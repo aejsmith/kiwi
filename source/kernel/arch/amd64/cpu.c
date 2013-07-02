@@ -338,10 +338,6 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 	x86_write_cr0((x86_read_cr0() | X86_CR0_WP | X86_CR0_NE | X86_CR0_MP
 		| X86_CR0_TS) & ~X86_CR0_EM);
 
-	/* Enable NX/XD if supported. */
-	if(cpu_features.xd)
-		x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
-
 	/* Set up SYSCALL/SYSRET MSRs. */
 	syscall_init();
 

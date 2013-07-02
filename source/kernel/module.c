@@ -75,7 +75,8 @@ void *module_mem_alloc(size_t size) {
 	mmu_context_lock(&kernel_mmu_context);
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		page = page_alloc(MM_BOOT);
-		mmu_context_map(&kernel_mmu_context, addr + i, page->addr, true, true, MM_BOOT);
+		mmu_context_map(&kernel_mmu_context, addr + i, page->addr,
+			MMU_MAP_WRITE | MMU_MAP_EXEC, MM_BOOT);
 	}
 	mmu_context_unlock(&kernel_mmu_context);
 

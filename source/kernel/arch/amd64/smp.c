@@ -68,7 +68,7 @@ __init_text void arch_smp_boot_prepare(void) {
 	ap_mmu_context = mmu_context_create(MM_BOOT);
 	mmu_context_lock(ap_mmu_context);
 	mmu_context_map(ap_mmu_context, (ptr_t)ap_bootstrap_page, ap_bootstrap_page,
-		true, true, MM_BOOT);
+		MMU_MAP_WRITE | MMU_MAP_EXEC, MM_BOOT);
 	mmu_context_unlock(ap_mmu_context);
 }
 
@@ -127,7 +127,7 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
 	*(uint64_t *)(mapping + 16) = (ptr_t)kmain_ap;
 	*(uint64_t *)(mapping + 24) = (ptr_t)cpu;
 	*(uint64_t *)(mapping + 32) = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;
-	*(uint32_t *)(mapping + 40) = (ptr_t)ap_mmu_context->pml4;
+	*(uint32_t *)(mapping + 40) = (ptr_t)ap_mmu_context->arch.pml4;
 	memory_barrier();
 	phys_unmap(mapping, PAGE_SIZE, false);
 

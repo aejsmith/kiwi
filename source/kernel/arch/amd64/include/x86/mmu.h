@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,24 +38,13 @@
 # define X86_PTE_NOEXEC		(1<<63)		/**< Page is not executable (requires NX support). */
 #endif
 
+/** Protection flag mask. */
+#define X86_PTE_PROTECT_MASK	(X86_PTE_WRITE | X86_PTE_NOEXEC)
+
+/** Cacheability flag mask. */
+#define X86_PTE_CACHE_MASK	(X86_PTE_PWT | X86_PTE_PCD)
+
 #ifndef __ASM__
-
-#include <sync/mutex.h>
-
-/** Size of TLB flush array. */
-#define INVALIDATE_ARRAY_SIZE	128
-
-/** Structure containing an MMU context. */
-struct mmu_context {
-	mutex_t lock;			/**< Lock to protect context. */
-	phys_ptr_t pml4;		/**< Physical address of the PML4. */
-
-	/** Array of TLB entries to flush when unlocking context.
-	 * @note		If the count becomes greater than the array
-	 *			size, then the entire TLB will be flushed. */
-	ptr_t pages_to_invalidate[INVALIDATE_ARRAY_SIZE];
-	size_t invalidate_count;
-};
 
 extern phys_ptr_t ap_bootstrap_page;
 

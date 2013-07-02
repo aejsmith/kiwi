@@ -97,7 +97,7 @@ static void add_dma_transfer(ata_dma_transfer_t **vecp, size_t *entriesp, ptr_t 
 
 	/* Find the physical address. */
 	pgoff = addr % PAGE_SIZE;
-	if(!mmu_context_query(&kernel_mmu_context, addr - pgoff, &phys, NULL, NULL)) {
+	if(!mmu_context_query(&kernel_mmu_context, addr - pgoff, &phys, NULL)) {
 		fatal("Part of DMA transfer buffer was not mapped");
 	}
 

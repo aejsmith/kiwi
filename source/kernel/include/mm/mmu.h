@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Alex Smith
+ * Copyright (C) 2011-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,34 +32,110 @@
 #ifndef __MM_MMU_H
 #define __MM_MMU_H
 
+#include <arch/mmu.h>
 #include <arch/page.h>
 
 #include <mm/mm.h>
 
-#include <types.h>
+#include <sync/mutex.h>
 
-/** Type holding an MMU context.
- * @note		Definition is not required by generic code, it is
- *			private to the architecture. */
-typedef struct mmu_context mmu_context_t;
+struct mmu_context;
 
-/** Kernel MMU context. */
+/** Structure containing architecture operations for an MMU context. */
+typedef struct mmu_context_ops {
+	/** Initialize a new context.
+	 * @param ctx		Context to initialize.
+	 * @param mmflag	Allocation behaviour flags.
+	 * @return		Status code describing result of the operation. */
+	status_t (*init)(struct mmu_context *ctx, int mmflag);
+
+	/** Destroy a context.
+	 * @param ctx		Context to destroy. */
+	void (*destroy)(struct mmu_context *ctx);
+
+	/** Map a page in a context.
+	 * @param ctx		Context to map in.
+	 * @param virt		Virtual address to map.
+	 * @param phys		Physical address to map to.
+	 * @param protect	Mapping protection flags.
+	 * @param mmflag	Allocation behaviour flags.
+	 * @return		Status code describing result of the operation. */
+	status_t (*map)(struct mmu_context *ctx, ptr_t virt, phys_ptr_t phys,
+		unsigned protect, int mmflag);
+
+	/** Modify protection flags on a range of mappings.
+	 * @param ctx		Context to modify.
+	 * @param virt		Start of range to update.
+	 * @param size		Size of range to update.
+	 * @param protect	New protection flags. */
+	void (*protect)(struct mmu_context *ctx, ptr_t virt, size_t size,
+		unsigned protect);
+
+	/** Unmap a page in a context.
+	 * @param ctx		Context to unmap in.
+	 * @param virt		Virtual address to unmap.
+	 * @param shared	Whether the mapping was shared across multiple
+	 *			CPUs. Used as an optimisation to not perform
+	 *			remote TLB invalidations if not necessary.
+	 * @param physp		Where to store physical address the page was
+	 *			mapped to.
+	 * @return		Whether a page was mapped at the virtual address. */
+	bool (*unmap)(struct mmu_context *ctx, ptr_t virt, bool shared,
+		phys_ptr_t *physp);
+
+	/** Query details about a mapping.
+	 * @param ctx		Context to query.
+	 * @param virt		Virtual address to query.
+	 * @param physp		Where to store physical address the page is
+	 *			mapped to.
+	 * @param protectp	Where to store protection flags for the mapping.
+	 * @return		Whether a page is mapped at the virtual address. */
+	bool (*query)(struct mmu_context *ctx, ptr_t virt, phys_ptr_t *physp,
+		unsigned *protectp);
+
+	/** Flush a context prior to unlocking.
+	 * @param ctx		Context to flush. */
+	void (*flush)(struct mmu_context *ctx);
+
+	/** Load an MMU context.
+	 * @param ctx		Context to load. */
+	void (*load)(struct mmu_context *ctx);
+
+	/** Unload an MMU context (optional).
+	 * @param ctx		Context to unload. */
+	void (*unload)(struct mmu_context *ctx);
+} mmu_context_ops_t;
+
+/** Structure containing an MMU context. */
+typedef struct mmu_context {
+	mutex_t lock;			/**< Lock to protect context. */
+	arch_mmu_context_t arch;	/**< Architecture implementation details. */
+} mmu_context_t;
+
+/** Mapping protection flags. */
+#define MMU_MAP_WRITE		(1<<0)	/**< Mapping should be writeable. */
+#define MMU_MAP_EXEC		(1<<1)	/**< Mapping should be executable. */
+
 extern mmu_context_t kernel_mmu_context;
+extern mmu_context_ops_t *mmu_context_ops;
 
 extern void mmu_context_lock(mmu_context_t *ctx);
 extern void mmu_context_unlock(mmu_context_t *ctx);
 
 extern status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-                                bool write, bool execute, int mmflag);
-extern void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, bool write, bool execute);
-extern bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_ptr_t *physp);
+	unsigned protect, int mmflag);
+extern void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size,
+	unsigned protect);
+extern bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared,
+	phys_ptr_t *physp);
 extern bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp,
-                              bool *writep, bool *executep);
+	unsigned *protectp);
 
-extern void mmu_context_switch(mmu_context_t *ctx);
+extern void mmu_context_load(mmu_context_t *ctx);
+extern void mmu_context_unload(mmu_context_t *ctx);
 
 extern mmu_context_t *mmu_context_create(int mmflag);
-extern void mmu_context_destroy(mmu_context_t *map);
+extern void mmu_context_destroy(mmu_context_t *ctx);
 
 extern void arch_mmu_init(void);
 extern void arch_mmu_init_percpu(void);

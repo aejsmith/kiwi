@@ -120,7 +120,7 @@ static futex_t *futex_lookup(int32_t *addr) {
 
 	/* Look up the physical address. */
 	mmu_context_lock(curr_aspace->mmu);
-	if(!mmu_context_query(curr_aspace->mmu, base, &phys, NULL, NULL)) {
+	if(!mmu_context_query(curr_aspace->mmu, base, &phys, NULL)) {
 		mmu_context_unlock(curr_aspace->mmu);
 
 		/* The page may not be mapped in. Try to trigger a fault, then
@@ -130,7 +130,7 @@ static futex_t *futex_lookup(int32_t *addr) {
 
 		mmu_context_lock(curr_aspace->mmu);
 
-		if(!mmu_context_query(curr_aspace->mmu, base, &phys, NULL, NULL)) {
+		if(!mmu_context_query(curr_aspace->mmu, base, &phys, NULL)) {
 			mmu_context_unlock(curr_aspace->mmu);
 			return NULL;
 		}

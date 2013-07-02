@@ -410,12 +410,12 @@ void kmem_raw_free(ptr_t addr, size_t size) {
 void *kmem_alloc(size_t size, int mmflag) {
 	phys_ptr_t paddr;
 	page_t *page;
-	ptr_t ret;
+	ptr_t addr;
 	size_t i;
 
 	/* Allocate a range to map into. */
-	ret = kmem_raw_alloc(size, mmflag);
-	if(unlikely(!ret))
+	addr = kmem_raw_alloc(size, mmflag);
+	if(unlikely(!addr))
 		return NULL;
 
 	mmu_context_lock(&kernel_mmu_context);
@@ -429,32 +429,33 @@ void *kmem_alloc(size_t size, int mmflag) {
 		}
 
 		/* Map the page into the kernel address space. */
-		if(mmu_context_map(&kernel_mmu_context, ret + i, page->addr, true, true,
+		if(mmu_context_map(&kernel_mmu_context, addr + i, page->addr,
+			MMU_MAP_WRITE | MMU_MAP_EXEC,
 			mmflag & MM_FLAG_MASK) != STATUS_SUCCESS)
 		{
 			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n",
-				page->addr, ret + i);
+				page->addr, addr + i);
 			page_free(page);
 			goto fail;
 		}
 
-		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", page->addr, ret + i);
+		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", page->addr, addr + i);
 	}
 
 	/* Zero the range if requested. */
 	if(mmflag & MM_ZERO)
-		memset((void *)ret, 0, size);
+		memset((void *)addr, 0, size);
 
 	mmu_context_unlock(&kernel_mmu_context);
-	return (void *)ret;
+	return (void *)addr;
 fail:
 	/* Go back and reverse what we have done. */
 	for(; i; i -= PAGE_SIZE) {
-		mmu_context_unmap(&kernel_mmu_context, ret + (i - PAGE_SIZE), true, &paddr);
+		mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), true, &paddr);
 		phys_free(paddr, PAGE_SIZE);
 	}
 	mmu_context_unlock(&kernel_mmu_context);
-	kmem_raw_free(ret, size);
+	kmem_raw_free(addr, size);
 	return NULL;
 }
 
@@ -487,39 +488,40 @@ void kmem_free(void *addr, size_t size) {
  * @return		Pointer to mapped range.
  */
 void *kmem_map(phys_ptr_t base, size_t size, int mmflag) {
-	ptr_t ret;
+	ptr_t addr;
 	size_t i;
 
 	assert(!(base % PAGE_SIZE));
 
-	ret = kmem_raw_alloc(size, mmflag);
-	if(unlikely(!ret))
+	addr = kmem_raw_alloc(size, mmflag);
+	if(unlikely(!addr))
 		return NULL;
 
 	mmu_context_lock(&kernel_mmu_context);
 
 	/* Back the allocation with the required page range. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
-		if(mmu_context_map(&kernel_mmu_context, ret + i, base + i, true, true,
+		if(mmu_context_map(&kernel_mmu_context, addr + i, base + i,
+			MMU_MAP_WRITE | MMU_MAP_EXEC,
 			mmflag & MM_FLAG_MASK) != STATUS_SUCCESS)
 		{
 			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n",
-				base + i, ret + i);
+				base + i, addr + i);
 			goto fail;
 		}
 
-		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", base + i, ret + i);
+		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", base + i, addr + i);
 	}
 
 	mmu_context_unlock(&kernel_mmu_context);
-	return (void *)ret;
+	return (void *)addr;
 fail:
 	/* Go back and reverse what we have done. */
 	for(; i; i -= PAGE_SIZE)
-		mmu_context_unmap(&kernel_mmu_context, ret + (i - PAGE_SIZE), true, NULL);
+		mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), true, NULL);
 
 	mmu_context_unlock(&kernel_mmu_context);
-	kmem_raw_free(ret, size);
+	kmem_raw_free(addr, size);
 	return NULL;
 }
 

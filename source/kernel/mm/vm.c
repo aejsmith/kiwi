@@ -326,12 +326,10 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	dest->amap->pages = kcalloc(dest->amap->max_size, sizeof(page_t *), MM_WAIT);
 	dest->amap->rref = kcalloc(dest->amap->max_size, sizeof(uint16_t *), MM_WAIT);
 
-	mmu_context_lock(src->as->mmu);
-
 	/* Write-protect all mappings on the source region. */
-	for(i = src->start; i < src->end; i += PAGE_SIZE)
-		mmu_context_protect(src->as->mmu, i, false, src->flags & VM_REGION_EXEC);
-
+	mmu_context_lock(src->as->mmu);
+	mmu_context_protect(src->as->mmu, src->start, src->end - src->start,
+		(src->flags & VM_REGION_EXEC) ? MMU_MAP_EXEC : 0);
 	mmu_context_unlock(src->as->mmu);
 
 	/* Point all of the pages in the new map to the pages from the source
@@ -818,8 +816,8 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 	offset_t offset;
 	page_t *page;
 	status_t ret;
-	bool write;
 	size_t i;
+	unsigned protect;
 
 	/* Work out the offset into the object. */
 	offset = region->amap_offset + (addr - region->start);
@@ -841,8 +839,14 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 		}
 	}
 
-	/* Get the page and work out the flags to map with. */
-	write = region->flags & VM_REGION_WRITE;
+	/* Protection flags to map with. The write flag is cleared later on if
+	 * the page needs to be mapped read only. */
+	protect = 0;
+	if(region->flags & VM_REGION_WRITE)
+		protect |= MMU_MAP_WRITE;
+	if(region->flags & VM_REGION_EXEC)
+		protect |= MMU_MAP_EXEC;
+
 	if(!amap->pages[i] && !handle) {
 		/* No page existing and no source. Allocate a zeroed page. */
 		dprintf("vm:  anon fault: no existing page and no source, allocating new\n");
@@ -883,7 +887,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			/* Find the page to copy. If handling a protection
 			 * fault, use the existing mapping address. */
 			if(reason == VM_FAULT_PROTECTION) {
-				if(unlikely(!mmu_context_query(region->as->mmu, addr, &paddr, NULL, NULL)))
+				if(unlikely(!mmu_context_query(region->as->mmu, addr, &paddr, NULL)))
 					fatal("No mapping for %p, but protection fault on it", addr);
 			} else {
 				assert(handle->object->type->get_page);
@@ -919,7 +923,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			 * only. */
 			if(refcount_get(&amap->pages[i]->count) > 1) {
 				assert(region->flags & VM_REGION_PRIVATE);
-				write = false;
+				protect &= ~MMU_MAP_WRITE;
 			}
 
 			paddr = amap->pages[i]->addr;
@@ -938,7 +942,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 
 			dprintf("vm:  anon read fault: mapping page 0x%" PRIxPHYS " from %p as read-only\n",
 				paddr, handle->object);
-			write = false;
+			protect &= ~MMU_MAP_WRITE;
 		}
 	}
 
@@ -951,10 +955,10 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 	}
 
 	/* Map the entry in. Should always succeed with MM_WAIT set. */
-	mmu_context_map(region->as->mmu, addr, paddr, write, region->flags & VM_REGION_EXEC, MM_WAIT);
+	mmu_context_map(region->as->mmu, addr, paddr, protect, MM_WAIT);
 
-	dprintf("vm:  anon fault: mapped 0x%" PRIxPHYS " at %p (as: %p, write: %d)\n",
-		paddr, addr, region->as, write);
+	dprintf("vm:  anon fault: mapped 0x%" PRIxPHYS " at %p (as: %p, protect: 0x%x)\n",
+		paddr, addr, region->as, protect);
 	mutex_unlock(&amap->lock);
 	return VM_FAULT_SUCCESS;
 }
@@ -967,7 +971,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
  * @return		VM_FAULT_* code describing result of the fault. */
 static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
 	phys_ptr_t phys, exist;
-	bool write, exec;
+	unsigned protect;
 	offset_t offset;
 	status_t ret;
 
@@ -985,7 +989,7 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	/* Check if a mapping already exists. This is possible if two threads
 	 * in a process on different CPUs fault on the same address
 	 * simultaneously. */
-	if(mmu_context_query(region->as->mmu, addr, &exist, NULL, NULL)) {
+	if(mmu_context_query(region->as->mmu, addr, &exist, NULL)) {
 		if(exist != phys) {
 			fatal("Incorrect existing mapping found (found %" PRIxPHYS", should be %" PRIxPHYS ")",
 				exist, phys);
@@ -997,13 +1001,16 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	}
 
 	/* Work out the flags to map with. */
-	write = region->flags & VM_REGION_WRITE;
-	exec = region->flags & VM_REGION_EXEC;
+	protect = 0;
+	if(region->flags & VM_REGION_WRITE)
+		protect |= MMU_MAP_WRITE;
+	if(region->flags & VM_REGION_EXEC)
+		protect |= MMU_MAP_EXEC;
 
 	/* Map the entry in. Should always succeed with MM_WAIT set. */
-	mmu_context_map(region->as->mmu, addr, phys, write, exec, MM_WAIT);
-	dprintf("vm:  mapped 0x%" PRIxPHYS " at %p (as: %p, write: %d, exec: %d)\n",
-		phys, addr, region->as, write, exec);
+	mmu_context_map(region->as->mmu, addr, phys, protect, MM_WAIT);
+	dprintf("vm:  mapped 0x%" PRIxPHYS " at %p (as: %p, protect: 0x%x)\n",
+		phys, addr, region->as, protect);
 	return VM_FAULT_SUCCESS;
 }
 
@@ -1270,12 +1277,14 @@ void vm_aspace_switch(vm_aspace_t *as) {
 		state = local_irq_disable();
 
 		/* Decrease old address space's reference count, if there is one. */
-		if(curr_aspace)
+		if(curr_aspace) {
+			mmu_context_unload(curr_aspace->mmu);
 			refcount_dec(&curr_aspace->count);
+		}
 
 		/* Switch to the new address space. */
 		refcount_inc(&as->count);
-		mmu_context_switch(as->mmu);
+		mmu_context_load(as->mmu);
 		curr_aspace = as;
 
 		local_irq_restore(state);
@@ -1361,10 +1370,17 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 
 /** Switch away from an address space to the kernel MMU context. */
 static inline void do_switch_aspace(vm_aspace_t *as) {
+	bool state = local_irq_disable();
+
 	assert(!curr_proc->aspace);
-	mmu_context_switch(&kernel_mmu_context);
+
+	mmu_context_unload(as->mmu);
 	refcount_dec(&as->count);
+
+	mmu_context_load(&kernel_mmu_context);
 	curr_aspace = NULL;
+
+	local_irq_restore(state);
 }
 
 #if CONFIG_SMP
