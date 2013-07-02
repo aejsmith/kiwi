@@ -28,7 +28,7 @@
 # Release information.
 version = {
 	'KIWI_VER_RELEASE': 0,
-	'KIWI_VER_UPDATE': 0,
+	'KIWI_VER_UPDATE': 1,
 	'KIWI_VER_REVISION': 0,
 }
 
@@ -252,15 +252,15 @@ Decider('MD5-timestamp')
 if ARGUMENTS.get('IGNORE_SUBMODULES') != '1' and not vcs.check_submodules():
 	raise SCons.Errors.StopError("Submodules outdated. Please run 'git submodule update --init'.")
 
-# Set revision to the VCS revision number.
-version['KIWI_VER_REVISION'] = vcs.revision_id()
-
 # Set the version string.
-version['KIWI_VER_STRING'] = '%d.%d.%d' % (
-	version['KIWI_VER_RELEASE'],
-	version['KIWI_VER_UPDATE'],
-	version['KIWI_VER_REVISION']
-)
+version['KIWI_VER_STRING'] = '%d.%d' % (
+    version['KIWI_VER_RELEASE'],
+    version['KIWI_VER_UPDATE'])
+if version['KIWI_VER_REVISION']:
+    version['KIWI_VER_STRING'] += '.%d' % (version['KIWI_VER_REVISION'])
+revision = vcs.revision_id()
+if revision:
+    version['KIWI_VER_STRING'] += '-%s' % (revision)
 
 # Create the configuration parser and environment manager.
 config = ConfigParser('.config')
