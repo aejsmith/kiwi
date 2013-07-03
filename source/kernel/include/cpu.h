@@ -89,7 +89,7 @@ extern void arch_cpu_init_percpu(void);
 
 extern void cpu_early_init(void);
 extern void cpu_early_init_percpu(cpu_t *cpu);
-extern void cpu_init_percpu(void);
 extern void cpu_init(void);
+extern void cpu_init_percpu(void);
 
 #endif /* __CPU_H */

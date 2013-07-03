@@ -482,6 +482,9 @@ static void sched_idle_thread(void *arg1, void *arg2) {
 __init_text void sched_init(void) {
 	status_t ret;
 
+	/* Initialize for the boot CPU. */
+	sched_init_percpu();
+
 	/* Create the thread reaper. */
 	ret = thread_create("reaper", NULL, 0, sched_reaper_thread, NULL, NULL, NULL, NULL);
 	if(ret != STATUS_SUCCESS)

@@ -102,22 +102,23 @@ __init_text void cpu_early_init(void) {
 	/* The boot CPU is initially assigned an ID of 0. It is later corrected
 	 * once we have the ability to get the real ID. */
 	cpu_ctor(&boot_cpu, 0, CPU_RUNNING);
-	list_append(&running_cpus, &boot_cpu.header);
 
 	/* Perform architecture initialization. This initializes some state
 	 * shared between all CPUs. */
 	arch_cpu_early_init();
+
+	/* We're being called on the boot CPU, initialize that. */
+	cpu_early_init_percpu(&boot_cpu);
 }
 
 /** Perform early per-CPU initialization.
  * @param cpu		Structure for the current CPU. */
 __init_text void cpu_early_init_percpu(cpu_t *cpu) {
 	arch_cpu_early_init_percpu(cpu);
-}
 
-/** Perform additional per-CPU initialization. */
-__init_text void cpu_init_percpu(void) {
-	arch_cpu_init_percpu();
+	/* Add ourself to the running CPU list. */
+	cpu->state = CPU_RUNNING;
+	list_append(&running_cpus, &curr_cpu->header);
 }
 
 /** Properly initialize the CPU subsystem. */
@@ -129,4 +130,12 @@ __init_text void cpu_init(void) {
 	/* Create the initial CPU array and add the boot CPU to it. */
 	cpus = kcalloc(highest_cpu_id + 1, sizeof(cpu_t *), MM_BOOT);
 	cpus[boot_cpu.id] = &boot_cpu;
+
+	/* We are called on the boot CPU. */
+	cpu_init_percpu();
+}
+
+/** Perform additional per-CPU initialization. */
+__init_text void cpu_init_percpu(void) {
+	arch_cpu_init_percpu();
 }

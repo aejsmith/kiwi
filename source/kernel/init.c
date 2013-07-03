@@ -109,9 +109,8 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 		arch_cpu_halt();
 	}
 
-	/* Do early CPU subsystem and CPU initialization. */
+	/* Set up the CPU subsystem and initialize the boot CPU. */
 	cpu_early_init();
-	cpu_early_init_percpu(&boot_cpu);
 
 	/* Initialize the security subsystem. */
 	security_init();
@@ -119,7 +118,6 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	/* Initialize kernel memory management subsystems. */
 	page_init();
 	mmu_init();
-	mmu_init_percpu();
 	kmem_init();
 	slab_init();
 	malloc_init();
@@ -127,15 +125,14 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	/* Set up the console. */
 	console_init();
 
-	/* Perform more per-CPU initialization that can be done now the memory
-	 * management subsystems are up. */
-	cpu_init_percpu();
-
-	/* Initialize the platform. */
+	/* Finish initializing the CPU subsystem and set up the platform. */
+	cpu_init();
 	platform_init();
-
-	/* Get the time from the hardware. */
 	time_init();
+	#if CONFIG_SMP
+	smp_init();
+	#endif
+	slab_late_init();
 
 	#if CONFIG_DEBUGGER_DELAY > 0
 	/* Delay to allow GDB to be connected. */
@@ -143,22 +140,12 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
 	#endif
 
-	/* Properly initialize the CPU subsystem, and detect other CPUs. */
-	cpu_init();
-	#if CONFIG_SMP
-	smp_init();
-	#endif
-
-	/* Initialize the slab per-CPU layer. */
-	slab_late_init();
-
 	/* Perform other initialization tasks. */
 	symbol_init();
 	handle_init();
 	session_init();
 	process_init();
 	thread_init();
-	sched_init_percpu();
 	sched_init();
 	dpc_init();
 
@@ -181,17 +168,13 @@ __init_text void kmain_ap(cpu_t *cpu) {
 	/* Indicate that we have reached the kernel. */
 	smp_boot_status = SMP_BOOT_ALIVE;
 
-	/* Switch to the kernel MMU context and perform CPU initialization. */
-	mmu_init_percpu();
+	/* Initialize everything. */
 	cpu_early_init_percpu(cpu);
+	mmu_init_percpu();
 	cpu_init_percpu();
-
-	/* Initialize the scheduler. */
 	sched_init_percpu();
 
-	/* Signal that we're up and add ourselves to the running CPU list. */
-	cpu->state = CPU_RUNNING;
-	list_append(&running_cpus, &curr_cpu->header);
+	/* Signal that we're up. */
 	smp_boot_status = SMP_BOOT_BOOTED;
 
 	/* Wait for remaining CPUs to be brought up. */
