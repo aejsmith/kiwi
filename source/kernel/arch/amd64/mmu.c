@@ -652,18 +652,22 @@ __init_text void arch_mmu_init(void) {
 
 	mmu_context_lock(&kernel_mmu_context);
 
-	/* Map the kernel in. The following mappings are made:
-	 *  .text      - R/X
-	 *  .init      - R/W/X
-	 *  .rodata    - R
-	 *  .data/.bss - R/W */
+	/* Map each section of the kernel. The linker script aligns the text
+	 * and data sections to 2MB boundaries to allow them to be mapped using
+	 * large pages. */
 	kprintf(LOG_NOTICE, "mmu: mapping kernel sections:\n");
-	map_kernel("text", ROUND_DOWN((ptr_t)__text_start, PAGE_SIZE),
-		(ptr_t)__text_end, MMU_MAP_EXEC);
-	map_kernel("init", (ptr_t)__init_start, (ptr_t)__init_end,
+	map_kernel("text",
+		ROUND_DOWN((ptr_t)__text_seg_start, LARGE_PAGE_SIZE),
+		ROUND_UP((ptr_t)__text_seg_end, LARGE_PAGE_SIZE),
+		MMU_MAP_EXEC);
+	map_kernel("data",
+		ROUND_DOWN((ptr_t)__data_seg_start, LARGE_PAGE_SIZE),
+		ROUND_UP((ptr_t)__data_seg_end, LARGE_PAGE_SIZE),
+		MMU_MAP_WRITE);
+	map_kernel("init",
+		ROUND_DOWN((ptr_t)__init_seg_start, PAGE_SIZE),
+		ROUND_UP((ptr_t)__init_seg_end, PAGE_SIZE),
 		MMU_MAP_WRITE | MMU_MAP_EXEC);
-	map_kernel("rodata", (ptr_t)__rodata_start, (ptr_t)__rodata_end, 0);
-	map_kernel("data", (ptr_t)__data_start, (ptr_t)__bss_end, MMU_MAP_WRITE);
 
 	/* Search for the highest physical address we have in the memory map. */
 	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {

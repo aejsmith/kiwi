@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -53,11 +53,9 @@
 #define STACK_GROWS_DOWN	1
 
 #ifndef __ASM__
-extern char __text_start[], __text_end[];
-extern char __init_start[], __init_end[];
-extern char __rodata_start[], __rodata_end[];
-extern char __data_start[], __data_end[];
-extern char __bss_start[], __bss_end[];
+extern char __text_seg_start[], __text_seg_end[];
+extern char __data_seg_start[], __data_seg_end[];
+extern char __init_seg_start[], __init_seg_end[];
 #endif
 
 #endif /* __ARCH_MEMORY_H */

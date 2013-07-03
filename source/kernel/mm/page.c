@@ -921,8 +921,8 @@ __init_text void page_late_init(void) {
 
 	/* Calculate the location and size of the initialization section. */
 	core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
-	init_start = ((ptr_t)__init_start - KERNEL_VIRT_BASE) + core->kernel_phys;
-	init_end = ((ptr_t)__init_end - KERNEL_VIRT_BASE) + core->kernel_phys;
+	init_start = ((ptr_t)__init_seg_start - KERNEL_VIRT_BASE) + core->kernel_phys;
+	init_end = ((ptr_t)__init_seg_end - KERNEL_VIRT_BASE) + core->kernel_phys;
 
 	/* It's OK for us to reclaim despite the fact that the KBoot data is
 	 * contained in memory that will be reclaimed, as nothing should make
