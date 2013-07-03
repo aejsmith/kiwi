@@ -25,19 +25,12 @@
 
 #include <assert.h>
 #include <status.h>
-#include <symbol.h>
-
 /** Handle a recursive locking error.
  * @param lock		Lock error occurred on. */
 static inline void mutex_recursive_error(mutex_t *lock) {
 	#if CONFIG_DEBUG
-	size_t off = 0;
-	symbol_t *sym;
-
-	sym = symbol_lookup_addr((ptr_t)lock->caller, &off);
 	fatal("Recursive locking of non-recursive mutex %s (%p)\n"
-		"Locked by [%p] %s+0x%zx", lock->name, lock, lock->caller,
-		(sym) ? sym->name : "<unknown>", off);
+		"locked at %pB", lock->name, lock, lock->caller);
 	#else
 	fatal("Recursive locking of non-recursive mutex %s (%p)", lock->name, lock);
 	#endif

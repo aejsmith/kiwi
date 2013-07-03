@@ -97,7 +97,7 @@ int kvprintf(int level, const char *fmt, va_list args) {
 	#endif
 
 	spinlock_lock(&klog_lock);
-	ret = do_printf(kvprintf_helper, &level, fmt, args);
+	ret = do_vprintf(kvprintf_helper, &level, fmt, args);
 	spinlock_unlock(&klog_lock);
 
 	return ret;

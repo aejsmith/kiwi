@@ -46,6 +46,7 @@
 
 #include <console.h>
 #include <cpu.h>
+#include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
 #include <setjmp.h>
@@ -117,6 +118,9 @@ static size_t current_output_pos = 0;
 /** Current output filter. */
 static kdb_filter_t *current_filter = NULL;
 
+/** Whether to output to the KBoot log. */
+static bool use_kboot_log = false;
+
 /**
  * Utility functions.
  */
@@ -144,6 +148,8 @@ static void kdb_putc(char ch) {
 		debug_console_ops->putc(ch);
 	if(main_console_ops)
 		main_console_ops->putc(ch);
+	if(use_kboot_log)
+		kboot_log_write(ch);
 }
 
 /** Helper for kdb_printf(). */
@@ -183,7 +189,7 @@ static void kdb_printf_helper(char ch, void *data, int *total) {
  * @param fmt		Format string.
  * @param args		Arguments to substitute into format string. */
 void kdb_vprintf(const char *fmt, va_list args) {
-	do_printf(kdb_printf_helper, NULL, fmt, args);
+	do_vprintf(kdb_printf_helper, NULL, fmt, args);
 }
 
 /** Output function to use within KDB.
@@ -197,33 +203,10 @@ void kdb_printf(const char *fmt, ...) {
 	va_end(args);
 }
 
-/**
- * Print out details of a symbol corresponding to an address.
- *
- * Looks up the symbol corresponding to the given address and prints out
- * details of it. The delta argument is applied to the address before looking
- * it up (and is not applied when actually printing). This is useful when
- * printing symbols in backtraces, as backtraces use the return address of a
- * call which may not yield the correct symbol if the compiler has produced a
- * tail call to a noreturn function.
- *
- * @param addr		Address of symbol.
- * @param delta		Delta to apply on lookup.
- */
-void kdb_print_symbol(ptr_t addr, int delta) {
-	symbol_t *sym;
-	size_t off;
-
-	sym = symbol_lookup_addr(addr + delta, &off);
-	kdb_printf("[%p] %s+0x%zx", addr, (sym) ? sym->name : "<unknown>", (sym) ? off - delta : 0);
-}
-
 /** Backtrace callback.
  * @param addr		Address of backtrace entry. */
 static void kdb_backtrace_cb(ptr_t addr) {
-	/* See above. */
-	kdb_print_symbol(addr, -1);
-	kdb_printf("\n");
+	kdb_printf("%pB\n", addr);
 }
 
 /** Read a character from the console.
@@ -840,28 +823,35 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 
 	/* Print information about why we've entered the debugger and where from. */
 	if(reason == KDB_REASON_BREAK) {
-		kdb_printf("\nBreakpoint %u at ", index);
-		kdb_print_symbol(frame->ip, 0);
+		kdb_printf("\nBreakpoint %u at %pS\n", index, frame->ip);
 	} else if(reason == KDB_REASON_WATCH) {
-		kdb_printf("\nWatchpoint %u hit by ", index);
-		kdb_print_symbol(frame->ip, 0);
+		kdb_printf("\nWatchpoint %u hit by %pS\n", index, frame->ip);
 	} else if(reason == KDB_REASON_STEP) {
-		kdb_printf("Stepped to ");
-		kdb_print_symbol(frame->ip, 0);
+		kdb_printf("Stepped to %pS\n", frame->ip);
 	} else if(reason == KDB_REASON_USER) {
-		kdb_printf("\nEntered KDB from ");
-		kdb_print_symbol(frame->ip, 0);
+		kdb_printf("\nEntered KDB from %pS\n", frame->ip);
+	} else if(reason == KDB_REASON_FATAL) {
+		/* When coming from a fatal error, enable writing to the KBoot
+		 * log temporarily as we want to dump some information there. */
+		use_kboot_log = true;
+		kdb_putc('\n');
 	}
-	kdb_putc('\n');
 
-	kdb_printf("Thread %" PRId32 " (%s) on CPU%u\n", (curr_thread) ? curr_thread->id : -1,
+	kdb_printf("Thread %" PRId32 " (%s) on CPU%u\n",
+		(curr_thread) ? curr_thread->id : -1,
 		(curr_thread) ? curr_thread->name : "<none>", cpu_id());
 
+	/* Dump some information when we come from a fatal error. */
 	if(reason == KDB_REASON_FATAL) {
+		arch_kdb_dump_registers();
+
 		kdb_printf("Backtrace:\n");
-		kdb_print_symbol(frame->ip, 0);
-		kdb_printf("\n");
+		kdb_printf("%pS\n", frame->ip);
 		arch_kdb_backtrace(NULL, kdb_backtrace_cb);
+
+		/* Flush and disable writing the KBoot log. */
+		kboot_log_flush();
+		use_kboot_log = false;
 	}
 
 	/* Main loop, get and process input. */
@@ -1273,8 +1263,7 @@ static kdb_status_t kdb_cmd_backtrace(int argc, char **argv, kdb_filter_t *filte
 		thread = NULL;
 
 		kdb_printf("--- Interrupt ---\n");
-		kdb_print_symbol(curr_kdb_frame->ip, 0);
-		kdb_printf("\n");
+		kdb_printf("%pS\n", curr_kdb_frame->ip);
 		kdb_printf("--- Stacktrace ---\n");
 	}
 

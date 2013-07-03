@@ -32,6 +32,7 @@
 #include <assert.h>
 #include <console.h>
 #include <cpu.h>
+#include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
 #include <status.h>
@@ -49,16 +50,9 @@ static void fatal_printf_helper(char ch, void *data, int *total) {
 	if(main_console_ops)
 		main_console_ops->putc(ch);
 
+	kboot_log_write(ch);
+
 	*total = *total + 1;
-}
-
-/** Formatted output function for use during _fatal(). */
-static void fatal_printf(const char *format, ...) {
-	va_list args;
-
-	va_start(args, format);
-	do_printf(fatal_printf_helper, NULL, format, args);
-	va_end(args);
 }
 
 /**
@@ -80,11 +74,11 @@ void _fatal(intr_frame_t *frame, const char *fmt, ...) {
 		/* Run callback functions registered. */
 		notifier_run_unlocked(&fatal_notifier, NULL, false);
 
-		fatal_printf("\nFatal Error: ");
+		do_printf(fatal_printf_helper, NULL, "\nFATAL: ");
 		va_start(args, fmt);
-		do_printf(fatal_printf_helper, NULL, fmt, args);
+		do_vprintf(fatal_printf_helper, NULL, fmt, args);
 		va_end(args);
-		fatal_printf("\n");
+		do_printf(fatal_printf_helper, NULL, "\n");
 
 		kdb_enter(KDB_REASON_FATAL, frame);
 	}

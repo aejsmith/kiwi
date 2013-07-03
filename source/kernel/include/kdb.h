@@ -106,7 +106,6 @@ extern void kdb_except_handler(const char *name, struct intr_frame *frame);
 
 extern void kdb_vprintf(const char *fmt, va_list args);
 extern void kdb_printf(const char *fmt, ...) __printf(1, 2);
-extern void kdb_print_symbol(ptr_t addr, int delta);
 extern uint16_t kdb_getc(void);
 extern void *kdb_malloc(size_t size);
 extern void kdb_free(void *addr);
