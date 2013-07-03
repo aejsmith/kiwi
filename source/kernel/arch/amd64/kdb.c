@@ -24,6 +24,7 @@
 #include <arch/memory.h>
 
 #include <x86/cpu.h>
+#include <x86/intr.h>
 #include <x86/lapic.h>
 
 #include <lib/string.h>
@@ -386,9 +387,27 @@ void arch_kdb_dump_registers(void) {
 		curr_kdb_frame->r13, curr_kdb_frame->r14, curr_kdb_frame->r15);
 	kdb_printf("RIP: 0x%016lx  RSP: 0x%016lx  RFL: 0x%016lx\n",
 		curr_kdb_frame->ip, curr_kdb_frame->sp, curr_kdb_frame->flags);
-	kdb_printf("CS:  0x%04lx  SS: 0x%04lx  EC:  %lu\n",
-		curr_kdb_frame->cs, curr_kdb_frame->ss,
-		curr_kdb_frame->err_code);
+	kdb_printf("CS:  0x%04lx  SS: 0x%04lx\n", curr_kdb_frame->cs,
+		curr_kdb_frame->ss);
+
+	switch(curr_kdb_frame->num) {
+	case X86_EXCEPT_PF:
+		kdb_printf("EC:  0x%04lx (%s/%s%s%s)\n", curr_kdb_frame->err_code,
+			(curr_kdb_frame->err_code & (1<<0)) ? "protection" : "not-present",
+			(curr_kdb_frame->err_code & (1<<1)) ? "write" : "read",
+			(curr_kdb_frame->err_code & (1<<3)) ? "/reserved-bit" : "",
+			(curr_kdb_frame->err_code & (1<<4)) ? "/execute" : "");
+		kdb_printf("CR2: 0x%016lx\n", x86_read_cr2());
+		break;
+	case X86_EXCEPT_DF:
+	case X86_EXCEPT_TS:
+	case X86_EXCEPT_NP:
+	case X86_EXCEPT_SS:
+	case X86_EXCEPT_GP:
+	case X86_EXCEPT_AC:
+		kdb_printf("EC:  0x%04lx\n", curr_kdb_frame->err_code);
+		break;
+	}
 }
 
 #if CONFIG_SMP

@@ -65,7 +65,7 @@ static void fatal_printf_helper(char ch, void *data, int *total) {
  * @param fmt		Error message format string.
  * @param ...		Arguments to substitute into format string.
  */
-void _fatal(intr_frame_t *frame, const char *fmt, ...) {
+void fatal_etc(intr_frame_t *frame, const char *fmt, ...) {
 	va_list args;
 
 	local_irq_disable();
@@ -92,7 +92,7 @@ void _fatal(intr_frame_t *frame, const char *fmt, ...) {
  * @param file		File name that contained the assertion.
  * @param line		Line number of the assertion. */
 void __assert_fail(const char *cond, const char *file, int line) {
-	_fatal(NULL, "Assertion `%s' failed\nat %s:%d", cond, file, line);
+	fatal("Assertion `%s' failed\nat %s:%d", cond, file, line);
 }
 
 /**

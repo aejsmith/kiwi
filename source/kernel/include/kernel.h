@@ -59,12 +59,12 @@ extern void update_boot_progress(int percent);
 
 extern void system_shutdown(int action);
 
-extern void _fatal(struct intr_frame *frame, const char *fmt, ...) __noreturn __printf(2, 3);
+extern void fatal_etc(struct intr_frame *frame, const char *fmt, ...) __noreturn __printf(2, 3);
 
 /** Handle an unrecoverable kernel error.
  * @param fmt		Error message format string.
  * @param ...		Arguments to substitute into format string. */
-#define fatal(fmt...)	_fatal(NULL, fmt)
+#define fatal(fmt...)	fatal_etc(NULL, fmt)
 
 extern int kvprintf(int level, const char *fmt, va_list args);
 extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);

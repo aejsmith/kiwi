@@ -65,7 +65,7 @@ static void unhandled_interrupt(intr_frame_t *frame) {
 	if(atomic_get(&kdb_running) == 2) {
 		kdb_except_handler("Unknown", frame);
 	} else {
-		_fatal(frame, "Received unknown interrupt %lu", frame->num);
+		fatal_etc(frame, "Received unknown interrupt %lu", frame->num);
 	}
 }
 
@@ -84,7 +84,7 @@ static void kmode_except_handler(intr_frame_t *frame) {
 	if(atomic_get(&kdb_running) == 2) {
 		kdb_except_handler(except_strings[frame->num], frame);
 	} else {
-		_fatal(frame, "Unhandled kernel-mode exception %lu (%s)",
+		fatal_etc(frame, "Unhandled kernel-mode exception %lu (%s)",
 			frame->num, except_strings[frame->num]);
 	}
 }
@@ -130,7 +130,7 @@ static void nmi_handler(intr_frame_t *frame) {
 	}
 	#endif
 
-	_fatal(frame, "Received unexpected NMI");
+	fatal_etc(frame, "Received unexpected NMI");
 }
 
 /** Invalid Opcode (#UD) fault handler.
@@ -181,7 +181,7 @@ static void nm_fault(intr_frame_t *frame) {
 /** Handler for double faults.
  * @param frame		Interrupt stack frame. */
 static void double_fault(intr_frame_t *frame) {
-	_fatal(frame, "Double fault", frame->ip);
+	fatal_etc(frame, "Double fault", frame->ip);
 	arch_cpu_halt();
 }
 
@@ -231,14 +231,14 @@ static void page_fault(intr_frame_t *frame) {
 	/* Nothing could handle this fault. If it happened in the kernel,
 	 * die, otherwise just kill the process. */
 	if(frame->err_code & (1<<2)) {
-		kprintf(LOG_DEBUG, "arch: unhandled pagefault in thread %" PRId32
+		kprintf(LOG_DEBUG, "arch: unhandled page fault in thread %" PRId32
 			" of process %" PRId32 " (%p)\n", curr_thread->id,
 			curr_proc->id, addr);
-		kprintf(LOG_DEBUG, "arch:  %s | %s%s%s\n",
+		kprintf(LOG_DEBUG, "arch: %s/%s%s%s\n",
 			(frame->err_code & (1<<0)) ? "protection" : "not-present",
 			(frame->err_code & (1<<1)) ? "write" : "read",
-			(frame->err_code & (1<<3)) ? " | reserved-bit" : "",
-			(frame->err_code & (1<<4)) ? " | execute" : "");
+			(frame->err_code & (1<<3)) ? "/reserved-bit" : "",
+			(frame->err_code & (1<<4)) ? "/execute" : "");
 		kdb_enter(KDB_REASON_USER, frame);
 
 		memset(&info, 0, sizeof(info));
@@ -265,12 +265,8 @@ static void page_fault(intr_frame_t *frame) {
 
 		signal_send(curr_thread, info.si_signo, &info, true);
 	} else {
-		_fatal(frame, "Unhandled kernel-mode page-fault exception (%p)\n"
-			"%s | %s%s%s", addr,
-			(frame->err_code & (1<<0)) ? "Protection" : "Not-present",
-			(frame->err_code & (1<<1)) ? "Write" : "Read",
-			(frame->err_code & (1<<3)) ? " | Reserved-bit" : "",
-			(frame->err_code & (1<<4)) ? " | Execute" : "");
+		fatal_etc(frame, "Unhandled kernel-mode page fault exception at %p",
+			addr);
 	}
 }
 
