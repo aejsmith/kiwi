@@ -43,8 +43,8 @@ extern unsigned char logo_ppm[];
 extern unsigned char copyright_ppm[];
 
 /** Dimensions and colours of the console font. */
-#define FONT_WIDTH		6
-#define FONT_HEIGHT		12
+#define FONT_WIDTH		7
+#define FONT_HEIGHT		14
 #define FONT_FG			0xffffff
 #define FONT_BG			0x000000
 
@@ -334,9 +334,9 @@ static console_out_ops_t fb_console_out_ops = {
 
 /** Reset the framebuffer console. */
 static void fb_console_reset(void) {
-	/* Reset the cursor position and clear the first row of the console. */
+	/* Reset the cursor position and clear the console. */
 	fb_console_x = fb_console_y = 0;
-	fb_fillrect(0, 0, fb_info.width, FONT_HEIGHT, FONT_BG);
+	fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
 	memset(fb_console_glyphs, ' ', fb_console_cols * fb_console_rows);
 	fb_console_enable_cursor();
 }
