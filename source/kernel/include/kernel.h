@@ -69,4 +69,6 @@ extern void _fatal(struct intr_frame *frame, const char *fmt, ...) __noreturn __
 extern int kvprintf(int level, const char *fmt, va_list args);
 extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);
 
+extern void log_early_init(void);
+
 #endif /* __KERNEL_H */

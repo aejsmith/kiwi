@@ -56,7 +56,7 @@
 #include <symbol.h>
 #include <time.h>
 
-KBOOT_IMAGE();
+KBOOT_IMAGE(KBOOT_IMAGE_LOG);
 
 /** Structure describing a boot module. */
 typedef struct boot_module {
@@ -71,6 +71,7 @@ extern void kmain_bsp(uint32_t magic, kboot_tag_t *tags);
 #if CONFIG_SMP
 extern void kmain_ap(cpu_t *cpu);
 #endif
+
 extern initcall_t __initcall_start[], __initcall_end[];
 extern fs_mount_t *root_mount;
 
@@ -99,8 +100,9 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	/* Make the debugger available as soon as possible. */
 	kdb_init();
 
-	/* Bring up the debug console. */
+	/* Bring up the console. */
 	console_early_init();
+	log_early_init();
 	kprintf(LOG_NOTICE, "kernel: version %s booting...\n", kiwi_ver_string);
 
 	/* Check the magic number. */
@@ -122,7 +124,7 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	slab_init();
 	malloc_init();
 
-	/* Set up the console. */
+	/* Properly set up the console. */
 	console_init();
 
 	/* Finish initializing the CPU subsystem and set up the platform. */

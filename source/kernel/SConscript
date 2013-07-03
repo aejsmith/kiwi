@@ -80,6 +80,7 @@ sources = FeatureSources(config, [
 	'fatal.c',
 	'init.c',
 	'kdb.c',
+    'log.c',
 	'module.c',
 	'object.c',
 	'shutdown.c',

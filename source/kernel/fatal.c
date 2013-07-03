@@ -46,8 +46,8 @@ static atomic_t in_fatal = 0;
 static void fatal_printf_helper(char ch, void *data, int *total) {
 	if(debug_console_ops)
 		debug_console_ops->putc(ch);
-	if(screen_console_ops)
-		screen_console_ops->putc(ch);
+	if(main_console_ops)
+		main_console_ops->putc(ch);
 
 	*total = *total + 1;
 }

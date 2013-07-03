@@ -47,6 +47,8 @@ __init_text void platform_init(void) {
 void platform_reboot(void) {
 	uint8_t val;
 
+	arch_cpu_invalidate_caches();
+
 	/* Try the keyboard controller. */
 	do {
 		val = in8(0x64);

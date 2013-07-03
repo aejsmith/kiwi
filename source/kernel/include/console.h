@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,14 @@
 
 #include <lib/list.h>
 
+struct kboot_tag_video;
+
 /** Kernel console output operations structure. */
 typedef struct console_out_ops {
+	/** Properly initialize the console after memory management setup.
+	 * @param video		KBoot video tag. */
+	void (*init)(struct kboot_tag_video *video);
+
 	/** Write a character to the console.
 	 * @param ch		Character to write. */
 	void (*putc)(char ch);
@@ -52,14 +58,13 @@ typedef struct console_in_ops {
 #define CONSOLE_KEY_DELETE	0x108
 
 extern console_out_ops_t *debug_console_ops;
-extern console_out_ops_t *screen_console_ops;
+extern console_out_ops_t *main_console_ops;
 extern list_t console_in_ops;
 
 extern void console_register_in_ops(console_in_ops_t *ops);
 extern void console_unregister_in_ops(console_in_ops_t *ops);
 
-extern void platform_console_early_init(void);
-extern void platform_console_init(void);
+extern void platform_console_early_init(struct kboot_tag_video *video);
 
 extern void console_early_init(void);
 extern void console_init(void);
@@ -100,6 +105,6 @@ typedef struct fb_info {
 #define FB_CONSOLE_RELEASE	4	/**< Release control of the framebuffer. */
 
 extern void fb_console_control(unsigned op, fb_info_t *info);
-extern void fb_console_init(void);
+extern void fb_console_early_init(struct kboot_tag_video *video);
 
 #endif /* __CONSOLE_H */

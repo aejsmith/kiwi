@@ -142,8 +142,8 @@ static kdb_command_desc_t *lookup_command(const char *name) {
 static void kdb_putc(char ch) {
 	if(debug_console_ops)
 		debug_console_ops->putc(ch);
-	if(screen_console_ops)
-		screen_console_ops->putc(ch);
+	if(main_console_ops)
+		main_console_ops->putc(ch);
 }
 
 /** Helper for kdb_printf(). */

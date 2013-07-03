@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Alex Smith
+ * Copyright (C) 2011-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,10 +17,6 @@
 /**
  * @file
  * @brief		KBoot utility functions.
- *
- * @warning		These functions are only available during kernel
- *			initialization. The memory they occupy is freed during
- *			boot memory reclaim.
  */
 
 #ifndef __KERNEL_KBOOT_H
@@ -29,6 +25,9 @@
 #include <lib/utility.h>
 
 #include "../../boot/include/kboot.h"
+
+extern kboot_log_t *kboot_log;
+extern size_t kboot_log_size;
 
 extern void *kboot_tag_iterate(uint32_t type, void *current);
 
@@ -48,5 +47,8 @@ extern void *kboot_tag_iterate(uint32_t type, void *current);
 extern bool kboot_boolean_option(const char *name);
 extern uint64_t kboot_integer_option(const char *name);
 extern const char *kboot_string_option(const char *name);
+
+extern void kboot_log_write(char ch);
+extern void kboot_log_flush(void);
 
 #endif /* __KERNEL_KBOOT_H */

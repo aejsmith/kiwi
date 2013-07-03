@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012 Alex Smith
+ * Copyright (C) 2011-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -66,6 +66,8 @@ extern unsigned char copyright_ppm[];
 /** Get the byte offset of a pixel. */
 #define OFFSET(x, y)		(((y * fb_info.width) + x) * fb_info.bytes_per_pixel)
 
+static void fb_console_configure(const fb_info_t *info, int mmflag);
+
 /** Framebuffer information. */
 static fb_info_t fb_info;
 static char *fb_mapping = NULL;
@@ -94,26 +96,38 @@ static void fb_putpixel(uint16_t x, uint16_t y, uint32_t rgb) {
 		| (GREEN(rgb, fb_info.green_size) << fb_info.green_position)
 		| (BLUE(rgb, fb_info.blue_size) << fb_info.blue_position);
 	size_t offset = OFFSET(x, y);
-	void *fb_dest = fb_mapping + offset;
-	void *bb_dest = fb_backbuffer + offset;
+	void *dest = fb_backbuffer + offset;
 
 	switch(fb_info.bytes_per_pixel) {
 	case 2:
-		*(uint16_t *)fb_dest = (uint16_t)value;
-		*(uint16_t *)bb_dest = (uint16_t)value;
+		*(uint16_t *)dest = (uint16_t)value;
 		break;
 	case 3:
-		((uint8_t *)fb_dest)[0] = value & 0xff;
-		((uint8_t *)fb_dest)[1] = (value >> 8) & 0xff;
-		((uint8_t *)fb_dest)[2] = (value >> 16) & 0xff;
-		((uint8_t *)bb_dest)[0] = value & 0xff;
-		((uint8_t *)bb_dest)[1] = (value >> 8) & 0xff;
-		((uint8_t *)bb_dest)[2] = (value >> 16) & 0xff;
+		((uint8_t *)dest)[0] = value & 0xff;
+		((uint8_t *)dest)[1] = (value >> 8) & 0xff;
+		((uint8_t *)dest)[2] = (value >> 16) & 0xff;
 		break;
 	case 4:
-		*(uint32_t *)fb_dest = value;
-		*(uint32_t *)bb_dest = value;
+		*(uint32_t *)dest = value;
 		break;
+	}
+
+	if(fb_backbuffer != fb_mapping) {
+		dest = fb_mapping + offset;
+
+		switch(fb_info.bytes_per_pixel) {
+		case 2:
+			*(uint16_t *)dest = (uint16_t)value;
+			break;
+		case 3:
+			((uint8_t *)dest)[0] = value & 0xff;
+			((uint8_t *)dest)[1] = (value >> 8) & 0xff;
+			((uint8_t *)dest)[2] = (value >> 16) & 0xff;
+			break;
+		case 4:
+			*(uint32_t *)dest = value;
+			break;
+		}
 	}
 }
 
@@ -128,8 +142,12 @@ static void fb_fillrect(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
 
 	if(x == 0 && width == fb_info.width && (rgb == 0 || rgb == 0xffffff)) {
 		/* Fast path where we can fill a block quickly. */
-		memset(fb_mapping + OFFSET(0, y), (uint8_t)rgb, width * height * fb_info.bytes_per_pixel);
-		memset(fb_backbuffer + OFFSET(0, y), (uint8_t)rgb, width * height * fb_info.bytes_per_pixel);
+		memset(fb_backbuffer + OFFSET(0, y), (uint8_t)rgb,
+			width * height * fb_info.bytes_per_pixel);
+		if(fb_backbuffer != fb_mapping) {
+			memset(fb_mapping + OFFSET(0, y), (uint8_t)rgb,
+				width * height * fb_info.bytes_per_pixel);
+		}
 	} else {
 		for(i = 0; i < height; i++) {
 			for(j = 0; j < width; j++)
@@ -139,33 +157,65 @@ static void fb_fillrect(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
 }
 
 /** Copy part of the framebuffer to another location.
+ * @param dest_x	X position of destination.
  * @param dest_y	Y position of destination.
+ * @param src_x		X position of source area.
  * @param src_y		Y position of source area.
+ * @param width		Width of area to copy.
  * @param height	Height of area to copy. */
-static void fb_copyrect(uint16_t dest_y, uint16_t src_y, uint16_t height) {
-	size_t dest_offset = OFFSET(0, dest_y);
-	size_t src_offset = OFFSET(0, src_y);
+static void fb_copyrect(uint16_t dest_x, uint16_t dest_y, uint16_t src_x,
+	uint16_t src_y, uint16_t width, uint16_t height)
+{
+	size_t dest_offset, src_offset;
+	uint16_t i;
 
-	/* Copy everything on the backbuffer. */
-	memmove(fb_backbuffer + dest_offset, fb_backbuffer + src_offset,
-		fb_info.width * height * fb_info.bytes_per_pixel);
+	if(dest_x == 0 && src_x == 0 && width == fb_info.width) {
+		/* Fast path where we can copy everything in one go. */
+		dest_offset = OFFSET(0, dest_y);
+		src_offset = OFFSET(0, src_y);
 
-	/* Copy the updated backbuffer onto the framebuffer. */
-	memcpy(fb_mapping + dest_offset, fb_backbuffer + dest_offset,
-		fb_info.width * height * fb_info.bytes_per_pixel);
+		/* Copy everything on the backbuffer. */
+		memmove(fb_backbuffer + dest_offset, fb_backbuffer + src_offset,
+			fb_info.width * height * fb_info.bytes_per_pixel);
+
+		if(fb_backbuffer != fb_mapping) {
+			/* Copy the updated backbuffer onto the framebuffer. */
+			memcpy(fb_mapping + dest_offset, fb_backbuffer + dest_offset,
+				fb_info.width * height * fb_info.bytes_per_pixel);
+		}
+	} else {
+		/* Copy line by line. */
+		for(i = 0; i < height; i++) {
+			dest_offset = OFFSET(dest_x, dest_y + i);
+			src_offset = OFFSET(src_x, src_y + i);
+
+			/* Copy everything on the backbuffer. */
+			memmove(fb_backbuffer + dest_offset, fb_backbuffer + src_offset,
+				width * fb_info.bytes_per_pixel);
+
+			if(fb_backbuffer != fb_mapping) {
+				/* Copy the updated backbuffer onto the framebuffer. */
+				memcpy(fb_mapping + dest_offset, fb_backbuffer + dest_offset,
+					width * fb_info.bytes_per_pixel);
+			}
+		}
+	}
 }
 
-/** Draw the glyph at the specified position the console.
+/** Properly initialize the framebuffer console.
+ * @param video		KBoot video tag. */
+static void fb_console_init(kboot_tag_video_t *video) {
+	fb_console_configure(&fb_info, MM_BOOT);
+}
+
+/** Draw a glyph at the specified position the console.
+ * @param ch		Character to draw.
  * @param x		X position (characters).
  * @param y		Y position (characters).
  * @param fg		Foreground colour.
  * @param bg		Background colour. */
-static void fb_console_draw_glyph(uint16_t x, uint16_t y, uint32_t fg, uint32_t bg) {
-	unsigned char ch;
+static void fb_console_draw_glyph(char ch, uint16_t x, uint16_t y, uint32_t fg, uint32_t bg) {
 	uint16_t i, j;
-
-	/* Get the glyph. */
-	ch = fb_console_glyphs[(y * fb_console_cols) + x];
 
 	/* Convert to a pixel position. */
 	x *= FONT_WIDTH;
@@ -186,21 +236,28 @@ static void fb_console_draw_glyph(uint16_t x, uint16_t y, uint32_t fg, uint32_t 
 /** Enable the cursor. */
 static void fb_console_enable_cursor(void) {
 	/* Draw in inverted colours. */
-	fb_console_draw_glyph(fb_console_x, fb_console_y, FONT_BG, FONT_FG);
+	if(fb_console_glyphs) {
+		fb_console_draw_glyph(
+			fb_console_glyphs[(fb_console_y * fb_console_cols) + fb_console_x],
+			fb_console_x, fb_console_y, FONT_BG, FONT_FG);
+	}
 }
 
 /** Disable the cursor. */
 static void fb_console_disable_cursor(void) {
 	/* Draw back in the correct colours. */
-	fb_console_draw_glyph(fb_console_x, fb_console_y, FONT_FG, FONT_BG);
+	if(fb_console_glyphs) {
+		fb_console_draw_glyph(
+			fb_console_glyphs[(fb_console_y * fb_console_cols) + fb_console_x],
+			fb_console_x, fb_console_y, FONT_FG, FONT_BG);
+	}
 }
 
 /** Write a character to the framebuffer console.
  * @param ch		Character to write. */
 static void fb_console_putc(char ch) {
-	if(fb_console_acquired) {
+	if(fb_console_acquired)
 		return;
-	}
 
 	fb_console_disable_cursor();
 
@@ -231,8 +288,10 @@ static void fb_console_putc(char ch) {
 		if(ch < ' ')
 			break;
 
-		fb_console_glyphs[(fb_console_y * fb_console_cols) + fb_console_x] = ch;
-		fb_console_draw_glyph(fb_console_x, fb_console_y, FONT_FG, FONT_BG);
+		if(fb_console_glyphs)
+			fb_console_glyphs[(fb_console_y * fb_console_cols) + fb_console_x] = ch;
+
+		fb_console_draw_glyph(ch, fb_console_x, fb_console_y, FONT_FG, FONT_BG);
 		fb_console_x++;
 		break;
 	}
@@ -240,18 +299,23 @@ static void fb_console_putc(char ch) {
 	/* If we have reached the edge of the screen insert a new line. */
 	if(fb_console_x >= fb_console_cols) {
 		fb_console_x = 0;
-		if(++fb_console_y < fb_console_rows)
-			fb_fillrect(0, FONT_HEIGHT * fb_console_y, fb_info.width, FONT_HEIGHT, FONT_BG);
+		if(++fb_console_y < fb_console_rows) {
+			fb_fillrect(0, FONT_HEIGHT * fb_console_y, fb_info.width,
+				FONT_HEIGHT, FONT_BG);
+		}
 	}
 
 	/* If we have reached the bottom of the screen, scroll. */
 	if(fb_console_y >= fb_console_rows) {
 		/* Move everything up and fill the last row with blanks. */
-		memmove(fb_console_glyphs, fb_console_glyphs + fb_console_cols,
-			(fb_console_rows - 1) * fb_console_cols);
-		memset(fb_console_glyphs + ((fb_console_rows - 1) * fb_console_cols),
-			' ', fb_console_cols);
-		fb_copyrect(0, FONT_HEIGHT, (fb_console_rows - 1) * FONT_HEIGHT);
+		if(fb_console_glyphs) {
+			memmove(fb_console_glyphs, fb_console_glyphs + fb_console_cols,
+				(fb_console_rows - 1) * fb_console_cols);
+			memset(fb_console_glyphs + ((fb_console_rows - 1) * fb_console_cols),
+				' ', fb_console_cols);
+		}
+		fb_copyrect(0, 0, 0, FONT_HEIGHT, fb_info.width,
+			(fb_console_rows - 1) * FONT_HEIGHT);
 		fb_fillrect(0, FONT_HEIGHT * (fb_console_rows - 1), fb_info.width,
 			FONT_HEIGHT, FONT_BG);
 
@@ -264,6 +328,7 @@ static void fb_console_putc(char ch) {
 
 /** Kernel console output operations structure. */
 static console_out_ops_t fb_console_out_ops = {
+	.init = fb_console_init,
 	.putc = fb_console_putc,
 };
 
@@ -281,7 +346,7 @@ static void fb_console_reset(void) {
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
 static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
-	if(screen_console_ops == &fb_console_out_ops) {
+	if(main_console_ops == &fb_console_out_ops) {
 		fb_was_acquired = fb_console_acquired;
 		if(fb_was_acquired) {
 			fb_console_acquired = false;
@@ -295,7 +360,7 @@ static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
 static void fb_console_disable(void *arg1, void *arg2, void *arg3) {
-	if(screen_console_ops == &fb_console_out_ops)
+	if(main_console_ops == &fb_console_out_ops)
 		fb_console_acquired = fb_was_acquired;
 }
 
@@ -303,15 +368,16 @@ static void fb_console_disable(void *arg1, void *arg2, void *arg3) {
  * @param info		Information structure for new framebuffer.
  * @param mmflag	Allocation behaviour flags (MM_WAIT or MM_BOOT). */
 static void fb_console_configure(const fb_info_t *info, int mmflag) {
+	bool was_boot;
 	size_t size;
 
-	/* Temporarily disable the framebuffer console to ensure nothing prints
-	 * to it while we're making the change. */
-	if(screen_console_ops == &fb_console_out_ops) {
+	was_boot = fb_backbuffer == fb_mapping;
+
+	if(main_console_ops == &fb_console_out_ops && !was_boot) {
 		/* Framebuffer console is already in use. Temporarily disable
 		 * it to ensure nothing prints to it while we're making
 		 * changes. */
-		screen_console_ops = NULL;
+		main_console_ops = NULL;
 
 		/* Free old mappings. */
 		size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
@@ -329,15 +395,20 @@ static void fb_console_configure(const fb_info_t *info, int mmflag) {
 
 	memcpy(&fb_info, info, sizeof(fb_info));
 
-	/* Map in the framebuffer, clear it and allocate a backbuffer. */
+	/* Map in the framebuffer and allocate a backbuffer. */
 	size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
 	fb_mapping = phys_map(fb_info.addr, size, mmflag);
-	memset(fb_mapping, 0, size);
 	fb_backbuffer = kmem_alloc(ROUND_UP(size, PAGE_SIZE), mmflag | MM_ZERO);
+
+	/* If this was the KBoot framebuffer we should copy the current content
+	 * of that to the backbuffer. */
+	if(was_boot) {
+		memcpy(fb_backbuffer, fb_mapping,
+			fb_info.height * fb_info.width * fb_info.bytes_per_pixel);
+	}
 
 	/* Configure the console and create a backbuffer for it, initially
 	 * filled with spaces. */
-	fb_console_x = fb_console_y = 0;
 	fb_console_cols = fb_info.width / FONT_WIDTH;
 	fb_console_rows = fb_info.height / FONT_HEIGHT;
 	fb_console_glyphs = kmalloc(fb_console_cols * fb_console_rows, mmflag);
@@ -345,11 +416,12 @@ static void fb_console_configure(const fb_info_t *info, int mmflag) {
 
 	if(!fb_console_acquired) {
 		/* Clear to the font background colour. */
-		fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
+		if(!was_boot)
+			fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
 		fb_console_enable_cursor();
 	}
 
-	screen_console_ops = &fb_console_out_ops;
+	main_console_ops = &fb_console_out_ops;
 }
 
 /** Control the framebuffer console.
@@ -464,41 +536,45 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
 	}
 }
 
-/** Initialize the framebuffer console. */
-__init_text void fb_console_init(void) {
+/** Initialize the framebuffer console.
+ * @param video		KBoot video tag. */
+__init_text void fb_console_early_init(kboot_tag_video_t *video) {
 	uint16_t width, height;
-	kboot_tag_video_t *video;
-	fb_info_t info;
 
-	/* Look up the framebuffer boot tag. */
-	video = kboot_tag_iterate(KBOOT_TAG_VIDEO, NULL);
-	if(!video || video->type != KBOOT_VIDEO_LFB)
-		fatal("Expected LFB but no video mode set by loader");
+	/* Copy the information from the video tag. */
+	fb_info.width = video->lfb.width;
+	fb_info.height = video->lfb.height;
+	fb_info.depth = video->lfb.bpp;
+	fb_info.bytes_per_pixel = ROUND_UP(video->lfb.bpp, 8) / 8;
+	fb_info.addr = video->lfb.fb_phys;
+	fb_info.red_position = video->lfb.red_pos;
+	fb_info.red_size = video->lfb.red_size;
+	fb_info.green_position = video->lfb.green_pos;
+	fb_info.green_size = video->lfb.green_size;
+	fb_info.blue_position = video->lfb.blue_pos;
+	fb_info.blue_size = video->lfb.blue_size;
 
-	/* Copy the information from it. */
-	info.width = video->lfb.width;
-	info.height = video->lfb.height;
-	info.depth = video->lfb.bpp;
-	info.bytes_per_pixel = ROUND_UP(video->lfb.bpp, 8) / 8;
-	info.addr = video->lfb.fb_phys;
-	info.red_position = video->lfb.red_pos;
-	info.red_size = video->lfb.red_size;
-	info.green_position = video->lfb.green_pos;
-	info.green_size = video->lfb.green_size;
-	info.blue_position = video->lfb.blue_pos;
-	info.blue_size = video->lfb.blue_size;
+	/* Get the mapping created by KBoot. Can't create a backbuffer yet so
+	 * set the backbuffer pointer to be the same - this will cause updates
+	 * from the backbuffer to not be done. */
+	fb_mapping = (char *)((ptr_t)video->lfb.fb_virt);
+	fb_backbuffer = fb_mapping;
+
+	/* Clear the framebuffer. */
+	fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
+
+	/* Configure the console. */
+	fb_console_x = fb_console_y = 0;
+	fb_console_cols = fb_info.width / FONT_WIDTH;
+	fb_console_rows = fb_info.height / FONT_HEIGHT;
+
+	main_console_ops = &fb_console_out_ops;
 
 	/* If the splash is enabled, acquire the console so output is ignored. */
 	if(!kboot_boolean_option("splash_disabled")) {
 		splash_enabled = true;
 		fb_console_acquired = true;
-	}
 
-	/* Configure the framebuffer. */
-	fb_console_configure(&info, MM_BOOT);
-
-	/* Draw the splash screen if enabled. */
-	if(splash_enabled) {
 		/* Draw copyright text. */
 		ppm_size(copyright_ppm, &width, &height);
 		ppm_draw(copyright_ppm, (fb_info.width / 2) - (width / 2),
