@@ -122,10 +122,9 @@ class BinutilsComponent(ToolchainComponent):
 # Component definition for GCC.
 class GCCComponent(ToolchainComponent):
     name = 'gcc'
-    version = '4.6.2'
+    version = '4.8.1'
     source = [
-        'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-core-' + version + '.tar.bz2',
-        'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-g++-' + version + '.tar.bz2',
+        'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-' + version + '.tar.bz2',
     ]
     patches = [
         ('gcc-' + version + '-no-fixinc.patch', 'gcc-' + version, 1),

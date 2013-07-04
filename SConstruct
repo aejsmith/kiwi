@@ -41,7 +41,7 @@ cc_warning_flags = [
 
 # C++ warning flags.
 cxx_warning_flags = [
-	'-Wold-style-cast', '-Wsign-promo',
+	'-Wold-style-cast', '-Wsign-promo', '-Wno-narrowing',
 ]
 
 # Variables to set in host environments. Don't build C code with our normal

@@ -54,6 +54,7 @@ ccflags = filter(lambda f: f not in ['-Wextra'], env['CCFLAGS']) + [
 	'-Wno-missing-declarations',
 	'-Wno-uninitialized',
 	'-Wno-redundant-decls',
+	'-Wno-unused-local-typedefs',
 ]
 defines = {
 	'PIXMAN_NO_TLS': 1,

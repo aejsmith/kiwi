@@ -28,6 +28,8 @@
 /** Interface class for objects that can receive mouse events. */
 class MouseReceiver {
 public:
+	virtual ~MouseReceiver() {}
+
 	virtual void MouseMoved(const kiwi::MouseEvent &event) = 0;
 	virtual void MousePressed(const kiwi::MouseEvent &event) = 0;
 	virtual void MouseReleased(const kiwi::MouseEvent &event) = 0;
