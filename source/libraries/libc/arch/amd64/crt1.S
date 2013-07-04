@@ -28,11 +28,5 @@ _start:
 	/* Call the real C library initialisation function. The libkernel
 	 * initialisation code calls us with a pointer to the process argument
 	 * block as the first argument, so this will be passed through. */
-	callq	libc_init
-
-	/* If we got here then something has broken (we should have exited).
-	 * Die horribly. */
-	movq	$0xDEADBEEF, %rax
-	ud2a
-1:	jmp	1b
+	jmp	libc_init
 .size _start, .-_start

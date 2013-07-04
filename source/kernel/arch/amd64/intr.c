@@ -95,6 +95,12 @@ static void except_handler(intr_frame_t *frame) {
 	siginfo_t info;
 
 	if(frame->cs & 3) {
+		kprintf(LOG_DEBUG, "arch: sending SIGSEGV to thread %" PRId32 " (%s) "
+			"due to exception %lu (%s) at %p\n", curr_thread->id,
+			curr_thread->name, frame->num, except_strings[frame->num],
+			frame->ip);
+		kdb_enter(KDB_REASON_USER, frame);
+
 		memset(&info, 0, sizeof(info));
 		info.si_addr = (void *)frame->ip;
 		signal_send(curr_thread, SIGSEGV, &info, true);
@@ -109,6 +115,12 @@ static void de_fault(intr_frame_t *frame) {
 	siginfo_t info;
 
 	if(frame->cs & 3) {
+		kprintf(LOG_DEBUG, "arch: sending SIGFPE to thread %" PRId32 " (%s) "
+			"due to exception %lu (%s) at %p\n", curr_thread->id,
+			curr_thread->name, frame->num, except_strings[frame->num],
+			frame->ip);
+
+
 		memset(&info, 0, sizeof(info));
 		info.si_code = FPE_INTDIV;
 		info.si_addr = (void *)frame->ip;
@@ -139,6 +151,11 @@ static void ud_fault(intr_frame_t *frame) {
 	siginfo_t info;
 
 	if(frame->cs & 3) {
+		kprintf(LOG_DEBUG, "arch: sending SIGILL to thread %" PRId32 " (%s) "
+			"due to exception %lu (%s) at %p\n", curr_thread->id,
+			curr_thread->name, frame->num, except_strings[frame->num],
+			frame->ip);
+
 		memset(&info, 0, sizeof(info));
 		info.si_code = ILL_ILLOPC;
 		info.si_addr = (void *)frame->ip;
