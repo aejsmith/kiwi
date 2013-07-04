@@ -234,7 +234,7 @@ void TerminalBuffer::Output(Character ch) {
  * @return		Character read. */
 TerminalBuffer::Character TerminalBuffer::CharAt(int x, int y) {
 	if(y < 0) {
-		assert(abs(y) <= m_history.size());
+		assert(static_cast<size_t>(abs(y)) <= m_history.size());
 		return (*(m_history.end() - abs(y)))->GetCharacter(x);
 	} else {
 		assert(y < m_rows);

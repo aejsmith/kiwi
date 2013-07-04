@@ -204,7 +204,7 @@ void TerminalWindow::TerminalScrolled(int start, int end, int delta) {
 void TerminalWindow::TerminalHistoryAdded() {
 	if(m_history_pos == 0) {
 		TerminalScrolled(0, m_rows - 1, -1);
-	} else if(abs(m_history_pos) == m_terminal.GetBuffer()->GetHistorySize()) {
+	} else if(static_cast<size_t>(abs(m_history_pos)) == m_terminal.GetBuffer()->GetHistorySize()) {
 		m_history_pos--;
 		ScrollDown(1);
 	} else {

@@ -47,8 +47,12 @@ sources = [
 	'pixman-matrix.c',
 ]
 
+# FIXME: Hack to work round breakage with GCC 4.8. Probably will be fixed in
+# a newer version, so remove after upgrade.
+ccflags = filter(lambda f: f[0:2] != '-O', env['CCFLAGS']) + ['-O0']
+
 # Build flags.
-ccflags = filter(lambda f: f not in ['-Wextra'], env['CCFLAGS']) + [
+ccflags = filter(lambda f: f not in ['-Wextra'], ccflags) + [
 	'-fno-strict-aliasing',
 	'-fvisibility=hidden',
 	'-Wno-missing-declarations',
