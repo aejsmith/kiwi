@@ -108,7 +108,6 @@ env.KiwiLibrary('cairo',
 	include_path = Dir('include'),
 	flags = {
 		'CCFLAGS': filter(lambda f: f[0:2] != '-W', env['CCFLAGS']) + [
-			'-Werror',
 			'-Wno-redundant-decls',
 			'-Wno-enum-compare',
 			'-Wno-switch-enum',

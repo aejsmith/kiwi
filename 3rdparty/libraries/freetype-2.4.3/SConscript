@@ -85,7 +85,6 @@ env.KiwiLibrary('freetype',
 	flags = {
 		'CCFLAGS': filter(lambda f: f[0:2] != '-W', env['CCFLAGS']) + [
 			'-Wall',
-			'-Werror',
 		],
 		'CPPDEFINES': {
 			'FT_CONFIG_OPTION_SYSTEM_ZLIB': None,

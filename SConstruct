@@ -34,9 +34,9 @@ version = {
 
 # C/C++ warning flags.
 cc_warning_flags = [
-	'-Wall', '-Wextra', '-Werror', '-Wno-variadic-macros',
-	'-Wno-unused-parameter', '-Wwrite-strings', '-Wmissing-declarations',
-	'-Wredundant-decls', '-Wno-format', '-Wno-unused-but-set-variable',
+	'-Wall', '-Wextra', '-Wno-variadic-macros', '-Wno-unused-parameter',
+	'-Wwrite-strings', '-Wmissing-declarations', '-Wredundant-decls',
+	'-Wno-format', '-Wno-unused-but-set-variable',
 ]
 
 # C++ warning flags.
