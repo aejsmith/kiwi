@@ -53,17 +53,15 @@ typedef struct page {
 
 	/** Basic page information. */
 	phys_ptr_t addr;		/**< Physical address of page. */
-	unsigned phys_range;		/**< Memory range that the page belongs to. */
+	unsigned range;			/**< Memory range that the page belongs to. */
 	unsigned state;			/**< State of the page. */
 	bool modified : 1;		/**< Whether the page has been modified. */
 	uint8_t unused: 7;
 
 	/** Information about how the page is being used.
-	 * @note		Use of count and avl_link is up to the owner.
-	 * @note		Should not have both cache and amap set. */
+	 * @note		Use of count and avl_link is up to the owner. */
 	refcount_t count;		/**< Reference count of the page (use is up to page user). */
 	struct vm_cache *cache;		/**< Cache that the page belongs to. */
-	struct vm_amap *amap;		/**< Anonymous map the page belongs to. */
 	offset_t offset;		/**< Offset into the owner of the page. */
 	avl_tree_node_t avl_link;	/**< Link to AVL tree for use by owner. */
 } page_t;
@@ -74,6 +72,8 @@ typedef struct page {
 #define PAGE_STATE_CACHED	2	/**< Cached. */
 #define PAGE_STATE_FREE		3	/**< Free. */
 
+extern bool page_init_done;
+
 extern void page_set_state(page_t *page, unsigned state);
 extern page_t *page_lookup(phys_ptr_t addr);
 extern page_t *page_alloc(int mmflag);
@@ -82,10 +82,13 @@ extern page_t *page_copy(page_t *page, int mmflag);
 
 extern void page_stats_get(page_stats_t *stats);
 
-extern void page_add_physical_range(phys_ptr_t start, phys_ptr_t end, unsigned freelist);
+extern void page_add_memory_range(phys_ptr_t start, phys_ptr_t end, unsigned freelist);
+
+extern phys_ptr_t page_early_alloc(void);
 
 extern void platform_page_init(void);
 
+extern void page_early_init(void);
 extern void page_init(void);
 extern void page_daemon_init(void);
 extern void page_late_init(void);

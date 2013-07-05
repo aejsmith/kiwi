@@ -118,8 +118,9 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	security_init();
 
 	/* Initialize kernel memory management subsystems. */
-	page_init();
+	page_early_init();
 	mmu_init();
+	page_init();
 	kmem_init();
 	slab_init();
 	malloc_init();

@@ -44,9 +44,4 @@
 /** Cacheability flag mask. */
 #define X86_PTE_CACHE_MASK	(X86_PTE_PWT | X86_PTE_PCD)
 
-#ifndef __ASM__
-
-extern phys_ptr_t ap_bootstrap_page;
-
-#endif /* __ASM__ */
 #endif /* __X86_MMU_H */

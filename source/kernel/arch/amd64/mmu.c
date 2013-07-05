@@ -151,20 +151,29 @@ static inline uint64_t test_and_set_pte(uint64_t *pte, uint64_t cmp, uint64_t va
 	return atomic_cas64((atomic64_t *)pte, cmp, val);
 }
 
-/** Allocate a paging structure.
- * @param mmflag	Allocation flags.
- * @return		Address of structure on success, 0 on failure. */
-static phys_ptr_t alloc_structure(int mmflag) {
-	page_t *page = page_alloc(mmflag | MM_ZERO);
-        return (page) ? page->addr : 0;
-}
-
 /** Get the virtual address of a page structure.
  * @param addr		Address of structure.
  * @return		Pointer to mapping. */
 static uint64_t *map_structure(phys_ptr_t addr) {
 	/* Our phys_map() implementation never fails. */
 	return phys_map(addr, PAGE_SIZE, MM_BOOT);
+}
+
+/** Allocate a paging structure.
+ * @param mmflag	Allocation flags.
+ * @return		Address of structure on success, 0 on failure. */
+static phys_ptr_t alloc_structure(int mmflag) {
+	page_t *page;
+	phys_ptr_t ret;
+
+	if(page_init_done) {
+		page = page_alloc(mmflag | MM_ZERO);
+		return (page) ? page->addr : 0;
+	} else {
+		ret = page_early_alloc();
+		memset(map_structure(ret), 0, PAGE_SIZE);
+		return ret;
+	}
 }
 
 /** Get the page directory containing a virtual address.
@@ -289,6 +298,7 @@ static void invalidate_page(mmu_context_t *ctx, ptr_t virt, bool shared) {
  * @return		Status code describing result of the operation. */
 static status_t amd64_mmu_init(mmu_context_t *ctx, int mmflag) {
 	uint64_t *kpml4, *pml4;
+	unsigned i;
 
 	ctx->arch.invalidate_count = 0;
 	ctx->arch.pml4 = alloc_structure(mmflag);
@@ -298,7 +308,9 @@ static status_t amd64_mmu_init(mmu_context_t *ctx, int mmflag) {
 	/* Get the kernel mappings into the new PML4. */
 	kpml4 = map_structure(kernel_mmu_context.arch.pml4);
 	pml4 = map_structure(ctx->arch.pml4);
-	pml4[511] = kpml4[511] & ~X86_PTE_ACCESSED;
+	for(i = 256; i < 512; i++)
+		pml4[i] = kpml4[i] & ~X86_PTE_ACCESSED;
+
 	return STATUS_SUCCESS;
 }
 
@@ -583,8 +595,8 @@ static void amd64_mmu_load(mmu_context_t *ctx) {
 	x86_write_cr3(ctx->arch.pml4);
 }
 
-/** AMD64 MMU context operations. */
-static mmu_context_ops_t amd64_mmu_context_ops = {
+/** AMD64 MMU operations. */
+static mmu_ops_t amd64_mmu_ops = {
 	.init = amd64_mmu_init,
 	.destroy = amd64_mmu_destroy,
 	.map = amd64_mmu_map,
@@ -639,12 +651,7 @@ __init_text void arch_mmu_init(void) {
 	phys_ptr_t i, j, end, highest_phys = 0;
 	uint64_t *pdir;
 
-	#if CONFIG_SMP
-	/* Reserve a low memory page for the AP bootstrap code. */
-	phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_BOOT, &ap_bootstrap_page);
-	#endif
-
-	mmu_context_ops = &amd64_mmu_context_ops;
+	mmu_ops = &amd64_mmu_ops;
 
 	/* Initialize the kernel MMU context. */
 	kernel_mmu_context.arch.invalidate_count = 0;

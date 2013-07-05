@@ -41,8 +41,8 @@
 
 struct mmu_context;
 
-/** Structure containing architecture operations for an MMU context. */
-typedef struct mmu_context_ops {
+/** Structure containing architecture MMU operations. */
+typedef struct mmu_ops {
 	/** Initialize a new context.
 	 * @param ctx		Context to initialize.
 	 * @param mmflag	Allocation behaviour flags.
@@ -104,7 +104,7 @@ typedef struct mmu_context_ops {
 	/** Unload an MMU context (optional).
 	 * @param ctx		Context to unload. */
 	void (*unload)(struct mmu_context *ctx);
-} mmu_context_ops_t;
+} mmu_ops_t;
 
 /** Structure containing an MMU context. */
 typedef struct mmu_context {
@@ -117,7 +117,7 @@ typedef struct mmu_context {
 #define MMU_MAP_EXEC		(1<<1)	/**< Mapping should be executable. */
 
 extern mmu_context_t kernel_mmu_context;
-extern mmu_context_ops_t *mmu_context_ops;
+extern mmu_ops_t *mmu_ops;
 
 extern void mmu_context_lock(mmu_context_t *ctx);
 extern void mmu_context_unlock(mmu_context_t *ctx);

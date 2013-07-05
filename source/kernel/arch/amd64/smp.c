@@ -45,7 +45,7 @@ extern void kmain_ap(cpu_t *cpu);
 static mmu_context_t *ap_mmu_context;
 
 /** Page reserved to copy the AP bootstrap code to. */
-phys_ptr_t ap_bootstrap_page = 0;
+static phys_ptr_t ap_bootstrap_page = 0;
 
 /** Send an IPI interrupt to a single CPU.
  * @param dest		Destination CPU ID. */
@@ -56,6 +56,9 @@ void arch_smp_ipi(cpu_id_t dest) {
 /** Prepare the SMP boot process. */
 __init_text void arch_smp_boot_prepare(void) {
 	void *mapping;
+
+	/* Allocate a low memory page for the trampoline code. */
+	phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_BOOT, &ap_bootstrap_page);
 
 	/* Copy the trampoline code to the page reserved by the paging
 	 * initialization code. */

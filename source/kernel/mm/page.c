@@ -24,9 +24,9 @@
  * page and how it is being used.
  *
  * Each usable memory range in the range list provided by the loader is stored
- * in a global array and has an array of page_t's allocated for it. This
- * global array can then be used to quickly look up the structure associated
- * with a physical address.
+ * in a global array and has an array of page_t's allocated for it. This global
+ * array is called the page database, and is used to quickly look up the
+ * structure associated with a physical address.
  *
  * There are a number of queues that a page can be placed in depending on its
  * state, and these queues are used for various purposes. Below is a
@@ -58,8 +58,8 @@
  * The allocation code is not optimised for quick allocations of contiguous
  * ranges of pages, or pages with alignment/boundary constraints, as it is
  * assumed that this will not be done frequently (e.g. in driver initialization
- * routines). The method used to do this is to search through each page of
- * memory to find free pages that satisfy the constraints.
+ * routines). The method used to do this is to search through the entire page
+ * database to find free pages that satisfy the constraints.
  *
  * Locking rules:
  *  - Free page lock must be held to set a page's state to PAGE_STATE_FREE, or
@@ -67,6 +67,10 @@
  *  - Free page lock and a page queue lock cannot be held at the same time.
  *
  * @todo		Pre-zero free pages while idle.
+ * @todo		Reservations of pages for allocations from userspace.
+ *			When swap is implemented, the count of memory available
+ *			to reserve will include swap space. This means that
+ *			allocation will not overcommit memory.
  */
 
 #include <arch/memory.h>
@@ -75,6 +79,7 @@
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
+#include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/phys.h>
 #include <mm/vm_cache.h>
@@ -96,13 +101,21 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Boot memory range structure. */
+typedef struct boot_range {
+	phys_ptr_t start;		/**< Start of the range. */
+	phys_size_t size;		/**< Total size of the range. */
+	phys_size_t allocated;		/**< Space allocated in the range. */
+	unsigned freelist;		/**< Free page list index. */
+} boot_range_t;
+
 /** Structure describing a range of physical memory. */
-typedef struct physical_range {
+typedef struct memory_range {
 	phys_ptr_t start;		/**< Start of the range. */
 	phys_ptr_t end;			/**< End of the range. */
 	page_t *pages;			/**< Pages in the range. */
 	unsigned freelist;		/**< Free page list index. */
-} physical_range_t;
+} memory_range_t;
 
 /** Structure containing a page queue. */
 typedef struct page_queue {
@@ -125,8 +138,8 @@ typedef struct page_freelist {
 /** Number of page queues. */
 #define PAGE_QUEUE_COUNT		3
 
-/** Maximum number of physical ranges. */
-#define PHYS_RANGE_MAX			32
+/** Maximum number of memory ranges. */
+#define MEMORY_RANGE_MAX		32
 
 /** Total usable page count. */
 static page_num_t total_page_count = 0;
@@ -139,8 +152,15 @@ static page_freelist_t free_page_lists[PAGE_FREE_LIST_COUNT];
 static MUTEX_DECLARE(free_page_lock, 0);
 
 /** Physical memory ranges. */
-static physical_range_t phys_ranges[PHYS_RANGE_MAX];
-static size_t phys_range_count = 0;
+static memory_range_t memory_ranges[MEMORY_RANGE_MAX];
+static size_t memory_range_count = 0;
+
+/** Free memory range descriptors for early page allocations. */
+static boot_range_t boot_ranges[MEMORY_RANGE_MAX] __init_data;
+static size_t boot_range_count __init_data = 0;
+
+/** Whether the physical memory manager has been initialized. */
+bool page_init_done = false;
 
 /** Page writer thread.
  * @param arg1		Unused.
@@ -274,9 +294,10 @@ page_t *page_lookup(phys_ptr_t addr) {
 
 	assert(!(addr % PAGE_SIZE));
 
-	for(i = 0; i < phys_range_count; i++) {
-		if(addr >= phys_ranges[i].start && addr < phys_ranges[i].end)
-			return &phys_ranges[i].pages[(addr - phys_ranges[i].start) >> PAGE_WIDTH];
+	for(i = 0; i < memory_range_count; i++) {
+		if(addr >= memory_ranges[i].start && addr < memory_ranges[i].end)
+			return &memory_ranges[i].pages[(addr - memory_ranges[i].start)
+				>> PAGE_WIDTH];
 	}
 
 	return NULL;
@@ -354,10 +375,9 @@ static void page_free_internal(page_t *page) {
 	page->state = PAGE_STATE_FREE;
 	page->modified = false;
 	page->cache = NULL;
-	page->amap = NULL;
 
 	/* Push it onto the appropriate list. */
-	list_prepend(&free_page_lists[phys_ranges[page->phys_range].freelist].pages, &page->header);
+	list_prepend(&free_page_lists[memory_ranges[page->range].freelist].pages, &page->header);
 }
 
 /** Free a page.
@@ -374,7 +394,7 @@ void page_free(page_t *page) {
 	mutex_unlock(&free_page_lock);
 
 	dprintf("page: freed page 0x%" PRIxPHYS " (list: %u)\n", page->addr,
-		phys_ranges[page->phys_range].freelist);
+		memory_ranges[page->range].freelist);
 }
 
 /** Create a copy of a page.
@@ -429,11 +449,7 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 			if(list_empty(&list->pages))
 				continue;
 
-			/* Get the page and mark it as allocated. */
-			page = list_first(&list->pages, page_t, header);
-			list_remove(&page->header);
-			page->state = PAGE_STATE_ALLOCATED;
-			return page;
+			return list_first(&list->pages, page_t, header);
 		} else if(end > base) {
 			/* Partial fit, record to check in the second pass. */
 			partial_fits[partial_fit_count++] = i;
@@ -450,11 +466,8 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 		LIST_FOREACH(&list->pages, iter) {
 			page = list_entry(iter, page_t, header);
 
-			if(page->addr >= minaddr && (!maxaddr || page->addr < maxaddr)) {
-				list_remove(&page->header);
-				page->state = PAGE_STATE_ALLOCATED;
+			if(page->addr >= minaddr && (!maxaddr || page->addr < maxaddr))
 				return page;
-			}
 		}
 	}
 
@@ -473,8 +486,7 @@ static page_t *phys_alloc_slowpath(page_num_t count, phys_ptr_t align,
 {
 	phys_ptr_t match_start, match_end, start, end;
 	page_num_t index, total, j;
-	physical_range_t *range;
-	page_t *pages;
+	memory_range_t *range;
 	size_t i;
 
 	if(boundary != 0)
@@ -488,8 +500,8 @@ static page_t *phys_alloc_slowpath(page_num_t count, phys_ptr_t align,
 	 * the free pages lock, it is guaranteed that no pages will enter or
 	 * leave the free state (they can still move between other states)
 	 * while we are working. */
-	for(i = 0; i < phys_range_count; i++) {
-		range = &phys_ranges[i];
+	for(i = 0; i < memory_range_count; i++) {
+		range = &memory_ranges[i];
 		total = 0;
 
 		/* Check if this range contains pages in the requested range. */
@@ -516,24 +528,12 @@ static page_t *phys_alloc_slowpath(page_num_t count, phys_ptr_t align,
 				continue;
 			}
 
-			if(++total == count) {
-				/* We have our pages! */
-				goto found;
-			}
+			if(++total == count)
+				return &range->pages[index];
 		}
 	}
 
 	return NULL;
-found:
-	/* Loop through the pages to remove them from their free list and mark
-	 * them as allocated. */
-	pages = &range->pages[index];
-	for(i = 0; i < count; i++) {
-		list_remove(&pages[i].header);
-		pages[i].state = PAGE_STATE_ALLOCATED;
-	}
-
-	return pages;
 }
 
 /**
@@ -586,11 +586,9 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 
 	/* Single-page allocations with no constraints or only minaddr/maxaddr
 	 * constraints can be performed quickly. */
-	if(count == 1 && !align && !boundary) {
-		pages = phys_alloc_fastpath(minaddr, maxaddr);
-	} else {
-		pages = phys_alloc_slowpath(count, align, boundary, minaddr, maxaddr);
-	}
+	pages = (count == 1 && !align && !boundary)
+		? phys_alloc_fastpath(minaddr, maxaddr)
+		: phys_alloc_slowpath(count, align, boundary, minaddr, maxaddr);
 	if(unlikely(!pages)) {
 		if(mmflag & MM_BOOT) {
 			fatal("Unable to satisfy boot allocation of %zu page(s)", count);
@@ -601,6 +599,12 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 		mutex_unlock(&free_page_lock);
 		thread_unwire(curr_thread);
 		return STATUS_NO_MEMORY;
+	}
+
+	/* Remove the pages from the free list and mark them as allocated. */
+	for(i = 0; i < count; i++) {
+		list_remove(&pages[i].header);
+		pages[i].state = PAGE_STATE_ALLOCATED;
 	}
 
 	/* Release the lock (see locking rules). */
@@ -651,14 +655,15 @@ void phys_free(phys_ptr_t base, phys_size_t size) {
 	/* Ranges allocated by phys_alloc() will not span across a physical
 	 * range boundary. Check that the caller is not trying to free across
 	 * one. */
-	if(unlikely((base + size) > phys_ranges[pages->phys_range].end))
+	if(unlikely((base + size) > memory_ranges[pages->range].end))
 		fatal("Invalid free across range boundary");
 
 	/* Remove each page in the range from its current queue. */
 	for(i = 0; i < (size / PAGE_SIZE); i++) {
 		if(unlikely(pages[i].state == PAGE_STATE_FREE)) {
-			fatal("Page 0x%" PRIxPHYS " in range [0x%" PRIxPHYS ",0x%" PRIxPHYS ") already free",
-				pages[i].addr, base, base + size);
+			fatal("Page 0x%" PRIxPHYS " in range [0x%" PRIxPHYS
+				",0x%" PRIxPHYS ") already free", pages[i].addr,
+				base, base + size);
 		}
 
 		remove_page_from_current_queue(&pages[i]);
@@ -667,13 +672,13 @@ void phys_free(phys_ptr_t base, phys_size_t size) {
 	mutex_lock(&free_page_lock);
 
 	/* Free each page. */
-	for(i = 0; i < (size / PAGE_SIZE); i++)
+	for(i = 0; i < size / PAGE_SIZE; i++)
 		page_free_internal(&pages[i]);
 
 	mutex_unlock(&free_page_lock);
 
 	dprintf("page: freed page range [0x%" PRIxPHYS ",0x%" PRIxPHYS ") (list: %u)\n",
-		base, base + size, phys_ranges[pages->phys_range].freelist);
+		base, base + size, memory_ranges[pages->range].freelist);
 }
 
 /** Get physical memory usage statistics.
@@ -718,22 +723,21 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
 			return KDB_FAILURE;
 		}
 
-		kdb_printf("Page 0x%" PRIxPHYS " (%p) (Range: %d)\n", page->addr, page, page->phys_range);
+		kdb_printf("Page 0x%" PRIxPHYS " (%p) (Range: %u)\n", page->addr, page, page->range);
 		kdb_printf("=================================================\n");
 		kdb_printf("State:    %d\n", page->state);
 		kdb_printf("Modified: %d\n", page->modified);
 		kdb_printf("Count:    %d\n", page->count);
 		kdb_printf("Cache:    %p\n", page->cache);
-		kdb_printf("Amap:     %p\n", page->amap);
 		kdb_printf("Offset:   %" PRIu64 "\n", page->offset);
 	} else {
 		kdb_printf("Start              End                Freelist Pages\n");
 		kdb_printf("=====              ===                ======== =====\n");
 
-		for(i = 0; i < phys_range_count; i++) {
+		for(i = 0; i < memory_range_count; i++) {
 			kdb_printf("0x%-16" PRIxPHYS " 0x%-16" PRIxPHYS " %-8u %p\n",
-				phys_ranges[i].start, phys_ranges[i].end,
-				phys_ranges[i].freelist, phys_ranges[i].pages);
+				memory_ranges[i].start, memory_ranges[i].end,
+				memory_ranges[i].freelist, memory_ranges[i].pages);
 		}
 
 		page_stats_get(&stats);
@@ -754,9 +758,9 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
  * @param start		Start of range.
  * @param end		End of range.
  * @param freelist	Free page list index for pages in the range. */
-__init_text void page_add_physical_range(phys_ptr_t start, phys_ptr_t end, unsigned freelist) {
+__init_text void page_add_memory_range(phys_ptr_t start, phys_ptr_t end, unsigned freelist) {
 	page_freelist_t *list = &free_page_lists[freelist];
-	physical_range_t *range, *prev;
+	memory_range_t *range, *prev;
 
 	/* Increase the total page count. */
 	total_page_count += (end - start) / PAGE_SIZE;
@@ -775,31 +779,58 @@ __init_text void page_add_physical_range(phys_ptr_t start, phys_ptr_t end, unsig
 	/* If we're contiguous with the previously recorded range (if any) and
 	 * have the same free list index, just append to it, else add a new
 	 * range. */
-	if(phys_range_count) {
-		prev = &phys_ranges[phys_range_count - 1];
+	if(memory_range_count) {
+		prev = &memory_ranges[memory_range_count - 1];
 		if(start == prev->end && freelist == prev->freelist) {
 			prev->end = end;
 			return;
 		}
 	}
 
-	if(phys_range_count >= PHYS_RANGE_MAX)
+	if(memory_range_count >= MEMORY_RANGE_MAX)
 		fatal("Too many physical memory ranges");
 
-	range = &phys_ranges[phys_range_count++];
+	range = &memory_ranges[memory_range_count++];
 	range->start = start;
 	range->end = end;
 	range->freelist = freelist;
 }
 
-/** Initialize the physical memory manager. */
-__init_text void page_init(void) {
-	phys_ptr_t pages_base = 0, offset = 0, addr;
-	phys_size_t pages_size = 0, size;
-	page_num_t count, j;
-	page_t *page;
-	bool allocated;
+/** Perform an early page allocation.
+ * @return		Physical address of page allocated. */
+phys_ptr_t page_early_alloc(void) {
+	phys_ptr_t ret;
 	size_t i;
+
+	/* Search for a range with free pages. */
+	for(i = 0; i < boot_range_count; i++) {
+		if(boot_ranges[i].allocated < boot_ranges[i].size) {
+			ret = boot_ranges[i].start + boot_ranges[i].allocated;
+			boot_ranges[i].allocated += PAGE_SIZE;
+			dprintf("page: allocated early page 0x%" PRIxPHYS "\n", ret);
+			return ret;
+		}
+	}
+
+	fatal("Exhausted available memory during boot");
+}
+
+/** Sort comparison function the boot range array. */
+static __init_text int boot_range_compare(const void *a, const void *b) {
+	const boot_range_t *first = (const boot_range_t *)a;
+	const boot_range_t *second = (const boot_range_t *)b;
+
+	if(first->freelist == second->freelist) {
+		return (first->start < second->start) ? -1 : (first->start > second->start);
+	} else {
+		return (first->freelist < second->freelist) ? -1 : 1;
+	}
+}
+
+/** Perform early physical memory manager initialization. */
+__init_text void page_early_init(void) {
+	page_freelist_t *list;
+	unsigned i;
 
 	/* Initialize page queues and freelists. */
 	for(i = 0; i < PAGE_QUEUE_COUNT; i++) {
@@ -817,91 +848,124 @@ __init_text void page_init(void) {
 	 * memory map provided by the loader and separate it further as
 	 * required (i.e. into different free lists). */
 	platform_page_init();
-	kprintf(LOG_DEBUG, "page: usable physical memory ranges:\n");
-	for(i = 0; i < phys_range_count; i++) {
-		kprintf(LOG_DEBUG, " 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS " (%u)\n",
-			phys_ranges[i].start, phys_ranges[i].end,
-			phys_ranges[i].freelist);
+
+	/* And here we have the fun of early memory management bringup. We want
+	 * to map pages during our initialization, but to do that the MMU code
+	 * needs to allocate pages. Therefore, we have an early page allocation
+	 * system for use during initialization that just grabs the first free
+	 * page it can find from the memory ranges given by the boot loader.
+	 * The real initialization code will then mark all pages allocated
+	 * through that function as allocated. */
+	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
+		if(boot_range_count == MEMORY_RANGE_MAX)
+			fatal("Memory map contains too many ranges");
+
+		boot_ranges[boot_range_count].start = range->start;
+		boot_ranges[boot_range_count].size = range->size;
+		boot_ranges[boot_range_count].allocated
+			= (range->type == KBOOT_MEMORY_FREE) ? 0 : range->size;
+
+		/* Match up the range against a freelist. Not entirely correct
+		 * for ranges that straddle across multiples lists, so we just
+		 * always select the lowest priority (highest index) list. */
+		for(i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
+			list = &free_page_lists[i];
+			if(!list->minaddr && !list->maxaddr)
+				continue;
+
+			if(range->start <= (list->maxaddr - 1)
+				&& list->minaddr <= (range->start + range->size - 1))
+			{
+				boot_ranges[boot_range_count].freelist = i;
+			}
+		}
+
+		boot_range_count++;
 	}
-	kprintf(LOG_DEBUG, "page: free list coverage:\n");
+
+	/* Sort the array of boot ranges by lowest to highest freelist index
+	 * so that early allocations honor free list priorities. */
+	qsort(boot_ranges, boot_range_count, sizeof(boot_range_t), boot_range_compare);
+}
+
+/** Initialize the physical memory manager. */
+__init_text void page_init(void) {
+	size_t pages_size, i, j, size;
+	ptr_t addr;
+	page_num_t count;
+	page_t *page;
+	unsigned index;
+
+	kprintf(LOG_NOTICE, "page: usable physical memory ranges:\n");
+	for(i = 0; i < memory_range_count; i++) {
+		kprintf(LOG_NOTICE, " 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS " (%u)\n",
+			memory_ranges[i].start, memory_ranges[i].end,
+			memory_ranges[i].freelist);
+	}
+	kprintf(LOG_NOTICE, "page: free list coverage:\n");
 	for(i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
-		kprintf(LOG_DEBUG, " %u: 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS "\n",
+		kprintf(LOG_NOTICE, " %u: 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS "\n",
 			i, free_page_lists[i].minaddr, free_page_lists[i].maxaddr);
 	}
 
-	/* Now we need to find a suitable free range to store the page
-	 * structures in. This range must be the largest possible range
-	 * that is accessible through the physical map area, as we cannot
-	 * currently map in any new memory. */
-	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
-		if(range->type != KBOOT_MEMORY_FREE)
-			continue;
+	/* Determine how much space we need for the page database. */
+	pages_size = ROUND_UP(sizeof(page_t) * total_page_count, PAGE_SIZE);
+	kprintf(LOG_NOTICE, "page: have %zu pages, using %" PRIuPHYS "KiB for page database\n",
+		total_page_count, pages_size / 1024);
+	if(pages_size > KERNEL_PDB_SIZE)
+		fatal("Available RAM exceeds maximum page database size");
 
-		#if KERNEL_PMAP_OFFSET > 0
-		if(range->start >= KERNEL_PMAP_OFFSET && range->start < (KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE)) {
-			size = MIN((phys_ptr_t)(KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE), range->start + range->size) - range->start;
-		#else
-		if(range->start < KERNEL_PMAP_SIZE) {
-			size = MIN((phys_ptr_t)KERNEL_PMAP_SIZE, range->start + range->size) - range->start;
-		#endif
-			if(size > pages_size) {
-				pages_base = range->start;
-				pages_size = size;
-			}
-		}
+	mmu_context_lock(&kernel_mmu_context);
+
+	/* Allocate and map the database. */
+	for(i = 0; i < pages_size; i += PAGE_SIZE) {
+		mmu_context_map(&kernel_mmu_context, KERNEL_PDB_BASE + i,
+			page_early_alloc(), MMU_MAP_WRITE, MM_BOOT);
 	}
 
-	/* Now check if we have enough memory in this range. */
-	size = ROUND_UP(sizeof(page_t) * total_page_count, PAGE_SIZE);
-	if(size > pages_size)
-		fatal("Not enough contiguous memory for initialization");
+	mmu_context_unlock(&kernel_mmu_context);
 
-	pages_size = size;
-
-	kprintf(LOG_DEBUG, "page: have %zu pages, using %" PRIuPHYS "KiB for structures at 0x%" PRIxPHYS "\n",
-		total_page_count, pages_size / 1024, pages_base);
+	addr = KERNEL_PDB_BASE;
 
 	/* Now for each memory range we have, create page structures. */
-	for(i = 0; i < phys_range_count; i++) {
-		count = (phys_ranges[i].end - phys_ranges[i].start) / PAGE_SIZE;
+	for(i = 0; i < memory_range_count; i++) {
+		count = (memory_ranges[i].end - memory_ranges[i].start) / PAGE_SIZE;
 		size = sizeof(page_t) * count;
-		phys_ranges[i].pages = phys_map(pages_base + offset, size, MM_BOOT);
-		offset += size;
+		memory_ranges[i].pages = (page_t *)addr;
+		addr += size;
 
 		/* Initialize each of the pages. */
-		memset(phys_ranges[i].pages, 0, size);
+		memset(memory_ranges[i].pages, 0, size);
 		for(j = 0; j < count; j++) {
-			list_init(&phys_ranges[i].pages[j].header);
-			phys_ranges[i].pages[j].addr = phys_ranges[i].start + ((phys_ptr_t)j * PAGE_SIZE);
-			phys_ranges[i].pages[j].phys_range = i;
+			page = &memory_ranges[i].pages[j];
+			list_init(&page->header);
+			page->addr = memory_ranges[i].start + ((phys_ptr_t)j * PAGE_SIZE);
+			page->range = i;
 		}
 	}
 
-	/* Finally, set the state of each page. */
-	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
-		/* We must individually look up each page because a single
-		 * KBoot range can be split over multiple physical ranges. */
-		for(addr = range->start; addr != range->start + range->size; addr += PAGE_SIZE) {
-			page = page_lookup(addr);
+	/* Finally, set the state of each page based on the boot allocation
+	 * information. */
+	for(i = 0; i < boot_range_count; i++) {
+		for(j = 0; j < boot_ranges[i].size; j += PAGE_SIZE) {
+			page = page_lookup(boot_ranges[i].start + j);
 			assert(page);
 
-			/* If the page was used for the page structures, mark
-			 * it as allocated. */
-			allocated = range->type != KBOOT_MEMORY_FREE
-				|| (addr >= pages_base && addr < (pages_base + pages_size));
-			if(allocated) {
+			if(j >= boot_ranges[i].allocated) {
+				page->state = PAGE_STATE_FREE;
+				index = memory_ranges[page->range].freelist;
+				list_append(&free_page_lists[index].pages, &page->header);
+			} else {
 				page->state = PAGE_STATE_ALLOCATED;
 				page_queue_append(PAGE_STATE_ALLOCATED, page);
-			} else {
-				page->state = PAGE_STATE_FREE;
-				list_append(&free_page_lists[phys_ranges[page->phys_range].freelist].pages,
-					&page->header);
 			}
 		}
 	}
 
-	/* Register the KDB command. */
-	kdb_register_command("page", "Display physical memory usage information.", kdb_cmd_page);
+	kdb_register_command("page", "Display physical memory usage information.",
+		kdb_cmd_page);
+
+	page_init_done = true;
 }
 
 /** Initialize the page daemons. */
