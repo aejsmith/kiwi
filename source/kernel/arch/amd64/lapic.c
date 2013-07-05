@@ -37,11 +37,7 @@
 #include <smp.h>
 #include <time.h>
 
-#if CONFIG_SMP
 KBOOT_BOOLEAN_OPTION("lapic_disabled", "Disable Local APIC usage (disables SMP)", false);
-#else
-KBOOT_BOOLEAN_OPTION("lapic_disabled", "Disable Local APIC usage", false);
-#endif
 
 /** Local APIC mapping. If NULL the LAPIC is not present. */
 static volatile uint32_t *lapic_mapping = NULL;
@@ -74,14 +70,12 @@ static void lapic_spurious_handler(intr_frame_t *frame) {
 	kprintf(LOG_DEBUG, "lapic: received spurious interrupt\n");
 }
 
-#if CONFIG_SMP
 /** IPI interrupt handler.
  * @param frame		Interrupt stack frame. */
 static void lapic_ipi_handler(intr_frame_t *frame) {
 	smp_ipi_handler();
 	lapic_eoi();
 }
-#endif
 
 /** Prepare local APIC timer tick.
  * @param us		Number of microseconds to tick in. */
@@ -207,14 +201,12 @@ __init_text void lapic_init(void) {
 
 	base &= 0xFFFFF000;
 
-	#if CONFIG_SMP
 	if(lapic_mapping) {
 		/* This is a secondary CPU. Ensure that the base address is
 		 * not different to the boot CPU's. */
 		if(base != lapic_base)
 			fatal("CPU %u has different LAPIC address to boot CPU", curr_cpu->id);
 	} else {
-	#endif
 		/* This is the boot CPU. Map the LAPIC into virtual memory and
 		 * register interrupt vector handlers. */
 		lapic_base = base;
@@ -228,10 +220,8 @@ __init_text void lapic_init(void) {
 		/* Install interrupt vectors. */
 		intr_table[LAPIC_VECT_SPURIOUS] = lapic_spurious_handler;
 		intr_table[LAPIC_VECT_TIMER] = lapic_timer_handler;
-	#if CONFIG_SMP
 		intr_table[LAPIC_VECT_IPI] = lapic_ipi_handler;
 	}
-	#endif
 
 	/* Enable the local APIC (bit 8) and set the spurious interrupt
 	 * vector in the Spurious Interrupt Vector Register. */
@@ -240,15 +230,11 @@ __init_text void lapic_init(void) {
 
 	/* Calculate LAPIC frequency. See comment about CPU frequency in QEMU
 	 * in arch_cpu_early_init_percpu(), same applies here. */
-	#if CONFIG_SMP
 	if(strncmp(curr_cpu->arch.model_name, "QEMU", 4) != 0 || curr_cpu == &boot_cpu) {
-	#endif
 		curr_cpu->arch.lapic_freq = calculate_frequency(calculate_lapic_frequency);
-	#if CONFIG_SMP
 	} else {
 		curr_cpu->arch.lapic_freq = boot_cpu.arch.lapic_freq;
 	}
-	#endif
 
 	/* Sanity check. */
 	if(curr_cpu != &boot_cpu) {

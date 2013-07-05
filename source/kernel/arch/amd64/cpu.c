@@ -280,9 +280,7 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 	 * structure. Otherwise, check that the feature set matches the global
 	 * features. We do not allow SMP configurations with different features
 	 * on different CPUs. */
-	#if CONFIG_SMP
 	if(cpu == &boot_cpu) {
-	#endif
 		memcpy(&cpu_features, &features, sizeof(cpu_features));
 
 		/* Check for required features. It is almost certain that AMD64
@@ -299,7 +297,6 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 		} else if(!cpu_features.pge) {
 			fatal("CPU does not support PGE");
 		}
-	#if CONFIG_SMP
 	} else {
 		if(cpu_features.highest_standard != features.highest_standard
 			|| cpu_features.highest_extended != features.highest_extended
@@ -311,20 +308,15 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 			fatal("CPU %u has different feature set to boot CPU", cpu->id);
 		}
 	}
-	#endif
 
 	/* Find out the CPU frequency. When running under QEMU the boot CPU's
 	 * frequency is OK but the others will usually get rubbish, so as a
 	 * workaround use the boot CPU's frequency on all CPUs under QEMU. */
-	#if CONFIG_SMP
 	if(strncmp(cpu->arch.model_name, "QEMU", 4) != 0 || cpu == &boot_cpu) {
-	#endif
 		cpu->arch.cpu_freq = calculate_frequency(calculate_cpu_frequency);
-	#if CONFIG_SMP
 	} else {
 		cpu->arch.cpu_freq = boot_cpu.arch.cpu_freq;
 	}
-	#endif
 
 	/* Work out the cycles per µs. */
 	cpu->arch.cycles_per_us = cpu->arch.cpu_freq / 1000000;

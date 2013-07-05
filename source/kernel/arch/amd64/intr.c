@@ -133,14 +133,12 @@ static void de_fault(intr_frame_t *frame) {
 /** Handler for NMIs.
  * @param frame		Interrupt stack frame. */
 static void nmi_handler(intr_frame_t *frame) {
-	#if CONFIG_SMP
 	if(atomic_get(&kdb_running) > 0) {
 		while(atomic_get(&kdb_running) > 0)
 			arch_cpu_spin_hint();
 
 		return;
 	}
-	#endif
 
 	fatal_etc(frame, "Received unexpected NMI");
 }

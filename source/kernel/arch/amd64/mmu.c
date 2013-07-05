@@ -277,7 +277,6 @@ static void invalidate_page(mmu_context_t *ctx, ptr_t virt, bool shared) {
 	if(is_current_context(ctx))
 		x86_invlpg(virt);
 
-	#if CONFIG_SMP
 	if(shared) {
 		/* Record the address to invalidate on other CPUs when the
 		 * context is unlocked. */
@@ -289,7 +288,6 @@ static void invalidate_page(mmu_context_t *ctx, ptr_t virt, bool shared) {
 		 * flushed. */
 		ctx->arch.invalidate_count++;
 	}
-	#endif
 }
 
 /** Initialize a new context.
@@ -523,7 +521,6 @@ static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, u
 	return ret;
 }
 
-#if CONFIG_SMP
 /** Remote TLB invalidation handler.
  * @param _ctx		Address of MMU context structure.
  * @return		Always returns STATUS_SUCCESS. */
@@ -554,12 +551,10 @@ static status_t tlb_invalidate_func(void *_ctx) {
 
 	return STATUS_SUCCESS;
 }
-#endif
 
 /** Perform remote TLB invalidation.
  * @param ctx		Context to send for. */
 static void amd64_mmu_flush(mmu_context_t *ctx) {
-	#if CONFIG_SMP
 	cpu_t *cpu;
 
 	/* Check if anything needs to be done. */
@@ -586,7 +581,6 @@ static void amd64_mmu_flush(mmu_context_t *ctx) {
 	}
 
 	ctx->arch.invalidate_count = 0;
-	#endif
 }
 
 /** Switch to another MMU context.
