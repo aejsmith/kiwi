@@ -59,7 +59,7 @@ x86_features_t cpu_features;
  * @return              Current CPU ID.
  */
 cpu_id_t cpu_id(void) {
-        return (cpu_id_t)lapic_id();
+	return (cpu_id_t)lapic_id();
 }
 
 /** Dump information about a CPU.
