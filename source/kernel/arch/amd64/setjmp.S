@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Alex Smith
+ * Copyright (C) 2011-2013 Alex Smith
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,7 +19,6 @@
  * @brief		AMD64 non-local jump functions.
  */
 
-#include <arch/memory.h>
 #include <x86/asm.h>
 
 /** Context offsets. */
@@ -35,12 +34,13 @@
 FUNCTION_START(initjmp)
 	movq	%rsi, JMP_OFF_IP(%rdi)
 
-	/* Save the stack pointer, minus 16 for initial return address and to
-	 * maintain ABI alignment requirements ((RSP - 8) % 16 == 0). */
+	/* Save the stack pointer, minus 8 to maintain ABI alignment
+	 * requirements (upon entry to a function, (RSP + 8) % 16 == 0). */
 	addq	%rcx, %rdx
 	subq	$8, %rdx
 	movq	%rdx, JMP_OFF_SP(%rdi)
 
+	/* Clear frame pointer. */
 	movq	$0, JMP_OFF_BP(%rdi)
 	ret
 FUNCTION_END(initjmp)

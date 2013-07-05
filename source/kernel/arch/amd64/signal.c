@@ -70,14 +70,18 @@ status_t arch_signal_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t 
 		/* No need to obey the red zone here, this is a dedicated stack
 		 * that nothing else should be using. */
 		dest = (ptr_t)curr_thread->signal_stack.ss_sp + curr_thread->signal_stack.ss_size;
-		dest = ROUND_DOWN(dest, sizeof(unsigned long)) - sizeof(signal_frame_t);
 	} else {
-		dest = ROUND_DOWN(iframe->sp, sizeof(unsigned long)) - sizeof(signal_frame_t);
-
 		/* We must not clobber the red zone (128 bytes below the stack
 		 * pointer). */
-		dest -= 128;
+		dest = iframe->sp - 128;
 	}
+
+	/* Make space for the frame on the stack and ensure that ABI alignment
+	 * requirements are maintained - ((RSP + 8) % 16) == 0 upon entry to
+	 * the handler. */
+	dest = ROUND_DOWN(dest, 8) - sizeof(signal_frame_t);
+	if((dest % 16) == 0)
+		dest -= 8;
 
 	/* Set up the frame structure. This is copied onto the user-mode stack
 	 * below with memcpy_to_user(). */
