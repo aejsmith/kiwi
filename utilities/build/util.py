@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2011 Alex Smith
+# Copyright (C) 2011-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,20 +14,22 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-## Helper for creating source lists with certain files only enabled by config settings.
-# @param config		Configuration object.
-# @param files		List of files. If an entry is a string, it is always
-#			added. If a tuple, the first entry is the config
-#                       setting and the second is the file name, and will only
-#			be added if the setting is True.
+from SCons.Script import *
+
+# Helper for creating source lists with certain files only enabled by config
+# settings.
 def FeatureSources(config, files):
-	from SCons.Script import File
-	
-	output = []
-	for f in files:
-		if type(f) == tuple:
-			if config[f[0]]:
-				output.append(File(f[1]))
-		else:
-			output.append(File(f))
-	return output
+    output = []
+    for f in files:
+        if type(f) == tuple:
+            if config[f[0]]:
+                output.append(File(f[1]))
+        else:
+            output.append(File(f))
+    return output
+
+# Raise an error if a certain target is not specified.
+def RequireTarget(target, error):
+    if GetOption('help') or target in COMMAND_LINE_TARGETS:
+        return
+    raise SCons.Errors.StopError(error)

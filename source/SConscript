@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2011 Alex Smith
+# Copyright (C) 2009-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,9 +14,31 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('envmgr', 'config')
+Import('config', 'manager')
+import tarfile, glob, os, tempfile, shutil, sys
 
-dist = envmgr['dist']
+# Generate the configuration header. We don't generate with Kconfig because its
+# too much of a pain to get SCons to do it properly.
+f = open('config.h', 'w')
+f.write('/* This file is automatically-generated, do not edit. */\n\n')
+for (k, v) in config.items():
+    if isinstance(v, str):
+        f.write("#define CONFIG_%s \"%s\"\n" % (k, v))
+    elif isinstance(v, bool) or isinstance(v, int):
+        f.write("#define CONFIG_%s %d\n" % (k, int(v)))
+    else:
+        raise Exception, "Unsupported type %s in config" % (type(v))
+f.close()
+
+# Create the distribution environment.
+dist = manager.Create('dist', {
+    'DATA': {},
+    'LINKS': {},
+    'MODULES': [],
+    'LIBRARIES': [],
+    'BINARIES': [],
+    'SERVICES': [],
+})
 
 #################
 # Kernel build. #
@@ -31,17 +53,17 @@ SConscript(dirs = ['kernel'])
 ################
 
 # Create the build environment for the bootloader.
-env = envmgr.Create('boot', {
-	'LIBS': [],
-	'CCFLAGS': [ '-nostdlib', '-nostdinc', '-ffreestanding', '-fno-stack-protector'],
-	'ASFLAGS': ['-nostdinc'],
-	'LINKFLAGS': ['-nostdlib'],
+env = manager.Create('boot', {
+    'LIBS': [],
+    'CCFLAGS': [ '-nostdlib', '-nostdinc', '-ffreestanding', '-fno-stack-protector'],
+    'ASFLAGS': ['-nostdinc'],
+    'LINKFLAGS': ['-nostdlib'],
 })
 
 # Override any optimisation level specified, we want to optimise for size.
 env['CCFLAGS'] = filter(lambda f: f[0:2] != '-O', env['CCFLAGS']) + ['-Os']
 
-# Add the GCC include directory for some standard headers.
+# Add the compiler include directory for some standard headers.
 from subprocess import Popen, PIPE
 incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip()
 env['CCFLAGS'] += ['-isystem', incdir]
@@ -51,13 +73,13 @@ env['ASFLAGS'] += ['-isystem', incdir]
 defaults = []
 SConscript(dirs = ['boot'], exports = ['env', 'defaults'])
 for t in defaults:
-	if t[0].name != 'loader':
-		Depends(File('boot/loader'), t)
+    if t[0].name != 'loader':
+        Depends(File('boot/loader'), t)
 
 # Put stuff into the distribution environment.
 dist['LOADER'] = File('boot/loader')
 if config['PLATFORM'] == 'pc':
-	dist['CDBOOT'] = File('boot/platform/pc/stage1/cdboot')
+    dist['CDBOOT'] = File('boot/platform/pc/stage1/cdboot')
 
 ####################
 # Userspace build. #
@@ -65,132 +87,132 @@ if config['PLATFORM'] == 'pc':
 
 """
 # Set up the userspace build environment.
-env = envmgr.Create('uspace', {
-	'CPPPATH': [Dir('include')],
-	'LIBPATH': [Dir('libraries')],
-	'ASFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
-	'CCFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
-	'CXXFLAGS': ['-std=c++0x'],
-	'LIBOUTDIR': Dir('libraries'),
-	'_LIBS': {}
+env = manager.Create('uspace', {
+    'CPPPATH': [Dir('include')],
+    'LIBPATH': [Dir('libraries')],
+    'ASFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
+    'CCFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
+    'CXXFLAGS': ['-std=c++0x'],
+    'LIBOUTDIR': Dir('libraries'),
+    '_LIBS': {}
 })
 
 # Process library dependencies, and set LIBS and CPPPATH in flags.
 def process_library_deps(env, flags, libraries, build_libraries):
-	if not flags.has_key('LIBS'):
-		flags['LIBS'] = []
-	if not flags.has_key('CPPPATH'):
-		flags['CPPPATH'] = [] + env['CPPPATH']
+    if not flags.has_key('LIBS'):
+        flags['LIBS'] = []
+    if not flags.has_key('CPPPATH'):
+        flags['CPPPATH'] = [] + env['CPPPATH']
 
-	# Work out libraries to link against.
-	def add_library(lib, link):
-		if link and flags['LIBS'].count(lib) == 0:
-			flags['LIBS'].append(lib)
-		if env['_LIBS'].has_key(lib):
-			info = env['_LIBS'][lib]
-			process_library_deps(env, flags, [], info['build_libraries'])
-			flags['CPPPATH'] += info['include_path']
-	for lib in libraries:
-		add_library(lib, True)
-	for lib in build_libraries:
-		add_library(lib, False)
+    # Work out libraries to link against.
+    def add_library(lib, link):
+        if link and flags['LIBS'].count(lib) == 0:
+            flags['LIBS'].append(lib)
+        if env['_LIBS'].has_key(lib):
+            info = env['_LIBS'][lib]
+            process_library_deps(env, flags, [], info['build_libraries'])
+            flags['CPPPATH'] += info['include_path']
+    for lib in libraries:
+        add_library(lib, True)
+    for lib in build_libraries:
+        add_library(lib, False)
 
 # Custom method to build a Kiwi application.
 def kiwi_application_method(env, target, sources, libraries = None, build_libraries = None, flags = None):
-	if not libraries:
-		libraries = []
-	if not build_libraries:
-		build_libraries = []
-	if not flags:
-		flags = {}
+    if not libraries:
+        libraries = []
+    if not build_libraries:
+        build_libraries = []
+    if not flags:
+        flags = {}
 
-	# Set up the include path and get the libraries to link to.
-	process_library_deps(env, flags, libraries, build_libraries)
+    # Set up the include path and get the libraries to link to.
+    process_library_deps(env, flags, libraries, build_libraries)
 
-	# Add the application to the distribution environment.
-	dist['BINARIES'].append(File(target))
+    # Add the application to the distribution environment.
+    dist['BINARIES'].append(File(target))
 
-	# Build the application.
-	return env.Program(target, sources, **flags)
+    # Build the application.
+    return env.Program(target, sources, **flags)
 env.AddMethod(kiwi_application_method, 'KiwiApplication')
 
 # Custom method to build a Kiwi service.
 def kiwi_service_method(env, target, sources, libraries = None, build_libraries = None, flags = None):
-	if not libraries:
-		libraries = []
-	if not build_libraries:
-		build_libraries = []
-	if not flags:
-		flags = {}
+    if not libraries:
+        libraries = []
+    if not build_libraries:
+        build_libraries = []
+    if not flags:
+        flags = {}
 
-	# Set up the include path and get the libraries to link to.
-	process_library_deps(env, flags, libraries, build_libraries)
+    # Set up the include path and get the libraries to link to.
+    process_library_deps(env, flags, libraries, build_libraries)
 
-	# Add the service to the distribution environment.
-	dist['SERVICES'].append(File(target))
+    # Add the service to the distribution environment.
+    dist['SERVICES'].append(File(target))
 
-	# Build the service.
-	return env.Program(target, sources, **flags)
+    # Build the service.
+    return env.Program(target, sources, **flags)
 env.AddMethod(kiwi_service_method, 'KiwiService')
 
 # Custom method to build a Kiwi library.
 def kiwi_library_method(env, target, sources, libraries = None, build_libraries = None,
                         include_path = None, flags = None):
-	if not libraries:
-		libraries = []
-	if not build_libraries:
-		build_libraries = []
-	if not include_path:
-		include_path = []
-	elif type(include_path) != list:
-		include_path = [include_path]
-	if not flags:
-		flags = {}
+    if not libraries:
+        libraries = []
+    if not build_libraries:
+        build_libraries = []
+    if not include_path:
+        include_path = []
+    elif type(include_path) != list:
+        include_path = [include_path]
+    if not flags:
+        flags = {}
 
-	# We want to use our own include directory.
-	if include_path:
-		if not flags.has_key('CPPPATH'):
-			flags['CPPPATH'] = [] + env['CPPPATH']
-		flags['CPPPATH'] += include_path
+    # We want to use our own include directory.
+    if include_path:
+        if not flags.has_key('CPPPATH'):
+            flags['CPPPATH'] = [] + env['CPPPATH']
+        flags['CPPPATH'] += include_path
 
-	# Set up the include path and get the libraries to link to.
-	process_library_deps(env, flags, libraries, build_libraries)
+    # Set up the include path and get the libraries to link to.
+    process_library_deps(env, flags, libraries, build_libraries)
 
-	# Store our dependency/include path information.
-	env['_LIBS'][target] = {
-		'build_libraries': build_libraries,
-		'include_path': include_path,
-	}
+    # Store our dependency/include path information.
+    env['_LIBS'][target] = {
+        'build_libraries': build_libraries,
+        'include_path': include_path,
+    }
 
-	# Modify the target path so that libraries all get placed in the build
-	# library directory.
-	target = File('%s/lib%s.so' % (str(env['LIBOUTDIR']), target))
+    # Modify the target path so that libraries all get placed in the build
+    # library directory.
+    target = File('%s/lib%s.so' % (str(env['LIBOUTDIR']), target))
 
-	# Add the library to the distribution environment.
-	dist['LIBRARIES'].append(target)
+    # Add the library to the distribution environment.
+    dist['LIBRARIES'].append(target)
 
-	# Build the library.
-	return env.SharedLibrary(target, sources, **flags)
+    # Build the library.
+    return env.SharedLibrary(target, sources, **flags)
 env.AddMethod(kiwi_library_method, 'KiwiLibrary')
 
 # Set up a shared library emitter to set dependencies on default libraries.
 def shlib_emitter(target, source, env):
-	if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
-		Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
-	if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
-		Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
-	return target, source
+    if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
+        Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
+    if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
+        Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+    return target, source
 env.Append(SHLIBEMITTER = [shlib_emitter])
 
 # Set up a program emitter to set dependencies on default libraries.
 def program_emitter(target, source, env):
-	if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
-		Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
-	if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
-		Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
-		if env['SMARTLINK'](source, target, env, None) == '$CXX':
-			Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
-	return target, source
+    if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
+        Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
+    if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
+        Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+        if env['SMARTLINK'](source, target, env, None) == '$CXX':
+            Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
+    return target, source
 env.Append(PROGEMITTER = [program_emitter])
 
 # Add an action for ASM files in a shared library.
@@ -202,3 +224,85 @@ shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARG
 SConscript(dirs = ['libraries', 'services', 'binaries'], exports = ['env'])
 """
 
+###############
+# Image build #
+###############
+
+# Create a TAR archive containing the filesystem tree.
+def fs_image_func(target, source, env):
+    # Create the work directory.
+    tmpdir = tempfile.mkdtemp('.kiwifsimage')
+    os.makedirs(os.path.join(tmpdir, 'system', 'binaries'))
+    os.makedirs(os.path.join(tmpdir, 'system', 'data'))
+    os.makedirs(os.path.join(tmpdir, 'system', 'libraries'))
+    os.makedirs(os.path.join(tmpdir, 'system', 'modules'))
+    os.makedirs(os.path.join(tmpdir, 'system', 'services'))
+
+    # Copy everything needed into it.
+    for bin in env['BINARIES']:
+        shutil.copy(str(bin), os.path.join(tmpdir, 'system', 'binaries'))
+    for svc in env['SERVICES']:
+        shutil.copy(str(svc), os.path.join(tmpdir, 'system', 'services'))
+    for lib in env['LIBRARIES']:
+        shutil.copy(str(lib), os.path.join(tmpdir, 'system', 'libraries'))
+    for mod in env['MODULES']:
+        shutil.copy(str(mod), os.path.join(tmpdir, 'system', 'modules'))
+    for (app, files) in env['DATA'].items():
+        os.makedirs(os.path.join(tmpdir, 'system', 'data', app))
+        for f in files:
+            shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
+    os.system('cp -R ' + os.path.join(str(Dir('#/data')), '*') + ' ' + tmpdir)
+    for (source, dest) in env['LINKS'].items():
+        if source[0] == '/':
+            source = source[1:]
+        os.symlink(dest, os.path.join(tmpdir, source))
+
+    # Copy extras.
+    if len(config['EXTRA_FSIMAGE']) > 0:
+        os.system('cp -R ' + os.path.join(config['EXTRA_FSIMAGE'], '*') + ' ' + tmpdir)
+
+    # Create the TAR file.
+    tar = tarfile.open(str(target[0]), 'w')
+    cwd = os.getcwd()
+    os.chdir(tmpdir)
+    for f in glob.glob('*'):
+        tar.add(f)
+    os.chdir(cwd)
+    tar.close()
+
+    # Clean up.
+    shutil.rmtree(tmpdir)
+data = []
+for (k, v) in dist['DATA'].items():
+    data += v
+target = dist.Command('fsimage.tar',
+    dist['MODULES'] + dist['LIBRARIES'] + dist['SERVICES'] + dist['BINARIES'] + data,
+    Action(fs_image_func, '$GENCOMSTR'))
+dist['FSIMAGE'] = File('fsimage.tar')
+
+# Always build the filesystem image to make sure new stuff is copied into it.
+AlwaysBuild(target)
+
+# Add aliases and set the default target.
+Alias('loader', dist['LOADER'])
+Alias('kernel', dist['KERNEL'])
+Alias('modules', dist['MODULES'])
+Alias('libraries', dist['LIBRARIES'])
+Alias('services', dist['SERVICES'])
+Alias('binaries', dist['BINARIES'])
+Alias('fsimage', dist['FSIMAGE'])
+
+# Add platform-specific targets to generate bootable images.
+if config['PLATFORM'] == 'pc':
+    from iso import ISOBuilder
+    dist['BUILDERS']['ISOImage'] = ISOBuilder
+
+    Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
+
+    # Target to run in QEMU.
+    Alias('qemu', dist.Command('__qemu', ['cdrom.iso'], Action(
+        config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'],
+        None)))
+else:
+    Default(dist['KERNEL'])
+    Default(dist['LOADER'])

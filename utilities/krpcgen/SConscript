@@ -15,34 +15,31 @@
 #
 
 import os.path
-Import('env', 'envmgr')
+Import('env', 'manager')
 
 # Add krpcgen to the build environments.
-envmgr.AddVariable('KRPCGEN', env.Program('krpcgen', [
-	'CXXCodeGen.cc',
-	'Function.cc',
-	'Service.cc',
-	'Type.cc',
-	'parser.y',
-	'lexer.l',
-	'main.cc',
+manager.AddVariable('KRPCGEN', env.Program('krpcgen', [
+    'CXXCodeGen.cc',
+    'Function.cc',
+    'Service.cc',
+    'Type.cc',
+    'parser.y',
+    'lexer.l',
+    'main.cc',
 ]))
 
 # Add builders to generate RPC server/client code.
 def rpc_emitter(target, source, env):
-	target.append(File(os.path.splitext(str(target[0]))[0] + '.h'))
-	env.Depends(target[0], env['KRPCGEN'])
-	env.Depends(target[1], env['KRPCGEN'])
-	return target, source
-envmgr.AddBuilder('RPCServerClient', Builder(
-	action=Action('$KRPCGEN -s -c -o $TARGET $SOURCE', '$GENCOMSTR'),
-	emitter=rpc_emitter
-))
-envmgr.AddBuilder('RPCServer', Builder(
-	action=Action('$KRPCGEN -s -o $TARGET $SOURCE', '$GENCOMSTR'),
-	emitter=rpc_emitter
-))
-envmgr.AddBuilder('RPCClient', Builder(
-	action=Action('$KRPCGEN -c -o $TARGET $SOURCE', '$GENCOMSTR'),
-	emitter=rpc_emitter
-))
+    target.append(File(os.path.splitext(str(target[0]))[0] + '.h'))
+    env.Depends(target[0], env['KRPCGEN'])
+    env.Depends(target[1], env['KRPCGEN'])
+    return target, source
+manager.AddBuilder('RPCServerClient', Builder(
+    action=Action('$KRPCGEN -s -c -o $TARGET $SOURCE', '$GENCOMSTR'),
+    emitter=rpc_emitter))
+manager.AddBuilder('RPCServer', Builder(
+    action=Action('$KRPCGEN -s -o $TARGET $SOURCE', '$GENCOMSTR'),
+    emitter=rpc_emitter))
+manager.AddBuilder('RPCClient', Builder(
+    action=Action('$KRPCGEN -c -o $TARGET $SOURCE', '$GENCOMSTR'),
+    emitter=rpc_emitter))

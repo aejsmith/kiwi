@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2011 Alex Smith
+# Copyright (C) 2009-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,77 +14,77 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'envmgr', 'version')
+Import('config', 'manager', 'version')
 from util import FeatureSources
 
 sources = FeatureSources(config, [
-	'console/console.c',
-	'console/copyright.c',
-	'console/fb.c',
-	'console/font.c',
-	'console/logo.c',
+    'console/console.c',
+    'console/copyright.c',
+    'console/fb.c',
+    'console/font.c',
+    'console/logo.c',
 
-	'device/irq.c',
+    'device/irq.c',
 
-	'io/context.c',
-	'io/device.c',
-	'io/entry_cache.c',
-	'io/file_map.c',
-	'io/fs.c',
-	'io/ramfs.c',
+    'io/context.c',
+    'io/device.c',
+    'io/entry_cache.c',
+    'io/file_map.c',
+    'io/fs.c',
+    'io/ramfs.c',
 
-	#'ipc/ipc.c',
-	'ipc/pipe.c',
+    #'ipc/ipc.c',
+    'ipc/pipe.c',
 
-	'lib/avl_tree.c',
-	'lib/bitmap.c',
-	'lib/fixed_heap.c',
-	'lib/id_allocator.c',
-	'lib/notifier.c',
-	'lib/printf.c',
-	'lib/qsort.c',
-	'lib/radix_tree.c',
-	'lib/string.c',
-	'lib/tar.c',
+    'lib/avl_tree.c',
+    'lib/bitmap.c',
+    'lib/fixed_heap.c',
+    'lib/id_allocator.c',
+    'lib/notifier.c',
+    'lib/printf.c',
+    'lib/qsort.c',
+    'lib/radix_tree.c',
+    'lib/string.c',
+    'lib/tar.c',
 
-	#'mm/area.c',
-	'mm/kmem.c',
-	'mm/malloc.c',
-	'mm/mmu.c',
-	'mm/page.c',
-	'mm/phys.c',
-	'mm/safe.c',
-	'mm/slab.c',
-	'mm/vm.c',
-	'mm/vm_cache.c',
+    #'mm/area.c',
+    'mm/kmem.c',
+    'mm/malloc.c',
+    'mm/mmu.c',
+    'mm/page.c',
+    'mm/phys.c',
+    'mm/safe.c',
+    'mm/slab.c',
+    'mm/vm.c',
+    'mm/vm_cache.c',
 
-	'proc/process.c',
-	'proc/sched.c',
-	'proc/signal.c',
-	'proc/thread.c',
+    'proc/process.c',
+    'proc/sched.c',
+    'proc/signal.c',
+    'proc/thread.c',
 
-	'sync/condvar.c',
-	'sync/futex.c',
-	'sync/mutex.c',
-	'sync/rwlock.c',
-	'sync/semaphore.c',
-	'sync/spinlock.c',
+    'sync/condvar.c',
+    'sync/futex.c',
+    'sync/mutex.c',
+    'sync/rwlock.c',
+    'sync/semaphore.c',
+    'sync/spinlock.c',
 
-	'cpu.c',
-	'dpc.c',
-	'elf.c',
-	'fatal.c',
-	'init.c',
-	'kdb.c',
+    'cpu.c',
+    'dpc.c',
+    'elf.c',
+    'fatal.c',
+    'init.c',
+    'kdb.c',
     'log.c',
-	'module.c',
-	'object.c',
-	'shutdown.c',
-	('SMP', 'smp.c'),
-	'symbol.c',
-	'syscall_table.c',
-	'time.c',
-	'version.c',
+    'module.c',
+    'object.c',
+    'shutdown.c',
+    ('SMP', 'smp.c'),
+    'symbol.c',
+    'syscall_table.c',
+    'time.c',
+    'version.c',
 ])
 
 ############################
@@ -92,38 +92,35 @@ sources = FeatureSources(config, [
 ############################
 
 # Create the kernel environment.
-env = envmgr.Create('kernel', {
-	'LIBS': [],
-	'CPPPATH': [
-		Dir('include'),
-		Dir('arch/%s/include' % (config['ARCH'])),
-		Dir('platform/%s/include' % (config['PLATFORM'])),
-	],
-	'CCFLAGS': [
-		'-nostdlib', '-nostdinc', '-ffreestanding',
-		'-fno-stack-protector', '-include',
-		'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
-	],
-	'CXXFLAGS': [
-		'-fno-exceptions', '-fno-rtti',
-	],
-	'ASFLAGS': [
-		'-nostdinc', '-include',
-		'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
-	],
-	'LINKFLAGS': [
-		'-nostdlib',
-	],
-	'CPPDEFINES': {
-		'KERNEL': None,
-	},
+env = manager.Create('kernel', {
+    'LIBS': [],
+    'CPPPATH': [
+        Dir('include'),
+        Dir('arch/%s/include' % (config['ARCH'])),
+        Dir('platform/%s/include' % (config['PLATFORM'])),
+    ],
+    'CCFLAGS': [
+        '-nostdlib', '-nostdinc', '-ffreestanding',
+        '-fno-omit-frame-pointer', '-fno-optimize-sibling-calls',
+        '-fno-stack-protector', '-include',
+        'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
+    ],
+    'CXXFLAGS': [
+        '-fno-exceptions', '-fno-rtti',
+    ],
+    'ASFLAGS': [
+        '-nostdinc', '-include',
+        'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
+    ],
+    'LINKFLAGS': [
+        '-nostdlib',
+    ],
+    'CPPDEFINES': {
+        'KERNEL': None,
+    },
 })
 
-# If doing a debug build, do not disable frame pointers.
-if config['DEBUG']:
-	env['CCFLAGS'] += ['-fno-omit-frame-pointer', '-fno-optimize-sibling-calls']
-
-# Add the GCC include directory for some standard headers.
+# Add the compiler include directory for some standard headers.
 from subprocess import Popen, PIPE
 incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip()
 env['CCFLAGS'] += ['-isystem', incdir]
@@ -131,27 +128,24 @@ env['ASFLAGS'] += ['-isystem', incdir]
 
 # Generate the version information file.
 def gen_version_c(target, source, env):
-	f = open(str(target[0]), 'w')
-	f.write('int kiwi_ver_release = %d;\n' % (version['KIWI_VER_RELEASE']))
-	f.write('int kiwi_ver_update = %d;\n' % (version['KIWI_VER_UPDATE']))
-	f.write('int kiwi_ver_revision = %d;\n' % (version['KIWI_VER_REVISION']))
-	f.write('const char *kiwi_ver_string = "%s";\n' % (version['KIWI_VER_STRING']))
-	f.close()
+    f = open(str(target[0]), 'w')
+    f.write('int kiwi_ver_release = %d;\n' % (version['KIWI_VER_RELEASE']))
+    f.write('int kiwi_ver_update = %d;\n' % (version['KIWI_VER_UPDATE']))
+    f.write('int kiwi_ver_revision = %d;\n' % (version['KIWI_VER_REVISION']))
+    f.write('const char *kiwi_ver_string = "%s";\n' % (version['KIWI_VER_STRING']))
+    f.close()
 AlwaysBuild(env.Command('version.c', [], env.Action(gen_version_c, None)))
 
 # Generate the boot splash image source files.
 env.Command('console/logo.c', ['console/logo.ppm'],
-	Action('$BIN2HEX $SOURCE logo_ppm > $TARGET', '$GENCOMSTR'))
+    Action('$BIN2HEX $SOURCE logo_ppm > $TARGET', '$GENCOMSTR'))
 env.Command('console/copyright.c', ['console/copyright.ppm'],
-	Action('$BIN2HEX $SOURCE copyright_ppm > $TARGET', '$GENCOMSTR'))
+    Action('$BIN2HEX $SOURCE copyright_ppm > $TARGET', '$GENCOMSTR'))
 
 # Generate the system call table.
 env['SYSCALLS'] = File('syscalls.def')
 env.SyscallTable('syscall_table.c', env['SYSCALLS'], TABLE='syscall_table')
 env.SyscallHeader('include/syscall_table.h', env['SYSCALLS'], GUARD='__SYSCALL_TABLE_H')
-
-# Let the distribution environment know where the kernel is.
-envmgr['dist']['KERNEL'] = File('kernel')
 
 # Get the list of source files from the architecture/platform.
 arch_sources = SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])
@@ -160,41 +154,44 @@ sources = arch_sources + platform_sources + sources
 
 # Create a fake symbol table used for the first linking stage.
 def fake_symtab_func(target, source, env):
-	f = open(str(target[0]), 'w')
-	f.write('/* This file is auto-generated, changes will be overwritten. */\n')
-	f.write('#include <symbol.h>\n')
-	f.write('static symbol_t kernel_symtab_array[] = { { { NULL, NULL }, 0x0, 0x0, "dummy", 0, false } };\n')
-	f.write('symbol_table_t kernel_symtab = { .symbols = kernel_symtab_array, .count = 1 };\n')
-	f.close()
-	return None
+    f = open(str(target[0]), 'w')
+    f.write('/* This file is auto-generated, changes will be overwritten. */\n')
+    f.write('#include <symbol.h>\n')
+    f.write('static symbol_t kernel_symtab_array[] = { { { NULL, NULL }, 0x0, 0x0, "dummy", 0, false } };\n')
+    f.write('symbol_table_t kernel_symtab = { .symbols = kernel_symtab_array, .count = 1 };\n')
+    f.close()
+    return None
 
 # Link the first kernel image using a fake symbol table.
 env.Command('fake-symtab.c', [], Action(fake_symtab_func, '$GENCOMSTR'))
 env.Program('kernel-pass1', map(env.Object, sources) + ['fake-symtab.c'],
-	LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+    LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
 Depends('kernel-pass1', env['LDSCRIPT'])
 
 # Generate the first real symbol table and relink the kernel with it.
 env.Command('symtab-pass1.c', ['kernel-pass1'],
-	Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
+    Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
 env.Program('kernel-pass2', map(env.Object, sources) + ['symtab-pass1.c'],
-	LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+    LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
 Depends('kernel-pass2', env['LDSCRIPT'])
 
 # Generate the final symbol table with correct symbol addresses.
 env.Command('symtab-pass2.c', ['kernel-pass2'],
-	Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
+    Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
 env.Program('kernel-unstripped', map(env.Object, sources) + ['symtab-pass2.c'],
-	LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+    LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
 Depends('kernel-unstripped', env['LDSCRIPT'])
 
 # Generate various information files and the stripped kernel image.
 env.Command(['kernel', 'kernel.lst', 'kernel.rde', 'kernel.sym'], 'kernel-unstripped', [
-	Action('$STRIP --strip-debug $SOURCE -o ${TARGETS[0]}', '$GENCOMSTR'),
-	Action('$OBJDUMP -d $SOURCE > ${TARGETS[1]}', None),
-	Action('$READELF -a $SOURCE > ${TARGETS[2]}', None),
-	Action('$NM -C $SOURCE | sort > ${TARGETS[3]}', None),
+    Action('$STRIP --strip-debug $SOURCE -o ${TARGETS[0]}', '$GENCOMSTR'),
+    Action('$OBJDUMP -d $SOURCE > ${TARGETS[1]}', None),
+    Action('$READELF -a $SOURCE > ${TARGETS[2]}', None),
+    Action('$NM -C $SOURCE | sort > ${TARGETS[3]}', None),
 ])
+
+# Let the distribution environment know where the kernel is.
+manager['dist']['KERNEL'] = File('kernel')
 
 # Build kernel modules.
 #SConscript(dirs = ['modules'])

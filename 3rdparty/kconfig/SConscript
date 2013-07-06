@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2010-2011 Alex Smith
+# Copyright (C) 2010-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,42 +14,45 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'envmgr')
+Import('env', 'manager')
 import os
 
 # Find out the name of the ncurses library.
 def lxdialog_libs():
-	for ext in ['so', 'a', 'dylib']:
-		for lib in ['ncursesw', 'ncurses', 'curses']:
-			ret = os.system(
-				'%s -print-file-name=lib%s.%s | grep -q /' % (env['CC'], lib, ext)
-			)
-			if ret == 0:
-				return [lib]
-	return []
+    for ext in ['so', 'a', 'dylib']:
+        for lib in ['ncursesw', 'ncurses', 'curses']:
+            ret = os.system(
+                '%s -print-file-name=lib%s.%s | grep -q /' % (env['CC'], lib, ext)
+            )
+            if ret == 0:
+                return [lib]
+    return []
 
 # Find the path to the ncurses header.
 def lxdialog_ccflags():
-	if os.path.exists('/usr/include/ncurses/ncurses.h'):
-		return '-I/usr/include/ncurses -DCURSES_LOC="<ncurses.h>"'
-	elif os.path.exists('/usr/include/ncurses/curses.h'):
-		return '-I/usr/include/ncurses -DCURSES_LOC="<ncurses/curses.h>"'
-	elif os.path.exists('/usr/include/ncurses.h'):
-		return '-DCURSES_LOC="<ncurses.h>"'
-	else:
-		return '-DCURSES_LOC="<curses.h>"'
+    if os.path.exists('/usr/include/ncurses/ncurses.h'):
+        return '-I/usr/include/ncurses -DCURSES_LOC="<ncurses.h>"'
+    elif os.path.exists('/usr/include/ncurses/curses.h'):
+        return '-I/usr/include/ncurses -DCURSES_LOC="<ncurses/curses.h>"'
+    elif os.path.exists('/usr/include/ncurses.h'):
+        return '-DCURSES_LOC="<ncurses.h>"'
+    else:
+        return '-DCURSES_LOC="<curses.h>"'
+
+mconf_sources = map(File, [
+    'mconf.c',
+    'zconf.tab.c',
+    'lxdialog/checklist.c',
+    'lxdialog/util.c',
+    'lxdialog/inputbox.c',
+    'lxdialog/textbox.c',
+    'lxdialog/yesno.c',
+    'lxdialog/menubox.c',
+])
 
 # Build the menu configuration utility.
-env['MCONF'] = env.Program('mconf', [
-	'mconf.c',
-	'zconf.tab.c',
-	'lxdialog/checklist.c',
-	'lxdialog/util.c',
-	'lxdialog/inputbox.c',
-	'lxdialog/textbox.c',
-	'lxdialog/yesno.c',
-	'lxdialog/menubox.c',
-], CCFLAGS = lxdialog_ccflags(), LIBS = lxdialog_libs(), CPPDEFINES = ['KBUILD_NO_NLS'])
+env['MCONF'] = env.Program('mconf', mconf_sources, CCFLAGS = lxdialog_ccflags(),
+    LIBS = lxdialog_libs(), CPPDEFINES = ['KBUILD_NO_NLS'])
 
 # Add a config menu builder.
-envmgr.AddTool('ConfigMenu', env['MCONF'], Action('$MCONF $SOURCE', None))
+manager.AddTool('ConfigMenu', env['MCONF'], Action('$MCONF $SOURCE', None))

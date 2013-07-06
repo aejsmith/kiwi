@@ -14,28 +14,25 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'env', 'envmgr')
+Import('config', 'env', 'manager')
 
 # Add sysgen to the build environments.
-envmgr.AddVariable('SYSGEN', env.Program('sysgen', [
-	'AMD64Target.cc',
-	'IA32Target.cc',
-	'parser.y',
-	'lexer.l',
-	'main.cc',
+manager.AddVariable('SYSGEN', env.Program('sysgen', [
+    'AMD64Target.cc',
+    'IA32Target.cc',
+    'parser.y',
+    'lexer.l',
+    'main.cc',
 ]))
-envmgr.AddVariable('SYSGENFLAGS', [])
+manager.AddVariable('SYSGENFLAGS', [])
 
 # Add builders to generate system call code.
-envmgr.AddTool('SyscallTable', env['SYSGEN'], Action(
-	'$SYSGEN $SYSGENFLAGS -t $TABLE -o $TARGET %s $SOURCES' % (config['ARCH']),
-	'$GENCOMSTR'
-))
-envmgr.AddTool('SyscallHeader', env['SYSGEN'], Action(
-	'$SYSGEN $SYSGENFLAGS -n $GUARD -o $TARGET %s $SOURCES' % (config['ARCH']),
-	'$GENCOMSTR'
-))
-envmgr.AddTool('Syscalls', env['SYSGEN'], Action(
-	'$SYSGEN $SYSGENFLAGS -o $TARGET %s $SOURCES' % (config['ARCH']),
-	'$GENCOMSTR'
-))
+manager.AddTool('SyscallTable', env['SYSGEN'], Action(
+    '$SYSGEN $SYSGENFLAGS -t $TABLE -o $TARGET %s $SOURCES' % (config['ARCH']),
+    '$GENCOMSTR'))
+manager.AddTool('SyscallHeader', env['SYSGEN'], Action(
+    '$SYSGEN $SYSGENFLAGS -n $GUARD -o $TARGET %s $SOURCES' % (config['ARCH']),
+    '$GENCOMSTR'))
+manager.AddTool('Syscalls', env['SYSGEN'], Action(
+    '$SYSGEN $SYSGENFLAGS -o $TARGET %s $SOURCES' % (config['ARCH']),
+    '$GENCOMSTR'))

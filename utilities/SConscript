@@ -14,17 +14,12 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'envmgr')
-import os
-
-if os.uname()[0] == 'Darwin':
-	env['CPPPATH'] = ['/opt/local/include']
-	env['LIBPATH'] = ['/opt/local/lib']
+Import('env', 'manager')
 
 # Set paths to build utilities.
-envmgr.AddVariable('GENSYMTAB', File('../../../utilities/gensymtab.py'))
-envmgr.AddVariable('GENERRLIST', File('../../../utilities/generrlist.py'))
-envmgr.AddVariable('BIN2HEX', File('../../../utilities/bin2hex.py'))
+manager.AddVariable('GENSYMTAB', File('../../utilities/gensymtab.py'))
+manager.AddVariable('GENERRLIST', File('../../utilities/generrlist.py'))
+manager.AddVariable('BIN2HEX', File('../../utilities/bin2hex.py'))
 
 # Visit subdirectories.
 SConscript(dirs = ['kconfig', 'krpcgen', 'sysgen'], exports = ['env'])
