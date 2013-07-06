@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -224,7 +224,7 @@ status_t kern_signal_send(handle_t handle, int num) {
 	memset(&info, 0, sizeof(info));
 	info.si_code = SI_USER;
 	info.si_pid = curr_proc->id;
-	info.si_uid = curr_proc->security.uid;
+	//info.si_uid = curr_proc->security.uid;
 
 	if(handle > 0) {
 		ret = object_handle_lookup(handle, -1, 0, &khandle);
@@ -234,10 +234,6 @@ status_t kern_signal_send(handle_t handle, int num) {
 		switch(khandle->object->type->id) {
 		case OBJECT_TYPE_PROCESS:
 			process = (process_t *)khandle->object;
-			if(!object_handle_rights(khandle, PROCESS_RIGHT_SIGNAL)) {
-				object_handle_release(khandle);
-				return STATUS_ACCESS_DENIED;
-			}
 
 			mutex_lock(&process->lock);
 
@@ -267,10 +263,6 @@ status_t kern_signal_send(handle_t handle, int num) {
 			break;
 		case OBJECT_TYPE_THREAD:
 			thread = (thread_t *)khandle->object;
-			if(!object_handle_rights(khandle, THREAD_RIGHT_SIGNAL)) {
-				object_handle_release(khandle);
-				return STATUS_ACCESS_DENIED;
-			}
 			break;
 		default:
 			object_handle_release(khandle);

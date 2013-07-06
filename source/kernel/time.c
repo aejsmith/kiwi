@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -526,19 +526,14 @@ static bool user_timer_func(void *_timer) {
  * @param handlep	Where to store handle to timer object.
  * @return		Status code describing result of the operation. */
 status_t kern_timer_create(unsigned flags, handle_t *handlep) {
-	object_acl_t acl;
-	object_security_t security = { -1, -1, &acl };
 	user_timer_t *timer;
 	status_t ret;
 
-	if(!handlep) {
+	if(!handlep)
 		return STATUS_INVALID_ARG;
-	}
-
-	object_acl_init(&acl);
 
 	timer = kmalloc(sizeof(*timer), MM_WAIT);
-	object_init(&timer->obj, &timer_object_type, &security, NULL);
+	object_init(&timer->obj, &timer_object_type);
 	timer_init(&timer->timer, "user_timer", user_timer_func, timer, TIMER_THREAD);
 	notifier_init(&timer->notifier, timer);
 	timer->flags = flags;

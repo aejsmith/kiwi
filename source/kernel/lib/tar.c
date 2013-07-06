@@ -31,6 +31,7 @@
 #include <object.h>
 #include <status.h>
 
+#if 0
 /** Convert a TAR mode to a set of rights.
  * @param mode		Mode to convert (the part of interest should be in the
  *			lowest 3 bits).
@@ -47,6 +48,7 @@ static inline object_rights_t mode_to_rights(uint16_t mode) {
 
 	return rights;
 }
+#endif
 
 /** Handle an entry in a TAR file.
  * @param header	Header for the entry.
@@ -55,11 +57,7 @@ static inline object_rights_t mode_to_rights(uint16_t mode) {
  * @param prefix	Prefix for path string.
  * @return		Status code describing result of the operation. */
 static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, const char *prefix) {
-	object_acl_t acl;
-	object_security_t security = { 0, 0, &acl };
 	object_handle_t *handle;
-	object_rights_t rights;
-	uint16_t mode;
 	status_t ret;
 	size_t bytes;
 	char *path;
@@ -74,25 +72,13 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 		path = header->name;
 	}
 
-	/* Convert the mode to an ACL. */
-	mode = strtoul(header->mode, NULL, 8);
-	object_acl_init(&acl);
-	rights = mode_to_rights(mode >> 6);
-	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, rights);
-	rights = mode_to_rights(mode >> 3);
-	object_acl_add_entry(&acl, ACL_ENTRY_GROUP, -1, rights);
-	rights = mode_to_rights(mode);
-	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, rights);
-
 	/* Handle the entry based on its type flag. */
 	switch(header->typeflag) {
 	case REGTYPE:
 	case AREGTYPE:
-		ret = file_open(path, FILE_RIGHT_WRITE, 0, FILE_CREATE_ALWAYS,
-			&security, &handle);
-		if(ret != STATUS_SUCCESS) {
+		ret = file_open(path, FILE_RIGHT_WRITE, 0, FILE_CREATE_ALWAYS, &handle);
+		if(ret != STATUS_SUCCESS)
 			goto out;
-		}
 
 		ret = file_write(handle, data, size, &bytes);
 		if(ret != STATUS_SUCCESS) {
@@ -107,16 +93,16 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 		object_handle_release(handle);
 		break;
 	case DIRTYPE:
-		ret = dir_create(path, &security);
-		if(ret != STATUS_SUCCESS) {
+		ret = dir_create(path);
+		if(ret != STATUS_SUCCESS)
 			goto out;
-		}
+
 		break;
 	case SYMTYPE:
 		ret = symlink_create(path, header->linkname);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			goto out;
-		}
+
 		break;
 	default:
 		kprintf(LOG_DEBUG, "tar: unhandled type flag '%c'\n", header->typeflag);
@@ -125,10 +111,9 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 
 	ret = STATUS_SUCCESS;
 out:
-	object_acl_destroy(&acl);
-	if(prefix) {
+	if(prefix)
 		kfree(path);
-	}
+
 	return ret;
 }
 

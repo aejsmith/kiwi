@@ -28,16 +28,11 @@
 extern "C" {
 #endif
 
-/** Semaphore access rights. */
-#define SEMAPHORE_RIGHT_USAGE	(1<<0)	/**< Allow usage of the semaphore. */
-
 /** Maximum length of a semaphore name. */
 #define SEMAPHORE_NAME_MAX	32
 
-extern status_t kern_semaphore_create(const char *name, size_t count,
-                                      const object_security_t *security,
-                                      object_rights_t rights, handle_t *handlep);
-extern status_t kern_semaphore_open(semaphore_id_t id, object_rights_t rights, handle_t *handlep);
+extern status_t kern_semaphore_create(const char *name, size_t count, handle_t *handlep);
+extern status_t kern_semaphore_open(semaphore_id_t id, handle_t *handlep);
 extern semaphore_id_t kern_semaphore_id(handle_t handle);
 extern status_t kern_semaphore_down(handle_t handle, useconds_t timeout);
 extern status_t kern_semaphore_up(handle_t handle, size_t count);

@@ -23,7 +23,6 @@
 #define __KERNEL_IPC_H
 
 #include <kernel/object.h>
-#include <kernel/security.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,8 +48,7 @@ typedef struct port_client {
 #define IPC_QUEUE_MAX			256	/**< Maximum number of messages in a queue at a time. */
 #define IPC_MESSAGE_MAX			16384	/**< Maximum size of a message data buffer. */
 
-extern status_t kern_port_create(const object_security_t *security, object_rights_t rights,
-                                 handle_t *handlep);
+extern status_t kern_port_create(object_rights_t rights, handle_t *handlep);
 extern status_t kern_port_open(port_id_t id, object_rights_t rights, handle_t *handlep);
 extern port_id_t kern_port_id(handle_t handle);
 extern status_t kern_port_listen(handle_t handle, useconds_t timeout, handle_t *connp,

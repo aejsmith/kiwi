@@ -33,8 +33,7 @@ extern "C" {
 #define AREA_RIGHT_WRITE	(1<<1)	/**< Allow mapping for writing. */
 
 extern status_t kern_area_create(size_t size, handle_t source, offset_t offset,
-                                 const object_security_t *security,
-                                 object_rights_t rights, handle_t *handlep);
+	object_rights_t rights, handle_t *handlep);
 extern status_t kern_area_open(area_id_t id, object_rights_t rights, handle_t *handlep);
 extern area_id_t kern_area_id(handle_t handle);
 extern size_t kern_area_size(handle_t handle);

@@ -32,9 +32,6 @@
 
 #include <proc/process.h>
 
-#include <security/cap.h>
-#include <security/context.h>
-
 #include <assert.h>
 #include <kboot.h>
 #include <kdb.h>
@@ -57,9 +54,8 @@ typedef struct file_handle {
 } file_handle_t;
 
 extern void fs_node_get(fs_node_t *node);
-extern status_t kern_fs_security(const char *path, bool follow, user_id_t *uidp,
-                                 group_id_t *gidp, object_acl_t *aclp);
 static status_t dir_lookup(fs_node_t *node, const char *name, node_id_t *idp);
+
 static object_type_t file_object_type;
 
 /** List of registered FS types. */
@@ -204,17 +200,11 @@ status_t fs_type_unregister(fs_type_t *type) {
  * @param mount		Mount that the node resides on.
  * @param id		ID of the node.
  * @param type		Type of the node.
- * @param security	Security attributes for the node. Should be NULL if the
- *			filesystem does not support security attributes, in
- *			which case default attributes will be used.
  * @param ops		Pointer to operations structure for the node.
  * @param data		Implementation-specific data pointer.
  * @return		Pointer to node structure allocated. */
 fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, file_type_t type,
-                         object_security_t *security, fs_node_ops_t *ops,
-                         void *data) {
-	object_security_t dsecurity;
-	object_acl_t acl, sacl;
+                         fs_node_ops_t *ops, void *data) {
 	fs_node_t *node;
 
 	node = slab_cache_alloc(fs_node_cache, MM_WAIT);
@@ -229,38 +219,15 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, file_type_t type,
 	node->data = data;
 	node->mount = mount;
 
-	/* If no security attributes are provided, it means that the FS we're
-	 * creating the node for does not have security support. Construct a
-	 * default ACL that grants access to everyone. */
-	if(!security) {
-		dsecurity.uid = 0;
-		dsecurity.gid = 0;
-		dsecurity.acl = &acl;
-
-		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEFAULT_FILE_RIGHTS_OWNER);
-
-		security = &dsecurity;
-	}
-
-	/* Create the system ACL. This grants processes with the CAP_FS_ADMIN
-	 * capability full control over the filesystem. FIXME: Should only
-	 * grant execute if a directory or if the standard ACL grants execute
-	 * capability to somebody. */
-	object_acl_init(&sacl);
-	object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_FS_ADMIN, OBJECT_RIGHT_OWNER);
-	//object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_FS_ADMIN,
-	//                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE);
-
 	/* Initialize the node's object header. Only regular files and
 	 * directories can have handles opened to them. */
 	switch(type) {
 	case FILE_TYPE_REGULAR:
 	case FILE_TYPE_DIR:
-		object_init(&node->obj, &file_object_type, security, &sacl);
+		object_init(&node->obj, &file_object_type);
 		break;
 	default:
-		object_init(&node->obj, NULL, security, &sacl);
+		object_init(&node->obj, NULL);
 		break;
 	}
 
@@ -774,43 +741,14 @@ void fs_node_remove(fs_node_t *node) {
  * @param path		Path to node to create.
  * @param type		Type to give the new node.
  * @param target	For symbolic links, the target of the link.
- * @param security	Security attributes for the node.
  * @param nodep		Where to store pointer to created node (can be NULL).
  * @return		Status code describing result of the operation. */
 static status_t fs_node_create(const char *path, file_type_t type, const char *target,
-                               object_security_t *security, fs_node_t **nodep) {
+                               fs_node_t **nodep) {
 	fs_node_t *parent = NULL, *node = NULL;
 	char *dir, *name;
 	node_id_t id;
 	status_t ret;
-	size_t i;
-
-	assert(security);
-	assert(security->acl);
-
-	/* Validate the security attributes. */
-	ret = object_security_validate(security, NULL);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	}
-	for(i = 0; i < security->acl->count; i++) {
-		switch(security->acl->entries[i].type) {
-		case ACL_ENTRY_CAPABILITY:
-			return STATUS_NOT_SUPPORTED;
-		}
-	}
-
-	/* Replace -1 for UID and GID in the security attributes with the
-	 * current UID/GID. Normally this would be done by object_init(),
-	 * however we pass this through to the filesystem to write the
-	 * security attributes for the node, meaning the values must be
-	 * valid. */
-	if(security->uid < 0) {
-		security->uid = security_current_uid();
-	}
-	if(security->gid < 0) {
-		security->gid = security_current_gid();
-	}
 
 	/* Split path into directory/name. */
 	dir = kdirname(path, MM_WAIT);
@@ -864,7 +802,7 @@ static status_t fs_node_create(const char *path, file_type_t type, const char *t
 	}
 
 	/* We can now call into the filesystem to create the node. */
-	ret = parent->ops->create(parent, name, type, target, security, &node);
+	ret = parent->ops->create(parent, name, type, target, &node);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -1048,33 +986,6 @@ static status_t file_handle_create(fs_node_t *node, object_rights_t rights, int 
 	return ret;
 }
 
-/** Change filesystem security attributes.
- * @param object	Object to check.
- * @param security	New security attributes.
- * @return		Status code describing result of the operation. */
-static status_t file_object_set_security(object_t *object, object_security_t *security) {
-	fs_node_t *node = (fs_node_t *)object;
-	size_t i;
-
-	if(FS_NODE_IS_RDONLY(node)) {
-		return STATUS_READ_ONLY;
-	} else if(!node->ops->set_security) {
-		return STATUS_NOT_SUPPORTED;
-	}
-
-	/* The ACL must not contain any capability entries. */
-	if(security->acl) {
-		for(i = 0; i < security->acl->count; i++) {
-			switch(security->acl->entries[i].type) {
-			case ACL_ENTRY_CAPABILITY:
-				return STATUS_NOT_SUPPORTED;
-			}
-		}
-	}
-
-	return node->ops->set_security(node, security);
-}
-
 /** Close a handle to a file.
  * @param handle	Handle to close. */
 static void file_object_close(object_handle_t *handle) {
@@ -1180,7 +1091,6 @@ static void file_object_release_page(object_handle_t *handle, offset_t offset, p
 /** File object operations. */
 static object_type_t file_object_type = {
 	.id = OBJECT_TYPE_FILE,
-	.set_security = file_object_set_security,
 	.close = file_object_close,
 	.control = file_object_control,
 	.mappable = file_object_mappable,
@@ -1260,7 +1170,7 @@ object_handle_t *file_from_memory(const void *buf, size_t size) {
 	file->data = buf;
 	file->size = size;
 
-	node = fs_node_alloc(NULL, 0, FILE_TYPE_REGULAR, NULL, &memory_file_ops, file);
+	node = fs_node_alloc(NULL, 0, FILE_TYPE_REGULAR, &memory_file_ops, file);
 	file_handle_create(node, FILE_RIGHT_READ, 0, &handle);
 	fs_node_release(node);
 	return handle;
@@ -1281,19 +1191,12 @@ object_handle_t *file_from_memory(const void *buf, size_t size) {
  *			created if it doesn't exist. If FILE_CREATE_ALWAYS, it
  *			will always be created, and an error will be returned
  *			if it already exists.
- * @param security	If creating the file, the security attributes to give
- *			to it. If NULL, default security attributes will be
- *			used. Note that the ACL (if any) will not be copied: the
- *			memory used for it will be taken over and the given ACL
- *			structure will be invalidated.
  * @param handlep	Where to store pointer to handle structure.
  *
  * @return		Status code describing result of the operation.
  */
 status_t file_open(const char *path, object_rights_t rights, int flags, int create,
-                   object_security_t *security, object_handle_t **handlep) {
-	object_security_t dsecurity = { -1, -1, NULL };
-	object_acl_t acl;
+                   object_handle_t **handlep) {
 	fs_node_t *node;
 	status_t ret;
 
@@ -1306,24 +1209,7 @@ status_t file_open(const char *path, object_rights_t rights, int flags, int crea
 	if(ret != STATUS_SUCCESS) {
 		/* If requested try to create the node. */
 		if(ret == STATUS_NOT_FOUND && create) {
-			if(security) {
-				dsecurity.uid = security->uid;
-				dsecurity.gid = security->gid;
-				dsecurity.acl = security->acl;
-			}
-
-			/* Create a default ACL if none is given. */
-			if(!dsecurity.acl) {
-				dsecurity.acl = &acl;
-				object_acl_init(&acl);
-				object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
-				                     DEFAULT_FILE_RIGHTS_OWNER);
-				object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
-				                     DEFAULT_FILE_RIGHTS_OTHERS);
-			}
-
-			ret = fs_node_create(path, FILE_TYPE_REGULAR, NULL, &dsecurity, &node);
-			object_acl_destroy(dsecurity.acl);
+			ret = fs_node_create(path, FILE_TYPE_REGULAR, NULL, &node);
 			if(ret != STATUS_SUCCESS) {
 				return ret;
 			}
@@ -1735,38 +1621,11 @@ static status_t dir_lookup(fs_node_t *node, const char *name, node_id_t *idp) {
  * entries from a new directory will only give '.' and '..' entries.
  *
  * @param path		Path to directory to create.
- * @param security	Security attributes for the directory. If NULL, default
- *			security attributes will be used. Note that the ACL (if
- *			any) will not be copied: the memory used for it will be
- *			taken over and the given ACL structure will be
- *			invalidated.
  *
  * @return		Status code describing result of the operation.
  */
-status_t dir_create(const char *path, object_security_t *security) {
-	object_security_t dsecurity = { -1, -1, NULL };
-	object_acl_t acl;
-	status_t ret;
-
-	if(security) {
-		dsecurity.uid = security->uid;
-		dsecurity.gid = security->gid;
-		if(security->acl) {
-			dsecurity.acl = security->acl;
-		}
-	}
-
-	/* Create a default ACL if none is given. */
-	if(!dsecurity.acl) {
-		dsecurity.acl = &acl;
-		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, DEFAULT_DIR_RIGHTS_OWNER);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEFAULT_DIR_RIGHTS_OTHERS);
-	}
-
-	ret = fs_node_create(path, FILE_TYPE_DIR, NULL, &dsecurity, NULL);
-	object_acl_destroy(dsecurity.acl);
-	return ret;
+status_t dir_create(const char *path) {
+	return fs_node_create(path, FILE_TYPE_DIR, NULL, NULL);
 }
 
 /**
@@ -1874,18 +1733,7 @@ status_t dir_read(object_handle_t *handle, dir_entry_t *buf, size_t size) {
  *			directory containing the link.
  * @return		Status code describing result of the operation. */
 status_t symlink_create(const char *path, const char *target) {
-	object_acl_t acl;
-	object_security_t security = { -1, -1, &acl };
-	status_t ret;
-
-	/* Construct the ACL for the symbolic link. */
-	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
-	                     FILE_RIGHT_READ | FILE_RIGHT_WRITE | FILE_RIGHT_EXECUTE);
-
-	ret = fs_node_create(path, FILE_TYPE_SYMLINK, target, &security, NULL);
-	object_acl_destroy(security.acl);
-	return ret;
+	return fs_node_create(path, FILE_TYPE_SYMLINK, target, NULL);
 }
 
 /**
@@ -2084,10 +1932,6 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 
 	if(!path || (!device && !type)) {
 		return STATUS_INVALID_ARG;
-	}
-
-	if(!cap_check(NULL, CAP_FS_MOUNT)) {
-		return STATUS_PERM_DENIED;
 	}
 
 	/* Parse the options string. */
@@ -2337,10 +2181,6 @@ status_t fs_unmount(const char *path) {
 
 	if(!path) {
 		return STATUS_INVALID_ARG;
-	}
-
-	if(!cap_check(NULL, CAP_FS_MOUNT)) {
-		return STATUS_PERM_DENIED;
 	}
 
 	/* Serialise mount/unmount operations. */
@@ -2638,16 +2478,12 @@ void fs_shutdown(void) {
  *			created if it doesn't exist. If FILE_CREATE_ALWAYS, it
  *			will always be created, and an error will be returned
  *			if it already exists.
- * @param security	If creating the file, the security attributes to give
- *			to it. If NULL, default security attributes will be
- *			used.
  * @param handlep	Where to store created handle.
  *
  * @return		Status code describing result of the operation.
  */
 status_t kern_file_open(const char *path, object_rights_t rights, int flags, int create,
-                        const object_security_t *security, handle_t *handlep) {
-	object_security_t ksecurity = { -1, -1, NULL };
+                        handle_t *handlep) {
 	object_handle_t *handle;
 	char *kpath = NULL;
 	status_t ret;
@@ -2661,30 +2497,14 @@ status_t kern_file_open(const char *path, object_rights_t rights, int flags, int
 		return ret;
 	}
 
-	if(security) {
-		/* Don't bother copying anything provided if we aren't going
-		 * to use it. */
-		if(create != 0) {
-			ret = object_security_from_user(&ksecurity, security, false);
-			if(ret != STATUS_SUCCESS) {
-				kfree(kpath);
-				return ret;
-			}
-		} else {
-			security = NULL;
-		}
-	}
-
-	ret = file_open(kpath, rights, flags, create, (security) ? &ksecurity : NULL, &handle);
+	ret = file_open(kpath, rights, flags, create, &handle);
 	if(ret != STATUS_SUCCESS) {
-		object_security_destroy(&ksecurity);
 		kfree(kpath);
 		return ret;
 	}
 
 	ret = object_handle_attach(handle, NULL, 0, NULL, handlep);
 	object_handle_release(handle);
-	object_security_destroy(&ksecurity);
 	kfree(kpath);
 	return ret;
 }
@@ -3060,11 +2880,8 @@ status_t kern_file_sync(handle_t handle) {
 
 /** Create a directory in the file system.
  * @param path		Path to directory to create.
- * @param security	Security attributes for the directory. If NULL, default
- *			security attributes will be used.
  * @return		Status code describing result of the operation. */
-status_t kern_dir_create(const char *path, const object_security_t *security) {
-	object_security_t ksecurity = { -1, -1, NULL };
+status_t kern_dir_create(const char *path) {
 	status_t ret;
 	char *kpath;
 
@@ -3073,16 +2890,7 @@ status_t kern_dir_create(const char *path, const object_security_t *security) {
 		return ret;
 	}
 
-	if(security) {
-		ret = object_security_from_user(&ksecurity, security, false);
-		if(ret != STATUS_SUCCESS) {
-			kfree(kpath);
-			return ret;
-		}
-	}
-
-	ret = dir_create(kpath, (security) ? &ksecurity : NULL);
-	object_security_destroy(&ksecurity);
+	ret = dir_create(kpath);
 	kfree(kpath);
 	return ret;
 }
@@ -3282,10 +3090,6 @@ status_t kern_fs_mount_info(mount_info_t *infop, size_t *countp) {
 	status_t ret;
 	char *path;
 
-	if(!cap_check(NULL, CAP_FS_MOUNT)) {
-		return STATUS_PERM_DENIED;
-	}
-
 	if(infop) {
 		ret = memcpy_from_user(&count, countp, sizeof(count));
 		if(ret != STATUS_SUCCESS) {
@@ -3466,10 +3270,6 @@ status_t kern_fs_setroot(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if(!cap_check(NULL, CAP_FS_SETROOT)) {
-		return STATUS_PERM_DENIED;
-	}
-
 	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
@@ -3516,154 +3316,6 @@ status_t kern_fs_info(const char *path, bool follow, file_info_t *infop) {
 	if(ret == STATUS_SUCCESS) {
 		ret = memcpy_to_user(infop, &kinfo, sizeof(*infop));
 	}
-	kfree(kpath);
-	return ret;
-}
-
-/** Obtain security attributes for a filesystem entry.
- * @note		This call is used internally by libkernel, and not
- *			exported from it, as it provides a wrapper around it
- *			that handles ACL memory allocation automatically, and
- *			puts everything into an object_security_t structure.
- * @param path		Path to entry to get security attributes for.
- * @param follow	Whether to follow if last path component is a symbolic
- *			link.
- * @param uidp		Where to store owning user ID.
- * @param gidp		Where to store owning group ID.
- * @param aclp		Where to store ACL. The structure referred to by this
- *			pointer must be initialized prior to calling the
- *			function. If the entries pointer in the structure is
- *			NULL, then the function will store the number of
- *			entries in the ACL in the count entry and do nothing
- *			else. Otherwise, at most the number of entries specified
- *			by the count entry will be copied to the entries
- *			array, and the count will be updated to give the actual
- *			number of entries in the ACL.
- * @return		Status code describing result of the operation. */
-status_t kern_fs_security(const char *path, bool follow, user_id_t *uidp, group_id_t *gidp,
-                          object_acl_t *aclp) {
-	object_acl_t kacl;
-	fs_node_t *node;
-	status_t ret;
-	size_t count;
-	char *kpath;
-
-	if(!uidp && !gidp && !aclp) {
-		return STATUS_INVALID_ARG;
-	}
-
-	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	}
-
-	if(aclp) {
-		ret = memcpy_from_user(&kacl, aclp, sizeof(*aclp));
-		if(ret != STATUS_SUCCESS) {
-			kfree(kpath);
-			return ret;
-		}
-	}
-
-	ret = fs_node_lookup(kpath, follow, -1, &node);
-	if(ret != STATUS_SUCCESS) {
-		kfree(kpath);
-		return ret;
-	}
-
-	rwlock_read_lock(&node->obj.lock);
-
-	if(uidp) {
-		ret = memcpy_to_user(uidp, &node->obj.uid, sizeof(*uidp));
-		if(ret != STATUS_SUCCESS) {
-			goto out;
-		}
-	}
-	if(gidp) {
-		ret = memcpy_to_user(gidp, &node->obj.gid, sizeof(*gidp));
-		if(ret != STATUS_SUCCESS) {
-			goto out;
-		}
-	}
-	if(aclp) {
-		/* If entries pointer is NULL, the caller wants us to give the
-		 * number of entries in the ACL. Otherwise, copy at most the
-		 * number of entries specified. */
-		if(kacl.entries) {
-			count = MIN(kacl.count, node->obj.uacl.count);
-			if(count) {
-				ret = memcpy_to_user(kacl.entries,
-				                     node->obj.uacl.entries,
-				                     sizeof(*kacl.entries) * count);
-				if(ret != STATUS_SUCCESS) {
-					goto out;
-				}
-			}
-		}
-
-		/* Copy back the number of ACL entries. */
-		ret = memcpy_to_user(&aclp->count, &node->obj.uacl.count, sizeof(aclp->count));
-		if(ret != STATUS_SUCCESS) {
-			goto out;
-		}
-	}
-
-	ret = STATUS_SUCCESS;
-out:
-	rwlock_unlock(&node->obj.lock);
-	fs_node_release(node);
-	kfree(kpath);
-	return ret;
-}
-
-/**
- * Set security attributes for a filesystem entry.
- *
- * Sets the security attributes (owning user/group and ACL) of a filesystem
- * entry. The calling process must either be the owner of the entry, or have
- * the CAP_FS_ADMIN capability.
- *
- * A process without the CAP_CHANGE_OWNER capability cannot set an owning user
- * ID different to its user ID, or set the owning group ID to that of a group
- * it does not belong to.
- *
- * @param path		Path to entry to set security attributes of.
- * @param follow	Whether to follow if last path component is a symbolic
- *			link.
- * @param security	Security attributes to set. If the user ID is -1, it
- *			will not be changed. If the group ID is -1, it will not
- *			be changed. If the ACL pointer is NULL, the ACL will
- *			not be changed.
- *
- * @return		Status code describing result of the operation.
- */
-status_t kern_fs_set_security(const char *path, bool follow, const object_security_t *security) {
-	object_security_t ksecurity;
-	fs_node_t *node;
-	status_t ret;
-	char *kpath;
-
-	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	}
-
-	ret = object_security_from_user(&ksecurity, security, false);
-	if(ret != STATUS_SUCCESS) {
-		kfree(kpath);
-		return ret;
-	}
-
-	ret = fs_node_lookup(kpath, follow, -1, &node);
-	if(ret != STATUS_SUCCESS) {
-		object_security_destroy(&ksecurity);
-		kfree(kpath);
-		return ret;
-	}
-
-	ret = object_set_security(&node->obj, &ksecurity);
-	fs_node_release(node);
-	object_security_destroy(&ksecurity);
 	kfree(kpath);
 	return ret;
 }

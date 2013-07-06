@@ -972,7 +972,7 @@ __init_text void page_init(void) {
 __init_text void page_daemon_init(void) {
 	status_t ret;
 
-	ret = thread_create("page_writer", NULL, 0, page_writer, NULL, NULL, NULL, NULL);
+	ret = thread_create("page_writer", NULL, 0, page_writer, NULL, NULL, NULL);
 	if(ret != STATUS_SUCCESS)
 		fatal("Could not start page writer (%d)", ret);
 }

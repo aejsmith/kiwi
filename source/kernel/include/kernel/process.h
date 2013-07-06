@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,7 +23,6 @@
 #define __KERNEL_PROCESS_H
 
 #include <kernel/object.h>
-#include <kernel/security.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,11 +41,6 @@ typedef struct process_args {
 /** Expected path to libkernel. */
 #define LIBKERNEL_PATH		"/system/libraries/libkernel.so"
 
-/** Process access rights. */
-#define PROCESS_RIGHT_QUERY	(1<<0)	/**< Query process information. */
-#define PROCESS_RIGHT_SECURITY	(1<<1)	/**< Set security context. */
-#define PROCESS_RIGHT_SIGNAL	(1<<2)	/**< Send a signal to the process. */
-
 /** Process object events. */
 #define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
 
@@ -54,9 +48,7 @@ typedef struct process_args {
 #define PROCESS_CREATE_CLONE	(1<<0)	/**< Inherit extra information from the parent. */
 
 /** Actions for kern_process_control(). */
-#define PROCESS_GET_SECTX	1	/**< Get security context (in: security_context_t). */
-#define PROCESS_SET_SECTX	2	/**< Set security context (out: security_context_t). */
-#define PROCESS_LOADED		3	/**< Signal that process is loaded (calling process only). */
+#define PROCESS_LOADED		1	/**< Signal that process is loaded (calling process only). */
 
 /** Process exit reason codes. */
 #define EXIT_REASON_NORMAL	0	/**< Normal exit (status is exit code). */
@@ -68,18 +60,13 @@ typedef struct process_args {
 #define PRIORITY_CLASS_HIGH	2	/**< High priority. */
 
 extern status_t kern_process_create(const char *path, const char *const args[],
-                                    const char *const env[], int flags,
-                                    const security_context_t *sectx,
-                                    handle_t map[][2], int count,
-                                    const object_security_t *security,
-                                    object_rights_t rights, handle_t *handlep);
+	const char *const env[], int flags, handle_t map[][2], int count,
+	handle_t *handlep);
 extern status_t kern_process_replace(const char *path, const char *const args[],
-                                     const char *const env[], const security_context_t *sectx,
-                                     handle_t map[][2], int count);
+	const char *const env[], handle_t map[][2], int count);
 extern status_t kern_process_clone(void (*func)(void *), void *arg, void *sp,
-                                   const object_security_t *security,
-                                   object_rights_t rights, handle_t *handlep);
-extern status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *handlep);
+	handle_t *handlep);
+extern status_t kern_process_open(process_id_t id, handle_t *handlep);
 extern process_id_t kern_process_id(handle_t handle);
 extern status_t kern_process_control(handle_t handle, int action, const void *in, void *out);
 extern status_t kern_process_status(handle_t handle, int *statusp, int *reasonp);

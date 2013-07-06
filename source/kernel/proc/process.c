@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,9 +34,6 @@
 #include <proc/process.h>
 #include <proc/thread.h>
 
-#include <security/cap.h>
-#include <security/context.h>
-
 #include <sync/futex.h>
 #include <sync/rwlock.h>
 #include <sync/semaphore.h>
@@ -53,10 +50,6 @@
 #else
 # define dprintf(fmt...)	
 #endif
-
-/** Default process rights. */
-#define DEFAULT_PROCESS_RIGHTS_OWNER	(PROCESS_RIGHT_QUERY | PROCESS_RIGHT_SIGNAL)
-#define DEFAULT_PROCESS_RIGHTS_OTHERS	(PROCESS_RIGHT_QUERY)
 
 /** Structure containing process creation information. */
 typedef struct process_create {
@@ -108,7 +101,6 @@ static void process_ctor(void *obj, void *data) {
 	mutex_init(&process->lock, "process_lock", 0);
 	list_init(&process->threads);
 	avl_tree_init(&process->futexes);
-	mutex_init(&process->security_lock, "process_security_lock", MUTEX_RECURSIVE);
 	notifier_init(&process->death_notifier, process);
 }
 
@@ -154,27 +146,6 @@ static void process_destroy(process_t *process) {
 static void process_release(process_t *process) {
 	if(refcount_dec(&process->count) == 0)
 		process_destroy(process);
-}
-
-/** Validate process object security changes.
- * @param object	Process object.
- * @param security	Security attributes being set.
- * @return		STATUS_SUCCESS if allowed, other status code if not. */
-static status_t process_object_set_security(object_t *object, object_security_t *security) {
-	size_t i;
-
-	/* If an ACL is provided, go through it to check that it does not
-	 * grant the PROCESS_SET_SECURITY right to anyone. This right is only
-	 * granted by the system ACL to processes with CAP_SECURITY_AUTHORITY,
-	 * and should not be granted to anyone else. */
-	if(security->acl) {
-		for(i = 0; i < security->acl->count; i++) {
-			if(security->acl->entries[i].rights & PROCESS_RIGHT_SECURITY)
-				return STATUS_PERM_DENIED;
-		}
-	}
-
-	return STATUS_SUCCESS;
 }
 
 /** Closes a handle to a process.
@@ -225,7 +196,6 @@ static void process_object_unwait(object_handle_t *handle, int event, void *sync
 /** Process object type operations. */
 static object_type_t process_object_type = {
 	.id = OBJECT_TYPE_PROCESS,
-	.set_security = process_object_set_security,
 	.close = process_object_close,
 	.wait = process_object_wait,
 	.unwait = process_object_unwait,
@@ -248,14 +218,9 @@ static object_type_t process_object_type = {
  *			specified in the mapping array.
  * @param parent	Process to inherit information from.
  * @param cflags	Creation flags for the process.
- * @param sectx		Security context to set for process. If NULL, parent's
- *			security context will be inherited. If there is no
- *			parent, a default security context will be created.
  * @param map		Array of handle mappings (see handle_table_init()).
  * @param count		Number of handles in mapping array.
- * @param security	Object security attributes.
  * @param procp		Where to store pointer to structure.
- * @param rights	Rights to give to created handle.
  * @param handlep	Where to store handle to process. This is the same as
  *			the ID that will be stored in the userspace location,
  *			and can be used to detach the handle upon failure in
@@ -270,53 +235,17 @@ static object_type_t process_object_type = {
  */
 static status_t process_alloc(const char *name, int flags, int priority,
 	vm_aspace_t *aspace, handle_table_t *table, process_t *parent, int cflags,
-	const security_context_t *sectx, handle_t map[][2], int count,
-	object_security_t *security, process_t **procp, object_rights_t rights,
-	handle_t *handlep, handle_t *uhandlep)
+	handle_t map[][2], int count, process_t **procp, handle_t *handlep,
+	handle_t *uhandlep)
 {
-	object_security_t dsecurity = { security->uid, security->gid, security->acl };
-	object_acl_t acl, sacl;
 	process_t *process;
 	status_t ret;
 
 	assert(name);
 	assert(procp);
 
-	ret = object_security_validate(security, NULL);
-	if(ret != STATUS_SUCCESS)
-		return ret;
-
-	ret = process_object_set_security(NULL, security);
-	if(ret != STATUS_SUCCESS)
-		return ret;
-
 	/* Allocate a new process structure. */
 	process = slab_cache_alloc(process_cache, MM_WAIT);
-
-	/* If a security context is provided, copy it to the structure and
-	 * validate it (which also canonicalises it), else work out which
-	 * context to use. */
-	if(sectx) {
-		memcpy(&process->security, sectx, sizeof(*sectx));
-
-		assert(parent);
-		mutex_lock(&parent->security_lock);
-
-		ret = security_context_validate(&parent->security, &parent->security, &process->security);
-		if(ret != STATUS_SUCCESS) {
-			mutex_unlock(&parent->security_lock);
-			slab_cache_free(process_cache, process);
-			return ret;
-		}
-
-		mutex_unlock(&parent->security_lock);
-	} else if(parent) {
-		mutex_lock(&parent->security_lock);
-		memcpy(&process->security, &parent->security, sizeof(process->security));
-		mutex_unlock(&parent->security_lock);
-	} else {
-		memcpy(&process->security, &init_security_context, sizeof(process->security));
-	}
 
 	/* Attempt to allocate a process ID. If creating the kernel process,
 	 * always give it an ID of 0. */
@@ -342,22 +271,8 @@ static status_t process_alloc(const char *name, int flags, int priority,
 		}
 	}
 
-	/* If an ACL is not given, construct a default ACL. */
-	if(!dsecurity.acl) {
-		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, DEFAULT_PROCESS_RIGHTS_OWNER);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEFAULT_PROCESS_RIGHTS_OTHERS);
-		dsecurity.acl = &acl;
-	}
-
-	/* Construct the SACL. We use this to grant the ability to set the
-	 * security context to processes with CAP_SECURITY_AUTHORITY. */
-	object_acl_init(&sacl);
-	object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_SECURITY_AUTHORITY,
-		PROCESS_RIGHT_SECURITY);
-
 	/* Initialize the remainder of the structure. */
-	object_init(&process->obj, &process_object_type, &dsecurity, &sacl);
+	object_init(&process->obj, &process_object_type);
 	refcount_set(&process->count, (uhandlep) ? 1 : 0);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
 	process->flags = flags;
@@ -389,7 +304,7 @@ static status_t process_alloc(const char *name, int flags, int priority,
 	/* Create a handle to the process if required. */
 	if(uhandlep) {
 		assert(parent);
-		ret = object_handle_create(&process->obj, NULL, rights, parent,
+		ret = object_handle_create(&process->obj, NULL, 0, parent,
 			0, NULL, handlep, uhandlep);
 		if(ret != STATUS_SUCCESS) {
 			process->aspace = NULL;
@@ -420,7 +335,7 @@ static status_t process_aspace_create(process_create_t *info) {
 	 * we must reserve space to ensure that the mappings we create below
 	 * for the arguments/stack don't end up placed where the binary wants
 	 * to be. */
-	ret = file_open(info->path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0, NULL, &handle);
+	ret = file_open(info->path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0, &handle);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -436,7 +351,7 @@ static status_t process_aspace_create(process_create_t *info) {
 	 * with the previous kernel. */
 	if(!kernel_library) {
 		ret = file_open(LIBKERNEL_PATH, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE,
-			0, 0, NULL, &kernel_library);
+			0, 0, &kernel_library);
 		if(ret != STATUS_SUCCESS)
 			fatal("Could not open kernel library (%d)", ret);
 	}
@@ -638,7 +553,6 @@ process_t *process_lookup(process_id_t id) {
 status_t process_create(const char *const args[], const char *const env[], int flags,
 	int priority, process_t *parent, process_t **procp)
 {
-	object_security_t security = { -1, -1, NULL };
 	process_create_t info;
 	process_t *process;
 	thread_t *thread;
@@ -653,24 +567,24 @@ status_t process_create(const char *const args[], const char *const env[], int f
 
 	/* Create the address space for the process. */
 	ret = process_aspace_create(&info);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Create the new process. */
 	ret = process_alloc(args[0], flags, priority, info.aspace, NULL, parent,
-		0, NULL, NULL, 0, &security, &process, 0, NULL, NULL);
+		0, NULL, 0, &process, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
 		vm_aspace_destroy(info.aspace);
 		return ret;
 	}
 
 	/* Create and run the entry thread. */
-	ret = thread_create("main", process, 0, process_entry_thread, &info, NULL, NULL, &thread);
+	ret = thread_create("main", process, 0, process_entry_thread, &info, NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
 		process_destroy(process);
 		return ret;
 	}
+
 	process->create = &info;
 	thread_run(thread);
 	thread_release(thread);
@@ -726,8 +640,8 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 		return KDB_SUCCESS;
 	}
 
-	kdb_printf("ID     State   User Group Prio Flags Count Aspace             Name\n");
-	kdb_printf("==     =====   ==== ===== ==== ===== ===== ======             ====\n");
+	kdb_printf("ID     State   Prio Flags Count Aspace             Name\n");
+	kdb_printf("==     =====   ==== ===== ===== ======             ====\n");
 
 	AVL_TREE_FOREACH(&process_tree, iter) {
 		process = avl_tree_entry(iter, process_t);
@@ -741,11 +655,9 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 		default:		kdb_printf("Bad     "); break;
 		}
 
-		kdb_printf("%-4d %-5d %-4d %-5d %-5d %-18p %s\n",
-			process->security.uid, process->security.groups[0],
-			process->priority, process->flags,
-			refcount_get(&process->count), process->aspace,
-			process->name);
+		kdb_printf("%-4d %-5d %-5d %-18p %s\n", process->priority,
+			process->flags, refcount_get(&process->count),
+			process->aspace, process->name);
 	}
 
 	return KDB_SUCCESS;;
@@ -753,8 +665,6 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 
 /** Initialize the process table and slab cache. */
 __init_text void process_init(void) {
-	object_acl_t acl;
-	object_security_t security = { 0, 0, &acl };
 	status_t ret;
 
 	/* Create the process ID allocator. We reserve ID 0 as it is always
@@ -769,14 +679,9 @@ __init_text void process_init(void) {
 	/* Register the KDB command. */
 	kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);
 
-	/* Create the ACL for the kernel process. */
-	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, PROCESS_RIGHT_QUERY);
-
 	/* Create the kernel process. */
 	ret = process_alloc("[kernel]", PROCESS_CRITICAL, PRIORITY_CLASS_SYSTEM,
-		NULL, NULL, NULL, 0, NULL, NULL, 0, &security, &kernel_proc, 0,
-		NULL, NULL);
+		NULL, NULL, NULL, 0, NULL, 0, &kernel_proc, NULL, NULL);
 	if(ret != STATUS_SUCCESS)
 		fatal("Could not initialize kernel process (%d)", ret);
 }
@@ -926,33 +831,20 @@ static status_t process_create_args_copy(const char *path, const char *const arg
  * @param env		Array of environment variables for the program
  *			(NULL-terminated).
  * @param flags		Flags modifying creation behaviour.
- * @param sectx		Security context for the new process, or NULL to
- *			inherit the context of the caller. The identity of the
- *			process cannot differ from the caller's unless it has
- *			the CAP_CHANGE_IDENTITY capability, and a new context
- *			cannot have capabilities that the caller does not have.
  * @param map		Array containing handle mappings (can be NULL if count
  *			is less than or equal to 0). The first ID of each entry
  *			specifies the handle in the caller, and the second
  *			specifies the ID to give it in the child.
  * @param count		Number of entries in handle mapping array, or -1 if
  *			array should not be used.
- * @param security	Security attributes for the process object. If NULL,
- *			default attributes will be constructed which set the
- *			owning user/group to that of the calling process, gives
- *			control of the process to the calling process' user
- *			and query access to everyone else.
- * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to process (can be NULL).
  *
  * @return		Status code describing result of the operation.
  */
 status_t kern_process_create(const char *path, const char *const args[],
-	const char *const env[], int flags, const security_context_t *sectx,
-	handle_t map[][2], int count, const object_security_t *security,
-	object_rights_t rights, handle_t *handlep)
+	const char *const env[], int flags, handle_t map[][2], int count,
+	handle_t *handlep)
 {
-	object_security_t ksecurity = { -1, -1, NULL };
 	process_t *process = NULL;
 	process_create_t info;
 	thread_t *thread;
@@ -963,14 +855,6 @@ status_t kern_process_create(const char *path, const char *const args[],
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	/* If no security attributes are provided a default ACL is constructed
-	 * by process_alloc(). */
-	if(security) {
-		ret = object_security_from_user(&ksecurity, security, false);
-		if(ret != STATUS_SUCCESS)
-			goto fail;
-	}
-
 	/* Create the address space for the process. */
 	ret = process_aspace_create(&info);
 	if(ret != STATUS_SUCCESS)
@@ -978,16 +862,14 @@ status_t kern_process_create(const char *path, const char *const args[],
 
 	/* Create the new process and a handle to it. */
 	ret = process_alloc(info.path, 0, PRIORITY_CLASS_NORMAL, info.aspace, NULL,
-		curr_proc, flags, NULL, info.map, count, &ksecurity,
-		&process, rights, &handle, handlep);
+		curr_proc, flags, info.map, count, &process, &handle, handlep);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
 	process->create = &info;
 
 	/* Create and run the entry thread. */
-	ret = thread_create("main", process, 0, process_entry_thread, &info, NULL,
-		NULL, &thread);
+	ret = thread_create("main", process, 0, process_entry_thread, &info, NULL, &thread);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -1001,7 +883,6 @@ status_t kern_process_create(const char *path, const char *const args[],
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
-	object_security_destroy(&ksecurity);
 	process_create_args_free(&info);
 	return ret;
 fail:
@@ -1015,7 +896,6 @@ fail:
 		vm_aspace_destroy(info.aspace);
 	}
 
-	object_security_destroy(&ksecurity);
 	process_create_args_free(&info);
 	return ret;
 }
@@ -1035,11 +915,6 @@ fail:
  *			(NULL-terminated).
  * @param env		Array of environment variables for the program
  *			(NULL-terminated).
- * @param sectx		New security context, or NULL to keep the current
- *			security context. The identity of the caller cannot be
- *			changed unless it has the CAP_CHANGE_IDENTITY
- *			capability, and a new context cannot have capabilities
- *			that the caller does not have.
  * @param map		Array containing handle mappings (can be NULL if count
  *			is less than or equal to 0). The first ID of each entry
  *			specifies the handle in the caller, and the second
@@ -1051,8 +926,7 @@ fail:
  *			failure.
  */
 status_t kern_process_replace(const char *path, const char *const args[],
-	const char *const env[], const security_context_t *sectx,
-	handle_t map[][2], int count)
+	const char *const env[], handle_t map[][2], int count)
 {
 	handle_table_t *table, *oldtable;
 	thread_t *thread = NULL;
@@ -1077,7 +951,7 @@ status_t kern_process_replace(const char *path, const char *const args[],
 
 	/* Create the entry thread to finish loading the program. */
 	ret = thread_create("main", curr_proc, 0, process_entry_thread, &info,
-		NULL, NULL, &thread);
+		NULL, &thread);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -1147,21 +1021,11 @@ fail:
  * @param sp		Stack pointer to use. Depending on the architecture,
  *			this may need to have space to store the argument to
  *			the function.
- * @param security	Security attributes for the process object. If NULL,
- *			default attributes will be constructed which set the
- *			owning user/group to that of the calling process, gives
- *			control of the process to the calling process' user
- *			and query access to everyone else.
- * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to the child process.
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_process_clone(void (*func)(void *), void *arg, void *sp,
-	const object_security_t *security, object_rights_t rights,
-	handle_t *handlep)
-{
-	object_security_t ksecurity = { -1, -1, NULL };
+status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, handle_t *handlep) {
 	thread_uspace_args_t *args;
 	process_t *process = NULL;
 	handle_table_t *table;
@@ -1173,22 +1037,14 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp,
 	if(validate_user_address(sp, 0) != STATUS_SUCCESS)
 		return STATUS_INVALID_ADDR;
 
-	/* If no security attributes are provided a default ACL is constructed
-	 * by process_alloc(). */
-	if(security) {
-		ret = object_security_from_user(&ksecurity, security, false);
-		if(ret != STATUS_SUCCESS)
-			return ret;
-	}
-
 	/* Create a clone of the process' address space and handle table. */
 	as = vm_aspace_clone(curr_proc->aspace);
 	table = handle_table_clone(curr_proc->handles);
 
 	/* Create the new process and a handle to it. */
 	ret = process_alloc(curr_proc->name, 0, PRIORITY_CLASS_NORMAL, as, table,
-		curr_proc, PROCESS_CREATE_CLONE, NULL, NULL, 0, &ksecurity,
-		&process, rights, &handle, handlep);
+		curr_proc, PROCESS_CREATE_CLONE, NULL, 0, &process, &handle,
+		handlep);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -1198,7 +1054,7 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp,
 	args->arg = (ptr_t)arg;
 	args->sp = (ptr_t)sp;
 	ret = thread_create("main", process, 0, thread_uspace_trampoline, args,
-		NULL, NULL, &thread);
+		NULL, &thread);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -1210,7 +1066,6 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp,
 	/* Run the new thread. */
 	thread_run(thread);
 	thread_release(thread);
-	object_security_destroy(&ksecurity);
 	return STATUS_SUCCESS;
 fail:
 	if(process) {
@@ -1224,16 +1079,14 @@ fail:
 		vm_aspace_destroy(as);
 	}
 
-	object_security_destroy(&ksecurity);
 	return ret;
 }
 
 /** Open a handle to a process.
  * @param id		ID of the process to open.
- * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to process.
  * @return		Status code describing result of the operation. */
-status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *handlep) {
+status_t kern_process_open(process_id_t id, handle_t *handlep) {
 	process_t *process;
 	status_t ret;
 
@@ -1254,7 +1107,7 @@ status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *ha
 	refcount_inc(&process->count);
 	rwlock_unlock(&process_tree_lock);
 
-	ret = object_handle_open(&process->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
+	ret = object_handle_open(&process->obj, NULL, 0, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS)
 		process_release(process);
 
@@ -1290,7 +1143,6 @@ process_id_t kern_process_id(handle_t handle) {
  * @return		Status code describing result of the operation. */
 status_t kern_process_control(handle_t handle, int action, const void *in, void *out) {
 	object_handle_t *khandle = NULL;
-	security_context_t *context;
 	process_t *process;
 	status_t ret;
 
@@ -1305,51 +1157,6 @@ status_t kern_process_control(handle_t handle, int action, const void *in, void 
 	}
 
 	switch(action) {
-	case PROCESS_GET_SECTX:
-		if(khandle) {
-			if(!object_handle_rights(khandle, PROCESS_RIGHT_QUERY)) {
-				ret = STATUS_ACCESS_DENIED;
-				goto out;
-			}
-		}
-
-		mutex_lock(&process->security_lock);
-		ret = memcpy_to_user(out, &process->security, sizeof(process->security));
-		mutex_unlock(&process->security_lock);
-		break;
-	case PROCESS_SET_SECTX:
-		if(khandle) {
-			if(!object_handle_rights(khandle, PROCESS_RIGHT_SECURITY)) {
-				ret = STATUS_ACCESS_DENIED;
-				goto out;
-			}
-		}
-
-		context = kmalloc(sizeof(*context), MM_WAIT);
-		ret = memcpy_from_user(context, in, sizeof(*context));
-		if(ret != STATUS_SUCCESS) {
-			kfree(context);
-			goto out;
-		}
-
-		mutex_lock(&curr_proc->security_lock);
-
-		/* Validate the context. */
-		ret = security_context_validate(&curr_proc->security, &process->security, context);
-		if(ret != STATUS_SUCCESS) {
-			mutex_unlock(&curr_proc->security_lock);
-			kfree(context);
-			goto out;
-		}
-
-		mutex_unlock(&curr_proc->security_lock);
-
-		/* Set the context. */
-		mutex_lock(&process->security_lock);
-		memcpy(&process->security, context, sizeof(*context));
-		mutex_unlock(&process->security_lock);
-		kfree(context);
-		break;
 	case PROCESS_LOADED:
 		if(khandle) {
 			ret = STATUS_NOT_SUPPORTED;
@@ -1382,7 +1189,7 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 	process_t *process;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, 0, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 

@@ -39,8 +39,6 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <security/context.h>
-
 #include <assert.h>
 #include <console.h>
 #include <cpu.h>
@@ -113,9 +111,6 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	/* Set up the CPU subsystem and initialize the boot CPU. */
 	cpu_early_init();
 
-	/* Initialize the security subsystem. */
-	security_init();
-
 	/* Initialize kernel memory management subsystems. */
 	page_early_init();
 	mmu_init();
@@ -154,7 +149,7 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	vm_init();
 
 	/* Create the second stage initialization thread. */
-	ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL, NULL);
+	ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL);
 	if(ret != STATUS_SUCCESS)
 		fatal("Could not create second-stage initialization thread");
 

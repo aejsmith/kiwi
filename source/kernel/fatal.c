@@ -27,8 +27,6 @@
 
 #include <mm/safe.h>
 
-#include <security/cap.h>
-
 #include <assert.h>
 #include <console.h>
 #include <cpu.h>
@@ -106,11 +104,8 @@ void __assert_fail(const char *cond, const char *file, int line) {
 void kern_fatal(const char *message) {
 	char *kmessage;
 
-	if(!cap_check(NULL, CAP_FATAL)) {
+	if(strdup_from_user(message, &kmessage) != STATUS_SUCCESS)
 		return;
-	} else if(strdup_from_user(message, &kmessage) != STATUS_SUCCESS) {
-		return;
-	}
 
 	fatal("%s", message);
 }

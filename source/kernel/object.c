@@ -28,10 +28,6 @@
  * by path strings, but ports, memory areas, etc. are referred to by global
  * IDs), or the lifetime of objects - it is up to each object type to manage
  * these.
- *
- * @note		The ACL-related functionality is not implemented in
- *			this file.
- * @see			security/acl.c
  */
 
 #include <lib/bitmap.h>
@@ -41,8 +37,6 @@
 #include <mm/slab.h>
 
 #include <proc/process.h>
-
-#include <security/context.h>
 
 #include <sync/semaphore.h>
 
@@ -92,66 +86,21 @@ static void handle_table_ctor(void *obj, void *data) {
  * @param obj		Object to initialize.
  * @param type		Pointer to type structure for object type. Can be NULL,
  *			in which case the object will be a 'NULL object', and
- *			handles will never be created to it.
- * @param security	Details of the owning user/group and ACL to assign to
- *			the object. The ACL pointer must not be NULL: default
- *			ACLs must be built by the caller. Note that this
- *			function does not perform any checks as to whether the
- *			security attributes should be allowed, nor does it
- *			canonicalise the ACL: to copy in a security attributes
- *			structure from userspace, object_security_from_user()
- *			must be used, which copies the structure, canonicalises
- *			the ACL and validates it. This function does not copy
- *			the data for the ACL, so it invalidates the structure
- *			after taking the data pointer from it, which means it
- *			will be safe to call object_acl_destroy() on it.
- * @param sacl		If not NULL, the system ACL to give to the object. The
- *			system ACL is interpreted differently to the user ACL:
- *			in the user ACL user, group and others entries are
- *			exclusive. In the system ACL they are all used together.
- *			This ACL should be in canonical form (see
- *			object_acl_canonicalise()). This function does not copy
- *			the data for the ACL, so it invalidates the structure
- *			after taking the data pointer from it, which means it
- *			will be safe to call object_acl_destroy() on it. */
-void object_init(object_t *object, object_type_t *type, object_security_t *security, object_acl_t *sacl) {
+ *			handles will never be created to it. */
+void object_init(object_t *object, object_type_t *type) {
 	assert(object);
-	if(type) {
-		assert(security);
-		assert(security->acl);
-	}
 
-	rwlock_init(&object->lock, "object_lock");
 	object->type = type;
-
-	/* If a user/group ID are provided, use them, else use the current. */
-	object->uid = (security->uid >= 0) ? security->uid : security_current_uid();
-	object->gid = (security->gid >= 0) ? security->gid : security_current_gid();
-
-	/* Set the user ACL and invalidate the provided structure. */
-	object->uacl.entries = security->acl->entries;
-	object->uacl.count = security->acl->count;
-	object_acl_init(security->acl);
-
-	/* If a system ACL is provided, use it, otherwise just make an empty one. */
-	if(sacl) {
-		object->sacl.entries = sacl->entries;
-		object->sacl.count = sacl->count;
-		object_acl_init(sacl);
-	} else {
-		object_acl_init(&object->sacl);
-	}
-
-	/* Add default system ACL entries. We always allow an object's owning
-	 * user to change its ACL and owner. */
-	object_acl_add_entry(&object->sacl, ACL_ENTRY_USER, -1, OBJECT_RIGHT_OWNER);
 }
 
 /** Destroy an object structure.
  * @param obj		Object to destroy. */
 void object_destroy(object_t *object) {
-	object_acl_destroy(&object->uacl);
-	object_acl_destroy(&object->sacl);
+	/* Nothing happens (yet). */
+}
+
+object_rights_t object_rights(object_t *object, struct process *process) {
+	return 0xFFFFFFFF;
 }
 
 /** Notifier function to use for object waiting.
@@ -621,68 +570,6 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 	return KDB_SUCCESS;
 }
 
-/** Dump an ACL.
- * @param acl		ACL to dump. */
-static void dump_object_acl(object_acl_t *acl) {
-	size_t i;
-
-	for(i = 0; i < acl->count; i++) {
-		switch(acl->entries[i].type) {
-		case ACL_ENTRY_USER:
-			kdb_printf(" User(%d): ", acl->entries[i].value);
-			break;
-		case ACL_ENTRY_GROUP:
-			kdb_printf(" Group(%d): ", acl->entries[i].value);
-			break;
-		case ACL_ENTRY_OTHERS:
-			kdb_printf(" Others: ");
-			break;
-		case ACL_ENTRY_CAPABILITY:
-			kdb_printf(" Capability(%d): ", acl->entries[i].value);
-			break;
-		}
-
-		kdb_printf("0x%x\n", acl->entries[i].rights);
-	}
-}
-
-/** Print information about an object.
- * @param argc		Argument count.
- * @param argv		Argument array.
- * @return		KDB status code. */
-static kdb_status_t kdb_cmd_object(int argc, char **argv, kdb_filter_t *filter) {
-	object_t *object;
-	uint64_t addr;
-
-	if(kdb_help(argc, argv)) {
-		kdb_printf("Usage: %s <address>\n\n", argv[0]);
-
-		kdb_printf("Prints out information about an object.\n");
-		return KDB_SUCCESS;
-	} else if(argc != 2) {
-		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDB_FAILURE;
-	}
-
-	if(kdb_parse_expression(argv[1], &addr, NULL) != KDB_SUCCESS)
-		return KDB_FAILURE;
-
-	object = (object_t *)((ptr_t)addr);
-
-	kdb_printf("Object %p\n", object);
-	kdb_printf("=================================================\n");
-	kdb_printf("Type:  %d(%p)\n", object->type->id, object->type);
-	kdb_printf("User:  %d\n", object->uid);
-	kdb_printf("Group: %d\n\n", object->gid);
-
-	kdb_printf("User ACL:\n");
-	dump_object_acl(&object->uacl);
-	kdb_printf("System ACL:\n");
-	dump_object_acl(&object->sacl);
-
-	return KDB_SUCCESS;
-}
-
 /** Initialize the handle caches. */
 __init_text void handle_init(void) {
 	object_handle_cache = slab_cache_create("object_handle_cache",
@@ -695,8 +582,6 @@ __init_text void handle_init(void) {
 	/* Register the KDB commands. */
 	kdb_register_command("handles", "Inspect a process' handle table.",
 		kdb_cmd_handles);
-	kdb_register_command("object", "Show information about a kernel object.",
-		kdb_cmd_object);
 }
 
 /** Get the type of an object referred to by a handle.

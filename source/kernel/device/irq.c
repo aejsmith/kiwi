@@ -123,7 +123,7 @@ status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *da
 	/* Create a handler thread if necessary. */
 	if(handler->bottom) {
 		sprintf(name, "irq-%u", num);
-		ret = thread_create(name, NULL, 0, irq_thread, handler, NULL, NULL, &handler->thread);
+		ret = thread_create(name, NULL, 0, irq_thread, handler, NULL, &handler->thread);
 		if(ret != STATUS_SUCCESS) {
 			kfree(handler);
 			return ret;

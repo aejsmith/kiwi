@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,8 +30,6 @@
 #include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/safe.h>
-
-#include <security/cap.h>
 
 #include <sync/mutex.h>
 
@@ -255,10 +253,6 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 	if(!handle || !depbuf)
 		return STATUS_INVALID_ARG;
 
-	/* Check if the current process can load modules. */
-	if(!cap_check(NULL, CAP_MODULE))
-		return STATUS_PERM_DENIED;
-
 	/* Take the module lock to serialise module loading. */
 	mutex_lock(&module_lock);
 
@@ -402,7 +396,7 @@ status_t kern_module_load(const char *path, char *depbuf) {
 		return ret;
 
 	/* Open a handle to the file. */
-	ret = file_open(kpath, FILE_RIGHT_READ, 0, 0, NULL, &handle);
+	ret = file_open(kpath, FILE_RIGHT_READ, 0, 0, &handle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
@@ -435,10 +429,6 @@ status_t kern_module_info(module_info_t *infop, size_t *countp) {
 	module_info_t info;
 	module_t *module;
 	status_t ret;
-
-	/* Check if the current process can load modules. */
-	if(!cap_check(NULL, CAP_MODULE))
-		return STATUS_PERM_DENIED;
 
 	if(infop) {
 		ret = memcpy_from_user(&count, countp, sizeof(count));

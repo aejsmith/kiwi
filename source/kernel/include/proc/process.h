@@ -59,10 +59,6 @@ typedef struct process {
 	list_t threads;			/**< List of threads. */
 	avl_tree_t futexes;		/**< Tree of futexes that the process has accessed. */
 
-	/** Security information. */
-	mutex_t security_lock;		/**< Lock for security context. */
-	security_context_t security;	/**< Security context (canonicalised). */
-
 	/** Signal information. */
 	sigset_t signal_mask;		/**< Bitmap of masked signals. */
 	sigaction_t signal_act[NSIG];	/**< Signal action structures. */

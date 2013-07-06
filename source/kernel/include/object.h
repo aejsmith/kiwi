@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,7 +23,6 @@
 #define __OBJECT_H
 
 #include <kernel/object.h>
-#include <kernel/security.h>
 
 #include <lib/avl_tree.h>
 #include <lib/list.h>
@@ -41,21 +40,6 @@ struct vm_region;
 /** Kernel object type structure. */
 typedef struct object_type {
 	int id;				/**< ID number for the type. */
-
-	/** Set new security attributes.
-	 * @note		This function can be used to validate security
-	 *			attributes, and to write changes to permanent
-	 *			storage (i.e. filesystem). If it is not provided,
-	 *			all changes will be allowed as long as they are
-	 *			permitted by the current ACL.
-	 * @note		It is checked whether the process has the
-	 *			necessary rights for the changes before calling
-	 *			this function.
-	 * @param object	Object to set for.
-	 * @param security	Security attributes to set. The ACL (if any)
-	 *			will be in canonical form.
-	 * @return		Status code describing result of the operation. */
-	status_t (*set_security)(struct object *object, object_security_t *security);
 
 	/** Close a handle to an object.
 	 * @param handle	Handle to the object. */
@@ -121,11 +105,6 @@ typedef struct object_type {
  *			another structure for the object. */
 typedef struct object {
 	object_type_t *type;		/**< Type of the object. */
-	rwlock_t lock;			/**< Lock protecting the security attributes. */
-	user_id_t uid;			/**< Owning user ID. */
-	group_id_t gid;			/**< Owning group ID. */
-	object_acl_t uacl;		/**< User-configurable ACL. */
-	object_acl_t sacl;		/**< System ACL. */
 } object_t;
 
 /** Structure containing a handle to a kernel object. */
@@ -143,29 +122,9 @@ typedef struct handle_table {
 	unsigned long *bitmap;		/**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
 
-/** Internally-used object rights. */
-#define OBJECT_RIGHT_OWNER	(1<<24)	/**< Grant owner priveleges (change owner/ACL). */
-
-/** The top 8 bits of object_rights_t are reserved for internal usage. */
-#define OBJECT_RIGHTS_MASK	0x0FFFFFFF
-
-extern void object_acl_init(object_acl_t *acl);
-extern void object_acl_destroy(object_acl_t *acl);
-extern void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value,
-	object_rights_t rights);
-extern void object_acl_canonicalise(object_acl_t *acl);
-
-extern status_t object_security_validate(object_security_t *security,
-	struct process *process);
-extern status_t object_security_from_user(object_security_t *dest,
-	const object_security_t *src, bool validate);
-extern void object_security_destroy(object_security_t *security);
-
-extern void object_init(object_t *object, object_type_t *type, object_security_t *security,
-	object_acl_t *sacl);
+extern void object_init(object_t *object, object_type_t *type);
 extern void object_destroy(object_t *object);
 extern object_rights_t object_rights(object_t *object, struct process *process);
-extern status_t object_set_security(object_t *object, object_security_t *security);
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_signal(void *sync);

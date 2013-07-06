@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -486,7 +486,7 @@ __init_text void sched_init(void) {
 	sched_init_percpu();
 
 	/* Create the thread reaper. */
-	ret = thread_create("reaper", NULL, 0, sched_reaper_thread, NULL, NULL, NULL, NULL);
+	ret = thread_create("reaper", NULL, 0, sched_reaper_thread, NULL, NULL, NULL);
 	if(ret != STATUS_SUCCESS)
 		fatal("Could not create thread reaper (%d)", ret);
 }
@@ -506,7 +506,7 @@ __init_text void sched_init_percpu(void) {
 
 	/* Create the idle thread. */
 	sprintf(name, "idle-%" PRIu32, curr_cpu->id);
-	ret = thread_create(name, NULL, 0, sched_idle_thread, NULL, NULL, NULL,
+	ret = thread_create(name, NULL, 0, sched_idle_thread, NULL, NULL,
 		&curr_cpu->sched->idle_thread);
 	if(ret != STATUS_SUCCESS)
 		fatal("Could not create idle thread for %" PRIu32 " (%d)", curr_cpu->id, ret);

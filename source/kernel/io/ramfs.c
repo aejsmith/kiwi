@@ -79,13 +79,11 @@ static void ramfs_node_free(fs_node_t *node) {
  * @param name		Name to give the node.
  * @param type		Type to give the new node.
  * @param target	For symbolic links, the target of the link.
- * @param security	Security attributes for the node.
  * @param nodep		Where to store pointer to node structure for created
  *			entry.
  * @return		Status code describing result of the operation. */
 static status_t ramfs_node_create(fs_node_t *parent, const char *name, file_type_t type,
-                                  const char *target, object_security_t *security,
-                                  fs_node_t **nodep) {
+                                  const char *target, fs_node_t **nodep) {
 	ramfs_mount_t *mount = parent->mount->data;
 	ramfs_node_t *pdata = parent->data, *data;
 	node_id_t id;
@@ -124,7 +122,7 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name, file_type
 	}
 
 	entry_cache_insert(pdata->entries, name, id);
-	*nodep = fs_node_alloc(parent->mount, id, type, security, parent->ops, data);
+	*nodep = fs_node_alloc(parent->mount, id, type, parent->ops, data);
 	return STATUS_SUCCESS;
 }
 
@@ -166,17 +164,6 @@ static void ramfs_node_info(fs_node_t *node, file_info_t *infop) {
 		infop->size = 0;
 		break;
 	}
-}
-
-/** Update security attributes of a RamFS node.
- * @param node		Node to set for.
- * @param security	New security attributes to set.
- * @return		Status code describing result of the operation. */
-static status_t ramfs_node_set_security(fs_node_t *node, const object_security_t *security) {
-	/* Do not need to do anything here. However, this function must be
-	 * given in the operations structure so that the FS layer knows that
-	 * we support security attributes. */
-	return STATUS_SUCCESS;
 }
 
 /** Read from a RamFS file.
@@ -306,7 +293,6 @@ static fs_node_ops_t ramfs_node_ops = {
 	.create = ramfs_node_create,
 	.unlink = ramfs_node_unlink,
 	.info = ramfs_node_info,
-	.set_security = ramfs_node_set_security,
 	.read = ramfs_node_read,
 	.write = ramfs_node_write,
 	.get_cache = ramfs_node_get_cache,
@@ -333,8 +319,6 @@ static fs_mount_ops_t ramfs_mount_ops = {
  * @param count		Number of options.
  * @return		Status code describing result of the operation. */
 static status_t ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t count) {
-	object_acl_t acl;
-	object_security_t security = { 0, 0, &acl };
 	ramfs_mount_t *data;
 	ramfs_node_t *ndata;
 
@@ -351,10 +335,7 @@ static status_t ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t c
 	ndata->entries = entry_cache_create(NULL, NULL);
 	entry_cache_insert(ndata->entries, ".", 0);
 	entry_cache_insert(ndata->entries, "..", 0);
-	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, DEFAULT_DIR_RIGHTS_OWNER);
-	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, -1, DEFAULT_DIR_RIGHTS_OTHERS);
-	mount->root = fs_node_alloc(mount, 0, FILE_TYPE_DIR, &security, &ramfs_node_ops, ndata);
+	mount->root = fs_node_alloc(mount, 0, FILE_TYPE_DIR, &ramfs_node_ops, ndata);
 	return STATUS_SUCCESS;
 }
 

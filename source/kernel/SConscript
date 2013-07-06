@@ -33,7 +33,7 @@ sources = FeatureSources(config, [
 	'io/fs.c',
 	'io/ramfs.c',
 
-	'ipc/ipc.c',
+	#'ipc/ipc.c',
 	'ipc/pipe.c',
 
 	'lib/avl_tree.c',
@@ -47,7 +47,7 @@ sources = FeatureSources(config, [
 	'lib/string.c',
 	'lib/tar.c',
 
-	'mm/area.c',
+	#'mm/area.c',
 	'mm/kmem.c',
 	'mm/malloc.c',
 	'mm/mmu.c',
@@ -62,9 +62,6 @@ sources = FeatureSources(config, [
 	'proc/sched.c',
 	'proc/signal.c',
 	'proc/thread.c',
-
-	'security/context.c',
-	'security/object.c',
 
 	'sync/condvar.c',
 	'sync/futex.c',

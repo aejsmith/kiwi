@@ -93,8 +93,7 @@ typedef struct mount_info {
 #define FILE_SEEK_END		3	/**< Set the offset to the end of the file plus the supplied value. */
 
 extern status_t kern_file_open(const char *path, object_rights_t rights, int flags,
-                               int create, const object_security_t *security,
-                               handle_t *handlep);
+                               int create, handle_t *handlep);
 extern status_t kern_file_read(handle_t handle, void *buf, size_t count, size_t *bytesp);
 extern status_t kern_file_pread(handle_t handle, void *buf, size_t count, offset_t offset,
                                 size_t *bytesp);
@@ -106,7 +105,7 @@ extern status_t kern_file_seek(handle_t handle, int action, rel_offset_t offset,
 extern status_t kern_file_info(handle_t handle, file_info_t *infop);
 extern status_t kern_file_sync(handle_t handle);
 
-extern status_t kern_dir_create(const char *path, const object_security_t *security);
+extern status_t kern_dir_create(const char *path);
 extern status_t kern_dir_read(handle_t handle, dir_entry_t *buf, size_t size);
 
 extern status_t kern_symlink_create(const char *path, const char *target);
@@ -121,10 +120,6 @@ extern status_t kern_fs_getcwd(char *buf, size_t size);
 extern status_t kern_fs_setcwd(const char *path);
 extern status_t kern_fs_setroot(const char *path);
 extern status_t kern_fs_info(const char *path, bool follow, file_info_t *infop);
-#ifndef KERNEL
-extern status_t kern_fs_security(const char *path, bool follow, object_security_t *securityp);
-#endif
-extern status_t kern_fs_set_security(const char *path, bool follow, const object_security_t *security);
 extern status_t kern_fs_link(const char *source, const char *dest);
 extern status_t kern_fs_unlink(const char *path);
 extern status_t kern_fs_rename(const char *source, const char *dest);

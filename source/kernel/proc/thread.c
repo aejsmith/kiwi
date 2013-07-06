@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -78,10 +78,6 @@
 #else
 # define dprintf(fmt...)	
 #endif
-
-/** Default thread rights. */
-#define DEFAULT_THREAD_RIGHTS_OWNER	(THREAD_RIGHT_QUERY | THREAD_RIGHT_SIGNAL)
-#define DEFAULT_THREAD_RIGHTS_OTHERS	(THREAD_RIGHT_QUERY)
 
 static bool thread_timeout(void *_thread);
 
@@ -698,46 +694,20 @@ thread_t *thread_lookup(thread_id_t id) {
  * @param func		Entry function for the thread.
  * @param arg1		First argument to pass to entry function.
  * @param arg2		Second argument to pass to entry function.
- * @param security	Security attributes for the thread (if NULL, default
- *			security attributes will be constructed).
  * @param threadp	Where to store pointer to thread object (can be NULL,
  *			see above).
  *
  * @return		Status code describing result of the operation.
  */
 status_t thread_create(const char *name, process_t *owner, unsigned flags,
-	thread_func_t func, void *arg1, void *arg2, object_security_t *security,
-	thread_t **threadp)
+	thread_func_t func, void *arg1, void *arg2, thread_t **threadp)
 {
-	object_security_t dsecurity = { -1, -1, NULL };
-	object_acl_t acl;
 	thread_t *thread;
-	status_t ret;
 
 	assert(name);
 
 	if(!owner)
 		owner = kernel_proc;
-
-	if(security) {
-		ret = object_security_validate(security, NULL);
-		if(ret != STATUS_SUCCESS)
-			return ret;
-
-		dsecurity.uid = security->uid;
-		dsecurity.gid = security->gid;
-		dsecurity.acl = security->acl;
-	}
-
-	/* If an ACL is not given, construct a default ACL. */
-	if(!dsecurity.acl) {
-		object_acl_init(&acl);
-		if(owner != kernel_proc)
-			object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, DEFAULT_THREAD_RIGHTS_OWNER);
-
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEFAULT_THREAD_RIGHTS_OTHERS);
-		dsecurity.acl = &acl;
-	}
 
 	/* Allocate a thread structure from the cache. The thread constructor
 	 * caches a kernel stack with the thread for us. */
@@ -764,7 +734,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags,
 	if(threadp)
 		refcount_inc(&thread->count);
 
-	object_init(&thread->obj, &thread_object_type, &dsecurity, NULL);
+	object_init(&thread->obj, &thread_object_type);
 	thread->state = THREAD_CREATED;
 	thread->flags = flags;
 	thread->priority = THREAD_PRIORITY_NORMAL;
@@ -961,10 +931,8 @@ __init_text void thread_init(void) {
  * @param handlep	Where to store handle to the thread (can be NULL).
  * @return		Status code describing result of the operation. */
 status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
-	void (*func)(void *), void *arg, const object_security_t *security,
-	object_rights_t rights, handle_t *handlep)
+	void (*func)(void *), void *arg, handle_t *handlep)
 {
-	object_security_t ksecurity = { -1, -1, NULL };
 	thread_uspace_args_t *args;
 	thread_t *thread = NULL;
 	handle_t handle = -1;
@@ -986,25 +954,18 @@ status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
 
-	if(security) {
-		ret = object_security_from_user(&ksecurity, security, false);
-		if(ret != STATUS_SUCCESS)
-			goto fail;
-	}
-
 	/* Create the thread, but do not run it yet. We attempt to create the
 	 * handle to the thread before running it as this allows us to
 	 * terminate it if not successful. */
 	ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args,
-		NULL, &ksecurity, &thread);
-	object_security_destroy(&ksecurity);
+		NULL, &thread);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
 	/* Create a handle to the thread if necessary. */
 	if(handlep) {
 		refcount_inc(&thread->count);
-		ret = object_handle_create(&thread->obj, NULL, rights, NULL, 0, NULL,
+		ret = object_handle_create(&thread->obj, NULL, 0, NULL, 0, NULL,
 			&handle, handlep);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
@@ -1048,10 +1009,9 @@ fail:
 
 /** Open a handle to a thread.
  * @param id		ID of the thread to open.
- * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to thread.
  * @return		Status code describing result of the operation. */
-status_t kern_thread_open(thread_id_t id, object_rights_t rights, handle_t *handlep) {
+status_t kern_thread_open(thread_id_t id, handle_t *handlep) {
 	thread_t *thread;
 	status_t ret;
 
@@ -1063,7 +1023,7 @@ status_t kern_thread_open(thread_id_t id, object_rights_t rights, handle_t *hand
 		return STATUS_NOT_FOUND;
 
 	/* Reference added by thread_lookup() is taken over by this handle. */
-	ret = object_handle_open(&thread->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
+	ret = object_handle_open(&thread->obj, NULL, 0, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS)
 		thread_release(thread);
 
@@ -1144,7 +1104,7 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 	thread_t *thread;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, THREAD_RIGHT_QUERY, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, 0, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 

@@ -26,8 +26,6 @@
 #include <proc/process.h>
 #include <proc/thread.h>
 
-#include <security/cap.h>
-
 #include <cpu.h>
 #include <kernel.h>
 #include <smp.h>
@@ -37,11 +35,13 @@
 bool shutdown_in_progress = false;
 
 #if CONFIG_SMP
+
 /** SMP call handler to halt a CPU. */
 static status_t shutdown_call_func(void *data) {
 	smp_call_acknowledge(STATUS_SUCCESS);
 	arch_cpu_halt();
 }
+
 #endif
 
 /** System shutdown thread.
@@ -92,7 +92,7 @@ void system_shutdown(int action) {
 		 * them, and if we're running in one, we'll block those DPCs
 		 * from executing. */
 		ret = thread_create("shutdown", NULL, 0, shutdown_thread_entry,
-			(void *)((ptr_t)action), NULL, NULL, NULL);
+			(void *)((ptr_t)action), NULL, NULL);
 		if(ret != STATUS_SUCCESS) {
 			/* FIXME: This shouldn't be able to fail, must reserve
 			 * a thread or something in case we've got too many
@@ -113,19 +113,13 @@ void system_shutdown(int action) {
  * Shut down the system.
  *
  * Terminates all running processes, flushes and unmounts all filesystems, and
- * then performs the specified action. The CAP_SHUTDOWN capability is required
- * to use this function.
+ * then performs the specified action.
  *
  * @param action	Action to perform once the system has been shut down.
  *
- * @return		Status code describing result of the operation. Will
- *			always succeed unless the calling process does not have
- *			the CAP_SHUTDOWN capability.
+ * @return		Status code describing result of the operation.
  */
 status_t kern_shutdown(int action) {
-	if(!cap_check(NULL, CAP_SHUTDOWN))
-		return STATUS_PERM_DENIED;
-
 	system_shutdown(action);
 	fatal("Shouldn't get here");
 }

@@ -40,9 +40,6 @@
 # define dprintf(fmt...)	
 #endif
 
-/** Access to grant others in the default ACL. */
-#define DEVICE_DEFAULT_RIGHTS	(DEVICE_RIGHT_QUERY | DEVICE_RIGHT_READ | DEVICE_RIGHT_WRITE)
-
 /** Root of the device tree. */
 device_t *device_tree_root;
 
@@ -158,9 +155,7 @@ static object_type_t device_object_type = {
  */
 status_t device_create(const char *name, device_t *parent, device_ops_t *ops, void *data,
                        device_attr_t *attrs, size_t count, device_t **devicep) {
-	object_security_t security;
 	device_t *device = NULL;
-	object_acl_t acl;
 	status_t ret;
 	size_t i;
 
@@ -175,15 +170,8 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 		goto fail;
 	}
 
-	/* Create an ACL and security structure. TODO: Restrict device access. */
-	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEVICE_DEFAULT_RIGHTS);
-	security.uid = 0;
-	security.gid = 0;
-	security.acl = &acl;
-
 	device = kmalloc(sizeof(device_t), MM_WAIT);
-	object_init(&device->obj, &device_object_type, &security, NULL);
+	object_init(&device->obj, &device_object_type);
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -258,8 +246,6 @@ fail:
  * @return		Status code describing result of the operation.
  */
 status_t device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep) {
-	object_security_t security;
-	object_acl_t acl;
 	device_t *device;
 
 	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !dest) {
@@ -278,13 +264,8 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 		return STATUS_ALREADY_EXISTS;
 	}
 
-	object_acl_init(&acl);
-	security.uid = 0;
-	security.gid = 0;
-	security.acl = &acl;
-
 	device = kmalloc(sizeof(device_t), MM_WAIT);
-	object_init(&device->obj, NULL, &security, NULL);
+	object_init(&device->obj, NULL);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
