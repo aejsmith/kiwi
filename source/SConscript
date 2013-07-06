@@ -23,7 +23,8 @@ dist = envmgr['dist']
 #################
 
 # Build the kernel and drivers.
-SConscript(dirs = ['kernel', 'drivers'])
+#SConscript(dirs = ['kernel', 'drivers'])
+SConscript(dirs = ['kernel'])
 
 ################
 # KBoot build. #
@@ -62,6 +63,7 @@ if config['PLATFORM'] == 'pc':
 # Userspace build. #
 ####################
 
+"""
 # Set up the userspace build environment.
 env = envmgr.Create('uspace', {
 	'CPPPATH': [Dir('include')],
@@ -198,3 +200,5 @@ shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARG
 
 # Build userspace.
 SConscript(dirs = ['libraries', 'services', 'binaries'], exports = ['env'])
+"""
+

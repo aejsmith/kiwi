@@ -201,4 +201,4 @@ env.Command(['kernel', 'kernel.lst', 'kernel.rde', 'kernel.sym'], 'kernel-unstri
 ])
 
 # Build kernel modules.
-SConscript(dirs = ['modules'])
+#SConscript(dirs = ['modules'])
