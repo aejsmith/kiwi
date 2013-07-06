@@ -637,9 +637,6 @@ static void dump_object_acl(object_acl_t *acl) {
 		case ACL_ENTRY_OTHERS:
 			kdb_printf(" Others: ");
 			break;
-		case ACL_ENTRY_SESSION:
-			kdb_printf(" Session(%d): ", acl->entries[i].value);
-			break;
 		case ACL_ENTRY_CAPABILITY:
 			kdb_printf(" Capability(%d): ", acl->entries[i].value);
 			break;

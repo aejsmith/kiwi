@@ -60,7 +60,6 @@ sources = FeatureSources(config, [
 
 	'proc/process.c',
 	'proc/sched.c',
-	'proc/session.c',
 	'proc/signal.c',
 	'proc/thread.c',
 

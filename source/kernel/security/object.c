@@ -72,8 +72,8 @@ static bool object_acl_entry_valid(uint8_t type, int32_t value, object_rights_t 
 		if(value < -1) {
 			return false;
 		}
-	} else if(type == ACL_ENTRY_SESSION || type == ACL_ENTRY_CAPABILITY) {
-		if(value < 0 || (type == ACL_ENTRY_CAPABILITY && value >= SECURITY_MAX_CAPS)) {
+	} else if(type == ACL_ENTRY_CAPABILITY) {
+		if(value < 0 || value >= SECURITY_MAX_CAPS) {
 			return false;
 		}
 	} else if(type != ACL_ENTRY_OTHERS) {
@@ -90,9 +90,8 @@ static bool object_acl_entry_valid(uint8_t type, int32_t value, object_rights_t 
  *			the entry type. For ACL_ENTRY_USER, it is a user ID,
  *			with -1 referring to the owning user. For
  *			ACL_ENTRY_GROUP, it is a group ID, with -1 referring to
- *			the owning group. For ACL_ENTRY_SESSION, it is a session
- *			ID. For ACL_ENTRY_CAPABILITY, it is a capability number.
- *			For ACL_ENTRY_OTHERS, it is ignored.
+ *			the owning group. For ACL_ENTRY_CAPABILITY, it is a
+ *			capability number. For ACL_ENTRY_OTHERS, it is ignored.
  * @param rights	Rights to give the entry. */
 void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, object_rights_t rights) {
 	size_t i;
@@ -162,9 +161,9 @@ static object_rights_t object_acl_rights(object_t *object, object_acl_t *acl, bo
 	size_t i;
 
 	/* Go through the entire ACL and calculate the rights allowed based on
-	 * the process's user, group, session and capabilities, and for others.
-	 * Any matching session and capability entries are always included in
-	 * the calculated rights. */
+	 * the process's user, group and capabilities, and for others. Any
+	 * matching capability entries are always included in the calculated
+	 * rights. */
 	for(i = 0; i < acl->count; i++) {
 		switch(acl->entries[i].type) {
 		case ACL_ENTRY_USER:
@@ -183,11 +182,6 @@ static object_rights_t object_acl_rights(object_t *object, object_acl_t *acl, bo
 			break;
 		case ACL_ENTRY_OTHERS:
 			orights |= acl->entries[i].rights;
-			break;
-		case ACL_ENTRY_SESSION:
-			if(acl->entries[i].value == process->session->id) {
-				rights |= acl->entries[i].rights;
-			}
 			break;
 		case ACL_ENTRY_CAPABILITY:
 			if(security_context_has_cap(context, acl->entries[i].value)) {

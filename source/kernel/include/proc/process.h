@@ -30,7 +30,6 @@
 #include <lib/avl_tree.h>
 #include <lib/notifier.h>
 
-#include <proc/session.h>
 #include <proc/thread.h>
 
 #include <sync/semaphore.h>
@@ -48,7 +47,6 @@ typedef struct process {
 	/** Main thread information. */
 	mutex_t lock;			/**< Lock to protect data in structure. */
 	refcount_t count;		/**< Number of handles to/threads in the process. */
-	session_t *session;		/**< Session the process belongs to. */
 
 	/** Scheduling information. */
 	int flags;			/**< Behaviour flags for the process. */

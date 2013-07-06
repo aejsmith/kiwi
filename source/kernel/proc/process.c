@@ -142,7 +142,6 @@ static void process_destroy(process_t *process) {
 		process->id, process->name, process, process->status);
 
 	process_cleanup(process);
-	session_release(process->session);
 	notifier_clear(&process->death_notifier);
 	object_destroy(&process->obj);
 	id_allocator_free(&process_id_allocator, process->id);
@@ -278,7 +277,6 @@ static status_t process_alloc(const char *name, int flags, int priority,
 	object_security_t dsecurity = { security->uid, security->gid, security->acl };
 	object_acl_t acl, sacl;
 	process_t *process;
-	session_t *session;
 	status_t ret;
 
 	assert(name);
@@ -291,26 +289,6 @@ static status_t process_alloc(const char *name, int flags, int priority,
 	ret = process_object_set_security(NULL, security);
 	if(ret != STATUS_SUCCESS)
 		return ret;
-
-	/* If creating a new session, check if the parent is allowed to do so. */
-	if(cflags & PROCESS_CREATE_SESSION && parent) {
-		if(!cap_check(parent, CAP_CREATE_SESSION))
-			return STATUS_PERM_DENIED;
-	}
-
-	/* Create a session for the process or inherit the parent's. */
-	if(!parent || cflags & PROCESS_CREATE_SESSION) {
-		/* Check if the parent is allowed to create sessions. */
-		if(parent && !cap_check(parent, CAP_CREATE_SESSION))
-			return STATUS_PERM_DENIED;
-
-		session = session_create();
-		if(!session)
-			return STATUS_PROCESS_LIMIT;
-	} else {
-		session_get(parent->session);
-		session = parent->session;
-	}
 
 	/* Allocate a new process structure. */
 	process = slab_cache_alloc(process_cache, MM_WAIT);
@@ -382,7 +360,6 @@ static status_t process_alloc(const char *name, int flags, int priority,
 	object_init(&process->obj, &process_object_type, &dsecurity, &sacl);
 	refcount_set(&process->count, (uhandlep) ? 1 : 0);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
-	process->session = session;
 	process->flags = flags;
 	process->priority = priority;
 	process->aspace = aspace;
@@ -749,8 +726,8 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 		return KDB_SUCCESS;
 	}
 
-	kdb_printf("ID     State   User Group Session Prio Flags Count Aspace             Name\n");
-	kdb_printf("==     =====   ==== ===== ======= ==== ===== ===== ======             ====\n");
+	kdb_printf("ID     State   User Group Prio Flags Count Aspace             Name\n");
+	kdb_printf("==     =====   ==== ===== ==== ===== ===== ======             ====\n");
 
 	AVL_TREE_FOREACH(&process_tree, iter) {
 		process = avl_tree_entry(iter, process_t);
@@ -764,9 +741,9 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 		default:		kdb_printf("Bad     "); break;
 		}
 
-		kdb_printf("%-4d %-5d %-7d %-4d %-5d %-5d %-18p %s\n",
+		kdb_printf("%-4d %-5d %-4d %-5d %-5d %-18p %s\n",
 			process->security.uid, process->security.groups[0],
-			process->session->id, process->priority, process->flags,
+			process->priority, process->flags,
 			refcount_get(&process->count), process->aspace,
 			process->name);
 	}
@@ -1298,27 +1275,6 @@ process_id_t kern_process_id(handle_t handle) {
 	} else if(object_handle_lookup(handle, OBJECT_TYPE_PROCESS, 0, &khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
 		id = process->id;
-		object_handle_release(khandle);
-	}
-
-	return id;
-}
-
-/** Get the ID of a process' session.
- * @param handle	Handle for process to get session ID of, or -1 to get
- *			the calling process' session ID.
- * @return		Session ID on success, -1 if handle is invalid. */
-session_id_t kern_process_session(handle_t handle) {
-	object_handle_t *khandle;
-	session_id_t id = -1;
-	process_t *process;
-
-	if(handle < 0) {
-		id = curr_proc->session->id;
-	} else if(object_handle_lookup(handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY,
-			&khandle) == STATUS_SUCCESS) {
-		process = (process_t *)khandle->object;
-		id = process->session->id;
 		object_handle_release(khandle);
 	}
 

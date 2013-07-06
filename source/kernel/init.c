@@ -37,7 +37,6 @@
 
 #include <proc/process.h>
 #include <proc/sched.h>
-#include <proc/session.h>
 #include <proc/thread.h>
 
 #include <security/context.h>
@@ -146,7 +145,6 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	/* Perform other initialization tasks. */
 	symbol_init();
 	handle_init();
-	session_init();
 	process_init();
 	thread_init();
 	sched_init();

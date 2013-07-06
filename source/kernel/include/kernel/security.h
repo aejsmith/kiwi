@@ -37,15 +37,14 @@ extern "C" {
 /** Definitions of capabilities.
  * @note		Update security_init() when adding capabilities. */
 #define CAP_SECURITY_AUTHORITY		0	/**< Ability to set any process' security context. */
-#define CAP_CREATE_SESSION		1	/**< Ability to create new sessions. */
-#define CAP_CHANGE_IDENTITY		2	/**< Ability to change user/group IDs. */
-#define CAP_MODULE			3	/**< Ability to load/unload kernel modules. */
-#define CAP_FS_ADMIN			4	/**< Ability to bypass access checks on the filesystem. */
-#define CAP_FS_SETROOT			5	/**< Ability to use the fs_setroot() system call. */
-#define CAP_FS_MOUNT			6	/**< Ability to mount/unmount filesystems. */
-#define CAP_CHANGE_OWNER		7	/**< Ability to set object user/group to arbitrary IDs. */
-#define CAP_FATAL			8	/**< Ability to halt the kernel with a fatal error. */
-#define CAP_SHUTDOWN			9	/**< Ability to shut down the system. */
+#define CAP_CHANGE_IDENTITY		1	/**< Ability to change user/group IDs. */
+#define CAP_MODULE			2	/**< Ability to load/unload kernel modules. */
+#define CAP_FS_ADMIN			3	/**< Ability to bypass access checks on the filesystem. */
+#define CAP_FS_SETROOT			4	/**< Ability to use the fs_setroot() system call. */
+#define CAP_FS_MOUNT			5	/**< Ability to mount/unmount filesystems. */
+#define CAP_CHANGE_OWNER		6	/**< Ability to set object user/group to arbitrary IDs. */
+#define CAP_FATAL			7	/**< Ability to halt the kernel with a fatal error. */
+#define CAP_SHUTDOWN			8	/**< Ability to shut down the system. */
 
 /** Structure defining the security context for a process/thread.
  * @note		Should be modified using the security_context_*()

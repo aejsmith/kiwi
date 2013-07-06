@@ -32,7 +32,6 @@ extern "C" {
 /** Structure containing details of a client on a port. */
 typedef struct port_client {
 	process_id_t pid;			/**< ID of client process. */
-	session_id_t sid;			/**< ID of client process' session. */
 } port_client_t;
 
 /** IPC port rights. */

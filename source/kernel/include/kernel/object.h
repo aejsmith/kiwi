@@ -46,8 +46,7 @@ extern "C" {
 #define ACL_ENTRY_USER		0	/**< User (value of -1 means owning user). */
 #define ACL_ENTRY_GROUP		1	/**< Group (value of -1 means owning group). */
 #define ACL_ENTRY_OTHERS	2	/**< Others. */
-#define ACL_ENTRY_SESSION	3	/**< Session. */
-#define ACL_ENTRY_CAPABILITY	4	/**< Capability. */
+#define ACL_ENTRY_CAPABILITY	3	/**< Capability. */
 
 /** Handle link behaviour flags. */
 #define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */
@@ -73,7 +72,7 @@ typedef struct object_event {
 /** Object ACL entry structure. */
 typedef struct object_acl_entry {
 	uint8_t type;			/**< Entry type. */
-	int32_t value;			/**< Value specific to type (user/group/session ID, capability). */
+	int32_t value;			/**< Value specific to type (user/group ID, capability). */
 	object_rights_t rights;		/**< Rights to grant. */
 } object_acl_entry_t;
 

@@ -796,7 +796,6 @@ static status_t fs_node_create(const char *path, file_type_t type, const char *t
 	for(i = 0; i < security->acl->count; i++) {
 		switch(security->acl->entries[i].type) {
 		case ACL_ENTRY_CAPABILITY:
-		case ACL_ENTRY_SESSION:
 			return STATUS_NOT_SUPPORTED;
 		}
 	}
@@ -1063,12 +1062,11 @@ static status_t file_object_set_security(object_t *object, object_security_t *se
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	/* The ACL must not contain any session or capability entries. */
+	/* The ACL must not contain any capability entries. */
 	if(security->acl) {
 		for(i = 0; i < security->acl->count; i++) {
 			switch(security->acl->entries[i].type) {
 			case ACL_ENTRY_CAPABILITY:
-			case ACL_ENTRY_SESSION:
 				return STATUS_NOT_SUPPORTED;
 			}
 		}

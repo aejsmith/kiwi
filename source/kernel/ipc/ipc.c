@@ -733,7 +733,6 @@ status_t kern_connection_open(port_id_t id, handle_t *handlep) {
 	/* Fill in the synchronisation structure. */
 	semaphore_init(&sync.sem, "ipc_connect_sem", 0);
 	sync.info.pid = curr_proc->id;
-	sync.info.sid = curr_proc->session->id;
 	conn->sync = &sync;
 
 	/* Create a handle now, as we do not want to find that we cannot create

@@ -218,7 +218,6 @@ __init_text void security_init(void) {
 	 * used for the kernel process and for the first userspace process.
 	 * They will be dropped as required. */
 	security_context_set_cap(&init_security_context, CAP_SECURITY_AUTHORITY);
-	security_context_set_cap(&init_security_context, CAP_CREATE_SESSION);
 	security_context_set_cap(&init_security_context, CAP_CHANGE_IDENTITY);
 	security_context_set_cap(&init_security_context, CAP_MODULE);
 	security_context_set_cap(&init_security_context, CAP_FS_ADMIN);

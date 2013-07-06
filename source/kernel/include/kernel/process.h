@@ -51,8 +51,7 @@ typedef struct process_args {
 #define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
 
 /** Process creation flags. */
-#define PROCESS_CREATE_SESSION	(1<<0)	/**< Place the process in a new session. */
-#define PROCESS_CREATE_CLONE	(1<<1)	/**< Inherit extra information from the parent. */
+#define PROCESS_CREATE_CLONE	(1<<0)	/**< Inherit extra information from the parent. */
 
 /** Actions for kern_process_control(). */
 #define PROCESS_GET_SECTX	1	/**< Get security context (in: security_context_t). */
@@ -82,7 +81,6 @@ extern status_t kern_process_clone(void (*func)(void *), void *arg, void *sp,
                                    object_rights_t rights, handle_t *handlep);
 extern status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *handlep);
 extern process_id_t kern_process_id(handle_t handle);
-extern session_id_t kern_process_session(handle_t handle);
 extern status_t kern_process_control(handle_t handle, int action, const void *in, void *out);
 extern status_t kern_process_status(handle_t handle, int *statusp, int *reasonp);
 extern void kern_process_exit(int status) __attribute__((noreturn));
