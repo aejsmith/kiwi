@@ -250,7 +250,7 @@ static void handle_table_insert(handle_table_t *table, handle_t id, object_handl
 	link->flags = flags;
 
 	bitmap_set(table->bitmap, id);
-	avl_tree_insert(&table->tree, &link->link, id, link);
+	avl_tree_insert(&table->tree, id, &link->link);
 }
 
 /**
@@ -317,7 +317,7 @@ static status_t object_handle_detach_unsafe(process_t *process, handle_t id) {
 	handle_link_t *link;
 
 	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&process->handles->tree, id);
+	link = avl_tree_lookup(&process->handles->tree, id, handle_link_t, link);
 	if(!link)
 		return STATUS_INVALID_HANDLE;
 
@@ -384,7 +384,7 @@ status_t object_handle_lookup(handle_t id, int type, object_rights_t rights, obj
 	rwlock_read_lock(&curr_proc->handles->lock);
 
 	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&curr_proc->handles->tree, id);
+	link = avl_tree_lookup(&curr_proc->handles->tree, id, handle_link_t, link);
 	if(!link) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;
@@ -448,7 +448,8 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 			assert(map);
 
 			for(i = 0; i < count; i++) {
-				link = avl_tree_lookup(&parent->tree, map[i][0]);
+				link = avl_tree_lookup(&parent->tree, map[i][0],
+					handle_link_t, link);
 				if(!link) {
 					rwlock_unlock(&parent->lock);
 					handle_table_destroy(table);
@@ -457,7 +458,7 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 					rwlock_unlock(&parent->lock);
 					handle_table_destroy(table);
 					return STATUS_INVALID_HANDLE;
-				} else if(avl_tree_lookup(&table->tree, map[i][1])) {
+				} else if(avl_tree_lookup_node(&table->tree, map[i][1])) {
 					rwlock_unlock(&parent->lock);
 					handle_table_destroy(table);
 					return STATUS_ALREADY_EXISTS;
@@ -468,7 +469,7 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 			}
 		} else {
 			AVL_TREE_FOREACH(&parent->tree, iter) {
-				link = avl_tree_entry(iter, handle_link_t);
+				link = avl_tree_entry(iter, handle_link_t, link);
 
 				if(link->flags & HANDLE_INHERITABLE) {
 					handle_table_insert(table, iter->key,
@@ -505,7 +506,7 @@ handle_table_t *handle_table_clone(handle_table_t *src) {
 	rwlock_read_lock(&src->lock);
 
 	AVL_TREE_FOREACH(&src->tree, iter) {
-		link = avl_tree_entry(iter, handle_link_t);
+		link = avl_tree_entry(iter, handle_link_t, link);
 		handle_table_insert(table, iter->key, link->handle, link->flags);
 	}
 
@@ -520,7 +521,7 @@ void handle_table_destroy(handle_table_t *table) {
 
 	/* Close all handles. */
 	AVL_TREE_FOREACH_SAFE(&table->tree, iter) {
-		link = avl_tree_entry(iter, handle_link_t);
+		link = avl_tree_entry(iter, handle_link_t, link);
 		object_handle_release(link->handle);
 		avl_tree_remove(&table->tree, &link->link);
 		kfree(link);
@@ -560,7 +561,7 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 	kdb_printf("==    ======             ====                  =====  ====\n");
 
 	AVL_TREE_FOREACH(&process->handles->tree, iter) {
-		link = avl_tree_entry(iter, handle_link_t);
+		link = avl_tree_entry(iter, handle_link_t, link);
 		kdb_printf("%-5" PRIu64 " %-18p %d(%-18p) %-6d %p\n",
 			iter->key, link->handle->object, link->handle->object->type->id,
 			link->handle->object->type, refcount_get(&link->handle->count),
@@ -685,7 +686,7 @@ status_t kern_handle_control(handle_t handle, int action, int arg, int *outp) {
 	rwlock_write_lock(&curr_proc->handles->lock);
 
 	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&curr_proc->handles->tree, handle);
+	link = avl_tree_lookup(&curr_proc->handles->tree, handle, handle_link_t, link);
 	if(!link) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;
@@ -766,7 +767,7 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, bool force, handl
 	rwlock_write_lock(&curr_proc->handles->lock);
 
 	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&curr_proc->handles->tree, handle);
+	link = avl_tree_lookup(&curr_proc->handles->tree, handle, handle_link_t, link);
 	if(!link) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;

@@ -647,8 +647,13 @@ void thread_exit(void) {
  * @param id		ID of the thread to find.
  * @return		Pointer to thread found, or NULL if not found. */
 thread_t *thread_lookup_unsafe(thread_id_t id) {
-	thread_t *thread = avl_tree_lookup(&thread_tree, id);
-	return (thread && (thread->state == THREAD_DEAD || thread->state == THREAD_CREATED)) ? NULL : thread;
+	thread_t *thread = avl_tree_lookup(&thread_tree, id, thread_t, tree_link);
+	if(thread) {
+		if(thread->state == THREAD_DEAD || thread->state == THREAD_CREATED)
+			return NULL;
+	}
+
+	return thread;
 }
 
 /**
@@ -770,7 +775,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags,
 
 	/* Add to the thread tree. */
 	rwlock_write_lock(&thread_tree_lock);
-	avl_tree_insert(&thread_tree, &thread->tree_link, thread->id, thread);
+	avl_tree_insert(&thread_tree, thread->id, &thread->tree_link);
 	rwlock_unlock(&thread_tree_lock);
 
 	dprintf("thread: created thread %" PRId32 " (%s) (thread: %p, owner: %p)\n",
@@ -866,7 +871,7 @@ static kdb_status_t kdb_cmd_thread(int argc, char **argv, kdb_filter_t *filter) 
 		}
 	} else {
 		AVL_TREE_FOREACH(&thread_tree, iter) {
-			thread = avl_tree_entry(iter, thread_t);
+			thread = avl_tree_entry(iter, thread_t, tree_link);
 			dump_thread(thread);
 		}
 	}

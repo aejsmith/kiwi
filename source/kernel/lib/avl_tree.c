@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,9 +17,6 @@
 /**
  * @file
  * @brief		AVL tree implementation.
- *
- * Implementation details:
- * - Non-unique keys are not supported.
  *
  * Reference:
  * - Wikipedia - AVL tree:
@@ -94,7 +91,7 @@ static inline void avl_tree_rotate_left(avl_tree_t *tree, avl_tree_node_t *node)
 
 	/* Child now takes ownership of the old root node as its left child. */
 	child->left = node;
-	child->left->parent = child;
+	node->parent = child;
 }
 
 /** Perform a right rotation.
@@ -126,7 +123,7 @@ static inline void avl_tree_rotate_right(avl_tree_t *tree, avl_tree_node_t *node
 
 	/* Child now takes ownership of the old root node as its right child. */
 	child->right = node;
-	child->right->parent = child;
+	node->parent = child;
 }
 
 /** Balance a node after an insertion.
@@ -159,35 +156,13 @@ static inline void avl_tree_balance_node(avl_tree_t *tree, avl_tree_node_t *node
 	}
 }
 
-/** Look up a node in an AVL tree.
- * @param tree		Tree to look up in.
- * @param key		Key to look for.
- * @return		Pointer to node if found, NULL if not. */
-static avl_tree_node_t *avl_tree_lookup_internal(avl_tree_t *tree, key_t key) {
-	avl_tree_node_t *node = tree->root;
-
-	/* Descend down the tree to find the required node. */
-	while(node) {
-		if(node->key > key) {
-			node = node->left;
-		} else if(node->key < key) {
-			node = node->right;
-		} else {
-			return node;
-		}
-	}
-
-	return NULL;
-}
-
 /** Insert a node in an AVL tree.
  * @param tree		Tree to insert into.
- * @param node		Node to insert into tree. This function does NOT check
- *			if the node is already in another tree: it must be
- *			removed by the caller if it is.
  * @param key		Key to give the node.
- * @param value		Value that the node will map to. */
-void avl_tree_insert(avl_tree_t *tree, avl_tree_node_t *node, key_t key, void *value) {
+ * @param node		Node that the key will map to. This function does NOT
+ *			check if the node is already in another tree: it must
+ *			be removed by the caller if it is. */
+void avl_tree_insert(avl_tree_t *tree, avl_tree_key_t key, avl_tree_node_t *node) {
 	avl_tree_node_t **next, *curr = NULL;
 	int balance;
 
@@ -195,7 +170,6 @@ void avl_tree_insert(avl_tree_t *tree, avl_tree_node_t *node, key_t key, void *v
 	node->right = NULL;
 	node->height = 0;
 	node->key = key;
-	node->value = value;
 
 	/* If tree is currently empty, just insert and finish. */
 	if(!tree->root) {
@@ -210,8 +184,7 @@ void avl_tree_insert(avl_tree_t *tree, avl_tree_node_t *node, key_t key, void *v
 		curr = *next;
 
 		/* Ensure that the key is unique. */
-		if(unlikely(key == curr->key))
-			fatal("Attempted to insert duplicate key into AVL tree");
+		assert(key != curr->key);
 
 		/* Get the next pointer. */
 		next = (key > curr->key) ? &curr->right : &curr->left;
@@ -327,42 +300,25 @@ void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
 	}
 }
 
-/**
- * Insert a value into an AVL tree with a dynamically allocated node.
- *
- * Inserts a value into an AVL tree with a dynamically allocated node. Values
- * inserted using this function must be removed with avl_tree_dyn_remove() to
- * free the node.
- *
- * @param tree		Tree to insert into.
- * @param key		Key to give the value.
- * @param value		Value the node will map to.
- */
-void avl_tree_dyn_insert(avl_tree_t *tree, key_t key, void *value) {
-	avl_tree_node_t *node;
-
-	node = kmalloc(sizeof(*node), MM_KERNEL);
-	avl_tree_insert(tree, node, key, value);
-}
-
-/** Remove a value from an AVL tree with a dynamically allocated node.
- * @param tree		Tree to remove from.
- * @param key		Key of value to remove. */
-void avl_tree_dyn_remove(avl_tree_t *tree, key_t key) {
-	avl_tree_node_t *node = avl_tree_lookup_internal(tree, key);
-	if(node) {
-		avl_tree_remove(tree, node);
-		kfree(node);
-	}
-}
-
 /** Look up a node in an AVL tree.
  * @param tree		Tree to look up in.
  * @param key		Key to look for.
- * @return		Node's value if found, NULL if not. */
-void *avl_tree_lookup(avl_tree_t *tree, key_t key) {
-	avl_tree_node_t *node = avl_tree_lookup_internal(tree, key);
-	return (node) ? node->value : NULL;
+ * @return		Pointer to node if found, NULL if not. */
+avl_tree_node_t *avl_tree_lookup_node(avl_tree_t *tree, avl_tree_key_t key) {
+	avl_tree_node_t *node = tree->root;
+
+	/* Descend down the tree to find the required node. */
+	while(node) {
+		if(node->key > key) {
+			node = node->left;
+		} else if(node->key < key) {
+			node = node->right;
+		} else {
+			return node;
+		}
+	}
+
+	return NULL;
 }
 
 /**
@@ -418,7 +374,7 @@ avl_tree_node_t *avl_tree_last(avl_tree_t *tree) {
 /** Get the node preceding another node in an AVL tree.
  * @param node		Node to get preceding node of.
  * @return		Preceding node or NULL if none found. */
-avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
+avl_tree_node_t *avl_tree_prev(avl_tree_node_t *node) {
 	if(!node)
 		return NULL;
 
@@ -445,7 +401,7 @@ avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
 /** Get the node following another node in an AVL tree.
  * @param node		Node to get following node of.
  * @return		Following node or NULL if none found. */
-avl_tree_node_t *avl_tree_node_next(avl_tree_node_t *node) {
+avl_tree_node_t *avl_tree_next(avl_tree_node_t *node) {
 	if(!node)
 		return NULL;
 

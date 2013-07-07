@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -520,7 +520,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 		        id, mount->id, tok);
 
 		/* Check if the node is cached in the mount. */
-		node = avl_tree_lookup(&mount->nodes, id);
+		node = avl_tree_lookup(&mount->nodes, id, fs_node_t, tree_link);
 		if(node) {
 			assert(node->mount == mount);
 
@@ -571,7 +571,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 			assert(node->ops);
 
 			/* Attach the node to the node tree and used list. */
-			avl_tree_insert(&mount->nodes, &node->tree_link, id, node);
+			avl_tree_insert(&mount->nodes, id, &node->tree_link);
 			list_append(&mount->used_nodes, &node->mount_link);
 			mutex_unlock(&mount->lock);
 		}
@@ -808,7 +808,7 @@ static status_t fs_node_create(const char *path, file_type_t type, const char *t
 	}
 
 	/* Attach the node to the node tree and used list. */
-	avl_tree_insert(&node->mount->nodes, &node->tree_link, node->id, node);
+	avl_tree_insert(&node->mount->nodes, node->id, &node->tree_link);
 	list_append(&node->mount->used_nodes, &node->mount_link);
 
 	dprintf("fs: created %s (node: %" PRIu16 ":%" PRIu64 ", parent: %" PRIu16 ":%" PRIu64 ")\n",
@@ -1705,7 +1705,7 @@ status_t dir_read(object_handle_t *handle, dir_entry_t *buf, size_t size) {
 		 * root, rather than the mountpoint. If the node the entry
 		 * currently points to is not in the cache, then it won't be a
 		 * mountpoint (mountpoints are always in the cache). */
-		child = avl_tree_lookup(&node->mount->nodes, buf->id);
+		child = avl_tree_lookup(&node->mount->nodes, buf->id, fs_node_t, tree_link);
 		if(child) {
 			if(child != node) {
 				/* Mounted pointer is protected by mount lock. */
@@ -2034,7 +2034,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 	}
 
 	/* Put the root node into the node tree/used list. */
-	avl_tree_insert(&mount->nodes, &mount->root->tree_link, mount->root->id, mount->root);
+	avl_tree_insert(&mount->nodes, mount->root->id, &mount->root->tree_link);
 	list_append(&mount->used_nodes, &mount->root->mount_link);
 
 	/* Make the mountpoint point to the new mount. */
@@ -2351,7 +2351,7 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 				return KDB_FAILURE;
 			} else if(kdb_parse_expression(argv[2], &val, NULL) != KDB_SUCCESS) {
 				return KDB_FAILURE;
-			} else if(!(node = avl_tree_lookup(&mount->nodes, val))) {
+			} else if(!(node = avl_tree_lookup(&mount->nodes, val, fs_node_t, tree_link))) {
 				kdb_printf("Unknown node ID %" PRIu64 ".\n", val);
 				return KDB_FAILURE;
 			}
@@ -2411,7 +2411,7 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 			}
 		} else {
 			AVL_TREE_FOREACH(&mount->nodes, iter) {
-				node = avl_tree_entry(iter, fs_node_t);
+				node = avl_tree_entry(iter, fs_node_t, tree_link);
 				kdb_printf("%-8" PRIu64 " %-5d %-7d %-4d %-18p %-18p %p\n",
 				           node->id, refcount_get(&node->count), node->removed,
 				           node->type, node->ops, node->data, node->mount);

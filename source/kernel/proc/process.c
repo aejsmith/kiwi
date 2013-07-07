@@ -108,7 +108,7 @@ static void process_ctor(void *obj, void *data) {
  * @note		Safe to call multiple times.
  * @param process	Process to clean up. */
 static void process_cleanup(process_t *process) {
-	futex_cleanup(process);
+	//futex_cleanup(process);
 	if(process->aspace) {
 		vm_aspace_destroy(process->aspace);
 		process->aspace = NULL;
@@ -298,7 +298,7 @@ static status_t process_alloc(const char *name, int flags, int priority,
 
 	/* Add to the process tree. */
 	rwlock_write_lock(&process_tree_lock);
-	avl_tree_insert(&process_tree, &process->tree_link, process->id, process);
+	avl_tree_insert(&process_tree, process->id, &process->tree_link);
 	rwlock_unlock(&process_tree_lock);
 
 	/* Create a handle to the process if required. */
@@ -519,7 +519,7 @@ void process_detach(thread_t *thread) {
  * @param id		ID of the process to find.
  * @return		Pointer to process found, or NULL if not found. */
 process_t *process_lookup_unsafe(process_id_t id) {
-	return avl_tree_lookup(&process_tree, id);
+	return avl_tree_lookup(&process_tree, id, process_t, tree_link);
 }
 
 /** Look up a process.
@@ -644,7 +644,7 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 	kdb_printf("==     =====   ==== ===== ===== ======             ====\n");
 
 	AVL_TREE_FOREACH(&process_tree, iter) {
-		process = avl_tree_entry(iter, process_t);
+		process = avl_tree_entry(iter, process_t, tree_link);
 
 		kdb_printf("%-5" PRId32 "%s ", process->id,
 			(process == curr_proc) ? "*" : " ");
@@ -696,7 +696,7 @@ void process_shutdown(void) {
 	rwlock_read_lock(&process_tree_lock);
 
 	AVL_TREE_FOREACH_SAFE(&process_tree, iter) {
-		process = avl_tree_entry(iter, process_t);
+		process = avl_tree_entry(iter, process_t, tree_link);
 		if(process != kernel_proc) {
 			LIST_FOREACH_SAFE(&process->threads, titer) {
 				thread = list_entry(titer, thread_t, owner_link);
@@ -715,7 +715,7 @@ void process_shutdown(void) {
 		count = 0;
 		rwlock_read_lock(&process_tree_lock);
 		AVL_TREE_FOREACH_SAFE(&process_tree, iter) {
-			process = avl_tree_entry(iter, process_t);
+			process = avl_tree_entry(iter, process_t, tree_link);
 			if(process != kernel_proc) {
 				count++;
 				if(!(interval % SECS2NSECS(2)) && process->state == PROCESS_RUNNING) {

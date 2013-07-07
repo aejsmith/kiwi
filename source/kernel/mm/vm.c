@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -392,7 +392,7 @@ static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
 	/* Fall back on searching through the AVL tree. */
 	node = as->tree.root;
 	while(node) {
-		region = avl_tree_entry(node, vm_region_t);
+		region = avl_tree_entry(node, vm_region_t, tree_link);
 		assert(vm_region_used(region));
 		if(addr >= region->start) {
 			if(addr < region->end) {
@@ -413,7 +413,7 @@ static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
 	 * list to find the required region. */
 	if(unused) {
 		if(near) {
-			region = vm_region_next(avl_tree_entry(near, vm_region_t));
+			region = vm_region_next(avl_tree_entry(near, vm_region_t, tree_link));
 		} else {
 			/* Should never be empty. */
 			assert(!list_empty(&as->regions));
@@ -553,7 +553,7 @@ static void vm_region_shrink(vm_region_t *region, ptr_t start, ptr_t end) {
 		 * region in the tree, because the key is changing. */
 		if(start != region->start) {
 			avl_tree_remove(&region->as->tree, &region->tree_link);
-			avl_tree_insert(&region->as->tree, &region->tree_link, start, region);
+			avl_tree_insert(&region->as->tree, start, &region->tree_link);
 		}
 	} else if(!(region->flags & VM_REGION_RESERVED)) {
 		/* If the size is changing, remove from the current freelist. */
@@ -602,7 +602,7 @@ static void vm_region_split(vm_region_t *region, ptr_t end, ptr_t start) {
 		}
 
 		/* Insert the split region. */
-		avl_tree_insert(&split->as->tree, &split->tree_link, split->start, split);
+		avl_tree_insert(&split->as->tree, split->start, &split->tree_link);
 	} else if(!(region->flags & VM_REGION_RESERVED)) {
 		/* Move the bottom half to the correct free list. */
 		vm_freelist_remove(region);
@@ -742,7 +742,7 @@ static vm_region_t *vm_region_insert(vm_aspace_t *as, ptr_t start, ptr_t end, in
 
 	/* Finally, insert into the region tree or the free lists. */
 	if(vm_region_used(region)) {
-		avl_tree_insert(&as->tree, &region->tree_link, region->start, region);
+		avl_tree_insert(&as->tree, region->start, &region->tree_link);
 	} else if(!(region->flags & VM_REGION_RESERVED)) {
 		vm_freelist_insert(region, region->end - region->start);
 	}
@@ -791,7 +791,7 @@ static vm_region_t *vm_region_alloc(vm_aspace_t *as, size_t size, int flags) {
 
 			/* Remove from the free list and add to the tree. */
 			vm_freelist_remove(region);
-			avl_tree_insert(&as->tree, &region->tree_link, region->start, region);
+			avl_tree_insert(&as->tree, region->start, &region->tree_link);
 			region->flags = flags;
 
 			dprintf("vm: allocated region [%p,%p) from list %d (as: %p)\n",
@@ -1358,7 +1358,7 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 
 		/* Insert into the region tree or the free lists. */
 		if(vm_region_used(region)) {
-			avl_tree_insert(&as->tree, &region->tree_link, region->start, region);
+			avl_tree_insert(&as->tree, region->start, &region->tree_link);
 		} else if(!(region->flags & VM_REGION_RESERVED)) {
 			vm_freelist_insert(region, region->end - region->start);
 		}
@@ -1513,7 +1513,7 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
 	kdb_printf("\nAllocated:\n\n");
 
 	AVL_TREE_FOREACH(&as->tree, iter)
-		dump_region(avl_tree_entry(iter, vm_region_t));
+		dump_region(avl_tree_entry(iter, vm_region_t, tree_link));
 
 	for(i = 0; i < VM_FREELISTS; i++) {
 		if(!(as->free_map & ((ptr_t)1 << i))) {

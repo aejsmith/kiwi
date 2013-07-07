@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -108,7 +108,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset,
 	}
 
 	/* Check if we have it cached. */
-	page = avl_tree_lookup(&cache->pages, offset);
+	page = avl_tree_lookup(&cache->pages, offset, page_t, avl_link);
 	if(page) {
 		if(refcount_inc(&page->count) == 1)
 			page_set_state(page, PAGE_STATE_ALLOCATED);
@@ -168,7 +168,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset,
 	refcount_inc(&page->count);
 	page->cache = cache;
 	page->offset = offset;
-	avl_tree_insert(&cache->pages, &page->avl_link, offset, page);
+	avl_tree_insert(&cache->pages, offset, &page->avl_link);
 	mutex_unlock(&cache->lock);
 
 	dprintf("cache: cached new page 0x%" PRIxPHYS " at offset 0x%" PRIx64 " in %p\n",
@@ -210,7 +210,7 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
 
 	assert(!cache->deleted);
 
-	page = avl_tree_lookup(&cache->pages, offset);
+	page = avl_tree_lookup(&cache->pages, offset, page_t, avl_link);
 	if(unlikely(!page))
 		fatal("Tried to release page that isn't cached");
 
@@ -483,7 +483,7 @@ void vm_cache_resize(vm_cache_t *cache, offset_t size) {
 	 * they will get freed once they are released. */
 	if(size < cache->size) {
 		AVL_TREE_FOREACH_SAFE(&cache->pages, iter) {
-			page = avl_tree_entry(iter, page_t);
+			page = avl_tree_entry(iter, page_t, avl_link);
 
 			if(page->offset >= size && refcount_get(&page->count) == 0) {
 				avl_tree_remove(&cache->pages, &page->avl_link);
@@ -546,7 +546,7 @@ status_t vm_cache_flush(vm_cache_t *cache) {
 
 	/* Flush all pages. */
 	AVL_TREE_FOREACH(&cache->pages, iter) {
-		page = avl_tree_entry(iter, page_t);
+		page = avl_tree_entry(iter, page_t, avl_link);
 
 		err = vm_cache_flush_page_internal(cache, page);
 		if(err != STATUS_SUCCESS)
@@ -571,7 +571,7 @@ status_t vm_cache_destroy(vm_cache_t *cache, bool discard) {
 
 	/* Free all pages. */
 	AVL_TREE_FOREACH_SAFE(&cache->pages, iter) {
-		page = avl_tree_entry(iter, page_t);
+		page = avl_tree_entry(iter, page_t, avl_link);
 
 		if(refcount_get(&page->count) != 0) {
 			fatal("Cache page still in use while destroying");
@@ -695,7 +695,7 @@ static kdb_status_t kdb_cmd_cache(int argc, char **argv, kdb_filter_t *filter) {
 	/* Show all cached pages. */
 	kdb_printf("Cached pages:\n");
 	AVL_TREE_FOREACH(&cache->pages, iter) {
-		page = avl_tree_entry(iter, page_t);
+		page = avl_tree_entry(iter, page_t, avl_link);
 
 		kdb_printf("  Page 0x%016" PRIxPHYS " - Offset: %-10" PRIu64 " Modified: %-1d Count: %d\n",
 			page->addr, page->offset, page->modified, refcount_get(&page->count));

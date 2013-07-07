@@ -88,7 +88,7 @@ void file_map_destroy(file_map_t *map) {
 	file_map_chunk_t *chunk;
 
 	AVL_TREE_FOREACH_SAFE(&map->chunks, iter) {
-		chunk = avl_tree_entry(iter, file_map_chunk_t);
+		chunk = avl_tree_entry(iter, file_map_chunk_t, link);
 
 		avl_tree_remove(&map->chunks, &chunk->link);
 		kfree(chunk->bitmap);
@@ -107,7 +107,7 @@ void file_map_destroy(file_map_t *map) {
 status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 	file_map_chunk_t *chunk;
 	size_t chunk_entry;
-	key_t chunk_num;
+	uint64_t chunk_num;
 	status_t ret;
 
 	mutex_lock(&map->lock);
@@ -117,7 +117,7 @@ status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 
 	/* If the chunk is already allocated, see if the block is cached in it,
 	 * else allocate a new chunk. */
-	chunk = avl_tree_lookup(&map->chunks, chunk_num);
+	chunk = avl_tree_lookup(&map->chunks, chunk_num, file_map_chunk_t, link);
 	if(chunk) {
 		if(bitmap_test(chunk->bitmap, chunk_entry)) {
 			*rawp = chunk->blocks[chunk_entry];
@@ -128,7 +128,7 @@ status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 		chunk = kmalloc(sizeof(file_map_chunk_t), MM_KERNEL);
 		chunk->blocks = kmalloc(sizeof(uint64_t) * map->blocks_per_chunk, MM_KERNEL);
 		chunk->bitmap = bitmap_alloc(map->blocks_per_chunk, MM_KERNEL);
-		avl_tree_insert(&map->chunks, &chunk->link, chunk_num, chunk);
+		avl_tree_insert(&map->chunks, chunk_num, &chunk->link);
 	}
 
 	/* Look up the block. */
@@ -150,15 +150,15 @@ status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
  * @param count		Number of blocks to invalidate. */
 void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
 	file_map_chunk_t *chunk;
-	uint64_t i;
+	uint64_t i, chunk_num;
 
 	mutex_lock(&map->lock);
 
 	for(i = start; i < (start + count); i++) {
-		chunk = avl_tree_lookup(&map->chunks, i / map->blocks_per_chunk);
-		if(!chunk) {
+		chunk_num = i / map->blocks_per_chunk;
+		chunk = avl_tree_lookup(&map->chunks, chunk_num, file_map_chunk_t, link);
+		if(!chunk)
 			continue;
-		}
 
 		bitmap_clear(chunk->bitmap, i % map->blocks_per_chunk);
 
@@ -203,14 +203,12 @@ status_t file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool 
 
 	for(i = 0; i < count; i++, buf += map->block_size) {
 		ret = file_map_lookup(map, start + i, &raw);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 
 		ret = map->ops->read_block(map, buf, raw, nonblock);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	return STATUS_SUCCESS;
@@ -245,14 +243,12 @@ status_t file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset
 
 	for(i = 0; i < count; i++, buf += map->block_size) {
 		ret = file_map_lookup(map, start + i, &raw);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 
 		ret = map->ops->write_block(map, buf, raw, nonblock);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	return STATUS_SUCCESS;
@@ -269,7 +265,7 @@ vm_cache_ops_t file_map_vm_cache_ops = {
 /** Initialize the file map slab cache. */
 static __init_text void file_map_init(void) {
 	file_map_cache = slab_cache_create("file_map_cache", sizeof(file_map_t),
-	                                   0, file_map_ctor, NULL, NULL, 0,
-	                                   MM_BOOT);
+		0, file_map_ctor, NULL, NULL, 0, MM_BOOT);
 }
+
 INITCALL(file_map_init);
