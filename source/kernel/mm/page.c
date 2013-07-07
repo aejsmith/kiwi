@@ -306,10 +306,12 @@ page_t *page_lookup(phys_ptr_t addr) {
 /** Allocate a page.
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to structure for allocated page. */
-page_t *page_alloc(int mmflag) {
+page_t *page_alloc(unsigned mmflag) {
 	void *mapping;
 	page_t *page;
 	unsigned i;
+
+	assert((mmflag & (MM_WAIT | MM_ATOMIC)) != (MM_WAIT | MM_ATOMIC));
 
 	/* Acquire the lock and wire the current thread to this CPU so that the
 	 * entire operation is performed on this CPU. */
@@ -402,7 +404,7 @@ void page_free(page_t *page) {
  * @param mmflag	Allocation flags.
  * @return		Pointer to new page structure on success, NULL on
  *			failure. */
-page_t *page_copy(page_t *page, int mmflag) {
+page_t *page_copy(page_t *page, unsigned mmflag) {
 	page_t *dest;
 
 	assert(page);
@@ -559,7 +561,7 @@ static page_t *phys_alloc_slowpath(page_num_t count, phys_ptr_t align,
  * @return		Status code describing the result of the operation.
  */
 status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
-	phys_ptr_t minaddr, phys_ptr_t maxaddr, int mmflag,
+	phys_ptr_t minaddr, phys_ptr_t maxaddr, unsigned mmflag,
 	phys_ptr_t *basep)
 {
 	page_num_t count, i;
@@ -575,6 +577,7 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 	assert(!(minaddr % PAGE_SIZE));
 	assert(!(maxaddr % PAGE_SIZE));
 	assert(!(minaddr && maxaddr) || maxaddr > minaddr);
+	assert((mmflag & (MM_WAIT | MM_ATOMIC)) != (MM_WAIT | MM_ATOMIC));
 
 	/* Work out how many pages we need to allocate. */
 	count = size / PAGE_SIZE;

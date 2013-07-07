@@ -342,7 +342,7 @@ static status_t tty_request(tty_device_t *tty, int request, const void *in, size
 			break;
 		}
 
-		*outp = kmemdup(&tty->termios, sizeof(tty->termios), MM_WAIT);
+		*outp = kmemdup(&tty->termios, sizeof(tty->termios), MM_KERNEL);
 		*outszp = sizeof(tty->termios);
 		ret = STATUS_SUCCESS;
 		break;
@@ -370,7 +370,7 @@ static status_t tty_request(tty_device_t *tty, int request, const void *in, size
 			break;
 		}
 
-		*outp = kmemdup(&tty->winsize, sizeof(tty->winsize), MM_WAIT);
+		*outp = kmemdup(&tty->winsize, sizeof(tty->winsize), MM_KERNEL);
 		*outszp = sizeof(tty->winsize);
 		ret = STATUS_SUCCESS;
 		break;
@@ -519,7 +519,7 @@ static status_t tty_master_open(device_t *device, void **datap) {
 	status_t ret;
 
 	/* Create a new terminal .*/
-	tty = kmalloc(sizeof(tty_device_t), MM_WAIT);
+	tty = kmalloc(sizeof(tty_device_t), MM_KERNEL);
 	mutex_init(&tty->lock, "tty_device_lock", 0);
 	refcount_set(&tty->count, 2);
 	tty->id = atomic_inc(&next_tty_id);
@@ -660,7 +660,7 @@ static status_t tty_master_request(device_t *device, void *data, int request, co
 			return STATUS_INVALID_ARG;
 		}
 
-		*outp = kmemdup(&tty->id, sizeof(tty->id), MM_WAIT);
+		*outp = kmemdup(&tty->id, sizeof(tty->id), MM_KERNEL);
 		*outszp = sizeof(tty->id);
 		return STATUS_SUCCESS;
 	default:

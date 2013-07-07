@@ -93,7 +93,7 @@ static MUTEX_DECLARE(kmem_lock, 0);
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to allocated structure on success, NULL on
  *			failure. */
-static kmem_range_t *kmem_range_get(int mmflag) {
+static kmem_range_t *kmem_range_get(unsigned mmflag) {
 	kmem_range_t *range, *first;
 	phys_ptr_t page;
 	status_t ret;
@@ -116,7 +116,8 @@ static kmem_range_t *kmem_range_get(int mmflag) {
 		/* Split up this page into range structures. */
 		first = NULL;
 		for(i = 0; i < (PAGE_SIZE / sizeof(kmem_range_t)); i++) {
-			range = phys_map(page + (i * sizeof(kmem_range_t)), sizeof(kmem_range_t), MM_WAIT);
+			range = phys_map(page + (i * sizeof(kmem_range_t)),
+				sizeof(kmem_range_t), MM_KERNEL);
 			list_init(&range->range_link);
 			list_init(&range->af_link);
 			range->allocated = 0;
@@ -328,11 +329,12 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
  * @param size		Size of allocation to make (multiple of PAGE_SIZE).
  * @param mmflag	Allocation behaviour flags.
  * @return		Address of allocation on success, 0 on failure. */
-ptr_t kmem_raw_alloc(size_t size, int mmflag) {
+ptr_t kmem_raw_alloc(size_t size, unsigned mmflag) {
 	kmem_range_t *range, *split;
 
 	assert(size);
 	assert(!(size % PAGE_SIZE));
+	assert((mmflag & (MM_WAIT | MM_ATOMIC)) != (MM_WAIT | MM_ATOMIC));
 
 	mutex_lock(&kmem_lock);
 
@@ -407,7 +409,7 @@ void kmem_raw_free(ptr_t addr, size_t size) {
  *
  * @return		Address of allocation on success, 0 on failure.
  */
-void *kmem_alloc(size_t size, int mmflag) {
+void *kmem_alloc(size_t size, unsigned mmflag) {
 	phys_ptr_t paddr;
 	page_t *page;
 	ptr_t addr;
@@ -487,7 +489,7 @@ void kmem_free(void *addr, size_t size) {
  *
  * @return		Pointer to mapped range.
  */
-void *kmem_map(phys_ptr_t base, size_t size, int mmflag) {
+void *kmem_map(phys_ptr_t base, size_t size, unsigned mmflag) {
 	ptr_t addr;
 	size_t i;
 

@@ -91,7 +91,7 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name, file_type
 	assert(parent->type == FILE_TYPE_DIR);
 
 	/* Create the information structure. */
-	data = kmalloc(sizeof(ramfs_node_t), MM_WAIT);
+	data = kmalloc(sizeof(ramfs_node_t), MM_KERNEL);
 	data->created = unix_time();
 	data->accessed = unix_time();
 	data->modified = unix_time();
@@ -114,7 +114,7 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name, file_type
 		entry_cache_insert(data->entries, "..", parent->id);
 		break;
 	case FILE_TYPE_SYMLINK:
-		data->target = kstrdup(target, MM_WAIT);
+		data->target = kstrdup(target, MM_KERNEL);
 		break;
 	default:
 		kfree(data);
@@ -251,7 +251,7 @@ static status_t ramfs_node_read_entry(fs_node_t *node, offset_t index, dir_entry
 		entry = radix_tree_entry(iter, dir_entry_t);
 
 		if(i++ == index) {
-			*entryp = kmemdup(entry, entry->length, MM_WAIT);
+			*entryp = kmemdup(entry, entry->length, MM_KERNEL);
 			mutex_unlock(&data->entries->lock);
 			return STATUS_SUCCESS;
 		}
@@ -283,7 +283,7 @@ static status_t ramfs_node_read_link(fs_node_t *node, char **destp) {
 
 	assert(node->type == FILE_TYPE_SYMLINK);
 
-	*destp = kstrdup(data->target, MM_WAIT);
+	*destp = kstrdup(data->target, MM_KERNEL);
 	return STATUS_SUCCESS;
 }
 
@@ -323,12 +323,12 @@ static status_t ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t c
 	ramfs_node_t *ndata;
 
 	mount->ops = &ramfs_mount_ops,
-	mount->data = data = kmalloc(sizeof(ramfs_mount_t), MM_WAIT);
+	mount->data = data = kmalloc(sizeof(ramfs_mount_t), MM_KERNEL);
 	mutex_init(&data->lock, "ramfs_mount_lock", 0);
 	data->next_id = 1;
 
 	/* Create the root directory, and add '.' and '..' entries. */
-	ndata = kmalloc(sizeof(ramfs_node_t), MM_WAIT);
+	ndata = kmalloc(sizeof(ramfs_node_t), MM_KERNEL);
 	ndata->created = unix_time();
 	ndata->accessed = unix_time();
 	ndata->modified = unix_time();

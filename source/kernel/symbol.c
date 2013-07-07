@@ -42,7 +42,7 @@ static void symbol_tree_insert(symbol_t *symbol) {
 	list_t *list;
 
 	if(!(list = radix_tree_lookup(symbol_tree, symbol->name))) {
-		list = kmalloc(sizeof(list_t), MM_WAIT);
+		list = kmalloc(sizeof(list_t), MM_KERNEL);
 		list_init(list);
 		radix_tree_insert(symbol_tree, symbol->name, list);
 	}
@@ -117,7 +117,7 @@ void symbol_table_insert(symbol_table_t *table, const char *name, ptr_t addr,
 
 	/* Resize the symbol table so we can fit the symbol in. */
 	i = table->count++;
-	table->symbols = krealloc(table->symbols, table->count * sizeof(symbol_t), MM_WAIT);
+	table->symbols = krealloc(table->symbols, table->count * sizeof(symbol_t), MM_KERNEL);
 
 	/* Fill in the symbol information. */
 	table->symbols[i].addr = addr;

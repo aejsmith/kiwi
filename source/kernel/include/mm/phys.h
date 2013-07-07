@@ -34,13 +34,13 @@
 #define MEMORY_TYPE_WT		4	/**< Write-through. */
 #define MEMORY_TYPE_WB		5	/**< Write-back. */
 
-extern void *phys_map(phys_ptr_t addr, size_t size, int mmflag);
+extern void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag);
 extern void phys_unmap(void *addr, size_t size, bool shared);
 
 extern status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
-	phys_ptr_t minaddr, phys_ptr_t maxaddr, int mmflag, phys_ptr_t *basep);
+	phys_ptr_t minaddr, phys_ptr_t maxaddr, unsigned mmflag, phys_ptr_t *basep);
 extern void phys_free(phys_ptr_t base, phys_size_t size);
-extern bool phys_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
+extern bool phys_copy(phys_ptr_t dest, phys_ptr_t source, unsigned mmflag);
 
 extern unsigned phys_memory_type(phys_ptr_t addr);
 extern void phys_set_memory_type(phys_ptr_t addr, phys_size_t size, unsigned type);

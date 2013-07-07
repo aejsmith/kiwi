@@ -162,7 +162,7 @@ static uint64_t *map_structure(phys_ptr_t addr) {
 /** Allocate a paging structure.
  * @param mmflag	Allocation flags.
  * @return		Address of structure on success, 0 on failure. */
-static phys_ptr_t alloc_structure(int mmflag) {
+static phys_ptr_t alloc_structure(unsigned mmflag) {
 	page_t *page;
 	phys_ptr_t ret;
 
@@ -183,7 +183,7 @@ static phys_ptr_t alloc_structure(int mmflag) {
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to mapped page directory, NULL if not found or
  *			on allocation failure. */
-static uint64_t *get_pdir(mmu_context_t *ctx, ptr_t virt, bool alloc, int mmflag) {
+static uint64_t *get_pdir(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
 	uint64_t *pml4, *pdp;
 	unsigned pml4e, pdpe;
 	phys_ptr_t page;
@@ -237,7 +237,7 @@ static uint64_t *get_pdir(mmu_context_t *ctx, ptr_t virt, bool alloc, int mmflag
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to mapped page table, NULL if not found or on
  *			allocation failure. */
-static uint64_t *get_ptbl(mmu_context_t *ctx, ptr_t virt, bool alloc, int mmflag) {
+static uint64_t *get_ptbl(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
 	phys_ptr_t page;
 	uint64_t *pdir;
 	unsigned pde;
@@ -294,7 +294,7 @@ static void invalidate_page(mmu_context_t *ctx, ptr_t virt, bool shared) {
  * @param ctx		Context to initialize.
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing result of the operation. */
-static status_t amd64_mmu_init(mmu_context_t *ctx, int mmflag) {
+static status_t amd64_mmu_init(mmu_context_t *ctx, unsigned mmflag) {
 	uint64_t *kpml4, *pml4;
 	unsigned i;
 
@@ -356,7 +356,7 @@ static void amd64_mmu_destroy(mmu_context_t *ctx) {
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing result of the operation. */
 static status_t amd64_mmu_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-	unsigned protect, int mmflag)
+	unsigned protect, unsigned mmflag)
 {
 	uint64_t *ptbl;
 	unsigned pte;

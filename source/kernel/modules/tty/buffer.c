@@ -225,7 +225,7 @@ status_t tty_buffer_insert(tty_buffer_t *buf, uint16_t ch, bool nonblock) {
 tty_buffer_t *tty_buffer_create(void) {
 	tty_buffer_t *buf;
 
-	buf = kmalloc(sizeof(tty_buffer_t), MM_WAIT);
+	buf = kmalloc(sizeof(tty_buffer_t), MM_KERNEL);
 	mutex_init(&buf->lock, "tty_buffer_lock", 0);
 	semaphore_init(&buf->lines, "tty_buffer_lines", 0);
 	semaphore_init(&buf->data, "tty_buffer_data", 0);
@@ -235,7 +235,7 @@ tty_buffer_t *tty_buffer_create(void) {
 	notifier_init(&buf->space_notifier, buf);
 	buf->start = 0;
 	buf->end = 0;
-	buf->buffer = kmem_alloc(TTY_BUFFER_SIZE * sizeof(*buf->buffer), MM_WAIT);
+	buf->buffer = kmem_alloc(TTY_BUFFER_SIZE * sizeof(*buf->buffer), MM_KERNEL);
 	return buf;
 }
 

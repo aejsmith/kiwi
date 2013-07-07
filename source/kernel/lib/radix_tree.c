@@ -51,9 +51,9 @@ static inline size_t radix_tree_key_len(unsigned char *key) {
  * @return		Pointer to duplicated key. */
 static inline unsigned char *radix_tree_key_dup(unsigned char *key, size_t len) {
 	if(len) {
-		return (unsigned char *)kstrndup((const char *)key, len, MM_WAIT);
+		return (unsigned char *)kstrndup((const char *)key, len, MM_KERNEL);
 	} else {
-		return (unsigned char *)kstrdup((const char *)key, MM_WAIT);
+		return (unsigned char *)kstrdup((const char *)key, MM_KERNEL);
 	}
 }
 
@@ -65,7 +65,7 @@ static inline unsigned char *radix_tree_key_concat(unsigned char *key1, unsigned
 	size_t len1 = radix_tree_key_len(key1), len2 = radix_tree_key_len(key2);
 	unsigned char *concat;
 
-	concat = kmalloc(len1 + len2 + 1, MM_WAIT);
+	concat = kmalloc(len1 + len2 + 1, MM_KERNEL);
 	strcpy((char *)concat, (const char *)key1);
 	strcpy((char *)(concat + len1), (const char *)key2);
 	return concat;
@@ -92,7 +92,7 @@ static void radix_tree_node_add_child(radix_tree_node_t *parent, radix_tree_node
 	unsigned char low = child->key[0] & 0xF;
 
 	if(!parent->children[high])
-		parent->children[high] = kcalloc(1, sizeof(radix_tree_node_ptr_t), MM_WAIT);
+		parent->children[high] = kcalloc(1, sizeof(radix_tree_node_ptr_t), MM_KERNEL);
 
 	if(!parent->children[high]->nodes[low]) {
 		parent->children[high]->count++;
@@ -181,7 +181,7 @@ static radix_tree_node_t *radix_tree_node_next_sibling(radix_tree_node_t *node) 
  * @param value		Value for the node.
  * @return		Allocated node. */
 static radix_tree_node_t *radix_tree_node_alloc(radix_tree_node_t *parent, unsigned char *key, void *value) {
-	radix_tree_node_t *node = kcalloc(1, sizeof(radix_tree_node_t), MM_WAIT);
+	radix_tree_node_t *node = kcalloc(1, sizeof(radix_tree_node_t), MM_KERNEL);
 
 	node->key = key;
 	node->value = value;
@@ -310,7 +310,7 @@ static radix_tree_node_t *radix_tree_node_lookup(radix_tree_t *tree, unsigned ch
  * @note		Nodes and keys within a radix tree are dynamically
  *			allocated, so this function must not be called while
  *			spinlocks are held, etc. (all the usual rules).
- *			Allocations are made using MM_WAIT, so it is possible
+ *			Allocations are made using MM_KERNEL, so it is possible
  *			for this function to block.
  *
  * @param tree		Tree to insert into.

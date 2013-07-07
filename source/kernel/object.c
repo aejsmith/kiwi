@@ -159,7 +159,7 @@ status_t object_handle_create(object_t *object, void *data, object_rights_t righ
 	assert(handlep || idp || uidp);
 
 	/* Create the kernel handle structure. */
-	handle = slab_cache_alloc(object_handle_cache, MM_WAIT);
+	handle = slab_cache_alloc(object_handle_cache, MM_KERNEL);
 	refcount_set(&handle->count, 1);
 	handle->object = object;
 	handle->data = data;
@@ -245,7 +245,7 @@ static void handle_table_insert(handle_table_t *table, handle_t id, object_handl
 
 	object_handle_get(handle);
 
-	link = kmalloc(sizeof(*link), MM_WAIT);
+	link = kmalloc(sizeof(*link), MM_KERNEL);
 	link->handle = handle;
 	link->flags = flags;
 
@@ -437,8 +437,8 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 	handle_link_t *link;
 	int i;
 
-	table = slab_cache_alloc(handle_table_cache, MM_WAIT);
-	table->bitmap = bitmap_alloc(CONFIG_HANDLE_MAX, MM_WAIT);
+	table = slab_cache_alloc(handle_table_cache, MM_KERNEL);
+	table->bitmap = bitmap_alloc(CONFIG_HANDLE_MAX, MM_KERNEL);
 
 	/* Inherit all inheritable handles in the parent table. */
 	if(parent && count != 0) {
@@ -499,8 +499,8 @@ handle_table_t *handle_table_clone(handle_table_t *src) {
 	handle_table_t *table;
 	handle_link_t *link;
 
-	table = slab_cache_alloc(handle_table_cache, MM_WAIT);
-	table->bitmap = bitmap_alloc(CONFIG_HANDLE_MAX, MM_WAIT);
+	table = slab_cache_alloc(handle_table_cache, MM_KERNEL);
+	table->bitmap = bitmap_alloc(CONFIG_HANDLE_MAX, MM_KERNEL);
 
 	rwlock_read_lock(&src->lock);
 
@@ -622,7 +622,7 @@ status_t kern_object_wait(object_event_t *events, size_t count, nstime_t timeout
 
 	/* Use of kcalloc() is important: the structures must be zeroed
 	 * initially for the cleanup code to work correctly. */
-	syncs = kcalloc(count, sizeof(*syncs), 0);
+	syncs = kcalloc(count, sizeof(*syncs), MM_USER);
 	if(!syncs)
 		return STATUS_NO_MEMORY;
 

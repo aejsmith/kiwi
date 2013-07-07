@@ -74,7 +74,7 @@ file_map_t *file_map_create(size_t blksize, file_map_ops_t *ops, void *data) {
 		fatal("Block size is not a power of 2");
 	}
 
-	map = slab_cache_alloc(file_map_cache, MM_WAIT);
+	map = slab_cache_alloc(file_map_cache, MM_KERNEL);
 	map->block_size = blksize;
 	map->blocks_per_chunk = CHUNK_SIZE / blksize;
 	map->ops = ops;
@@ -125,9 +125,9 @@ status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 			return STATUS_SUCCESS;
 		}
 	} else {
-		chunk = kmalloc(sizeof(file_map_chunk_t), MM_WAIT);
-		chunk->blocks = kmalloc(sizeof(uint64_t) * map->blocks_per_chunk, MM_WAIT);
-		chunk->bitmap = bitmap_alloc(map->blocks_per_chunk, MM_WAIT);
+		chunk = kmalloc(sizeof(file_map_chunk_t), MM_KERNEL);
+		chunk->blocks = kmalloc(sizeof(uint64_t) * map->blocks_per_chunk, MM_KERNEL);
+		chunk->bitmap = bitmap_alloc(map->blocks_per_chunk, MM_KERNEL);
 		avl_tree_insert(&map->chunks, &chunk->link, chunk_num, chunk);
 	}
 

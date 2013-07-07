@@ -76,9 +76,9 @@ extern bool page_init_done;
 
 extern void page_set_state(page_t *page, unsigned state);
 extern page_t *page_lookup(phys_ptr_t addr);
-extern page_t *page_alloc(int mmflag);
+extern page_t *page_alloc(unsigned mmflag);
 extern void page_free(page_t *page);
-extern page_t *page_copy(page_t *page, int mmflag);
+extern page_t *page_copy(page_t *page, unsigned mmflag);
 
 extern void page_stats_get(page_stats_t *stats);
 

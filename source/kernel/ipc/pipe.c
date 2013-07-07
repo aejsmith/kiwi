@@ -233,10 +233,10 @@ void pipe_unwait(pipe_t *pipe, bool write, void *sync) {
 pipe_t *pipe_create(void) {
 	pipe_t *pipe;
 
-	pipe = slab_cache_alloc(pipe_cache, MM_WAIT);
+	pipe = slab_cache_alloc(pipe_cache, MM_KERNEL);
 	semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
 	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
-	pipe->buf = kmem_alloc(PIPE_SIZE, MM_WAIT);
+	pipe->buf = kmem_alloc(PIPE_SIZE, MM_KERNEL);
 	pipe->start = 0;
 	pipe->end = 0;
 	return pipe;

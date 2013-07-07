@@ -66,7 +66,7 @@ extern unsigned char copyright_ppm[];
 /** Get the byte offset of a pixel. */
 #define OFFSET(x, y)		(((y * fb_info.width) + x) * fb_info.bytes_per_pixel)
 
-static void fb_console_configure(const fb_info_t *info, int mmflag);
+static void fb_console_configure(const fb_info_t *info, unsigned mmflag);
 
 /** Framebuffer information. */
 static fb_info_t fb_info;
@@ -366,8 +366,8 @@ static void fb_console_disable(void *arg1, void *arg2, void *arg3) {
 
 /** Reconfigure the framebuffer console.
  * @param info		Information structure for new framebuffer.
- * @param mmflag	Allocation behaviour flags (MM_WAIT or MM_BOOT). */
-static void fb_console_configure(const fb_info_t *info, int mmflag) {
+ * @param mmflag	Allocation behaviour flags (MM_KERNEL or MM_BOOT). */
+static void fb_console_configure(const fb_info_t *info, unsigned mmflag) {
 	bool was_boot;
 	size_t size;
 
@@ -436,7 +436,7 @@ void fb_console_control(unsigned op, fb_info_t *info) {
 		break;
 	case FB_CONSOLE_CONFIGURE:
 		/* Reconfigure to use a new framebuffer. */
-		fb_console_configure(info, MM_WAIT);
+		fb_console_configure(info, MM_KERNEL);
 		break;
 	case FB_CONSOLE_ACQUIRE:
 		/* Acquire the framebuffer for exclusive use. */

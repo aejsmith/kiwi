@@ -170,13 +170,13 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 		goto fail;
 	}
 
-	device = kmalloc(sizeof(device_t), MM_WAIT);
+	device = kmalloc(sizeof(device_t), MM_KERNEL);
 	object_init(&device->obj, &device_object_type);
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
 	list_init(&device->aliases);
-	device->name = kstrdup(name, MM_WAIT);
+	device->name = kstrdup(name, MM_KERNEL);
 	device->parent = parent;
 	device->dest = NULL;
 	device->ops = ops;
@@ -198,12 +198,12 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 		}
 
 		/* Duplicate the structures, then fix up the data. */
-		device->attrs = kmemdup(attrs, sizeof(device_attr_t) * count, MM_WAIT);
+		device->attrs = kmemdup(attrs, sizeof(device_attr_t) * count, MM_KERNEL);
 		device->attr_count = count;
 		for(i = 0; i < device->attr_count; i++) {
-			device->attrs[i].name = kstrdup(device->attrs[i].name, MM_WAIT);
+			device->attrs[i].name = kstrdup(device->attrs[i].name, MM_KERNEL);
 			if(device->attrs[i].type == DEVICE_ATTR_STRING) {
-				device->attrs[i].value.string = kstrdup(device->attrs[i].value.string, MM_WAIT);
+				device->attrs[i].value.string = kstrdup(device->attrs[i].value.string, MM_KERNEL);
 			}
 		}
 	} else {
@@ -264,13 +264,13 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 		return STATUS_ALREADY_EXISTS;
 	}
 
-	device = kmalloc(sizeof(device_t), MM_WAIT);
+	device = kmalloc(sizeof(device_t), MM_KERNEL);
 	object_init(&device->obj, NULL);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
 	list_init(&device->dest_link);
-	device->name = kstrdup(name, MM_WAIT);
+	device->name = kstrdup(name, MM_KERNEL);
 	device->parent = parent;
 	device->dest = dest;
 	device->ops = NULL;
@@ -416,7 +416,7 @@ static device_t *device_lookup(const char *path) {
 		return NULL;
 	}
 
-	dup = orig = kstrdup(path, MM_WAIT);
+	dup = orig = kstrdup(path, MM_KERNEL);
 
 	mutex_lock(&device->lock);
 	while((tok = strsep(&dup, "/"))) {
@@ -486,7 +486,7 @@ char *device_path(device_t *device) {
 	while(device != device_tree_root) {
 		mutex_lock(&device->lock);
 		len += strlen(device->name) + 1;
-		tmp = kmalloc(len + 1, MM_WAIT);
+		tmp = kmalloc(len + 1, MM_KERNEL);
 		strcpy(tmp, "/");
 		strcat(tmp, device->name);
 		if(path) {
@@ -500,7 +500,7 @@ char *device_path(device_t *device) {
 	}
 
 	if(!len) {
-		path = kstrdup("/", MM_WAIT);
+		path = kstrdup("/", MM_KERNEL);
 	}
 	return path;
 }
@@ -893,11 +893,8 @@ status_t kern_device_read(handle_t handle, void *buf, size_t count, offset_t off
 		goto out;
 	}
 
-	/* Allocate a temporary buffer to read into. Don't use MM_WAIT for
-	 * this allocation because the process may provide a count larger than
-	 * we can allocate in kernel space, in which case it would block
-	 * forever. */
-	kbuf = kmalloc(count, 0);
+	/* Allocate a temporary buffer to read into. */
+	kbuf = kmalloc(count, MM_USER);
 	if(!kbuf) {
 		ret = STATUS_NO_MEMORY;
 		goto out;
@@ -958,11 +955,8 @@ status_t kern_device_write(handle_t handle, const void *buf, size_t count, offse
 		goto out;
 	}
 
-	/* Copy the data to write across from userspace. Don't use MM_WAIT for
-	 * this allocation because the process may provide a count larger than
-	 * we can allocate in kernel space, in which case it would block
-	 * forever. */
-	kbuf = kmalloc(count, 0);
+	/* Copy the data to write across from userspace. */
+	kbuf = kmalloc(count, MM_USER);
 	if(!kbuf) {
 		ret = STATUS_NO_MEMORY;
 		goto out;
@@ -1012,7 +1006,7 @@ status_t kern_device_request(handle_t handle, int request, const void *in, size_
 	}
 
 	if(in && insz) {
-		kin = kmalloc(insz, 0);
+		kin = kmalloc(insz, MM_USER);
 		if(!kin) {
 			ret = STATUS_NO_MEMORY;
 			goto out;

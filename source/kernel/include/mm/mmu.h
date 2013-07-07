@@ -47,7 +47,7 @@ typedef struct mmu_ops {
 	 * @param ctx		Context to initialize.
 	 * @param mmflag	Allocation behaviour flags.
 	 * @return		Status code describing result of the operation. */
-	status_t (*init)(struct mmu_context *ctx, int mmflag);
+	status_t (*init)(struct mmu_context *ctx, unsigned mmflag);
 
 	/** Destroy a context.
 	 * @param ctx		Context to destroy. */
@@ -61,7 +61,7 @@ typedef struct mmu_ops {
 	 * @param mmflag	Allocation behaviour flags.
 	 * @return		Status code describing result of the operation. */
 	status_t (*map)(struct mmu_context *ctx, ptr_t virt, phys_ptr_t phys,
-		unsigned protect, int mmflag);
+		unsigned protect, unsigned mmflag);
 
 	/** Modify protection flags on a range of mappings.
 	 * @param ctx		Context to modify.
@@ -123,7 +123,7 @@ extern void mmu_context_lock(mmu_context_t *ctx);
 extern void mmu_context_unlock(mmu_context_t *ctx);
 
 extern status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-	unsigned protect, int mmflag);
+	unsigned protect, unsigned mmflag);
 extern void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size,
 	unsigned protect);
 extern bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared,
@@ -134,7 +134,7 @@ extern bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp,
 extern void mmu_context_load(mmu_context_t *ctx);
 extern void mmu_context_unload(mmu_context_t *ctx);
 
-extern mmu_context_t *mmu_context_create(int mmflag);
+extern mmu_context_t *mmu_context_create(unsigned mmflag);
 extern void mmu_context_destroy(mmu_context_t *ctx);
 
 extern void arch_mmu_init(void);

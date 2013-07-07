@@ -159,7 +159,7 @@ status_t strdup_from_user(const void *src, char **destp) {
 		return STATUS_INVALID_ARG;
 	}
 
-	d = kmalloc(len + 1, 0);
+	d = kmalloc(len + 1, MM_USER);
 	if(!d)
 		return STATUS_NO_MEMORY;
 
@@ -204,7 +204,7 @@ status_t strndup_from_user(const void *src, size_t max, char **destp) {
 		return STATUS_TOO_LONG;
 	}
 
-	d = kmalloc(len + 1, MM_WAIT);
+	d = kmalloc(len + 1, MM_KERNEL);
 	ret = memcpy_from_user(d, src, len);
 	if(ret != STATUS_SUCCESS) {
 		kfree(d);
@@ -235,7 +235,7 @@ status_t arrcpy_from_user(const char *const src[], char ***arrayp) {
 
 	/* Copy the arrays across. */
 	for(i = 0; ; i++) {
-		narr = krealloc(array, sizeof(char *) * (i + 1), 0);
+		narr = krealloc(array, sizeof(char *) * (i + 1), MM_USER);
 		if(!narr) {
 			ret = STATUS_NO_MEMORY;
 			goto fail;

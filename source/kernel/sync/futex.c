@@ -153,7 +153,7 @@ static futex_t *futex_lookup(int32_t *addr) {
 		if(!futex) {
 			/* Couldn't find it, this means that this is the first
 			 * access to this futex. Create a structure for it. */
-			futex = slab_cache_alloc(futex_cache, MM_WAIT);
+			futex = slab_cache_alloc(futex_cache, MM_KERNEL);
 			refcount_set(&futex->count, 1);
 			futex->phys = phys;
 
@@ -198,7 +198,7 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
 	 * Wire ourself to the current CPU to make a remote TLB invalidation
 	 * unnecessary when unmapping. */
 	thread_wire(curr_thread);
-	mapping = phys_map(futex->phys, sizeof(*mapping), MM_WAIT);
+	mapping = phys_map(futex->phys, sizeof(*mapping), MM_KERNEL);
 
 	spinlock_lock(&futex->lock);
 

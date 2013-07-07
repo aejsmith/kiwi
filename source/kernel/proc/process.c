@@ -245,7 +245,7 @@ static status_t process_alloc(const char *name, int flags, int priority,
 	assert(procp);
 
 	/* Allocate a new process structure. */
-	process = slab_cache_alloc(process_cache, MM_WAIT);
+	process = slab_cache_alloc(process_cache, MM_KERNEL);
 
 	/* Attempt to allocate a process ID. If creating the kernel process,
 	 * always give it an ID of 0. */
@@ -280,7 +280,7 @@ static status_t process_alloc(const char *name, int flags, int priority,
 	process->aspace = aspace;
 	process->handles = table;
 	process->state = PROCESS_RUNNING;
-	process->name = kstrdup(name, MM_WAIT);
+	process->name = kstrdup(name, MM_KERNEL);
 	process->status = 0;
 	process->reason = EXIT_REASON_NORMAL;
 	process->create = NULL;
@@ -800,7 +800,7 @@ static status_t process_create_args_copy(const char *path, const char *const arg
 
 	if(count > 0) {
 		size = sizeof(handle_t) * 2 * count;
-		info->map = kmalloc(size, 0);
+		info->map = kmalloc(size, MM_USER);
 		if(!info->map) {
 			process_create_args_free(info);
 			return STATUS_NO_MEMORY;
@@ -971,7 +971,7 @@ status_t kern_process_replace(const char *path, const char *const args[],
 	oldtable = curr_proc->handles;
 	curr_proc->handles = table;
 	oldname = curr_proc->name;
-	curr_proc->name = kstrdup(info.path, MM_WAIT);
+	curr_proc->name = kstrdup(info.path, MM_KERNEL);
 
 	/* Reset signal handling state. */
 	memset(curr_proc->signal_act, 0, sizeof(curr_proc->signal_act));
@@ -1049,7 +1049,7 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, handle_t 
 		goto fail;
 
 	/* Create the entry thread. */
-	args = kmalloc(sizeof(*args), MM_WAIT);
+	args = kmalloc(sizeof(*args), MM_KERNEL);
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
 	args->sp = (ptr_t)sp;

@@ -82,7 +82,7 @@ void *module_mem_alloc(size_t size) {
 	remaining_module_size -= size;
 	return (void *)addr;
 	#else
-	return kmem_alloc(ROUND_UP(size, PAGE_SIZE), 0);
+	return kmem_alloc(ROUND_UP(size, PAGE_SIZE), MM_NOWAIT);
 	#endif
 }
 
@@ -101,7 +101,7 @@ static void module_mem_free(void *base, size_t size) {
 static module_t *module_alloc(object_handle_t *handle) {
 	module_t *module;
 
-	module = kmalloc(sizeof(module_t), MM_WAIT);
+	module = kmalloc(sizeof(module_t), MM_KERNEL);
 	list_init(&module->header);
 	refcount_set(&module->count, 0);
 	symbol_table_init(&module->symtab);

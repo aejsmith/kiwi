@@ -110,7 +110,7 @@ bool notifier_run(notifier_t *notif, void *data, bool destroy) {
  * @param func		Function to add.
  * @param data		Pointer to pass as third argument to function. */
 void notifier_register(notifier_t *notif, notifier_cb_t func, void *data) {
-	notifier_func_t *nf = kmalloc(sizeof(notifier_func_t), MM_WAIT);
+	notifier_func_t *nf = kmalloc(sizeof(notifier_func_t), MM_KERNEL);
 
 	list_init(&nf->header);
 	nf->func = func;

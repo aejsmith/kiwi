@@ -169,13 +169,13 @@ static size_t remaining_size = BIOS_MEM_SIZE;
  *			NULL on failure. The returned addresss must not be
  *			passed to interrupts - use bios_mem_virt2phys() to
  *			convert the address to a physical address first. */
-void *bios_mem_alloc(size_t size, int mmflag) {
+void *bios_mem_alloc(size_t size, unsigned mmflag) {
 	uint32_t ret;
 
 	mutex_lock(&bios_lock);
 
 	if(size > remaining_size) {
-		if(mmflag & MM_WAIT) {
+		if(mmflag & MM_KERNEL) {
 			fatal("oh dear\n");
 		}
 		return NULL;
@@ -255,8 +255,8 @@ void bios_interrupt(uint8_t num, bios_regs_t *regs) {
 	size_t save_remaining_size = remaining_size;
 
 	/* Allocate a stack and a halt byte to finish execution. */
-	stack = bios_mem_alloc(BIOS_STACK_SIZE, MM_WAIT);
-	halt = bios_mem_alloc(1, MM_WAIT);
+	stack = bios_mem_alloc(BIOS_STACK_SIZE, MM_KERNEL);
+	halt = bios_mem_alloc(1, MM_KERNEL);
 	*(uint8_t *)halt = 0xF4;
 
 	/* Copy in the registers. */
@@ -325,7 +325,7 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
 
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		mmu_context_map(&kernel_mmu_context, (ptr_t)bios_mem_mapping + addr + i,
-			phys + i, MMU_MAP_WRITE | MMU_MAP_EXEC, MM_WAIT);
+			phys + i, MMU_MAP_WRITE | MMU_MAP_EXEC, MM_KERNEL);
 	}
 
 	mmu_context_unlock(&kernel_mmu_context);
@@ -335,8 +335,8 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
  * @return		Status code describing result of the operation. */
 static status_t bios_init(void) {
 	/* Allocate a chunk of address space and map stuff into it. */
-	bios_mem_mapping = (void *)kmem_raw_alloc(0x100000, MM_WAIT);
-	phys_alloc(BIOS_MEM_SIZE, 0, 0, 0, 0, MM_WAIT, &bios_mem_pages);
+	bios_mem_mapping = (void *)kmem_raw_alloc(0x100000, MM_KERNEL);
+	phys_alloc(BIOS_MEM_SIZE, 0, 0, 0, 0, MM_KERNEL, &bios_mem_pages);
 	bios_mem_map(BIOS_BDA_BASE, BIOS_BDA_BASE, BIOS_BDA_SIZE);
 	bios_mem_map(BIOS_MEM_BASE, bios_mem_pages, BIOS_MEM_SIZE);
 	bios_mem_map(BIOS_EBDA_BASE, BIOS_EBDA_BASE, BIOS_EBDA_SIZE);

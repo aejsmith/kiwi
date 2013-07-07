@@ -77,7 +77,7 @@ void mmu_context_unlock(mmu_context_t *ctx) {
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing the result of the operation. */
 status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-	unsigned protect, int mmflag)
+	unsigned protect, unsigned mmflag)
 {
 	assert(mutex_held(&ctx->lock));
 	assert(!(virt % PAGE_SIZE));
@@ -185,7 +185,7 @@ void mmu_context_unload(mmu_context_t *ctx) {
 /** Create and initialize an MMU context.
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to new context, NULL on allocation failure. */
-mmu_context_t *mmu_context_create(int mmflag) {
+mmu_context_t *mmu_context_create(unsigned mmflag) {
 	mmu_context_t *ctx;
 	status_t ret;
 

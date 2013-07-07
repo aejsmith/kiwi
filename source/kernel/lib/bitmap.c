@@ -47,7 +47,7 @@
  *
  * @return		Pointer to allocated bitmap, or null on failure.
  */
-unsigned long *bitmap_alloc(size_t nbits, int mmflag) {
+unsigned long *bitmap_alloc(size_t nbits, unsigned mmflag) {
 	unsigned long *bitmap = kmalloc(BITMAP_BYTES(nbits), mmflag);
 
 	if(likely(bitmap))

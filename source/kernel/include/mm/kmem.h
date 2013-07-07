@@ -26,13 +26,13 @@
 
 #include <mm/mm.h>
 
-extern ptr_t kmem_raw_alloc(size_t size, int mmflag);
+extern ptr_t kmem_raw_alloc(size_t size, unsigned mmflag);
 extern void kmem_raw_free(ptr_t addr, size_t size);
 
-extern void *kmem_alloc(size_t size, int mmflag);
+extern void *kmem_alloc(size_t size, unsigned mmflag);
 extern void kmem_free(void *addr, size_t size);
 
-extern void *kmem_map(phys_ptr_t base, size_t size, int mmflag);
+extern void *kmem_map(phys_ptr_t base, size_t size, unsigned mmflag);
 extern void kmem_unmap(void *addr, size_t size, bool shared);
 
 extern void kmem_init(void);

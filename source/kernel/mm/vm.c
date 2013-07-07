@@ -194,12 +194,12 @@ static vm_amap_t *vm_amap_create(size_t size) {
 
 	assert(size);
 
-	map = slab_cache_alloc(vm_amap_cache, MM_WAIT);
+	map = slab_cache_alloc(vm_amap_cache, MM_KERNEL);
 	refcount_set(&map->count, 1);
 	map->curr_size = 0;
 	map->max_size = size >> PAGE_WIDTH;
-	map->pages = kcalloc(map->max_size, sizeof(page_t *), MM_WAIT);
-	map->rref = kcalloc(map->max_size, sizeof(uint16_t *), MM_WAIT);
+	map->pages = kcalloc(map->max_size, sizeof(page_t *), MM_KERNEL);
+	map->rref = kcalloc(map->max_size, sizeof(uint16_t *), MM_KERNEL);
 	dprintf("vm: created anonymous map %p (size: %zu, pages: %zu)\n", map, size, map->max_size);
 	return map;
 }
@@ -263,7 +263,7 @@ static status_t vm_amap_map(vm_amap_t *map, offset_t offset, size_t size) {
 static vm_region_t *vm_region_create(vm_aspace_t *as, ptr_t start, ptr_t end, int flags) {
 	vm_region_t *region;
 
-	region = slab_cache_alloc(vm_region_cache, MM_WAIT);
+	region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
 	list_init(&region->header);
 	list_init(&region->free_link);
 	region->as = as;
@@ -319,12 +319,12 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	assert(end <= src->amap->max_size);
 
 	/* Create a new map. */
-	dest->amap = slab_cache_alloc(vm_amap_cache, MM_WAIT);
+	dest->amap = slab_cache_alloc(vm_amap_cache, MM_KERNEL);
 	refcount_set(&dest->amap->count, 1);
 	dest->amap->curr_size = 0;
 	dest->amap->max_size = end - start;
-	dest->amap->pages = kcalloc(dest->amap->max_size, sizeof(page_t *), MM_WAIT);
-	dest->amap->rref = kcalloc(dest->amap->max_size, sizeof(uint16_t *), MM_WAIT);
+	dest->amap->pages = kcalloc(dest->amap->max_size, sizeof(page_t *), MM_KERNEL);
+	dest->amap->rref = kcalloc(dest->amap->max_size, sizeof(uint16_t *), MM_KERNEL);
 
 	/* Write-protect all mappings on the source region. */
 	mmu_context_lock(src->as->mmu);
@@ -850,7 +850,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 	if(!amap->pages[i] && !handle) {
 		/* No page existing and no source. Allocate a zeroed page. */
 		dprintf("vm:  anon fault: no existing page and no source, allocating new\n");
-		amap->pages[i] = page_alloc(MM_WAIT | MM_ZERO);
+		amap->pages[i] = page_alloc(MM_KERNEL | MM_ZERO);
 		refcount_inc(&amap->pages[i]->count);
 		amap->curr_size++;
 		paddr = amap->pages[i]->addr;
@@ -866,7 +866,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 
 				dprintf("vm:  anon write fault: copying page %zu due to refcount > 1\n", i);
 
-				page = page_copy(amap->pages[i], MM_WAIT);
+				page = page_copy(amap->pages[i], MM_KERNEL);
 				refcount_inc(&page->count);
 
 				/* Decrease the count of the old page. We must
@@ -903,8 +903,8 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			dprintf("vm:  anon write fault: copying page 0x%" PRIxPHYS " from %p\n",
 				paddr, handle->object);
 
-			page = page_alloc(MM_WAIT);
-			phys_copy(page->addr, paddr, MM_WAIT);
+			page = page_alloc(MM_KERNEL);
+			phys_copy(page->addr, paddr, MM_KERNEL);
 
 			/* Add the page and release the old one. */
 			refcount_inc(&page->count);
@@ -954,8 +954,8 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			fatal("Could not remove previous mapping for %p", addr);
 	}
 
-	/* Map the entry in. Should always succeed with MM_WAIT set. */
-	mmu_context_map(region->as->mmu, addr, paddr, protect, MM_WAIT);
+	/* Map the entry in. Should always succeed with MM_KERNEL set. */
+	mmu_context_map(region->as->mmu, addr, paddr, protect, MM_KERNEL);
 
 	dprintf("vm:  anon fault: mapped 0x%" PRIxPHYS " at %p (as: %p, protect: 0x%x)\n",
 		paddr, addr, region->as, protect);
@@ -1007,8 +1007,8 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	if(region->flags & VM_REGION_EXEC)
 		protect |= MMU_MAP_EXEC;
 
-	/* Map the entry in. Should always succeed with MM_WAIT set. */
-	mmu_context_map(region->as->mmu, addr, phys, protect, MM_WAIT);
+	/* Map the entry in. Should always succeed with MM_KERNEL set. */
+	mmu_context_map(region->as->mmu, addr, phys, protect, MM_KERNEL);
 	dprintf("vm:  mapped 0x%" PRIxPHYS " at %p (as: %p, protect: 0x%x)\n",
 		phys, addr, region->as, protect);
 	return VM_FAULT_SUCCESS;
@@ -1298,8 +1298,8 @@ vm_aspace_t *vm_aspace_create(void) {
 	vm_aspace_t *as;
 	status_t ret;
 
-	as = slab_cache_alloc(vm_aspace_cache, MM_WAIT);
-	as->mmu = mmu_context_create(MM_WAIT);
+	as = slab_cache_alloc(vm_aspace_cache, MM_KERNEL);
+	as->mmu = mmu_context_create(MM_KERNEL);
 	as->find_cache = NULL;
 	as->free_map = 0;
 
@@ -1343,8 +1343,8 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 	vm_region_t *orig_region, *region;
 	vm_aspace_t *as;
 
-	as = slab_cache_alloc(vm_aspace_cache, MM_WAIT);
-	as->mmu = mmu_context_create(MM_WAIT);
+	as = slab_cache_alloc(vm_aspace_cache, MM_KERNEL);
+	as->mmu = mmu_context_create(MM_KERNEL);
 	as->find_cache = NULL;
 	as->free_map = 0;
 

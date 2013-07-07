@@ -167,7 +167,7 @@ status_t kern_semaphore_create(const char *name, size_t count, handle_t *handlep
 	if(!handlep)
 		return STATUS_INVALID_ARG;
 
-	sem = kmalloc(sizeof(user_semaphore_t), MM_WAIT);
+	sem = kmalloc(sizeof(user_semaphore_t), MM_KERNEL);
 	sem->id = id_allocator_alloc(&semaphore_id_allocator);
 	if(sem->id < 0) {
 		kfree(sem);

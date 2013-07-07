@@ -29,7 +29,7 @@
 /** Get the number of bytes required for a bitmap. */
 #define BITMAP_BYTES(nbits)	(ROUND_UP(nbits, 8) / 8)
 
-extern unsigned long *bitmap_alloc(size_t nbits, int mmflag);
+extern unsigned long *bitmap_alloc(size_t nbits, unsigned mmflag);
 extern void bitmap_zero(unsigned long *bitmap, size_t nbits);
 extern void bitmap_set(unsigned long *bitmap, unsigned long bit);
 extern void bitmap_clear(unsigned long *bitmap, unsigned long bit);

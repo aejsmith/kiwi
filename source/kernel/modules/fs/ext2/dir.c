@@ -110,7 +110,7 @@ status_t ext2_dir_iterate(ext2_inode_t *dir, offset_t index, ext2_dir_iterate_cb
 
 	mutex_lock(&dir->lock);
 
-	name = kmalloc(EXT2_NAME_MAX + 1, MM_WAIT);
+	name = kmalloc(EXT2_NAME_MAX + 1, MM_KERNEL);
 	while(offset < dir->size) {
 		if(i++ >= index) {
 			ret = ext2_dirent_read(dir, &entry, offset, name);

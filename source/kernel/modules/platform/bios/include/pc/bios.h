@@ -34,7 +34,7 @@ typedef struct bios_regs {
 	uint32_t ds, es, fs, gs;
 } bios_regs_t;
 
-extern void *bios_mem_alloc(size_t size, int mmflag);
+extern void *bios_mem_alloc(size_t size, unsigned mmflag);
 extern void bios_mem_free(void *addr, size_t size);
 extern uint32_t bios_mem_virt2phys(void *addr);
 extern void *bios_mem_phys2virt(uint32_t addr);

@@ -144,7 +144,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
  * @param cache		Cache to allocate from.
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to slab structure. */
-static inline slab_t *slab_create(slab_cache_t *cache, int mmflag) {
+static inline slab_t *slab_create(slab_cache_t *cache, unsigned mmflag) {
 	slab_bufctl_t *bufctl, *prev = NULL;
 	slab_t *slab;
 	void *addr;
@@ -287,7 +287,7 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
  * @param cache		Cache to allocate from.
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to allocated object, or NULL on failure. */
-static inline void *slab_obj_alloc(slab_cache_t *cache, int mmflag) {
+static inline void *slab_obj_alloc(slab_cache_t *cache, unsigned mmflag) {
 	slab_bufctl_t *bufctl;
 	uint32_t hash;
 	slab_t *slab;
@@ -385,9 +385,13 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 		list_remove(&mag->header);
 		assert(!mag->rounds);
 	} else {
-		/* TODO: If low on memory, should not attempt to allocate
-		 * a magazine, and instead free directly to the slab layer. */
-		mag = slab_cache_alloc(&slab_mag_cache, 0);
+		/* None available, try to allocate a new structure. We do not
+		 * wait for memory to be available here as if a new magazine
+		 * cannot be allocated on the first try it means that the system
+		 * is low on memory. In this case, the object should be freed
+		 * back to the source. TODO: If low on memory, should not
+		 * attempt to allocate at all. */
+		mag = slab_cache_alloc(&slab_mag_cache, MM_ATOMIC);
 		if(mag) {
 			list_init(&mag->header);
 			mag->rounds = 0;
@@ -528,7 +532,7 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to allocated object or NULL if unable to
  *			allocate.  */
-void *slab_cache_alloc(slab_cache_t *cache, int mmflag) {
+void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
 	void *ret;
 
 	assert(cache);
@@ -585,7 +589,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 /** Create the per-CPU data for a slab cache.
  * @param cache         Cache to create for.
  * @return		Status code describing result of the operation. */
-static status_t slab_percpu_init(slab_cache_t *cache, int mmflag) {
+static status_t slab_percpu_init(slab_cache_t *cache, unsigned mmflag) {
 	assert(cpu_count != 0);
 	assert(slab_percpu_cache);
 
@@ -614,7 +618,7 @@ static status_t slab_percpu_init(slab_cache_t *cache, int mmflag) {
  * @return		Status code describing result of the operation. */
 static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t size,
 	size_t align, slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
-	int flags, int mmflag)
+	int flags, unsigned mmflag)
 {
 	slab_cache_t *exist;
 	status_t ret;
@@ -725,7 +729,7 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
  * @return		Pointer to cache on success, NULL on failure. */
 slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
 	slab_ctor_t ctor, slab_dtor_t dtor, void *data, int flags,
-	int mmflag)
+	unsigned mmflag)
 {
 	slab_cache_t *cache;
 

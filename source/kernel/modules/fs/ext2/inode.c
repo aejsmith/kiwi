@@ -59,7 +59,7 @@ static status_t ext2_map_lookup(file_map_t *map, uint64_t block, uint64_t *rawp)
 	}
 
 	block -= EXT2_NDIR_BLOCKS;
-	i_block = kmalloc(inode->mount->block_size, MM_WAIT);
+	i_block = kmalloc(inode->mount->block_size, MM_KERNEL);
 
 	/* Check whether the indirect block contains the block number we need.
 	 * The indirect block contains as many 32-bit entries as will fit in
@@ -81,7 +81,7 @@ static status_t ext2_map_lookup(file_map_t *map, uint64_t block, uint64_t *rawp)
 	}
 
 	block -= ENTRIES_PER_BLOCK(inode);
-	bi_block = kmalloc(inode->mount->block_size, MM_WAIT);
+	bi_block = kmalloc(inode->mount->block_size, MM_KERNEL);
 
 	/* Not in the indirect block, check the bi-indirect blocks. The
 	 * bi-indirect block contains as many 32-bit entries as will fit in
@@ -216,7 +216,7 @@ static status_t ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool
 	}
 
 	block -= EXT2_NDIR_BLOCKS;
-	i_block = kmalloc(inode->mount->block_size, MM_WAIT);
+	i_block = kmalloc(inode->mount->block_size, MM_KERNEL);
 
 	/* Check whether the block is in the indirect block. */
 	if(block < ENTRIES_PER_BLOCK(inode)) {
@@ -256,7 +256,7 @@ static status_t ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool
 	}
 
 	block -= ENTRIES_PER_BLOCK(inode);
-	bi_block = kmalloc(inode->mount->block_size, MM_WAIT);
+	bi_block = kmalloc(inode->mount->block_size, MM_KERNEL);
 
 	/* Try the bi-indirect block. */
 	if(block < (ENTRIES_PER_BLOCK(inode) * ENTRIES_PER_BLOCK(inode))) {
@@ -368,7 +368,7 @@ static status_t ext2_inode_block_free(ext2_inode_t *inode, uint32_t *num) {
  * @param num		Pointer to block number.
  * @return		Status code describing result of the operation. */
 static status_t ext2_inode_iblock_free(ext2_inode_t *inode, uint32_t *num) {
-	uint32_t *block = kmalloc(inode->mount->block_size, MM_WAIT), i;
+	uint32_t *block = kmalloc(inode->mount->block_size, MM_KERNEL), i;
 	status_t ret;
 
 	/* Read in the block. */
@@ -403,7 +403,7 @@ static status_t ext2_inode_iblock_free(ext2_inode_t *inode, uint32_t *num) {
  * @param num		Pointer to block number.
  * @return		Status code describing result of the operation. */
 static status_t ext2_inode_biblock_free(ext2_inode_t *inode, uint32_t *num) {
-	uint32_t *block = kmalloc(inode->mount->block_size, MM_WAIT), i;
+	uint32_t *block = kmalloc(inode->mount->block_size, MM_KERNEL), i;
 	status_t ret;
 
 	/* Read in the block. */
@@ -529,7 +529,7 @@ status_t ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, const object_secur
 		count = (count > 0) ? count : 1;
 
 		/* Iterate through all inodes in the bitmap. */
-		block = kmalloc(mount->block_size, MM_WAIT);
+		block = kmalloc(mount->block_size, MM_KERNEL);
 		for(i = 0; i < count; i++) {
 			ret = ext2_block_read(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false);
 			if(ret != STATUS_SUCCESS) {
@@ -645,7 +645,7 @@ status_t ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode) {
 
 	/* Get the block within the bitmap that contains the inode. */
 	i = (num % mount->inodes_per_group) / 8 / mount->block_size;
-	block = kmalloc(mount->block_size, MM_WAIT);
+	block = kmalloc(mount->block_size, MM_KERNEL);
 	ret = ext2_block_read(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false);
 	if(ret != STATUS_SUCCESS) {
 		mutex_unlock(&mount->lock);
@@ -703,7 +703,7 @@ status_t ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **inodep
 	offset = ((num - 1) % mount->inodes_per_group) * mount->inode_size;
 
 	/* Create a structure to store details of the inode in memory. */
-	inode = kmalloc(sizeof(ext2_inode_t), MM_WAIT);
+	inode = kmalloc(sizeof(ext2_inode_t), MM_KERNEL);
 	mutex_init(&inode->lock, "ext2_inode_lock", MUTEX_RECURSIVE);
 	inode->mount = mount;
 	inode->num = num;

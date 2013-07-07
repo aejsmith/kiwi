@@ -451,7 +451,7 @@ status_t kern_port_create(const object_security_t *security, object_rights_t rig
 
 	/* Construct a default ACL if required. */
 	if(!ksecurity.acl) {
-		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_WAIT);
+		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_KERNEL);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
 		                     PORT_RIGHT_LISTEN | PORT_RIGHT_CONNECT);
@@ -459,7 +459,7 @@ status_t kern_port_create(const object_security_t *security, object_rights_t rig
 		                     PORT_RIGHT_CONNECT);
 	}
 
-	port = slab_cache_alloc(ipc_port_cache, MM_WAIT);
+	port = slab_cache_alloc(ipc_port_cache, MM_KERNEL);
 	port->id = id_allocator_alloc(&port_id_allocator);
 	if(port->id < 0) {
 		slab_cache_free(ipc_port_cache, port);
@@ -627,7 +627,7 @@ static ipc_connection_t *ipc_connection_create(ipc_port_t *port, int count) {
 	security.acl = &acl;
 
 	/* Create a connection structure. */
-	conn = slab_cache_alloc(ipc_connection_cache, MM_WAIT);
+	conn = slab_cache_alloc(ipc_connection_cache, MM_KERNEL);
 	object_init(&conn->obj, &connection_object_type, &security, NULL);
 	refcount_set(&conn->count, count);
 	conn->port = port;
@@ -804,7 +804,7 @@ status_t kern_connection_send(handle_t handle, uint32_t type, const void *buf, s
 	}
 
 	/* Allocate a message structure, and copy the data buffer into it. */
-	message = kmalloc(sizeof(ipc_message_t) + size, MM_WAIT);
+	message = kmalloc(sizeof(ipc_message_t) + size, MM_KERNEL);
 	list_init(&message->header);
 	message->type = type;
 	message->size = size;

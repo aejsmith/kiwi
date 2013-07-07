@@ -539,7 +539,7 @@ status_t kern_timer_create(unsigned flags, handle_t *handlep) {
 	if(!handlep)
 		return STATUS_INVALID_ARG;
 
-	timer = kmalloc(sizeof(*timer), MM_WAIT);
+	timer = kmalloc(sizeof(*timer), MM_KERNEL);
 	object_init(&timer->obj, &timer_object_type);
 	timer_init(&timer->timer, "user_timer", user_timer_func, timer, TIMER_THREAD);
 	notifier_init(&timer->notifier, timer);

@@ -76,7 +76,7 @@ void id_allocator_reserve(id_allocator_t *alloc, int32_t id) {
  * @param max		Highest allowed ID.
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing the result of the operation. */
-status_t id_allocator_init(id_allocator_t *alloc, int32_t max, int mmflag) {
+status_t id_allocator_init(id_allocator_t *alloc, int32_t max, unsigned mmflag) {
 	mutex_init(&alloc->lock, "id_allocator_lock", 0);
 	alloc->nbits = max + 1;
 	alloc->bitmap = bitmap_alloc(alloc->nbits, mmflag);

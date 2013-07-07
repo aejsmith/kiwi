@@ -35,7 +35,7 @@ extern int32_t id_allocator_alloc(id_allocator_t *alloc);
 extern void id_allocator_free(id_allocator_t *alloc, int32_t id);
 extern void id_allocator_reserve(id_allocator_t *alloc, int32_t id);
 
-extern status_t id_allocator_init(id_allocator_t *alloc, int32_t max, int mmflag);
+extern status_t id_allocator_init(id_allocator_t *alloc, int32_t max, unsigned mmflag);
 extern void id_allocator_destroy(id_allocator_t *alloc);
 
 #endif /* __LIB_ID_ALLOCATOR_H */

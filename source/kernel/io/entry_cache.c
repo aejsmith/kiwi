@@ -54,7 +54,7 @@ static void entry_cache_ctor(void *obj, void *data) {
 entry_cache_t *entry_cache_create(entry_cache_ops_t *ops, void *data) {
 	entry_cache_t *cache;
 
-	cache = slab_cache_alloc(entry_cache_cache, MM_WAIT);
+	cache = slab_cache_alloc(entry_cache_cache, MM_KERNEL);
 	cache->ops = ops;
 	cache->data = data;
 	return cache;
@@ -77,7 +77,7 @@ static dir_entry_t *entry_cache_insert_internal(entry_cache_t *cache, const char
 	size_t len;
 
 	len = sizeof(dir_entry_t) + strlen(name) + 1;
-	entry = kmalloc(len, MM_WAIT);
+	entry = kmalloc(len, MM_KERNEL);
 	entry->length = len;
 	entry->id = id;
 	strcpy(entry->name, name);

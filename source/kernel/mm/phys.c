@@ -64,7 +64,7 @@ static SPINLOCK_DECLARE(memory_types_lock);
  * @param size		Size of range to map.
  * @param mmflag	Allocation flags.
  * @return		Pointer to mapped data. */
-void *phys_map(phys_ptr_t addr, size_t size, int mmflag) {
+void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
 	phys_ptr_t base, end;
 
 	if(unlikely(!size))
@@ -104,7 +104,7 @@ void phys_unmap(void *addr, size_t size, bool shared) {
  * @param mmflag	Allocation flags for mapping page in memory.
  * @return		True if successful, false if unable to map pages into
  *			memory (cannot happen if MM_WAIT is specified). */
-bool phys_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
+bool phys_copy(phys_ptr_t dest, phys_ptr_t source, unsigned mmflag) {
 	void *mdest, *msrc;
 
 	assert(!(dest % PAGE_SIZE));
