@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,8 +35,13 @@
 /** Type used to store a kernel status code. */
 typedef int32_t status_t;
 
-/** Type used to store a handle to an object. */
+/** Type used to store a kernel object handle. */
 typedef int32_t handle_t;
+
+/** Other integer types used throughout the kernel. */
+typedef int64_t nstime_t;		/**< Type used to store a time value in nanoseconds. */
+typedef uint64_t offset_t;		/**< Type used to store an offset into something. */
+typedef int64_t rel_offset_t;		/**< Type used to store a relative offset. */
 
 /** Object identifier types. */
 typedef int32_t process_id_t;		/**< Type used to store a process ID. */
@@ -48,10 +53,5 @@ typedef int16_t user_id_t;		/**< Type used to store a user ID. */
 typedef int16_t group_id_t;		/**< Type used to store a group ID. */
 typedef uint16_t mount_id_t;		/**< Type used to store a mount ID. */
 typedef uint64_t node_id_t;		/**< Type used to store a filesystem node ID. */
-
-/** Other integer types. */
-typedef int64_t useconds_t;		/**< Type used to store a time period in microseconds. */
-typedef uint64_t offset_t;		/**< Type used to store an offset into something. */
-typedef int64_t rel_offset_t;		/**< Type used to store a relative offset. */
 
 #endif /* __KERNEL_TYPES_H */

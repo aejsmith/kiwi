@@ -79,11 +79,11 @@ __init_text void arch_smp_boot_prepare(void) {
  * @param id		CPU ID to boot.
  * @return		Whether the CPU responded in time. */
 static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
-	useconds_t delay;
+	nstime_t delay;
 
 	/* Send an INIT IPI to the AP to reset its state and delay 10ms. */
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, id, LAPIC_IPI_INIT, 0x00);
-	spin(10000);
+	spin(MSECS2NSECS(10));
 
 	/* Send a SIPI. The vector argument specifies where to look for the
 	 * bootstrap code, as the SIPI will start execution from 0x000VV000,
@@ -93,7 +93,7 @@ static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
 	 * If the CPU reaches the idle loop before the second SIPI is sent, it
 	 * will fault. */
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
-	spin(10000);
+	spin(MSECS2NSECS(10));
 
 	/* If the CPU is up, then return. */
 	if(smp_boot_status > SMP_BOOT_INIT)
@@ -102,11 +102,11 @@ static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
 	/* Send a second SIPI and then check in 10ms intervals to see if it
 	 * has booted. If it hasn't booted after 5 seconds, fail. */
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
-	for(delay = 0; delay < 5000000; delay += 10000) {
+	for(delay = 0; delay < SECS2NSECS(5); delay += MSECS2NSECS(10)) {
 		if(smp_boot_status > SMP_BOOT_INIT)
 			return true;
 
-		spin(10000);
+		spin(MSECS2NSECS(10));
 	}
 
 	return false;

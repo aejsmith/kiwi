@@ -92,7 +92,7 @@
 #define PRIORITY_COUNT		32
 
 /** Timeslice to give to threads. */
-#define THREAD_TIMESLICE	MSECS2USECS(3)
+#define THREAD_TIMESLICE	MSECS2NSECS(3)
 
 /** Maximum penalty to CPU-bound threads. */
 #define MAX_PENALTY		5

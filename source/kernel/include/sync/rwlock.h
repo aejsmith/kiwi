@@ -49,8 +49,8 @@ typedef struct rwlock {
 #define RWLOCK_DECLARE(_var)			\
 	rwlock_t _var = RWLOCK_INITIALIZER(_var, #_var)
 
-extern status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags);
-extern status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags);
+extern status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, int flags);
+extern status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, int flags);
 extern void rwlock_read_lock(rwlock_t *lock);
 extern void rwlock_write_lock(rwlock_t *lock);
 extern void rwlock_unlock(rwlock_t *lock);

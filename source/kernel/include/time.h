@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,17 +28,23 @@
 
 struct cpu;
 
-/** Convert microseconds to seconds. */
-#define USECS2SECS(secs)	(secs / 1000000)
+/** Convert seconds to nanoseconds. */
+#define SECS2NSECS(secs)	((nstime_t)secs * 1000000000)
 
-/** Convert seconds to microseconds. */
-#define SECS2USECS(secs)	((useconds_t)secs * 1000000)
+/** Convert milliseconds to nanoseconds. */
+#define MSECS2NSECS(msecs)	((nstime_t)msecs * 1000000)
 
-/** Convert microseconds to milliseconds. */
-#define USECS2MSECS(msecs)	(msecs / 1000)
+/** Convert microseconds to nanoseconds. */
+#define USECS2NSECS(usecs)	((nstime_t)usecs * 1000)
 
-/** Convert milliseconds to microseconds. */
-#define MSECS2USECS(msecs)	((useconds_t)msecs * 1000)
+/** Convert nanoseconds to seconds. */
+#define NSECS2SECS(nsecs)	(nsecs / 1000000000)
+
+/** Convert nanoseconds to milliseconds. */
+#define NSECS2MSECS(nsecs)	(nsecs / 1000000)
+
+/** Convert nanoseconds to microseconds. */
+#define NSECS2USECS(nsecs)	(nsecs / 1000)
 
 /** Structure containing details of a hardware timer. */
 typedef struct timer_device {
@@ -62,8 +68,8 @@ typedef struct timer_device {
 	 * 			range supported by the timer): the timer tick
 	 * 			handler will only call handlers if system_time()
 	 * 			shows that the timer's target has been reached.
-	 * @param us		Microseconds to fire in. */
-	void (*prepare)(useconds_t us);
+	 * @param nsecs		Nanoseconds to fire in. */
+	void (*prepare)(nstime_t nsecs);
 } timer_device_t;
 
 /** Callback function for timers.
@@ -80,37 +86,37 @@ typedef bool (*timer_func_t)(void *data);
 typedef struct timer {
 	list_t header;			/**< Link to timers list. */
 
-	useconds_t target;		/**< Time at which the timer will fire. */
+	nstime_t target;		/**< Time at which the timer will fire. */
 	struct cpu *cpu;		/**< CPU that the timer was started on. */
 	timer_func_t func;		/**< Function to call when the timer expires. */
 	void *data;			/**< Argument to pass to timer handler. */
 	unsigned flags;			/**< Behaviour flags. */
 	unsigned mode;			/**< Mode of the timer. */
-	useconds_t initial;		/**< Initial time (for periodic timers). */
+	nstime_t initial;		/**< Initial time (for periodic timers). */
 	const char *name;		/**< Name of the timer (for debugging purposes). */
 } timer_t;
 
 /** Behaviour flags for timers. */
 #define TIMER_THREAD		(1<<0)	/**< Run the handler in thread (DPC) context. */
 
-extern useconds_t time_to_unix(unsigned year, unsigned month, unsigned day,
+extern nstime_t time_to_unix(unsigned year, unsigned month, unsigned day,
 	unsigned hour, unsigned min, unsigned sec);
 
-extern useconds_t system_time(void);
-extern useconds_t unix_time(void);
+extern nstime_t system_time(void);
+extern nstime_t unix_time(void);
 
 extern void timer_device_set(timer_device_t *device);
 extern bool timer_tick(void);
 extern void timer_init(timer_t *timer, const char *name, timer_func_t func,
 	void *data, unsigned flags);
-extern void timer_start(timer_t *timer, useconds_t length, unsigned mode);
+extern void timer_start(timer_t *timer, nstime_t length, unsigned mode);
 extern void timer_stop(timer_t *timer);
 
-extern status_t delay_etc(useconds_t us, int flags);
-extern void delay(useconds_t us);
-extern void spin(useconds_t us);
+extern status_t delay_etc(nstime_t nsecs, int flags);
+extern void delay(nstime_t nsecs);
+extern void spin(nstime_t nsecs);
 
-extern useconds_t platform_time_from_hardware(void);
+extern nstime_t platform_time_from_hardware(void);
 
 extern void time_init(void);
 

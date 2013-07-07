@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2011 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,6 +20,15 @@
  *
  * @todo		Handle systems where the TSC is not invariant. We
  *			should use the HPET or PIT on such systems.
+ * @todo		Because I'm lazy this is only microsecond resolution
+ *			at the moment. Doing nanosecond resolution requires
+ *			some fixed point maths fun. Something along the lines
+ *			of:
+ *			 cv_factor = (cpu_freq << 32) / ns_per_sec;
+ *			 time = (tsc << 32) / ns_per_sec;
+ *			The problem with this, however, is that you lose the
+ *			top 32 bits of the TSC, which is really not very
+ *			useful.
  */
 
 #include <x86/cpu.h>
@@ -32,21 +41,19 @@
 #include <time.h>
 
 /** Boot CPU system_time() value. */
-static useconds_t system_time_sync __init_data;
+static volatile nstime_t system_time_sync __init_data;
 
-/** Get the system time (number of microseconds since boot).
- * @return		Number of microseconds since system was booted. */
-useconds_t system_time(void) {
-	return (useconds_t)((x86_rdtsc() - curr_cpu->arch.system_time_offset)
+/** Get the system time (number of nanoseconds since boot).
+ * @return		Number of nanoseconds since system was booted. */
+nstime_t system_time(void) {
+	return USECS2NSECS((x86_rdtsc() - curr_cpu->arch.system_time_offset)
 		/ curr_cpu->arch.cycles_per_us);
 }
 
 /** Spin for a certain amount of time.
- * @param us		Microseconds to spin for. */
-void spin(useconds_t us) {
-	uint64_t target = x86_rdtsc() + (us * curr_cpu->arch.cycles_per_us);
-
-	/* Spin until we reach the target. */
+ * @param nsecs		Nanoseconds to spin for. */
+void spin(nstime_t nsecs) {
+	uint64_t target = x86_rdtsc() + (NSECS2USECS(nsecs) * curr_cpu->arch.cycles_per_us);
 	while(x86_rdtsc() < target)
 		arch_cpu_spin_hint();
 }
@@ -70,7 +77,7 @@ __init_text void tsc_init_target(void) {
 
 		/* Calculate the offset we need to use. */
 		curr_cpu->arch.system_time_offset =
-			-((system_time_sync * curr_cpu->arch.cycles_per_us)
+			-((NSECS2USECS(system_time_sync) * curr_cpu->arch.cycles_per_us)
 				- x86_rdtsc());
 	}
 }

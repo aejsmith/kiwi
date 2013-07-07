@@ -132,7 +132,7 @@ typedef struct page_freelist {
 } page_freelist_t;
 
 /** Page writer settings. */
-#define PAGE_WRITER_INTERVAL		SECS2USECS(4)
+#define PAGE_WRITER_INTERVAL		SECS2NSECS(4)
 #define PAGE_WRITER_MAX_PER_RUN		128
 
 /** Number of page queues. */

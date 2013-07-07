@@ -76,10 +76,10 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  * the lock, in order to prevent starvation of writers.
  *
  * @param lock		Lock to acquire.
- * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
- *			microseconds in which the sleep will time out. If 0 is
+ *			nanoseconds in which the sleep will time out. If 0 is
  *			specified, the function will return an error immediately
  *			if the lock cannot be acquired immediately. If -1
  *			is specified, the thread will sleep indefinitely until
@@ -90,7 +90,7 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
+status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, int flags) {
 	spinlock_lock(&lock->lock);
 
 	if(lock->held) {
@@ -121,10 +121,10 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
  * it.
  *
  * @param lock		Lock to acquire.
- * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
- *			microseconds in which the sleep will time out. If 0 is
+ *			nanoseconds in which the sleep will time out. If 0 is
  *			specified, the function will return an error immediately
  *			if the lock cannot be acquired immediately. If -1
  *			is specified, the thread will sleep indefinitely until
@@ -135,7 +135,7 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
+status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, int flags) {
 	status_t ret = STATUS_SUCCESS;
 
 	spinlock_lock(&lock->lock);

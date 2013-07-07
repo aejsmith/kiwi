@@ -61,7 +61,7 @@ typedef struct object_event {
 } object_event_t;
 
 extern int kern_object_type(handle_t handle);
-extern status_t kern_object_wait(object_event_t *events, size_t count, useconds_t timeout);
+extern status_t kern_object_wait(object_event_t *events, size_t count, nstime_t timeout);
 
 extern status_t kern_handle_control(handle_t handle, int action, int arg, int *outp);
 extern status_t kern_handle_duplicate(handle_t handle, handle_t dest, bool force, handle_t *newp);

@@ -54,7 +54,7 @@ static inline size_t semaphore_count(semaphore_t *sem) {
 	return sem->count;
 }
 
-extern status_t semaphore_down_etc(semaphore_t *sem, useconds_t timeout, int flags);
+extern status_t semaphore_down_etc(semaphore_t *sem, nstime_t timeout, int flags);
 extern void semaphore_down(semaphore_t *sem);
 extern void semaphore_up(semaphore_t *sem, size_t count);
 extern void semaphore_init(semaphore_t *sem, const char *name, size_t initial);

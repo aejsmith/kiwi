@@ -688,7 +688,7 @@ __init_text void process_init(void) {
 
 /** Terminate all running processes. */
 void process_shutdown(void) {
-	useconds_t interval = 0;
+	nstime_t interval = 0;
 	process_t *process;
 	thread_t *thread;
 	int count;
@@ -709,8 +709,8 @@ void process_shutdown(void) {
 
 	/* Wait until everything has terminated. */
 	do {
-		delay(1000);
-		interval += 1000;
+		delay(MSECS2NSECS(1));
+		interval += MSECS2NSECS(1);
 
 		count = 0;
 		rwlock_read_lock(&process_tree_lock);
@@ -718,7 +718,7 @@ void process_shutdown(void) {
 			process = avl_tree_entry(iter, process_t);
 			if(process != kernel_proc) {
 				count++;
-				if(!(interval % 2000000) && process->state == PROCESS_RUNNING) {
+				if(!(interval % SECS2NSECS(2)) && process->state == PROCESS_RUNNING) {
 					kprintf(LOG_NOTICE, "system: still waiting for %u(%s)...\n",
 						process->id, process->name);
 				}

@@ -36,10 +36,10 @@
  *
  * @param cv		Condition variable to wait on.
  * @param mutex		Mutex to atomically release while waiting.
- * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
- *			microseconds in which the sleep will time out. If 0 is
+ *			nanoseconds in which the sleep will time out. If 0 is
  *			specified, the function will return an error immediately
  *			if the lock is currently held by another thread. If -1
  *			is specified, the thread will sleep indefinitely until
@@ -50,7 +50,7 @@
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, useconds_t timeout, int flags) {
+status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, int flags) {
 	status_t ret;
 
 	spinlock_lock(&cv->lock);

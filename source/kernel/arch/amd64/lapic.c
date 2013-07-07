@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -78,10 +78,10 @@ static void lapic_ipi_handler(intr_frame_t *frame) {
 }
 
 /** Prepare local APIC timer tick.
- * @param us		Number of microseconds to tick in. */
-static void lapic_timer_prepare(useconds_t us) {
-	uint32_t count = (uint32_t)((curr_cpu->arch.lapic_timer_cv * us) >> 32);
-	lapic_write(LAPIC_REG_TIMER_INITIAL, (count == 0 && us != 0) ? 1 : count);
+ * @param nsecs		Number of nanoseconds to tick in. */
+static void lapic_timer_prepare(nstime_t nsecs) {
+	uint32_t count = (curr_cpu->arch.lapic_timer_cv * nsecs) >> 32;
+	lapic_write(LAPIC_REG_TIMER_INITIAL, (count == 0 && nsecs != 0) ? 1 : count);
 }
 
 /** Local APIC timer device. */
@@ -243,7 +243,7 @@ __init_text void lapic_init(void) {
 	}
 
 	/* Figure out the timer conversion factor. */
-	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000;
+	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000000;
 	kprintf(LOG_NOTICE, "lapic: timer conversion factor for CPU %u is %u (freq: %" PRIu64 "MHz)\n",
 		curr_cpu->id, curr_cpu->arch.lapic_timer_cv,
 		curr_cpu->arch.lapic_freq / 1000000);

@@ -180,11 +180,11 @@ static futex_t *futex_lookup(int32_t *addr) {
  *			futex before this thread has gone to sleep. If the
  *			value has changed just before sleeping, the function
  *			will return STATUS_TRY_AGAIN.
- * @param timeout	Timeout in microseconds. If -1, the function will block
+ * @param timeout	Timeout in nanoseconds. If -1, the function will block
  *			until woken by a call to futex_wake(). If 0, an error
  *			will be returned immediately.
  * @return		Status code describing result of the operation. */
-status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
+status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
 	int32_t *mapping;
 	futex_t *futex;
 	status_t ret;

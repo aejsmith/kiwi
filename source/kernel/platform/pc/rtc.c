@@ -32,9 +32,9 @@
 /** Lock serialising accesses to the RTC. */
 static SPINLOCK_DECLARE(rtc_lock);
 
-/** Get the number of microseconds since the Epoch from the RTC.
- * @return		Number of microseconds since Epoch. */
-useconds_t platform_time_from_hardware(void) {
+/** Get the number of nanoseconds since the Epoch from the RTC.
+ * @return		Number of nanoseconds since Epoch. */
+nstime_t platform_time_from_hardware(void) {
 	uint32_t year, month, day, hour, min, sec;
 	uint8_t tmp;
 

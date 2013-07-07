@@ -91,7 +91,7 @@ typedef struct thread {
 	int max_prio;			/**< Maximum scheduling priority. */
 	int curr_prio;			/**< Current scheduling priority. */
 	cpu_t *cpu;			/**< CPU that the thread runs on. */
-	useconds_t timeslice;		/**< Current timeslice. */
+	nstime_t timeslice;		/**< Current timeslice. */
 
 	/** Sleeping information. */
 	list_t wait_link;		/**< Link to a waiting list. */
@@ -101,9 +101,9 @@ typedef struct thread {
 	const char *waiting_on;		/**< What is being waited on (for informational purposes). */
 
 	/** Accounting information. */
-	useconds_t last_time;		/**< Time that the thread entered/left the kernel. */
-	useconds_t kernel_time;		/**< Total time the thread has spent in the kernel. */
-	useconds_t user_time;		/**< Total time the thread has spent in user mode. */
+	nstime_t last_time;		/**< Time that the thread entered/left the kernel. */
+	nstime_t kernel_time;		/**< Total time the thread has spent in the kernel. */
+	nstime_t user_time;		/**< Total time the thread has spent in user mode. */
 
 	/** Information used by user memory functions. */
 	bool in_usermem;		/**< Whether the thread is in the user memory access functions. */
@@ -171,7 +171,7 @@ extern void thread_rename(thread_t *thread, const char *name);
 extern void thread_preempt(void);
 extern void thread_disable_preempt(void);
 extern void thread_enable_preempt(void);
-extern status_t thread_sleep(spinlock_t *lock, useconds_t timeout, const char *name, int flags);
+extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, int flags);
 extern void thread_yield(void);
 extern void thread_at_kernel_entry(void);
 extern void thread_at_kernel_exit(void);

@@ -17,6 +17,12 @@
 /**
  * @file
  * @brief		Time handling functions.
+ *
+ * @todo		Timers are tied to the CPU that they are created on.
+ *			This is the right thing to do with, e.g. the scheduler
+ *			timers, but what should we do with user timers? Load
+ *			balance them? They'll probably get balanced reasonably
+ *			due to thread load balancing. Does it matter that much?
  */
 
 #include <kernel/time.h>
@@ -56,7 +62,7 @@ typedef struct user_timer {
 #define DAYS(y)		(LEAPYR(y) ? 366 : 365)
 
 /** Table containing number of days before a month. */
-static int days_before_month[] = {
+static unsigned days_before_month[] = {
 	0,
 	/* Jan. */ 0,
 	/* Feb. */ 31,
@@ -72,21 +78,21 @@ static int days_before_month[] = {
 	/* Dec. */ 31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
 };
 
-/** The number of microseconds since the Epoch the kernel was booted at. */
-static useconds_t boot_unix_time = 0;
+/** The number of nanoseconds since the Epoch the kernel was booted at. */
+static nstime_t boot_unix_time = 0;
 
 /** Hardware timer device. */
 static timer_device_t *timer_device = NULL;
 
-/** Convert a date/time to microseconds since the epoch.
+/** Convert a date/time to nanoseconds since the epoch.
  * @param year		Year.
  * @param month		Month (1-12).
  * @param day		Day of month (1-31).
  * @param hour		Hour (0-23).
  * @param min		Minute (0-59).
  * @param sec		Second (0-59).
- * @return		Number of microseconds since the epoch. */
-useconds_t time_to_unix(unsigned year, unsigned month, unsigned day, unsigned hour,
+ * @return		Number of nanoseconds since the epoch. */
+nstime_t time_to_unix(unsigned year, unsigned month, unsigned day, unsigned hour,
 	unsigned min, unsigned sec)
 {
 	uint32_t seconds = 0;
@@ -110,33 +116,34 @@ useconds_t time_to_unix(unsigned year, unsigned month, unsigned day, unsigned ho
 	for(i = 1970; i < year; i++)
 		seconds += DAYS(i) * 24 * 60 * 60;
 
-	return SECS2USECS(seconds);
+	return SECS2NSECS(seconds);
 }
 
 /**
- * Get the number of microseconds since the Unix Epoch.
+ * Get the number of nanoseconds since the Unix Epoch.
  *
- * Returns the number of microseconds that have passed since the Unix Epoch,
+ * Returns the number of nanoseconds that have passed since the Unix Epoch,
  * 00:00:00 UTC, January 1st, 1970.
  *
- * @return		Number of microseconds since epoch.
+ * @return		Number of nanoseconds since epoch.
  */
-useconds_t unix_time(void) {
+nstime_t unix_time(void) {
 	return boot_unix_time + system_time();
 }
 
 /** Prepares next timer tick.
  * @param timer		Timer to prepare for. */
 static void timer_device_prepare(timer_t *timer) {
-	useconds_t length = timer->target - system_time();
+	nstime_t length = timer->target - system_time();
 	timer_device->prepare((length > 0) ? length : 1);
 }
 
 /** Ensure that the timer device is enabled. */
 static inline void timer_device_enable(void) {
-	/* The device may not be disabled when we expect it to be, if
+	/* The device may not be disabled when we expect it to be (if
 	 * timer_stop() is run from a different CPU to the one the timer is
-	 * running on. */
+	 * running on, it won't be able to disable the timer if the list
+	 * becomes empty). */
 	if(!curr_cpu->timer_enabled) {
 		timer_device->enable();
 		curr_cpu->timer_enabled = true;
@@ -205,7 +212,7 @@ static void timer_dpc_request(void *_timer) {
 /** Handles a timer tick.
  * @return		Whether to preempt the current thread. */
 bool timer_tick(void) {
-	useconds_t time = system_time();
+	nstime_t time = system_time();
 	bool preempt = false;
 	timer_t *timer;
 
@@ -277,10 +284,10 @@ void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data,
 
 /** Start a timer.
  * @param timer		Timer to start. Must not already be running.
- * @param length	Microseconds to run the timer for. If 0 or negative
+ * @param length	Nanoseconds to run the timer for. If 0 or negative
  *			the function will do nothing.
  * @param mode		Mode for the timer. */
-void timer_start(timer_t *timer, useconds_t length, unsigned mode) {
+void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
 	if(length <= 0)
 		return;
 
@@ -349,18 +356,18 @@ void timer_stop(timer_t *timer) {
 }
 
 /** Sleep for a certain amount of time.
- * @param us		Microseconds to sleep for (must be greater than or
+ * @param nsecs		Nanoseconds to sleep for (must be greater than or
  *			equal to 0). If SYNC_ABSOLUTE is specified, this is
  *			a target system time to sleep until.
  * @param flags		Behaviour flags (see sync/sync.h).
  * @return		STATUS_SUCCESS on success, STATUS_INTERRUPTED if
  *			SYNC_INTERRUPTIBLE specified and sleep was interrupted. */
-status_t delay_etc(useconds_t us, int flags) {
+status_t delay_etc(nstime_t nsecs, int flags) {
 	status_t ret;
 
-	assert(us >= 0);
+	assert(nsecs >= 0);
 
-	ret = thread_sleep(NULL, us, "usleep", flags);
+	ret = thread_sleep(NULL, nsecs, "usleep", flags);
 	if(likely(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK))
 		ret = STATUS_SUCCESS;
 
@@ -368,10 +375,10 @@ status_t delay_etc(useconds_t us, int flags) {
 }
 
 /** Delay for a period of time.
- * @param us		Microseconds to sleep for (must be greater than or
+ * @param nsecs		Nanoseconds to sleep for (must be greater than or
  *			equal to 0). */
-void delay(useconds_t us) {
-	delay_etc(us, 0);
+void delay(nstime_t nsecs) {
+	delay_etc(nsecs, 0);
 }
 
 /** Dump a list of timers.
@@ -425,7 +432,7 @@ static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) 
  * @param filter	Unused.
  * @return		KDB status code. */
 static kdb_status_t kdb_cmd_uptime(int argc, char **argv, kdb_filter_t *filter) {
-	useconds_t time;
+	nstime_t time;
 
 	if(kdb_help(argc, argv)) {
 		kdb_printf("Usage: %s\n\n", argv[0]);
@@ -435,7 +442,7 @@ static kdb_status_t kdb_cmd_uptime(int argc, char **argv, kdb_filter_t *filter) 
 	}
 
 	time = system_time();
-	kdb_printf("%llu seconds (%llu microseconds)\n", time / 1000000, time);
+	kdb_printf("%llu seconds (%llu nanoseconds)\n", NSECS2SECS(time), time);
 	return KDB_SUCCESS;
 }
 
@@ -552,13 +559,13 @@ status_t kern_timer_create(unsigned flags, handle_t *handlep) {
 
 /** Start a timer.
  * @param handle	Handle to timer object.
- * @param interval	Interval of the timer in microseconds.
+ * @param interval	Interval of the timer in nanoseconds.
  * @param mode		Mode of the timer. If TIMER_ONESHOT, the timer event
  *			will only be fired once after the specified time period.
  *			If TIMER_PERIODIC, it will be fired periodically at the
  *			specified interval, until timer_stop() is called.
  * @return		Status code describing result of the operation. */
-status_t kern_timer_start(handle_t handle, useconds_t interval, unsigned mode) {
+status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode) {
 	object_handle_t *khandle;
 	user_timer_t *timer;
 	status_t ret;
@@ -581,10 +588,10 @@ status_t kern_timer_start(handle_t handle, useconds_t interval, unsigned mode) {
  * @param handle	Handle to timer object.
  * @param remp		If not NULL, where to store remaining time.
  * @return		Status code describing result of the operation. */
-status_t kern_timer_stop(handle_t handle, useconds_t *remp) {
+status_t kern_timer_stop(handle_t handle, nstime_t *remp) {
 	object_handle_t *khandle;
 	user_timer_t *timer;
-	useconds_t rem;
+	nstime_t rem;
 	status_t ret;
 
 	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, 0, &khandle);
@@ -601,22 +608,23 @@ status_t kern_timer_stop(handle_t handle, useconds_t *remp) {
 	} else if(remp) {
 		ret = memset_user(remp, 0, sizeof(*remp));
 	}
+
 	object_handle_release(khandle);
 	return ret;
 }
 
 /** Get the system time (time since boot).
- * @param usp		Where to store number of microseconds since boot.
+ * @param timep		Where to store number of nanoseconds since boot.
  * @return		Status code describing result of the operation. */
-status_t kern_system_time(useconds_t *usp) {
-	useconds_t ret = system_time();
-	return memcpy_to_user(usp, &ret, sizeof(ret));
+status_t kern_system_time(nstime_t *timep) {
+	nstime_t ret = system_time();
+	return memcpy_to_user(timep, &ret, sizeof(ret));
 }
 
 /** Get the time since the UNIX epoch.
- * @param usp		Where to store number of microseconds since the epoch.
+ * @param timep		Where to store number of nanoseconds since the epoch.
  * @return		Status code describing result of the operation. */
-status_t kern_unix_time(useconds_t *usp) {
-	useconds_t ret = unix_time();
-	return memcpy_to_user(usp, &ret, sizeof(ret));
+status_t kern_unix_time(nstime_t *timep) {
+	nstime_t ret = unix_time();
+	return memcpy_to_user(timep, &ret, sizeof(ret));
 }

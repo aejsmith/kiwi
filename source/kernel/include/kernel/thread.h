@@ -49,7 +49,7 @@ extern thread_id_t kern_thread_id(handle_t handle);
 extern status_t kern_thread_control(handle_t handle, int action, const void *in, void *out);
 extern status_t kern_thread_status(handle_t handle, int *statusp);
 extern void kern_thread_exit(int status) __attribute__((noreturn));
-extern status_t kern_thread_usleep(useconds_t us, useconds_t *remp);
+extern status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp);
 
 #ifdef __cplusplus
 }

@@ -504,10 +504,10 @@ void thread_enable_preempt(void) {
  *			if any. Must be locked with IRQ state saved. Will be
  *			unlocked after the thread has been locked, and will not
  *			be held when the function returns. Can be NULL.
- * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
- *			microseconds in which the sleep will time out. If 0 is
+ *			nanoseconds in which the sleep will time out. If 0 is
  *			specified, the function will return an error immediately.
  *			If -1 is specified, the thread will sleep indefinitely
  *			until woken or interrupted.
@@ -520,7 +520,7 @@ void thread_enable_preempt(void) {
  *			STATUS_INTERRUPTED if interrupted.
  *			STATUS_WOULD_BLOCK if timeout is 0.
  */
-status_t thread_sleep(spinlock_t *lock, useconds_t timeout, const char *name, int flags) {
+status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, int flags) {
 	status_t ret;
 	bool state;
 
@@ -588,7 +588,7 @@ void thread_yield(void) {
 
 /** Perform tasks necessary when a thread is entering the kernel. */
 void thread_at_kernel_entry(void) {
-	useconds_t now;
+	nstime_t now;
 
 	/* Update accounting information. */
 	now = system_time();
@@ -598,7 +598,7 @@ void thread_at_kernel_entry(void) {
 
 /** Perform tasks necessary when a thread is returning to userspace. */
 void thread_at_kernel_exit(void) {
-	useconds_t now;
+	nstime_t now;
 
 	/* Update accounting information. */
 	now = system_time();
@@ -1128,25 +1128,29 @@ void kern_thread_exit(int status) {
 }
 
 /** Sleep for a certain amount of time.
- * @param us		Number of microseconds to sleep for. Must be 0 or
+ * @param nsecs		Number of nanoseconds to sleep for. Must be 0 or
  *			higher.
- * @param remp		If not NULL, the number of microseconds remaining will
+ * @param remp		If not NULL, the number of nanoseconds remaining will
  *			be stored here if the wait is interrupted.
  * @return		Status code describing result of the operation. */
-status_t kern_thread_usleep(useconds_t us, useconds_t *remp) {
-	useconds_t begin, elapsed, rem;
+status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp) {
+	nstime_t begin, elapsed, rem;
 	status_t ret;
 
-	if(us < 0)
+	if(nsecs < 0)
 		return STATUS_INVALID_ARG;
+
+	// TODO: Once system call restarting is implemented, don't return
+	// remaining time. To be accurate we'd calculate target time and use
+	// SYNC_ABSOLUTE, and repeatedly wait until we reach that target.
 
 	/* FIXME: The method getting remaining time isn't quite accurate. */
 	begin = system_time();
-	ret = delay_etc(us, SYNC_INTERRUPTIBLE);
+	ret = delay_etc(nsecs, SYNC_INTERRUPTIBLE);
 	if(ret == STATUS_INTERRUPTED && remp) {
 		elapsed = system_time() - begin;
-		if(elapsed < us) {
-			rem = us - elapsed;
+		if(elapsed < nsecs) {
+			rem = nsecs - elapsed;
 			memcpy_to_user(remp, &rem, sizeof(rem));
 		} else {
 			ret = STATUS_SUCCESS;

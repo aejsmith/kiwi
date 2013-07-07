@@ -44,7 +44,7 @@ typedef struct condvar {
 #define CONDVAR_DECLARE(_var)			\
 	condvar_t _var = CONDVAR_INITIALIZER(_var, #_var)
 
-extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *lock, useconds_t timeout, int flags);
+extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *lock, nstime_t timeout, int flags);
 extern void condvar_wait(condvar_t *cv, mutex_t *mutex);
 extern bool condvar_signal(condvar_t *cv);
 extern bool condvar_broadcast(condvar_t *cv);

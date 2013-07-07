@@ -64,10 +64,10 @@ static RWLOCK_DECLARE(semaphore_tree_lock);
 
 /** Down a semaphore.
  * @param sem		Semaphore to down.
- * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
- *			microseconds in which the sleep will time out. If 0 is
+ *			nanoseconds in which the sleep will time out. If 0 is
  *			specified, the function will return an error immediately
  *			if the lock cannot be acquired immediately. If -1
  *			is specified, the thread will sleep indefinitely until
@@ -76,7 +76,7 @@ static RWLOCK_DECLARE(semaphore_tree_lock);
  * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set. */
-status_t semaphore_down_etc(semaphore_t *sem, useconds_t timeout, int flags) {
+status_t semaphore_down_etc(semaphore_t *sem, nstime_t timeout, int flags) {
 	spinlock_lock(&sem->lock);
 
 	if(sem->count) {
@@ -253,14 +253,14 @@ semaphore_id_t kern_semaphore_id(handle_t handle) {
  * ups the semaphore, or until the timeout expires.
  *
  * @param handle	Handle to semaphore to down.
- * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
+ * @param timeout	Timeout in nanoseconds. A timeout of -1 will sleep
  *			forever until the count can be decreased, and a timeout
  *			of 0 will return an error immediately if unable to down
  *			the semaphore.
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_semaphore_down(handle_t handle, useconds_t timeout) {
+status_t kern_semaphore_down(handle_t handle, nstime_t timeout) {
 	object_handle_t *khandle;
 	user_semaphore_t *sem;
 	status_t ret;

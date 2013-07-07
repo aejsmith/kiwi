@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-extern status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout);
+extern status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout);
 extern status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp);
 
 #ifdef __cplusplus

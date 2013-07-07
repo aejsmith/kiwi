@@ -46,9 +46,9 @@ typedef struct ramfs_node {
 		char *target;		/**< Symbolic link destination. */
 	};
 
-	useconds_t created;		/**< Time of creation. */
-	useconds_t accessed;		/**< Time of last access. */
-	useconds_t modified;		/**< Time last modified. */
+	nstime_t created;		/**< Time of creation. */
+	nstime_t accessed;		/**< Time of last access. */
+	nstime_t modified;		/**< Time last modified. */
 } ramfs_node_t;
 
 /** Free a RamFS node.

@@ -38,10 +38,10 @@ static inline void mutex_recursive_error(mutex_t *lock) {
 
 /** Internal mutex locking code.
  * @param lock		Mutex to acquire.
- * @param timeout	Timeout in microseconds.
+ * @param timeout	Timeout in nanoseconds.
  * @param flags		Synchronization flags.
  * @return		Status code describing result of the operation. */
-static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, int flags) {
+static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, int flags) {
 	status_t ret;
 
 	if(atomic_cas(&lock->value, 0, 1) != 0) {
@@ -85,10 +85,10 @@ static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, in
  * SYNC_INTERRUPTIBLE) is specified.
  *
  * @param lock		Mutex to acquire.
- * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
- *			microseconds in which the sleep will time out. If 0 is
+ *			nanoseconds in which the sleep will time out. If 0 is
  *			specified, the function will return an error immediately
  *			if the lock is currently held by another thread. If -1
  *			is specified, the thread will sleep indefinitely until
@@ -99,7 +99,7 @@ static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, in
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
+status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, int flags) {
 	status_t ret;
 
 	ret = mutex_lock_internal(lock, timeout, flags);

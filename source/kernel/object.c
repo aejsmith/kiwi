@@ -606,12 +606,12 @@ int kern_object_type(handle_t handle) {
  *			structure will be updated to reflect whether or not the
  *			event was signalled.
  * @param count		Number of array entries.
- * @param timeout	Maximum time to wait in microseconds. A value of 0 will
+ * @param timeout	Maximum time to wait in nanoseconds. A value of 0 will
  *			cause the function to return immediately if the none of
  *			the events have happened, and a value of -1 will block
  *			indefinitely until one of events happens.
  * @return		Status code describing result of the operation. */
-status_t kern_object_wait(object_event_t *events, size_t count, useconds_t timeout) {
+status_t kern_object_wait(object_event_t *events, size_t count, nstime_t timeout) {
 	semaphore_t sem = SEMAPHORE_INITIALIZER(sem, "object_wait_sem", 0);
 	object_wait_sync_t *syncs;
 	status_t ret, err;

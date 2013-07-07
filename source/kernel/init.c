@@ -134,7 +134,7 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	#if CONFIG_DEBUGGER_DELAY > 0
 	/* Delay to allow GDB to be connected. */
 	kprintf(LOG_NOTICE, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
-	spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
+	spin(SECS2NSECS(CONFIG_DEBUGGER_DELAY));
 	#endif
 
 	/* Perform other initialization tasks. */

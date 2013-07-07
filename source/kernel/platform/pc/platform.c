@@ -56,7 +56,7 @@ void platform_reboot(void) {
 			in8(0x60);
 	} while(val & (1<<1));
 	out8(0x64, 0xfe);
-	spin(5000);
+	spin(MSECS2NSECS(5));
 
 	/* Fall back on a triple fault. */
 	x86_lidt(NULL, 0);

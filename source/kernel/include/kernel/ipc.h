@@ -51,16 +51,16 @@ typedef struct port_client {
 extern status_t kern_port_create(object_rights_t rights, handle_t *handlep);
 extern status_t kern_port_open(port_id_t id, object_rights_t rights, handle_t *handlep);
 extern port_id_t kern_port_id(handle_t handle);
-extern status_t kern_port_listen(handle_t handle, useconds_t timeout, handle_t *connp,
+extern status_t kern_port_listen(handle_t handle, nstime_t timeout, handle_t *connp,
                                  port_client_t *infop);
 extern status_t kern_port_loopback(handle_t handle, handle_t connp[2]);
 
 extern status_t kern_connection_open(port_id_t id, handle_t *handlep);
 extern status_t kern_connection_send(handle_t handle, uint32_t type, const void *buf,
                                      size_t size);
-extern status_t kern_connection_peek(handle_t handle, useconds_t timeout, uint32_t *typep,
+extern status_t kern_connection_peek(handle_t handle, nstime_t timeout, uint32_t *typep,
                                      size_t *sizep);
-extern status_t kern_connection_receive(handle_t handle, useconds_t timeout, uint32_t *typep,
+extern status_t kern_connection_receive(handle_t handle, nstime_t timeout, uint32_t *typep,
                                         void *buf, size_t size);
 
 #ifdef __cplusplus

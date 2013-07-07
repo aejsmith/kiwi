@@ -60,10 +60,10 @@ typedef struct file_info {
 	offset_t size;			/**< Total size of file on filesystem. */
 	size_t links;			/**< Number of links to the node. */
 
-	/** Node times, all in microseconds since the UNIX epoch. */
-	useconds_t created;		/**< Time of creation. */
-	useconds_t accessed;		/**< Time of last access. */
-	useconds_t modified;		/**< Time last modified. */
+	/** Node times, all in nanoseconds since the UNIX epoch. */
+	nstime_t created;		/**< Time of creation. */
+	nstime_t accessed;		/**< Time of last access. */
+	nstime_t modified;		/**< Time last modified. */
 } file_info_t;
 
 /** Mount information structure. */
