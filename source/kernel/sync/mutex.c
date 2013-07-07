@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 
 #include <assert.h>
 #include <status.h>
+
 /** Handle a recursive locking error.
  * @param lock		Lock error occurred on. */
 static inline void mutex_recursive_error(mutex_t *lock) {
@@ -39,9 +40,9 @@ static inline void mutex_recursive_error(mutex_t *lock) {
 /** Internal mutex locking code.
  * @param lock		Mutex to acquire.
  * @param timeout	Timeout in nanoseconds.
- * @param flags		Synchronization flags.
+ * @param flags		Sleeping behaviour flags.
  * @return		Status code describing result of the operation. */
-static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, int flags) {
+static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, unsigned flags) {
 	status_t ret;
 
 	if(atomic_cas(&lock->value, 0, 1) != 0) {
@@ -82,10 +83,10 @@ static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, int 
  * set, and the calling thread already holds it, the recursion count will be
  * increased. Otherwise, the function will block until the mutex can be
  * acquired, until the timeout expires, or until interrupted (only if
- * SYNC_INTERRUPTIBLE) is specified.
+ * SLEEP_INTERRUPTIBLE) is specified.
  *
  * @param lock		Mutex to acquire.
- * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SLEEP_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
  *			nanoseconds in which the sleep will time out. If 0 is
@@ -93,13 +94,13 @@ static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, int 
  *			if the lock is currently held by another thread. If -1
  *			is specified, the thread will sleep indefinitely until
  *			the lock can be acquired or it is interrupted.
- * @param flags		Synchronization flags.
+ * @param flags		Sleeping behaviour flags.
  *
  * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
- *			SYNC_INTERRUPTIBLE flag is set.
+ *			SLEEP_INTERRUPTIBLE flag is set.
  */
-status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, int flags) {
+status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, unsigned flags) {
 	status_t ret;
 
 	ret = mutex_lock_internal(lock, timeout, flags);

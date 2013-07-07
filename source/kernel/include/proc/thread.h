@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,7 +34,6 @@
 #include <lib/refcount.h>
 
 #include <sync/spinlock.h>
-#include <sync/sync.h>
 
 #include <cpu.h>
 #include <object.h>
@@ -147,6 +146,10 @@ typedef struct thread {
 #define THREAD_KILLED		(1<<2)	/**< Thread has been killed. */
 #define THREAD_RWLOCK_WRITER	(1<<3)	/**< Thread is blocked on an rwlock for writing. */
 
+/** Sleeping behaviour flags. */
+#define SLEEP_INTERRUPTIBLE	(1<<0)	/**< Sleep should be interruptible. */
+#define SLEEP_ABSOLUTE		(1<<1)	/**< Specified timeout is absolute, not relative to current time. */
+
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)
 
@@ -171,7 +174,8 @@ extern void thread_rename(thread_t *thread, const char *name);
 extern void thread_preempt(void);
 extern void thread_disable_preempt(void);
 extern void thread_enable_preempt(void);
-extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, int flags);
+extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name,
+	unsigned flags);
 extern void thread_yield(void);
 extern void thread_at_kernel_entry(void);
 extern void thread_at_kernel_exit(void);

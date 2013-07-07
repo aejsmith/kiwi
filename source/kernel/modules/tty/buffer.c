@@ -64,7 +64,7 @@ status_t tty_buffer_read_line(tty_buffer_t *buf, char *dest, size_t count, bool 
 	size_t i;
 
 	/* Wait for a line to come into the buffer. */
-	ret = semaphore_down_etc(&buf->lines, (nonblock) ? 0 : -1, SYNC_INTERRUPTIBLE);
+	ret = semaphore_down_etc(&buf->lines, (nonblock) ? 0 : -1, SLEEP_INTERRUPTIBLE);
 	if(ret != STATUS_SUCCESS) {
 		*bytesp = 0;
 		return ret;
@@ -116,7 +116,7 @@ status_t tty_buffer_read(tty_buffer_t *buf, char *dest, size_t count, bool nonbl
 	size_t i;
 
 	for(i = 0; i < count; i++) {
-		ret = semaphore_down_etc(&buf->data, (nonblock) ? 0 : -1, SYNC_INTERRUPTIBLE);
+		ret = semaphore_down_etc(&buf->data, (nonblock) ? 0 : -1, SLEEP_INTERRUPTIBLE);
 		if(ret != STATUS_SUCCESS) {
 			break;
 		}
@@ -197,7 +197,7 @@ size_t tty_buffer_kill(tty_buffer_t *buf) {
 status_t tty_buffer_insert(tty_buffer_t *buf, uint16_t ch, bool nonblock) {
 	status_t ret;
 
-	ret = semaphore_down_etc(&buf->space, (nonblock) ? 0 : -1, SYNC_INTERRUPTIBLE);
+	ret = semaphore_down_etc(&buf->space, (nonblock) ? 0 : -1, SLEEP_INTERRUPTIBLE);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

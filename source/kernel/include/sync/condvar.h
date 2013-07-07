@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -44,7 +44,8 @@ typedef struct condvar {
 #define CONDVAR_DECLARE(_var)			\
 	condvar_t _var = CONDVAR_INITIALIZER(_var, #_var)
 
-extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *lock, nstime_t timeout, int flags);
+extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *lock, nstime_t timeout,
+	unsigned flags);
 extern void condvar_wait(condvar_t *cv, mutex_t *mutex);
 extern bool condvar_signal(condvar_t *cv);
 extern bool condvar_broadcast(condvar_t *cv);

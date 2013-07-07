@@ -24,6 +24,8 @@
 #include <mm/kmem.h>
 #include <mm/slab.h>
 
+#include <proc/thread.h>
+
 #include <assert.h>
 #include <kernel.h>
 #include <object.h>
@@ -95,7 +97,7 @@ status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t 
 		/* Try to get all required data before reading. */
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
-			                         SYNC_INTERRUPTIBLE);
+			                         SLEEP_INTERRUPTIBLE);
 			if(ret != STATUS_SUCCESS) {
 				semaphore_up(&pipe->data_sem, i);
 				i = 0;
@@ -112,7 +114,7 @@ status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t 
 	} else if(count) {
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
-			                         SYNC_INTERRUPTIBLE);
+			                         SLEEP_INTERRUPTIBLE);
 			if(ret != STATUS_SUCCESS) {
 				goto out;
 			}
@@ -155,7 +157,7 @@ status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, 
 		/* Try to get all required space before writing. */
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
-			                         SYNC_INTERRUPTIBLE);
+			                         SLEEP_INTERRUPTIBLE);
 			if(ret != STATUS_SUCCESS) {
 				semaphore_up(&pipe->space_sem, i);
 				i = 0;
@@ -174,7 +176,7 @@ status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, 
 	} else if(count) {
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
-			                         SYNC_INTERRUPTIBLE);
+			                         SLEEP_INTERRUPTIBLE);
 			if(ret != STATUS_SUCCESS) {
 				goto out;
 			}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,7 +36,7 @@
  *
  * @param cv		Condition variable to wait on.
  * @param mutex		Mutex to atomically release while waiting.
- * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SLEEP_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
  *			nanoseconds in which the sleep will time out. If 0 is
@@ -44,13 +44,13 @@
  *			if the lock is currently held by another thread. If -1
  *			is specified, the thread will sleep indefinitely until
  *			woken or interrupted.
- * @param flags		Synchronization flags.
+ * @param flags		Sleeping behaviour flags (see proc/thread.h).
  *
  * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
- *			SYNC_INTERRUPTIBLE flag is set.
+ *			SLEEP_INTERRUPTIBLE flag is set.
  */
-status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, int flags) {
+status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, unsigned flags) {
 	status_t ret;
 
 	spinlock_lock(&cv->lock);

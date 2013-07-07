@@ -357,11 +357,11 @@ void timer_stop(timer_t *timer) {
 
 /** Sleep for a certain amount of time.
  * @param nsecs		Nanoseconds to sleep for (must be greater than or
- *			equal to 0). If SYNC_ABSOLUTE is specified, this is
+ *			equal to 0). If SLEEP_ABSOLUTE is specified, this is
  *			a target system time to sleep until.
  * @param flags		Behaviour flags (see sync/sync.h).
  * @return		STATUS_SUCCESS on success, STATUS_INTERRUPTED if
- *			SYNC_INTERRUPTIBLE specified and sleep was interrupted. */
+ *			SLEEP_INTERRUPTIBLE specified and sleep was interrupted. */
 status_t delay_etc(nstime_t nsecs, int flags) {
 	status_t ret;
 

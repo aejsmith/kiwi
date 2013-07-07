@@ -24,8 +24,6 @@
 
 #include <lib/atomic.h>
 
-#include <sync/sync.h>
-
 /** Structure containing a spinlock. */
 typedef struct spinlock {
 	atomic_t value;			/**< Value of lock (1 == free, 0 == held, others == held with waiters). */

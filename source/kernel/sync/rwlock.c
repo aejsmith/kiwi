@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -76,7 +76,7 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  * the lock, in order to prevent starvation of writers.
  *
  * @param lock		Lock to acquire.
- * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SLEEP_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
  *			nanoseconds in which the sleep will time out. If 0 is
@@ -84,13 +84,13 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  *			if the lock cannot be acquired immediately. If -1
  *			is specified, the thread will sleep indefinitely until
  *			the lock can be acquired or it is interrupted.
- * @param flags		Synchronization flags.
+ * @param flags		Sleeping behaviour flags.
  *
  * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
- *			SYNC_INTERRUPTIBLE flag is set.
+ *			SLEEP_INTERRUPTIBLE flag is set.
  */
-status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, int flags) {
+status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) {
 	spinlock_lock(&lock->lock);
 
 	if(lock->held) {
@@ -121,7 +121,7 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, int flags) {
  * it.
  *
  * @param lock		Lock to acquire.
- * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SLEEP_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
  *			nanoseconds in which the sleep will time out. If 0 is
@@ -129,13 +129,13 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, int flags) {
  *			if the lock cannot be acquired immediately. If -1
  *			is specified, the thread will sleep indefinitely until
  *			the lock can be acquired or it is interrupted.
- * @param flags		Synchronization flags.
+ * @param flags		Sleeping behaviour flags.
  *
  * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
- *			SYNC_INTERRUPTIBLE flag is set.
+ *			SLEEP_INTERRUPTIBLE flag is set.
  */
-status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, int flags) {
+status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) {
 	status_t ret = STATUS_SUCCESS;
 
 	spinlock_lock(&lock->lock);

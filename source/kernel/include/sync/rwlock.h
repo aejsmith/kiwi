@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,8 +49,8 @@ typedef struct rwlock {
 #define RWLOCK_DECLARE(_var)			\
 	rwlock_t _var = RWLOCK_INITIALIZER(_var, #_var)
 
-extern status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, int flags);
-extern status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, int flags);
+extern status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags);
+extern status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags);
 extern void rwlock_read_lock(rwlock_t *lock);
 extern void rwlock_write_lock(rwlock_t *lock);
 extern void rwlock_unlock(rwlock_t *lock);

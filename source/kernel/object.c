@@ -653,7 +653,7 @@ status_t kern_object_wait(object_event_t *events, size_t count, nstime_t timeout
 		}
 	}
 
-	ret = semaphore_down_etc(&sem, timeout, SYNC_INTERRUPTIBLE);
+	ret = semaphore_down_etc(&sem, timeout, SLEEP_INTERRUPTIBLE);
 out:
 	while(i--) {
 		syncs[i].handle->object->type->unwait(syncs[i].handle, syncs[i].info.event, &syncs[i]);

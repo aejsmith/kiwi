@@ -104,7 +104,7 @@ void system_shutdown(int action) {
 	if(curr_proc != kernel_proc) {
 		/* The process shutdown code will interrupt us when it wants to
 		 * kill this thread. */
-		thread_sleep(NULL, -1, "system_shutdown", SYNC_INTERRUPTIBLE);
+		thread_sleep(NULL, -1, "system_shutdown", SLEEP_INTERRUPTIBLE);
 		thread_exit();
 	}
 }

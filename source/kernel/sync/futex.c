@@ -206,7 +206,7 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
 	 * description above). */
 	if(*mapping == val) {
 		list_append(&futex->threads, &curr_thread->wait_link);
-		ret = thread_sleep(&futex->lock, timeout, "futex", SYNC_INTERRUPTIBLE);
+		ret = thread_sleep(&futex->lock, timeout, "futex", SLEEP_INTERRUPTIBLE);
 	} else {
 		spinlock_unlock(&futex->lock);
 		ret = STATUS_TRY_AGAIN;

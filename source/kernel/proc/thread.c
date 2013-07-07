@@ -504,7 +504,7 @@ void thread_enable_preempt(void) {
  *			if any. Must be locked with IRQ state saved. Will be
  *			unlocked after the thread has been locked, and will not
  *			be held when the function returns. Can be NULL.
- * @param timeout	Timeout in nanoseconds. If SYNC_ABSOLUTE is specified,
+ * @param timeout	Timeout in nanoseconds. If SLEEP_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
  *			nanoseconds in which the sleep will time out. If 0 is
@@ -513,19 +513,19 @@ void thread_enable_preempt(void) {
  *			until woken or interrupted.
  * @param name		Name of the object the thread is waiting on, for
  *			informational purposes.
- * @param flags		Synchronization behaviour flags (see sync/sync.h).
+ * @param flags		Sleeping behaviour flags.
  *
  * @return		STATUS_SUCCESS if woken normally.
  *			STATUS_TIMED_OUT if timed out.
  *			STATUS_INTERRUPTED if interrupted.
  *			STATUS_WOULD_BLOCK if timeout is 0.
  */
-status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, int flags) {
+status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsigned flags) {
 	status_t ret;
 	bool state;
 
 	/* Convert an absolute target time to a relative time. */
-	if(flags & SYNC_ABSOLUTE && timeout > 0) {
+	if(flags & SLEEP_ABSOLUTE && timeout > 0) {
 		timeout = timeout - system_time();
 		if(timeout < 0)
 			timeout = 0;
@@ -539,7 +539,7 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, int 
 
 	/* If interruptible and the interrupted flag is set, we also return an
 	 * error immediately. */
-	if(flags & SYNC_INTERRUPTIBLE && curr_thread->flags & THREAD_INTERRUPTED) {
+	if(flags & SLEEP_INTERRUPTIBLE && curr_thread->flags & THREAD_INTERRUPTED) {
 		curr_thread->flags &= ~THREAD_INTERRUPTED;
 		ret = STATUS_INTERRUPTED;
 		goto cancel;
@@ -552,7 +552,7 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, int 
 	curr_thread->sleep_status = STATUS_SUCCESS;
 	curr_thread->wait_lock = lock;
 	curr_thread->waiting_on = name;
-	if(flags & SYNC_INTERRUPTIBLE)
+	if(flags & SLEEP_INTERRUPTIBLE)
 		curr_thread->flags |= THREAD_INTERRUPTIBLE;
 
 	/* Start off the timer if required. */
@@ -1147,11 +1147,11 @@ status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp) {
 
 	// TODO: Once system call restarting is implemented, don't return
 	// remaining time. To be accurate we'd calculate target time and use
-	// SYNC_ABSOLUTE, and repeatedly wait until we reach that target.
+	// SLEEP_ABSOLUTE, and repeatedly wait until we reach that target.
 
 	/* FIXME: The method getting remaining time isn't quite accurate. */
 	begin = system_time();
-	ret = delay_etc(nsecs, SYNC_INTERRUPTIBLE);
+	ret = delay_etc(nsecs, SLEEP_INTERRUPTIBLE);
 	if(ret == STATUS_INTERRUPTED && remp) {
 		elapsed = system_time() - begin;
 		if(elapsed < nsecs) {
