@@ -22,11 +22,11 @@
 #ifndef __LIB_ID_ALLOCATOR_H
 #define __LIB_ID_ALLOCATOR_H
 
-#include <sync/mutex.h>
+#include <sync/spinlock.h>
 
 /** ID allocator structure. */
 typedef struct id_allocator {
-	mutex_t lock;			/**< Lock to protect the allocator. */
+	spinlock_t lock;		/**< Lock to protect the allocator. */
 	unsigned long *bitmap;		/**< Bitmap of IDs. */
 	size_t nbits;			/**< Number of bits in the bitmap. */
 } id_allocator_t;

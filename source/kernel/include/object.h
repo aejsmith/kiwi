@@ -143,7 +143,7 @@ extern status_t object_handle_create(object_t *object, void *data, object_rights
 extern status_t object_handle_open(object_t *object, void *data, object_rights_t rights,
 	struct process *process, int flags, object_handle_t **handlep, handle_t *idp,
 	handle_t *uidp);
-extern void object_handle_get(object_handle_t *handle);
+extern void object_handle_retain(object_handle_t *handle);
 extern void object_handle_release(object_handle_t *handle);
 extern status_t object_handle_attach(object_handle_t *handle, struct process *process,
 	int flags, handle_t *idp, handle_t *uidp);

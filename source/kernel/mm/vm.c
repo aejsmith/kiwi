@@ -291,7 +291,7 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 
 	/* Copy the object handle. */
 	if(src->handle) {
-		object_handle_get(src->handle);
+		object_handle_retain(src->handle);
 		dest->handle = src->handle;
 		dest->obj_offset = src->obj_offset;
 	}
@@ -591,7 +591,7 @@ static void vm_region_split(vm_region_t *region, ptr_t end, ptr_t start) {
 
 		/* Copy object details into the split. */
 		if((split->handle = region->handle))
-			object_handle_get(split->handle);
+			object_handle_retain(split->handle);
 
 		if((split->amap = region->amap)) {
 			refcount_inc(&split->amap->count);
@@ -1211,7 +1211,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags,
 	 * creating an anonymous or private mapping. */
 	if(handle) {
 		region->handle = handle;
-		object_handle_get(region->handle);
+		object_handle_retain(region->handle);
 		region->obj_offset = offset;
 	}
 	if(!handle || (flags & VM_MAP_PRIVATE)) {

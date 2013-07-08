@@ -33,17 +33,17 @@
 int32_t id_allocator_alloc(id_allocator_t *alloc) {
 	int32_t id;
 
-	mutex_lock(&alloc->lock);
+	spinlock_lock(&alloc->lock);
 
 	id = bitmap_ffz(alloc->bitmap, alloc->nbits);
 	if(id < 0) {
-		mutex_unlock(&alloc->lock);
+		spinlock_unlock(&alloc->lock);
 		return -1;
 	}
 
 	bitmap_set(alloc->bitmap, id);
 
-	mutex_unlock(&alloc->lock);
+	spinlock_unlock(&alloc->lock);
 	return id;
 }
 
@@ -51,24 +51,24 @@ int32_t id_allocator_alloc(id_allocator_t *alloc) {
  * @param alloc		Allocator to free to.
  * @param id		ID to free. */
 void id_allocator_free(id_allocator_t *alloc, int32_t id) {
-	mutex_lock(&alloc->lock);
+	spinlock_lock(&alloc->lock);
 
 	assert(bitmap_test(alloc->bitmap, id));
 	bitmap_clear(alloc->bitmap, id);
 
-	mutex_unlock(&alloc->lock);
+	spinlock_unlock(&alloc->lock);
 }
 
 /** Reserve an ID in the allocator.
  * @param alloc		Allocator to reserve in.
  * @param id		ID to reserve. */
 void id_allocator_reserve(id_allocator_t *alloc, int32_t id) {
-	mutex_lock(&alloc->lock);
+	spinlock_lock(&alloc->lock);
 
 	assert(!bitmap_test(alloc->bitmap, id));
 	bitmap_set(alloc->bitmap, id);
 
-	mutex_unlock(&alloc->lock);
+	spinlock_unlock(&alloc->lock);
 }
 
 /** Initialise an ID allocator.
@@ -77,7 +77,7 @@ void id_allocator_reserve(id_allocator_t *alloc, int32_t id) {
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing the result of the operation. */
 status_t id_allocator_init(id_allocator_t *alloc, int32_t max, unsigned mmflag) {
-	mutex_init(&alloc->lock, "id_allocator_lock", 0);
+	spinlock_init(&alloc->lock, "id_allocator_lock");
 	alloc->nbits = max + 1;
 	alloc->bitmap = bitmap_alloc(alloc->nbits, mmflag);
 	return (alloc->bitmap) ? STATUS_SUCCESS : STATUS_NO_MEMORY;

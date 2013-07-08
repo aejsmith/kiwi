@@ -210,7 +210,7 @@ status_t object_handle_open(object_t *object, void *data, object_rights_t rights
  * 
  * @param handle	Handle to increase reference count of.
  */
-void object_handle_get(object_handle_t *handle) {
+void object_handle_retain(object_handle_t *handle) {
 	assert(handle);
 	refcount_inc(&handle->count);
 }
@@ -243,7 +243,7 @@ void object_handle_release(object_handle_t *handle) {
 static void handle_table_insert(handle_table_t *table, handle_t id, object_handle_t *handle, int flags) {
 	handle_link_t *link;
 
-	object_handle_get(handle);
+	object_handle_retain(handle);
 
 	link = kmalloc(sizeof(*link), MM_KERNEL);
 	link->handle = handle;
@@ -402,7 +402,7 @@ status_t object_handle_lookup(handle_t id, int type, object_rights_t rights, obj
 		return STATUS_ACCESS_DENIED;
 	}
 
-	object_handle_get(link->handle);
+	object_handle_retain(link->handle);
 	*handlep = link->handle;
 	rwlock_unlock(&curr_proc->handles->lock);
 	return STATUS_SUCCESS;
