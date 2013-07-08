@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Kernel object functions/definitions.
+ * @brief		Kernel object management.
  */
 
 #ifndef __KERNEL_OBJECT_H
@@ -28,43 +28,47 @@
 extern "C" {
 #endif
 
+/** Value used to refer to an invalid handle.
+ * @note		This is used to mean various things, for example with
+ *			thread/process functions it refers to the current
+ *			thread/process rather than one referred to by a handle. */
+#define INVALID_HANDLE          (-1)
+
 /** Object type ID definitions. */
-#define OBJECT_TYPE_FILE	1	/**< File. */
-#define OBJECT_TYPE_DEVICE	2	/**< Device. */
-#define OBJECT_TYPE_PROCESS	3	/**< Process. */
-#define OBJECT_TYPE_THREAD	4	/**< Thread. */
-#define OBJECT_TYPE_PORT	5	/**< IPC port. */
-#define OBJECT_TYPE_CONNECTION	6	/**< IPC connection. */
-#define OBJECT_TYPE_SEMAPHORE	7	/**< Semaphore. */
-#define OBJECT_TYPE_AREA	8	/**< Memory area. */
-#define OBJECT_TYPE_TIMER	9	/**< Timer. */
+#define OBJECT_TYPE_PROCESS	1	/**< Process (non-securable, transferrable). */
+#define OBJECT_TYPE_THREAD	2	/**< Thread (non-securable, transferrable). */
+#define OBJECT_TYPE_TOKEN	3	/**< Security Token (non-securable, transferrable). */
+#define OBJECT_TYPE_TIMER	4	/**< Timer (non-securable, transferrable). */
+#define OBJECT_TYPE_WATCHER	5	/**< Watcher (non-securable, non-transferrable). */
+#define OBJECT_TYPE_AREA	6	/**< Memory Area (securable, transferrable). */
+#define OBJECT_TYPE_FILE	7	/**< File (securable, transferrable). */
+#define OBJECT_TYPE_PORT	8	/**< Port (securable, transferrable). */
+#define OBJECT_TYPE_CONNECTION	9	/**< Connection (non-securable, non-transferrable). */
+#define OBJECT_TYPE_SEMAPHORE	10	/**< Semaphore (non-securable, transferrable). */
+#define OBJECT_TYPE_DEVICE	11	// remove me
 
-/** Handle link behaviour flags. */
+/** Flags for a handle table entry. */
 #define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */
-
-/** Actions for kern_handle_control(). */
-#define HANDLE_GET_LFLAGS	1	/**< Get handle table link flags. */
-#define HANDLE_SET_LFLAGS	2	/**< Set handle table link flags. */
-#define HANDLE_GET_FLAGS	3	/**< Get handle flags (object type-specific). */
-#define HANDLE_SET_FLAGS	4	/**< Set handle flags (object type-specific). */
-#define HANDLE_GET_RIGHTS	5	/**< Get handle rights. */
-#define HANDLE_SET_RIGHTS	6	/**< Set handle rights. */
-
-/** Type used to store a set of object rights. */
-typedef uint32_t object_rights_t;
 
 /** Details of an object event to wait for. */
 typedef struct object_event {
 	handle_t handle;		/**< Handle to wait on. */
-	int event;			/**< Event to wait for. */
+	unsigned event;			/**< Event to wait for. */
+	unsigned long data;		/**< Integer data associated with the event. */
 	bool signalled;			/**< Whether the event was signalled. */
 } object_event_t;
 
-extern int kern_object_type(handle_t handle);
-extern status_t kern_object_wait(object_event_t *events, size_t count, nstime_t timeout);
+/** Behaviour flags for kern_object_wait(). */
+#define OBJECT_WAIT_ALL		(1<<0)	/**< Wait for all the specified events to occur. */
 
-extern status_t kern_handle_control(handle_t handle, int action, int arg, int *outp);
-extern status_t kern_handle_duplicate(handle_t handle, handle_t dest, bool force, handle_t *newp);
+extern int kern_object_type(handle_t handle);
+extern status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags,
+	nstime_t timeout);
+
+extern status_t kern_handle_flags(handle_t handle, uint32_t *flagsp);
+extern status_t kern_handle_set_flags(handle_t handle, uint32_t flags);
+extern status_t kern_handle_rights(handle_t handle, object_rights_t *rightsp);
+extern status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *newp);
 extern status_t kern_handle_close(handle_t handle);
 
 #ifdef __cplusplus

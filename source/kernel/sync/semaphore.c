@@ -152,6 +152,7 @@ static void semaphore_object_close(object_handle_t *handle) {
 /** Semaphore object type. */
 static object_type_t semaphore_object_type = {
 	.id = OBJECT_TYPE_SEMAPHORE,
+	.flags = OBJECT_TRANSFERRABLE,
 	.close = semaphore_object_close,
 };
 

@@ -65,6 +65,7 @@
 #include <lib/string.h>
 
 #include <mm/malloc.h>
+#include <mm/mmu.h>
 #include <mm/phys.h>
 #include <mm/safe.h>
 #include <mm/slab.h>

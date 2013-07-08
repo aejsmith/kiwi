@@ -435,29 +435,29 @@ static status_t tty_slave_write(device_t *device, void *data, const void *buf, s
  * @param device	Device to wait for.
  * @param data		Handle-specific data pointer (unused).
  * @param event		Event to wait for.
- * @param sync		Synchronisation pointer.
+ * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t tty_slave_wait(device_t *device, void *data, int event, void *sync) {
+static status_t tty_slave_wait(device_t *device, void *data, int event, void *wait) {
 	tty_device_t *tty = device->data;
 
 	switch(event) {
 	case DEVICE_EVENT_READABLE:
 		if(tty->termios.c_lflag & ICANON) {
 			if(semaphore_count(&tty->input->lines)) {
-				object_wait_signal(sync);
+				object_wait_signal(wait);
 			} else {
-				notifier_register(&tty->input->lines_notifier, object_wait_notifier, sync);
+				notifier_register(&tty->input->lines_notifier, object_wait_notifier, wait);
 			}
 		} else {
 			if(semaphore_count(&tty->input->data)) {
-				object_wait_signal(sync);
+				object_wait_signal(wait);
 			} else {
-				notifier_register(&tty->input->data_notifier, object_wait_notifier, sync);
+				notifier_register(&tty->input->data_notifier, object_wait_notifier, wait);
 			}
 		}
 		return STATUS_SUCCESS;
 	case DEVICE_EVENT_WRITABLE:
-		pipe_wait(tty->output, true, sync);
+		pipe_wait(tty->output, true, wait);
 		return STATUS_SUCCESS;
 	default:
 		return STATUS_INVALID_EVENT;
@@ -468,18 +468,18 @@ static status_t tty_slave_wait(device_t *device, void *data, int event, void *sy
  * @param device	Device to stop waiting for.
  * @param data		Handle-specific data pointer (unused).
  * @param event		Event to wait for.
- * @param sync		Synchronisation pointer. */
-static void tty_slave_unwait(device_t *device, void *data, int event, void *sync) {
+ * @param wait		Internal wait data pointer. */
+static void tty_slave_unwait(device_t *device, void *data, int event, void *wait) {
 	tty_device_t *tty = device->data;
 
 	switch(event) {
 	case DEVICE_EVENT_READABLE:
 		/* Remove from both in case ICANON was changed while waiting. */
-		notifier_unregister(&tty->input->lines_notifier, object_wait_notifier, sync);
-		notifier_unregister(&tty->input->data_notifier, object_wait_notifier, sync);
+		notifier_unregister(&tty->input->lines_notifier, object_wait_notifier, wait);
+		notifier_unregister(&tty->input->data_notifier, object_wait_notifier, wait);
 		break;
 	case DEVICE_EVENT_WRITABLE:
-		pipe_unwait(tty->output, true, sync);
+		pipe_unwait(tty->output, true, wait);
 		break;
 	}
 }
@@ -602,20 +602,20 @@ static status_t tty_master_write(device_t *device, void *data, const void *_buf,
  * @param device	Device to wait for.
  * @param data		Pointer to terminal structure.
  * @param event		Event to wait for.
- * @param sync		Synchronisation pointer.
+ * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t tty_master_wait(device_t *device, void *data, int event, void *sync) {
+static status_t tty_master_wait(device_t *device, void *data, int event, void *wait) {
 	tty_device_t *tty = data;
 
 	switch(event) {
 	case DEVICE_EVENT_READABLE:
-		pipe_wait(tty->output, false, sync);
+		pipe_wait(tty->output, false, wait);
 		return STATUS_SUCCESS;
 	case DEVICE_EVENT_WRITABLE:
 		if(semaphore_count(&tty->input->space)) {
-			object_wait_signal(sync);
+			object_wait_signal(wait);
 		} else {
-			notifier_register(&tty->input->space_notifier, object_wait_notifier, sync);
+			notifier_register(&tty->input->space_notifier, object_wait_notifier, wait);
 		}
 		return STATUS_SUCCESS;
 	default:
@@ -627,16 +627,16 @@ static status_t tty_master_wait(device_t *device, void *data, int event, void *s
  * @param device	Device to stop waiting for.
  * @param data		Pointer to terminal structure.
  * @param event		Event to wait for.
- * @param sync		Synchronisation pointer. */
-static void tty_master_unwait(device_t *device, void *data, int event, void *sync) {
+ * @param wait		Internal wait data pointer. */
+static void tty_master_unwait(device_t *device, void *data, int event, void *wait) {
 	tty_device_t *tty = data;
 
 	switch(event) {
 	case DEVICE_EVENT_READABLE:
-		pipe_unwait(tty->output, false, sync);
+		pipe_unwait(tty->output, false, wait);
 		break;
 	case DEVICE_EVENT_WRITABLE:
-		notifier_unregister(&tty->input->space_notifier, object_wait_notifier, sync);
+		notifier_unregister(&tty->input->space_notifier, object_wait_notifier, wait);
 		break;
 	}
 }

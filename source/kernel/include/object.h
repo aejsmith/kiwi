@@ -24,37 +24,22 @@
 
 #include <kernel/object.h>
 
-#include <lib/avl_tree.h>
 #include <lib/list.h>
 #include <lib/refcount.h>
 
 #include <sync/rwlock.h>
 
-struct object;
 struct object_handle;
-struct object_wait;
 struct process;
-struct vm_page;
-struct vm_region;
 
 /** Kernel object type structure. */
 typedef struct object_type {
 	int id;				/**< ID number for the type. */
+	unsigned flags;			/**< Flags for objects of this type. */
 
 	/** Close a handle to an object.
 	 * @param handle	Handle to the object. */
 	void (*close)(struct object_handle *handle);
-
-	/** Change handle options.
-	 * @note		Since the HANDLE_{G,S}ET_FLAGS operations modify
-	 *			type-specific flags, it is up to this function
-	 *			to implement them.
-	 * @param handle	Handle to operate on.
-	 * @param action	Action to perform.
-	 * @param arg		Argument to function.
-	 * @param outp		Where to store return value.
-	 * @return		Status code describing result of the operation. */
-	status_t (*control)(struct object_handle *handle, int action, int arg, int *outp);
 
 	/** Signal that an object event is being waited for.
 	 * @note		If the event being waited for has occurred
@@ -62,16 +47,16 @@ typedef struct object_type {
 	 *			function and return success.
 	 * @param handle	Handle to object.
 	 * @param event		Event that is being waited for.
-	 * @param sync		Internal data pointer to be passed to
+	 * @param wait		Internal data pointer to be passed to
 	 *			object_wait_signal() or object_wait_notifier().
 	 * @return		Status code describing result of the operation. */
-	status_t (*wait)(struct object_handle *handle, int event, void *sync);
+	status_t (*wait)(struct object_handle *handle, int event, void *wait);
 
 	/** Stop waiting for an object.
 	 * @param handle	Handle to object.
 	 * @param event		Event that is being waited for.
-	 * @param sync		Internal data pointer. */
-	void (*unwait)(struct object_handle *handle, int event, void *sync);
+	 * @param wait		Internal data pointer. */
+	void (*unwait)(struct object_handle *handle, int event, void *wait);
 
 	/** Check if an object can be memory-mapped.
 	 * @note		If this function is implemented, the get_page
@@ -100,6 +85,10 @@ typedef struct object_type {
 		phys_ptr_t phys);
 } object_type_t;
 
+/** Properties of an object type. */
+#define OBJECT_TRANSFERRABLE	(1<<0)	/**< Objects can be inherited or transferred over IPC. */
+#define OBJECT_SECURABLE	(1<<1)	/**< Objects are secured through an ACL. */
+
 /** Structure defining a kernel object.
  * @note		This structure is intended to be embedded inside
  *			another structure for the object. */
@@ -111,14 +100,15 @@ typedef struct object {
 typedef struct object_handle {
 	object_t *object;		/**< Object that the handle refers to. */
 	void *data;			/**< Per-handle data pointer. */
-	object_rights_t rights;		/**< Rights for the handle. */
+	object_rights_t rights;		/**< Access rights for the handle. */
 	refcount_t count;		/**< References to the handle. */
 } object_handle_t;
 
 /** Table that maps IDs to handles (handle_t -> object_handle_t). */
 typedef struct handle_table {
 	rwlock_t lock;			/**< Lock to protect table. */
-	avl_tree_t tree;		/**< Tree of ID to handle structure mappings. */
+	object_handle_t **handles;	/**< Array of allocated handles. */
+	uint32_t *flags;		/**< Array of entry flags. */
 	unsigned long *bitmap;		/**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
 
@@ -127,7 +117,14 @@ extern void object_destroy(object_t *object);
 extern object_rights_t object_rights(object_t *object, struct process *process);
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
-extern void object_wait_signal(void *sync);
+extern void object_wait_signal(void *wait, unsigned long data);
+
+extern object_handle_t *object_handle_create(object_t *object, void *data,
+	object_rights_t rights);
+extern status_t object_handle_open(object_t *object, void *data, object_rights_t rights,
+	object_handle_t **handlep);
+extern void object_handle_retain(object_handle_t *handle);
+extern void object_handle_release(object_handle_t *handle);
 
 /** Check if a handle has a set of rights.
  * @param handle	Handle to check.
@@ -137,22 +134,14 @@ static inline bool object_handle_rights(object_handle_t *handle, object_rights_t
 	return ((handle->rights & rights) == rights);
 }
 
-extern status_t object_handle_create(object_t *object, void *data, object_rights_t rights,
-	struct process *process, int flags, object_handle_t **handlep, handle_t *idp,
-	handle_t *uidp);
-extern status_t object_handle_open(object_t *object, void *data, object_rights_t rights,
-	struct process *process, int flags, object_handle_t **handlep, handle_t *idp,
-	handle_t *uidp);
-extern void object_handle_retain(object_handle_t *handle);
-extern void object_handle_release(object_handle_t *handle);
-extern status_t object_handle_attach(object_handle_t *handle, struct process *process,
-	int flags, handle_t *idp, handle_t *uidp);
-extern status_t object_handle_detach(struct process *process, handle_t id);
 extern status_t object_handle_lookup(handle_t id, int type, object_rights_t rights,
 	object_handle_t **handlep);
+extern status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
+	handle_t *uidp);
+extern status_t object_handle_detach(handle_t id);
 
-extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
-	handle_table_t **tablep);
+extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2],
+	int count, handle_table_t **tablep);
 extern handle_table_t *handle_table_clone(handle_table_t *src);
 extern void handle_table_destroy(handle_table_t *table);
 

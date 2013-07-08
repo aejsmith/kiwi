@@ -157,9 +157,9 @@ static void process_object_close(object_handle_t *handle) {
 /** Signal that a process is being waited for.
  * @param handle	Handle to process.
  * @param event		Event to wait for.
- * @param sync		Internal data pointer.
+ * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t process_object_wait(object_handle_t *handle, int event, void *sync) {
+static status_t process_object_wait(object_handle_t *handle, int event, void *wait) {
 	process_t *process = (process_t *)handle->object;
 
 	switch(event) {
@@ -167,9 +167,9 @@ static status_t process_object_wait(object_handle_t *handle, int event, void *sy
 		mutex_lock(&process->lock);
 
 		if(process->state == PROCESS_DEAD) {
-			object_wait_signal(sync);
+			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&process->death_notifier, object_wait_notifier, sync);
+			notifier_register(&process->death_notifier, object_wait_notifier, wait);
 		}
 
 		mutex_unlock(&process->lock);
@@ -182,13 +182,13 @@ static status_t process_object_wait(object_handle_t *handle, int event, void *sy
 /** Stop waiting for a process.
  * @param handle	Handle to process.
  * @param event		Event to wait for.
- * @param sync		Internal data pointer. */
-static void process_object_unwait(object_handle_t *handle, int event, void *sync) {
+ * @param wait		Internal wait data pointer. */
+static void process_object_unwait(object_handle_t *handle, int event, void *wait) {
 	process_t *process = (process_t *)handle->object;
 
 	switch(event) {
 	case PROCESS_EVENT_DEATH:
-		notifier_unregister(&process->death_notifier, object_wait_notifier, sync);
+		notifier_unregister(&process->death_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
@@ -196,6 +196,7 @@ static void process_object_unwait(object_handle_t *handle, int event, void *sync
 /** Process object type operations. */
 static object_type_t process_object_type = {
 	.id = OBJECT_TYPE_PROCESS,
+	.flags = OBJECT_TRANSFERRABLE,
 	.close = process_object_close,
 	.wait = process_object_wait,
 	.unwait = process_object_unwait,
@@ -239,6 +240,7 @@ static status_t process_alloc(const char *name, int flags, int priority,
 	handle_t *uhandlep)
 {
 	process_t *process;
+	object_handle_t *handle;
 	status_t ret;
 
 	assert(name);
@@ -303,14 +305,18 @@ static status_t process_alloc(const char *name, int flags, int priority,
 
 	/* Create a handle to the process if required. */
 	if(uhandlep) {
-		assert(parent);
-		ret = object_handle_create(&process->obj, NULL, 0, parent,
-			0, NULL, handlep, uhandlep);
+		// FIXME: just remove parent arg?
+		assert(parent == curr_proc);
+
+		handle = object_handle_create(&process->obj, NULL, 0);
+		ret = object_handle_attach(handle, handlep, uhandlep);
 		if(ret != STATUS_SUCCESS) {
 			process->aspace = NULL;
-			process_release(process);
+			object_handle_release(handle);
 			return ret;
 		}
+
+		object_handle_release(handle);
 	}
 
 	dprintf("process: created process %" PRId32 "(%s) (proc: %p)\n",
@@ -888,7 +894,7 @@ status_t kern_process_create(const char *path, const char *const args[],
 fail:
 	if(process) {
 		if(handlep) {
-			object_handle_detach(NULL, handle);
+			object_handle_detach(handle);
 		} else {
 			process_destroy(process);
 		}
@@ -1070,7 +1076,7 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, handle_t 
 fail:
 	if(process) {
 		if(handlep) {
-			object_handle_detach(NULL, handle);
+			object_handle_detach(handle);
 		} else {
 			process_destroy(process);
 		}
@@ -1088,6 +1094,7 @@ fail:
  * @return		Status code describing result of the operation. */
 status_t kern_process_open(process_id_t id, handle_t *handlep) {
 	process_t *process;
+	object_handle_t *handle;
 	status_t ret;
 
 	if(!handlep)
@@ -1107,10 +1114,9 @@ status_t kern_process_open(process_id_t id, handle_t *handlep) {
 	refcount_inc(&process->count);
 	rwlock_unlock(&process_tree_lock);
 
-	ret = object_handle_open(&process->obj, NULL, 0, NULL, 0, NULL, NULL, handlep);
-	if(ret != STATUS_SUCCESS)
-		process_release(process);
-
+	handle = object_handle_create(&process->obj, NULL, 0);
+	ret = object_handle_attach(handle, NULL, handlep);
+	object_handle_release(handle);
 	return ret;
 }
 

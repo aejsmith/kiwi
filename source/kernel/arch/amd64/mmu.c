@@ -34,6 +34,7 @@
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
+#include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/phys.h>
 #include <mm/vm.h>

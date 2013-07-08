@@ -148,17 +148,17 @@ static void thread_object_close(object_handle_t *handle) {
 /** Signal that a thread is being waited for.
  * @param handle	Handle to thread.
  * @param event		Event to wait for.
- * @param sync		Internal data pointer.
+ * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t thread_object_wait(object_handle_t *handle, int event, void *sync) {
+static status_t thread_object_wait(object_handle_t *handle, int event, void *wait) {
 	thread_t *thread = (thread_t *)handle->object;
 
 	switch(event) {
 	case THREAD_EVENT_DEATH:
 		if(thread->state == THREAD_DEAD) {
-			object_wait_signal(sync);
+			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&thread->death_notifier, object_wait_notifier, sync);
+			notifier_register(&thread->death_notifier, object_wait_notifier, wait);
 		}
 
 		return STATUS_SUCCESS;
@@ -170,13 +170,13 @@ static status_t thread_object_wait(object_handle_t *handle, int event, void *syn
 /** Stop waiting for a thread.
  * @param handle	Handle to thread.
  * @param event		Event to wait for.
- * @param sync		Internal data pointer. */
-static void thread_object_unwait(object_handle_t *handle, int event, void *sync) {
+ * @param wait		Internal wait data pointer. */
+static void thread_object_unwait(object_handle_t *handle, int event, void *wait) {
 	thread_t *thread = (thread_t *)handle->object;
 
 	switch(event) {
 	case THREAD_EVENT_DEATH:
-		notifier_unregister(&thread->death_notifier, object_wait_notifier, sync);
+		notifier_unregister(&thread->death_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
@@ -184,6 +184,7 @@ static void thread_object_unwait(object_handle_t *handle, int event, void *sync)
 /** Thread object type. */
 static object_type_t thread_object_type = {
 	.id = OBJECT_TYPE_THREAD,
+	.flags = OBJECT_TRANSFERRABLE,
 	.close = thread_object_close,
 	.wait = thread_object_wait,
 	.unwait = thread_object_unwait,
@@ -502,8 +503,8 @@ void thread_enable_preempt(void) {
  *
  * @param lock		Lock protecting the list on which the thread is waiting,
  *			if any. Must be locked with IRQ state saved. Will be
- *			unlocked after the thread has been locked, and will not
- *			be held when the function returns. Can be NULL.
+ *			unlocked after the thread has gone to sleep, and will
+ *			not be held when the function returns. Can be NULL.
  * @param timeout	Timeout in nanoseconds. If SLEEP_ABSOLUTE is specified,
  *			will always be taken to be a system time at which the
  *			sleep will time out. Otherwise, taken as the number of
@@ -950,6 +951,7 @@ status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
 {
 	thread_uspace_args_t *args;
 	thread_t *thread = NULL;
+	object_handle_t *khandle;
 	handle_t handle = -1;
 	status_t ret;
 	char *kname;
@@ -980,8 +982,9 @@ status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
 	/* Create a handle to the thread if necessary. */
 	if(handlep) {
 		refcount_inc(&thread->count);
-		ret = object_handle_create(&thread->obj, NULL, 0, NULL, 0, NULL,
-			&handle, handlep);
+		khandle = object_handle_create(&thread->obj, NULL, 0);
+		ret = object_handle_attach(khandle, &handle, handlep);
+		object_handle_release(khandle);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
 	}
@@ -1012,7 +1015,7 @@ status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
 	return ret;
 fail:
 	if(handle >= 0)
-		object_handle_detach(NULL, handle);
+		object_handle_detach(handle);
 
 	if(thread)
 		thread_release(thread);
@@ -1028,6 +1031,7 @@ fail:
  * @return		Status code describing result of the operation. */
 status_t kern_thread_open(thread_id_t id, handle_t *handlep) {
 	thread_t *thread;
+	object_handle_t *handle;
 	status_t ret;
 
 	if(!handlep)
@@ -1038,10 +1042,9 @@ status_t kern_thread_open(thread_id_t id, handle_t *handlep) {
 		return STATUS_NOT_FOUND;
 
 	/* Reference added by thread_lookup() is taken over by this handle. */
-	ret = object_handle_open(&thread->obj, NULL, 0, NULL, 0, NULL, NULL, handlep);
-	if(ret != STATUS_SUCCESS)
-		thread_release(thread);
-
+	handle = object_handle_create(&thread->obj, NULL, 0);
+	ret = object_handle_attach(handle, NULL, handlep);
+	object_handle_release(handle);
 	return ret;
 }
 

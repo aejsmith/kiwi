@@ -238,9 +238,9 @@ static void port_object_close(object_handle_t *handle) {
 /** Signal that a port event is being waited for.
  * @param handle	Handle to port.
  * @param event		Event being waited for.
- * @param sync		Internal data pointer.
+ * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t port_object_wait(object_handle_t *handle, int event, void *sync) {
+static status_t port_object_wait(object_handle_t *handle, int event, void *wait) {
 	ipc_port_t *port = (ipc_port_t *)handle->object;
 	status_t ret = STATUS_SUCCESS;
 
@@ -253,9 +253,9 @@ static status_t port_object_wait(object_handle_t *handle, int event, void *sync)
 		}
 
 		if(semaphore_count(&port->conn_sem)) {
-			object_wait_signal(sync);
+			object_wait_signal(wait);
 		} else {
-			notifier_register(&port->conn_notifier, object_wait_notifier, sync);
+			notifier_register(&port->conn_notifier, object_wait_notifier, wait);
 		}
 		break;
 	default:
@@ -270,13 +270,13 @@ static status_t port_object_wait(object_handle_t *handle, int event, void *sync)
 /** Stop waiting for a port event.
  * @param handle	Handle to port.
  * @param event		Event being waited for.
- * @param sync		Internal data pointer. */
-static void port_object_unwait(object_handle_t *handle, int event, void *sync) {
+ * @param wait		Internal wait data pointer. */
+static void port_object_unwait(object_handle_t *handle, int event, void *wait) {
 	ipc_port_t *port = (ipc_port_t *)handle->object;
 
 	switch(event) {
 	case PORT_EVENT_CONNECTION:
-		notifier_unregister(&port->conn_notifier, object_wait_notifier, sync);
+		notifier_unregister(&port->conn_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
@@ -284,6 +284,7 @@ static void port_object_unwait(object_handle_t *handle, int event, void *sync) {
 /** IPC port object type. */
 static object_type_t port_object_type = {
 	.id = OBJECT_TYPE_PORT,
+	.flags = OBJECT_TRANSFERRABLE | OBJECT_SECURABLE,
 	.close = port_object_close,
 	.wait = port_object_wait,
 	.unwait = port_object_unwait,
@@ -359,9 +360,9 @@ static void connection_object_close(object_handle_t *handle) {
 /** Signal that a connection event is being waited for.
  * @param handle	Handle to connection.
  * @param event		Event being waited for.
- * @param sync		Internal data pointer.
+ * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t connection_object_wait(object_handle_t *handle, int event, void *sync) {
+static status_t connection_object_wait(object_handle_t *handle, int event, void *wait) {
 	ipc_connection_t *conn = (ipc_connection_t *)handle->object;
 	ipc_endpoint_t *endpoint = handle->data;
 	status_t ret = STATUS_SUCCESS;
@@ -371,16 +372,16 @@ static status_t connection_object_wait(object_handle_t *handle, int event, void 
 	switch(event) {
 	case CONNECTION_EVENT_HANGUP:
 		if(!endpoint->remote) {
-			object_wait_signal(sync);
+			object_wait_signal(wait);
 		} else {
-			notifier_register(&endpoint->hangup_notifier, object_wait_notifier, sync);
+			notifier_register(&endpoint->hangup_notifier, object_wait_notifier, wait);
 		}
 		break;
 	case CONNECTION_EVENT_MESSAGE:
 		if(semaphore_count(&endpoint->data_sem)) {
-			object_wait_signal(sync);
+			object_wait_signal(wait);
 		} else {
-			notifier_register(&endpoint->msg_notifier, object_wait_notifier, sync);
+			notifier_register(&endpoint->msg_notifier, object_wait_notifier, wait);
 		}
 		break;
 
@@ -396,16 +397,16 @@ static status_t connection_object_wait(object_handle_t *handle, int event, void 
 /** Stop waiting for a connection event.
  * @param handle	Handle to connection.
  * @param event		Event being waited for.
- * @param sync		Internal data pointer. */
-static void connection_object_unwait(object_handle_t *handle, int event, void *sync) {
+ * @param wait		Internal wait data pointer. */
+static void connection_object_unwait(object_handle_t *handle, int event, void *wait) {
 	ipc_endpoint_t *endpoint = handle->data;
 
 	switch(event) {
 	case CONNECTION_EVENT_HANGUP:
-		notifier_unregister(&endpoint->hangup_notifier, object_wait_notifier, sync);
+		notifier_unregister(&endpoint->hangup_notifier, object_wait_notifier, wait);
 		break;
 	case CONNECTION_EVENT_MESSAGE:
-		notifier_unregister(&endpoint->msg_notifier, object_wait_notifier, sync);
+		notifier_unregister(&endpoint->msg_notifier, object_wait_notifier, wait);
 		break;
 	}
 }

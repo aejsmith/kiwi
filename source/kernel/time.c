@@ -469,18 +469,18 @@ static void timer_object_close(object_handle_t *handle) {
 /** Signal that a timer is being waited for.
  * @param handle	Handle to timer.
  * @param event		Event to wait for.
- * @param sync		Internal data pointer.
+ * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t timer_object_wait(object_handle_t *handle, int event, void *sync) {
+static status_t timer_object_wait(object_handle_t *handle, int event, void *wait) {
 	user_timer_t *timer = (user_timer_t *)handle->object;
 
 	switch(event) {
 	case TIMER_EVENT:
 		if(timer->fired) {
 			timer->fired = false;
-			object_wait_signal(sync);
+			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&timer->notifier, object_wait_notifier, sync);
+			notifier_register(&timer->notifier, object_wait_notifier, wait);
 		}
 
 		return STATUS_SUCCESS;
@@ -492,13 +492,13 @@ static status_t timer_object_wait(object_handle_t *handle, int event, void *sync
 /** Stop waiting for a timer.
  * @param handle	Handle to timer.
  * @param event		Event to wait for.
- * @param sync		Internal data pointer. */
-static void timer_object_unwait(object_handle_t *handle, int event, void *sync) {
+ * @param wait		Internal wait data pointer. */
+static void timer_object_unwait(object_handle_t *handle, int event, void *wait) {
 	user_timer_t *timer = (user_timer_t *)handle->object;
 
 	switch(event) {
 	case TIMER_EVENT:
-		notifier_unregister(&timer->notifier, object_wait_notifier, sync);
+		notifier_unregister(&timer->notifier, object_wait_notifier, wait);
 		break;
 	}
 }
@@ -506,6 +506,7 @@ static void timer_object_unwait(object_handle_t *handle, int event, void *sync) 
 /** Timer object type. */
 static object_type_t timer_object_type = {
 	.id = OBJECT_TYPE_TIMER,
+	.flags = OBJECT_TRANSFERRABLE,
 	.close = timer_object_close,
 	.wait = timer_object_wait,
 	.unwait = timer_object_unwait,
@@ -534,6 +535,7 @@ static bool user_timer_func(void *_timer) {
  * @return		Status code describing result of the operation. */
 status_t kern_timer_create(unsigned flags, handle_t *handlep) {
 	user_timer_t *timer;
+	object_handle_t *handle;
 	status_t ret;
 
 	if(!handlep)
@@ -547,13 +549,9 @@ status_t kern_timer_create(unsigned flags, handle_t *handlep) {
 	timer->fired = false;
 	timer->thread = curr_thread;
 
-	ret = object_handle_create(&timer->obj, NULL, 0, NULL, 0, NULL, NULL, handlep);
-	if(ret != STATUS_SUCCESS) {
-		object_destroy(&timer->obj);
-		kfree(timer);
-		return ret;
-	}
-
+	handle = object_handle_create(&timer->obj, NULL, 0);
+	ret = object_handle_attach(handle, NULL, handlep);
+	object_handle_release(handle);
 	return STATUS_SUCCESS;
 }
 

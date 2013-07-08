@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,9 +52,8 @@ static inline char pipe_get(pipe_t *pipe) {
 	char ch;
 
 	ch = pipe->buf[pipe->start];
-	if(++pipe->start >= PIPE_SIZE) {
+	if(++pipe->start >= PIPE_SIZE)
 		pipe->start = 0;
-	}
 
 	semaphore_up(&pipe->space_sem, 1);
 	return ch;
@@ -65,9 +64,8 @@ static inline char pipe_get(pipe_t *pipe) {
  * @param ch		Character to write. */
 static inline void pipe_insert(pipe_t *pipe, char ch) {
 	pipe->buf[pipe->end] = ch;
-	if(++pipe->end >= PIPE_SIZE) {
+	if(++pipe->end >= PIPE_SIZE)
 		pipe->end = 0;
-	}
 
 	semaphore_up(&pipe->data_sem, 1);
 }
@@ -97,7 +95,7 @@ status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t 
 		/* Try to get all required data before reading. */
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
-			                         SLEEP_INTERRUPTIBLE);
+				SLEEP_INTERRUPTIBLE);
 			if(ret != STATUS_SUCCESS) {
 				semaphore_up(&pipe->data_sem, i);
 				i = 0;
@@ -106,18 +104,19 @@ status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t 
 		}
 
 		mutex_lock(&pipe->lock);
-		for(i = 0; i < count; i++) {
+
+		for(i = 0; i < count; i++)
 			buf[i] = pipe_get(pipe);
-		}
+
 		notifier_run(&pipe->space_notifier, NULL, false);
+
 		mutex_unlock(&pipe->lock);
 	} else if(count) {
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
-			                         SLEEP_INTERRUPTIBLE);
-			if(ret != STATUS_SUCCESS) {
+				SLEEP_INTERRUPTIBLE);
+			if(ret != STATUS_SUCCESS)
 				goto out;
-			}
 
 			mutex_lock(&pipe->lock);
 			buf[i] = pipe_get(pipe);
@@ -126,9 +125,9 @@ status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t 
 		}
 	}
 out:
-	if(bytesp) {
+	if(bytesp)
 		*bytesp = i;
-	}
+
 	return ret;
 }
 
@@ -157,7 +156,7 @@ status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, 
 		/* Try to get all required space before writing. */
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
-			                         SLEEP_INTERRUPTIBLE);
+				SLEEP_INTERRUPTIBLE);
 			if(ret != STATUS_SUCCESS) {
 				semaphore_up(&pipe->space_sem, i);
 				i = 0;
@@ -165,21 +164,22 @@ status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, 
 			}
 		}
 
+		mutex_lock(&pipe->lock);
+
+		for(i = 0; i < count; i++)
+			pipe_insert(pipe, buf[i]);
+
 		/* For atomic writes, we only run the data notifier after
 		 * writing everything, so we don't do too many calls. */
-		mutex_lock(&pipe->lock);
-		for(i = 0; i < count; i++) {
-			pipe_insert(pipe, buf[i]);
-		}
 		notifier_run(&pipe->data_notifier, NULL, false);
+
 		mutex_unlock(&pipe->lock);
 	} else if(count) {
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
-			                         SLEEP_INTERRUPTIBLE);
-			if(ret != STATUS_SUCCESS) {
+				SLEEP_INTERRUPTIBLE);
+			if(ret != STATUS_SUCCESS)
 				goto out;
-			}
 
 			mutex_lock(&pipe->lock);
 			pipe_insert(pipe, buf[i]);
@@ -188,9 +188,9 @@ status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, 
 		}
 	}
 out:
-	if(bytesp) {
+	if(bytesp)
 		*bytesp = i;
-	}
+
 	return ret;
 }
 
@@ -204,20 +204,20 @@ out:
  * @param pipe		Pipe to wait for.
  * @param write		Whether to wait to be writable (pipe is classed as
  *			writable when there is space in the buffer).
- * @param sync		Wait synchronisation pointer.
+ * @param wait		Internal wait data pointer.
  */
-void pipe_wait(pipe_t *pipe, bool write, void *sync) {
+void pipe_wait(pipe_t *pipe, bool write, void *wait) {
 	if(write) {
 		if(semaphore_count(&pipe->space_sem)) {
-			object_wait_signal(sync);
+			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&pipe->space_notifier, object_wait_notifier, sync);
+			notifier_register(&pipe->space_notifier, object_wait_notifier, wait);
 		}
 	} else {
 		if(semaphore_count(&pipe->data_sem)) {
-			object_wait_signal(sync);
+			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&pipe->data_notifier, object_wait_notifier, sync);
+			notifier_register(&pipe->data_notifier, object_wait_notifier, wait);
 		}
 	}
 }
@@ -225,9 +225,11 @@ void pipe_wait(pipe_t *pipe, bool write, void *sync) {
 /** Stop waiting for a pipe event.
  * @param pipe		Pipe to stop waiting for.
  * @param write		Whether waiting to be writable.
- * @param sync		Wait synchronisation pointer. */
-void pipe_unwait(pipe_t *pipe, bool write, void *sync) {
-	notifier_unregister((write) ? &pipe->space_notifier : &pipe->data_notifier, object_wait_notifier, sync);
+ * @param wait		Internal wait data pointer. */
+void pipe_unwait(pipe_t *pipe, bool write, void *wait) {
+	notifier_t *notifier = (write) ? &pipe->space_notifier
+		: &pipe->data_notifier;
+	notifier_unregister(notifier, object_wait_notifier, wait);
 }
 
 /** Create a new pipe.
@@ -258,6 +260,7 @@ void pipe_destroy(pipe_t *pipe) {
 /** Initialize the pipe slab cache. */
 static __init_text void pipe_cache_init(void) {
 	pipe_cache = slab_cache_create("pipe_cache", sizeof(pipe_t), 0, pipe_ctor,
-	                               NULL, NULL, 0, MM_BOOT);
+		NULL, NULL, 0, MM_BOOT);
 }
+
 INITCALL(pipe_cache_init);

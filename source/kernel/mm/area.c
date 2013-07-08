@@ -191,6 +191,7 @@ static void area_object_release_page(object_handle_t *handle, offset_t offset, p
 /** Memory area object type. */
 static object_type_t area_object_type = {
 	.id = OBJECT_TYPE_AREA,
+	.flags = OBJECT_TRANSFERRABLE | OBJECT_SECURABLE,
 	.close = area_object_close,
 	.mappable = area_object_mappable,
 	.get_page = area_object_get_page,

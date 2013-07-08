@@ -18,13 +18,6 @@ config SMP
 	depends on HAVE_SMP
 	def_bool y
 
-config HANDLE_MAX
-	int "Handle table size"
-	default 1024
-	help
-	  Maximimum number of open handles for a process. Increasing this will
-	  increase the amount of memory required for each process.
-
 config KLOG_SIZE
 	int "Kernel log buffer size"
 	default 16384

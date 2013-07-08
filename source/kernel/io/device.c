@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -128,6 +128,7 @@ static status_t device_object_get_page(object_handle_t *handle, offset_t offset,
 /** Device object type structure. */
 static object_type_t device_object_type = {
 	.id = OBJECT_TYPE_DEVICE,
+	.flags = OBJECT_TRANSFERRABLE | OBJECT_SECURABLE,
 	.close = device_object_close,
 	.wait = device_object_wait,
 	.unwait = device_object_unwait,
@@ -530,7 +531,7 @@ status_t device_get(device_t *device, object_rights_t rights, object_handle_t **
 		}
 	}
 
-	ret = object_handle_open(&device->obj, data, rights, NULL, 0, handlep, NULL, NULL);
+	ret = object_handle_open(&device->obj, data, rights, handlep);
 	if(ret != STATUS_SUCCESS) {
 		refcount_dec(&device->count);
 	}
@@ -568,7 +569,7 @@ status_t device_open(const char *path, object_rights_t rights, object_handle_t *
 		}
 	}
 
-	ret = object_handle_open(&device->obj, data, rights, NULL, 0, handlep, NULL, NULL);
+	ret = object_handle_open(&device->obj, data, rights, handlep);
 	if(ret != STATUS_SUCCESS) {
 		refcount_dec(&device->count);
 	}
@@ -821,6 +822,7 @@ __init_text void device_init(void) {
 	kdb_register_command("device", "Examine the device tree.", kdb_cmd_device);
 }
 
+#if 0
 /**
  * Open a handle to a device.
  *
@@ -1048,3 +1050,4 @@ out:
 	object_handle_release(khandle);
 	return ret;
 }
+#endif

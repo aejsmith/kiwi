@@ -961,7 +961,6 @@ fail:
 static status_t file_handle_create(fs_node_t *node, object_rights_t rights, int flags,
                                    object_handle_t **handlep) {
 	file_handle_t *data;
-	status_t ret;
 
 	/* Prevent opening for writing on a read-only filesystem. */
 	if(rights & FILE_RIGHT_WRITE && FS_NODE_IS_RDONLY(node)) {
@@ -977,13 +976,8 @@ static status_t file_handle_create(fs_node_t *node, object_rights_t rights, int 
 	fs_node_get(node);
 
 	/* Create the handle. */
-	ret = object_handle_create(&node->obj, data, rights, NULL, 0, handlep, NULL, NULL);
-	if(ret != STATUS_SUCCESS) {
-		fs_node_release(node);
-		kfree(data);
-	}
-
-	return ret;
+	*handlep = object_handle_create(&node->obj, data, rights);
+	return STATUS_SUCCESS;
 }
 
 /** Close a handle to a file.
@@ -993,6 +987,7 @@ static void file_object_close(object_handle_t *handle) {
 	kfree(handle->data);
 }
 
+#if 0
 /** Change file handle options.
  * @param handle	Handle to operate on.
  * @param action	Action to perform.
@@ -1015,6 +1010,7 @@ static status_t file_object_control(object_handle_t *handle, int action, int arg
 
 	return STATUS_SUCCESS;
 }
+#endif
 
 /** Check if a file can be memory-mapped.
  * @param handle	Handle to file.
@@ -1091,8 +1087,9 @@ static void file_object_release_page(object_handle_t *handle, offset_t offset, p
 /** File object operations. */
 static object_type_t file_object_type = {
 	.id = OBJECT_TYPE_FILE,
+	.flags = OBJECT_TRANSFERRABLE | OBJECT_SECURABLE,
 	.close = file_object_close,
-	.control = file_object_control,
+	//.control = file_object_control,
 	.mappable = file_object_mappable,
 	.get_page = file_object_get_page,
 	.release_page = file_object_release_page,
@@ -2503,7 +2500,7 @@ status_t kern_file_open(const char *path, object_rights_t rights, int flags, int
 		return ret;
 	}
 
-	ret = object_handle_attach(handle, NULL, 0, NULL, handlep);
+	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 	kfree(kpath);
 	return ret;
