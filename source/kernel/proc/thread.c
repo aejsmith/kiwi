@@ -449,7 +449,7 @@ void thread_preempt(void) {
 
 	spinlock_lock_noirq(&curr_thread->lock);
 	if(curr_thread->preempt_disabled > 0) {
-		curr_thread->missed_preempt = true;
+		curr_thread->flags |= THREAD_PREEMPTED;
 		spinlock_unlock_noirq(&curr_thread->lock);
 		local_irq_restore(state);
 	} else {
@@ -481,8 +481,8 @@ void thread_enable_preempt(void) {
 
 	if(--curr_thread->preempt_disabled == 0) {
 		/* If a preemption was missed then preempt immediately. */
-		if(curr_thread->missed_preempt) {
-			curr_thread->missed_preempt = false;
+		if(curr_thread->flags & THREAD_PREEMPTED) {
+			curr_thread->flags &= ~THREAD_PREEMPTED;
 			sched_reschedule(state);
 			return;
 		}
@@ -640,20 +640,21 @@ void thread_exit(void) {
 	fatal("Shouldn't get here");
 }
 
-/** Look up a running thread without taking the tree lock.
- * @note		Newly created and dead threads are ignored.
- * @note		This function should only be used within KDB. Use
+/**
+ * Look up a thread without taking the tree lock.
+ *
+ * Looks up a thread by its ID, without taking the tree lock. The returned
+ * thread will _not_ have an extra reference on it.
+ *
+ * @warning		This function should only be used within KDB. Use
  *			thread_lookup() outside of KDB.
+ *
  * @param id		ID of the thread to find.
- * @return		Pointer to thread found, or NULL if not found. */
+ *
+ * @return		Pointer to thread found, or NULL if not found.
+ */
 thread_t *thread_lookup_unsafe(thread_id_t id) {
-	thread_t *thread = avl_tree_lookup(&thread_tree, id, thread_t, tree_link);
-	if(thread) {
-		if(thread->state == THREAD_DEAD || thread->state == THREAD_CREATED)
-			return NULL;
-	}
-
-	return thread;
+	return avl_tree_lookup(&thread_tree, id, thread_t, tree_link);
 }
 
 /**
@@ -661,24 +662,34 @@ thread_t *thread_lookup_unsafe(thread_id_t id) {
  *
  * Looks up a running thread by its ID. Newly created and dead threads are
  * ignored. If the thread is found, it will be returned with a reference
- * added to it. Once it is no longer needed, thread_release() should be called
- * on it.
+ * added to it. Once it is no longer needed, release() should be called on it.
  *
  * @param id		ID of the thread to find.
  *
  * @return		Pointer to thread found, or NULL if not found.
  */
 thread_t *thread_lookup(thread_id_t id) {
-	thread_t *ret;
+	thread_t *thread;
 
 	rwlock_read_lock(&thread_tree_lock);
 
-	ret = thread_lookup_unsafe(id);
-	if(ret)
-		thread_retain(ret);
+	thread = thread_lookup_unsafe(id);
+	if(thread) {
+		/* Ignore newly created and dead threads. TODO: Perhaps we want
+		 * to allow dead threads to be looked up. Possible case:
+		 * process/thread list utility, we may want to be able to see
+		 * that there's a dead thread lying around that's being held
+		 * onto by some handles, and query information. Note that if
+		 * this is allowed, a change will be necessary to prevent a
+		 * race condition with thread_release(). */
+		if(thread->state == THREAD_DEAD || thread->state == THREAD_CREATED)
+			return NULL;
+
+		thread_retain(thread);
+	}
 
 	rwlock_unlock(&thread_tree_lock);
-	return ret;
+	return thread;
 }
 
 /**
@@ -745,7 +756,6 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->priority = THREAD_PRIORITY_NORMAL;
 	thread->wired = 0;
 	thread->preempt_disabled = 0;
-	thread->missed_preempt = false;
 	thread->max_prio = -1;
 	thread->curr_prio = -1;
 	thread->timeslice = 0;

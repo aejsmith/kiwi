@@ -83,7 +83,6 @@ typedef struct thread {
 	int priority;			/**< Priority of the thread. */
 	size_t wired;			/**< How many calls to thread_wire() have been made. */
 	size_t preempt_disabled;	/**< Whether preemption is disabled. */
-	bool missed_preempt;		/**< Whether preemption was missed due to being disabled. */
 
 	/** Scheduling information. */
 	list_t runq_link;		/**< Link to run queues. */
@@ -144,6 +143,7 @@ typedef struct thread {
 #define THREAD_INTERRUPTIBLE	(1<<0)	/**< Thread is in an interruptible sleep. */
 #define THREAD_INTERRUPTED	(1<<1)	/**< Thread has been interrupted. */
 #define THREAD_KILLED		(1<<2)	/**< Thread has been killed. */
+#define THREAD_PREEMPTED	(1<<3)	/**< Thread was preempted while preemption disabled. */
 #define THREAD_RWLOCK_WRITER	(1<<3)	/**< Thread is blocked on an rwlock for writing. */
 
 /** Sleeping behaviour flags. */
