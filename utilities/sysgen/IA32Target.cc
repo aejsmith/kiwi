@@ -29,6 +29,7 @@ using namespace std;
  * @param map		Map to add to. */
 void IA32Target::AddTypes(TypeMap &map) {
 	map["int"] = Type(1);
+	map["uint"] = Type(1);
 	map["char"] = Type(1);
 	map["bool"] = Type(1);
 	map["ptr_t"] = Type(1);

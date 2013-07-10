@@ -76,11 +76,11 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 	switch(header->typeflag) {
 	case REGTYPE:
 	case AREGTYPE:
-		ret = file_open(path, FILE_RIGHT_WRITE, 0, FILE_CREATE_ALWAYS, &handle);
+		ret = fs_open(path, FILE_RIGHT_WRITE, 0, FS_CREATE_ALWAYS, &handle);
 		if(ret != STATUS_SUCCESS)
 			goto out;
 
-		ret = file_write(handle, data, size, &bytes);
+		ret = file_write(handle, data, size, -1, &bytes);
 		if(ret != STATUS_SUCCESS) {
 			object_handle_release(handle);
 			goto out;
@@ -93,13 +93,13 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 		object_handle_release(handle);
 		break;
 	case DIRTYPE:
-		ret = dir_create(path);
+		ret = fs_create_dir(path);
 		if(ret != STATUS_SUCCESS)
 			goto out;
 
 		break;
 	case SYMTYPE:
-		ret = symlink_create(path, header->linkname);
+		ret = fs_create_symlink(path, header->linkname);
 		if(ret != STATUS_SUCCESS)
 			goto out;
 
@@ -134,7 +134,7 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 
 	while(true) {
 		/* Read in the next header. */
-		ret = file_pread(handle, header, sizeof(*header), offset, &bytes);
+		ret = file_read(handle, header, sizeof(*header), offset, &bytes);
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		} else if(bytes < 2) {
@@ -164,7 +164,7 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 				goto fail;
 			}
 
-			ret = file_pread(handle, data, size, offset + 512, &bytes);
+			ret = file_read(handle, data, size, offset + 512, &bytes);
 			if(ret != STATUS_SUCCESS) {
 				goto fail;
 			} else if(bytes != size) {

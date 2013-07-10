@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,26 +16,22 @@
 
 /**
  * @file
- * @brief		Semaphore functions.
+ * @brief		Pipe functions.
  */
 
-#ifndef __KERNEL_SEMAPHORE_H
-#define __KERNEL_SEMAPHORE_H
+#ifndef __KERNEL_PIPE_H
+#define __KERNEL_PIPE_H
 
-#include <kernel/object.h>
+#include <kernel/file.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern status_t kern_semaphore_create(const char *name, size_t count, handle_t *handlep);
-extern status_t kern_semaphore_open(semaphore_id_t id, handle_t *handlep);
-extern semaphore_id_t kern_semaphore_id(handle_t handle);
-extern status_t kern_semaphore_down(handle_t handle, nstime_t timeout);
-extern status_t kern_semaphore_up(handle_t handle, size_t count);
+extern status_t kern_pipe_create(handle_t handles[2]);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __KERNEL_SEMAPHORE_H */
+#endif /* __KERNEL_PIPE_H */

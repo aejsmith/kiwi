@@ -43,8 +43,7 @@ typedef uint32_t object_rights_t;
 
 /** Other integer types used throughout the kernel. */
 typedef int64_t nstime_t;		/**< Type used to store a time value in nanoseconds. */
-typedef uint64_t offset_t;		/**< Type used to store an offset into something. */
-typedef int64_t rel_offset_t;		/**< Type used to store a relative offset. */
+typedef int64_t offset_t;		/**< Type used to store an offset into an object. */
 
 /** Object identifier types. */
 typedef int32_t process_id_t;		/**< Type used to store a process ID. */

@@ -1167,7 +1167,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags,
 	}
 	if(handle) {
 		/* Check for overflow. */
-		if((offset + size) < offset)
+		if((offset_t)(offset + size) < offset)
 			return STATUS_INVALID_ARG;
 
 		/* Check if the object can be mapped in with the given flags. */

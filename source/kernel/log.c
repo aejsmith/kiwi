@@ -22,8 +22,6 @@
 #include <arch/page.h>
 #include <arch/cpu.h>
 
-#include <io/device.h>
-
 #include <lib/printf.h>
 
 #include <mm/phys.h>
@@ -185,6 +183,7 @@ static kdb_status_t kdb_cmd_log(int argc, char **argv, kdb_filter_t *filter) {
 	return KDB_SUCCESS;
 }
 
+#if 0
 /** Write to the kernel console device.
  * @param device	Device to write to.
  * @param data		Handle-specific data pointer.
@@ -218,6 +217,7 @@ static status_t kconsole_device_write(device_t *device, void *data, const void *
 static device_ops_t kconsole_device_ops = {
 	.write = kconsole_device_write,
 };
+#endif
 
 /** Initialize the kernel log. */
 __init_text void log_early_init(void) {
@@ -231,6 +231,7 @@ __init_text void log_early_init(void) {
 	kdb_register_command("log", "Display the kernel log buffer.", kdb_cmd_log);
 }
 
+#if 0
 /** Create the kernel log device. */
 static __init_text void log_init(void) {
 	kboot_tag_log_t *tag;
@@ -250,4 +251,4 @@ static __init_text void log_init(void) {
 }
 
 INITCALL(log_init);
-
+#endif

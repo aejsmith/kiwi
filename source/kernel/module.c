@@ -396,7 +396,7 @@ status_t kern_module_load(const char *path, char *depbuf) {
 		return ret;
 
 	/* Open a handle to the file. */
-	ret = file_open(kpath, FILE_RIGHT_READ, 0, 0, &handle);
+	ret = fs_open(kpath, FILE_RIGHT_READ, 0, 0, &handle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;

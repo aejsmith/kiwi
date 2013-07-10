@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2010 Alex Smith
+# Copyright (C) 2010-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,7 @@ type area_id_t int32_t;
 type mount_id_t uint16_t;
 type node_id_t uint64_t;
 type nstime_t int64_t;
-type offset_t uint64_t;
-type rel_offset_t int64_t;
+type offset_t int64_t;
 type object_rights_t uint32_t;
 type user_id_t int16_t;
 type group_id_t int16_t;
@@ -34,8 +33,10 @@ syscall kern_fatal(ptr_t);
 syscall kern_shutdown(int);
 syscall kern_system_time(ptr_t);
 syscall kern_unix_time(ptr_t);
+
 syscall kern_module_load(ptr_t, ptr_t);
 syscall kern_module_info(ptr_t, ptr_t);
+
 syscall kern_object_type(handle_t);
 syscall kern_object_wait(ptr_t, size_t, uint32_t, nstime_t);
 syscall kern_handle_flags(handle_t, ptr_t);
@@ -43,32 +44,39 @@ syscall kern_handle_set_flags(handle_t, uint32_t);
 syscall kern_handle_rights(handle_t, ptr_t);
 syscall kern_handle_duplicate(handle_t, handle_t, ptr_t);
 syscall kern_handle_close(handle_t);
-syscall kern_file_open(ptr_t, object_rights_t, int, int, ptr_t);
-syscall kern_file_read(handle_t, ptr_t, size_t, ptr_t);
-syscall kern_file_pread(handle_t, ptr_t, size_t, offset_t, ptr_t);
-syscall kern_file_write(handle_t, ptr_t, size_t, ptr_t);
-syscall kern_file_pwrite(handle_t, ptr_t, size_t, offset_t, ptr_t);
+
+syscall kern_file_read(handle_t, ptr_t, size_t, offset_t, ptr_t);
+syscall kern_file_write(handle_t, ptr_t, size_t, offset_t, ptr_t);
+syscall kern_file_read_vecs(handle_t, ptr_t, size_t, offset_t, ptr_t);
+syscall kern_file_write_vecs(handle_t, ptr_t, size_t, offset_t, ptr_t);
+syscall kern_file_read_dir(handle_t, ptr_t, size_t);
+syscall kern_file_rewind_dir(handle_t);
 syscall kern_file_resize(handle_t, offset_t);
-syscall kern_file_seek(handle_t, int, rel_offset_t, ptr_t);
+syscall kern_file_seek(handle_t, uint, offset_t, ptr_t);
 syscall kern_file_info(handle_t, ptr_t);
 syscall kern_file_sync(handle_t);
-syscall kern_dir_create(ptr_t);
-syscall kern_dir_read(handle_t, ptr_t, size_t);
-syscall kern_symlink_create(ptr_t, ptr_t);
-syscall kern_symlink_read(ptr_t, ptr_t, size_t);
-syscall kern_fs_mount(ptr_t, ptr_t, ptr_t, ptr_t);
-syscall kern_fs_mount_info(ptr_t, ptr_t);
+
+syscall kern_fs_open(ptr_t, object_rights_t, uint32_t, uint, ptr_t);
+syscall kern_fs_create_dir(ptr_t);
+syscall kern_fs_create_fifo(ptr_t);
+syscall kern_fs_create_symlink(ptr_t, ptr_t);
+syscall kern_fs_read_symlink(ptr_t, ptr_t, size_t);
+syscall kern_fs_mount(ptr_t, ptr_t, ptr_t, uint32_t, ptr_t);
+syscall kern_fs_mount_info(mount_id_t, ptr_t, ptr_t);
 syscall kern_fs_unmount(ptr_t);
-syscall kern_fs_getcwd(ptr_t, size_t);
-syscall kern_fs_setcwd(ptr_t);
-syscall kern_fs_setroot(ptr_t);
+syscall kern_fs_path(ptr_t, handle_t, ptr_t, size_t);
+syscall kern_fs_work_dir(ptr_t, size_t);
+syscall kern_fs_set_work_dir(ptr_t);
+syscall kern_fs_set_root_dir(ptr_t);
 syscall kern_fs_info(ptr_t, bool, ptr_t);
 syscall kern_fs_link(ptr_t, ptr_t);
 syscall kern_fs_unlink(ptr_t);
 syscall kern_fs_rename(ptr_t, ptr_t);
 syscall kern_fs_sync();
+
 syscall kern_vm_map(ptr_t, size_t, int, handle_t, offset_t, ptr_t);
 syscall kern_vm_unmap(ptr_t, size_t);
+
 syscall kern_process_create(ptr_t, ptr_t, ptr_t, int, ptr_t, int, ptr_t);
 syscall kern_process_replace(ptr_t, ptr_t, ptr_t, ptr_t, int);
 syscall kern_process_clone(ptr_t, ptr_t, ptr_t, ptr_t);
@@ -77,6 +85,7 @@ syscall kern_process_id(handle_t);
 syscall kern_process_control(handle_t, int, ptr_t, ptr_t);
 syscall kern_process_status(handle_t, ptr_t, ptr_t);
 syscall kern_process_exit(int);
+
 syscall kern_thread_create(ptr_t, ptr_t, size_t, ptr_t, ptr_t, ptr_t) wrapped;
 syscall kern_thread_open(thread_id_t, ptr_t);
 syscall kern_thread_id(handle_t);
@@ -84,6 +93,7 @@ syscall kern_thread_control(handle_t, int, ptr_t, ptr_t);
 syscall kern_thread_status(handle_t, ptr_t);
 syscall kern_thread_exit(int) wrapped;
 syscall kern_thread_sleep(nstime_t, ptr_t);
+
 #syscall kern_port_create(object_rights_t, ptr_t);
 #syscall kern_port_open(port_id_t, object_rights_t, ptr_t);
 #syscall kern_port_id(handle_t);
@@ -93,21 +103,26 @@ syscall kern_thread_sleep(nstime_t, ptr_t);
 #syscall kern_connection_send(handle_t, uint32_t, ptr_t, size_t);
 #syscall kern_connection_peek(handle_t, nstime_t, ptr_t, ptr_t);
 #syscall kern_connection_receive(handle_t, nstime_t, ptr_t, ptr_t, size_t);
+
 #syscall kern_semaphore_create(ptr_t, size_t, ptr_t);
 #syscall kern_semaphore_open(semaphore_id_t, ptr_t);
 #syscall kern_semaphore_id(handle_t);
 #syscall kern_semaphore_down(handle_t, nstime_t);
 #syscall kern_semaphore_up(handle_t, size_t);
+
 #syscall kern_area_create(size_t, handle_t, offset_t, object_rights_t, ptr_t);
 #syscall kern_area_open(area_id_t, object_rights_t, ptr_t);
 #syscall kern_area_id(handle_t);
 #syscall kern_area_size(handle_t);
 #syscall kern_area_resize(handle_t, size_t);
+
 #syscall kern_futex_wait(ptr_t, int32_t, nstime_t);
 #syscall kern_futex_wake(ptr_t, size_t, ptr_t);
+
 syscall kern_timer_create(int, ptr_t);
 syscall kern_timer_start(handle_t, nstime_t, int);
 syscall kern_timer_stop(handle_t, ptr_t);
+
 syscall kern_signal_send(handle_t, int);
 syscall kern_signal_action(int, ptr_t, ptr_t) wrapped;
 syscall kern_signal_mask(int, ptr_t, ptr_t);

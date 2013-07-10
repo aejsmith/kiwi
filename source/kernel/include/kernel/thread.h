@@ -22,6 +22,7 @@
 #ifndef __KERNEL_THREAD_H
 #define __KERNEL_THREAD_H
 
+#include <kernel/limits.h>
 #include <kernel/object.h>
 
 #ifdef __cplusplus
@@ -33,9 +34,6 @@ extern "C" {
 
 /** Actions for kern_thread_control(). */
 #define THREAD_SET_TLS_ADDR	1	/**< Set TLS base address (calling thread only). */
-
-/** Maximum length of a thread name. */
-#define THREAD_NAME_MAX		32
 
 /** Thread priority values. */
 #define THREAD_PRIORITY_LOW	0	/**< Low priority. */

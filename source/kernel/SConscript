@@ -27,11 +27,13 @@ sources = FeatureSources(config, [
     'device/irq.c',
 
     'io/context.c',
-    'io/device.c',
-    'io/entry_cache.c',
-    'io/file_map.c',
-    'io/fs.c',
-    'io/ramfs.c',
+    #'io/device.c',
+    #'io/entry_cache.c',
+    'io/file.c',
+    #'io/file_map.c',
+    #'io/fs.c',
+    #'io/ramfs.c',
+    'io/request.c',
 
     #'ipc/ipc.c',
     'ipc/pipe.c',

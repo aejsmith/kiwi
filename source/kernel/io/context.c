@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,7 +26,6 @@
 #include <assert.h>
 #include <status.h>
 
-extern void fs_node_get(fs_node_t *node);
 extern fs_mount_t *root_mount;
 
 /**
@@ -42,7 +41,7 @@ extern fs_mount_t *root_mount;
  */
 void io_context_init(io_context_t *context, io_context_t *parent) {
 	rwlock_init(&context->lock, "io_context_lock");
-	context->curr_dir = NULL;
+	context->work_dir = NULL;
 	context->root_dir = NULL;
 
 	/* Inherit parent's current/root directories if possible. */
@@ -50,19 +49,19 @@ void io_context_init(io_context_t *context, io_context_t *parent) {
 		rwlock_read_lock(&parent->lock);
 
 		assert(parent->root_dir);
-		assert(parent->curr_dir);
+		assert(parent->work_dir);
 
-		fs_node_get(parent->root_dir);
+		fs_node_retain(parent->root_dir);
 		context->root_dir = parent->root_dir;
-		fs_node_get(parent->curr_dir);
-		context->curr_dir = parent->curr_dir;
+		fs_node_retain(parent->work_dir);
+		context->work_dir = parent->work_dir;
 
 		rwlock_unlock(&parent->lock);
 	} else if(root_mount) {
-		fs_node_get(root_mount->root);
+		fs_node_retain(root_mount->root);
 		context->root_dir = root_mount->root;
-		fs_node_get(root_mount->root);
-		context->curr_dir = root_mount->root;
+		fs_node_retain(root_mount->root);
+		context->work_dir = root_mount->root;
 	} else {
 		/* This should only be the case when the kernel process is
 		 * being created. */
@@ -73,14 +72,14 @@ void io_context_init(io_context_t *context, io_context_t *parent) {
 /** Destroy an I/O context.
  * @param context	Context to destroy. */
 void io_context_destroy(io_context_t *context) {
-	fs_node_release(context->curr_dir);
+	fs_node_release(context->work_dir);
 	fs_node_release(context->root_dir);
 }
 
 /**
- * Set the current directory of an I/O context.
+ * Set the working directory of an I/O context.
  *
- * Sets the current directory of an I/O context to the specified filesystem
+ * Sets the working directory of an I/O context to the specified filesystem
  * node. The previous working directory node will be released, and the supplied
  * node will be referenced.
  *
@@ -89,18 +88,17 @@ void io_context_destroy(io_context_t *context) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t io_context_setcwd(io_context_t *context, fs_node_t *node) {
+status_t io_context_set_work_dir(io_context_t *context, fs_node_t *node) {
 	fs_node_t *old;
 
-	if(node->type != FILE_TYPE_DIR) {
+	if(node->file.type != FILE_TYPE_DIR)
 		return STATUS_NOT_DIR;
-	}
 
-	fs_node_get(node);
+	fs_node_retain(node);
 
 	rwlock_write_lock(&context->lock);
-	old = context->curr_dir;
-	context->curr_dir = node;
+	old = context->work_dir;
+	context->work_dir = node;
 	rwlock_unlock(&context->lock);
 
 	fs_node_release(old);
@@ -110,7 +108,7 @@ status_t io_context_setcwd(io_context_t *context, fs_node_t *node) {
 /**
  * Set the root directory of an I/O context.
  *
- * Sets both the root directory and current directory of an I/O context to
+ * Sets both the root directory and working directory of an I/O context to
  * the specified directory.
  *
  * @param context	Context to set in.
@@ -118,25 +116,24 @@ status_t io_context_setcwd(io_context_t *context, fs_node_t *node) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t io_context_setroot(io_context_t *context, fs_node_t *node) {
-	fs_node_t *oldr, *oldc;
+status_t io_context_set_root_dir(io_context_t *context, fs_node_t *node) {
+	fs_node_t *old_root, *old_work;
 
-	if(node->type != FILE_TYPE_DIR) {
+	if(node->file.type != FILE_TYPE_DIR)
 		return STATUS_NOT_DIR;
-	}
 
-	/* Get twice: one for root, one for current. */
-	fs_node_get(node);
-	fs_node_get(node);
+	/* Get twice: one for root, one for working. */
+	fs_node_retain(node);
+	fs_node_retain(node);
 
 	rwlock_write_lock(&context->lock);
-	oldc = context->curr_dir;
-	context->curr_dir = node;
-	oldr = context->root_dir;
+	old_work = context->work_dir;
+	context->work_dir = node;
+	old_root = context->root_dir;
 	context->root_dir = node;
 	rwlock_unlock(&context->lock);
 
-	fs_node_release(oldc);
-	fs_node_release(oldr);
+	fs_node_release(old_work);
+	fs_node_release(old_root);
 	return STATUS_SUCCESS;
 }

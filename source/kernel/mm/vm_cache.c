@@ -302,7 +302,7 @@ status_t vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offs
 	if(offset >= cache->size || count == 0) {
 		mutex_unlock(&cache->lock);
 		goto out;
-	} else if((offset + count) >= cache->size) {
+	} else if((offset_t)(offset + count) >= cache->size) {
 		count = (size_t)(cache->size - offset);
 	}
 
@@ -382,7 +382,7 @@ status_t vm_cache_write(vm_cache_t *cache, const void *buf, size_t count,
 	if(offset >= cache->size || count == 0) {
 		mutex_unlock(&cache->lock);
 		goto out;
-	} else if((offset + count) >= cache->size) {
+	} else if((offset_t)(offset + count) >= cache->size) {
 		count = (size_t)(cache->size - offset);
 	}
 

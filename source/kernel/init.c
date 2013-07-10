@@ -306,7 +306,7 @@ static void init_thread(void *arg1, void *arg2) {
 		cpu_dump(list_entry(iter, cpu_t, header));
 
 	/* Bring up the filesystem manager and device manager. */
-	device_init();
+	//device_init();
 	fs_init();
 
 	/* Call other initialization functions. */
@@ -324,7 +324,7 @@ static void init_thread(void *arg1, void *arg2) {
 			fatal("Could not find boot filesystem");
 
 		/* Mount a ramfs at the root to extract the images to. */
-		ret = fs_mount(NULL, "/", "ramfs", NULL);
+		ret = fs_mount(NULL, "/", "ramfs", 0, NULL);
 		if(ret != STATUS_SUCCESS)
 			fatal("Could not mount ramfs for root (%d)", ret);
 
