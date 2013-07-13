@@ -38,8 +38,9 @@ typedef struct mount_info {
 } mount_info_t;
 
 /** Values for the create option of kern_fs_open(). */
+#define FS_OPEN			0	/**< Open the file, do not create if non-existant. */
 #define FS_CREATE		1	/**< Create the file if it doesn't exist. */
-#define FS_CREATE_ALWAYS	2	/**< If the file already exists, fail, else create it. */
+#define FS_MUST_CREATE		2	/**< If the file already exists, fail, else create it. */
 
 /** Behaviour flags for kern_fs_mount(). */
 #define FS_MOUNT_READ_ONLY	(1<<0)	/**< Mount filesystem as read-only. */
@@ -55,12 +56,12 @@ extern status_t kern_fs_read_symlink(const char *path, char *buf, size_t size);
 
 extern status_t kern_fs_mount(const char *device, const char *path, const char *type,
 	uint32_t flags, const char *opts);
-extern status_t kern_fs_mount_info(mount_id_t id, mount_info_t *info, size_t *countp);
+extern status_t kern_fs_mount_info(mount_info_t *infos, size_t *countp);
 extern status_t kern_fs_unmount(const char *path);
 
 extern status_t kern_fs_path(const char *path, handle_t from, char *buf, size_t size);
-extern status_t kern_fs_work_dir(char *buf, size_t size);
-extern status_t kern_fs_set_work_dir(const char *path);
+extern status_t kern_fs_curr_dir(char *buf, size_t size);
+extern status_t kern_fs_set_curr_dir(const char *path);
 extern status_t kern_fs_set_root_dir(const char *path);
 extern status_t kern_fs_info(const char *path, bool follow, file_info_t *info);
 extern status_t kern_fs_link(const char *source, const char *dest);

@@ -26,11 +26,265 @@
 
 #include <mm/malloc.h>
 #include <mm/safe.h>
+#include <mm/vm.h>
 
 #include <assert.h>
 #include <kernel.h>
 #include <object.h>
 #include <status.h>
+
+/** Data used by a memory file. */
+typedef struct memory_file {
+	file_t file;			/**< File header. */
+	const void *data;		/**< File data. */
+	size_t size;			/**< Size of the data. */
+} memory_file_t;
+
+/** Close a handle to an file.
+ * @param handle	Handle to the object. */
+static void file_object_close(object_handle_t *handle) {
+	file_t *file = (file_t *)handle->object;
+	file_handle_t *data = (file_handle_t *)handle->data;
+
+	if(file->ops->close)
+		file->ops->close(file, data);
+
+	kfree(data);
+}
+
+/** Signal that an object event is being waited for.
+ * @param handle	Handle to object.
+ * @param event		Event that is being waited for.
+ * @param wait		Internal data pointer.
+ * @return		Status code describing result of the operation. */
+static status_t file_object_wait(object_handle_t *handle, unsigned event, void *wait) {
+	file_t *file = (file_t *)handle->object;
+	file_handle_t *data = (file_handle_t *)handle->data;
+
+	if(!file->ops->wait)
+		return STATUS_NOT_SUPPORTED;
+
+	return file->ops->wait(file, data, event, wait);
+}
+
+/** Stop waiting for an object.
+ * @param handle	Handle to object.
+ * @param event		Event that is being waited for.
+ * @param wait		Internal data pointer. */
+static void file_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
+	file_t *file = (file_t *)handle->object;
+	file_handle_t *data = (file_handle_t *)handle->data;
+
+	assert(file->ops->unwait);
+	return file->ops->unwait(file, data, event, wait);
+}
+
+/** Check if an object can be memory-mapped.
+ * @param handle	Handle to object.
+ * @param flags		Mapping flags (VM_MAP_*).
+ * @return		STATUS_SUCCESS if can be mapped, status code explaining
+ *			why if not. */
+static status_t file_object_mappable(object_handle_t *handle, int flags) {
+	file_t *file = (file_t *)handle->object;
+	file_handle_t *data = (file_handle_t *)handle->data;
+	object_rights_t rights = 0;
+	status_t ret;
+
+	/* Directories cannot be memory-mapped. */
+	if(file->type == FILE_TYPE_DIR)
+		return STATUS_NOT_SUPPORTED;
+
+	if(file->ops->mappable) {
+		assert(file->ops->get_page);
+		ret = file->ops->mappable(file, data, flags);
+		if(ret != STATUS_SUCCESS)
+			return ret;
+	} else {
+		if(!file->ops->get_page)
+			return STATUS_NOT_SUPPORTED;
+	}
+
+	/* Check for the necessary access rights. Don't need write permission
+	 * for private mappings, changes won't be written back to the file. */
+	if(flags & VM_MAP_READ) {
+		rights |= FILE_RIGHT_READ;
+	} else if((flags & (VM_MAP_WRITE | VM_MAP_PRIVATE)) == VM_MAP_WRITE) {
+		rights |= FILE_RIGHT_WRITE;
+	} else if(flags & VM_MAP_EXEC) {
+		rights |= FILE_RIGHT_EXECUTE;
+	}
+
+	return (object_handle_rights(handle, rights)) ? STATUS_SUCCESS
+		: STATUS_ACCESS_DENIED;
+}
+
+/** Get a page from the object.
+ * @param handle	Handle to object to get page from.
+ * @param offset	Offset into object to get page from.
+ * @param physp		Where to store physical address of page.
+ * @return		Status code describing result of the operation. */
+static status_t file_object_get_page(object_handle_t *handle, offset_t offset,
+	phys_ptr_t *physp)
+{
+	file_t *file = (file_t *)handle->object;
+	file_handle_t *data = (file_handle_t *)handle->data;
+
+	return file->ops->get_page(file, data, offset, physp);
+}
+
+/** Release a page from the object.
+ * @param handle	Handle to object to release page in.
+ * @param offset	Offset of page in object.
+ * @param phys		Physical address of page that was unmapped. */
+static void file_object_release_page(object_handle_t *handle, offset_t offset,
+	phys_ptr_t phys)
+{
+	file_t *file = (file_t *)handle->object;
+	file_handle_t *data = (file_handle_t *)handle->data;
+
+	if(file->ops->release_page)
+		file->ops->release_page(file, data, offset, phys);
+}
+
+/** File object type definition. */
+static object_type_t file_object_type = {
+	.id = OBJECT_TYPE_FILE,
+	.flags = OBJECT_TRANSFERRABLE | OBJECT_SECURABLE,
+	.close = file_object_close,
+	.wait = file_object_wait,
+	.unwait = file_object_unwait,
+	.mappable = file_object_mappable,
+	.get_page = file_object_get_page,
+	.release_page = file_object_release_page,
+};
+
+/** Initialize a file object.
+ * @param file		Object to initialize.
+ * @param ops		File operations structure.
+ * @param type		Type of the file. */
+void file_init(file_t *file, file_ops_t *ops, file_type_t type) {
+	object_init(&file->obj, &file_object_type);
+	file->ops = ops;
+	file->type = type;
+}
+
+/** Destroy a file object.
+ * @param file		Object to destroy. */
+void file_destroy(file_t *file) {
+	object_destroy(&file->obj);
+}
+
+/**
+ * Create a new file handle.
+ *
+ * Creates a new file handle. Does not perform rights checks on the file, this
+ * must be done manually before calling this function.
+ *
+ * @param file		File to create handle to.
+ * @param rights	Access rights for the handle.
+ * @param flags		Flags for the handle.
+ * @param data		Data pointer for the handle.
+ *
+ * @return		Pointer to the created handle.
+ */
+object_handle_t *file_handle_create(file_t *file, object_rights_t rights,
+	uint32_t flags, void *data)
+{
+	file_handle_t *handle;
+
+	handle = kmalloc(sizeof(*handle), MM_KERNEL);
+	mutex_init(&handle->lock, "file_handle_lock", 0);
+	handle->offset = 0;
+	handle->flags = flags;
+	handle->data = data;
+
+	return object_handle_create(&file->obj, handle, rights);
+}
+
+/** Close a FS handle.
+ * @param file		File being closed.
+ * @param handle	File handle structure. */
+static void memory_file_close(file_t *file, file_handle_t *handle) {
+	kfree(file);
+}
+
+/** Perform I/O on a file.
+ * @param file		File to perform I/O on.
+ * @param handle	File handle structure.
+ * @param request	I/O request.
+ * @return		Status code describing result of the operation. */
+static status_t memory_file_io(file_t *file, file_handle_t *handle, io_request_t *request) {
+	memory_file_t *data = (memory_file_t *)file;
+	size_t size;
+
+	assert(request->op == IO_OP_READ);
+	assert(request->count == 1);
+	assert(request->target == IO_TARGET_KERNEL);
+
+	if(request->offset >= (offset_t)data->size) {
+		request->total = 0;
+		return STATUS_SUCCESS;
+	}
+
+	size = ((request->offset + request->vecs[0].size) > data->size)
+		? data->size - request->offset
+		: request->vecs[0].size;
+
+	memcpy(request->vecs[0].buffer, data->data + request->offset, size);
+	request->total = size;
+	return STATUS_SUCCESS;
+}
+
+/** Get information about a file.
+ * @param file		File to get information on.
+ * @param handle	File handle structure.
+ * @param info		Information structure to fill in. */
+static void memory_file_info(file_t *file, file_handle_t *handle, file_info_t *info) {
+	memory_file_t *data = (memory_file_t *)file;
+
+	info->id = 0;
+	info->mount = 0;
+	info->type = file->type;
+	info->block_size = 1;
+	info->size = data->size;
+	info->links = 1;
+	info->created = info->accessed = info->modified = unix_time();
+}
+
+/** File operations for a memory-backed file. */
+static file_ops_t memory_file_ops = {
+	.close = memory_file_close,
+	.io = memory_file_io,
+	.info = memory_file_info,
+};
+
+/**
+ * Create a read-only file backed by a chunk of memory.
+ *
+ * Creates a special read-only file that is backed by the given chunk of memory.
+ * This is useful to pass data stored in memory to code that expects to be
+ * operating on files, such as the module loader. The given memory area will
+ * not be duplicated, and therefore it must remain in memory for the lifetime
+ * of the handle.
+ *
+ * @note		Files created with this function do not support being
+ *			memory-mapped.
+ *
+ * @param buf		Pointer to memory area to use.
+ * @param size		Size of memory area.
+ *
+ * @return		Pointer to handle to file (has FILE_RIGHT_READ right).
+ */
+object_handle_t *file_from_memory(const void *buf, size_t size) {
+	memory_file_t *file;
+
+	file = kmalloc(sizeof(*file), MM_BOOT);
+	file_init(&file->file, &memory_file_ops, FILE_TYPE_REGULAR);
+	file->data = buf;
+	file->size = size;
+
+	return file_handle_create(&file->file, FILE_RIGHT_READ, 0, NULL);
+}
 
 /** Determine whether a file is seekable.
  * @param file		File to check.
@@ -42,15 +296,13 @@ static inline bool is_seekable(file_t *file) {
 /** Perform an I/O request on a file.
  * @param handle	Handle to file to perform request on.
  * @param request	I/O request to perform.
- * @param bytesp	Where to store number of bytes transferred (optional).
  * @return		Status code describing result of the operation. */
-static status_t file_io(object_handle_t *handle, io_request_t *request, size_t *bytesp) {
+static status_t file_io(object_handle_t *handle, io_request_t *request) {
 	file_t *file;
 	file_handle_t *data;
 	object_rights_t right;
-	bool update_offset;
+	bool update_offset = false;
 	file_info_t info;
-	size_t total = 0;
 	status_t ret;
 
 	if(handle->object->type->id != OBJECT_TYPE_FILE) {
@@ -94,29 +346,22 @@ static status_t file_io(object_handle_t *handle, io_request_t *request, size_t *
 			}
 
 			update_offset = true;
-		} else {
-			update_offset = false;
 		}
 	} else {
 		if(request->offset >= 0) {
 			ret = STATUS_NOT_SUPPORTED;
 			goto out;
 		}
-
-		update_offset = false;
 	}
 
-	ret = file->ops->io(file, data, request, &total);
+	ret = file->ops->io(file, data, request);
 out:
 	/* Update the file handle offset. */
-	if(total && update_offset) {
+	if(request->total && update_offset) {
 		mutex_lock(&data->lock);
-		data->offset += total;
+		data->offset += request->total;
 		mutex_unlock(&data->lock);
 	}
-
-	if(bytesp)
-		*bytesp = total;
 
 	return ret;
 }
@@ -161,7 +406,10 @@ status_t file_read(object_handle_t *handle, void *buf, size_t size, offset_t off
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = file_io(handle, &request, bytesp);
+	ret = file_io(handle, &request);
+	if(bytesp)
+		*bytesp = request.total;
+
 	io_request_destroy(&request);
 	return ret;
 }
@@ -207,7 +455,10 @@ status_t file_write(object_handle_t *handle, const void *buf, size_t size,
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = file_io(handle, &request, bytesp);
+	ret = file_io(handle, &request);
+	if(bytesp)
+		*bytesp = request.total;
+
 	io_request_destroy(&request);
 	return ret;
 }
@@ -246,7 +497,10 @@ status_t file_read_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t co
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = file_io(handle, &request, bytesp);
+	ret = file_io(handle, &request);
+	if(bytesp)
+		*bytesp = request.total;
+
 	io_request_destroy(&request);
 	return ret;
 }
@@ -286,7 +540,10 @@ status_t file_write_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t c
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = file_io(handle, &request, bytesp);
+	ret = file_io(handle, &request);
+	if(bytesp)
+		*bytesp = request.total;
+
 	io_request_destroy(&request);
 	return ret;
 }
@@ -517,11 +774,11 @@ status_t file_sync(object_handle_t *handle) {
 	file = (file_t *)handle->object;
 	data = (file_handle_t *)handle->data;
 
-	return file->ops->sync(file, data);
-}
+	/* If it's not implemented, assume there is nothing to sync. */
+	if(!file->ops->sync)
+		return STATUS_SUCCESS;
 
-object_handle_t *file_from_memory(const void *buf, size_t size) {
-	fatal("meow");
+	return file->ops->sync(file, data);
 }
 
 status_t kern_file_read(handle_t handle, void *buf, size_t size, offset_t offset,

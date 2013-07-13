@@ -50,13 +50,13 @@ typedef struct object_type {
 	 * @param wait		Internal data pointer to be passed to
 	 *			object_wait_signal() or object_wait_notifier().
 	 * @return		Status code describing result of the operation. */
-	status_t (*wait)(struct object_handle *handle, int event, void *wait);
+	status_t (*wait)(struct object_handle *handle, unsigned event, void *wait);
 
 	/** Stop waiting for an object.
 	 * @param handle	Handle to object.
 	 * @param event		Event that is being waited for.
 	 * @param wait		Internal data pointer. */
-	void (*unwait)(struct object_handle *handle, int event, void *wait);
+	void (*unwait)(struct object_handle *handle, unsigned event, void *wait);
 
 	/** Check if an object can be memory-mapped.
 	 * @note		If this function is implemented, the get_page

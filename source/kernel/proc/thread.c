@@ -150,7 +150,7 @@ static void thread_object_close(object_handle_t *handle) {
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t thread_object_wait(object_handle_t *handle, int event, void *wait) {
+static status_t thread_object_wait(object_handle_t *handle, unsigned event, void *wait) {
 	thread_t *thread = (thread_t *)handle->object;
 
 	switch(event) {
@@ -171,7 +171,7 @@ static status_t thread_object_wait(object_handle_t *handle, int event, void *wai
  * @param handle	Handle to thread.
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer. */
-static void thread_object_unwait(object_handle_t *handle, int event, void *wait) {
+static void thread_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
 	thread_t *thread = (thread_t *)handle->object;
 
 	switch(event) {

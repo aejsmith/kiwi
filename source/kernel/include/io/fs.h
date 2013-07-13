@@ -173,9 +173,10 @@ typedef struct fs_node_ops {
 
 	/** Open a handle to the node.
 	 * @param node		Node being opened.
-	 * @param handle	File handle structure to fill in.
+	 * @param flags		Flags being opened with.
+	 * @param datap		Where to store handle data pointer.
 	 * @return		Status code describing result of the operation. */
-	status_t (*open)(struct fs_node *node, struct file_handle *handle);
+	status_t (*open)(struct fs_node *node, uint32_t flags, void **datap);
 
 	/** Close a handle to the node.
 	 * @param node		Node being closed.
@@ -185,11 +186,11 @@ typedef struct fs_node_ops {
 	/** Perform I/O on a file.
 	 * @param node		Node to perform I/O on.
 	 * @param handle	File handle structure.
-	 * @param request	I/O request.
-	 * @param bytesp	Where to store total number of bytes transferred.
+	 * @param request	I/O request. Should be updated with the total
+	 *			number of bytes transferred.
 	 * @return		Status code describing result of the operation. */
 	status_t (*io)(struct fs_node *node, struct file_handle *handle,
-		struct io_request *request, size_t *bytesp);
+		struct io_request *request);
 
 	/** Get the data cache for a file.
 	 * @param node		Node to get cache for.

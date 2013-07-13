@@ -106,7 +106,7 @@ void object_destroy(object_t *object) {
 
 /** Calculate the set of rights that a process has for an object.
  * @param object	Object to check.
- * @param process	Process to check for.
+ * @param process	Process to check for (if NULL, uses the current process).
  * @return		Set of rights that the process has for the object. */
 object_rights_t object_rights(object_t *object, struct process *process) {
 	// TODO

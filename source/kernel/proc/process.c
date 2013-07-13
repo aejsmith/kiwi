@@ -159,7 +159,7 @@ static void process_object_close(object_handle_t *handle) {
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t process_object_wait(object_handle_t *handle, int event, void *wait) {
+static status_t process_object_wait(object_handle_t *handle, unsigned event, void *wait) {
 	process_t *process = (process_t *)handle->object;
 
 	switch(event) {
@@ -183,7 +183,7 @@ static status_t process_object_wait(object_handle_t *handle, int event, void *wa
  * @param handle	Handle to process.
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer. */
-static void process_object_unwait(object_handle_t *handle, int event, void *wait) {
+static void process_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
 	process_t *process = (process_t *)handle->object;
 
 	switch(event) {

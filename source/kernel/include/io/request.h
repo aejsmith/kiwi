@@ -43,6 +43,7 @@ typedef struct io_request {
 	io_vec_t *vecs;			/**< I/O vectors. */
 	size_t count;			/**< Number of I/O vectors. */
 	offset_t offset;		/**< Offset in the object. */
+	size_t total;			/**< Total size transferred so far. */
 	io_op_t op;			/**< Operation to perform. */
 	io_target_t target;		/**< Target address space. */
 	thread_t *thread;		/**< Thread performing the request. */

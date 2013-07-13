@@ -105,12 +105,6 @@ config OBJECT_DEBUG
 	help
 	  Enable debug output from the object manager.
 
-config FS_DEBUG
-	bool "FS debug output"
-	default n
-	help
-	  Enable debug output from the filesystem layer.
-
 config CACHE_DEBUG
 	bool "Page cache debug output"
 	default n

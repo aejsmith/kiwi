@@ -41,7 +41,7 @@ extern fs_mount_t *root_mount;
  */
 void io_context_init(io_context_t *context, io_context_t *parent) {
 	rwlock_init(&context->lock, "io_context_lock");
-	context->work_dir = NULL;
+	context->curr_dir = NULL;
 	context->root_dir = NULL;
 
 	/* Inherit parent's current/root directories if possible. */
@@ -49,19 +49,19 @@ void io_context_init(io_context_t *context, io_context_t *parent) {
 		rwlock_read_lock(&parent->lock);
 
 		assert(parent->root_dir);
-		assert(parent->work_dir);
+		assert(parent->curr_dir);
 
 		fs_node_retain(parent->root_dir);
 		context->root_dir = parent->root_dir;
-		fs_node_retain(parent->work_dir);
-		context->work_dir = parent->work_dir;
+		fs_node_retain(parent->curr_dir);
+		context->curr_dir = parent->curr_dir;
 
 		rwlock_unlock(&parent->lock);
 	} else if(root_mount) {
 		fs_node_retain(root_mount->root);
 		context->root_dir = root_mount->root;
 		fs_node_retain(root_mount->root);
-		context->work_dir = root_mount->root;
+		context->curr_dir = root_mount->root;
 	} else {
 		/* This should only be the case when the kernel process is
 		 * being created. */
@@ -72,7 +72,7 @@ void io_context_init(io_context_t *context, io_context_t *parent) {
 /** Destroy an I/O context.
  * @param context	Context to destroy. */
 void io_context_destroy(io_context_t *context) {
-	fs_node_release(context->work_dir);
+	fs_node_release(context->curr_dir);
 	fs_node_release(context->root_dir);
 }
 
@@ -85,24 +85,20 @@ void io_context_destroy(io_context_t *context) {
  *
  * @param context	Context to set directory of.
  * @param node		Node to set to.
- *
- * @return		Status code describing result of the operation.
  */
-status_t io_context_set_work_dir(io_context_t *context, fs_node_t *node) {
+void io_context_set_curr_dir(io_context_t *context, fs_node_t *node) {
 	fs_node_t *old;
 
-	if(node->file.type != FILE_TYPE_DIR)
-		return STATUS_NOT_DIR;
+	assert(node->file.type == FILE_TYPE_DIR);
 
 	fs_node_retain(node);
 
 	rwlock_write_lock(&context->lock);
-	old = context->work_dir;
-	context->work_dir = node;
+	old = context->curr_dir;
+	context->curr_dir = node;
 	rwlock_unlock(&context->lock);
 
 	fs_node_release(old);
-	return STATUS_SUCCESS;
 }
 
 /**
@@ -113,27 +109,23 @@ status_t io_context_set_work_dir(io_context_t *context, fs_node_t *node) {
  *
  * @param context	Context to set in.
  * @param node		Node to set to.
- *
- * @return		Status code describing result of the operation.
  */
-status_t io_context_set_root_dir(io_context_t *context, fs_node_t *node) {
+void io_context_set_root_dir(io_context_t *context, fs_node_t *node) {
 	fs_node_t *old_root, *old_work;
 
-	if(node->file.type != FILE_TYPE_DIR)
-		return STATUS_NOT_DIR;
+	assert(node->file.type == FILE_TYPE_DIR);
 
 	/* Get twice: one for root, one for working. */
 	fs_node_retain(node);
 	fs_node_retain(node);
 
 	rwlock_write_lock(&context->lock);
-	old_work = context->work_dir;
-	context->work_dir = node;
+	old_work = context->curr_dir;
+	context->curr_dir = node;
 	old_root = context->root_dir;
 	context->root_dir = node;
 	rwlock_unlock(&context->lock);
 
 	fs_node_release(old_work);
 	fs_node_release(old_root);
-	return STATUS_SUCCESS;
 }

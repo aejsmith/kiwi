@@ -53,6 +53,7 @@ status_t io_request_init(io_request_t *request, const io_vec_t *vecs, size_t cou
 	size_t i;
 
 	request->offset = offset;
+	request->total = 0;
 	request->op = op;
 	request->target = target;
 	request->thread = curr_thread;

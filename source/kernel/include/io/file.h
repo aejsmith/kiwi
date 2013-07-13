@@ -40,14 +40,64 @@ typedef struct file_ops {
 	 *			the handle should be freed. */
 	void (*close)(struct file *file, struct file_handle *handle);
 
+	/** Signal that a file event is being waited for.
+	 * @note		If the event being waited for has occurred
+	 *			already, this function should call the callback
+	 *			function and return success.
+	 * @param file		File being waited on.
+	 * @param handle	File handle structure.
+	 * @param event		Event that is being waited for.
+	 * @param wait		Internal data pointer to be passed to
+	 *			object_wait_signal() or object_wait_notifier().
+	 * @return		Status code describing result of the operation. */
+	status_t (*wait)(struct file *file, struct file_handle *handle, unsigned event,
+		void *wait);
+
+	/** Stop waiting for a file.
+	 * @param file		File being waited on.
+	 * @param handle	File handle structure.
+	 * @param event		Event that is being waited for.
+	 * @param wait		Internal data pointer. */
+	void (*unwait)(struct file *file, struct file_handle *handle, unsigned event,
+		void *wait);
+
 	/** Perform I/O on a file.
 	 * @param file		File to perform I/O on.
 	 * @param handle	File handle structure.
-	 * @param request	I/O request.
-	 * @param bytesp	Where to store total number of bytes transferred.
+	 * @param request	I/O request. Should be updated with the total
+	 *			number of bytes transferred.
 	 * @return		Status code describing result of the operation. */
 	status_t (*io)(struct file *file, struct file_handle *handle,
-		struct io_request *request, size_t *bytesp);
+		struct io_request *request);
+
+	/** Check if a file can be memory-mapped.
+	 * @note		If this function is implemented, the get_page
+	 *			operation MUST be implemented. If it is not,
+	 *			then the file will be classed as mappable if
+	 *			get_page is implemented.
+	 * @param file		File being mapped.
+	 * @param handle	File handle structure.
+	 * @param flags		Mapping flags (VM_MAP_*).
+	 * @return		STATUS_SUCCESS if can be mapped, status code
+	 *			explaining why if not. */
+	status_t (*mappable)(struct file *file, struct file_handle *handle, int flags);
+
+	/** Get a page from the file.
+	 * @param file		File to get page from.
+	 * @param handle	File handle structure.
+	 * @param offset	Offset into file to get page from.
+	 * @param physp		Where to store physical address of page.
+	 * @return		Status code describing result of the operation. */
+	status_t (*get_page)(struct file *file, struct file_handle *handle,
+		offset_t offset, phys_ptr_t *physp);
+
+	/** Release a page from the object.
+	 * @param file		File to release page in.
+	 * @param handle	File handle structure.
+	 * @param offset	Offset of page in file.
+	 * @param phys		Physical address of page that was unmapped. */
+	void (*release_page)(struct file *file, struct file_handle *handle,
+		offset_t offset, phys_ptr_t phys);
 
 	/** Read the next directory entry.
 	 * @note		The implementation can make use of the offset
@@ -88,8 +138,8 @@ typedef struct file_ops {
 typedef struct file {
 	object_t obj;			/**< Kernel object header. */
 
-	file_type_t type;		/**< Type of the file. */
 	file_ops_t *ops;		/**< File operations structure. */
+	file_type_t type;		/**< Type of the file. */
 } file_t;
 
 /** File handle information. */
@@ -99,6 +149,21 @@ typedef struct file_handle {
 	mutex_t lock;			/**< Lock to protect offset. */
 	offset_t offset;		/**< Current file offset. */
 } file_handle_t;
+
+/**
+ * File object implementation functions.
+ */
+
+extern void file_init(file_t *file, file_ops_t *ops, file_type_t type);
+extern void file_destroy(file_t *file);
+
+extern object_handle_t *file_handle_create(file_t *file, object_rights_t rights,
+	uint32_t flags, void *data);
+extern object_handle_t *file_from_memory(const void *buf, size_t size);
+
+/**
+ * Public kernel interface.
+ */
 
 extern status_t file_read(object_handle_t *handle, void *buf, size_t size,
 	offset_t offset, size_t *bytesp);
@@ -118,7 +183,5 @@ extern status_t file_seek(object_handle_t *handle, unsigned action, offset_t off
 	offset_t *resultp);
 extern status_t file_info(object_handle_t *handle, file_info_t *info);
 extern status_t file_sync(object_handle_t *handle);
-
-extern object_handle_t *file_from_memory(const void *buf, size_t size);
 
 #endif /* __IO_FILE_H */
