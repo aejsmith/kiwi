@@ -143,8 +143,8 @@ typedef struct fs_node_ops {
 
 	/** Get information about a node.
 	 * @param node		Node to get information on.
-	 * @param infop		Information structure to fill in. */
-	void (*info)(struct fs_node *node, file_info_t *infop);
+	 * @param info		Information structure to fill in. */
+	void (*info)(struct fs_node *node, file_info_t *info);
 
 	/** Modify the size of a file.
 	 * @param node		Node being resized.

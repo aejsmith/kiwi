@@ -532,7 +532,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 		prev = node;
 
 		dprintf("fs: resolved '%s' in %" PRIu16 ":%" PRIu64 " to %" PRIu64
-			"\n", tok, node->id, mount->id, id);
+			"\n", tok, mount->id, node->id, id);
 
 		/* Check if the node is cached in the mount. */
 		node = avl_tree_lookup(&mount->nodes, id, fs_node_t, tree_link);
@@ -759,7 +759,7 @@ static status_t fs_node_create(const char *path, file_type_t type, const char *t
 		goto out;
 	}
 
-	dprintf("fs: create(%s): dirname = '%s', basename = '%s'\n", path, dir, name);
+	dprintf("fs: create '%s': dirname = '%s', basename = '%s'\n", path, dir, name);
 
 	/* Check for disallowed names. */
 	if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
@@ -775,7 +775,7 @@ static status_t fs_node_create(const char *path, file_type_t type, const char *t
 	mutex_lock(&parent->mount->lock);
 
 	/* Check if the name we're creating already exists. */
-	ret = node->ops->lookup(parent, name, &id);
+	ret = parent->ops->lookup(parent, name, &id);
 	if(ret != STATUS_NOT_FOUND) {
 		if(ret == STATUS_SUCCESS) {
 			ret = STATUS_ALREADY_EXISTS;
@@ -806,8 +806,9 @@ static status_t fs_node_create(const char *path, file_type_t type, const char *t
 	avl_tree_insert(&parent->mount->nodes, node->id, &node->tree_link);
 	list_append(&parent->mount->used_nodes, &node->mount_link);
 
-	dprintf("fs: created %s: node %" PRIu64 " (%p) in %" PRIu64 " (%p) on %"
-		PRIu16 " (%p)\n", path, node->id, parent->id, parent->mount->id);
+	dprintf("fs: created '%s': node %" PRIu64 " (%p) in %" PRIu64 " (%p) on %"
+		PRIu16 " (%p)\n", path, node->id, node, parent->id, parent,
+		parent->mount->id);
 
 	if(nodep) {
 		*nodep = node;
@@ -1762,7 +1763,7 @@ status_t fs_unlink(const char *path) {
 		goto out;
 	}
 
-	dprintf("fs: unlink(%s): dirname = '%s', basename = '%s'\n", path, dir, name);
+	dprintf("fs: unlink '%s': dirname = '%s', basename = '%s'\n", path, dir, name);
 
 	/* Look up the parent node and the node to unlink. */
 	ret = fs_node_lookup(dir, true, FILE_TYPE_DIR, &parent);
@@ -1819,7 +1820,7 @@ static kdb_status_t kdb_cmd_mount(int argc, char **argv, kdb_filter_t *filter) {
 	if(kdb_help(argc, argv)) {
 		kdb_printf("Usage: %s [<addr>]\n\n", argv[0]);
 
-		kdb_printf("Prints out a list of all mounted filesystems.");
+		kdb_printf("Prints out a list of all mounted filesystems.\n");
 		return KDB_SUCCESS;
 	} else if(argc != 1 && argc != 2) {
 		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
@@ -1868,7 +1869,7 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 
 	if(kdb_help(argc, argv)) {
 		kdb_printf("Usage: %s [--unused|--used] <mount ID>\n", argv[0]);
-		kdb_printf("       %s <mount ID> <node ID>\n\n", argv[0]);
+		kdb_printf("       %s <mount ID> <node ID>\n", argv[0]);
 		kdb_printf("       %s <addr>\n\n", argv[0]);
 
 		kdb_printf("Prints either a list of nodes on a mount, or details of a\n");
@@ -1894,6 +1895,9 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 		}
 
 		if(argc == 3 && argv[1][0] != '-') {
+			if(kdb_parse_expression(argv[2], &val, NULL) != KDB_SUCCESS)
+				return KDB_FAILURE;
+
 			node = avl_tree_lookup(&mount->nodes, val, fs_node_t, tree_link);
 			if(!node) {
 				kdb_printf("Unknown node ID %" PRIu64 ".\n", val);
@@ -1932,9 +1936,9 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 			}
 		}
 
-		kdb_printf("%-8s %-5s %-5s %-4s %-18s %-18s %p\n"
+		kdb_printf("%-8s %-5s %-5s %-4s %-18s %-18s %s\n",
 			"ID", "Count", "Flags", "Type", "Ops", "Data", "Mount");
-		kdb_printf("%-8s %-5s %-5s %-4s %-18s %-18s %p\n"
+		kdb_printf("%-8s %-5s %-5s %-4s %-18s %-18s %s\n",
 			"==", "=====", "=====", "====", "===", "====", "=====");
 
 		if(list) {
