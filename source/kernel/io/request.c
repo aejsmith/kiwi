@@ -44,7 +44,8 @@
 
 /** Initialize an I/O request.
  * @param request	Request to initialize.
- * @param vecs		I/O vectors.
+ * @param vecs		I/O vectors. Will be copied, original vectors can be
+ *			freed after this function returns.
  * @param count		Number of I/O vectors.
  * @param offset	Offset to perform I/O at.
  * @param op		I/O operation to perform.

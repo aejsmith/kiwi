@@ -96,6 +96,7 @@ static status_t file_object_mappable(object_handle_t *handle, int flags) {
 
 	if(file->ops->mappable) {
 		assert(file->ops->get_page);
+
 		ret = file->ops->mappable(file, data, flags);
 		if(ret != STATUS_SUCCESS)
 			return ret;
@@ -395,8 +396,7 @@ status_t file_read(object_handle_t *handle, void *buf, size_t size, offset_t off
 	vec.buffer = buf;
 	vec.size = size;
 
-	ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ,
-		IO_TARGET_KERNEL);
+	ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ, IO_TARGET_KERNEL);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -444,8 +444,7 @@ status_t file_write(object_handle_t *handle, const void *buf, size_t size,
 	vec.buffer = (void *)buf;
 	vec.size = size;
 
-	ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE,
-		IO_TARGET_KERNEL);
+	ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -775,52 +774,441 @@ status_t file_sync(object_handle_t *handle) {
 	return file->ops->sync(file, data);
 }
 
+/**
+ * Read from a file.
+ *
+ * Reads data from a file into a buffer. If the specified offset is greater
+ * than or equal to 0, then data will be read from exactly that offset in the
+ * file, and the handle's offset will not be modified. Otherwise, the read will
+ * occur from the file handle's current offset, and before returning the offset
+ * will be incremented by the number of bytes read.
+ *
+ * @param handle	Handle to file to read from. Must have the
+ *			FILE_RIGHT_READ access right.
+ * @param buf		Buffer to read data into.
+ * @param size		Number of bytes to read. The supplied buffer should be
+ *			at least this size.
+ * @param offset	Offset to read from. If negative, handle's offset will
+ *			be used.
+ * @param bytesp	Where to store number of bytes read (optional). This
+ *			is updated even upon failure, as it can fail when part
+ *			of the data has been read.
+ *
+ * @return		Status code describing result of the operation.
+ */
 status_t kern_file_read(handle_t handle, void *buf, size_t size, offset_t offset,
 	size_t *bytesp)
 {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	io_vec_t vec;
+	io_request_t request;
+	status_t ret, err;
+
+	request.transferred = 0;
+
+	if(!buf) {
+		ret = STATUS_INVALID_ARG;
+		goto out;
+	}
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		goto out;
+
+	vec.buffer = buf;
+	vec.size = size;
+
+	ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ, IO_TARGET_USER);
+	if(ret != STATUS_SUCCESS) {
+		object_handle_release(khandle);
+		goto out;
+	}
+
+	ret = file_io(khandle, &request);
+	io_request_destroy(&request);
+	object_handle_release(khandle);
+out:
+	if(bytesp) {
+		err = memcpy_to_user(bytesp, &request.transferred, sizeof(*bytesp));
+		if(err != STATUS_SUCCESS)
+			ret = err;
+	}
+
+	return ret;
 }
 
+/**
+ * Write to a file.
+ *
+ * Writes data from a buffer to a file. If the specified offset is greater than
+ * or equal to 0, then data will be written to exactly that offset in the file,
+ * and the handle's offset will not be modified. Otherwise, the write will
+ * occur at the file handle's current offset (which will be set to the end of
+ * the file if the handle has the FILE_APPEND flag set), and before returning
+ * the offset will be incremented by the number of bytes written.
+ *
+ * @param handle	Handle to file to write to. Must have the
+ *			FILE_RIGHT_WRITE access right.
+ * @param buf		Buffer containing data to write.
+ * @param size		Number of bytes to write. The supplied buffer should be
+ *			at least this size.
+ * @param offset	Offset to write to. If negative, handle's offset will
+ *			be used.
+ * @param bytesp	Where to store number of bytes written (optional). This
+ *			is updated even upon failure, as it can fail when part
+ *			of the data has been written.
+ *
+ * @return		Status code describing result of the operation.
+ */
 status_t kern_file_write(handle_t handle, const void *buf, size_t size,
 	offset_t offset, size_t *bytesp)
 {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	io_vec_t vec;
+	io_request_t request;
+	status_t ret, err;
+
+	request.transferred = 0;
+
+	if(!buf) {
+		ret = STATUS_INVALID_ARG;
+		goto out;
+	}
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		goto out;
+
+	vec.buffer = (void *)buf;
+	vec.size = size;
+
+	ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE, IO_TARGET_USER);
+	if(ret != STATUS_SUCCESS) {
+		object_handle_release(khandle);
+		goto out;
+	}
+
+	ret = file_io(khandle, &request);
+	io_request_destroy(&request);
+	object_handle_release(khandle);
+out:
+	if(bytesp) {
+		err = memcpy_to_user(bytesp, &request.transferred, sizeof(*bytesp));
+		if(err != STATUS_SUCCESS)
+			ret = err;
+	}
+
+	return ret;
 }
 
+/**
+ * Read from a file.
+ *
+ * Reads data from a file into multiple buffers. If the specified offset is
+ * greater than or equal to 0, then data will be read from exactly that offset
+ * in the file, and the handle's offset will not be modified. Otherwise, the
+ * read will occur from the file handle's current offset, and before returning
+ * the offset will be incremented by the number of bytes read.
+ *
+ * @param handle	Handle to file to read from. Must have the
+ *			FILE_RIGHT_READ access right.
+ * @param vecs		I/O vectors describing buffers to read into.
+ * @param count		Number of I/O vectors.
+ * @param offset	Offset to read from. If negative, handle's offset will
+ *			be used.
+ * @param bytesp	Where to store number of bytes read (optional). This
+ *			is updated even upon failure, as it can fail when part
+ *			of the data has been read.
+ *
+ * @return		Status code describing result of the operation.
+ */
 status_t kern_file_read_vecs(handle_t handle, const io_vec_t *vecs, size_t count,
 	offset_t offset, size_t *bytesp)
 {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	io_vec_t *kvecs;
+	io_request_t request;
+	status_t ret, err;
+
+	request.transferred = 0;
+
+	if(!vecs) {
+		ret = STATUS_INVALID_ARG;
+		goto out;
+	}
+
+	kvecs = kmalloc(sizeof(*kvecs) * count, MM_USER);
+	if(!kvecs) {
+		ret = STATUS_NO_MEMORY;
+		goto out;
+	}
+
+	ret = memcpy_from_user(kvecs, vecs, sizeof(*kvecs) * count);
+	if(ret != STATUS_SUCCESS) {
+		kfree(kvecs);
+		goto out;
+	}
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS) {
+		kfree(kvecs);
+		goto out;
+	}
+
+	ret = io_request_init(&request, kvecs, count, offset, IO_OP_READ, IO_TARGET_USER);
+	kfree(kvecs);
+	if(ret != STATUS_SUCCESS) {
+		object_handle_release(khandle);
+		goto out;
+	}
+
+	ret = file_io(khandle, &request);
+	io_request_destroy(&request);
+	object_handle_release(khandle);
+out:
+	if(bytesp) {
+		err = memcpy_to_user(bytesp, &request.transferred, sizeof(*bytesp));
+		if(err != STATUS_SUCCESS)
+			ret = err;
+	}
+
+	return ret;
 }
 
+/**
+ * Write to a file.
+ *
+ * Writes data from multiple buffers to a file. If the specified offset is
+ * greater than or equal to 0, then data will be written to exactly that offset
+ * in the file, and the handle's offset will not be modified. Otherwise, the
+ * write will occur at the file handle's current offset (which will be set to
+ * the end of the file if the handle has the FILE_APPEND flag set), and before
+ * returning the offset will be incremented by the number of bytes written.
+ *
+ * @param handle	Handle to file to write to. Must have the
+ *			FILE_RIGHT_WRITE access right.
+ * @param vecs		I/O vectors describing buffers containing data to write.
+ * @param count		Number of I/O vectors.
+ * @param offset	Offset to write to. If negative, handle's offset will
+ *			be used.
+ * @param bytesp	Where to store number of bytes written (optional). This
+ *			is updated even upon failure, as it can fail when part
+ *			of the data has been written.
+ *
+ * @return		Status code describing result of the operation.
+ */
 status_t kern_file_write_vecs(handle_t handle, const io_vec_t *vecs, size_t count,
 	offset_t offset, size_t *bytesp)
 {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	io_vec_t *kvecs;
+	io_request_t request;
+	status_t ret, err;
+
+	request.transferred = 0;
+
+	if(!vecs) {
+		ret = STATUS_INVALID_ARG;
+		goto out;
+	}
+
+	kvecs = kmalloc(sizeof(*kvecs) * count, MM_USER);
+	if(!kvecs) {
+		ret = STATUS_NO_MEMORY;
+		goto out;
+	}
+
+	ret = memcpy_from_user(kvecs, vecs, sizeof(*kvecs) * count);
+	if(ret != STATUS_SUCCESS) {
+		kfree(kvecs);
+		goto out;
+	}
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS) {
+		kfree(kvecs);
+		goto out;
+	}
+
+	ret = io_request_init(&request, kvecs, count, offset, IO_OP_WRITE, IO_TARGET_USER);
+	kfree(kvecs);
+	if(ret != STATUS_SUCCESS) {
+		object_handle_release(khandle);
+		goto out;
+	}
+
+	ret = file_io(khandle, &request);
+	io_request_destroy(&request);
+	object_handle_release(khandle);
+out:
+	if(bytesp) {
+		err = memcpy_to_user(bytesp, &request.transferred, sizeof(*bytesp));
+		if(err != STATUS_SUCCESS)
+			ret = err;
+	}
+
+	return ret;
 }
 
+/**
+ * Read a directory entry.
+ *
+ * Reads a single directory entry structure from a directory into a buffer. As
+ * the structure length is variable, a buffer size argument must be provided
+ * to ensure that the buffer isn't overflowed. The number of the entry read
+ * will be the handle's current offset, and upon success the handle's offset
+ * will be incremented by 1.
+ *
+ * @param handle	Handle to directory to read from. Must have the
+ *			FILE_RIGHT_READ access right.
+ * @param buf		Buffer to read entry in to.
+ * @param size		Size of buffer (if not large enough, the function will
+ *			return STATUS_TOO_SMALL).
+ *
+ * @return		STATUS_SUCCESS if successful.
+ *			STATUS_NOT_FOUND if the end of the directory has been
+ *			reached.
+ *			STATUS_TOO_SMALL if the buffer is too small for the
+ *			entry.
+ */
 status_t kern_file_read_dir(handle_t handle, dir_entry_t *buf, size_t size) {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	dir_entry_t *kbuf;
+	status_t ret;
+
+	if(!buf)
+		return STATUS_INVALID_ARG;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	kbuf = kmalloc(size, MM_USER);
+	if(!kbuf) {
+		object_handle_release(khandle);
+		return STATUS_NO_MEMORY;
+	}
+
+	ret = file_read_dir(khandle, kbuf, size);
+	if(ret == STATUS_SUCCESS)
+		ret = memcpy_to_user(buf, kbuf, kbuf->length);
+
+	kfree(kbuf);
+	object_handle_release(khandle);
+	return ret;
 }
 
+/** Rewind to the beginning of a directory.
+ * @param handle	Handle to directory to rewind.
+ * @return		Status code describing result of the operation. */
 status_t kern_file_rewind_dir(handle_t handle) {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	status_t ret;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	ret = file_rewind_dir(khandle);
+	object_handle_release(khandle);
+	return ret;
 }
 
+/**
+ * Modify the size of a file.
+ *
+ * Modifies the size of a file. If the new size is smaller than the previous
+ * size of the file, then the extra data is discarded. If it is larger than the
+ * previous size, then the extended space will be filled with zero bytes.
+ *
+ * @param handle	Handle to file to resize. Must have the FILE_RIGHT_WRITE
+ *			access right.
+ * @param size		New size of the file.
+ *
+ * @return		Status code describing result of the operation.
+ */
 status_t kern_file_resize(handle_t handle, offset_t size) {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	status_t ret;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	ret = file_resize(khandle, size);
+	object_handle_release(khandle);
+	return ret;
 }
 
+/**
+ * Set the offset of a file handle.
+ *
+ * Modifies the offset of a file handle (the position that will next be read
+ * from or written to) according to the specified action, and returns the new
+ * offset.
+ *
+ * @param handle	Handle to modify offset of.
+ * @param action	Operation to perform (FILE_SEEK_*).
+ * @param offset	Value to perform operation with.
+ * @param newp		Where to store new offset value (optional).
+ *
+ * @return		Status code describing result of the operation.
+ */
 status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset,
 	offset_t *resultp)
 {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	offset_t result;
+	status_t ret;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	ret = file_seek(khandle, action, offset, &result);
+	if(ret == STATUS_SUCCESS && resultp)
+		ret = memcpy_to_user(resultp, &result, sizeof(*resultp));
+
+	object_handle_release(khandle);
+	return ret;
 }
 
+/** Get information about a file or directory.
+ * @param handle	Handle to file to get information for.
+ * @param info		Information structure to fill in.
+ * @return		Status code describing result of the operation. */
 status_t kern_file_info(handle_t handle, file_info_t *info) {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	file_info_t kinfo;
+	status_t ret;
+
+	if(!info)
+		return STATUS_INVALID_ARG;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	ret = file_info(khandle, &kinfo);
+	if(ret == STATUS_SUCCESS)
+		ret = memcpy_to_user(info, &kinfo, sizeof(*info));
+
+	object_handle_release(khandle);
+	return ret;
 }
 
+/** Flush changes to a file to the FS.
+ * @param handle	Handle to file to flush.
+ * @return		Status code describing result of the operation. */
 status_t kern_file_sync(handle_t handle) {
-	return STATUS_NOT_IMPLEMENTED;
+	object_handle_t *khandle;
+	status_t ret;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	ret = file_sync(khandle);
+	object_handle_release(khandle);
+	return ret;
 }
