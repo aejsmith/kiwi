@@ -66,7 +66,8 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 	if(prefix) {
 		path = kmalloc(strlen(prefix) + strlen(header->name) + 2, MM_KERNEL);
 		strcpy(path, prefix);
-		strcat(path, "/");
+		if(prefix[strlen(prefix) - 1] != '/')
+			strcat(path, "/");
 		strcat(path, header->name);
 	} else {
 		path = header->name;

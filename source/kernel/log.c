@@ -231,11 +231,10 @@ __init_text void log_early_init(void) {
 	kdb_register_command("log", "Display the kernel log buffer.", kdb_cmd_log);
 }
 
-#if 0
 /** Create the kernel log device. */
 static __init_text void log_init(void) {
 	kboot_tag_log_t *tag;
-	status_t ret;
+	//status_t ret;
 
 	/* The KBoot log mapping will go away so we need to remap it somewhere
 	 * else. */
@@ -244,11 +243,12 @@ static __init_text void log_init(void) {
 		kboot_log = phys_map(tag->log_phys, tag->log_size, MM_BOOT);
 	}
 
+#if 0
 	ret = device_create("kconsole", device_tree_root, &kconsole_device_ops,
 		NULL, NULL, 0, NULL);
 	if(ret != STATUS_SUCCESS)
 		fatal("Failed to register kernel console device (%d)", ret);
+#endif
 }
 
 INITCALL(log_init);
-#endif

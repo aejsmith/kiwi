@@ -20,11 +20,15 @@
  *
  * Implementation notes:
  *  - The radix tree stores pointers to directory entry structures. This allows
- *    the cache to be used to implement read_entry for RamFS.
+ *    the cache to be used to implement read_dir for RamFS.
+ *
+ * @todo		Could convert to use a rwlock instead of a mutex,
+ *			there's no need for exclusive access when reading from
+ *			the cache.
  */
 
 #include <io/entry_cache.h>
-#include <io/fs.h>
+#include <io/file.h>
 
 #include <lib/string.h>
 
@@ -35,7 +39,7 @@
 #include <status.h>
 
 /** Slab cache for entry cache structures. */
-static slab_cache_t *entry_cache_cache;
+static slab_cache_t *entry_cache_cache = NULL;
 
 /** Entry cache constructor.
  * @param obj		Object to construct.
@@ -72,7 +76,7 @@ void entry_cache_destroy(entry_cache_t *cache) {
  * @param name		Name of entry.
  * @param id		ID of node that entry points to.
  * @return		Pointer to entry structure. */
-static dir_entry_t *entry_cache_insert_internal(entry_cache_t *cache, const char *name, node_id_t id) {
+static dir_entry_t *insert_entry(entry_cache_t *cache, const char *name, node_id_t id) {
 	dir_entry_t *entry;
 	size_t len;
 
@@ -111,7 +115,7 @@ status_t entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *i
 			return ret;
 		}
 
-		entry = entry_cache_insert_internal(cache, name, id);
+		entry = insert_entry(cache, name, id);
 	}
 
 	*idp = entry->id;
@@ -125,7 +129,7 @@ status_t entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *i
  * @param id		ID of node that entry points to. */
 void entry_cache_insert(entry_cache_t *cache, const char *name, node_id_t id) {
 	mutex_lock(&cache->lock);
-	entry_cache_insert_internal(cache, name, id);
+	insert_entry(cache, name, id);
 	mutex_unlock(&cache->lock);
 }
 
@@ -140,8 +144,9 @@ void entry_cache_remove(entry_cache_t *cache, const char *name) {
 
 /** Initialize the entry cache slab cache. */
 static __init_text void entry_cache_init(void) {
-	entry_cache_cache = slab_cache_create("entry_cache_cache", sizeof(entry_cache_t),
-	                                      0, entry_cache_ctor, NULL, NULL, 0,
-	                                      MM_BOOT);
+	entry_cache_cache = slab_cache_create("entry_cache_cache",
+		sizeof(entry_cache_t), 0, entry_cache_ctor, NULL,
+		NULL, 0, MM_BOOT);
 }
+
 INITCALL(entry_cache_init);
