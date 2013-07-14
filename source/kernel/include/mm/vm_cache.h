@@ -26,6 +26,7 @@
 #include <mm/page.h>
 #include <sync/mutex.h>
 
+struct io_request;
 struct vm_cache;
 
 /** Structure containing operations for a page cache. */
@@ -36,9 +37,8 @@ typedef struct vm_cache_ops {
 	 * @param cache		Cache being read from.
 	 * @param buf		Buffer to read into.
 	 * @param offset	Offset to read from.
-	 * @param nonblock	Whether the operation is required to not block.
 	 * @return		Status code describing result of operation. */
-	status_t (*read_page)(struct vm_cache *cache, void *buf, offset_t offset, bool nonblock);
+	status_t (*read_page)(struct vm_cache *cache, void *buf, offset_t offset);
 
 	/** Write a page of data to the source.
 	 * @note		If not provided, pages in the cache will never
@@ -46,9 +46,8 @@ typedef struct vm_cache_ops {
 	 * @param cache		Cache to write to.
 	 * @param buf		Buffer containing data to write.
 	 * @param offset	Offset to write from.
-	 * @param nonblock	Whether the operation is required to not block.
 	 * @return		Status code describing result of operation. */
-	status_t (*write_page)(struct vm_cache *cache, const void *buf, offset_t offset, bool nonblock);
+	status_t (*write_page)(struct vm_cache *cache, const void *buf, offset_t offset);
 
 	/** Determine whether a page can be evicted.
 	 * @note		If not provided, then behaviour will be as
@@ -70,10 +69,7 @@ typedef struct vm_cache {
 } vm_cache_t;
 
 extern vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data);
-extern status_t vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offset,
-                              bool nonblock, size_t *bytesp);
-extern status_t vm_cache_write(vm_cache_t *cache, const void *buf, size_t count, offset_t offset,
-                               bool nonblock, size_t *bytesp);
+extern status_t vm_cache_io(vm_cache_t *cache, struct io_request *request);
 extern status_t vm_cache_get_page(vm_cache_t *cache, offset_t offset, phys_ptr_t *physp);
 extern void vm_cache_release_page(vm_cache_t *cache, offset_t offset, phys_ptr_t phys);
 extern void vm_cache_resize(vm_cache_t *cache, offset_t size);
