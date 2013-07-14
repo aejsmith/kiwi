@@ -30,11 +30,16 @@
 
 #include <io/request.h>
 
+#include <lib/string.h>
+#include <lib/utility.h>
+
 #include <mm/malloc.h>
 #include <mm/safe.h>
 
 #include <proc/thread.h>
 
+#include <assert.h>
+#include <kernel.h>
 #include <status.h>
 
 /** Initialize an I/O request.
@@ -54,6 +59,7 @@ status_t io_request_init(io_request_t *request, const io_vec_t *vecs, size_t cou
 
 	request->offset = offset;
 	request->total = 0;
+	request->transferred = 0;
 	request->op = op;
 	request->target = target;
 	request->thread = curr_thread;
@@ -76,6 +82,7 @@ status_t io_request_init(io_request_t *request, const io_vec_t *vecs, size_t cou
 
 		request->vecs[request->count].buffer = vecs[i].buffer;
 		request->vecs[request->count].size = vecs[i].size;
+		request->total += vecs[i].size;
 		request->count++;
 	}
 
@@ -86,4 +93,76 @@ status_t io_request_init(io_request_t *request, const io_vec_t *vecs, size_t cou
  * @param request	Request to destroy. */
 void io_request_destroy(io_request_t *request) {
 	kfree(request->vecs);
+}
+
+/**
+ * Copy data for an I/O request.
+ *
+ * Copies data for an I/O request. If the request is a read, then data will be
+ * copied from the supplied buffer to the request's buffer. If it is a write,
+ * data will be copied from the request's buffer to the supplied buffer. The
+ * data will be copied to/from after any previously copied data, and the total
+ * transferred count will be updated.
+ *
+ * @param request	Request to copy for.
+ * @param buf		Buffer to transfer data to/from.
+ * @param size		Size to transfer.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t io_request_copy(io_request_t *request, void *buf, size_t size) {
+	size_t i, vec_start, vec_size, offset = 0;
+	void *vec_buf;
+	status_t ret;
+
+	for(i = 0; i < request->count && size; i++) {
+		/* Find the vector to start at. */
+		if(offset + request->vecs[i].size <= request->transferred) {
+			offset += request->vecs[i].size;
+			continue;
+		}
+
+		vec_start = request->transferred - offset;
+		vec_size = MIN(request->vecs[i].size - vec_start, size);
+		vec_buf = request->vecs[i].buffer + vec_start;
+
+		if(request->op == IO_OP_WRITE) {
+			/* Write, copy from the request to the supplied buffer. */
+			if(request->target == IO_TARGET_USER) {
+				/* FIXME: Handle different address spaces. */
+				assert(request->thread == curr_thread);
+
+				ret = memcpy_from_user(buf, vec_buf, vec_size);
+				if(ret != STATUS_SUCCESS)
+					return ret;
+			} else {
+				memcpy(buf, vec_buf, vec_size);
+			}
+		} else {
+			/* Read, copy to the request from the supplied buffer. */
+			if(request->target == IO_TARGET_USER) {
+				/* FIXME: Handle different address spaces. */
+				assert(request->thread == curr_thread);
+
+				ret = memcpy_to_user(vec_buf, buf, vec_size);
+				if(ret != STATUS_SUCCESS)
+					return ret;
+			} else {
+				memcpy(vec_buf, buf, vec_size);
+			}
+		}
+
+		request->transferred += vec_size;
+
+		offset += request->vecs[i].size;
+		buf += vec_size;
+		size -= vec_size;
+	}
+
+	if(unlikely(size)) {
+		fatal("I/O request transfer too large (total: %zu, remaining: %zu)",
+			request->total, size);
+	}
+
+	return STATUS_SUCCESS;
 }

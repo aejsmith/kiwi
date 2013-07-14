@@ -218,21 +218,15 @@ static status_t memory_file_io(file_t *file, file_handle_t *handle, io_request_t
 	size_t size;
 
 	assert(request->op == IO_OP_READ);
-	assert(request->count == 1);
-	assert(request->target == IO_TARGET_KERNEL);
 
-	if(request->offset >= (offset_t)data->size) {
-		request->total = 0;
+	if(request->offset >= (offset_t)data->size)
 		return STATUS_SUCCESS;
-	}
 
-	size = ((request->offset + request->vecs[0].size) > data->size)
+	size = ((request->offset + request->total) > data->size)
 		? data->size - request->offset
-		: request->vecs[0].size;
+		: request->total;
 
-	memcpy(request->vecs[0].buffer, data->data + request->offset, size);
-	request->total = size;
-	return STATUS_SUCCESS;
+	return io_request_copy(request, (void *)data->data + request->offset, size);
 }
 
 /** Get information about a file.
@@ -357,9 +351,9 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
 	ret = file->ops->io(file, data, request);
 out:
 	/* Update the file handle offset. */
-	if(request->total && update_offset) {
+	if(request->transferred && update_offset) {
 		mutex_lock(&data->lock);
-		data->offset += request->total;
+		data->offset += request->transferred;
 		mutex_unlock(&data->lock);
 	}
 
@@ -408,7 +402,7 @@ status_t file_read(object_handle_t *handle, void *buf, size_t size, offset_t off
 
 	ret = file_io(handle, &request);
 	if(bytesp)
-		*bytesp = request.total;
+		*bytesp = request.transferred;
 
 	io_request_destroy(&request);
 	return ret;
@@ -457,7 +451,7 @@ status_t file_write(object_handle_t *handle, const void *buf, size_t size,
 
 	ret = file_io(handle, &request);
 	if(bytesp)
-		*bytesp = request.total;
+		*bytesp = request.transferred;
 
 	io_request_destroy(&request);
 	return ret;
@@ -499,7 +493,7 @@ status_t file_read_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t co
 
 	ret = file_io(handle, &request);
 	if(bytesp)
-		*bytesp = request.total;
+		*bytesp = request.transferred;
 
 	io_request_destroy(&request);
 	return ret;
@@ -542,7 +536,7 @@ status_t file_write_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t c
 
 	ret = file_io(handle, &request);
 	if(bytesp)
-		*bytesp = request.total;
+		*bytesp = request.transferred;
 
 	io_request_destroy(&request);
 	return ret;
