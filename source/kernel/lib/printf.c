@@ -167,6 +167,10 @@ static void print_symbol(printf_state_t *state, void *ptr, char ext) {
 	symbol_t *sym;
 	long delta;
 	size_t off;
+	int width;
+
+	/* Zero pad up to the width of a pointer. */
+	width = (sizeof(void *) * 2) + 2;
 
 	/* For a backtrace, we want to subtract 1 from the address when looking
 	 * up the symbol (but not when printing), as backtraces use the return
@@ -176,12 +180,12 @@ static void print_symbol(printf_state_t *state, void *ptr, char ext) {
 
 	sym = symbol_lookup_addr((ptr_t)ptr + delta, &off);
 	if(isupper(ext)) {
-		state->total += do_printf(state->helper, state->data, "[%p] %s+0x%zx",
-			ptr, (sym) ? sym->name : "<unknown>",
+		state->total += do_printf(state->helper, state->data, "[%0*p] %s+0x%zx",
+			width, ptr, (sym) ? sym->name : "<unknown>",
 			(sym) ? off - delta : 0);
 	} else {
-		state->total += do_printf(state->helper, state->data, "[%p] %s",
-			ptr, (sym) ? sym->name : "<unknown>");
+		state->total += do_printf(state->helper, state->data, "[%0*p] %s",
+			width, ptr, (sym) ? sym->name : "<unknown>");
 	}
 }
 
@@ -190,16 +194,10 @@ static void print_symbol(printf_state_t *state, void *ptr, char ext) {
  * @param fmt		Pointer to format string pointer.
  * @param ptr		Pointer to print. */
 static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
-	/* Print lower-case and as though # was specified. Also zero pad up to
-	 * the width of a pointer if a width was not specified, because I like
-	 * it like that. */
+	/* Print lower-case and as though # was specified. */
 	state->flags |= PRINTF_LOW_CASE | PRINTF_PREFIX;
 	if(state->precision == -1)
 		state->precision = 1;
-	if(state->width == -1) {
-		state->width = (sizeof(void *) * 2) + 2;
-		state->flags |= PRINTF_ZERO_PAD;
-	}
 
 	/* Extensions to print kernel information. Idea borrowed from the Linux
 	 * kernel. The following formats are implemented:
