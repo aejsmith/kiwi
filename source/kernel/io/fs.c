@@ -998,10 +998,13 @@ static status_t fs_file_io(file_t *file, file_handle_t *handle, io_request_t *re
 /** Check if a file can be memory-mapped.
  * @param file		File being mapped.
  * @param handle	File handle structure.
+ * @param protection	Protection flags (VM_PROT_*).
  * @param flags		Mapping flags (VM_MAP_*).
  * @return		STATUS_SUCCESS if can be mapped, status code explaining
  *			why if not. */
-static status_t fs_file_mappable(file_t *file, file_handle_t *handle, int flags) {
+static status_t fs_file_mappable(file_t *file, file_handle_t *handle, uint32_t protection,
+	uint32_t flags)
+{
 	fs_node_t *node = (fs_node_t *)file;
 
 	return (node->ops->get_cache) ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;

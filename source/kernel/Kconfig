@@ -73,12 +73,6 @@ config SLAB_DEBUG
 	help
 	  Enable extra debug output from the slab allocator.
 
-config VM_DEBUG
-	bool "Virtual memory manager debug output"
-	default n
-	help
-	  Enable extra debug output from the userspace virtual memory manager.
-
 config PROC_DEBUG
 	bool "Process/thread debug output"
 	default n

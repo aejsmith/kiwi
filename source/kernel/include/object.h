@@ -64,10 +64,12 @@ typedef struct object_type {
 	 *			then the object will be classed as mappable if
 	 *			get_page is implemented.
 	 * @param handle	Handle to object.
+	 * @param protection	Protection flags (VM_PROT_*).
 	 * @param flags		Mapping flags (VM_MAP_*).
 	 * @return		STATUS_SUCCESS if can be mapped, status code
 	 *			explaining why if not. */
-	status_t (*mappable)(struct object_handle *handle, int flags);
+	status_t (*mappable)(struct object_handle *handle, uint32_t protection,
+		uint32_t flags);
 
 	/** Get a page from the object.
 	 * @param handle	Handle to object to get page from.

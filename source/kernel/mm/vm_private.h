@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,17 +19,10 @@
  * @brief		VM internal definitions.
  */
 
-#ifndef __VM_PRIV_H
-#define __VM_PRIV_H
+#ifndef __VM_PRIVATE_H
+#define __VM_PRIVATE_H
 
 #include <mm/vm.h>
-#include <kernel.h>
-
-#if CONFIG_VM_DEBUG
-# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
-#else
-# define dprintf(fmt...)	
-#endif
 
 /** Structure containing an anonymous memory map. */
 typedef struct vm_amap {
@@ -50,21 +43,33 @@ typedef struct vm_region {
 
 	vm_aspace_t *as;		/**< Address space that the region belongs to. */
 	ptr_t start;			/**< Base address of the region. */
-	ptr_t end;			/**< End address of the region. */
-	int flags;			/**< Flags for the region (0 if region is free). */
+	size_t size;			/**< Size of the region. */
+	uint32_t protection;		/**< Protection flags for the region. */
+	uint32_t flags;			/**< Region behaviour flags. */
+
+	/** Allocation state of the region. */
+	enum {
+		VM_REGION_FREE,		/**< Region is free. */
+		VM_REGION_ALLOCATED,	/**< Region is in use. */
+		VM_REGION_RESERVED,	/**< Region is reserved, must not be allocated. */
+	} state;
 
 	object_handle_t *handle;	/**< Handle to object that this region is mapping. */
 	offset_t obj_offset;		/**< Offset into the object. */
 	vm_amap_t *amap;		/**< Anonymous map. */
 	offset_t amap_offset;		/**< Offset into the anonymous map. */
+
+	char *name;			/**< Name of the region (can be NULL). */
 } vm_region_t;
 
-/** Region behaviour flags. */
-#define VM_REGION_READ		VM_MAP_READ
-#define VM_REGION_WRITE		VM_MAP_WRITE
-#define VM_REGION_EXEC		VM_MAP_EXEC
-#define VM_REGION_PRIVATE	VM_MAP_PRIVATE
-#define VM_REGION_STACK		VM_MAP_STACK
-#define VM_REGION_RESERVED	(1<<5)	/**< Region is reserved and should never be allocated. */
+/** Fault context structure. */
+typedef struct fault_context {
+	struct intr_frame *frame;	/**< Interrupt frame. */
+	ptr_t addr;			/**< Base address of page the fault occurred in. */
+	int reason;			/**< Reason for the fault. */
+	uint32_t access;		/**< Access type that caused the fault. */
+	int signal;			/**< Signal number to send. */
+	int signal_code;		/**< Error code for the signal. */
+} fault_context_t;
 
-#endif /* __VM_PRIV_H */
+#endif /* __VM_PRIVATE_H */

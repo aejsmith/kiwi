@@ -74,7 +74,7 @@ syscall kern_fs_unlink(ptr_t);
 syscall kern_fs_rename(ptr_t, ptr_t);
 syscall kern_fs_sync();
 
-syscall kern_vm_map(ptr_t, size_t, int, handle_t, offset_t, ptr_t);
+syscall kern_vm_map(ptr_t, size_t, uint32_t, uint32_t, uint32_t, handle_t, offset_t, ptr_t);
 syscall kern_vm_unmap(ptr_t, size_t);
 
 syscall kern_process_create(ptr_t, ptr_t, ptr_t, int, ptr_t, int, ptr_t);

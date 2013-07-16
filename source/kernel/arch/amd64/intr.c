@@ -39,6 +39,7 @@
 #include <kdb.h>
 #include <kernel.h>
 #include <setjmp.h>
+#include <status.h>
 
 extern void kdb_db_handler(intr_frame_t *frame);
 extern void intr_handler(intr_frame_t *frame);
@@ -203,11 +204,10 @@ static void double_fault(intr_frame_t *frame) {
 /** Handler for page faults.
  * @param frame		Interrupt stack frame. */
 static void page_fault(intr_frame_t *frame) {
-	int reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION : VM_FAULT_NOTPRESENT;
-	int access = (frame->err_code & (1<<1)) ? VM_FAULT_WRITE : VM_FAULT_READ;
-	ptr_t addr = x86_read_cr2();
-	siginfo_t info;
-	int ret;
+	ptr_t addr;
+	int reason;
+	uint32_t access;
+	status_t ret;
 
 	/* We can't service a page fault while running KDB. */
 	if(unlikely(atomic_get(&kdb_running) == 2)) {
@@ -215,73 +215,30 @@ static void page_fault(intr_frame_t *frame) {
 		return;
 	}
 
-	/* Check if the fault was caused by instruction execution. */
-	if(cpu_features.xd && frame->err_code & (1<<4))
-		access = VM_FAULT_EXEC;
+	addr = x86_read_cr2();
+	reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION
+		: VM_FAULT_NOT_PRESENT;
+	access = (cpu_features.xd && frame->err_code & (1<<4))
+		? VM_PROT_EXECUTE
+		: ((frame->err_code & (1<<1)) ? VM_PROT_WRITE : VM_PROT_READ);
 
 	/* Check if a reserved bit fault. This is always fatal. */
-	if(frame->err_code & (1<<3)) {
-		fatal("Reserved bit page-fault exception (%p) (0x%x)", addr,
-			frame->err_code);
-	}
+	if(frame->err_code & (1<<3))
+		fatal("Reserved bit page fault exception at %p", addr);;
 
-	/* Try the virtual memory manager if the fault occurred at a userspace
-	 * address. */
-	if(addr < (USER_BASE + USER_SIZE)) {
-		ret = vm_fault(addr, reason, access);
-		if(ret == VM_FAULT_SUCCESS) {
-			return;
-		} else if(curr_thread && curr_thread->in_usermem) {
-			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n",
-				addr, frame->ip);
+	ret = vm_fault(frame, addr, reason, access);
+	if(ret != STATUS_SUCCESS) {
+		/* Handle faults in safe user memory access functions. */
+		if(curr_thread && curr_thread->in_usermem) {
+			kprintf(LOG_DEBUG, "arch: thread %" PRId32 " (%s) faulted "
+				"in usermem at %p (ip: %p)\n", curr_thread->id,
+				curr_thread->name, addr, frame->ip);
 			kdb_enter(KDB_REASON_USER, frame);
 			longjmp(curr_thread->usermem_context, 1);
 		}
-	} else {
-		/* This is an access to kernel memory, which should be reported
-		 * to userspace as accessing non-existant memory. */
-		ret = VM_FAULT_NOREGION;
-	}
 
-	/* Nothing could handle this fault. If it happened in the kernel,
-	 * die, otherwise just kill the process. */
-	if(frame->err_code & (1<<2)) {
-		kprintf(LOG_DEBUG, "arch: unhandled page fault in thread %" PRId32
-			" of process %" PRId32 " (%p)\n", curr_thread->id,
-			curr_proc->id, addr);
-		kprintf(LOG_DEBUG, "arch: %s/%s%s%s\n",
-			(frame->err_code & (1<<0)) ? "protection" : "not-present",
-			(frame->err_code & (1<<1)) ? "write" : "read",
-			(frame->err_code & (1<<3)) ? "/reserved-bit" : "",
-			(frame->err_code & (1<<4)) ? "/execute" : "");
-		kdb_enter(KDB_REASON_USER, frame);
-
-		memset(&info, 0, sizeof(info));
-		info.si_addr = (void *)frame->ip;
-
-		/* Pick the signal number and code. */
-		switch(ret) {
-		case VM_FAULT_NOREGION:
-			info.si_signo = SIGSEGV;
-			info.si_code = SEGV_MAPERR;
-			break;
-		case VM_FAULT_ACCESS:
-			info.si_signo = SIGSEGV;
-			info.si_code = SEGV_ACCERR;
-			break;
-		case VM_FAULT_OOM:
-			info.si_signo = SIGBUS;
-			info.si_code = BUS_ADRERR;
-			break;
-		default:
-			info.si_signo = SIGSEGV;
-			break;
-		}
-
-		signal_send(curr_thread, info.si_signo, &info, true);
-	} else {
-		fatal_etc(frame, "Unhandled kernel-mode page fault exception at %p",
-			addr);
+		fatal_etc(frame, "Unhandled %s-mode page fault exception at %p (%d)",
+			(frame->cs & 3) ? "user" : "kernel", addr, ret);
 	}
 }
 

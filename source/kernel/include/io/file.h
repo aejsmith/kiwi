@@ -77,10 +77,12 @@ typedef struct file_ops {
 	 *			get_page is implemented.
 	 * @param file		File being mapped.
 	 * @param handle	File handle structure.
+	 * @param protection	Protection flags (VM_PROT_*).
 	 * @param flags		Mapping flags (VM_MAP_*).
 	 * @return		STATUS_SUCCESS if can be mapped, status code
 	 *			explaining why if not. */
-	status_t (*mappable)(struct file *file, struct file_handle *handle, int flags);
+	status_t (*mappable)(struct file *file, struct file_handle *handle,
+		uint32_t protection, uint32_t flags);
 
 	/** Get a page from the file.
 	 * @param file		File to get page from.

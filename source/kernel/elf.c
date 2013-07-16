@@ -144,25 +144,23 @@ status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
  * @param i		Index of program header.
  * @return		Status code describing result of the operation. */
 static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i) {
+	uint32_t protection = 0;
 	ptr_t start, end;
 	offset_t offset;
 	status_t ret;
 	size_t size;
-	int flags;
 
 	/* Work out the protection flags to use. */
-	flags  = ((phdr->p_flags & ELF_PF_R) ? VM_MAP_READ  : 0);
-	flags |= ((phdr->p_flags & ELF_PF_W) ? VM_MAP_WRITE : 0);
-	flags |= ((phdr->p_flags & ELF_PF_X) ? VM_MAP_EXEC  : 0);
-	if(flags == 0) {
+	if(phdr->p_flags & ELF_PF_R)
+		protection |= VM_PROT_READ;
+	if(phdr->p_flags & ELF_PF_W)
+		protection |= VM_PROT_WRITE;
+	if(phdr->p_flags & ELF_PF_X)
+		protection |= VM_PROT_EXECUTE;
+	if(!protection) {
 		dprintf("elf: program header %zu has no protection flags set\n", i);
 		return STATUS_MALFORMED_IMAGE;
 	}
-
-	/* Set the fixed flag, and the private flag if mapping as writeable. */
-	flags |= VM_MAP_FIXED;
-	if(flags & VM_MAP_WRITE)
-		flags |= VM_MAP_PRIVATE;
 
 	/* Map an anonymous region if memory size is greater than file size. */
 	if(phdr->p_memsz > phdr->p_filesz) {
@@ -174,13 +172,14 @@ static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, siz
 
 		/* We have to have it writeable for us to be able to clear it
 		 * later on. */
-		if((flags & VM_MAP_WRITE) == 0) {
+		if(!(protection & VM_PROT_WRITE)) {
 			dprintf("elf: program header %zu should be writeable\n", i);
 			return STATUS_MALFORMED_IMAGE;
 		}
 
 		/* Create an anonymous memory region for it. */
-		ret = vm_map(binary->as, start, size, flags, NULL, 0, NULL);
+		ret = vm_map(binary->as, &start, size, VM_ADDRESS_EXACT, protection,
+			VM_MAP_PRIVATE, NULL, 0, NULL);
 		if(ret != STATUS_SUCCESS)
 			return ret;
 	}
@@ -197,9 +196,12 @@ static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, siz
 
 	dprintf("elf: loading program header %zu to %p (size: %zu)\n", i, start, size);
 
-	/* Map the data in. We do not need to check whether the supplied
-	 * addresses are valid - vm_map() will reject the call if they aren't. */
-	return vm_map(binary->as, start, size, flags, binary->handle, offset, NULL);
+	/* Map the data in. Set the private flag if mapping as writeable. We do
+	 * not need to check whether the supplied addresses are valid - vm_map()
+	 * will reject them if they aren't. */
+	return vm_map(binary->as, &start, size, VM_ADDRESS_EXACT, protection,
+		(protection & VM_PROT_WRITE) ? VM_MAP_PRIVATE : 0,
+		binary->handle, offset, NULL);
 }
 
 /** Load an ELF binary into an address space.
@@ -213,7 +215,6 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 	size_t bytes, i, size, load_count = 0;
 	elf_binary_t *binary;
 	status_t ret;
-	int flags;
 
 	/* Allocate a structure to store data about the binary. */
 	binary = kmalloc(sizeof(*binary), MM_KERNEL);
@@ -272,11 +273,10 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 		}
 
 		/* If a location is specified, force the binary to be there. */
-		flags = VM_MAP_READ | VM_MAP_PRIVATE;
-		if(dest)
-			flags |= VM_MAP_FIXED;
-
-		ret = vm_map(binary->as, dest, binary->load_size, flags, NULL, 0, &binary->load_base);
+		binary->load_base = dest;
+		ret = vm_map(binary->as, &binary->load_base, binary->load_size,
+			(dest) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY, VM_PROT_READ,
+			VM_MAP_PRIVATE, NULL, 0, NULL);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
 	} else {

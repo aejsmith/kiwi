@@ -81,10 +81,13 @@ static void file_object_unwait(object_handle_t *handle, unsigned event, void *wa
 
 /** Check if an object can be memory-mapped.
  * @param handle	Handle to object.
+ * @param protection	Protection flags (VM_PROT_*).
  * @param flags		Mapping flags (VM_MAP_*).
  * @return		STATUS_SUCCESS if can be mapped, status code explaining
  *			why if not. */
-static status_t file_object_mappable(object_handle_t *handle, int flags) {
+static status_t file_object_mappable(object_handle_t *handle, uint32_t protection,
+	uint32_t flags)
+{
 	file_t *file = (file_t *)handle->object;
 	file_handle_t *data = (file_handle_t *)handle->data;
 	object_rights_t rights = 0;
@@ -97,7 +100,7 @@ static status_t file_object_mappable(object_handle_t *handle, int flags) {
 	if(file->ops->mappable) {
 		assert(file->ops->get_page);
 
-		ret = file->ops->mappable(file, data, flags);
+		ret = file->ops->mappable(file, data, protection, flags);
 		if(ret != STATUS_SUCCESS)
 			return ret;
 	} else {
@@ -107,11 +110,11 @@ static status_t file_object_mappable(object_handle_t *handle, int flags) {
 
 	/* Check for the necessary access rights. Don't need write permission
 	 * for private mappings, changes won't be written back to the file. */
-	if(flags & VM_MAP_READ) {
+	if(protection & VM_PROT_READ) {
 		rights |= FILE_RIGHT_READ;
-	} else if((flags & (VM_MAP_WRITE | VM_MAP_PRIVATE)) == VM_MAP_WRITE) {
+	} else if(protection & VM_PROT_WRITE && !(flags & VM_MAP_PRIVATE)) {
 		rights |= FILE_RIGHT_WRITE;
-	} else if(flags & VM_MAP_EXEC) {
+	} else if(protection & VM_PROT_EXECUTE) {
 		rights |= FILE_RIGHT_EXECUTE;
 	}
 

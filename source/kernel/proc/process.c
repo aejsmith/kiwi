@@ -378,15 +378,15 @@ static status_t process_aspace_create(process_create_t *info) {
 	size = ROUND_UP(size, PAGE_SIZE);
 
 	/* Create a mapping for it. */
-	ret = vm_map(info->aspace, 0, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
-		NULL, 0, &info->arg_block);
+	ret = vm_map(info->aspace, &info->arg_block, size, VM_ADDRESS_ANY,
+		VM_PROT_READ | VM_PROT_WRITE, VM_MAP_PRIVATE, NULL, 0, NULL);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
 	/* Create a stack mapping. */
-	ret = vm_map(info->aspace, 0, USTACK_SIZE,
-		VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
-		NULL, 0, &info->stack);
+	ret = vm_map(info->aspace, &info->stack, USTACK_SIZE, VM_ADDRESS_ANY,
+		VM_PROT_READ | VM_PROT_WRITE, VM_MAP_PRIVATE | VM_MAP_STACK,
+		NULL, 0, NULL);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 

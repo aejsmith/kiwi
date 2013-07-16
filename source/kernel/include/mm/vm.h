@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,11 +34,15 @@
 #include <cpu.h>
 #include <object.h>
 
+struct intr_frame;
 struct mmu_context;
 struct vm_region;
 
 /** Number of free lists to use. */
-#define VM_FREELISTS		(((int)BITS(ptr_t)) - PAGE_WIDTH)
+#define VM_FREELISTS		(((unsigned)BITS(ptr_t)) - PAGE_WIDTH)
+
+/** Maximum length of a region name. */
+#define REGION_NAME_MAX		32
 
 /** Structure containing a virtual address space. */
 typedef struct vm_aspace {
@@ -64,27 +68,19 @@ typedef struct vm_aspace {
 #define curr_aspace		(curr_cpu->aspace)
 
 /** Page fault reason codes. */
-#define VM_FAULT_NOTPRESENT	1	/**< Fault caused by a not present page. */
-#define VM_FAULT_PROTECTION	2	/**< Fault caused by a protection violation. */
+enum {
+	VM_FAULT_NOT_PRESENT,		/**< Fault caused by a not present page. */
+	VM_FAULT_PROTECTION,		/**< Fault caused by a protection violation. */
+};
 
-/** Page fault access codes. */
-#define VM_FAULT_READ		VM_MAP_READ
-#define VM_FAULT_WRITE		VM_MAP_WRITE
-#define VM_FAULT_EXEC		VM_MAP_EXEC
+extern status_t vm_fault(struct intr_frame *frame, ptr_t addr, int reason,
+	uint32_t access);
 
-/** Page fault status codes. */
-#define VM_FAULT_SUCCESS	0	/**< Fault handled successfully. */
-#define VM_FAULT_FAILURE	1	/**< Other failure. */
-#define VM_FAULT_NOREGION	2	/**< Address not in valid region (SEGV_MAPERR). */
-#define VM_FAULT_ACCESS		3	/**< Access denied to region (SEGV_ACCERR). */
-#define VM_FAULT_OOM		4	/**< Out of memory (BUS_ADRERR). */
-
-extern int vm_fault(ptr_t addr, int reason, int access);
-
-extern status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
-extern status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags,
-                       object_handle_t *handle, offset_t offset, ptr_t *addrp);
+extern status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
+	uint32_t protection, uint32_t flags, object_handle_t *handle,
+	offset_t offset, const char *name);
 extern status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
+extern status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
 
 extern void vm_aspace_switch(vm_aspace_t *as);
 extern vm_aspace_t *vm_aspace_create(void);

@@ -999,9 +999,9 @@ status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
 			stacksz = USTACK_SIZE;
 		}
 
-		ret = vm_map(curr_proc->aspace, 0, stacksz,
-			VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
-			NULL, 0, &thread->ustack);
+		ret = vm_map(curr_proc->aspace, &thread->ustack, stacksz,
+			VM_ADDRESS_ANY, VM_PROT_READ | VM_PROT_WRITE,
+			VM_MAP_PRIVATE | VM_MAP_STACK, NULL, 0, NULL);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
 
