@@ -22,9 +22,22 @@
 #ifndef __MM_SAFE_H
 #define __MM_SAFE_H
 
+#include <arch/memory.h>
+
 #include <mm/mm.h>
 
 #include <types.h>
+
+/** Check whether an address is a user address.
+ * @param addr		Address to check.
+ * @return		Whether the address is a user address. */
+static inline bool is_user_address(ptr_t addr) {
+	#if USER_BASE > 0
+	return (addr >= USER_BASE && addr < (USER_BASE + USER_SIZE));
+	#else
+	return (addr < USER_SIZE);
+	#endif 
+}
 
 extern status_t validate_user_address(void *dest, size_t size);
 
