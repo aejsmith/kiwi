@@ -76,5 +76,12 @@ typedef struct __packed intr_frame {
 	unsigned long ss;		/**< SS. */
 } intr_frame_t;
 
+/** Return whether an interrupt frame is from user mode.
+ * @param frame		Frame to check.
+ * @return		Whether the frame is from user mode. */
+static inline bool intr_frame_from_user(intr_frame_t *frame) {
+	return (frame->cs & 3);
+}
+
 #endif /* __ASM__ */
 #endif /* __ARCH_FRAME_H */
