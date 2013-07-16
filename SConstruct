@@ -25,7 +25,7 @@ version = {
 cc_warning_flags = [
     '-Wall', '-Wextra', '-Wno-variadic-macros', '-Wno-unused-parameter',
     '-Wwrite-strings', '-Wmissing-declarations', '-Wredundant-decls',
-    '-Wno-format', '-Wno-unused-but-set-variable',
+    '-Wno-format'
 ]
 
 # C++ warning flags.
@@ -50,7 +50,9 @@ target_flags = {
     'CCFLAGS': cc_warning_flags + ['-gdwarf-2', '-pipe'],
     'CFLAGS': ['-std=gnu99'],
     'CXXFLAGS': cxx_warning_flags,
-    'ASFLAGS': ['-D__ASM__'],
+
+    # Clang's integrated assembler doesn't support 16-bit code.
+    'ASFLAGS': ['-D__ASM__', '-no-integrated-as'],
 
     # Set correct shared library link flags.
     'SHCCFLAGS': '$CCFLAGS -fPIC -DSHARED',
@@ -204,15 +206,14 @@ class EnvironmentManager(dict):
                 self.config['TOOLCHAIN_TARGET'] + "-" + name)
         if os.environ.has_key('CC') and os.path.basename(os.environ['CC']) == 'ccc-analyzer':
             env['CC'] = os.environ['CC']
-            env['ENV']['CCC_CC'] = tool_path('gcc')
+            env['ENV']['CCC_CC'] = tool_path('clang')
         else:
-            env['CC'] = tool_path('gcc')
+            env['CC'] = tool_path('clang')
         if os.environ.has_key('CXX') and os.path.basename(os.environ['CXX']) == 'c++-analyzer':
             env['CXX'] = os.environ['CXX']
-            env['ENV']['CCC_CXX'] = tool_path('g++')
-            print env['CXX']
+            env['ENV']['CCC_CXX'] = tool_path('clang++')
         else:
-            env['CXX'] = tool_path('g++')
+            env['CXX'] = tool_path('clang++')
         env['AS']      = tool_path('as')
         env['OBJDUMP'] = tool_path('objdump')
         env['READELF'] = tool_path('readelf')

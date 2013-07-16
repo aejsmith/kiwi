@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2011 Alex Smith
+# Copyright (C) 2009-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -22,34 +22,32 @@ from time import time
 class ToolchainComponent:
     def __init__(self, manager):
         self.manager = manager
-        self.srcdir = os.path.join(os.getcwd(), 'utilities', 'toolchain')
-        self.dldir = self.manager.parentdir
+        self.destdir = manager.genericdir if self.generic else manager.targetdir
 
     # Check if the component requires updating.
     def check(self):
-        path = os.path.join(self.manager.destdir, '.%s-%s-installed' % (self.name, self.version))
+        path = os.path.join(self.destdir, '.%s-%s-installed' % (self.name, self.version))
         if not os.path.exists(path):
             return True
 
         # Check if any of the patches are newer.
         mtime = os.stat(path).st_mtime
         for p in self.patches:
-            if os.stat(os.path.join(self.srcdir, p[0])).st_mtime > mtime:
+            if os.stat(os.path.join(self.manager.srcdir, p[0])).st_mtime > mtime:
                 return True
         return False
 
     # Download an unpack all sources for the component.
     def download(self):
-        for f in self.source:
-            name = urlparse(f).path.split('/')[-1]
-            target = os.path.join(self.dldir, name)
-            if not os.path.exists(os.path.join(self.dldir, name)):
+        for url in self.source:
+            name = urlparse(url).path.split('/')[-1]
+            target = os.path.join(self.manager.dldir, name)
+            if not os.path.exists(target):
                 self.manager.msg(' Downloading source file: %s' % (name))
 
-                # Download to .part and then rename when
-                # complete so we can easily do continuing of
-                # downloads.
-                self.execute('wget -c -O %s %s' % (target + '.part', f))
+                # Download to .part and then rename when complete so we can
+                # easily do continuing of downloads.
+                self.execute('wget -c -O %s %s' % (target + '.part', url))
                 os.rename(target + '.part', target)
 
             # Unpack if this is a tarball.
@@ -58,28 +56,27 @@ class ToolchainComponent:
             elif name[-7:] == '.tar.gz':
                 self.execute('tar -C %s -xzf %s' % (self.manager.builddir, target))
 
-    # Helper function to execute a command and throw an exception if
-    # required status not returned.
-    def execute(self, cmd, directory='.', expected=0):
+    # Helper function to execute a command and throw an exception if required
+    # status not returned.
+    def execute(self, cmd, directory = '.', expected = 0):
         print "+ %s" % (cmd)
         oldcwd = os.getcwd()
         os.chdir(directory)
         if os.system(cmd) != expected:
             os.chdir(oldcwd)
-            raise Exception, 'Command did not return expected value'
+            raise Exception('Command did not return expected value')
         os.chdir(oldcwd)
 
     # Apply all patches for this component.
     def patch(self):
         for (p, d, s) in self.patches:
-            name = os.path.join(self.srcdir, p)
+            name = os.path.join(self.manager.srcdir, p)
             self.execute('patch -Np%d -i %s' % (s, name), d)
 
     # Performs all required tasks to update this component.
     def _build(self):
         self.manager.msg("Building toolchain component '%s'" % (self.name))
         self.download()
-        self.patch()
 
         # Measure time taken to build.
         start = time()
@@ -88,8 +85,7 @@ class ToolchainComponent:
         self.manager.totaltime += (end - start)
 
         # Signal that we've updated this.
-        self.changed = True
-        f = open(os.path.join(self.manager.destdir, '.%s-%s-installed' % (self.name, self.version)), 'w')
+        f = open(os.path.join(self.destdir, '.%s-%s-installed' % (self.name, self.version)), 'w')
         f.write('')
         f.close()
 
@@ -97,6 +93,7 @@ class ToolchainComponent:
 class BinutilsComponent(ToolchainComponent):
     name = 'binutils'
     version = '2.23.1'
+    generic = False
     source = [
         'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
     ]
@@ -105,68 +102,102 @@ class BinutilsComponent(ToolchainComponent):
     ]
 
     def build(self):
-        os.mkdir('binutils-build')
+        self.patch()
 
         # Work out configure options to use.
-        confopts  = '--prefix=%s ' % (self.manager.destdir)
+        confopts  = '--prefix=%s ' % (self.destdir)
         confopts += '--target=%s ' % (self.manager.target)
         confopts += '--disable-werror '
+        confopts += '--with-sysroot=%s ' % (os.path.join(self.destdir, 'sysroot'))
+
         # gold has bugs which cause the generated kernel image to be huge.
         #confopts += '--enable-gold=default '
 
         # Build and install it.
+        os.mkdir('binutils-build')
         self.execute('../binutils-%s/configure %s' % (self.version, confopts), 'binutils-build')
         self.execute('make -j%d' % (self.manager.makejobs), 'binutils-build')
         self.execute('make install', 'binutils-build')
 
-# Component definition for GCC.
-class GCCComponent(ToolchainComponent):
-    name = 'gcc'
-    version = '4.8.1'
+# Component definition for LLVM/Clang.
+class LLVMComponent(ToolchainComponent):
+    name = 'llvm'
+    version = '3.3'
+    generic = True
     source = [
-        'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-' + version + '.tar.bz2',
+        'http://llvm.org/releases/' + version + '/llvm-' + version + '.src.tar.gz',
+        'http://llvm.org/releases/' + version + '/cfe-' + version + '.src.tar.gz',
     ]
     patches = [
-        ('gcc-' + version + '-no-fixinc.patch', 'gcc-' + version, 1),
-        ('gcc-' + version + '-kiwi.patch', 'gcc-' + version, 1),
-        ('gcc-' + version + '-autoconf.patch', 'gcc-' + version, 1),
+        ('llvm-' + version + '-kiwi.patch', 'llvm-' + version + '.src', 1),
     ]
 
     def build(self):
-        os.mkdir('gcc-build')
+        # Move clang sources to the right place.
+        os.rename('cfe-%s.src' % (self.version), 'llvm-%s.src/tools/clang' % (self.version))
+
+        self.patch()
 
         # Work out configure options to use.
-        env = ""
-        confopts  = '--prefix=%s ' % (self.manager.destdir)
-        confopts += '--target=%s ' % (self.manager.target)
-        confopts += '--enable-languages=c,c++ '
-        confopts += '--disable-libstdcxx-pch '
-        confopts += '--disable-shared '
-        if os.uname()[0] == 'Darwin':
-            env = "CC=clang CXX=clang++ "
-            confopts += '--with-libiconv-prefix=/opt/local --with-gmp=/opt/local --with-mpfr=/opt/local'
+        confopts  = '--prefix=%s ' % (self.destdir)
+        confopts += '--enable-optimized '
+        confopts += '--enable-targets=x86,x86_64,arm '
 
         # Build and install it.
-        self.execute('%s../gcc-%s/configure %s' % (env, self.version, confopts), 'gcc-build')
-        self.execute('make -j%d all-gcc' % (self.manager.makejobs), 'gcc-build')
-        self.execute('make -j%d all-target-libgcc all-target-libstdc++-v3' % (self.manager.makejobs), 'gcc-build')
-        self.execute('make install-gcc install-target-libgcc install-target-libstdc++-v3', 'gcc-build')
+        os.mkdir('llvm-build')
+        self.execute('../llvm-%s.src/configure %s' % (self.version, confopts), 'llvm-build')
+        self.execute('make -j%d' % (self.manager.makejobs), 'llvm-build')
+        self.execute('make install', 'llvm-build')
+
+# Component definition for Compiler-RT.
+class CompilerRTComponent(ToolchainComponent):
+    name = 'compiler-rt'
+    version = '3.3'
+    generic = False
+    source = [
+        'http://llvm.org/releases/' + version + '/compiler-rt-' + version + '.src.tar.gz',
+    ]
+    patches = [
+        ('compiler-rt-' + version + '-kiwi.patch', 'compiler-rt-' + version + '.src', 1),
+    ]
+
+    def build(self):
+        self.patch()
+
+        # Build it.
+        self.execute('make CC=%s AR=%s RANLIB=%s clang_kiwi' % (
+            self.manager.tool_path('clang'),
+            self.manager.tool_path('ar'),
+            self.manager.tool_path('ranlib')), 'compiler-rt-%s.src' % self.version)
+
+        # Install it. Iterate directories because some targets build multiple
+        # libraries (e.g. i386 and x86_64).
+        archs = os.listdir(os.path.join('compiler-rt-%s.src' % self.version, 'clang_kiwi'))
+        for arch in archs:
+            shutil.copyfile(os.path.join('compiler-rt-%s.src' % self.version, 'clang_kiwi',
+                    arch, 'libcompiler_rt.a'),
+                os.path.join(self.manager.genericdir, 'lib', 'clang', self.version,
+                    'libclang_rt.%s.a' % arch))
 
 # Class to manage building and updating the toolchain.
 class ToolchainManager:
     def __init__(self, config):
         self.config = config
-        self.parentdir = config['TOOLCHAIN_DIR']
-        self.destdir = os.path.join(config['TOOLCHAIN_DIR'], config['TOOLCHAIN_TARGET'])
-        self.builddir = os.path.join(self.destdir, 'build-tmp')
+        self.srcdir = os.path.join(os.getcwd(), 'utilities', 'toolchain')
+        self.destdir = config['TOOLCHAIN_DIR']
         self.target = config['TOOLCHAIN_TARGET']
+        self.genericdir = os.path.join(self.destdir, 'generic')
+        self.targetdir = os.path.join(self.destdir, self.target)
+        self.builddir = os.path.join(self.destdir, 'build-tmp')
+        self.dldir = self.destdir
         self.makejobs = config['TOOLCHAIN_MAKE_JOBS']
         self.totaltime = 0
 
         # Keep sorted in dependency order.
         self.components = [
             BinutilsComponent(self),
-            GCCComponent(self),
+            LLVMComponent(self),
+            CompilerRTComponent(self),
         ]
 
     # Write a status message.
@@ -175,28 +206,56 @@ class ToolchainManager:
 
     # Repairs any links within the toolchain directory.
     def repair(self):
-        # Remove existing stuff.
-        self.remove('%s/%s/sys-include' % (self.destdir, self.target))
-        self.remove('%s/%s/lib' % (self.destdir, self.target))
-
-        # Link into the source tree.
-        os.symlink('%s/source/include' % (os.getcwd()), '%s/%s/sys-include' % (self.destdir, self.target))
-        os.symlink('%s/build/%s-%s/source/libraries' % (os.getcwd(), self.config['ARCH'], self.config['PLATFORM']),
-                   '%s/%s/lib' % (self.destdir, self.target))
+        # Create clang wrapper scripts.
+        for name in ['clang', 'clang++']:
+            path = os.path.join(self.genericdir, 'bin', name)
+            wrapper = os.path.join(self.targetdir, 'bin', '%s-%s' % (self.target, name))
+            f = open(wrapper, 'w')
+            f.write('#!/bin/sh\n\n')
+            f.write('%s -target %s --sysroot=%s/sysroot $*\n' % (path, self.target, self.targetdir))
+            f.close()
+            os.chmod(wrapper, 0755)
+        try:
+            os.symlink('%s-clang' % (self.target),
+                os.path.join(self.targetdir, 'bin', '%s-cc' % (self.target)))
+            os.symlink('%s-clang++' % (self.target),
+                os.path.join(self.targetdir, 'bin', '%s-c++' % (self.target)))
+        except:
+            pass
+        
+        # Set up the sysroot to link to the source tree.
+        self.remove(os.path.join(self.targetdir, 'sysroot', 'include'))
+        self.remove(os.path.join(self.targetdir, 'sysroot', 'lib'))
+        os.symlink(os.path.join(os.getcwd(), 'source', 'include'),
+            os.path.join(self.targetdir, 'sysroot', 'include'))
+        os.symlink(os.path.join(os.getcwd(), 'build',
+                '%s-%s' % (self.config['ARCH'], self.config['PLATFORM']), 'libraries'),
+            os.path.join(self.targetdir, 'sysroot', 'lib'))
 
     # Remove a file, symbolic link or directory tree.
     def remove(self, path):
         if not os.path.lexists(path):
             return
 
-        # Handle symbolic links first as isfile() and isdir() follow
-        # links.
+        # Handle symbolic links first as isfile() and isdir() follow links.
         if os.path.islink(path) or os.path.isfile(path):
             os.remove(path)
         elif os.path.isdir(path):
             shutil.rmtree(path)
         else:
-            raise Exception, "Unhandled type during remove (%s)" % (path)
+            raise Exception('Unhandled type during remove (%s)' % (path))
+
+    # Make a directory and all intermediate directories, ignoring error if it
+    # already exists.
+    def makedirs(self, path):
+        try:
+            os.makedirs(path)
+        except:
+            pass
+
+    # Get the path to a toolchain utility.
+    def tool_path(self, name):
+        return os.path.join(self.targetdir, 'bin', self.target + '-' + name)
 
     # Build a component.
     def build(self, c):
@@ -219,38 +278,43 @@ class ToolchainManager:
             if c.check():
                 return True
 
-        # Nothing needs to be built, check links and clean up.
-        self.remove(self.builddir)
+        # Nothing needs to be built, just ensure that everything's set up
+        # correctly and clean up.
         self.repair()
+        self.remove(self.builddir)
         return False
 
     # Rebuilds the toolchain if required.
     def update(self, target, source, env):
         if not self.check():
+            self.msg('Toolchain already up-to-date, nothing to be done')
             return 0
 
-        # Remove existing installation.
-        self.remove(self.destdir)
+        # Remove existing installation. Only remove generic/target directories
+        # when a generic/target component requires updating, this avoids
+        # rebuilding LLVM when we only need to rebuild Binutils and vice-versa.
+        for c in self.components:
+            if c.check():
+                self.remove(self.genericdir if c.generic else self.targetdir)
 
-        # Create new destination directory, and set up the include link
-        # into the source tree.
-        os.makedirs('%s/%s' % (self.destdir, self.target))
-        os.symlink('%s/source/include' % (os.getcwd()), '%s/%s/sys-include' % (self.destdir, self.target))
+        # Create new destination directory.
+        self.makedirs(self.genericdir)
+        self.makedirs(self.targetdir)
+        self.makedirs(os.path.join(self.targetdir, 'bin'))
+        self.makedirs(os.path.join(self.targetdir, 'sysroot'))
+
+        # Need to do this first as compiler-rt build requires wrapper in place.
+        self.repair()
 
         # Build necessary components.
         try:
             for c in self.components:
-                self.build(c)
+                if c.check():
+                    self.build(c)
         except Exception, e:
             self.msg('Exception during toolchain build: \033[0;0m%s' % (str(e)))
             return 1
 
-        # Move the directory containing built libraries and linker
-        # scripts to where the build system expects them.
-        os.rename('%s/%s/lib' % (self.destdir, self.target), '%s/%s/toolchain-lib' % (self.destdir, self.target))
-
-        # Create library directory link and clean up.
-        self.repair()
         self.remove(self.builddir)
         self.msg('Toolchain updated in %d seconds' % (self.totaltime))
         return 0
