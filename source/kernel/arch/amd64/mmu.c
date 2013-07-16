@@ -108,7 +108,7 @@ static inline uint64_t mapping_flags(mmu_context_t *ctx, phys_ptr_t phys, unsign
 	flags = X86_PTE_PRESENT;
 	if(protect & MMU_MAP_WRITE)
 		flags |= X86_PTE_WRITE;
-	if(!(protect & MMU_MAP_EXEC) && cpu_features.xd)
+	if(!(protect & MMU_MAP_EXECUTE) && cpu_features.xd)
 		flags |= X86_PTE_NOEXEC;
 	if(is_kernel_context(ctx)) {
 		flags |= X86_PTE_GLOBAL;
@@ -412,7 +412,7 @@ static void amd64_mmu_protect(mmu_context_t *ctx, ptr_t virt, size_t size, unsig
 				entry = (prev & X86_PTE_PROTECT_MASK);
 				if(protect & MMU_MAP_WRITE)
 					entry |= X86_PTE_WRITE;
-				if(!(protect & MMU_MAP_EXEC) && cpu_features.xd)
+				if(!(protect & MMU_MAP_EXECUTE) && cpu_features.xd)
 					entry |= X86_PTE_NOEXEC;
 
 				if(test_and_set_pte(&ptbl[pte], prev, entry) == prev)
@@ -515,7 +515,7 @@ static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, u
 			*physp = phys;
 		if(protectp) {
 			*protectp = ((entry & X86_PTE_WRITE) ? MMU_MAP_WRITE : 0)
-				| ((entry & X86_PTE_NOEXEC) ? 0 : MMU_MAP_EXEC);
+				| ((entry & X86_PTE_NOEXEC) ? 0 : MMU_MAP_EXECUTE);
 		}
 	}
 
@@ -661,7 +661,7 @@ __init_text void arch_mmu_init(void) {
 	map_kernel("text",
 		ROUND_DOWN((ptr_t)__text_seg_start, LARGE_PAGE_SIZE),
 		ROUND_UP((ptr_t)__text_seg_end, LARGE_PAGE_SIZE),
-		MMU_MAP_EXEC);
+		MMU_MAP_EXECUTE);
 	map_kernel("data",
 		ROUND_DOWN((ptr_t)__data_seg_start, LARGE_PAGE_SIZE),
 		ROUND_UP((ptr_t)__data_seg_end, LARGE_PAGE_SIZE),
@@ -669,7 +669,7 @@ __init_text void arch_mmu_init(void) {
 	map_kernel("init",
 		ROUND_DOWN((ptr_t)__init_seg_start, PAGE_SIZE),
 		ROUND_UP((ptr_t)__init_seg_end, PAGE_SIZE),
-		MMU_MAP_WRITE | MMU_MAP_EXEC);
+		MMU_MAP_WRITE | MMU_MAP_EXECUTE);
 
 	/* Search for the highest physical address we have in the memory map. */
 	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {

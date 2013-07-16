@@ -422,7 +422,7 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	/* Write-protect all mappings on the source region. */
 	mmu_context_lock(src->as->mmu);
 	mmu_context_protect(src->as->mmu, src->start, src->size,
-		(src->protection & VM_PROT_EXECUTE) ? MMU_MAP_EXEC : 0);
+		(src->protection & VM_PROT_EXECUTE) ? MMU_MAP_EXECUTE : 0);
 	mmu_context_unlock(src->as->mmu);
 
 	/* Point all of the pages in the new map to the pages from the source
@@ -638,7 +638,7 @@ static status_t vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, uint3
 	if(region->protection & VM_PROT_WRITE)
 		protect |= MMU_MAP_WRITE;
 	if(region->protection & VM_PROT_EXECUTE)
-		protect |= MMU_MAP_EXEC;
+		protect |= MMU_MAP_EXECUTE;
 
 	if(!amap->pages[idx] && !handle) {
 		/* No page existing and no source. Allocate a zeroed page. */
@@ -819,7 +819,7 @@ static status_t vm_object_fault(vm_region_t *region, ptr_t addr) {
 	if(region->protection & VM_PROT_WRITE)
 		protect |= MMU_MAP_WRITE;
 	if(region->protection & VM_PROT_EXECUTE)
-		protect |= MMU_MAP_EXEC;
+		protect |= MMU_MAP_EXECUTE;
 
 	/* Map the entry in. FIXME: Once page reservations are implemented we
 	 * should reserve pages right at the beginning of the fault handler

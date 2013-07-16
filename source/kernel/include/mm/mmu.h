@@ -114,7 +114,7 @@ typedef struct mmu_context {
 
 /** Mapping protection flags. */
 #define MMU_MAP_WRITE		(1<<0)	/**< Mapping should be writeable. */
-#define MMU_MAP_EXEC		(1<<1)	/**< Mapping should be executable. */
+#define MMU_MAP_EXECUTE		(1<<1)	/**< Mapping should be executable. */
 
 extern mmu_context_t kernel_mmu_context;
 extern mmu_ops_t *mmu_ops;

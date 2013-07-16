@@ -325,7 +325,7 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
 
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		mmu_context_map(&kernel_mmu_context, (ptr_t)bios_mem_mapping + addr + i,
-			phys + i, MMU_MAP_WRITE | MMU_MAP_EXEC, MM_KERNEL);
+			phys + i, MMU_MAP_WRITE | MMU_MAP_EXECUTE, MM_KERNEL);
 	}
 
 	mmu_context_unlock(&kernel_mmu_context);
