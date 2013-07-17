@@ -1100,13 +1100,16 @@ status_t kern_thread_control(handle_t handle, int action, const void *in, void *
 		/* Can only set TLS address of current thread. */
 		if(khandle) {
 			ret = STATUS_NOT_SUPPORTED;
-			goto out;
+			break;
 		}
 
 		ret = arch_thread_set_tls_addr(thread, (ptr_t)in);
 		break;
+	default:
+		ret = STATUS_INVALID_ARG;
+		break;
 	}
-out:
+
 	if(khandle)
 		object_handle_release(khandle);
 

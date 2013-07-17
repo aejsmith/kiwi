@@ -162,7 +162,7 @@ static __init_text void detect_cpu_features(cpu_t *cpu, x86_features_t *features
 	/* Get the highest supported standard level. */
 	x86_cpuid(X86_CPUID_VENDOR_ID, &features->highest_standard, &ebx, &ecx, &edx);
 	if(features->highest_standard < X86_CPUID_FEATURE_INFO)
-		return;
+		fatal("CPUID feature information not supported");
 
 	/* Get standard feature information. */
 	x86_cpuid(X86_CPUID_FEATURE_INFO, &eax, &ebx, &features->standard_ecx, &features->standard_edx);

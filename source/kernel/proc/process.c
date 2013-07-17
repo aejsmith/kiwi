@@ -1166,22 +1166,29 @@ status_t kern_process_control(handle_t handle, int action, const void *in, void 
 	case PROCESS_LOADED:
 		if(khandle) {
 			ret = STATUS_NOT_SUPPORTED;
-			goto out;
+			break;
 		}
 
 		mutex_lock(&process->lock);
+
 		if(process->create) {
 			process->create->status = STATUS_SUCCESS;
 			semaphore_up(&process->create->sem, 1);
 			process->create = NULL;
 		}
+
 		mutex_unlock(&curr_proc->lock);
+
+		ret = STATUS_SUCCESS;
+		break;
+	default:
+		ret = STATUS_INVALID_ARG;
 		break;
 	}
-out:
-	if(khandle) {
+
+	if(khandle)
 		object_handle_release(khandle);
-	}
+
 	return ret;
 }
 

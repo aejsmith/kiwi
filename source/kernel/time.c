@@ -552,7 +552,7 @@ status_t kern_timer_create(unsigned flags, handle_t *handlep) {
 	handle = object_handle_create(&timer->obj, NULL, 0);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
-	return STATUS_SUCCESS;
+	return ret;
 }
 
 /** Start a timer.

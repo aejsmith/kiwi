@@ -1676,7 +1676,7 @@ static void dump_region(vm_region_t *region) {
 static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) {
 	enum { DUMP_ALL, DUMP_ALLOCATED, DUMP_FREE } mode;
 	uint64_t val;
-	process_t *process;
+	process_t *process = NULL;
 	vm_aspace_t *as;
 	unsigned i;
 
@@ -1725,9 +1725,9 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
 
 	if(mode == DUMP_ALL) {
 		if(process) {
-			kdb_printf("Aspace %p\n", as);
-		} else {
 			kdb_printf("Aspace %p (%s)\n", as, process->name);
+		} else {
+			kdb_printf("Aspace %p\n", as);
 		}
 		kdb_printf("=================================================\n");
 
