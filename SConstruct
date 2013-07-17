@@ -207,6 +207,11 @@ class EnvironmentManager(dict):
         if os.environ.has_key('CC') and os.path.basename(os.environ['CC']) == 'ccc-analyzer':
             env['CC'] = os.environ['CC']
             env['ENV']['CCC_CC'] = tool_path('clang')
+
+            # Force a rebuild when doing static analysis.
+            def decide_if_changed(dependency, target, prev_ni):
+                return True
+            env.Decider(decide_if_changed)
         else:
             env['CC'] = tool_path('clang')
         if os.environ.has_key('CXX') and os.path.basename(os.environ['CXX']) == 'c++-analyzer':
