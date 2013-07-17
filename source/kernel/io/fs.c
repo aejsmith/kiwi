@@ -1915,16 +1915,16 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 			node->mount->id, node->id);
 		kdb_printf("=================================================\n");
 
-		kdb_printf("Count:   %d\n", refcount_get(&node->count));
-		kdb_printf("Mount:   %p - locked: %d (%" PRId32 ")\n",
+		kdb_printf("count:   %d\n", refcount_get(&node->count));
+		kdb_printf("mount:   %p - locked: %d (%" PRId32 ")\n",
 			node->mount, atomic_get(&node->mount->lock.value),
 			(node->mount->lock.holder) ? node->mount->lock.holder->id : -1);
-		kdb_printf("Ops:     %p\n", node->ops);
-		kdb_printf("Data:    %p\n", node->data);
-		kdb_printf("Flags:   0x%x\n", node->flags);
-		kdb_printf("Type:    %d\n", node->file.type);
+		kdb_printf("ops:     %p\n", node->ops);
+		kdb_printf("data:    %p\n", node->data);
+		kdb_printf("flags:   0x%x\n", node->flags);
+		kdb_printf("type:    %d\n", node->file.type);
 		if(node->mounted) {
-			kdb_printf("Mounted: %p (%" PRIu16 ")\n", node->mounted,
+			kdb_printf("mounted: %p (%" PRIu16 ")\n", node->mounted,
 				node->mounted->id);
 		}
 	} else {

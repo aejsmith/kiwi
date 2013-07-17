@@ -728,11 +728,11 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
 
 		kdb_printf("Page 0x%" PRIxPHYS " (%p) (Range: %u)\n", page->addr, page, page->range);
 		kdb_printf("=================================================\n");
-		kdb_printf("State:    %d\n", page->state);
-		kdb_printf("Modified: %d\n", page->modified);
-		kdb_printf("Count:    %d\n", page->count);
-		kdb_printf("Cache:    %p\n", page->cache);
-		kdb_printf("Offset:   %" PRIu64 "\n", page->offset);
+		kdb_printf("state:    %d\n", page->state);
+		kdb_printf("modified: %d\n", page->modified);
+		kdb_printf("count:    %d\n", page->count);
+		kdb_printf("cache:    %p\n", page->cache);
+		kdb_printf("offset:   %" PRIu64 "\n", page->offset);
 	} else {
 		kdb_printf("Start              End                Freelist Pages\n");
 		kdb_printf("=====              ===                ======== =====\n");

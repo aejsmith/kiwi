@@ -602,12 +602,12 @@ static kdb_status_t kdb_cmd_cache(int argc, char **argv, kdb_filter_t *filter) {
 	kdb_printf("Cache %p\n", cache);
 	kdb_printf("=================================================\n");
 
-	kdb_printf("Locked:  %d (%" PRId32 ")\n", atomic_get(&cache->lock.value),
+	kdb_printf("locked:  %d (%" PRId32 ")\n", atomic_get(&cache->lock.value),
 		(cache->lock.holder) ? cache->lock.holder->id : -1);
-	kdb_printf("Size:    %" PRIu64 "\n", cache->size);
-	kdb_printf("Ops:     %p\n", cache->ops);
-	kdb_printf("Data:    %p\n", cache->data);
-	kdb_printf("Deleted: %d\n\n", cache->deleted);
+	kdb_printf("size:    %" PRIu64 "\n", cache->size);
+	kdb_printf("ops:     %p\n", cache->ops);
+	kdb_printf("data:    %p\n", cache->data);
+	kdb_printf("deleted: %d\n\n", cache->deleted);
 
 	/* Show all cached pages. */
 	kdb_printf("Cached pages:\n");
