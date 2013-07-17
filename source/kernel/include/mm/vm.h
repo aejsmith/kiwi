@@ -83,8 +83,8 @@ extern status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
 extern status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
 
 extern void vm_aspace_switch(vm_aspace_t *as);
-extern vm_aspace_t *vm_aspace_create(void);
-extern vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig);
+extern vm_aspace_t *vm_aspace_create(vm_aspace_t *parent);
+extern vm_aspace_t *vm_aspace_clone(vm_aspace_t *parent);
 extern void vm_aspace_destroy(vm_aspace_t *as);
 
 extern void vm_init(void);

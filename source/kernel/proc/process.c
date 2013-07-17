@@ -326,15 +326,16 @@ static status_t process_alloc(const char *name, int flags, int priority,
 }
 
 /** Set up a new address space for a process.
+ * @param parent	Parent process.
  * @param info		Pointer to information structure.
  * @return		Status code describing result of the operation. */
-static status_t process_aspace_create(process_create_t *info) {
+static status_t process_aspace_create(process_t *parent, process_create_t *info) {
 	object_handle_t *handle;
 	status_t ret;
 	size_t size;
 
 	semaphore_init(&info->sem, "process_create_sem", 0);
-	info->aspace = vm_aspace_create();
+	info->aspace = vm_aspace_create(parent->aspace);
 
 	/* Reserve space for the binary being loaded in the address space. The
 	 * actual loading of it is done by the kernel library's loader, however
@@ -572,7 +573,7 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	info.env = env;
 
 	/* Create the address space for the process. */
-	ret = process_aspace_create(&info);
+	ret = process_aspace_create(parent, &info);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -862,7 +863,7 @@ status_t kern_process_create(const char *path, const char *const args[],
 		return ret;
 
 	/* Create the address space for the process. */
-	ret = process_aspace_create(&info);
+	ret = process_aspace_create(curr_proc, &info);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -951,7 +952,7 @@ status_t kern_process_replace(const char *path, const char *const args[],
 		return ret;
 
 	/* Create the new address space for the process. */
-	ret = process_aspace_create(&info);
+	ret = process_aspace_create(curr_proc, &info);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 

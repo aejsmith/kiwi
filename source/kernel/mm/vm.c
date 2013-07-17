@@ -58,8 +58,8 @@
  *			two-level array, which would reduce memory consumption
  *			for large, sparsely-used objects.
  * @todo		Swap support.
- * @todo		Implement VM_MAP_INHERIT, VM_MAP_OVERCOMMIT (at the
- *			moment we just overcommit regardless).
+ * @todo		Implement VM_MAP_OVERCOMMIT (at the moment we just
+ *			overcommit regardless).
  * @todo		Memory locking.
  * @todo		Shouldn't use MM_KERNEL for user address spaces? Note
  *			that MM_USER will at some point use interruptible sleep
@@ -358,6 +358,10 @@ static vm_region_t *vm_region_create(vm_aspace_t *as, ptr_t start, size_t size,
 	uint32_t protection, uint32_t flags, int state, const char *name)
 {
 	vm_region_t *region;
+
+	assert(!(start % PAGE_SIZE));
+	assert(!(size % PAGE_SIZE));
+	assert(state == VM_REGION_ALLOCATED || !name);
 
 	region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
 	region->as = as;
@@ -1072,33 +1076,18 @@ static vm_region_t *trim_regions(vm_aspace_t *as, ptr_t start, size_t size) {
 }
 
 /** Insert a region, replacing overlapping existing regions.
- * @note		Addresses must be checked for validity by the caller.
  * @param as		Address space to insert into.
- * @param start		Start of region to insert.
- * @param size		Size of region to insert.
- * @param protection	Protection flags for the region.
- * @param flags		Flags for the region.
- * @param state		State of the region.
- * @param name		Name of the region (should be NULL for non-allocated
- *			regions).
- * @return		Pointer to inserted region. May not start or end at the
- *			requested addresses if inserting a free or reserved
- *			region due to coalescing. This region will have been
- *			inserted into the tree or free lists as necessary. */
-static vm_region_t *insert_region(vm_aspace_t *as, ptr_t start, size_t size,
-	uint32_t protection, uint32_t flags, int state, const char *name)
-{
-	vm_region_t *region, *exist;
-
-	assert(state == VM_REGION_ALLOCATED || !name);
-
-	/* Create the new region. */
-	region = vm_region_create(as, start, size, protection, flags, state, name);
+ * @param region	Region to insert. Start address and size may be modified
+ * 			if inserting a free or reserved region due to coalescing.
+ *			This region will have been inserted into the tree or
+ *			free lists as necessary. */
+static void insert_region(vm_aspace_t *as, vm_region_t *region) {
+	vm_region_t *exist;
 
 	/* Create a hole to insert the new region into. */
-	exist = trim_regions(as, start, size);
+	exist = trim_regions(as, region->start, region->size);
 	if(exist) {
-		assert((exist->start + exist->size) == start);
+		assert((exist->start + exist->size) == region->start);
 
 		list_add_after(&exist->header, &region->header);
 
@@ -1115,7 +1104,7 @@ static vm_region_t *insert_region(vm_aspace_t *as, ptr_t start, size_t size,
 	/* Check if we can merge with the region after. */
 	exist = vm_region_next(region);
 	if(exist) {
-		assert(exist->start == (start + size));
+		assert(exist->start == (region->start + region->size));
 
 		if(vm_region_mergeable(region, exist)) {
 			region->size += exist->size;
@@ -1129,8 +1118,6 @@ static vm_region_t *insert_region(vm_aspace_t *as, ptr_t start, size_t size,
 	} else if(region->state == VM_REGION_FREE) {
 		vm_freelist_insert(region, region->size);
 	}
-
-	return region;
 }
 
 /** Allocate space in an address space.
@@ -1322,9 +1309,9 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 			return STATUS_NO_MEMORY;
 		}
 
-		/* Replace any existing mappings. */
-		region = insert_region(as, addr, size, protection, flags,
+		region = vm_region_create(as, addr, size, protection, flags,
 			VM_REGION_ALLOCATED, name);
+		insert_region(as, region);
 		break;
 	}
 
@@ -1364,6 +1351,8 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
  * @return		Status code describing result of the operation.
  */
 status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
+	vm_region_t *region;
+
 	if(!size || start % PAGE_SIZE || size % PAGE_SIZE)
 		return STATUS_INVALID_ARG;
 
@@ -1374,7 +1363,8 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 		return STATUS_NO_MEMORY;
 	}
 
-	insert_region(as, start, size, 0, 0, VM_REGION_FREE, NULL);
+	region = vm_region_create(as, start, size, 0, 0, VM_REGION_FREE, NULL);
+	insert_region(as, region);
 
 	dprintf("vm: unmapped region [%p,%p) in %p\n", start, start + size, as);
 	mutex_unlock(&as->lock);
@@ -1395,6 +1385,8 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
  * @return		Status code describing result of the operation.
  */
 status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
+	vm_region_t *region;
+
 	if(!size || start % PAGE_SIZE || size % PAGE_SIZE)
 		return STATUS_INVALID_ARG;
 
@@ -1405,7 +1397,8 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 		return STATUS_NO_MEMORY;
 	}
 
-	insert_region(as, start, size, 0, 0, VM_REGION_RESERVED, NULL);
+	region = vm_region_create(as, start, size, 0, 0, VM_REGION_RESERVED, NULL);
+	insert_region(as, region);
 
 	dprintf("vm: reserved region [%p,%p) in %p\n", start, start + size, as);
 	mutex_unlock(&as->lock);
@@ -1443,10 +1436,12 @@ void vm_aspace_switch(vm_aspace_t *as) {
 }
 
 /** Create a new address space.
+ * @param parent	Parent process' address space, used to inherit regions.
+ *			Can be NULL.
  * @return		Pointer to address space structure. */
-vm_aspace_t *vm_aspace_create(void) {
-	vm_region_t *region;
+vm_aspace_t *vm_aspace_create(vm_aspace_t *parent) {
 	vm_aspace_t *as;
+	vm_region_t *region, *parent_region;
 	status_t ret;
 
 	as = slab_cache_alloc(vm_aspace_cache, MM_KERNEL);
@@ -1466,6 +1461,27 @@ vm_aspace_t *vm_aspace_create(void) {
 	assert(ret == STATUS_SUCCESS);
 	ret = vm_reserve(as, LIBKERNEL_BASE, LIBKERNEL_SIZE);
 	assert(ret == STATUS_SUCCESS);
+
+	if(parent) {
+		mutex_lock(&parent->lock);
+
+		/* Find all inheritable regions in the parent's address space
+		 * and clone them. */
+		LIST_FOREACH(&parent->regions, iter) {
+			parent_region = list_entry(iter, vm_region_t, header);
+
+			if(!(parent_region->flags & VM_MAP_INHERIT))
+				continue;
+
+			assert(parent_region->state == VM_REGION_ALLOCATED);
+
+			region = vm_region_clone(parent_region, as);
+			insert_region(as, region);
+		}
+
+		mutex_unlock(&parent->lock);
+	}
+
 	return as;
 }
 
@@ -1476,25 +1492,25 @@ vm_aspace_t *vm_aspace_create(void) {
  * shared among the two address spaces (modifications in one will affect both),
  * whereas private regions will be duplicated via copy-on-write.
  *
- * @param orig		Original address space.
+ * @param parent	Original address space.
  *
  * @return		Pointer to new address space.
  */
-vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
-	vm_region_t *orig_region, *region;
+vm_aspace_t *vm_aspace_clone(vm_aspace_t *parent) {
 	vm_aspace_t *as;
+	vm_region_t *parent_region, *region;
 
 	as = slab_cache_alloc(vm_aspace_cache, MM_KERNEL);
 	as->mmu = mmu_context_create(MM_KERNEL);
 	as->find_cache = NULL;
 	as->free_map = 0;
 
-	mutex_lock(&orig->lock);
+	mutex_lock(&parent->lock);
 
 	/* Clone each region in the original address space. */
-	LIST_FOREACH(&orig->regions, iter) {
-		orig_region = list_entry(iter, vm_region_t, header);
-		region = vm_region_clone(orig_region, as);
+	LIST_FOREACH(&parent->regions, iter) {
+		parent_region = list_entry(iter, vm_region_t, header);
+		region = vm_region_clone(parent_region, as);
 		list_append(&as->regions, &region->header);
 
 		/* Insert into the region tree or the free lists. */
@@ -1505,7 +1521,7 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 		}
 	}
 
-	mutex_unlock(&orig->lock);
+	mutex_unlock(&parent->lock);
 	return as;
 }
 
