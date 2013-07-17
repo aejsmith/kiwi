@@ -34,9 +34,15 @@
 # define __printf(a, b)		__attribute__((format(printf, a, b)))
 # define __deprecated		__attribute__((deprecated))
 # define __always_inline	__attribute__((always_inline))
-# define __init_text		__attribute__((section(".init.text")))
-# define __init_data		__attribute__((section(".init.data")))
-# define __section(s)		__attribute__((section(s)))
+# ifdef __clang_analyzer__
+#  define __init_text		
+#  define __init_data		
+#  define __section(s)		
+# else
+#  define __init_text		__attribute__((section(".init.text")))
+#  define __init_data		__attribute__((section(".init.data")))
+#  define __section(s)		__attribute__((section(s)))
+# endif
 # define __cacheline_aligned	__aligned(CPU_CACHE_SIZE)
 # define likely(x)		__builtin_expect(!!(x), 1)
 # define unlikely(x)		__builtin_expect(!!(x), 0)
