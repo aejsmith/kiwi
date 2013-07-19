@@ -49,6 +49,8 @@
 
 #include <arch/memory.h>
 
+#include <kernel/private/thread.h>
+
 #include <lib/id_allocator.h>
 #include <lib/string.h>
 
@@ -73,11 +75,21 @@
 #include <status.h>
 #include <time.h>
 
-#if CONFIG_PROC_DEBUG
+/** Define to enable debug output on thread creation/deletion. */
+#define DEBUG_THREAD
+
+#ifdef DEBUG_THREAD
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
 #else
 # define dprintf(fmt...)	
 #endif
+
+/** Thread creation arguments structure, for thread_uspace_trampoline(). */
+typedef struct thread_uspace_args {
+	ptr_t sp;			/**< Stack pointer. */
+	ptr_t entry;			/**< Entry point address. */
+	ptr_t arg;			/**< Argument. */
+} thread_uspace_args_t;
 
 static bool thread_timeout(void *_thread);
 
@@ -106,37 +118,69 @@ static void thread_ctor(void *obj, void *data) {
 	notifier_init(&thread->death_notifier, thread);
 }
 
-/** Thread entry function wrapper. */
-static void thread_trampoline(void) {
-	/* Upon switching to a newly-created thread's context, execution will
-	 * jump to this function, rather than going back to the scheduler.
-	 * It is therefore necessary to perform post-switch tasks now. */
-	sched_post_switch(true);
-
-	dprintf("thread: entered thread %" PRId32 " (%s) on CPU %" PRIu32 "\n",
-		curr_thread->id, curr_thread->name, curr_cpu->id);
-
-	/* Set the last time to now so that accounting information is correct. */
-	curr_thread->last_time = system_time();
-
-	/* Run the thread's main function and then exit when it returns. */
-	curr_thread->func(curr_thread->arg1, curr_thread->arg2);
-	thread_exit();
+/**
+ * Increase the reference count of a thread.
+ *
+ * Increases the reference count of a thread. This should be done when you
+ * want to ensure that the thread will not freed: it will only be freed once
+ * the count reaches 0.
+ *
+ * @param thread	Thread to retain.
+ */
+void thread_retain(thread_t *thread) {
+	refcount_inc(&thread->count);
 }
 
-/** Entry function for a userspace thread.
- * @param _args		Argument structure pointer (will be freed).
- * @param arg2		Unused. */
-void thread_uspace_trampoline(void *_args, void *arg2) {
-	thread_uspace_args_t *args = _args;
-	ptr_t entry, sp, arg;
+/** Clean up a thread's resources after it has died.
+ * @param thread	Thread to clean up. */
+static void thread_cleanup(thread_t *thread) {
+	/* If the user stack was allocated by us on behalf of the program, we
+	 * should unmap it. */
+	if(thread->ustack_size)
+		vm_unmap(thread->owner->aspace, thread->ustack, thread->ustack_size);
 
-	entry = args->entry;
-	sp = args->sp;
-	arg = args->arg;
-	kfree(args);
+	arch_thread_destroy(thread);
+	kmem_free(thread->kstack, KSTACK_SIZE);
+	notifier_clear(&thread->death_notifier);
+}
 
-	arch_thread_enter_userspace(entry, sp, arg);
+/**
+ * Decrease the reference count of a thread.
+ *
+ * Decreases the reference count of a thread. This should be called once you
+ * no longer require a thread object (that was returned from thread_create() or
+ * thread_lookup(), or that you previously called thread_retain() on). Once the
+ * reference count reaches 0, the thread will be destroyed.
+ *
+ * @param thread	Thread to release.
+ */
+void thread_release(thread_t *thread) {
+	if(refcount_dec(&thread->count) > 0)
+		return;
+
+	/* If a thread is running it will have a reference on it. Should not be
+	 * in the running state for this reason. */
+	assert(thread->state == THREAD_CREATED || thread->state == THREAD_DEAD);
+	assert(list_empty(&thread->runq_link));
+
+	/* If the thread hasn't been run we still have to clean it up as it will
+	 * not have gone through thread_exit(). */
+	if(thread->state == THREAD_CREATED)
+		thread_cleanup(thread);
+
+	rwlock_write_lock(&thread_tree_lock);
+	avl_tree_remove(&thread_tree, &thread->tree_link);
+	rwlock_unlock(&thread_tree_lock);
+
+	process_detach_thread(thread);
+
+	object_destroy(&thread->obj);
+	id_allocator_free(&thread_id_allocator, thread->id);
+
+	dprintf("thread: destroyed thread %" PRId32 " (%s) (thread: %p)\n", thread->id,
+		thread->name, thread);
+
+	slab_cache_free(thread_cache, thread);
 }
 
 /** Closes a handle to a thread.
@@ -189,61 +233,6 @@ static object_type_t thread_object_type = {
 	.wait = thread_object_wait,
 	.unwait = thread_object_unwait,
 };
-
-/**
- * Increase the reference count of a thread.
- *
- * Increases the reference count of a thread. This should be done when you
- * want to ensure that the thread will not freed: it will only be freed once
- * the count reaches 0.
- *
- * @param thread	Thread to retain.
- */
-void thread_retain(thread_t *thread) {
-	refcount_inc(&thread->count);
-}
-
-/**
- * Decrease the reference count of a thread.
- *
- * Decreases the reference count of a thread. This should be called once you
- * no longer require a thread object (that was returned from thread_create() or
- * thread_lookup(), or that you previously called thread_retain() on). Once the
- * reference count reaches 0, the thread will be destroyed.
- *
- * @param thread	Thread to release.
- */
-void thread_release(thread_t *thread) {
-	if(refcount_dec(&thread->count) > 0)
-		return;
-
-	/* If a thread is running it will have a reference on it. Should not be
-	 * in the running state for this reason. */
-	assert(thread->state == THREAD_CREATED || thread->state == THREAD_DEAD);
-	assert(list_empty(&thread->runq_link));
-
-	/* Remove from thread tree. */
-	rwlock_write_lock(&thread_tree_lock);
-	avl_tree_remove(&thread_tree, &thread->tree_link);
-	rwlock_unlock(&thread_tree_lock);
-
-	/* Detach from its owner. */
-	process_detach(thread);
-
-	/* Now clean up the thread. */
-	arch_thread_destroy(thread);
-	kmem_free(thread->kstack, KSTACK_SIZE);
-	notifier_clear(&thread->death_notifier);
-	object_destroy(&thread->obj);
-
-	/* Deallocate the thread ID. */
-	id_allocator_free(&thread_id_allocator, thread->id);
-
-	dprintf("thread: destroyed thread %" PRId32 " (%s) (thread: %p)\n", thread->id,
-		thread->name, thread);
-
-	slab_cache_free(thread_cache, thread);
-}
 
 /**
  * Wire a thread to its current CPU.
@@ -627,10 +616,9 @@ void thread_at_kernel_exit(void) {
 void thread_exit(void) {
 	bool state;
 
-	if(curr_thread->ustack_size)
-		vm_unmap(curr_proc->aspace, curr_thread->ustack, curr_thread->ustack_size);
-
 	notifier_run(&curr_thread->death_notifier, NULL, true);
+	thread_cleanup(curr_thread);
+	process_thread_exited(curr_thread);
 
 	state = local_irq_disable();
 	spinlock_lock_noirq(&curr_thread->lock);
@@ -645,7 +633,7 @@ void thread_exit(void) {
  * Look up a thread without taking the tree lock.
  *
  * Looks up a thread by its ID, without taking the tree lock. The returned
- * thread will _not_ have an extra reference on it.
+ * thread will not have an extra reference on it.
  *
  * @warning		This function should only be used within KDB. Use
  *			thread_lookup() outside of KDB.
@@ -663,7 +651,8 @@ thread_t *thread_lookup_unsafe(thread_id_t id) {
  *
  * Looks up a running thread by its ID. Newly created and dead threads are
  * ignored. If the thread is found, it will be returned with a reference
- * added to it. Once it is no longer needed, release() should be called on it.
+ * added to it. Once it is no longer needed, thread_release() should be called
+ * on it.
  *
  * @param id		ID of the thread to find.
  *
@@ -691,6 +680,24 @@ thread_t *thread_lookup(thread_id_t id) {
 
 	rwlock_unlock(&thread_tree_lock);
 	return thread;
+}
+
+/** Thread entry function wrapper. */
+static void thread_trampoline(void) {
+	/* Upon switching to a newly-created thread's context, execution will
+	 * jump to this function, rather than going back to the scheduler.
+	 * It is therefore necessary to perform post-switch tasks now. */
+	sched_post_switch(true);
+
+	dprintf("thread: entered thread %" PRId32 " (%s) on CPU %" PRIu32 "\n",
+		curr_thread->id, curr_thread->name, curr_cpu->id);
+
+	/* Set the last time to now so that accounting information is correct. */
+	curr_thread->last_time = system_time();
+
+	/* Run the thread's main function and then exit when it returns. */
+	curr_thread->func(curr_thread->arg1, curr_thread->arg2);
+	thread_exit();
 }
 
 /**
@@ -782,12 +789,11 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->signal_stack.ss_flags = SS_DISABLE;
 
 	/* Add the thread to the owner. */
-	process_attach(owner, thread);
+	process_attach_thread(owner, thread);
 
 	/* Add to the thread tree. */
 	rwlock_write_lock(&thread_tree_lock);
 	avl_tree_insert(&thread_tree, thread->id, &thread->tree_link);
-	rwlock_unlock(&thread_tree_lock);
 
 	dprintf("thread: created thread %" PRId32 " (%s) (thread: %p, owner: %p)\n",
 		thread->id, thread->name, thread, owner);
@@ -799,12 +805,15 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags,
 		thread_run(thread);
 	}
 
+	rwlock_unlock(&thread_tree_lock);
 	return STATUS_SUCCESS;
 }
 
 /** Run a newly-created thread.
  * @param thread	Thread to run. */
 void thread_run(thread_t *thread) {
+	process_thread_started(thread);
+
 	spinlock_lock(&thread->lock);
 
 	assert(thread->state == THREAD_CREATED);
@@ -934,42 +943,65 @@ __init_text void thread_init(void) {
 	kdb_register_command("kill", "Kill a running user thread.", kdb_cmd_kill);
 }
 
+/** Entry function for a userspace thread.
+ * @param _args		Argument structure pointer (will be freed).
+ * @param arg2		Unused. */
+void thread_uspace_trampoline(void *_args, void *arg2) {
+	thread_uspace_args_t *args = _args;
+	ptr_t entry, sp, arg;
+
+	entry = args->entry;
+	sp = args->sp;
+	arg = args->arg;
+	kfree(args);
+
+	arch_thread_enter_userspace(entry, sp, arg, 0);
+}
+
 /** Create a new thread.
  * @param name		Name of the thread to create.
- * @param stack		Pointer to base of stack to use for thread. If NULL,
- *			then a new stack will be allocated.
- * @param stacksz	Size of stack. If a stack is provided, then this should
- *			be the size of that stack. Otherwise, it is used as the
- *			size of the stack to create - if it is zero then a
- *			stack of the default size will be allocated.
- * @param func		Function to execute.
- * @param arg		Argument to pass to thread.
+ * @param entry		Details of the entry point and stack for the new thread.
+ *			See the documentation for thread_entry_t for details of
+ *			the purpose of each member.
+ * @param flags		Creation behaviour flags.
  * @param handlep	Where to store handle to the thread (can be NULL).
  * @return		Status code describing result of the operation. */
-status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
-	void (*func)(void *), void *arg, handle_t *handlep)
+status_t kern_thread_create(const char *name, thread_entry_t *entry,
+	uint32_t flags, handle_t *handlep)
 {
+	thread_entry_t kentry;
 	thread_uspace_args_t *args;
 	thread_t *thread = NULL;
 	object_handle_t *khandle;
-	handle_t handle = -1;
-	status_t ret;
+	handle_t uhandle = -1;
+	char str[THREAD_NAME_MAX];
 	char *kname;
+	status_t ret;
 
-	if(!handlep) {
+	ret = memcpy_from_user(&kentry, entry, sizeof(kentry));
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	if(!kentry.func)
 		return STATUS_INVALID_ARG;
-	} else if(validate_user_address(stack, stacksz) != STATUS_SUCCESS) {
-		return STATUS_INVALID_ADDR;
+
+	if(kentry.stack) {
+		if(!kentry.stack_size)
+			return STATUS_INVALID_ARG;
+
+		ret = validate_user_address(kentry.stack, kentry.stack_size);
+		if(ret != STATUS_SUCCESS)
+			return ret;
 	}
 
 	ret = strndup_from_user(name, THREAD_NAME_MAX, &kname);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	/* Create arguments structure. */
+	/* Create arguments structure. This will be freed by the entry thread. */
 	args = kmalloc(sizeof(thread_uspace_args_t), MM_KERNEL);
-	args->entry = (ptr_t)func;
-	args->arg = (ptr_t)arg;
+	args->entry = (ptr_t)kentry.func;
+	args->arg = (ptr_t)kentry.arg;
 
 	/* Create the thread, but do not run it yet. We attempt to create the
 	 * handle to the thread before running it as this allows us to
@@ -982,40 +1014,46 @@ status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
 	/* Create a handle to the thread if necessary. */
 	if(handlep) {
 		refcount_inc(&thread->count);
+
 		khandle = object_handle_create(&thread->obj, NULL, 0);
-		ret = object_handle_attach(khandle, &handle, handlep);
+		ret = object_handle_attach(khandle, &uhandle, handlep);
 		object_handle_release(khandle);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
 	}
 
 	/* Create a userspace stack. TODO: Stack direction! */
-	if(stack) {
-		args->sp = (ptr_t)stack + stacksz;
+	if(kentry.stack) {
+		args->sp = (ptr_t)kentry.stack + kentry.stack_size;
 	} else {
-		if(stacksz) {
-			stacksz = ROUND_UP(stacksz, PAGE_SIZE);
+		if(kentry.stack_size) {
+			kentry.stack_size = ROUND_UP(kentry.stack_size, PAGE_SIZE);
 		} else {
-			stacksz = USTACK_SIZE;
+			kentry.stack_size = USTACK_SIZE;
 		}
 
-		ret = vm_map(curr_proc->aspace, &thread->ustack, stacksz,
+		snprintf(str, sizeof(str), "%s_stack", kname);
+
+		ret = vm_map(curr_proc->aspace, &thread->ustack, kentry.stack_size,
 			VM_ADDRESS_ANY, VM_PROT_READ | VM_PROT_WRITE,
-			VM_MAP_PRIVATE | VM_MAP_STACK, NULL, 0, NULL);
+			VM_MAP_PRIVATE | VM_MAP_STACK, NULL, 0, str);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
 
-		thread->ustack_size = stacksz;
-		args->sp = thread->ustack + stacksz;
+		/* Stack will be unmapped when the thread exits by
+		 * thread_cleanup(). */
+		thread->ustack_size = kentry.stack_size;
+
+		args->sp = thread->ustack + kentry.stack_size;
 	}
 
 	thread_run(thread);
 	thread_release(thread);
 	kfree(kname);
-	return ret;
+	return STATUS_SUCCESS;
 fail:
-	if(handle >= 0)
-		object_handle_detach(handle);
+	if(uhandle >= 0)
+		object_handle_detach(uhandle);
 
 	if(thread)
 		thread_release(thread);
@@ -1048,16 +1086,10 @@ status_t kern_thread_open(thread_id_t id, handle_t *handlep) {
 	return ret;
 }
 
-/**
- * Get the ID of a thread.
- *
- * Gets the ID of the thread referred to by a handle. If the handle is
- * specified as -1, then the ID of the calling thread will be returned.
- *
- * @param handle	Handle for thread to get ID of.
- *
- * @return		Thread ID, or -1 if the handle is invalid.
- */
+/** Get the ID of a thread.
+ * @param handle	Handle for thread to get ID of, or INVALID_HANDLE to
+ *			get ID of the calling thread.
+ * @return		Thread ID on success, -1 if handle is invalid. */
 thread_id_t kern_thread_id(handle_t handle) {
 	object_handle_t *khandle;
 	thread_id_t id = -1;
@@ -1074,44 +1106,27 @@ thread_id_t kern_thread_id(handle_t handle) {
 	return id;
 }
 
-/** Perform operations on a thread.
- * @param handle	Handle to thread, or -1 to operate on the calling thread.
+/** Perform operations on the current thread (for internal use by libkernel).
  * @param action	Action to perform.
  * @param in		Pointer to input buffer.
  * @param out		Pointer to output buffer.
  * @return		Status code describing result of the operation. */
-status_t kern_thread_control(handle_t handle, int action, const void *in, void *out) {
-	object_handle_t *khandle = NULL;
-	thread_t *thread;
+status_t kern_thread_control(unsigned action, const void *in, void *out) {
+	ptr_t addr;
 	status_t ret;
 
-	if(handle < 0) {
-		thread = curr_thread;
-	} else {
-		ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, 0, &khandle);
-		if(ret != STATUS_SUCCESS)
-			return ret;
-
-		thread = (thread_t *)khandle->object;
-	}
-
 	switch(action) {
+	case THREAD_GET_TLS_ADDR:
+		addr = arch_thread_tls_addr(curr_thread);
+		ret = memcpy_to_user(out, &addr, sizeof(addr));
+		break;
 	case THREAD_SET_TLS_ADDR:
-		/* Can only set TLS address of current thread. */
-		if(khandle) {
-			ret = STATUS_NOT_SUPPORTED;
-			break;
-		}
-
-		ret = arch_thread_set_tls_addr(thread, (ptr_t)in);
+		ret = arch_thread_set_tls_addr(curr_thread, (ptr_t)in);
 		break;
 	default:
 		ret = STATUS_INVALID_ARG;
 		break;
 	}
-
-	if(khandle)
-		object_handle_release(khandle);
 
 	return ret;
 }

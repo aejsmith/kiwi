@@ -44,13 +44,6 @@ struct process;
 /** Entry function for a thread. */
 typedef void (*thread_func_t)(void *, void *);
 
-/** Thread creation arguments structure, for thread_uspace_trampoline(). */
-typedef struct thread_uspace_args {
-	ptr_t sp;			/**< Stack pointer. */
-	ptr_t entry;			/**< Entry point address. */
-	ptr_t arg;			/**< Argument. */
-} thread_uspace_args_t;
-
 /** Definition of a thread. */
 typedef struct thread {
 	object_t obj;			/**< Object header. */
@@ -158,12 +151,12 @@ extern void arch_thread_destroy(thread_t *thread);
 extern void arch_thread_switch(thread_t *thread, thread_t *prev);
 extern ptr_t arch_thread_tls_addr(thread_t *thread);
 extern status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr);
-extern void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) __noreturn;
-
-extern void thread_uspace_trampoline(void *_args, void *arg2);
+extern void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg1,
+	ptr_t arg2) __noreturn;
 
 extern void thread_retain(thread_t *thread);
 extern void thread_release(thread_t *thread);
+
 extern void thread_wire(thread_t *thread);
 extern void thread_unwire(thread_t *thread);
 extern void thread_wake(thread_t *thread);
@@ -183,6 +176,7 @@ extern void thread_exit(void) __noreturn;
 
 extern thread_t *thread_lookup_unsafe(thread_id_t id);
 extern thread_t *thread_lookup(thread_id_t id);
+
 extern status_t thread_create(const char *name, struct process *owner, unsigned flags,
 	thread_func_t func, void *arg1, void *arg2, thread_t **threadp);
 extern void thread_run(thread_t *thread);

@@ -29,22 +29,47 @@
 extern "C" {
 #endif
 
-/** Thread object events. */
-#define THREAD_EVENT_DEATH	0	/**< Wait for thread death. */
+/** Thread entry information. */
+typedef struct thread_entry {
+	void (*func)(void *);		/**< Entry point for the thread. */
+	void *arg;			/**< Argument to the entry function. */
 
-/** Actions for kern_thread_control(). */
-#define THREAD_SET_TLS_ADDR	1	/**< Set TLS base address (calling thread only). */
+	/**
+	 * Base of stack.
+	 *
+	 * Base address of the stack area for the process. The kernel deals with
+	 * setting the stack pointer within the specified area. If NULL, a stack
+	 * will be allocated by the kernel, and will be freed automatically
+	 * when the thread terminates. If not NULL, it is the responsibility of
+	 * the program to free the stack after the thread terminates.
+	 */
+	void *stack;
+
+	/**
+	 * Size of the stack.
+	 *
+	 * If stack is not NULL, then this should be the non-zero size of the
+	 * provided stack. Otherwise, it is used as the size of the stack to
+	 * create, with zero indicating that the default size should be used.
+	 */
+	size_t stack_size;
+} thread_entry_t;
+
+/** Handle value used to refer to the current thread. */
+#define THREAD_SELF		INVALID_HANDLE
+
+/** Thread object events. */
+#define THREAD_EVENT_DEATH	1	/**< Wait for thread death. */
 
 /** Thread priority values. */
 #define THREAD_PRIORITY_LOW	0	/**< Low priority. */
 #define THREAD_PRIORITY_NORMAL	1	/**< Normal priority. */
 #define THREAD_PRIORITY_HIGH	2	/**< High priority. */
 
-extern status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
-	void (*func)(void *), void *arg, handle_t *handlep);
+extern status_t kern_thread_create(const char *name, thread_entry_t *entry,
+	uint32_t flags, handle_t *handlep);
 extern status_t kern_thread_open(thread_id_t id, handle_t *handlep);
 extern thread_id_t kern_thread_id(handle_t handle);
-extern status_t kern_thread_control(handle_t handle, int action, const void *in, void *out);
 extern status_t kern_thread_status(handle_t handle, int *statusp);
 extern void kern_thread_exit(int status) __attribute__((noreturn));
 extern status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp);

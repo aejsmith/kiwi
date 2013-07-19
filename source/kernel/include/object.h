@@ -143,7 +143,7 @@ extern status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
 extern status_t object_handle_detach(handle_t id);
 
 extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2],
-	int count, handle_table_t **tablep);
+	ssize_t count, handle_table_t **tablep);
 extern handle_table_t *handle_table_clone(handle_table_t *src);
 extern void handle_table_destroy(handle_table_t *table);
 

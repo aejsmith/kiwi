@@ -32,7 +32,7 @@
 #include <cpu.h>
 #include <status.h>
 
-extern void amd64_enter_userspace(ptr_t entry, ptr_t sp, ptr_t arg) __noreturn;
+extern void amd64_enter_userspace(ptr_t entry, ptr_t sp, ptr_t arg1, ptr_t arg2) __noreturn;
 extern void amd64_context_switch(ptr_t new_rsp, ptr_t *old_rsp);
 extern void amd64_context_restore(ptr_t new_rsp);
 
@@ -156,12 +156,12 @@ status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr) {
 /** Enter userspace in the current thread.
  * @param entry		Entry function.
  * @param stack		Stack pointer.
- * @param arg		Argument to function. */
-void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) {
+ * @param arg1		First argument to function.
+ * @param arg2		Second argument to function. */
+void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg1, ptr_t arg2) {
 	/* Write a 0 return address for the entry function. */
 	stack -= sizeof(unsigned long);
-	if(memset_user((void *)stack, 0, sizeof(unsigned long)) != STATUS_SUCCESS)
-		thread_exit();
+	memset_user((void *)stack, 0, sizeof(unsigned long));
 
-	amd64_enter_userspace(entry, stack, arg);
+	amd64_enter_userspace(entry, stack, arg1, arg2);
 }

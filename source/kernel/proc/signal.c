@@ -126,7 +126,7 @@ void signal_handle_pending(void) {
 	int num;
 
 	/* Delay signal delivery during process loading. */
-	if(curr_proc->create)
+	if(curr_proc->load)
 		return;
 
 	mutex_lock(&curr_proc->lock);

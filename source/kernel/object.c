@@ -394,8 +394,8 @@ status_t object_handle_detach(handle_t id) {
  * @return		Status code describing result of the operation. Failure
  *			can only occur when handle mappings are specified.
  */
-status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
-	handle_table_t **tablep)
+status_t handle_table_create(handle_table_t *parent, handle_t map[][2],
+	ssize_t count, handle_table_t **tablep)
 {
 	handle_table_t *table;
 	object_handle_t *handle;

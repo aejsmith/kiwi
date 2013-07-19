@@ -308,15 +308,15 @@ FUNCTION_START(amd64_enter_userspace)
 	push	$(USER_CS | 0x03)
 	push	%rdi
 
-	/* Move argument to RDI. */
+	/* Move arguments to correct place. */
 	movq	%rdx, %rdi
+	movq	%rcx, %rsi
 	
-	/* Clear general purpose registers (except RDI). */
+	/* Clear general purpose registers (except arguments). */
 	xorq	%rax, %rax
 	xorq	%rbx, %rbx
 	xorq	%rcx, %rcx
 	xorq	%rdx, %rdx
-	xorq	%rsi, %rsi
 	xorq	%rbp, %rbp
 	xorq	%r8, %r8
 	xorq	%r9, %r9

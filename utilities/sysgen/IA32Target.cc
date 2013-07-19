@@ -34,6 +34,7 @@ void IA32Target::AddTypes(TypeMap &map) {
 	map["bool"] = Type(1);
 	map["ptr_t"] = Type(1);
 	map["size_t"] = Type(1);
+	map["ssize_t"] = Type(1);
 	map["int8_t"] = Type(1);
 	map["int16_t"] = Type(1);
 	map["int32_t"] = Type(1);

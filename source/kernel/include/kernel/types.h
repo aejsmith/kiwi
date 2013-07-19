@@ -42,6 +42,7 @@ typedef int32_t handle_t;
 typedef uint32_t object_rights_t;
 
 /** Other integer types used throughout the kernel. */
+typedef long ssize_t;			/**< Signed version of size_t. */
 typedef int64_t nstime_t;		/**< Type used to store a time value in nanoseconds. */
 typedef int64_t offset_t;		/**< Type used to store an offset into an object. */
 
