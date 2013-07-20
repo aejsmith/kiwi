@@ -1310,7 +1310,7 @@ process_id_t kern_process_id(handle_t handle) {
 	return id;
 }
 
-/** Perform operations on a process (for internal use by libkernel).
+/** Perform operations on the current process (for internal use by libkernel).
  * @param action	Action to perform.
  * @param in		Pointer to input buffer.
  * @param out		Pointer to output buffer.

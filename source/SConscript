@@ -85,15 +85,14 @@ if config['PLATFORM'] == 'pc':
 # Userspace build. #
 ####################
 
-"""
 # Set up the userspace build environment.
 env = manager.Create('uspace', {
     'CPPPATH': [Dir('include')],
-    'LIBPATH': [Dir('libraries')],
+    'LIBPATH': [Dir('lib')],
     'ASFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
     'CCFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
-    'CXXFLAGS': ['-std=c++0x'],
-    'LIBOUTDIR': Dir('libraries'),
+    'CXXFLAGS': ['-std=c++11'],
+    'LIBOUTDIR': Dir('lib'),
     '_LIBS': {}
 })
 
@@ -200,7 +199,7 @@ def shlib_emitter(target, source, env):
     if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
         Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
     if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
-        Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+        Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
     return target, source
 env.Append(SHLIBEMITTER = [shlib_emitter])
 
@@ -209,7 +208,7 @@ def program_emitter(target, source, env):
     if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
         Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
     if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
-        Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+        Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
         if env['SMARTLINK'](source, target, env, None) == '$CXX':
             Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
     return target, source
@@ -221,8 +220,7 @@ static_obj, shared_obj = createObjBuilders(env)
 shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
 
 # Build userspace.
-SConscript(dirs = ['libraries', 'services', 'binaries'], exports = ['env'])
-"""
+SConscript(dirs = ['lib', 'bin'], exports = ['env'])
 
 ###############
 # Image build #
@@ -232,19 +230,19 @@ SConscript(dirs = ['libraries', 'services', 'binaries'], exports = ['env'])
 def fs_image_func(target, source, env):
     # Create the work directory.
     tmpdir = tempfile.mkdtemp('.kiwifsimage')
-    os.makedirs(os.path.join(tmpdir, 'system', 'binaries'))
+    os.makedirs(os.path.join(tmpdir, 'system', 'bin'))
     os.makedirs(os.path.join(tmpdir, 'system', 'data'))
-    os.makedirs(os.path.join(tmpdir, 'system', 'libraries'))
+    os.makedirs(os.path.join(tmpdir, 'system', 'lib'))
     os.makedirs(os.path.join(tmpdir, 'system', 'modules'))
     os.makedirs(os.path.join(tmpdir, 'system', 'services'))
 
     # Copy everything needed into it.
     for bin in env['BINARIES']:
-        shutil.copy(str(bin), os.path.join(tmpdir, 'system', 'binaries'))
+        shutil.copy(str(bin), os.path.join(tmpdir, 'system', 'bin'))
     for svc in env['SERVICES']:
         shutil.copy(str(svc), os.path.join(tmpdir, 'system', 'services'))
     for lib in env['LIBRARIES']:
-        shutil.copy(str(lib), os.path.join(tmpdir, 'system', 'libraries'))
+        shutil.copy(str(lib), os.path.join(tmpdir, 'system', 'lib'))
     for mod in env['MODULES']:
         shutil.copy(str(mod), os.path.join(tmpdir, 'system', 'modules'))
     for (app, files) in env['DATA'].items():

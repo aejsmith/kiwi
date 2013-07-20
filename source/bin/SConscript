@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,20 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-import os
+Import('env')
 
-Import('env', 'config')
+dirs = [
+]
 
-# Build all the libraries.
-SConscript(dirs = [
-	'kernel',
-	'libc',
-	'3rdparty/libm',
-	'libstdc++',
-	'3rdparty/zlib-1.2.5',
-	'3rdparty/libpng-1.4.3',
-	'3rdparty/freetype-2.4.3',
-	'3rdparty/pixman-0.20.0',
-	'3rdparty/cairo-1.10.2',
-	'kiwi',
-], exports = ['env'])
+SConscript(dirs = dirs, exports = ['env'])
