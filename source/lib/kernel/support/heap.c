@@ -19,7 +19,7 @@
  * @brief		Kernel library heap functions.
  */
 
-#include <util/mutex.h>
+//#include <util/mutex.h>
 #include <stdlib.h>
 #include "../libkernel.h"
 
@@ -31,7 +31,7 @@ static size_t libkernel_heap_current = 0;
 static libkernel_heap_ops_t *libkernel_heap_ops = NULL;
 
 /** Lock to protect the heap. */
-static LIBC_MUTEX_DECLARE(libkernel_heap_lock);
+//static LIBC_MUTEX_DECLARE(libkernel_heap_lock);
 
 /** Allocate some memory.
  * @param size		Size to allocate.
@@ -39,7 +39,7 @@ static LIBC_MUTEX_DECLARE(libkernel_heap_lock);
 void *malloc(size_t size) {
 	void *ret;
 
-	libc_mutex_lock(&libkernel_heap_lock, -1);
+	//libc_mutex_lock(&libkernel_heap_lock, -1);
 
 	if(libkernel_heap_ops) {
 		ret = libkernel_heap_ops->alloc(size);
@@ -50,7 +50,7 @@ void *malloc(size_t size) {
 		libkernel_heap_current += size;
 	}
 
-	libc_mutex_unlock(&libkernel_heap_lock);
+	//libc_mutex_unlock(&libkernel_heap_lock);
 	return ret;
 }
 

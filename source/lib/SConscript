@@ -17,6 +17,7 @@
 Import('env')
 
 dirs = [
+    'kernel'
 ]
 
 SConscript(dirs = dirs, exports = ['env'])

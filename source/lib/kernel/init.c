@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,11 +27,12 @@
 
 #include "libkernel.h"
 
-extern void libkernel_init_stage2(process_args_t *args);
+extern void libkernel_init_stage2(process_args_t *args, void *load_base);
 
 extern elf_dyn_t _DYNAMIC[];
 
-/** Kernel library 1st stage initialisation.
+/**
+ * Kernel library 1st stage initialisation.
  *
  * The job of this function is to relocate the the library. The kernel just
  * loads us somewhere and does not perform any relocations. We must therefore
@@ -39,22 +40,22 @@ extern elf_dyn_t _DYNAMIC[];
  * use global variables.
  *
  * @param args		Process argument block.
+ * @param load_base	Load base address.
  */
-void libkernel_init(process_args_t *args) {
+void libkernel_init(process_args_t *args, void *load_base) {
 	rtld_image_t *image;
 	int i;
 
 	/* Work out the correct location of the libkernel image structure and
 	 * fill it in with information we have. */
-	image = (rtld_image_t *)((elf_addr_t)&libkernel_image + (elf_addr_t)args->load_base);
-	image->load_base = args->load_base;
-	image->dyntab = (elf_dyn_t *)((elf_addr_t)_DYNAMIC + (elf_addr_t)args->load_base);
+	image = (rtld_image_t *)((elf_addr_t)&libkernel_image + (elf_addr_t)load_base);
+	image->load_base = load_base;
+	image->dyntab = (elf_dyn_t *)((elf_addr_t)_DYNAMIC + (elf_addr_t)load_base);
 
 	/* Populate the dynamic table and do address fixups. */
 	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED) {
+		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED)
 			continue;
-		}
 
 		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
 
@@ -74,37 +75,39 @@ void libkernel_init(process_args_t *args) {
 	/* Get the architecture to relocate us. */
 	libkernel_arch_init(args, image);
 
-	/* Jump to the second stage initialisation. Annoyingly, GCC caches the
-	 * location of libkernel_image, so if we try to get at it from this
-	 * function it will use the old address. So, we must continue in a
-	 * separate function (global, to prevent GCC from inlining it). */
-	libkernel_init_stage2(args);
+	/* Jump to the second stage initialisation. Annoyingly, the compiler
+	 * can cache the location of libkernel_image, so if we try to get at it
+	 * from this function it will use the old address. So, we must continue
+	 * in a separate function (global, to prevent the compiler from inlining
+	 * it). */
+	libkernel_init_stage2(args, load_base);
 }
 
 /** Second stage initialisation.
- * @param args		Process argument block. */
-void libkernel_init_stage2(process_args_t *args) {
+ * @param args		Process argument block.
+ * @param load_base	Load base address. */
+void libkernel_init_stage2(process_args_t *args, void *load_base) {
 	void (*entry)(process_args_t *);
 	bool dry_run = false;
 	rtld_image_t *image;
 	void (*func)(void);
 	elf_phdr_t *phdrs;
 	elf_ehdr_t *ehdr;
-	handle_t handle;
+	//handle_t handle;
+	size_t i;
 	status_t ret;
-	int i;
 
 	/* Find out where our TLS segment is loaded to. */
-	ehdr = (elf_ehdr_t *)args->load_base;
-	phdrs = (elf_phdr_t *)((elf_addr_t)args->load_base + ehdr->e_phoff);
-	for(i = 0; i < (int)ehdr->e_phnum; i++) {
+	ehdr = (elf_ehdr_t *)load_base;
+	phdrs = (elf_phdr_t *)((elf_addr_t)load_base + ehdr->e_phoff);
+	for(i = 0; i < ehdr->e_phnum; i++) {
 		if(phdrs[i].p_type == ELF_PT_TLS) {
-			if(!phdrs[i].p_memsz) {
+			if(!phdrs[i].p_memsz)
 				break;
-			}
 
 			libkernel_image.tls_module_id = tls_alloc_module_id();
-			libkernel_image.tls_image = (void *)((elf_addr_t)args->load_base + phdrs[i].p_vaddr);
+			libkernel_image.tls_image = (void *)((elf_addr_t)load_base
+				+ phdrs[i].p_vaddr);
 			libkernel_image.tls_filesz = phdrs[i].p_filesz;
 			libkernel_image.tls_memsz = phdrs[i].p_memsz;
 			libkernel_image.tls_align = phdrs[i].p_align;
@@ -114,12 +117,12 @@ void libkernel_init_stage2(process_args_t *args) {
 
 	/* If we're the first process, open handles to the kernel console. */
 	if(kern_process_id(-1) == 1) {
-		kern_device_open("/kconsole", DEVICE_RIGHT_READ, &handle);
-		kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
-		kern_device_open("/kconsole", DEVICE_RIGHT_WRITE, &handle);
-		kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
-		kern_device_open("/kconsole", DEVICE_RIGHT_WRITE, &handle);
-		kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
+		//kern_device_open("/kconsole", DEVICE_RIGHT_READ, &handle);
+		//kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
+		//kern_device_open("/kconsole", DEVICE_RIGHT_WRITE, &handle);
+		//kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
+		//kern_device_open("/kconsole", DEVICE_RIGHT_WRITE, &handle);
+		//kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
 	}
 
 	/* Check if any of our options are set. */
@@ -133,21 +136,18 @@ void libkernel_init_stage2(process_args_t *args) {
 
 	/* Initialise the runtime loader and load the program. */
 	entry = (void (*)(process_args_t *))rtld_init(args, dry_run);
-	if(dry_run) {
+	if(dry_run)
 		kern_process_exit(STATUS_SUCCESS);
-	}
 
 	/* Set up TLS for the current thread. */
-	if(libkernel_image.tls_module_id) {
+	if(libkernel_image.tls_module_id)
 		libkernel_image.tls_offset = tls_tp_offset(&libkernel_image);
-	}
 	ret = tls_init();
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		kern_process_exit(ret);
-	}
 
 	/* Signal to the kernel that we've completed loading. */
-	kern_process_control(-1, PROCESS_LOADED, NULL, NULL);
+	kern_process_control(PROCESS_LOADED, NULL, NULL);
 
 	/* Run INIT functions for loaded images. */
 	LIST_FOREACH(&loaded_images, iter) {

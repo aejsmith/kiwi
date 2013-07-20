@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2010 Alex Smith
+# Copyright (C) 2010-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,41 +14,38 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'envmgr', 'config')
+Import('env', 'manager', 'config')
 
 sources = map(File, [
-	'rtld/image.c',
-	'rtld/symbol.c',
+    'rtld/image.c',
+    'rtld/symbol.c',
 
-	'support/heap.c',
-	'support/printf.c',
-	'support/string.c',
+    'support/heap.c',
+    'support/printf.c',
+    'support/string.c',
 
-	'fs.c',
-	'init.c',
-	'object.c',
-	'signal.c',
-	'status_list.c',
-	'syscalls.S',
-	'thread.c',
-	'tls.c',
+    'init.c',
+    'signal.c',
+    'status_list.c',
+    'syscalls.S',
+    #'thread.c',
+    'tls.c',
 ])
 
-# These won't conflict with the copies in libc, we don't export the symbols. I
-# would like to avoid having to do this, though...
-libc_sources = map(lambda x: File('../libc/%s' % x), [
-	'util/mutex.c',
+# These won't conflict with the copies in libsystem, we don't export the
+# symbols. I would like to avoid having to do this, though...
+libsystem_sources = map(lambda x: File('../system/%s' % x), [
+#    'util/mutex.c',
 ])
 
 # Generate the system call functions.
-env.Syscalls('syscalls.S', envmgr['kernel']['SYSCALLS'])
+env.Syscalls('syscalls.S', manager['kernel']['SYSCALLS'])
 
 # Generate the status string list.
 env.Command(
-	'status_list.c',
-	['../../include/kernel/status.h'],
-	Action('$GENERRLIST $SOURCE __kernel_status_strings __kernel_status_size > $TARGET', '$GENCOMSTR')
-)
+    'status_list.c',
+    ['../../include/kernel/status.h'],
+    Action('$GENERRLIST $SOURCE __kernel_status_strings __kernel_status_size > $TARGET', '$GENCOMSTR'))
 
 # Get a list of architecture-specific source files.
 arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
@@ -56,23 +53,24 @@ arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
 # Copy the architecture header in.
 Command('arch.h', 'arch/%s/arch.h' % (config['ARCH']), Action('cp $SOURCE $TARGET', None))
 
-# Perform some black magic to make the object files built from libc sources
+# Perform some black magic to make the object files built from libsystem sources
 # have an alternative file name to not conflict.
 ccflags = env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden']
-libc_objects = map(lambda x: env.SharedObject(target = '%s.os' % (x.name), source = x, CCFLAGS = ccflags), libc_sources)
+libsystem_objects = map(lambda x: env.SharedObject(target = '%s.os' % (x.name),
+    source = x, CCFLAGS = ccflags), libsystem_sources)
 
 # Build the library. The default visibility is set to hidden, as the majority
 # of functions in this library should not be exported.
 env.KiwiLibrary('kernel',
-	sources = map(
-		lambda x: env.SharedObject(
-			x,
-			CCFLAGS = ccflags,
-			CPPDEFINES = ['LIBKERNEL']
-		),
-		arch_sources + sources
-	) + libc_objects,
-	flags = {
-		'LINKFLAGS': ['-nodefaultlibs', '-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
-	},
+    sources = map(
+        lambda x: env.SharedObject(
+            x,
+            CCFLAGS = ccflags,
+            CPPDEFINES = ['LIBKERNEL']
+        ),
+        arch_sources + sources
+    ) + libsystem_objects,
+    flags = {
+        'LINKFLAGS': ['-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
+    },
 )

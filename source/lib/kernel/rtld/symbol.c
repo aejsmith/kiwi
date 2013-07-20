@@ -30,9 +30,8 @@ static unsigned long rtld_symbol_hash(const unsigned char *name) {
 
 	while(*name) {
 		h = (h << 4) + *name++;
-		if((g = h & 0xf0000000)) {
+		if((g = h & 0xf0000000))
 			h ^= g >> 24;
-		}
 		h &= ~g;
 	}
 	return h;
@@ -52,6 +51,7 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp
 	elf_sym_t *symtab;
 	Elf32_Word i;
 	list_t *iter;
+	uint8_t type;
 
 	hash = rtld_symbol_hash((const unsigned char *)name);
 
@@ -68,24 +68,24 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp
 		iter = iter->next;
 
 		/* If the hash table is empty we do not need to do anything. */
-		if(image->h_nbucket == 0) {
+		if(image->h_nbucket == 0)
 			continue;
-		}
 
 		symtab = (elf_sym_t *)image->dynamic[ELF_DT_SYMTAB];
 		strtab = (const char *)image->dynamic[ELF_DT_STRTAB];
 
 		/* Loop through all hash table entries. */
 		for(i = image->h_buckets[hash % image->h_nbucket];
-		    i != ELF_STN_UNDEF;
-		    i = image->h_chains[i])
+			i != ELF_STN_UNDEF;
+			i = image->h_chains[i])
 		{
-			if((symtab[i].st_value == 0 && ELF_ST_TYPE(symtab[i].st_info) != ELF_STT_TLS) ||
-			   symtab[i].st_shndx == ELF_SHN_UNDEF) {
+			type = ELF_ST_TYPE(symtab[i].st_info);
+
+			if(symtab[i].st_value == 0 && type != ELF_STT_TLS) {
 				continue;
-			} else if(ELF_ST_TYPE(symtab[i].st_info) > ELF_STT_FUNC &&
-			          ELF_ST_TYPE(symtab[i].st_info) != ELF_STT_COMMON &&
-			          ELF_ST_TYPE(symtab[i].st_info) != ELF_STT_TLS) {
+			} else if(symtab[i].st_shndx == ELF_SHN_UNDEF) {
+				continue;
+			} else if(type > ELF_STT_FUNC && type != ELF_STT_COMMON && type != ELF_STT_TLS) {
 				continue;
 			} else if(strcmp(strtab + symtab[i].st_name, name) != 0) {
 				continue;
@@ -95,8 +95,9 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp
 				*addrp = symtab[i].st_value;
 			} else {
 				/* Cannot look up non-global symbols. */
-				if(ELF_ST_BIND(symtab[i].st_info) != ELF_STB_GLOBAL &&
-				   ELF_ST_BIND(symtab[i].st_info) != ELF_STB_WEAK) {
+				if(ELF_ST_BIND(symtab[i].st_info) != ELF_STB_GLOBAL
+					&& ELF_ST_BIND(symtab[i].st_info) != ELF_STB_WEAK)
+				{
 					break;
 				}
 

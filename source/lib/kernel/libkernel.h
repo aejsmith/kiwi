@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +22,7 @@
 #ifndef __LIBKERNEL_H
 #define __LIBKERNEL_H
 
-#include <kernel/process.h>
+#include <kernel/private/process.h>
 #include <kernel/status.h>
 
 #include <util/list.h>
@@ -121,11 +121,11 @@ extern bool libkernel_debug;
 #define dprintf(fmt...)		if(libkernel_debug) { printf(fmt); }
 
 extern status_t rtld_image_relocate(rtld_image_t *image);
-extern status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp,
-                                rtld_image_t **imagep);
+extern status_t rtld_image_load(const char *path, rtld_image_t *req, int type,
+	void **entryp, rtld_image_t **imagep);
 extern void rtld_image_unload(rtld_image_t *image);
 extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp,
-                               rtld_image_t **sourcep);
+	rtld_image_t **sourcep);
 extern void rtld_symbol_init(rtld_image_t *image);
 extern void *rtld_init(process_args_t *args, bool dry_run);
 
@@ -138,6 +138,6 @@ extern void tls_destroy(void);
 extern void libkernel_heap_configure(libkernel_heap_ops_t *ops);
 
 extern void libkernel_arch_init(process_args_t *args, rtld_image_t *image);
-extern void libkernel_init(process_args_t *args);
+extern void libkernel_init(process_args_t *args, void *load_base);
 
 #endif /* __LIBKERNEL_H */

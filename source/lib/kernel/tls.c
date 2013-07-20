@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,7 +29,7 @@
  *			data for all other threads should be freed.
  */
 
-#include <kernel/thread.h>
+#include <kernel/private/thread.h>
 #include <kernel/vm.h>
 
 #include <stdlib.h>
@@ -54,9 +54,8 @@ static rtld_image_t *tls_module_lookup(size_t id) {
 	LIST_FOREACH(&loaded_images, iter) {
 		image = list_entry(iter, rtld_image_t, header);
 
-		if(image->tls_module_id == id) {
+		if(image->tls_module_id == id)
 			return image;
-		}
 	}
 
 	return NULL;
@@ -95,7 +94,7 @@ void *tls_get_addr(size_t module, size_t offset) {
 #ifdef TLS_VARIANT2
 /** Work out the size to allocate for the initial TLS block.
  * @return		Size to allocate. */
-static size_t tls_initial_block_size(void) {
+static size_t initial_block_size(void) {
 	rtld_image_t *image;
 	size_t i, size = 0;
 
@@ -103,9 +102,8 @@ static size_t tls_initial_block_size(void) {
 	 * tlsoffset(m+1) = round(tlsoffset(m) + tlssize(m+1), align(m+1)) */
 	for(i = 1; i < static_dtv_size; i++) {
 		image = tls_module_lookup(i);
-		if(image) {
+		if(image)
 			size = ROUND_UP(size + image->tls_memsz, image->tls_align);
-		}
 	}
 
 	/* Add on the TCB size. */
@@ -117,32 +115,29 @@ static size_t tls_initial_block_size(void) {
  * @param base		Base address of block.
  * @param dtv		Dynamic thread vector.
  * @return		TCB pointer. */
-static tls_tcb_t *tls_initial_block_init(ptr_t base, ptr_t *dtv) {
+static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
 	rtld_image_t *image;
 	size_t i;
 
 	for(i = (static_dtv_size - 1); i >= 1; i--) {
 		image = tls_module_lookup(i);
-		if(!image) {
+		if(!image)
 			continue;
-		}
 
 		/* Handle alignment requirements. */
-		if(image->tls_align) {
+		if(image->tls_align)
 			base = ROUND_UP(base, image->tls_align);
-		}
 
-		dprintf("tls: loading image for module %s (%zu) to %p (offset %p) for thread %d\n",
-		        image->name, image->tls_module_id, base, -image->tls_offset,
-		        kern_thread_id(-1));
+		dprintf("tls: loading image for module %s (%zu) to %p (offset %p) "
+			"for thread %d\n", image->name, image->tls_module_id, base,
+			-image->tls_offset, kern_thread_id(-1));
 		dtv[i] = base;
 
-		if(image->tls_filesz) {
+		if(image->tls_filesz)
 			memcpy((void *)base, image->tls_image, image->tls_filesz);
-		}
-		if(image->tls_memsz - image->tls_filesz) {
+		if(image->tls_memsz - image->tls_filesz)
 			memset((void *)(base + image->tls_filesz), 0, image->tls_memsz - image->tls_filesz);
-		}
+
 		base += image->tls_memsz;
 	}
 
@@ -160,17 +155,15 @@ ptrdiff_t tls_tp_offset(rtld_image_t *image) {
 	rtld_image_t *exist;
 	size_t i;
 
-	if(static_dtv_size) {
+	if(static_dtv_size)
 		return 0;
-	}
 
 	/* tlsoffset(1) = round(tlssize(1), align(1))
 	 * tlsoffset(m+1) = round(tlsoffset(m) + tlssize(m+1), align(m+1)) */
 	for(i = 1; i < image->tls_module_id; i++) {
 		exist = tls_module_lookup(i);
-		if(exist) {
+		if(exist)
 			offset = ROUND_UP(offset + exist->tls_memsz, exist->tls_align);
-		}
 	}
 	offset = ROUND_UP(offset + image->tls_memsz, image->tls_align);
 
@@ -204,40 +197,39 @@ status_t tls_init(void) {
 	 * because the first DTV entry is the "generation number". This is used
 	 * to record the current size of the DTV to allow it to be dynamically
 	 * resized. */
-	if(!static_dtv_size) {
+	if(!static_dtv_size)
 		static_dtv_size = next_module_id;
-	}
 
 	/* Create the dynamic thread vector. */
 	dtv = malloc(static_dtv_size * sizeof(ptr_t));
-	if(!dtv) {
+	if(!dtv)
 		return STATUS_NO_MEMORY;
-	}
 
 	/* Store the current size. */
 	dtv[0] = static_dtv_size;
 
 	/* Allocate the TLS block. */
-	size = ROUND_UP(tls_initial_block_size(), PAGE_SIZE);
-	ret = kern_vm_map(NULL, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &alloc);
+	size = ROUND_UP(initial_block_size(), PAGE_SIZE);
+	ret = kern_vm_map(&alloc, size, VM_ADDRESS_ANY, VM_PROT_READ | VM_PROT_WRITE,
+		VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
 	if(ret != STATUS_SUCCESS) {
 		free(dtv);
 		return ret;
 	}
 
 	/* Initialise it and tell the kernel our TLS address. */
-	tcb = tls_initial_block_init((ptr_t)alloc, dtv);
+	tcb = initial_block_init((ptr_t)alloc, dtv);
 	tls_tcb_init(tcb);
 	tcb->dtv = dtv;
 	tcb->base = alloc;
-	kern_thread_control(-1, THREAD_SET_TLS_ADDR, tcb, NULL);
+	kern_thread_control(THREAD_SET_TLS_ADDR, tcb, NULL);
 	return STATUS_SUCCESS;
 }
 
 /** Destroy the TLS block for the current thread.
  * @todo		Will need to free dynamically allocated blocks here. */
 void tls_destroy(void) {
-	size_t size = ROUND_UP(tls_initial_block_size(), PAGE_SIZE);
+	size_t size = ROUND_UP(initial_block_size(), PAGE_SIZE);
 	tls_tcb_t *tcb = tls_tcb_get();
 
 	dprintf("tls: freeing block %p (size: %zu) for thread %d\n",

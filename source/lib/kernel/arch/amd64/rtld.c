@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,6 +20,7 @@
  */
 
 #include <string.h>
+
 #include "../../libkernel.h"
 
 /** Internal part of relocation.
@@ -27,7 +28,7 @@
  * @param relocs	Relocation table.
  * @param size		Size of relocations.
  * @return		Status code describing result of the operation. */
-static status_t rtld_image_relocate_internal(rtld_image_t *image, elf_rela_t *relocs, size_t size) {
+static status_t do_relocations(rtld_image_t *image, elf_rela_t *relocs, size_t size) {
 	elf_addr_t *addr, sym_addr;
 	const char *strtab, *name;
 	int type, symidx, bind;
@@ -52,7 +53,8 @@ static status_t rtld_image_relocate_internal(rtld_image_t *image, elf_rela_t *re
 				sym_addr = symtab[symidx].st_value;
 			} else if(!rtld_symbol_lookup(image, name, &sym_addr, &source)) {
 				if(bind != ELF_STB_WEAK) {
-					printf("rtld: %s: cannot resolve symbol '%s'\n", image->name, name);
+					printf("rtld: %s: cannot resolve symbol '%s'\n",
+						image->name, name);
 					return STATUS_MISSING_SYMBOL;
 				}
 			}
@@ -76,9 +78,8 @@ static status_t rtld_image_relocate_internal(rtld_image_t *image, elf_rela_t *re
 			*addr = (elf_addr_t)image->load_base + relocs[i].r_addend;
 			break;
 		case ELF_R_X86_64_COPY:
-			if(sym_addr) {
+			if(sym_addr)
 				memcpy((char *)addr, (char *)sym_addr, symtab[symidx].st_size);
-			}
 			break;
 		case ELF_R_X86_64_DTPMOD64:
 			*addr = image->tls_module_id;
@@ -107,12 +108,11 @@ status_t rtld_image_relocate(rtld_image_t *image) {
 
 	/* First perform RELA relocations. */
 	relocs = (elf_rela_t *)image->dynamic[ELF_DT_REL_TYPE];
-	ret = rtld_image_relocate_internal(image, relocs, image->dynamic[ELF_DT_RELSZ_TYPE]);
-	if(ret != STATUS_SUCCESS) {
+	ret = do_relocations(image, relocs, image->dynamic[ELF_DT_RELSZ_TYPE]);
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Then PLT relocations. */
 	relocs = (elf_rela_t *)image->dynamic[ELF_DT_JMPREL];
-	return rtld_image_relocate_internal(image, relocs, image->dynamic[ELF_DT_PLTRELSZ]);
+	return do_relocations(image, relocs, image->dynamic[ELF_DT_PLTRELSZ]);
 }

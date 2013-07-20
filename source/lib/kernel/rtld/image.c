@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,7 +21,7 @@
  * @todo		Report missing library/symbol names back to the creator
  *			of the process.
  * @todo		When the API is implemented, need to wrap calls in a
- *			semaphore.
+ *			lock.
  */
 
 #include <kernel/fs.h>
@@ -33,6 +33,9 @@
 #include <string.h>
 
 #include "../libkernel.h"
+
+/** Expected path to libkernel. */
+#define LIBKERNEL_PATH		"/system/lib/libkernel.so"
 
 extern char _end[];
 
@@ -67,7 +70,7 @@ static bool rtld_library_exists(const char *path) {
 	dprintf("  trying %s... ", path);
 
 	/* Attempt to open it to see if it is there. */
-	ret = kern_file_open(path, FILE_RIGHT_READ, 0, 0, NULL, &handle);
+	ret = kern_fs_open(path, FILE_RIGHT_READ, 0, 0, &handle);
 	if(ret != STATUS_SUCCESS) {
 		dprintf("returned %d\n", ret);
 		return false;
@@ -86,9 +89,8 @@ static rtld_image_t *rtld_image_lookup(const char *name) {
 
 	LIST_FOREACH_SAFE(&loaded_images, iter) {
 		image = list_entry(iter, rtld_image_t, header);
-		if(strcmp(image->name, name) == 0) {
+		if(strcmp(image->name, name) == 0)
 			return image;
-		}
 	}
 
 	return NULL;
@@ -123,9 +125,8 @@ static status_t rtld_library_load(const char *name, rtld_image_t *req, rtld_imag
 		strcpy(buf, library_search_dirs[i]);
 		strcat(buf, "/");
 		strcat(buf, name);
-		if(rtld_library_exists(buf)) {
+		if(rtld_library_exists(buf))
 			return rtld_image_load(buf, req, ELF_ET_DYN, NULL, imagep);
-		}
 	}
 
 	printf("rtld: could not find required library %s (required by %s)\n", name, req->name);
@@ -140,51 +141,53 @@ static status_t rtld_library_load(const char *name, rtld_image_t *req, rtld_imag
  * @param i		Index of the program header.
  * @return		Status code describing result of the operation. */
 static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t handle,
-                             const char *path, size_t i) {
+	const char *path, size_t i)
+{
+	uint32_t protection = 0;
 	elf_addr_t start, end;
 	offset_t offset;
-	int flags = 0;
 	status_t ret;
 	size_t size;
 
-	/* Work out the flags to map with. */
-	flags |= ((phdr->p_flags & ELF_PF_R) ? VM_MAP_READ  : 0);
-	flags |= ((phdr->p_flags & ELF_PF_W) ? VM_MAP_WRITE : 0);
-	flags |= ((phdr->p_flags & ELF_PF_X) ? VM_MAP_EXEC  : 0);
-	if(!flags) {
+	/* Work out the protection flags to use. */
+	if(phdr->p_flags & ELF_PF_R)
+		protection |= VM_PROT_READ;
+	if(phdr->p_flags & ELF_PF_W)
+		protection |= VM_PROT_WRITE;
+	if(phdr->p_flags & ELF_PF_X)
+		protection |= VM_PROT_EXECUTE;
+	if(!protection) {
 		dprintf("rtld: %s: program header %zu has no protection flags\n", path, i);
 		return STATUS_MALFORMED_IMAGE;
 	}
 
-	/* Set the fixed flag, and the private flag if mapping as writeable. */
-	flags |= VM_MAP_FIXED;
-	if(phdr->p_flags & ELF_PF_W) {
-		flags |= VM_MAP_PRIVATE;
-	}
-
 	/* Map the BSS if required. */
 	if(phdr->p_memsz > phdr->p_filesz) {
-		start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
-		end = (elf_addr_t)image->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
+		start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr
+			+ phdr->p_filesz, PAGE_SIZE);
+		end = (elf_addr_t)image->load_base + ROUND_UP(phdr->p_vaddr
+			+ phdr->p_memsz, PAGE_SIZE);
 		size = end - start;
 
 		/* Must be writable to be able to clear later. */
-		if(!(flags & VM_MAP_WRITE)) {
-			dprintf("rtld: %s: program header %zu should be writable\n", path, i);
+		if(!(protection & VM_PROT_WRITE)) {
+			dprintf("rtld: %s: program header %zu should be writable\n",
+				path, i);
 			return STATUS_MALFORMED_IMAGE;
 		}
 
 		/* Create an anonymous region for it. */
-		ret = kern_vm_map((void *)start, size, flags, -1, 0, NULL);
+		ret = kern_vm_map((void **)&start, size, VM_ADDRESS_EXACT, protection,
+			VM_MAP_PRIVATE, INVALID_HANDLE, 0, path);
 		if(ret != STATUS_SUCCESS) {
-			dprintf("rtld: %s: unable to create anonymous BSS region (%d)\n", path, ret);
+			dprintf("rtld: %s: unable to create anonymous BSS region (%d)\n",
+				path, ret);
 			return ret;
 		}
 	}
 
-	if(phdr->p_filesz == 0) {
+	if(phdr->p_filesz == 0)
 		return STATUS_SUCCESS;
-	}
 
 	/* Load the data. */
 	start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr, PAGE_SIZE);
@@ -193,7 +196,10 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 	offset = ROUND_DOWN(phdr->p_offset, PAGE_SIZE);
 	dprintf("rtld: %s: loading header %zu to [%p,%p)\n", path, i, start, start + size);
 
-	ret = kern_vm_map((void *)start, size, flags, handle, offset, NULL);
+	/* Map the data in. Set the private flag if mapping as writeable. */
+	ret = kern_vm_map((void **)&start, size, VM_ADDRESS_EXACT, protection,
+		(protection & VM_PROT_WRITE) ? VM_MAP_PRIVATE : 0, handle,
+		offset, path);
 	if(ret != STATUS_SUCCESS) {
 		dprintf("rtld: %s: unable to map file data into memory (%d)\n", path, ret);
 		return ret;
@@ -203,7 +209,8 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 	if(phdr->p_filesz < phdr->p_memsz) {
 		start = (elf_addr_t)image->load_base + phdr->p_vaddr + phdr->p_filesz;
 		size = phdr->p_memsz - phdr->p_filesz;
-		dprintf("rtld: %s: clearing BSS for %zu at [%p,%p)\n", path, i, start, start + size);
+		dprintf("rtld: %s: clearing BSS for %zu at [%p,%p)\n", path, i,
+			start, start + size);
 		memset((void *)start, 0, size);
 	}
 
@@ -219,7 +226,9 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
  *			ELF_ET_EXEC.
  * @param imagep	Where to store pointer to image structure.
  * @return		Status code describing result of the operation. */
-status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp, rtld_image_t **imagep) {
+status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp,
+	rtld_image_t **imagep)
+{
 	rtld_image_t *image = NULL;
 	size_t bytes, size, i;
 	char *interp = NULL;
@@ -230,27 +239,29 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	status_t ret;
 
 	/* Try to open the image. */
-	ret = kern_file_open(path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0, NULL, &handle);
-	if(ret != STATUS_SUCCESS) {
+	ret = kern_fs_open(path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0, &handle);
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Read in its header and ensure that it is valid. */
-	ret = kern_file_pread(handle, &ehdr, sizeof(ehdr), 0, &bytes);
+	ret = kern_file_read(handle, &ehdr, sizeof(ehdr), 0, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	} else if(bytes != sizeof(ehdr)) {
 		ret = STATUS_UNKNOWN_IMAGE;
 		goto fail;
-	} else if(ehdr.e_ident[0] != 0x7f || ehdr.e_ident[1] != 'E' || ehdr.e_ident[2] != 'L' || ehdr.e_ident[3] != 'F') {
+	} else if(strncmp((const char *)ehdr.e_ident, ELF_MAGIC, strlen(ELF_MAGIC)) != 0) {
 		dprintf("rtld: %s: not a valid ELF file\n", path);
 		ret = STATUS_UNKNOWN_IMAGE;
 		goto fail;
-	} else if(ehdr.e_ident[4] != ELF_CLASS || ehdr.e_ident[5] != ELF_ENDIAN || ehdr.e_machine != ELF_MACHINE) {
+	} else if(ehdr.e_ident[ELF_EI_CLASS] != ELF_CLASS
+		|| ehdr.e_ident[ELF_EI_DATA] != ELF_ENDIAN
+		|| ehdr.e_machine != ELF_MACHINE)
+	{
 		dprintf("rtld: %s: not for the machine we are running on\n", path);
 		ret = STATUS_UNKNOWN_IMAGE;
 		goto fail;
-	} else if(ehdr.e_ident[6] != 1 || ehdr.e_version != 1) {
+	} else if(ehdr.e_ident[ELF_EI_VERSION] != 1 || ehdr.e_version != 1) {
 		dprintf("rtld: %s: not correct ELF version\n", path);
 		ret = STATUS_UNKNOWN_IMAGE;
 		goto fail;
@@ -282,7 +293,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	 * heap space. */
 	size = ehdr.e_phnum * ehdr.e_phentsize;
 	phdrs = alloca(size);
-	ret = kern_file_pread(handle, phdrs, size, ehdr.e_phoff, &bytes);
+	ret = kern_file_read(handle, phdrs, size, ehdr.e_phoff, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	} else if(bytes != size) {
@@ -295,16 +306,19 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	 * executables, just put the load base as NULL. */
 	if(ehdr.e_type == ELF_ET_DYN) {
 		for(i = 0, image->load_size = 0; i < ehdr.e_phnum; i++) {
-			if(phdrs[i].p_type == ELF_PT_LOAD) {
+			if(phdrs[i].p_type == ELF_PT_LOAD)
 				continue;
-			}
+
 			if((phdrs[i].p_vaddr + phdrs[i].p_memsz) > image->load_size) {
-				image->load_size = ROUND_UP(phdrs[i].p_vaddr + phdrs[i].p_memsz, PAGE_SIZE);
+				image->load_size = ROUND_UP(phdrs[i].p_vaddr
+					+ phdrs[i].p_memsz, PAGE_SIZE);
 			}
 		}
 
 		/* Allocate a chunk of memory for it. */
-		ret = kern_vm_map(NULL, image->load_size, VM_MAP_READ | VM_MAP_PRIVATE, -1, 0, &image->load_base);
+		ret = kern_vm_map((void **)&image->load_base, image->load_size,
+			VM_ADDRESS_ANY, VM_PROT_READ, VM_MAP_PRIVATE, INVALID_HANDLE,
+			0, path);
 		if(ret != STATUS_SUCCESS) {
 			dprintf("rtld: %s: unable to allocate memory (%d)\n", path, ret);
 			goto fail;
@@ -320,33 +334,37 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 		switch(phdrs[i].p_type) {
 		case ELF_PT_LOAD:
 			ret = do_load_phdr(image, &phdrs[i], handle, path, i);
-			if(ret != STATUS_SUCCESS) {
+			if(ret != STATUS_SUCCESS)
 				goto fail;
-			}
+
 			break;
 		case ELF_PT_INTERP:
 			if(ehdr.e_type == ELF_ET_EXEC) {
 				interp = alloca(phdrs[i].p_filesz + 1);
-				ret = kern_file_pread(handle, interp, phdrs[i].p_filesz, phdrs[i].p_offset, NULL);
-				if(ret != STATUS_SUCCESS) {
+				ret = kern_file_read(handle, interp, phdrs[i].p_filesz,
+					phdrs[i].p_offset, NULL);
+				if(ret != STATUS_SUCCESS)
 					goto fail;
-				}
+
 				interp[phdrs[i].p_filesz] = 0;
 			} else if(ehdr.e_type == ELF_ET_DYN) {
-				dprintf("rtld: %s: library requires an interpreter!\n", path);
+				dprintf("rtld: %s: library requires an interpreter!\n",
+					path);
 				ret = STATUS_MALFORMED_IMAGE;
 				goto fail;
 			}
 			break;
 		case ELF_PT_DYNAMIC:
-			image->dyntab = (elf_dyn_t *)((elf_addr_t)image->load_base + phdrs[i].p_vaddr);
+			image->dyntab = (elf_dyn_t *)((elf_addr_t)image->load_base
+				+ phdrs[i].p_vaddr);
 			break;
 		case ELF_PT_TLS:
 			if(!phdrs[i].p_memsz) {
 				break;
 			} else if(image->tls_memsz) {
 				/* TODO: Is this right? */
-				dprintf("rtld: %s: multiple TLS segments not allowed\n", path);
+				dprintf("rtld: %s: multiple TLS segments not allowed\n",
+					path);
 				ret = STATUS_MALFORMED_IMAGE;
 				goto fail;
 			}
@@ -360,22 +378,23 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 			}
 
 			/* Record information about the initial TLS image. */
-			image->tls_image = (void *)((elf_addr_t)image->load_base + phdrs[i].p_vaddr);
+			image->tls_image = (void *)((elf_addr_t)image->load_base
+				+ phdrs[i].p_vaddr);
 			image->tls_filesz = phdrs[i].p_filesz;
 			image->tls_memsz = phdrs[i].p_memsz;
 			image->tls_align = phdrs[i].p_align;
 			image->tls_offset = tls_tp_offset(image);
 
-			dprintf("rtld: %s: got TLS segment at %p (filesz: %zu, memsz: %zu, align: %zu)\n",
-			        path, image->tls_image, image->tls_filesz, image->tls_memsz,
-			        image->tls_align);
+			dprintf("rtld: %s: got TLS segment at %p (filesz: %zu, memsz: "
+				"%zu, align: %zu)\n", path, image->tls_image,
+				image->tls_filesz, image->tls_memsz, image->tls_align);
 			break;
 		case ELF_PT_NOTE:
 		case ELF_PT_PHDR:
 			break;
 		default:
 			dprintf("rtld: %s: program header %zu has unhandled type %u\n",
-			        path, phdrs[i].p_type);
+				path, phdrs[i].p_type);
 			ret = STATUS_MALFORMED_IMAGE;
 			goto fail;
 		}
@@ -401,9 +420,8 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 
 	/* Fill in our dynamic table. */
 	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED) {
+		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED)
 			continue;
-		}
 
 		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
 
@@ -423,7 +441,8 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	/* Set name and loading state, and fill out hash information.
 	 * FIXME: Use base of library path if SONAME not set. */
 	if(type == ELF_ET_DYN) {
-		image->name = (const char *)(image->dynamic[ELF_DT_SONAME] + image->dynamic[ELF_DT_STRTAB]);
+		image->name = (const char *)(image->dynamic[ELF_DT_SONAME]
+			+ image->dynamic[ELF_DT_STRTAB]);
 	} else {
 		image->name = "<application>";
 	}
@@ -449,40 +468,37 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 
 	/* Load libraries that we depend on. */
 	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		if(image->dyntab[i].d_tag != ELF_DT_NEEDED) {
+		if(image->dyntab[i].d_tag != ELF_DT_NEEDED)
 			continue;
-		}
 
 		dep = (const char *)(image->dyntab[i].d_un.d_ptr + image->dynamic[ELF_DT_STRTAB]);
 		dprintf("rtld: %s: dependency on %s, loading...\n", path, dep);
 		ret = rtld_library_load(dep, image, NULL);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			goto fail;
-		}
 	}
 
 	/* We can now perform relocations. */
 	ret = rtld_image_relocate(image);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* We are loaded. Set the state to loaded and return required info. */
 	image->refcount = 1;
 	image->state = RTLD_IMAGE_LOADED;
-	if(entryp) {
+
+	if(entryp)
 		*entryp = (void *)ehdr.e_entry;
-	}
-	if(imagep) {
+	if(imagep)
 		*imagep = image;
-	}
+
 	kern_handle_close(handle);
 	return STATUS_SUCCESS;
 fail:
 	if(image) {
-		if(image->load_base) {
+		if(image->load_base)
 			kern_vm_unmap(image->load_base, image->load_size);
-		}
+
 		list_remove(&image->header);
 		free(image);
 	}
@@ -549,8 +565,7 @@ void *rtld_init(process_args_t *args, bool dry_run) {
 	/* Finish setting up the libkernel image structure. */
 	libkernel_image.load_size = ROUND_UP(
 		(elf_addr_t)_end - (elf_addr_t)libkernel_image.load_base,
-		PAGE_SIZE
-	);
+		PAGE_SIZE);
 	rtld_symbol_init(&libkernel_image);
 	list_init(&libkernel_image.header);
 	list_append(&loaded_images, &libkernel_image.header);
@@ -569,7 +584,8 @@ void *rtld_init(process_args_t *args, bool dry_run) {
 		LIST_FOREACH(&loaded_images, iter) {
 			image = list_entry(iter, rtld_image_t, header);
 			if(image->path) {
-				printf("  %s => %s (%p)\n", image->name, image->path, image->load_base);
+				printf("  %s => %s (%p)\n", image->name, image->path,
+					image->load_base);
 			} else {
 				printf("  %s (%p)\n", image->name, image->load_base);
 			}

@@ -27,16 +27,13 @@
 #ifndef __SYS_TYPES_H
 #define __SYS_TYPES_H
 
-#define __need_size_t
-#include <stddef.h>
-#include <stdint.h>
+#include <kernel/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /** POSIX type definitions. */
-typedef int32_t ssize_t;		/**< Used for a count of bytes or error indiction. */
 typedef int64_t time_t;			/**< Used for UNIX timestamps. */
 typedef int64_t clock_t;		/**< Used to store clock ticks since process start. */
 typedef int32_t pid_t;			/**< Used to store a POSIX process ID. */

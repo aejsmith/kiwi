@@ -77,22 +77,22 @@ syscall kern_fs_sync();
 syscall kern_vm_map(ptr_t, size_t, uint32_t, uint32_t, uint32_t, handle_t, offset_t, ptr_t);
 syscall kern_vm_unmap(ptr_t, size_t);
 
-#syscall kern_process_create(ptr_t, ptr_t, ptr_t, uint32_t, ptr_t, ssize_t, ptr_t);
-#syscall kern_process_exec(ptr_t, ptr_t, ptr_t, uint32_t, ptr_t, ssize_t);
+syscall kern_process_create(ptr_t, ptr_t, ptr_t, uint32_t, ptr_t, ssize_t, ptr_t);
+syscall kern_process_exec(ptr_t, ptr_t, ptr_t, uint32_t, ptr_t, ssize_t);
 #syscall kern_process_clone(ptr_t);
-#syscall kern_process_open(process_id_t, ptr_t);
-#syscall kern_process_id(handle_t) wrapped;
-#syscall kern_process_status(handle_t, ptr_t, ptr_t);
-#syscall kern_process_exit(int);
-#syscall kern_process_control(uint, ptr_t, ptr_t);
+syscall kern_process_open(process_id_t, ptr_t);
+syscall kern_process_id(handle_t);
+syscall kern_process_status(handle_t, ptr_t, ptr_t);
+syscall kern_process_exit(int);
+syscall kern_process_control(uint, ptr_t, ptr_t);
 
-#syscall kern_thread_create(ptr_t, ptr_t, uint32_t, ptr_t) wrapped;
-#syscall kern_thread_open(thread_id_t, ptr_t);
-#syscall kern_thread_id(handle_t) wrapped;
-#syscall kern_thread_status(handle_t, ptr_t);
-#syscall kern_thread_exit(int) wrapped;
-#syscall kern_thread_sleep(nstime_t, ptr_t);
-#syscall kern_thread_control(uint, ptr_t, ptr_t);
+syscall kern_thread_create(ptr_t, ptr_t, uint32_t, ptr_t) wrapped;
+syscall kern_thread_open(thread_id_t, ptr_t);
+syscall kern_thread_id(handle_t);
+syscall kern_thread_status(handle_t, ptr_t);
+syscall kern_thread_exit(int) wrapped;
+syscall kern_thread_sleep(nstime_t, ptr_t);
+syscall kern_thread_control(uint, ptr_t, ptr_t);
 
 #syscall kern_port_create(object_rights_t, ptr_t);
 #syscall kern_port_open(port_id_t, object_rights_t, ptr_t);
