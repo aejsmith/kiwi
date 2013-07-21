@@ -458,7 +458,8 @@ static status_t process_load(process_load_t *load, process_t *parent) {
 	}
 
 	/* Map the kernel library. */
-	ret = elf_binary_load(kernel_library, load->aspace, LIBKERNEL_BASE, &load->data);
+	ret = elf_binary_load(kernel_library, load->aspace, LIBKERNEL_BASE,
+		LIBKERNEL_PATH, &load->data);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 

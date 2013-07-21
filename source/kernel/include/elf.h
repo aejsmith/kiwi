@@ -31,7 +31,7 @@ struct vm_aspace;
 
 extern status_t elf_binary_reserve(struct object_handle *handle, struct vm_aspace *as);
 extern status_t elf_binary_load(struct object_handle *handle, struct vm_aspace *as,
-	ptr_t dest, void **datap);
+	ptr_t dest, const char *path, void **datap);
 extern ptr_t elf_binary_finish(void *data);
 
 extern status_t elf_module_apply_rel(struct module *module, elf_rel_t *rel,

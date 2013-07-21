@@ -142,8 +142,9 @@ status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
  * @param binary	ELF binary data structure.
  * @param phdr		Program header to load.
  * @param i		Index of program header.
+ * @param path		Path of image.
  * @return		Status code describing result of the operation. */
-static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i) {
+static status_t do_load_phdr(elf_binary_t *binary, elf_phdr_t *phdr, size_t i, const char *path) {
 	uint32_t protection = 0;
 	ptr_t start, end;
 	offset_t offset;
@@ -179,7 +180,7 @@ static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, siz
 
 		/* Create an anonymous memory region for it. */
 		ret = vm_map(binary->as, &start, size, VM_ADDRESS_EXACT, protection,
-			VM_MAP_PRIVATE, NULL, 0, NULL);
+			VM_MAP_PRIVATE, NULL, 0, path);
 		if(ret != STATUS_SUCCESS)
 			return ret;
 	}
@@ -201,7 +202,7 @@ static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, siz
 	 * will reject them if they aren't. */
 	return vm_map(binary->as, &start, size, VM_ADDRESS_EXACT, protection,
 		(protection & VM_PROT_WRITE) ? VM_MAP_PRIVATE : 0,
-		binary->handle, offset, NULL);
+		binary->handle, offset, path);
 }
 
 /** Load an ELF binary into an address space.
@@ -209,9 +210,12 @@ static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, siz
  * @param as		Address space to load into.
  * @param dest		If not 0, an address to load the binary to. This
  *			requires the binary to be ELF_ET_DYN.
+ * @param path		Path to binary (used to name regions).
  * @param datap		Where to store data pointer to pass to elf_binary_finish().
  * @return		Status code describing result of the operation. */
-status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, void **datap) {
+status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest,
+	const char *path, void **datap)
+{
 	size_t bytes, i, size, load_count = 0;
 	elf_binary_t *binary;
 	status_t ret;
@@ -276,7 +280,7 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 		binary->load_base = dest;
 		ret = vm_map(binary->as, &binary->load_base, binary->load_size,
 			(dest) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY, VM_PROT_READ,
-			VM_MAP_PRIVATE, NULL, 0, NULL);
+			VM_MAP_PRIVATE, NULL, 0, path);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
 	} else {
@@ -288,7 +292,7 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 	for(i = 0; i < binary->ehdr.e_phnum; i++) {
 		switch(binary->phdrs[i].p_type) {
 		case ELF_PT_LOAD:
-			ret = elf_binary_phdr_load(binary, &binary->phdrs[i], i);
+			ret = do_load_phdr(binary, &binary->phdrs[i], i, path);
 			if(ret != STATUS_SUCCESS)
 				goto fail;
 
