@@ -21,6 +21,8 @@
 
 #include <lib/string.h>
 
+#include <kernel/private/signal.h>
+
 #include <mm/safe.h>
 
 #include <proc/process.h>
@@ -31,8 +33,6 @@
 #include <kernel.h>
 #include <object.h>
 #include <status.h>
-
-extern void kern_signal_return(void);
 
 /** Check if a signal defaults to being ignored. */
 #define signal_dfl_ignore(s)	\

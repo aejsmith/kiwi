@@ -76,15 +76,15 @@ typedef struct stack {
 
 /** Structure describing previous machine context on a signal. */
 typedef struct mcontext {
-#if defined(__i386__) || defined(__x86_64__)
+	#if defined(__i386__) || defined(__x86_64__)
 	unsigned long ax, bx, cx, dx, di, si, bp;
-#ifdef __x86_64__
+	#ifdef __x86_64__
 	unsigned long r8, r9, r10, r11, r12, r13, r14, r15;
-#endif
+	#endif
 	unsigned long ip, flags, sp;
-#else
-# error "No mcontext_t defined for this architecture"
-#endif
+	#else
+	# error "No mcontext_t defined for this architecture"
+	#endif
 } mcontext_t;
 
 /** Structure containing a saved context. */
@@ -167,10 +167,11 @@ typedef struct sigaction {
 
 	sigset_t sa_mask;		/**< Bitmap of signals to block during handler execution. */
 	int sa_flags;			/**< Flags controlling signal behaviour. */
-#if defined(KERNEL) || defined(LIBKERNEL)
+
+	#if defined(KERNEL) || defined(LIBKERNEL)
 	/** Fields for internal use only. */
 	void *sa_restorer;		/**< Return address for handler. */
-#endif
+	#endif
 } sigaction_t;
 
 /** Special signal handler values. */

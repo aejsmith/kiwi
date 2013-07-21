@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,18 +16,15 @@
 
 /**
  * @file
- * @brief		Signal wrapper functions.
+ * @brief		Signal functions.
  */
 
-#include <kernel/signal.h>
+#include <kernel/private/signal.h>
 #include <kernel/status.h>
 
 #include <string.h>
 
 #include "libkernel.h"
-
-extern status_t _kern_signal_action(int num, const sigaction_t *newp, sigaction_t *oldp);
-extern void kern_signal_return(void);
 
 /** Examine and modify the action for a signal.
  * @param num		Signal number to modify.
@@ -44,9 +41,8 @@ __export status_t kern_signal_action(int num, const sigaction_t *newp, sigaction
 	}
 
 	ret = _kern_signal_action(num, (newp) ? &new : NULL, &old);
-	if(ret == STATUS_SUCCESS && oldp) {
+	if(ret == STATUS_SUCCESS && oldp)
 		memcpy(oldp, &old, sizeof(old) - sizeof(old.sa_restorer));
-	}
 
 	return ret;
 }
