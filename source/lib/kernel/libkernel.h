@@ -115,6 +115,9 @@ extern list_t loaded_images;
 extern rtld_image_t libkernel_image;
 extern rtld_image_t *application_image;
 
+extern __thread thread_id_t curr_thread_id;
+extern process_id_t curr_process_id;
+
 extern bool libkernel_debug;
 
 /** Print a debug message. */

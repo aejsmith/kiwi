@@ -1087,8 +1087,8 @@ status_t kern_thread_open(thread_id_t id, handle_t *handlep) {
 }
 
 /** Get the ID of a thread.
- * @param handle	Handle for thread to get ID of, or INVALID_HANDLE to
- *			get ID of the calling thread.
+ * @param handle	Handle for thread to get ID of, or THREAD_SELF to get
+ *			ID of the calling thread.
  * @return		Thread ID on success, -1 if handle is invalid. */
 thread_id_t kern_thread_id(handle_t handle) {
 	object_handle_t *khandle;

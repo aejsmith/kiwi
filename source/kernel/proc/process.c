@@ -1291,8 +1291,8 @@ status_t kern_process_open(process_id_t id, handle_t *handlep) {
 }
 
 /** Get the ID of a process.
- * @param handle	Handle for process to get ID of, or INVALID_HANDLE to
- *			get ID of the calling process.
+ * @param handle	Handle for process to get ID of, or PROCESS_SELF to get
+ *			ID of the calling process.
  * @return		Process ID on success, -1 if handle is invalid. */
 process_id_t kern_process_id(handle_t handle) {
 	object_handle_t *khandle;

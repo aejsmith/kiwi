@@ -130,19 +130,22 @@ static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
 
 		dprintf("tls: loading image for module %s (%zu) to %p (offset %p) "
 			"for thread %d\n", image->name, image->tls_module_id, base,
-			-image->tls_offset, kern_thread_id(-1));
+			-image->tls_offset, _kern_thread_id(THREAD_SELF));
 		dtv[i] = base;
 
 		if(image->tls_filesz)
 			memcpy((void *)base, image->tls_image, image->tls_filesz);
-		if(image->tls_memsz - image->tls_filesz)
-			memset((void *)(base + image->tls_filesz), 0, image->tls_memsz - image->tls_filesz);
+		if(image->tls_memsz - image->tls_filesz) {
+			memset((void *)(base + image->tls_filesz), 0, image->tls_memsz
+				- image->tls_filesz);
+		}
 
 		base += image->tls_memsz;
 	}
 
 	/* Return the TCB address. */
-	dprintf("tls: thread pointer for thread %d is %p\n", kern_thread_id(-1), base);
+	dprintf("tls: thread pointer for thread %d is %p\n", _kern_thread_id(THREAD_SELF),
+		base);
 	return (void *)base;
 }
 
@@ -233,6 +236,6 @@ void tls_destroy(void) {
 	tls_tcb_t *tcb = tls_tcb_get();
 
 	dprintf("tls: freeing block %p (size: %zu) for thread %d\n",
-	        tcb->base, size, kern_thread_id(-1));
+		tcb->base, size, _kern_thread_id(THREAD_SELF));
 	kern_vm_unmap(tcb->base, size);
 }

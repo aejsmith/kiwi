@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,11 +20,14 @@
  */
 
 #include <kernel/object.h>
-#include <kernel/semaphore.h>
-#include <kernel/thread.h>
+#include <kernel/private/thread.h>
 
 #include "libkernel.h"
 
+/** Saved ID for the current thread. */
+__thread thread_id_t curr_thread_id = -1;
+
+#if 0
 /** Information used by thread_create(). */
 typedef struct thread_create_info {
 	handle_t sem;			/**< Semaphore for communication between entry and create. */
@@ -32,11 +35,6 @@ typedef struct thread_create_info {
 	void (*func)(void *);		/**< Real entry function. */
 	void *arg;			/**< Argument to entry function. */
 } thread_create_info_t;
-
-extern status_t _kern_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
-                                   void *arg, const object_security_t *security, object_rights_t rights,
-                               handle_t *handlep);
-extern void _kern_thread_exit(int status) __attribute__((noreturn));
 
 /** Thread entry wrapper.
  * @param arg		Pointer to information structure. */
@@ -96,6 +94,21 @@ __export status_t kern_thread_create(const char *name, void *stack, size_t stack
 	kern_semaphore_down(info.sem, -1);
 	kern_handle_close(info.sem);
 	return info.ret;
+}
+#endif
+
+/** Get the ID of a thread.
+ * @param handle	Handle for thread to get ID of, or THREAD_SELF to get
+ *			ID of the calling thread.
+ * @return		Thread ID on success, -1 if handle is invalid. */
+thread_id_t kern_thread_id(handle_t handle) {
+	/* We save the current thread ID to avoid having to perform a kernel
+	 * call just to get our own ID. */
+	if(handle < 0) {
+		return curr_thread_id;
+	} else {
+		return _kern_thread_id(handle);
+	}
 }
 
 /** Terminate the calling thread.

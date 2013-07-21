@@ -20,6 +20,8 @@
  */
 
 #include <kernel/device.h>
+#include <kernel/private/process.h>
+#include <kernel/private/thread.h>
 #include <kernel/object.h>
 
 #include <elf.h>
@@ -115,8 +117,11 @@ void libkernel_init_stage2(process_args_t *args, void *load_base) {
 		}
 	}
 
+	/* Save the current process ID for the kern_process_id() wrapper. */
+	curr_process_id = _kern_process_id(PROCESS_SELF);
+
 	/* If we're the first process, open handles to the kernel console. */
-	if(kern_process_id(-1) == 1) {
+	if(curr_process_id == 1) {
 		//kern_device_open("/kconsole", DEVICE_RIGHT_READ, &handle);
 		//kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
 		//kern_device_open("/kconsole", DEVICE_RIGHT_WRITE, &handle);
@@ -145,6 +150,9 @@ void libkernel_init_stage2(process_args_t *args, void *load_base) {
 	ret = tls_init();
 	if(ret != STATUS_SUCCESS)
 		kern_process_exit(ret);
+
+	/* Save the current thread ID in TLS for the kern_thread_id() wrapper. */
+	curr_thread_id = _kern_thread_id(THREAD_SELF);
 
 	/* Signal to the kernel that we've completed loading. */
 	kern_process_control(PROCESS_LOADED, NULL, NULL);

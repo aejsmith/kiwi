@@ -25,10 +25,11 @@ sources = map(File, [
     'support/string.c',
 
     'init.c',
+    'process.c',
     'signal.c',
     'status_list.c',
     'syscalls.S',
-    #'thread.c',
+    'thread.c',
     'tls.c',
 ])
 
