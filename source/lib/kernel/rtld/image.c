@@ -392,6 +392,10 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 		case ELF_PT_NOTE:
 		case ELF_PT_PHDR:
 			break;
+		case ELF_PT_GNU_EH_FRAME:
+		case ELF_PT_GNU_STACK:
+			// FIXME: Handle stack.
+			break;
 		default:
 			dprintf("rtld: %s: program header %zu has unhandled type %u\n",
 				path, phdrs[i].p_type);

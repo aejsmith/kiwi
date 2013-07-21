@@ -314,6 +314,12 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 			kprintf(LOG_WARN, "elf: unexpected interpreter\n");
 			ret = STATUS_NOT_SUPPORTED;
 			goto fail;
+		case ELF_PT_GNU_EH_FRAME:
+		case ELF_PT_GNU_STACK:
+			// FIXME: Handle stack. Need to take into account binary
+			// flags as well, and library ones, so RTLD should do
+			// something.
+			break;
 		default:
 			kprintf(LOG_WARN, "elf: unhandled program header type %u\n",
 				binary->phdrs[i].p_type);

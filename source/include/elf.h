@@ -235,6 +235,8 @@ typedef struct {
 #define ELF_PT_SHLIB		5		/**< Reserved. */
 #define ELF_PT_PHDR		6		/**< Program header table. */
 #define ELF_PT_TLS		7		/**< Thread-local storage data. */
+#define ELF_PT_GNU_EH_FRAME	0x6474e550	/**< GCC .eh_frame_hdr segment */
+#define ELF_PT_GNU_STACK	0x6474e551	/**< Indicates stack executability */
 
 /** Program header flags. */
 #define ELF_PF_X		0x1		/**< Execute permission. */
