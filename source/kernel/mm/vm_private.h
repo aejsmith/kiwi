@@ -62,14 +62,4 @@ typedef struct vm_region {
 	char *name;			/**< Name of the region (can be NULL). */
 } vm_region_t;
 
-/** Fault context structure. */
-typedef struct fault_context {
-	struct intr_frame *frame;	/**< Interrupt frame. */
-	ptr_t addr;			/**< Base address of page the fault occurred in. */
-	int reason;			/**< Reason for the fault. */
-	uint32_t access;		/**< Access type that caused the fault. */
-	int signal;			/**< Signal number to send. */
-	int signal_code;		/**< Error code for the signal. */
-} fault_context_t;
-
 #endif /* __VM_PRIVATE_H */

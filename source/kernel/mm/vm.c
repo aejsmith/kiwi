@@ -545,7 +545,7 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, size_t size) {
 				/* If page is in the object, then do nothing. */
 				if(region->amap->pages[idx]) {
 					assert(region->amap->pages[idx]->addr == phys);
-					return;
+					continue;
 				}
 
 				assert(region->handle);
@@ -1671,6 +1671,16 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
 	kdb_printf("handle:      %p\n", region->handle);
 	kdb_printf("obj_offset:  0x%" PRIx64 "\n", region->obj_offset);
 	kdb_printf("amap:        %p\n", region->amap);
+
+	if(region->amap) {
+		kdb_printf(" count:      %d\n", refcount_get(&region->amap->count));
+		kdb_printf(" lock:       %d (%" PRId32 ")\n",
+			atomic_get(&region->amap->lock.value),
+			(region->amap->lock.holder) ? region->amap->lock.holder->id : -1);
+		kdb_printf(" curr_size:  %zu\n", region->amap->curr_size);
+		kdb_printf(" max_size:   %zu\n", region->amap->max_size);
+	}
+
 	kdb_printf("amap_offset: 0x%" PRIx64 "\n", region->amap_offset);
 
 	return KDB_SUCCESS;

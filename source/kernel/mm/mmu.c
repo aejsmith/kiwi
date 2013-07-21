@@ -36,6 +36,15 @@
 #include <kernel.h>
 #include <status.h>
 
+/** Define to enable (very) verbose debug output. */
+//#define DEBUG_MMU
+
+#ifdef DEBUG_MMU
+# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
+#else
+# define dprintf(fmt...)	
+#endif
+
 /** Kernel MMU context. */
 mmu_context_t kernel_mmu_context;
 
@@ -89,6 +98,9 @@ status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
 		assert(virt < USER_SIZE);
 	}
 
+	dprintf("mmu: mmu_context_map(%p, %p, 0x%" PRIxPHYS ", 0x%x, 0x%x)\n",
+		ctx, virt, phys, protect, mmflag);
+
 	return mmu_ops->map(ctx, virt, phys, protect, mmflag);
 }
 
@@ -107,6 +119,9 @@ void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size, unsigned p
 	} else {
 		assert(virt < USER_SIZE);
 	}
+
+	dprintf("mmu: mmu_context_protect(%p, %p, 0x%zx, 0x%x)\n", ctx, virt,
+		size, protect);
 
 	return mmu_ops->protect(ctx, virt, size, protect);
 }
@@ -128,6 +143,8 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_ptr_t *
 	} else {
 		assert(virt < USER_SIZE);
 	}
+
+	dprintf("mmu: mmu_context_unmap(%p, %p, %d)\n", ctx, virt, shared);
 
 	return mmu_ops->unmap(ctx, virt, shared, physp);
 }
