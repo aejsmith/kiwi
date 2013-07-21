@@ -16,8 +16,10 @@
 
 Import('env')
 
-dirs = [
-    'test',
-]
-
-SConscript(dirs = dirs, exports = ['env'])
+env.KiwiApplication('test',
+    sources = ['main.c'],
+    libraries = ['kernel'],
+    flags = {
+        'LINKFLAGS': ['-nostdlib'],
+    }
+)
