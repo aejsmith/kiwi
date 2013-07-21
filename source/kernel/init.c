@@ -142,7 +142,6 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	handle_init();
 	process_init();
 	thread_init();
-	sched_init();
 	dpc_init();
 
 	/* Bring up the VM system. */

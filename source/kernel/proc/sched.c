@@ -72,8 +72,6 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <sync/semaphore.h>
-
 #include <assert.h>
 #include <cpu.h>
 #include <kdb.h>
@@ -82,7 +80,10 @@
 #include <status.h>
 #include <time.h>
 
-#if CONFIG_SCHED_DEBUG
+/** Define to enable extremely verbose debug output. */
+//#define DEBUG_SCHED
+
+#ifdef DEBUG_SCHED
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
 #else
 # define dprintf(fmt...)	
@@ -121,11 +122,6 @@ typedef struct sched_cpu {
 /** Total number of running/ready threads across all CPUs. */
 static atomic_t threads_running = 0;
 #endif
-
-/** Dead thread queue. */
-static LIST_DECLARE(dead_threads);
-static SPINLOCK_DECLARE(dead_thread_lock);
-static SEMAPHORE_DECLARE(dead_thread_sem, 0);
 
 /** Add a thread to a queue.
  * @param queue		Queue to add to.
@@ -330,17 +326,6 @@ void sched_post_switch(bool state) {
 		 * switch is not performed if the new thread is the same as the
 		 * previous. */
 		spinlock_unlock_noirq(&curr_cpu->sched->prev_thread->lock);
-
-		/* Deal with thread terminations. We cannot delete the thread
-		 * directly as all allocator functions are unsafe to call
-		 * from here. Instead we queue the thread to be deleted by
-		 * the reaper thread. */
-		if(curr_cpu->sched->prev_thread->state == THREAD_DEAD) {
-			spinlock_lock(&dead_thread_lock);
-			list_append(&dead_threads, &curr_cpu->sched->prev_thread->runq_link);
-			semaphore_up(&dead_thread_sem, 1);
-			spinlock_unlock(&dead_thread_lock);
-		}
 	}
 
 	local_irq_restore(state);
@@ -442,26 +427,6 @@ void sched_insert_thread(thread_t *thread) {
 	spinlock_unlock(&sched->lock);
 }
 
-/** Dead thread reaper.
- * @param arg1		Unused.
- * @param arg2		Unused. */
-static void sched_reaper_thread(void *arg1, void *arg2) {
-	thread_t *thread;
-
-	while(true) {
-		semaphore_down(&dead_thread_sem);
-
-		/* Take the next thread off the list. */
-		spinlock_lock(&dead_thread_lock);
-		assert(!list_empty(&dead_threads));
-		thread = list_first(&dead_threads, thread_t, runq_link);
-		list_remove(&thread->runq_link);
-		spinlock_unlock(&dead_thread_lock);
-
-		thread_release(thread);
-	}
-}
-
 /** Scheduler idle thread function.
  * @param arg1		Unused.
  * @param arg2		Unused. */
@@ -480,15 +445,8 @@ static void sched_idle_thread(void *arg1, void *arg2) {
 
 /** Initialize the scheduler globally. */
 __init_text void sched_init(void) {
-	status_t ret;
-
 	/* Initialize for the boot CPU. */
 	sched_init_percpu();
-
-	/* Create the thread reaper. */
-	ret = thread_create("reaper", NULL, 0, sched_reaper_thread, NULL, NULL, NULL);
-	if(ret != STATUS_SUCCESS)
-		fatal("Could not create thread reaper (%d)", ret);
 }
 
 /** Initialize the scheduler for the current CPU. */

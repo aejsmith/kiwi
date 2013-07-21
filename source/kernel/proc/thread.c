@@ -66,6 +66,7 @@
 #include <proc/thread.h>
 
 #include <sync/mutex.h>
+#include <sync/semaphore.h>
 
 #include <assert.h>
 #include <cpu.h>
@@ -102,6 +103,11 @@ static id_allocator_t thread_id_allocator;
 
 /** Thread structure cache. */
 static slab_cache_t *thread_cache;
+
+/** Dead thread queue. */
+static LIST_DECLARE(dead_threads);
+static SPINLOCK_DECLARE(dead_thread_lock);
+static SEMAPHORE_DECLARE(dead_thread_sem, 0);
 
 /** Constructor for thread objects.
  * @param obj		Pointer to object.
@@ -181,6 +187,39 @@ void thread_release(thread_t *thread) {
 		thread->name, thread);
 
 	slab_cache_free(thread_cache, thread);
+}
+
+/** Dead thread reaper.
+ * @param arg1		Unused.
+ * @param arg2		Unused. */
+static void reaper_thread(void *arg1, void *arg2) {
+	thread_t *thread;
+
+	while(true) {
+		semaphore_down(&dead_thread_sem);
+
+		/* Take the next thread off the list. */
+		spinlock_lock(&dead_thread_lock);
+		assert(!list_empty(&dead_threads));
+		thread = list_first(&dead_threads, thread_t, runq_link);
+		list_remove(&thread->runq_link);
+		spinlock_unlock(&dead_thread_lock);
+
+		/* Attempt to lock the thread and then unlock it. We must do
+		 * this to ensure that the scheduler has switched away from the
+		 * thread, on SMP it's possible that we get here before the
+		 * thread's CPU has finished with it. */
+		spinlock_lock(&thread->lock);
+		spinlock_unlock(&thread->lock);
+
+		/* Run death notifications. */
+		notifier_run(&thread->death_notifier, NULL, true);
+		thread_cleanup(thread);
+		process_thread_exited(thread);
+
+		/* Drop the running reference. */
+		thread_release(thread);
+	}
 }
 
 /** Closes a handle to a thread.
@@ -616,12 +655,15 @@ void thread_at_kernel_exit(void) {
 void thread_exit(void) {
 	bool state;
 
-	notifier_run(&curr_thread->death_notifier, NULL, true);
-	thread_cleanup(curr_thread);
-	process_thread_exited(curr_thread);
-
 	state = local_irq_disable();
 	spinlock_lock_noirq(&curr_thread->lock);
+
+	/* Queue the thread up to the reaper so that it gets cleaned up after
+	 * the scheduler has switched away from it. */
+	spinlock_lock(&dead_thread_lock);
+	list_append(&dead_threads, &curr_thread->runq_link);
+	semaphore_up(&dead_thread_sem, 1);
+	spinlock_unlock(&dead_thread_lock);
 
 	curr_thread->state = THREAD_DEAD;
 
@@ -846,10 +888,10 @@ static inline void dump_thread(thread_t *thread) {
 	default:		kdb_printf("Bad          "); break;
 	}
 
-	kdb_printf("%-4" PRIu32 " %-4zu %-4d %-6d %-5d %-20s %-5" PRId32 " %s\n",
-		(thread->cpu) ? thread->cpu->id : 0, thread->wired, thread->priority,
-		thread->curr_prio, thread->flags,
-		(thread->state == THREAD_SLEEPING) ? thread->waiting_on : "None",
+	kdb_printf("%-5d %-4" PRIu32 " %-4zu %-4d %-4d 0x%-3x %-20s %-5" PRId32 " %s\n",
+		refcount_get(&thread->count), (thread->cpu) ? thread->cpu->id : 0,
+		thread->wired, thread->priority, thread->curr_prio, thread->flags,
+		(thread->state == THREAD_SLEEPING) ? thread->waiting_on : "<none>",
 		thread->owner->id, thread->name);
 }
 
@@ -873,8 +915,8 @@ static kdb_status_t kdb_cmd_thread(int argc, char **argv, kdb_filter_t *filter) 
 		return KDB_FAILURE;
 	}
 
-	kdb_printf("ID     State        CPU  Wire Prio (Curr) Flags Waiting On           Owner Name\n");
-	kdb_printf("==     =====        ===  ==== ==== ====== ===== ==========           ===== ====\n");
+	kdb_printf("ID     State        Count CPU  Wire Prio Curr Flags Waiting On           Owner Name\n");
+	kdb_printf("==     =====        ===== ===  ==== ==== ==== ===== ==========           ===== ====\n");
 
 	if(argc == 2) {
 		/* Find the process ID. */
@@ -931,6 +973,8 @@ static kdb_status_t kdb_cmd_kill(int argc, char **argv, kdb_filter_t *filter) {
 
 /** Initialize the thread system. */
 __init_text void thread_init(void) {
+	status_t ret;
+
 	/* Initialize the thread ID allocator. */
 	id_allocator_init(&thread_id_allocator, 65535, MM_BOOT);
 
@@ -941,6 +985,14 @@ __init_text void thread_init(void) {
 	/* Register our KDB commands. */
 	kdb_register_command("thread", "Print information about threads.", kdb_cmd_thread);
 	kdb_register_command("kill", "Kill a running user thread.", kdb_cmd_kill);
+
+	/* Initialize the scheduler. */
+	sched_init();
+
+	/* Create the thread reaper. */
+	ret = thread_create("reaper", NULL, 0, reaper_thread, NULL, NULL, NULL);
+	if(ret != STATUS_SUCCESS)
+		fatal("Could not create thread reaper (%d)", ret);
 }
 
 /** Entry function for a userspace thread.

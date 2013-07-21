@@ -294,7 +294,7 @@ static void vm_amap_unmap(vm_amap_t *map, offset_t offset, size_t size) {
 		assert(map->rref[i]);
 
 		if(--map->rref[i] == 0 && map->pages[i]) {
-			dprintf("vm: anon object %p rref[%zu] reached 0, freeing"
+			dprintf("vm: anon object %p rref[%zu] reached 0, freeing "
 				"0x%" PRIxPHYS "\n", map, i, map->pages[i]->addr);
 
 			if(refcount_dec(&map->pages[i]->count) == 0)

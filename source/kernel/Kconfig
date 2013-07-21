@@ -73,20 +73,6 @@ config SLAB_DEBUG
 	help
 	  Enable extra debug output from the slab allocator.
 
-config PROC_DEBUG
-	bool "Process/thread debug output"
-	default n
-	help
-	  Enable extra debug output from the process/thread managers.
-
-config SCHED_DEBUG
-	bool "Scheduler debug output"
-	default n
-	help
-	  Enable large amounts of debug output from the thread scheduler. This
-	  will not print messages on every thread switch, however this can be
-	  enabled by defining SCHED_OVERKILL_DEBUG to 1 in sched.c.
-
 config MODULE_DEBUG
 	bool "Module loader debug output"
 	default n

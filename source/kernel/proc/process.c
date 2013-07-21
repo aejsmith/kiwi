@@ -239,7 +239,7 @@ void process_detach_thread(thread_t *thread) {
 
 	mutex_lock(&process->lock);
 	list_remove(&thread->owner_link);
-	mutex_lock(&process->lock);
+	mutex_unlock(&process->lock);
 
 	thread->owner = NULL;
 
@@ -799,6 +799,7 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 			(process == curr_proc) ? "*" : " ");
 
 		switch(process->state) {
+		case PROCESS_CREATED:	kdb_printf("Created "); break;
 		case PROCESS_RUNNING:	kdb_printf("Running "); break;
 		case PROCESS_DEAD:	kdb_printf("Dead    "); break;
 		default:		kdb_printf("Bad     "); break;
