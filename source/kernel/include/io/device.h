@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,15 +22,21 @@
 #ifndef __IO_DEVICE_H
 #define __IO_DEVICE_H
 
+#include <io/file.h>
+
 #include <kernel/device.h>
+
 #include <lib/radix_tree.h>
+#include <lib/refcount.h>
+
 #include <sync/mutex.h>
-#include <object.h>
 
 struct device;
 
 /** Structure containing device operations. */
 typedef struct device_ops {
+	file_type_t type;			/**< Type of the device. */
+
 	/** Clean up all data associated with a device.
 	 * @param device	Device to destroy. */
 	void (*destroy)(struct device *device);
@@ -38,92 +44,81 @@ typedef struct device_ops {
 	/** Handler for open calls.
 	 * @note		Called with device lock held.
 	 * @param device	Device being opened.
+	 * @param flags		Flags being opened with.
 	 * @param datap		Where to store handle-specific data pointer.
 	 * @return		Status code describing result of operation. */
-	status_t (*open)(struct device *device, void **datap);
+	status_t (*open)(struct device *device, uint32_t flags, void **datap);
 
 	/** Handler for close calls.
 	 * @note		Called with device lock held.
 	 * @param device	Device being released.
-	 * @param data		Handle-specific data pointer (all data should
-	 *			be freed). */
-	void (*close)(struct device *device, void *data);
-
-	/** Read from a device.
-	 * @param device	Device to read from.
-	 * @param data		Handle-specific data pointer.
-	 * @param buf		Buffer to read into.
-	 * @param count		Number of bytes to read.
-	 * @param offset	Offset to write to (only valid for certain
-	 *			device types).
-	 * @param bytesp	Where to store number of bytes read.
-	 * @return		Status code describing result of operation. */
-	status_t (*read)(struct device *device, void *data, void *buf, size_t count,
-		offset_t offset, size_t *bytesp);
-
-	/** Write to a device.
-	 * @param device	Device to write to.
-	 * @param data		Handle-specific data pointer.
-	 * @param buf		Buffer containing data to write.
-	 * @param count		Number of bytes to write.
-	 * @param offset	Offset to write to (only valid for certain
-	 *			device types).
-	 * @param bytesp	Where to store number of bytes written.
-	 * @return		Status code describing result of operation. */
-	status_t (*write)(struct device *device, void *data, const void *buf,
-		size_t count, offset_t offset, size_t *bytesp);
+	 * @param handle	File handle structure. */
+	void (*close)(struct device *device, file_handle_t *handle);
 
 	/** Signal that a device event is being waited for.
 	 * @note		If the event being waited for has occurred
 	 *			already, this function should call the callback
 	 *			function and return success.
 	 * @param device	Device to wait on.
-	 * @param data		Handle-specific data pointer.
-	 * @param event		Event to wait for.
-	 * @param sync		Internal information pointer.
-	 * @return		Status code describing result of operation. */
-	status_t (*wait)(struct device *device, void *data, int event, void *sync);
+	 * @param handle	File handle structure.
+	 * @param event		Event that is being waited for.
+	 * @param wait		Internal data pointer to be passed to
+	 *			object_wait_signal() or object_wait_notifier().
+	 * @return		Status code describing result of the operation. */
+	status_t (*wait)(struct device *device, file_handle_t *handle, unsigned event,
+		void *wait);
 
 	/** Stop waiting for a device event.
-	 * @param device	Device to stop waiting for.
-	 * @param data		Handle-specific data pointer.
-	 * @param event		Event to wait for.
-	 * @param sync		Internal information pointer. */
-	void (*unwait)(struct device *device, void *data, int event, void *sync);
+	 * @param device	Device being waited on.
+	 * @param handle	File handle structure.
+	 * @param event		Event that is being waited for.
+	 * @param wait		Internal data pointer. */
+	void (*unwait)(struct device *device, file_handle_t *handle, unsigned event,
+		void *wait);
+
+	/** Perform I/O on a device.
+	 * @param device	Device to perform I/O on.
+	 * @param handle	File handle structure.
+	 * @param request	I/O request.
+	 * @return		Status code describing result of the operation. */
+	status_t (*io)(struct device *device, file_handle_t *handle,
+		struct io_request *request);
 
 	/** Check if a device can be memory-mapped.
 	 * @note		If this function is implemented, the get_page
 	 *			operation MUST be implemented. If it is not,
 	 *			then the device will be classed as mappable if
 	 *			get_page is implemented.
-	 * @param device	Device to check.
-	 * @param data		Handle-specific data pointer.
+	 * @param device	Device being mapped.
+	 * @param handle	File handle structure.
+	 * @param protection	Protection flags (VM_PROT_*).
 	 * @param flags		Mapping flags (VM_MAP_*).
 	 * @return		STATUS_SUCCESS if can be mapped, status code
 	 *			explaining why if not. */
-	status_t (*mappable)(struct device *device, void *data, int flags);
+	status_t (*mappable)(struct device *device, file_handle_t *handle,
+		uint32_t protection, uint32_t flags);
 
-	/** Get a page for the device (for memory-mapping the device).
-	 * @note		See note for mappable.
+	/** Get a page from the device.
 	 * @param device	Device to get page from.
-	 * @param data		Handle-specific data pointer.
-	 * @param offset	Offset into device of page to get.
-	 * @param physp		Where to store address of page to map.
-	 * @return		Status code describing result of operation. */
-	status_t (*get_page)(struct device *device, void *data, offset_t offset,
-		phys_ptr_t *physp);
+	 * @param handle	File handle structure.
+	 * @param offset	Offset into device to get page from.
+	 * @param physp		Where to store physical address of page.
+	 * @return		Status code describing result of the operation. */
+	status_t (*get_page)(struct device *device, file_handle_t *handle,
+		offset_t offset, phys_ptr_t *physp);
 
 	/** Handler for device-specific requests.
 	 * @param device	Device request is being made on.
-	 * @param data		Handle-specific data pointer.
+	 * @param handle	File handle structure.
 	 * @param request	Request number.
 	 * @param in		Input buffer.
-	 * @param insz		Input buffer size.
+	 * @param in_size	Input buffer size.
 	 * @param outp		Where to store pointer to output buffer.
-	 * @param outszp	Where to store output buffer size.
+	 * @param out_sizep	Where to store output buffer size.
 	 * @return		Status code describing result of operation. */
-	status_t (*request)(struct device *device, void *data, int request,
-		const void *in, size_t insz, void **outp, size_t *outszp);
+	status_t (*request)(struct device *device, file_handle_t *handle,
+		unsigned request, const void *in, size_t in_size, void **outp,
+		size_t *out_sizep);
 } device_ops_t;
 
 /** Device attribute structure. */
@@ -151,7 +146,7 @@ typedef struct device_attr {
 
 /** Structure describing an entry in the device tree. */
 typedef struct device {
-	object_t obj;				/**< Object header. */
+	file_t file;				/**< File header. */
 
 	char *name;				/**< Name of the device. */
 	mutex_t lock;				/**< Lock to protect structure. */
@@ -171,16 +166,18 @@ typedef struct device {
 	size_t attr_count;			/**< Number of attributes. */
 } device_t;
 
+/** Return values from device_iterate_t. */
+enum {
+	DEVICE_ITERATE_END,			/**< Finish iteration. */
+	DEVICE_ITERATE_DESCEND,			/**< Descend onto children. */
+	DEVICE_ITERATE_RETURN,			/**< Return to parent. */
+};
+
 /** Device tree iteration callback.
  * @param device	Device currently on.
  * @param data		Iteration data.
- * @return		0 if should finish iteration, 1 if should visit
- *			children, 2 if should return to parent. */
+ * @return		Action to perform (DEVICE_ITERATE_*). */
 typedef int (*device_iterate_t)(device_t *device, void *data);
-
-/** Various limitations. */
-#define DEVICE_NAME_MAX			32	/**< Maximum length of a device name/device attribute name. */
-#define DEVICE_ATTR_MAX			256	/**< Maximum length of a device attribute string value. */
 
 /** Start of class-specific event/request numbers. */
 #define DEVICE_CLASS_EVENT_START	32
@@ -211,14 +208,13 @@ extern void device_iterate(device_t *start, device_iterate_t func, void *data);
 extern device_attr_t *device_attr(device_t *device, const char *name, int type);
 extern char *device_path(device_t *device);
 
-extern status_t device_get(device_t *device, uint32_t rights, object_handle_t **handlep);
-extern status_t device_open(const char *path, uint32_t rights, object_handle_t **handlep);
-extern status_t device_read(object_handle_t *handle, void *buf, size_t count,
-	offset_t offset, size_t *bytesp);
-extern status_t device_write(object_handle_t *handle, const void *buf, size_t count,
-	offset_t offset, size_t *bytesp);
-extern status_t device_request(object_handle_t *handle, int request, const void *in,
-	size_t insz, void **outp, size_t *outszp);
+extern status_t device_get(device_t *device, object_rights_t rights, uint32_t flags,
+	object_handle_t **handlep);
+extern status_t device_open(const char *path, object_rights_t rights, uint32_t flags,
+	object_handle_t **handlep);
+
+extern status_t device_request(object_handle_t *handle, unsigned request, const void *in,
+	size_t in_size, void **outp, size_t *out_sizep);
 
 extern void device_init(void);
 

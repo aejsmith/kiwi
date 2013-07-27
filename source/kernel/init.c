@@ -305,7 +305,7 @@ static void init_thread(void *arg1, void *arg2) {
 		cpu_dump(list_entry(iter, cpu_t, header));
 
 	/* Bring up the filesystem manager and device manager. */
-	//device_init();
+	device_init();
 	fs_init();
 
 	/* Call other initialization functions. */

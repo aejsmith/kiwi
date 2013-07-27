@@ -989,10 +989,8 @@ static void fs_file_unwait(file_t *file, file_handle_t *handle, unsigned event, 
 static status_t fs_file_io(file_t *file, file_handle_t *handle, io_request_t *request) {
 	fs_node_t *node = (fs_node_t *)file;
 
-	if(!node->ops->io)
-		return STATUS_NOT_SUPPORTED;
-
-	return node->ops->io(node, handle, request);
+	return (node->ops->io) ? node->ops->io(node, handle, request)
+		: STATUS_NOT_SUPPORTED;
 }
 
 /** Check if a file can be memory-mapped.

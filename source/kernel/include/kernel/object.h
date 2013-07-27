@@ -45,7 +45,6 @@ extern "C" {
 #define OBJECT_TYPE_PORT	8	/**< Port (securable, transferrable). */
 #define OBJECT_TYPE_CONNECTION	9	/**< Connection (non-securable, non-transferrable). */
 #define OBJECT_TYPE_SEMAPHORE	10	/**< Semaphore (non-securable, transferrable). */
-#define OBJECT_TYPE_DEVICE	11	// remove me
 
 /** Flags for a handle table entry. */
 #define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,31 +22,18 @@
 #ifndef __KERNEL_DEVICE_H
 #define __KERNEL_DEVICE_H
 
+#include <kernel/file.h>
 #include <kernel/limits.h>
-#include <kernel/object.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Device rights. */
-#define DEVICE_RIGHT_QUERY		(1<<0)	/**< Query device information. */
-#define DEVICE_RIGHT_READ		(1<<1)	/**< Read directly from the device. */
-#define DEVICE_RIGHT_WRITE		(1<<2)	/**< Write directly to the device. */
+extern status_t kern_device_open(const char *path, object_rights_t rights,
+	uint32_t flags, handle_t *handlep);
 
-/** Generic device events. */
-#define DEVICE_EVENT_READABLE		0	/**< Wait for the device to be readable. */
-#define DEVICE_EVENT_WRITABLE		1	/**< Wait for the device to be writable. */
-//#define DEVICE_EVENT_CHILD_ADDED	2	/**< Wait for a child device to be added. */
-//#define DEVICE_EVENT_CHILD_REMOVED	3	/**< Wait for a child device to be removed. */
-
-extern status_t kern_device_open(const char *path, object_rights_t rights, handle_t *handlep);
-extern status_t kern_device_read(handle_t handle, void *buf, size_t count, offset_t offset,
-                                 size_t *bytesp);
-extern status_t kern_device_write(handle_t handle, const void *buf, size_t count,
-                                  offset_t offset, size_t *bytesp);
-extern status_t kern_device_request(handle_t handle, int request, const void *in, size_t insz,
-                                    void *out, size_t outsz, size_t *bytesp);
+extern status_t kern_device_request(handle_t handle, unsigned request, const void *in,
+	size_t in_size, void *out, size_t out_size, size_t *bytesp);
 
 #ifdef __cplusplus
 }

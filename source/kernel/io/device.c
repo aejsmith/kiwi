@@ -20,6 +20,7 @@
  */
 
 #include <io/device.h>
+#include <io/request.h>
 
 #include <lib/string.h>
 
@@ -27,18 +28,11 @@
 #include <mm/safe.h>
 #include <mm/vm.h>
 
-#include <proc/process.h>
-
 #include <assert.h>
 #include <kdb.h>
 #include <kernel.h>
 #include <status.h>
-
-#if CONFIG_DEVICE_DEBUG
-# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
-#else
-# define dprintf(fmt...)	
-#endif
+#include <time.h>
 
 /** Root of the device tree. */
 device_t *device_tree_root;
@@ -46,94 +40,120 @@ device_t *device_tree_root;
 /** Standard device directories. */
 device_t *device_bus_dir;
 
-/** Closes a handle to a device.
- * @param handle	Handle to the device. */
-static void device_object_close(object_handle_t *handle) {
-	device_t *device = (device_t *)handle->object;
+/** Close a device.
+ * @param file		Device being closed.
+ * @param handle	File handle structure. */
+static void device_file_close(file_t *file, file_handle_t *handle) {
+	device_t *device = (device_t *)file;
 
-	if(device->ops && device->ops->close) {
-		device->ops->close(device, handle->data);
-	}
+	if(device->ops && device->ops->close)
+		device->ops->close(device, handle);
 
 	refcount_dec(&device->count);
 }
 
-/** Signal that a device is being waited for.
- * @param handle	Handle to device.
- * @param event		Event to wait for.
- * @param sync		Internal data pointer.
+/** Signal that a device event is being waited for.
+ * @param file		Device being waited on.
+ * @param handle	File handle structure.
+ * @param event		Event that is being waited for.
+ * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t device_object_wait(object_handle_t *handle, int event, void *sync) {
-	device_t *device = (device_t *)handle->object;
+static status_t device_file_wait(file_t *file, file_handle_t *handle, unsigned event, void *wait) {
+	device_t *device = (device_t *)file;
 
-	if(device->ops && device->ops->wait && device->ops->unwait) {
-		return device->ops->wait(device, handle->data, event, sync);
-	} else {
-		return STATUS_INVALID_EVENT;
-	}
+	return (device->ops && device->ops->wait && device->ops->unwait)
+		? device->ops->wait(device, handle, event, wait)
+		: STATUS_INVALID_EVENT;
 }
 
-/** Stop waiting for a device.
- * @param handle	Handle to device.
- * @param event		Event that was being waited for.
- * @param sync		Internal data pointer. */
-static void device_object_unwait(object_handle_t *handle, int event, void *sync) {
-	device_t *device = (device_t *)handle->object;
+/** Stop waiting for a device event.
+ * @param file		Device being waited on.
+ * @param handle	File handle structure.
+ * @param event		Event that is being waited for.
+ * @param wait		Internal data pointer. */
+static void device_file_unwait(file_t *file, file_handle_t *handle, unsigned event, void *wait) {
+	device_t *device = (device_t *)file;
+
 	assert(device->ops);
-	return device->ops->unwait(device, handle->data, event, sync);
+	return device->ops->unwait(device, handle, event, wait);
+}
+
+/** Perform I/O on a device.
+ * @param file		Device to perform I/O on.
+ * @param handle	File handle structure.
+ * @param request	I/O request.
+ * @return		Status code describing result of the operation. */
+static status_t device_file_io(file_t *file, file_handle_t *handle, io_request_t *request) {
+	device_t *device = (device_t *)file;
+
+	return (device->ops && device->ops->io)
+		? device->ops->io(device, handle, request)
+		: STATUS_NOT_SUPPORTED;
 }
 
 /** Check if a device can be memory-mapped.
- * @param handle	Handle to device.
+ * @param file		Device being mapped.
+ * @param handle	File handle structure.
+ * @param protection	Protection flags (VM_PROT_*).
  * @param flags		Mapping flags (VM_MAP_*).
  * @return		STATUS_SUCCESS if can be mapped, status code explaining
  *			why if not. */
-static status_t device_object_mappable(object_handle_t *handle, int flags) {
-	device_t *device = (device_t *)handle->object;
+static status_t device_file_mappable(file_t *file, file_handle_t *handle,
+	uint32_t protection, uint32_t flags)
+{
+	device_t *device = (device_t *)file;
 
 	/* Cannot create private mappings to devices. */
-	if(flags & VM_MAP_PRIVATE) {
+	if(!device->ops || flags & VM_MAP_PRIVATE)
 		return STATUS_NOT_SUPPORTED;
-	}
 
 	if(device->ops->mappable) {
 		assert(device->ops->get_page);
-		return device->ops->mappable(device, handle->data, flags);
+		return device->ops->mappable(device, handle, protection, flags);
 	} else {
-		return (device->ops->get_page) ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;
+		return (device->ops->get_page) ? STATUS_SUCCESS
+			: STATUS_NOT_SUPPORTED;
 	}
 }
 
 /** Get a page from a device.
- * @param handle	Handle to device to get page from.
+ * @param file		Device to get page from.
+ * @param handle	File handle structure.
  * @param offset	Offset into device to get page from.
  * @param physp		Where to store physical address of page.
  * @return		Status code describing result of the operation. */
-static status_t device_object_get_page(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
-	device_t *device = (device_t *)handle->object;
-	status_t ret;
+static status_t device_file_get_page(file_t *file, file_handle_t *handle,
+	offset_t offset, phys_ptr_t *physp)
+{
+	device_t *device = (device_t *)file;
 
 	assert(device->ops && device->ops->get_page);
-
-	/* Ask the device for a page. */
-	ret = device->ops->get_page(device, handle->data, offset, physp);
-	if(ret != STATUS_SUCCESS) {
-		dprintf("device: failed to get page from offset %" PRIu64 " in %p(%s) (%d)\n",
-		        offset, device, device->name, ret);
-	}
-
-	return ret;
+	return device->ops->get_page(device, handle, offset, physp);
 }
 
-/** Device object type structure. */
-static object_type_t device_object_type = {
-	.id = OBJECT_TYPE_DEVICE,
-	.flags = OBJECT_TRANSFERRABLE | OBJECT_SECURABLE,
-	.close = device_object_close,
-	.wait = device_object_wait,
-	.unwait = device_object_unwait,
-	.mappable = device_object_mappable,
-	.get_page = device_object_get_page,
+/** Get information about a device.
+ * @param file		Device to get information on.
+ * @param handle	File handle structure.
+ * @param info		Information structure to fill in. */
+static void device_file_info(file_t *file, file_handle_t *handle, file_info_t *info) {
+	info->id = 0;
+	info->mount = 0;
+	info->type = file->type;
+	info->block_size = 0;
+	info->size = 0;
+	info->links = 1;
+	info->created = info->accessed = info->modified = boot_time();
+}
+
+/** Device file operations structure. */
+static file_ops_t device_file_ops = {
+	.close = device_file_close,
+	.wait = device_file_wait,
+	.unwait = device_file_unwait,
+	.io = device_file_io,
+	.mappable = device_file_mappable,
+	.get_page = device_file_get_page,
+	.info = device_file_info,
 };
 
 /**
@@ -154,15 +174,20 @@ static object_type_t device_object_type = {
  *
  * @return		Status code describing result of the operation.
  */
-status_t device_create(const char *name, device_t *parent, device_ops_t *ops, void *data,
-                       device_attr_t *attrs, size_t count, device_t **devicep) {
+status_t device_create(const char *name, device_t *parent, device_ops_t *ops,
+	void *data, device_attr_t *attrs, size_t count, device_t **devicep)
+{
 	device_t *device = NULL;
 	status_t ret;
 	size_t i;
 
-	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || parent->dest) {
-		return STATUS_INVALID_ARG;
-	}
+	assert(name);
+	assert(strlen(name) < DEVICE_NAME_MAX);
+	assert(parent);
+	assert(!parent->dest);
+
+	if(ops)
+		assert(ops->type == FILE_TYPE_BLOCK || ops->type == FILE_TYPE_CHAR);
 
 	/* Check if a child already exists with this name. */
 	mutex_lock(&parent->lock);
@@ -172,7 +197,7 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 	}
 
 	device = kmalloc(sizeof(device_t), MM_KERNEL);
-	object_init(&device->obj, &device_object_type);
+	file_init(&device->file, &device_file_ops, (ops) ? ops->type : FILE_TYPE_CHAR);
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -217,17 +242,19 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 	radix_tree_insert(&parent->children, device->name, device);
 	mutex_unlock(&parent->lock);
 
-	dprintf("device: created device %p(%s) under %p(%s) (ops: %p, data: %p)\n",
-	        device, device->name, parent, parent->name, ops, data);
-	if(devicep) {
+	kprintf(LOG_DEBUG, "device: created device %s (%p) in %s (%p) (ops: %p, data: %p)\n",
+		device->name, device, parent->name, parent, ops, data);
+
+	if(devicep)
 		*devicep = device;
-	}
+
 	return STATUS_SUCCESS;
 fail:
 	if(device) {
 		kfree(device->name);
 		kfree(device);
 	}
+
 	mutex_unlock(&parent->lock);
 	return ret;
 }
@@ -249,14 +276,15 @@ fail:
 status_t device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep) {
 	device_t *device;
 
-	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !dest) {
-		return STATUS_INVALID_ARG;
-	}
+	assert(name);
+	assert(strlen(name) < DEVICE_NAME_MAX);
+	assert(parent);
+	assert(!parent->dest);
+	assert(dest);
 
 	/* If the destination is an alias, use it's destination. */
-	if(dest->dest) {
+	if(dest->dest)
 		dest = dest->dest;
-	}
 
 	/* Check if a child already exists with this name. */
 	mutex_lock(&parent->lock);
@@ -266,7 +294,8 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 	}
 
 	device = kmalloc(sizeof(device_t), MM_KERNEL);
-	object_init(&device->obj, NULL);
+	file_init(&device->file, &device_file_ops, (dest->ops) ? dest->ops->type
+		: FILE_TYPE_CHAR);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -288,11 +317,12 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 	list_append(&dest->aliases, &device->dest_link);
 	mutex_unlock(&dest->lock);
 
-	dprintf("device: created alias %p(%s) under %p(%s) (dest: %p)\n",
-	        device, device->name, parent, parent->name, dest);
-	if(devicep) {
+	kprintf(LOG_DEBUG, "device: created alias %s (%p) in %s (%p) to %s (%p)\n",
+		device->name, device, parent->name, parent, dest->name, dest);
+
+	if(devicep)
 		*devicep = device;
-	}
+
 	return STATUS_SUCCESS;
 }
 
@@ -327,9 +357,8 @@ status_t device_destroy(device_t *device) {
 	}
 
 	/* Call the device's destroy operation, if any. */
-	if(device->ops && device->ops->destroy) {
+	if(device->ops && device->ops->destroy)
 		device->ops->destroy(device);
-	}
 
 	/* Remove all aliases to the device. */
 	if(!device->dest) {
@@ -347,16 +376,17 @@ status_t device_destroy(device_t *device) {
 	if(device->attrs) {
 		for(i = 0; i < device->attr_count; i++) {
 			kfree((char *)device->attrs[i].name);
-			if(device->attrs[i].type == DEVICE_ATTR_STRING) {
+			if(device->attrs[i].type == DEVICE_ATTR_STRING)
 				kfree((char *)device->attrs[i].value.string);
-			}
 		}
 
 		kfree(device->attrs);
 	}
 
-	dprintf("device: destroyed device %p(%s) (parent: %p)\n", device, device->name, device->parent);
-	object_destroy(&device->obj);
+	kprintf(LOG_DEBUG, "device: destroyed device %s (%p) (parent: %p)\n",
+		device->name, device, device->parent);
+
+	file_destroy(&device->file);
 	kfree(device->name);
 	kfree(device);
 	return STATUS_SUCCESS;
@@ -371,19 +401,20 @@ static bool device_iterate_internal(device_t *device, device_iterate_t func, voi
 	device_t *child;
 
 	switch(func(device, data)) {
-	case 0: return false;
-	case 2: return true;
-	}
+	case DEVICE_ITERATE_END:
+		return false;
+	case DEVICE_ITERATE_DESCEND:
+		RADIX_TREE_FOREACH(&device->children, iter) {
+			child = radix_tree_entry(iter, device_t);
 
-	RADIX_TREE_FOREACH(&device->children, iter) {
-		child = radix_tree_entry(iter, device_t);
-
-		if(!device_iterate_internal(child, func, data)) {
-			return false;
+			if(!device_iterate_internal(child, func, data))
+				return false;
 		}
+	case DEVICE_ITERATE_RETURN:
+		return true;
 	}
 
-	return true;
+	return false;
 }
 
 /**
@@ -392,9 +423,9 @@ static bool device_iterate_internal(device_t *device, device_iterate_t func, voi
  * Calls the specified function on a device and all its children (and all their
  * children, etc).
  *
- * @todo		Meep, we have small kernel stacks. Recursive lookup
- *			probably isn't a very good idea. Then again, the device
- *			tree shouldn't go *too* deep.
+ * @todo		We have small kernel stacks. Recursive lookup probably
+ *			isn't a very good idea. Then again, the device tree
+ *			shouldn't go *too* deep.
  *
  * @param start		Starting device.
  * @param func		Function to call on devices.
@@ -413,17 +444,16 @@ static device_t *device_lookup(const char *path) {
 
 	assert(path);
 
-	if(!path[0] || path[0] != '/') {
+	if(!path[0] || path[0] != '/')
 		return NULL;
-	}
 
 	dup = orig = kstrdup(path, MM_KERNEL);
 
 	mutex_lock(&device->lock);
+
 	while((tok = strsep(&dup, "/"))) {
-		if(!tok[0]) {
+		if(!tok[0])
 			continue;
-		}
 
 		child = radix_tree_lookup(&device->children, tok);
 		if(!child) {
@@ -466,9 +496,9 @@ device_attr_t *device_attr(device_t *device, const char *name, int type) {
 
 	for(i = 0; i < device->attr_count; i++) {
 		if(strcmp(device->attrs[i].name, name) == 0) {
-			if(type != -1 && (int)device->attrs[i].type != type) {
+			if(type != -1 && (int)device->attrs[i].type != type)
 				return NULL;
-			}
+
 			return &device->attrs[i];
 		}
 	}
@@ -500,9 +530,9 @@ char *device_path(device_t *device) {
 		device = parent;
 	}
 
-	if(!len) {
+	if(!len)
 		path = kstrdup("/", MM_KERNEL);
-	}
+
 	return path;
 }
 
@@ -510,9 +540,12 @@ char *device_path(device_t *device) {
 /** Get a handle to a device.
  * @param device	Device to get handle to.
  * @param rights	Requested rights for the handle.
+ * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store handle to device.
  * @return		Status code describing result of the operation. */
-status_t device_get(device_t *device, object_rights_t rights, object_handle_t **handlep) {
+status_t device_get(device_t *device, object_rights_t rights, uint32_t flags,
+	object_handle_t **handlep)
+{
 	void *data = NULL;
 	status_t ret;
 
@@ -520,32 +553,35 @@ status_t device_get(device_t *device, object_rights_t rights, object_handle_t **
 	assert(handlep);
 
 	mutex_lock(&device->lock);
-	refcount_inc(&device->count);
+
+	if(rights && (object_rights(&device->file.obj, NULL) & rights) != rights) {
+		mutex_unlock(&device->lock);
+		return STATUS_ACCESS_DENIED;
+	}
 
 	if(device->ops && device->ops->open) {
-		ret = device->ops->open(device, &data);
+		ret = device->ops->open(device, flags, &data);
 		if(ret != STATUS_SUCCESS) {
-			refcount_dec(&device->count);
 			mutex_unlock(&device->lock);
 			return ret;
 		}
 	}
 
-	ret = object_handle_open(&device->obj, data, rights, handlep);
-	if(ret != STATUS_SUCCESS) {
-		refcount_dec(&device->count);
-	}
-
+	refcount_inc(&device->count);
+	*handlep = file_handle_create(&device->file, rights, flags, data);
 	mutex_unlock(&device->lock);
-	return ret;
+	return STATUS_SUCCESS;
 }
 
 /** Create a handle to a device.
  * @param path		Path to device to open.
  * @param rights	Requested rights for the handle.
+ * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store pointer to handle structure.
  * @return		Status code describing result of the operation. */
-status_t device_open(const char *path, object_rights_t rights, object_handle_t **handlep) {
+status_t device_open(const char *path, object_rights_t rights, uint32_t flags,
+	object_handle_t **handlep)
+{
 	void *data = NULL;
 	device_t *device;
 	status_t ret;
@@ -554,14 +590,19 @@ status_t device_open(const char *path, object_rights_t rights, object_handle_t *
 	assert(handlep);
 
 	device = device_lookup(path);
-	if(device == NULL) {
+	if(!device)
 		return STATUS_NOT_FOUND;
-	}
 
 	mutex_lock(&device->lock);
 
+	if(rights && (object_rights(&device->file.obj, NULL) & rights) != rights) {
+		refcount_dec(&device->count);
+		mutex_unlock(&device->lock);
+		return STATUS_ACCESS_DENIED;
+	}
+
 	if(device->ops && device->ops->open) {
-		ret = device->ops->open(device, &data);
+		ret = device->ops->open(device, flags, &data);
 		if(ret != STATUS_SUCCESS) {
 			refcount_dec(&device->count);
 			mutex_unlock(&device->lock);
@@ -569,108 +610,9 @@ status_t device_open(const char *path, object_rights_t rights, object_handle_t *
 		}
 	}
 
-	ret = object_handle_open(&device->obj, data, rights, handlep);
-	if(ret != STATUS_SUCCESS) {
-		refcount_dec(&device->count);
-	}
-
+	*handlep = file_handle_create(&device->file, rights, flags, data);
 	mutex_unlock(&device->lock);
-	return ret;
-}
-
-/**
- * Read from a device.
- *
- * Reads data from a device into a buffer. The device may not support the
- * operation - it is provided as a function rather than a request type because
- * it is supported by multiple device types.
- *
- * @param handle	Handle to device to read from. Must have the
- *			DEVICE_RIGHT_READ access right.
- * @param buf		Buffer to read into.
- * @param count		Number of bytes to read.
- * @param offset	Offset in the device to read from (only valid for
- *			certain device types).
- * @param bytesp	Where to store number of bytes read.
- *
- * @return		Status code describing result of the operation.
- */
-status_t device_read(object_handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	device_t *device;
-	status_t ret;
-	size_t bytes;
-
-	if(!handle || !buf) {
-		return STATUS_INVALID_ARG;
-	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
-		return STATUS_INVALID_HANDLE;
-	} else if(!object_handle_rights(handle, DEVICE_RIGHT_READ)) {
-		return STATUS_ACCESS_DENIED;
-	}
-
-	device = (device_t *)handle->object;
-	if(!device->ops || !device->ops->read) {
-		return STATUS_NOT_SUPPORTED;
-	} else if(!count) {
-		if(bytesp) {
-			*bytesp = 0;
-		}
-		return STATUS_SUCCESS;
-	}
-
-	ret = device->ops->read(device, handle->data, buf, count, offset, &bytes);
-	if(bytesp) {
-		*bytesp = bytes;
-	}
-	return ret;
-}
-
-/**
- * Write to a device.
- *
- * Writes data to a device from buffer. The device may not support the
- * operation - it is provided as a function rather than a request type because
- * it is supported by multiple device types.
- *
- * @param handle	Handle to device to write to. Must have the
- *			DEVICE_RIGHT_WRITE right.
- * @param buf		Buffer containing data to write.
- * @param count		Number of bytes to write.
- * @param offset	Offset in the device to write to (only valid for
- *			certain device types).
- * @param bytesp	Where to store number of bytes read.
- *
- * @return		Status code describing result of the operation.
- */
-status_t device_write(object_handle_t *handle, const void *buf, size_t count, offset_t offset,
-                      size_t *bytesp) {
-	device_t *device;
-	status_t ret;
-	size_t bytes;
-
-	if(!handle || !buf) {
-		return STATUS_INVALID_ARG;
-	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
-		return STATUS_INVALID_HANDLE;
-	} else if(!object_handle_rights(handle, DEVICE_RIGHT_WRITE)) {
-		return STATUS_ACCESS_DENIED;
-	}
-
-	device = (device_t *)handle->object;
-	if(!device->ops || !device->ops->write) {
-		return STATUS_NOT_SUPPORTED;
-	} else if(!count) {
-		if(bytesp) {
-			*bytesp = 0;
-		}
-		return STATUS_SUCCESS;
-	}
-
-	ret = device->ops->write(device, handle->data, buf, count, offset, &bytes);
-	if(bytesp) {
-		*bytesp = bytes;
-	}
-	return ret;
+	return STATUS_SUCCESS;
 }
 
 /** Perform a device-specific operation.
@@ -678,46 +620,50 @@ status_t device_write(object_handle_t *handle, const void *buf, size_t count, of
  * @param request	Operation number to perform.
  * @param in		Optional input buffer containing data to pass to the
  *			operation handler.
- * @param insz		Size of input buffer.
+ * @param in_size	Size of input buffer.
  * @param outp		Where to store pointer to data returned by the
  *			operation handler (optional).
- * @param outszp	Where to store size of data returned.
+ * @param out_sizep	Where to store size of data returned.
  * @return		Status code describing result of the operation. */
-status_t device_request(object_handle_t *handle, int request, const void *in, size_t insz,
-                        void **outp, size_t *outszp) {
+status_t device_request(object_handle_t *handle, unsigned request, const void *in,
+	size_t in_size, void **outp, size_t *out_sizep)
+{
 	device_t *device;
+	file_handle_t *data;
 
-	if(!handle) {
-		return STATUS_INVALID_ARG;
-	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
+	assert(handle);
+
+	if(handle->object->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
-	}
 
 	device = (device_t *)handle->object;
-	if(!device->ops || !device->ops->request) {
+	data = (file_handle_t *)handle->data;
+
+	if(device->file.ops != &device_file_ops) {
+		return STATUS_INVALID_HANDLE;
+	} else if(!device->ops || !device->ops->request) {
 		return STATUS_INVALID_REQUEST;
 	}
 
-	// FIXME: Right checks?
-	return device->ops->request(device, handle->data, request, in, insz, outp, outszp);
+	return device->ops->request(device, data, request, in, in_size, outp, out_sizep);
 }
 
 /** Print out a device's children.
  * @param tree		Radix tree to print.
  * @param indent	Indentation level. */
-static void device_dump_children(radix_tree_t *tree, int indent) {
+static void dump_children(radix_tree_t *tree, int indent) {
 	device_t *device;
 
 	RADIX_TREE_FOREACH(tree, iter) {
 		device = radix_tree_entry(iter, device_t);
 
 		kdb_printf("%*s%-*s %-18p %-18p %d\n", indent, "",
-		        24 - indent, device->name, device, device->parent,
-		        refcount_get(&device->count));
+			24 - indent, device->name, device, device->parent,
+			refcount_get(&device->count));
 		if(device->dest) {
-			device_dump_children(&device->dest->children, indent + 2);
+			dump_children(&device->dest->children, indent + 2);
 		} else {
-			device_dump_children(&device->children, indent + 2);
+			dump_children(&device->children, indent + 2);
 		}
 	}
 }
@@ -746,28 +692,26 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
 		kdb_printf("Name                     Address            Parent             Count\n");
 		kdb_printf("====                     =======            ======             =====\n");
 
-		device_dump_children(&device_tree_root->children, 0);
+		dump_children(&device_tree_root->children, 0);
 		return KDB_SUCCESS;
 	}
 
-	if(kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS) {
+	if(kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS)
 		return KDB_FAILURE;
-	}
+
 	device = (device_t *)((ptr_t)val);
 
-	kdb_printf("Device %p(%s)\n", device, device->name);
+	kdb_printf("Device %p (%s)\n", device, device->name);
 	kdb_printf("=================================================\n");
 	kdb_printf("Count:       %d\n", refcount_get(&device->count));
 	kdb_printf("Parent:      %p\n", device->parent);
-	if(device->dest) {
+	if(device->dest)
 		kdb_printf("Destination: %p(%s)\n", device->dest, device->dest->name);
-	}
 	kdb_printf("Ops:         %p\n", device->ops);
 	kdb_printf("Data:        %p\n", device->data);
 
-	if(!device->attrs) {
+	if(!device->attrs)
 		return KDB_SUCCESS;
-	}
 
 	kdb_printf("\nAttributes:\n");
 
@@ -776,19 +720,19 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
 		switch(device->attrs[i].type) {
 		case DEVICE_ATTR_UINT8:
 			kdb_printf("uint8: %" PRIu8 " (0x%" PRIx8 ")\n",
-			        device->attrs[i].value.uint8, device->attrs[i].value.uint8);
+				device->attrs[i].value.uint8, device->attrs[i].value.uint8);
 			break;
 		case DEVICE_ATTR_UINT16:
 			kdb_printf("uint16: %" PRIu16 " (0x%" PRIx16 ")\n",
-			        device->attrs[i].value.uint16, device->attrs[i].value.uint16);
+				device->attrs[i].value.uint16, device->attrs[i].value.uint16);
 			break;
 		case DEVICE_ATTR_UINT32:
 			kdb_printf("uint32: %" PRIu32 " (0x%" PRIx32 ")\n",
-			        device->attrs[i].value.uint32, device->attrs[i].value.uint32);
+				device->attrs[i].value.uint32, device->attrs[i].value.uint32);
 			break;
 		case DEVICE_ATTR_UINT64:
 			kdb_printf("uint64: %" PRIu64 " (0x%" PRIx64 ")\n",
-			        device->attrs[i].value.uint64, device->attrs[i].value.uint64);
+				device->attrs[i].value.uint64, device->attrs[i].value.uint64);
 			break;
 		case DEVICE_ATTR_STRING:
 			kdb_printf("string: '%s'\n", device->attrs[i].value.string);
@@ -798,6 +742,7 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
 			break;
 		}
 	}
+
 	return KDB_SUCCESS;
 }
 
@@ -814,174 +759,42 @@ __init_text void device_init(void) {
 
 	/* Create standard device directories. */
 	ret = device_create("bus", device_tree_root, NULL, NULL, NULL, 0, &device_bus_dir);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		fatal("Could not create bus directory in device tree (%d)", ret);
-	}
 
 	/* Register the KDB command. */
 	kdb_register_command("device", "Examine the device tree.", kdb_cmd_device);
 }
 
-#if 0
-/**
- * Open a handle to a device.
- *
- * Opens a handle to a device that can be used to perform other operations on
- * it. Once the device is no longer required, the handle should be closed with
- * kern_handle_close().
- *
+/** Open a handle to a device.
  * @param path		Device tree path for device to open.
  * @param rights	Requested rights for the handle.
+ * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store handle to the device.
- *
- * @return		Status code describing result of the operation.
- */
-status_t kern_device_open(const char *path, object_rights_t rights, handle_t *handlep) {
+ * @return		Status code describing result of the operation. */
+status_t kern_device_open(const char *path, object_rights_t rights, uint32_t flags,
+	handle_t *handlep)
+{
 	object_handle_t *handle;
 	status_t ret;
 	char *kpath;
 
-	if(!handlep) {
+	if(!path || !handlep)
 		return STATUS_INVALID_ARG;
-	}
 
 	ret = strndup_from_user(path, DEVICE_PATH_MAX, &kpath);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
-	ret = device_open(kpath, rights, &handle);
+	ret = device_open(kpath, rights, flags, &handle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
 
-	ret = object_handle_attach(handle, NULL, 0, NULL, handlep);
+	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 	kfree(kpath);
-	return ret;
-}
-
-/**
- * Read from a device.
- *
- * Reads data from a device into a buffer. The device may not support the
- * operation - it is provided as a function rather than a request type because
- * it is supported by multiple device types.
- *
- * @param handle	Handle to device to read from.
- * @param buf		Buffer to read into.
- * @param count		Number of bytes to read.
- * @param offset	Offset in the device to read from (only valid for
- *			certain device types).
- * @param bytesp	Where to store number of bytes read (can be NULL).
- *
- * @return		Status code describing result of the operation.
- */
-status_t kern_device_read(handle_t handle, void *buf, size_t count, offset_t offset,
-                          size_t *bytesp) {
-	object_handle_t *khandle = NULL;
-	status_t ret, err;
-	size_t bytes = 0;
-	void *kbuf;
-
-	ret = object_handle_lookup(handle, OBJECT_TYPE_DEVICE, 0, &khandle);
-	if(ret != STATUS_SUCCESS) {
-		goto out;
-	}
-
-	/* Don't do anything if there are no bytes to read. */
-	if(!count) {
-		goto out;
-	}
-
-	/* Allocate a temporary buffer to read into. */
-	kbuf = kmalloc(count, MM_USER);
-	if(!kbuf) {
-		ret = STATUS_NO_MEMORY;
-		goto out;
-	}
-
-	ret = device_read(khandle, kbuf, count, offset, &bytes);
-	if(bytes) {
-		err = memcpy_to_user(buf, kbuf, bytes);	
-		if(err != STATUS_SUCCESS) {
-			ret = err;
-			bytes = 0;
-		}
-	}
-	kfree(kbuf);
-out:
-	if(khandle) {
-		object_handle_release(khandle);
-	}
-	if(bytesp) {
-		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
-		if(err != STATUS_SUCCESS) {
-			ret = err;
-		}
-	}
-	return ret;
-}
-
-/**
- * Write to a device.
- *
- * Writes data to a device from buffer. The device may not support the
- * operation - it is provided as a function rather than a request type because
- * it is supported by multiple device types.
- *
- * @param handle	Handle to device to write to.
- * @param buf		Buffer containing data to write.
- * @param count		Number of bytes to write.
- * @param offset	Offset in the device to write to (only valid for
- *			certain device types).
- * @param bytesp	Where to store number of bytes read (can be NULL).
- *
- * @return		Status code describing result of the operation.
- */
-status_t kern_device_write(handle_t handle, const void *buf, size_t count, offset_t offset,
-                           size_t *bytesp) {
-	object_handle_t *khandle = NULL;
-	status_t ret, err;
-	void *kbuf = NULL;
-	size_t bytes = 0;
-
-	ret = object_handle_lookup(handle, OBJECT_TYPE_DEVICE, 0, &khandle);
-	if(ret != STATUS_SUCCESS) {
-		goto out;
-	}
-
-	/* Don't do anything if there are no bytes to write. */
-	if(!count) {
-		goto out;
-	}
-
-	/* Copy the data to write across from userspace. */
-	kbuf = kmalloc(count, MM_USER);
-	if(!kbuf) {
-		ret = STATUS_NO_MEMORY;
-		goto out;
-	}
-	ret = memcpy_from_user(kbuf, buf, count);
-	if(ret != STATUS_SUCCESS) {
-		goto out;
-	}
-
-	ret = device_write(khandle, kbuf, count, offset, &bytes);
-out:
-	if(kbuf) {
-		kfree(kbuf);
-	}
-	if(khandle) {
-		object_handle_release(khandle);
-	}
-	if(bytesp) {
-		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
-		if(err != STATUS_SUCCESS) {
-			ret = err;
-		}
-	}
 	return ret;
 }
 
@@ -990,39 +803,45 @@ out:
  * @param request	Operation number to perform.
  * @param in		Optional input buffer containing data to pass to the
  *			operation handler.
- * @param insz		Size of input buffer.
- * @param outp		Where to store pointer to data returned by the
- *			operation handler (optional).
- * @param outszp	Where to store size of data returned.
+ * @param in_size	Size of input buffer.
+ * @param out		Optional output buffer.
+ * @param out_size	Size of output buffer.
+ * @param bytesp	Where to store number of bytes copied into output buffer.
  * @return		Status code describing result of the operation. */
-status_t kern_device_request(handle_t handle, int request, const void *in, size_t insz, void *out,
-                             size_t outsz, size_t *bytesp) {
+status_t kern_device_request(handle_t handle, unsigned request, const void *in,
+	size_t in_size, void *out, size_t out_size, size_t *bytesp)
+{
 	void *kin = NULL, *kout = NULL;
 	object_handle_t *khandle;
 	status_t ret, err;
 	size_t koutsz;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_DEVICE, 0, &khandle);
-	if(ret != STATUS_SUCCESS) {
-		goto out;
-	}
+	if(in_size && !in)
+		return STATUS_INVALID_ARG;
+	if(out_size && !out)
+		return STATUS_INVALID_ARG;
 
-	if(in && insz) {
-		kin = kmalloc(insz, MM_USER);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		goto out;
+
+	if(in_size) {
+		kin = kmalloc(in_size, MM_USER);
 		if(!kin) {
 			ret = STATUS_NO_MEMORY;
 			goto out;
 		}
-		ret = memcpy_from_user(kin, in, insz);
-		if(ret != STATUS_SUCCESS) {
+
+		ret = memcpy_from_user(kin, in, in_size);
+		if(ret != STATUS_SUCCESS)
 			goto out;
-		}
 	}
 
-	ret = device_request(khandle, request, kin, insz, (out) ? &kout : NULL, (out) ? &koutsz : NULL);
+	ret = device_request(khandle, request, kin, in_size, (out) ? &kout : NULL,
+		(out) ? &koutsz : NULL);
+
 	if(kout) {
-		assert(koutsz);
-		if(koutsz > outsz) {
+		if(koutsz > out_size) {
 			ret = STATUS_TOO_SMALL;
 			goto out;
 		}
@@ -1034,20 +853,17 @@ status_t kern_device_request(handle_t handle, int request, const void *in, size_
 		}
 
 		if(bytesp) {
-			err = memcpy_to_user(bytesp, &koutsz, sizeof(size_t));
-			if(err != STATUS_SUCCESS) {
+			err = memcpy_to_user(bytesp, &koutsz, sizeof(*bytesp));
+			if(err != STATUS_SUCCESS)
 				ret = err;
-			}
 		}
 	}
 out:
-	if(kin) {
+	if(kin)
 		kfree(kin);
-	}
-	if(kout) {
+	if(kout)
 		kfree(kout);
-	}
+
 	object_handle_release(khandle);
 	return ret;
 }
-#endif

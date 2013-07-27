@@ -104,6 +104,7 @@ extern nstime_t time_to_unix(unsigned year, unsigned month, unsigned day,
 
 extern nstime_t system_time(void);
 extern nstime_t unix_time(void);
+extern nstime_t boot_time(void);
 
 extern void timer_device_set(timer_device_t *device);
 extern bool timer_tick(void);

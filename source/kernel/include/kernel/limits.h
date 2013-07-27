@@ -34,6 +34,8 @@
 #define FS_NESTED_LINK_MAX	16	/**< Maximum number of nested symbolic links. */
 
 /** Device manager limits. */
+#define DEVICE_NAME_MAX		32	/**< Maximum length of a device name/device attribute name. */
+#define DEVICE_ATTR_MAX		256	/**< Maximum length of a device attribute string value. */
 #define DEVICE_PATH_MAX		256	/**< Maximum length of a device tree path. */
 
 #endif /* __KERNEL_LIMITS_H */

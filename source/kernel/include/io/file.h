@@ -53,7 +53,7 @@ typedef struct file_ops {
 	status_t (*wait)(struct file *file, struct file_handle *handle, unsigned event,
 		void *wait);
 
-	/** Stop waiting for a file.
+	/** Stop waiting for a file event.
 	 * @param file		File being waited on.
 	 * @param handle	File handle structure.
 	 * @param event		Event that is being waited for.
@@ -64,8 +64,7 @@ typedef struct file_ops {
 	/** Perform I/O on a file.
 	 * @param file		File to perform I/O on.
 	 * @param handle	File handle structure.
-	 * @param request	I/O request. Should be updated with the total
-	 *			number of bytes transferred.
+	 * @param request	I/O request.
 	 * @return		Status code describing result of the operation. */
 	status_t (*io)(struct file *file, struct file_handle *handle,
 		struct io_request *request);
@@ -84,7 +83,7 @@ typedef struct file_ops {
 	status_t (*mappable)(struct file *file, struct file_handle *handle,
 		uint32_t protection, uint32_t flags);
 
-	/** Get a page from the file.
+	/** Get a page from a file.
 	 * @param file		File to get page from.
 	 * @param handle	File handle structure.
 	 * @param offset	Offset into file to get page from.
@@ -93,7 +92,7 @@ typedef struct file_ops {
 	status_t (*get_page)(struct file *file, struct file_handle *handle,
 		offset_t offset, phys_ptr_t *physp);
 
-	/** Release a page from the object.
+	/** Release a page from a file.
 	 * @param file		File to release page in.
 	 * @param handle	File handle structure.
 	 * @param offset	Offset of page in file.

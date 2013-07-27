@@ -79,7 +79,7 @@ static unsigned days_before_month[] = {
 };
 
 /** The number of nanoseconds since the Epoch the kernel was booted at. */
-static nstime_t boot_unix_time = 0;
+nstime_t boot_unix_time = 0;
 
 /** Hardware timer device. */
 static timer_device_t *timer_device = NULL;
@@ -129,6 +129,12 @@ nstime_t time_to_unix(unsigned year, unsigned month, unsigned day, unsigned hour
  */
 nstime_t unix_time(void) {
 	return boot_unix_time + system_time();
+}
+
+/** Get the system boot time.
+ * @return		UNIX time at which the system was booted. */
+nstime_t boot_time(void) {
+	return boot_unix_time;
 }
 
 /** Prepares next timer tick.

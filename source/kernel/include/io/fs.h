@@ -181,7 +181,7 @@ typedef struct fs_node_ops {
 	/** Close a handle to the node.
 	 * @param node		Node being closed.
 	 * @param handle	File handle structure. */
-	void (*close)(struct fs_node *node, struct file_handle *handle);
+	void (*close)(struct fs_node *node, file_handle_t *handle);
 
 	/** Perform I/O on a file.
 	 * @param node		Node to perform I/O on.
@@ -189,7 +189,7 @@ typedef struct fs_node_ops {
 	 * @param request	I/O request. Should be updated with the total
 	 *			number of bytes transferred.
 	 * @return		Status code describing result of the operation. */
-	status_t (*io)(struct fs_node *node, struct file_handle *handle,
+	status_t (*io)(struct fs_node *node, file_handle_t *handle,
 		struct io_request *request);
 
 	/** Get the data cache for a file.
@@ -199,7 +199,7 @@ typedef struct fs_node_ops {
 	 *			provided, it is assumed that this function will
 	 *			always succeed, otherwise it is assumed that
 	 *			the file cannot be memory-mapped. */
-	struct vm_cache *(*get_cache)(struct fs_node *node, struct file_handle *handle);
+	struct vm_cache *(*get_cache)(struct fs_node *node, file_handle_t *handle);
 
 	/** Read the next directory entry.
 	 * @note		It is up to the filesystem implementation to
@@ -214,7 +214,7 @@ typedef struct fs_node_ops {
 	 *			structure (must be allocated using a
 	 *			kmalloc()-based function).
 	 * @return		Status code describing result of the operation. */
-	status_t (*read_dir)(struct fs_node *node, struct file_handle *handle,
+	status_t (*read_dir)(struct fs_node *node, file_handle_t *handle,
 		dir_entry_t **entryp);
 } fs_node_ops_t;
 
