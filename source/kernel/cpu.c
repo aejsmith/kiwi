@@ -131,6 +131,8 @@ __init_text void cpu_init(void) {
 	cpus = kcalloc(highest_cpu_id + 1, sizeof(cpu_t *), MM_BOOT);
 	cpus[boot_cpu.id] = &boot_cpu;
 
+	arch_cpu_init();
+
 	/* We are called on the boot CPU. */
 	cpu_init_percpu();
 }

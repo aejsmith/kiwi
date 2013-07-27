@@ -85,6 +85,7 @@ extern void cpu_dump(cpu_t *cpu);
 
 extern void arch_cpu_early_init(void);
 extern void arch_cpu_early_init_percpu(cpu_t *cpu);
+extern void arch_cpu_init(void);
 extern void arch_cpu_init_percpu(void);
 
 extern void cpu_early_init(void);

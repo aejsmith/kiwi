@@ -367,9 +367,14 @@ static kdb_status_t kdb_cmd_cpus(int argc, char **argv, kdb_filter_t *filter) {
 	return KDB_SUCCESS;
 }
 
-/** Perform additional initialization of the current CPU. */
-__init_text void arch_cpu_init_percpu() {
+/** Perform additional initialization. */
+__init_text void arch_cpu_init() {
 	kdb_register_command("cpus", "Display a list of CPUs.", kdb_cmd_cpus);
 
 	lapic_init();
+}
+
+/** Perform additional initialization of the current CPU. */
+__init_text void arch_cpu_init_percpu() {
+	lapic_init_percpu();
 }

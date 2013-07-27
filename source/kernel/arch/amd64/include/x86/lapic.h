@@ -101,6 +101,7 @@ extern bool lapic_enabled(void);
 extern uint32_t lapic_id(void);
 extern void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector);
 
+extern void lapic_init_percpu(void);
 extern void lapic_init(void);
 
 #endif /* __X86_LAPIC_H */

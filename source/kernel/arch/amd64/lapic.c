@@ -181,7 +181,7 @@ static __init_text uint64_t calculate_lapic_frequency(void) {
 	return (lticks * 8 * PIT_BASE_FREQUENCY) / pticks;
 }
 
-/** Initialize the local APIC on the current CPU. */
+/** Initialize the local APIC. */
 __init_text void lapic_init(void) {
 	uint64_t base;
 
@@ -196,32 +196,30 @@ __init_text void lapic_init(void) {
 	if(!(base & (1<<11))) {
 		return;
 	} else if(cpu_features.x2apic && base & (1<<10)) {
-		fatal("Cannot handle CPU %u in x2APIC mode", curr_cpu->id);
+		fatal("Cannot handle LAPIC in x2APIC mode");
 	}
 
 	base &= 0xFFFFF000;
 
-	if(lapic_mapping) {
-		/* This is a secondary CPU. Ensure that the base address is
-		 * not different to the boot CPU's. */
-		if(base != lapic_base)
-			fatal("CPU %u has different LAPIC address to boot CPU", curr_cpu->id);
-	} else {
-		/* This is the boot CPU. Map the LAPIC into virtual memory and
-		 * register interrupt vector handlers. */
-		lapic_base = base;
-		lapic_mapping = phys_map(base, PAGE_SIZE, MM_BOOT);
-		kprintf(LOG_NOTICE, "lapic: physical location 0x%" PRIxPHYS ", mapped to %p\n",
-			base, lapic_mapping);
+	/* Map the LAPIC into virtual memory and register interrupt handlers. */
+	lapic_base = base;
+	lapic_mapping = phys_map(base, PAGE_SIZE, MM_BOOT);
+	kprintf(LOG_NOTICE, "lapic: physical location 0x%" PRIxPHYS ", mapped to %p\n",
+		base, lapic_mapping);
 
-		/* Install the LAPIC timer device. */
-		timer_device_set(&lapic_timer_device);
+	/* Install the LAPIC timer device. */
+	timer_device_set(&lapic_timer_device);
 
-		/* Install interrupt vectors. */
-		intr_table[LAPIC_VECT_SPURIOUS] = lapic_spurious_handler;
-		intr_table[LAPIC_VECT_TIMER] = lapic_timer_handler;
-		intr_table[LAPIC_VECT_IPI] = lapic_ipi_handler;
-	}
+	/* Install interrupt vectors. */
+	intr_table[LAPIC_VECT_SPURIOUS] = lapic_spurious_handler;
+	intr_table[LAPIC_VECT_TIMER] = lapic_timer_handler;
+	intr_table[LAPIC_VECT_IPI] = lapic_ipi_handler;
+}
+
+/** Initialize the local APIC on the current CPU. */
+__init_text void lapic_init_percpu(void) {
+	if(!lapic_mapping)
+		return;
 
 	/* Enable the local APIC (bit 8) and set the spurious interrupt
 	 * vector in the Spurious Interrupt Vector Register. */

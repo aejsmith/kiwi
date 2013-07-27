@@ -186,8 +186,7 @@ typedef struct fs_node_ops {
 	/** Perform I/O on a file.
 	 * @param node		Node to perform I/O on.
 	 * @param handle	File handle structure.
-	 * @param request	I/O request. Should be updated with the total
-	 *			number of bytes transferred.
+	 * @param request	I/O request.
 	 * @return		Status code describing result of the operation. */
 	status_t (*io)(struct fs_node *node, file_handle_t *handle,
 		struct io_request *request);
