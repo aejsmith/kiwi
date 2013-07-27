@@ -25,7 +25,7 @@ version = {
 cc_warning_flags = [
     '-Wall', '-Wextra', '-Wno-variadic-macros', '-Wno-unused-parameter',
     '-Wwrite-strings', '-Wmissing-declarations', '-Wredundant-decls',
-    '-Wno-format'
+    '-Wno-format', '-Werror', '-Wno-error=unused',
 ]
 
 # C++ warning flags.
