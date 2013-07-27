@@ -95,7 +95,7 @@ void libkernel_init_stage2(process_args_t *args, void *load_base) {
 	void (*func)(void);
 	elf_phdr_t *phdrs;
 	elf_ehdr_t *ehdr;
-	//handle_t handle;
+	handle_t handle;
 	size_t i;
 	status_t ret;
 
@@ -122,12 +122,12 @@ void libkernel_init_stage2(process_args_t *args, void *load_base) {
 
 	/* If we're the first process, open handles to the kernel console. */
 	if(curr_process_id == 1) {
-		//kern_device_open("/kconsole", DEVICE_RIGHT_READ, &handle);
-		//kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
-		//kern_device_open("/kconsole", DEVICE_RIGHT_WRITE, &handle);
-		//kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
-		//kern_device_open("/kconsole", DEVICE_RIGHT_WRITE, &handle);
-		//kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
+		kern_device_open("/kconsole", FILE_RIGHT_READ, 0, &handle);
+		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
+		kern_device_open("/kconsole", FILE_RIGHT_WRITE, 0, &handle);
+		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
+		kern_device_open("/kconsole", FILE_RIGHT_WRITE, 0, &handle);
+		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
 	}
 
 	/* Check if any of our options are set. */

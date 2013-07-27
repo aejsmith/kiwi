@@ -290,7 +290,7 @@ static __init_text void load_modules(void) {
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void init_thread(void *arg1, void *arg2) {
-	const char *pargs[] = { "/system/bin/test", NULL }, *penv[] = { NULL };
+	const char *pargs[] = { "/system/bin/test", NULL }, *penv[] = { "LIBKERNEL_DEBUG=1", NULL };
 	initcall_t *initcall;
 	boot_module_t *mod;
 	status_t ret;

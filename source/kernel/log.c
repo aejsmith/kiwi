@@ -22,8 +22,12 @@
 #include <arch/page.h>
 #include <arch/cpu.h>
 
+#include <io/device.h>
+#include <io/request.h>
+
 #include <lib/printf.h>
 
+#include <mm/malloc.h>
 #include <mm/phys.h>
 
 #include <sync/spinlock.h>
@@ -183,41 +187,52 @@ static kdb_status_t kdb_cmd_log(int argc, char **argv, kdb_filter_t *filter) {
 	return KDB_SUCCESS;
 }
 
-#if 0
-/** Write to the kernel console device.
- * @param device	Device to write to.
- * @param data		Handle-specific data pointer.
- * @param buf		Buffer containing data to write.
- * @param count		Number of bytes to write.
- * @param offset	Unused.
- * @param bytesp	Where to store number of bytes written.
+/** Perform I/O on the kernel console device.
+ * @param device	Device to perform I/O on.
+ * @param handle	File handle structure.
+ * @param request	I/O request.
  * @return		Status code describing result of the operation. */
-static status_t kconsole_device_write(device_t *device, void *data, const void *buf,
-	size_t count, offset_t offset, size_t *bytesp)
+static status_t kconsole_device_io(device_t *device, file_handle_t *handle,
+	io_request_t *request)
 {
-	const char *str = buf;
+	char *buf;
 	size_t i;
+	status_t ret;
 
-	spinlock_lock(&klog_lock);
+	if(request->op == IO_OP_WRITE) {
+		buf = kmalloc(request->total, MM_USER);
+		if(!buf)
+			return STATUS_NO_MEMORY;
 
-	for(i = 0; i < count; i++) {
-		if(debug_console_ops)
-			debug_console_ops->putc(str[i]);
-		if(main_console_ops)
-			main_console_ops->putc(str[i]);
+		ret = io_request_copy(request, buf, request->total);
+		if(ret != STATUS_SUCCESS) {
+			kfree(buf);
+			return ret;
+		}
+
+		spinlock_lock(&klog_lock);
+
+		for(i = 0; i < request->total; i++) {
+			if(debug_console_ops)
+				debug_console_ops->putc(buf[i]);
+			if(main_console_ops)
+				main_console_ops->putc(buf[i]);
+		}
+
+		spinlock_unlock(&klog_lock);
+
+		kfree(buf);
+		return STATUS_SUCCESS;
+	} else {
+		return STATUS_NOT_SUPPORTED;
 	}
-
-	spinlock_unlock(&klog_lock);
-
-	*bytesp = count;
-	return STATUS_SUCCESS;
 }
 
 /** Kernel console device operations structure. */
 static device_ops_t kconsole_device_ops = {
-	.write = kconsole_device_write,
+	.type = FILE_TYPE_CHAR,
+	.io = kconsole_device_io,
 };
-#endif
 
 /** Initialize the kernel log. */
 __init_text void log_early_init(void) {
@@ -234,7 +249,7 @@ __init_text void log_early_init(void) {
 /** Create the kernel log device. */
 static __init_text void log_init(void) {
 	kboot_tag_log_t *tag;
-	//status_t ret;
+	status_t ret;
 
 	/* The KBoot log mapping will go away so we need to remap it somewhere
 	 * else. */
@@ -243,12 +258,10 @@ static __init_text void log_init(void) {
 		kboot_log = phys_map(tag->log_phys, tag->log_size, MM_BOOT);
 	}
 
-#if 0
 	ret = device_create("kconsole", device_tree_root, &kconsole_device_ops,
 		NULL, NULL, 0, NULL);
 	if(ret != STATUS_SUCCESS)
 		fatal("Failed to register kernel console device (%d)", ret);
-#endif
 }
 
 INITCALL(log_init);
