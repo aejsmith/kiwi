@@ -226,8 +226,8 @@ class ToolchainManager:
         # Set up the sysroot to link to the source tree.
         self.remove(os.path.join(self.targetdir, 'sysroot', 'include'))
         self.remove(os.path.join(self.targetdir, 'sysroot', 'lib'))
-        os.symlink(os.path.join(os.getcwd(), 'source', 'include'),
-            os.path.join(self.targetdir, 'sysroot', 'include'))
+        #os.symlink(os.path.join(os.getcwd(), 'source', 'include'),
+        #    os.path.join(self.targetdir, 'sysroot', 'include'))
         os.symlink(os.path.join(os.getcwd(), 'build',
                 '%s-%s' % (self.config['ARCH'], self.config['PLATFORM']), 'libraries'),
             os.path.join(self.targetdir, 'sysroot', 'lib'))

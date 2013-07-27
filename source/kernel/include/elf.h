@@ -22,7 +22,7 @@
 #ifndef __KERNEL_ELF_H
 #define __KERNEL_ELF_H
 
-#include "../../include/elf.h"
+#include "../../lib/system/include/elf.h"
 #include <arch/elf.h>
 
 struct object_handle;

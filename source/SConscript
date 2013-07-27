@@ -85,45 +85,64 @@ if config['PLATFORM'] == 'pc':
 # Userspace build. #
 ####################
 
+# Get the compiler include directory which contains some standard headers.
+from subprocess import Popen, PIPE
+incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip()
+
 # Set up the userspace build environment.
 env = manager.Create('uspace', {
-    'CPPPATH': [Dir('include')],
+    # Specify -nostdinc to prevent the compiler trying to use the automatically
+    # generated sysroot. That only needs to be used when compiling outside the
+    # build system, we manage all the header paths internally. We do need to
+    # add the compiler's own include directory to the path, though.
+    'ASFLAGS': ['-nostdinc', '-isystem', incdir, '-include',
+        'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
+    'CCFLAGS': ['-nostdinc', '-isystem', incdir, '-include',
+        'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
+
+    # We'll be using the sysroot's library path as the compiler needs it to
+    # find crt*.o, but specify our own one as well so that SCons picks up
+    # dependencies properly.
     'LIBPATH': [Dir('lib')],
-    'ASFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
-    'CCFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
-    'CXXFLAGS': ['-std=c++11'],
     'LIBOUTDIR': Dir('lib'),
-    '_LIBS': {}
+
+    'CPPPATH': [],
+    'CXXFLAGS': ['-std=c++11'],
+    '_LIBINFO': {}
 })
 
 # Process library dependencies, and set LIBS and CPPPATH in flags.
 def process_library_deps(env, flags, libraries, build_libraries):
-    if not flags.has_key('LIBS'):
+    if not 'LIBS' in flags:
         flags['LIBS'] = []
-    if not flags.has_key('CPPPATH'):
+    if not 'LINKFLAGS' in flags:
+        flags['LINKFLAGS'] = [] + env['LINKFLAGS']
+    if not 'CPPPATH' in flags:
         flags['CPPPATH'] = [] + env['CPPPATH']
 
     # Work out libraries to link against.
     def add_library(lib, link):
         if link and flags['LIBS'].count(lib) == 0:
             flags['LIBS'].append(lib)
-        if env['_LIBS'].has_key(lib):
-            info = env['_LIBS'][lib]
+        if env['_LIBINFO'].has_key(lib):
+            info = env['_LIBINFO'][lib]
             process_library_deps(env, flags, [], info['build_libraries'])
-            flags['CPPPATH'] += info['include_path']
+            flags['CPPPATH'] += info['include_paths']
     for lib in libraries:
         add_library(lib, True)
     for lib in build_libraries:
         add_library(lib, False)
 
+    # Need to add headers for libkernel and libsystem.
+    if not ('-nostdlib' in flags['LINKFLAGS'] or '-nodefaultlibs' in flags['LINKFLAGS']):
+        add_library('kernel', False)
+        add_library('system', False)
+
 # Custom method to build a Kiwi application.
-def kiwi_application_method(env, target, sources, libraries = None, build_libraries = None, flags = None):
-    if not libraries:
-        libraries = []
-    if not build_libraries:
-        build_libraries = []
-    if not flags:
-        flags = {}
+def kiwi_application_method(env, target, sources, **kwargs):
+    libraries = kwargs['libraries'] if 'libraries' in kwargs else []
+    build_libraries = kwargs['build_libraries'] if 'build_libraries' in kwargs else []
+    flags = kwargs['flags'] if 'flags' in kwargs else []
 
     # Set up the include path and get the libraries to link to.
     process_library_deps(env, flags, libraries, build_libraries)
@@ -135,52 +154,25 @@ def kiwi_application_method(env, target, sources, libraries = None, build_librar
     return env.Program(target, sources, **flags)
 env.AddMethod(kiwi_application_method, 'KiwiApplication')
 
-# Custom method to build a Kiwi service.
-def kiwi_service_method(env, target, sources, libraries = None, build_libraries = None, flags = None):
-    if not libraries:
-        libraries = []
-    if not build_libraries:
-        build_libraries = []
-    if not flags:
-        flags = {}
-
-    # Set up the include path and get the libraries to link to.
-    process_library_deps(env, flags, libraries, build_libraries)
-
-    # Add the service to the distribution environment.
-    dist['SERVICES'].append(File(target))
-
-    # Build the service.
-    return env.Program(target, sources, **flags)
-env.AddMethod(kiwi_service_method, 'KiwiService')
-
 # Custom method to build a Kiwi library.
-def kiwi_library_method(env, target, sources, libraries = None, build_libraries = None,
-                        include_path = None, flags = None):
-    if not libraries:
-        libraries = []
-    if not build_libraries:
-        build_libraries = []
-    if not include_path:
-        include_path = []
-    elif type(include_path) != list:
-        include_path = [include_path]
-    if not flags:
-        flags = {}
+def kiwi_library_method(env, target, sources, **kwargs):
+    libraries = kwargs['libraries'] if 'libraries' in kwargs else []
+    build_libraries = kwargs['build_libraries'] if 'build_libraries' in kwargs else []
+    include_paths = kwargs['include_paths'] if 'include_paths' in kwargs else []
+    flags = kwargs['flags'] if 'flags' in kwargs else []
 
-    # We want to use our own include directory.
-    if include_path:
+    if include_paths:
         if not flags.has_key('CPPPATH'):
             flags['CPPPATH'] = [] + env['CPPPATH']
-        flags['CPPPATH'] += include_path
+        flags['CPPPATH'] += include_paths
 
     # Set up the include path and get the libraries to link to.
     process_library_deps(env, flags, libraries, build_libraries)
 
     # Store our dependency/include path information.
-    env['_LIBS'][target] = {
+    env['_LIBINFO'][target] = {
         'build_libraries': build_libraries,
-        'include_path': include_path,
+        'include_paths': include_paths,
     }
 
     # Modify the target path so that libraries all get placed in the build
@@ -209,8 +201,8 @@ def program_emitter(target, source, env):
         Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
     if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
         Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
-        if env['SMARTLINK'](source, target, env, None) == '$CXX':
-            Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
+        #if env['SMARTLINK'](source, target, env, None) == '$CXX':
+        #    Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
     return target, source
 env.Append(PROGEMITTER = [program_emitter])
 

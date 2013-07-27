@@ -33,19 +33,13 @@ sources = map(File, [
     'tls.c',
 ])
 
-# These won't conflict with the copies in libsystem, we don't export the
-# symbols. I would like to avoid having to do this, though...
-libsystem_sources = map(lambda x: File('../system/%s' % x), [
-#    'util/mutex.c',
-])
-
 # Generate the system call functions.
 env.Syscalls('syscalls.S', manager['kernel']['SYSCALLS'])
 
 # Generate the status string list.
 env.Command(
     'status_list.c',
-    ['../../include/kernel/status.h'],
+    ['include/kernel/status.h'],
     Action('$GENERRLIST $SOURCE __kernel_status_strings __kernel_status_size > $TARGET', '$GENCOMSTR'))
 
 # Get a list of architecture-specific source files.
@@ -54,24 +48,15 @@ arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
 # Copy the architecture header in.
 Command('arch.h', 'arch/%s/arch.h' % (config['ARCH']), Action('cp $SOURCE $TARGET', None))
 
-# Perform some black magic to make the object files built from libsystem sources
-# have an alternative file name to not conflict.
-ccflags = env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden']
-libsystem_objects = map(lambda x: env.SharedObject(target = '%s.os' % (x.name),
-    source = x, CCFLAGS = ccflags), libsystem_sources)
-
 # Build the library. The default visibility is set to hidden, as the majority
 # of functions in this library should not be exported.
 env.KiwiLibrary('kernel',
-    sources = map(
-        lambda x: env.SharedObject(
-            x,
-            CCFLAGS = ccflags,
-            CPPDEFINES = ['LIBKERNEL']
-        ),
-        arch_sources + sources
-    ) + libsystem_objects,
+    sources = arch_sources + sources,
+    include_paths = [Dir('include')],
     flags = {
         'LINKFLAGS': ['-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
+        'CCFLAGS': env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden'],
+        'CPPDEFINES': ['LIBKERNEL'],
+        'CPPPATH': [Dir('../system/include')],
     },
 )
