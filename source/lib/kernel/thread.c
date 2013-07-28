@@ -101,7 +101,7 @@ __export status_t kern_thread_create(const char *name, void *stack, size_t stack
  * @param handle	Handle for thread to get ID of, or THREAD_SELF to get
  *			ID of the calling thread.
  * @return		Thread ID on success, -1 if handle is invalid. */
-thread_id_t kern_thread_id(handle_t handle) {
+__export thread_id_t kern_thread_id(handle_t handle) {
 	/* We save the current thread ID to avoid having to perform a kernel
 	 * call just to get our own ID. */
 	if(handle < 0) {

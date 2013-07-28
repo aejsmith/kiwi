@@ -21,6 +21,8 @@
 
 #include <kernel/private/process.h>
 
+#include "libkernel.h"
+
 /** Saved ID for the current process. */
 process_id_t curr_process_id = -1;
 
@@ -28,7 +30,7 @@ process_id_t curr_process_id = -1;
  * @param handle	Handle for process to get ID of, or PROCESS_SELF to get
  *			ID of the calling process.
  * @return		Process ID on success, -1 if handle is invalid. */
-process_id_t kern_process_id(handle_t handle) {
+__export process_id_t kern_process_id(handle_t handle) {
 	/* We save the current process ID to avoid having to perform a kernel
 	 * call just to get our own ID. */
 	if(handle < 0) {
