@@ -135,14 +135,14 @@ def process_library_deps(env, flags, libraries, build_libraries):
 
     # Need to add headers for libkernel and libsystem.
     if not ('-nostdlib' in flags['LINKFLAGS'] or '-nodefaultlibs' in flags['LINKFLAGS']):
-        add_library('kernel', False)
-        add_library('system', False)
+        flags['CPPPATH'] += env['_LIBINFO']['kernel']['include_paths']
+        flags['CPPPATH'] += env['_LIBINFO']['system']['include_paths']
 
 # Custom method to build a Kiwi application.
 def kiwi_application_method(env, target, sources, **kwargs):
     libraries = kwargs['libraries'] if 'libraries' in kwargs else []
     build_libraries = kwargs['build_libraries'] if 'build_libraries' in kwargs else []
-    flags = kwargs['flags'] if 'flags' in kwargs else []
+    flags = kwargs['flags'] if 'flags' in kwargs else {}
 
     # Set up the include path and get the libraries to link to.
     process_library_deps(env, flags, libraries, build_libraries)
@@ -159,7 +159,7 @@ def kiwi_library_method(env, target, sources, **kwargs):
     libraries = kwargs['libraries'] if 'libraries' in kwargs else []
     build_libraries = kwargs['build_libraries'] if 'build_libraries' in kwargs else []
     include_paths = kwargs['include_paths'] if 'include_paths' in kwargs else []
-    flags = kwargs['flags'] if 'flags' in kwargs else []
+    flags = kwargs['flags'] if 'flags' in kwargs else {}
 
     if include_paths:
         if not flags.has_key('CPPPATH'):
