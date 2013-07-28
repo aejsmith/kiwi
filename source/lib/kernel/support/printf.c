@@ -26,7 +26,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "../libkernel.h"
+#include "libkernel.h"
 
 /** Output handle to use (stderr). */
 #define OUTPUT_HANDLE		2

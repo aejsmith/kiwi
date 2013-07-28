@@ -23,6 +23,7 @@
 #include <kernel/private/process.h>
 #include <kernel/private/thread.h>
 #include <kernel/object.h>
+#include <kernel/signal.h>
 
 #include <elf.h>
 #include <string.h>
@@ -172,4 +173,12 @@ void libkernel_init_stage2(process_args_t *args, void *load_base) {
 	entry(args);
 	dprintf("libkernel: program entry point returned\n");
 	kern_process_exit(0);
+}
+
+/** Abort the process. */
+void libkernel_abort(void) {
+	/* Try to raise a SIGABRT, failing that (signal may be blocked) then
+	 * just exit. */
+	kern_signal_send(PROCESS_SELF, SIGABRT);
+	kern_process_exit(-1);
 }

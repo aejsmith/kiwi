@@ -21,7 +21,7 @@
 
 #include <string.h>
 
-#include "../../libkernel.h"
+#include "libkernel.h"
 
 /** Internal part of relocation.
  * @param image		Image to relocate.

@@ -19,7 +19,7 @@
  * @brief		AMD64 thread-local storage support functions.
  */
 
-#include "../../libkernel.h"
+#include "libkernel.h"
 
 /** Argument passed to __tls_get_addr(). */
 typedef struct tls_index {

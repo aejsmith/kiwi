@@ -20,7 +20,8 @@
  */
 
 #include <string.h>
-#include "../libkernel.h"
+
+#include "libkernel.h"
 
 /** Work out the ELF hash for a symbol name.
  * @param name		Name to get hash of.

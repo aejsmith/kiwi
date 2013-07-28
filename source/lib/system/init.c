@@ -19,27 +19,16 @@
  * @brief		C library startup code.
  */
 
-#include <kernel/process.h>
+#include <kernel/private/process.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "libsystem.h"
-#include "../kernel/libkernel.h"
-
-/** Heap operations for libkernel. */
-static libkernel_heap_ops_t libsystem_heap_ops = {
-	.alloc = malloc,
-	.realloc = realloc,
-	.free = free,
-};
 
 /** Early system library initialisation. */
 static void __attribute__((constructor)) libsystem_early_init(void) {
-	/* Tell libkernel to use our allocation functions. */
-	libkernel_heap_configure(&libsystem_heap_ops);
-
 	/* Attempt to open standard I/O streams from existing handles. */
 	stdin = fdopen(STDIN_FILENO, "r");
 	stdout = fdopen(STDOUT_FILENO, "a");

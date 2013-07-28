@@ -32,7 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../libkernel.h"
+#include "libkernel.h"
 
 /** Expected path to libkernel. */
 #define LIBKERNEL_PATH		"/system/lib/libkernel.so"

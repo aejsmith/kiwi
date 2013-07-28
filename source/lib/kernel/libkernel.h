@@ -32,6 +32,7 @@
 
 /** Compiler attribute/builtin macros. */
 #define __export		__attribute__((visibility("default")))
+#define __noreturn		__attribute__((noreturn))
 #define likely(x)		__builtin_expect(!!(x), 1)
 #define unlikely(x)		__builtin_expect(!!(x), 0)
 
@@ -58,8 +59,11 @@
 		__n; \
 	})
 
-/** Size of the early heap. */
-#define LIBKERNEL_HEAP_SIZE	8192
+/** Get the lowest value out of a pair of values. */
+#define MIN(a, b)		((a) < (b) ? (a) : (b))
+
+/** Get the highest value out of a pair of values. */
+#define MAX(a, b)		((a) < (b) ? (b) : (a))
 
 #include "arch.h"
 
@@ -99,13 +103,6 @@ typedef struct rtld_image {
 	} state;
 } rtld_image_t;
 
-/** Heap operations structure. */
-typedef struct libkernel_heap_ops {
-	void *(*alloc)(size_t);
-	void *(*realloc)(void *, size_t);
-	void (*free)(void *);
-} libkernel_heap_ops_t;
-
 /** Pre-defined TLS module IDs. */
 #define APPLICATION_TLS_ID	1	/**< Application always has module ID 1. */
 #define LIBKERNEL_TLS_ID	2	/**< If libkernel has TLS, this will be its ID. */
@@ -138,7 +135,7 @@ extern void *tls_get_addr(size_t module, size_t offset);
 extern status_t tls_init(void);
 extern void tls_destroy(void);
 
-extern void libkernel_heap_configure(libkernel_heap_ops_t *ops);
+extern void libkernel_abort(void) __noreturn;
 
 extern void libkernel_arch_init(process_args_t *args, rtld_image_t *image);
 extern void libkernel_init(process_args_t *args, void *load_base);

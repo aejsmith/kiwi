@@ -19,7 +19,7 @@
  * @brief		AMD64 kernel library initialisation function.
  */
 
-#include "../../libkernel.h"
+#include "libkernel.h"
 
 /** Kernel library architecture initialisation function.
  * @param args		Process argument block.
