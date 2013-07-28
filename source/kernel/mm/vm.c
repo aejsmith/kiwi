@@ -92,6 +92,7 @@
 #include <mm/phys.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
+#include <mm/vm.h>
 #include <mm/vm_cache.h>
 
 #include <proc/process.h>
@@ -102,8 +103,6 @@
 #include <kdb.h>
 #include <smp.h>
 #include <status.h>
-
-#include "vm_private.h"
 
 /** Define to enable (very) verbose debug output. */
 #define DEBUG_VM
@@ -153,6 +152,10 @@ static void vm_amap_ctor(void *obj, void *data) {
 
 	mutex_init(&map->lock, "vm_amap_lock", 0);
 }
+
+/**
+ * Utility functions.
+ */
 
 /** Check if a region fits in an address space.
  * @param as		Address space to check in.
@@ -210,6 +213,47 @@ static inline bool vm_freelist_empty(vm_aspace_t *as, unsigned list) {
 	}
 }
 
+/** Get the region before another region in the region list.
+ * @param region	Region to get region before from.
+ * @return		Pointer to previous region, or NULL if start of list. */
+static vm_region_t *vm_region_prev(vm_region_t *region) {
+	if(region == list_first(&region->as->regions, vm_region_t, header))
+		return NULL;
+
+	return list_prev(&region->header, vm_region_t, header);
+}
+
+/** Get the region after another region in the region list.
+ * @param region	Region to get region after from.
+ * @return		Pointer to next region, or NULL if end of list. */
+static vm_region_t *vm_region_next(vm_region_t *region) {
+	if(region == list_last(&region->as->regions, vm_region_t, header))
+		return NULL;
+
+	return list_next(&region->header, vm_region_t, header);
+}
+
+/** Check if a region contains an address.
+ * @param region	Region to check.
+ * @param addr		Address to check.
+ * @return		Whether the region contains the address. */
+static inline bool vm_region_contains(vm_region_t *region, ptr_t addr) {
+	return (addr >= region->start && addr <= (region->start + region->size - 1));
+}
+
+/** Check if two regions can be merged.
+ * @param a		First region.
+ * @param b		Second region.
+ * @return		Whether the regions can be merged. Regions are only
+ *			mergeable if unused. */
+static inline bool vm_region_mergeable(const vm_region_t *a, const vm_region_t *b) {
+	return (a->state != VM_REGION_ALLOCATED && a->state == b->state);
+}
+
+/**
+ * Anonymous map functions.
+ */
+
 /** Create an anonymous map.
  * @param size		Size of object.
  * @return		Pointer to created map (reference count will be 1). */
@@ -227,6 +271,41 @@ static vm_amap_t *vm_amap_create(size_t size) {
 	dprintf("vm: created anonymous map %p (size: %zu, pages: %zu)\n", map,
 		size, map->max_size);
 	return map;
+}
+
+/** Clone an existing anonymous map.
+ * @param src		Existing map to clone.
+ * @param offset	Offset into the map to clone from.
+ * @param size		Size of the cloned area.
+ * @return		Pointer to created map. */
+static vm_amap_t *vm_amap_clone(vm_amap_t *src, offset_t offset, size_t size) {
+	vm_amap_t *dest;
+	size_t i, start, end;
+
+	dest = vm_amap_create(size);
+
+	mutex_lock(&src->lock);
+
+	start = (size_t)(offset >> PAGE_WIDTH);
+	end = start + (size >> PAGE_WIDTH);
+	assert(end <= src->max_size);
+
+	/* Point all of the pages in the new map to the pages from the source
+	 * map: they will be copied when a write fault occurs on either the
+	 * source or the destination. Set the region reference count for each
+	 * page to 1, to account for the destination region. */
+	for(i = start; i < end; i++) {
+		if(src->pages[i]) {
+			refcount_inc(&src->pages[i]->count);
+			dest->curr_size++;
+		}
+
+		dest->pages[i - start] = src->pages[i];
+		dest->rref[i - start] = 1;
+	}
+
+	mutex_unlock(&src->lock);
+	return dest;
 }
 
 /** Destroy an anonymous map.
@@ -314,298 +393,13 @@ static void vm_amap_unmap(vm_amap_t *map, offset_t offset, size_t size) {
 	mutex_unlock(&map->lock);
 }
 
-/** Get the region before another region in the region list.
- * @param region	Region to get region before from.
- * @return		Pointer to previous region, or NULL if start of list. */
-static vm_region_t *vm_region_prev(vm_region_t *region) {
-	if(region == list_first(&region->as->regions, vm_region_t, header))
-		return NULL;
-
-	return list_prev(&region->header, vm_region_t, header);
-}
-
-/** Get the region after another region in the region list.
- * @param region	Region to get region after from.
- * @return		Pointer to next region, or NULL if end of list. */
-static vm_region_t *vm_region_next(vm_region_t *region) {
-	if(region == list_last(&region->as->regions, vm_region_t, header))
-		return NULL;
-
-	return list_next(&region->header, vm_region_t, header);
-}
-
-/** Check if a region contains an address.
- * @param region	Region to check.
- * @param addr		Address to check.
- * @return		Whether the region contains the address. */
-static inline bool vm_region_contains(vm_region_t *region, ptr_t addr) {
-	return (addr >= region->start && addr <= (region->start + region->size - 1));
-}
-
-/** Check if two regions can be merged.
- * @param a		First region.
- * @param b		Second region.
- * @return		Whether the regions can be merged. Regions are only
- *			mergeable if unused. */
-static inline bool vm_region_mergeable(const vm_region_t *a, const vm_region_t *b) {
-	return (a->state != VM_REGION_ALLOCATED && a->state == b->state);
-}
-
-/** Allocate a new region structure. Caller must attach object to it.
- * @param as		Address space of the region.
- * @param start		Start address of the region.
- * @param size		Size of the region.
- * @param protection	Protection flags for the region.
- * @param flags		Flags for the region.
- * @param state		Allocation state of the region.
- * @param name		Name of the region (will be copied).
- * @return		Pointer to region structure. */
-static vm_region_t *vm_region_create(vm_aspace_t *as, ptr_t start, size_t size,
-	uint32_t protection, uint32_t flags, int state, const char *name)
-{
-	vm_region_t *region;
-
-	assert(!(start % PAGE_SIZE));
-	assert(!(size % PAGE_SIZE));
-	assert(state == VM_REGION_ALLOCATED || !name);
-
-	region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
-	region->as = as;
-	region->start = start;
-	region->size = size;
-	region->protection = protection;
-	region->flags = flags;
-	region->state = state;
-	region->handle = NULL;
-	region->obj_offset = 0;
-	region->amap = NULL;
-	region->amap_offset = 0;
-	region->name = (name) ? kstrdup(name, MM_KERNEL) : NULL;
-	return region;
-}
-
-/** Clone a region.
- * @param src		Region to clone.
- * @param as		Address space for new region.
- * @return		Pointer to cloned region. */
-static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
-	size_t i, start, end;
-	vm_region_t *dest;
-
-	dest = vm_region_create(as, src->start, src->size, src->protection,
-		src->flags, src->state, src->name);
-	if(src->state != VM_REGION_ALLOCATED)
-		return dest;
-
-	/* Copy the object handle. */
-	if(src->handle) {
-		object_handle_retain(src->handle);
-		dest->handle = src->handle;
-		dest->obj_offset = src->obj_offset;
-	}
-
-	/* If this is not a private mapping, just point the new region at the
-	 * old anonymous map and return. */
-	if(!(src->flags & VM_MAP_PRIVATE)) {
-		if(src->amap) {
-			refcount_inc(&src->amap->count);
-			vm_amap_map(src->amap, src->amap_offset, src->size);
-			dest->amap = src->amap;
-			dest->amap_offset = src->amap_offset;
-		}
-
-		return dest;
-	}
-
-	/* This is a private region. We must create a copy of the area within
-	 * the source anonymous map that the region points to, so work out the
-	 * entries within the map that the region covers. */
-	assert(src->amap);
-	mutex_lock(&src->amap->lock);
-	start = src->amap_offset >> PAGE_WIDTH;
-	end = start + (src->size >> PAGE_WIDTH);
-	assert(end <= src->amap->max_size);
-
-	/* Create a new map. */
-	dest->amap = vm_amap_create(src->size);
-
-	/* Write-protect all mappings on the source region. */
-	mmu_context_lock(src->as->mmu);
-	mmu_context_protect(src->as->mmu, src->start, src->size,
-		src->protection & ~VM_PROT_WRITE);
-	mmu_context_unlock(src->as->mmu);
-
-	/* Point all of the pages in the new map to the pages from the source
-	 * map: they will be copied when a write fault occurs on either the
-	 * source or the destination. Set the region reference count for each
-	 * page to 1, to account for the destination region. */
-	for(i = start; i < end; i++) {
-		if(src->amap->pages[i]) {
-			refcount_inc(&src->amap->pages[i]->count);
-			dest->amap->curr_size++;
-		}
-
-		dest->amap->pages[i - start] = src->amap->pages[i];
-		dest->amap->rref[i - start] = 1;
-	}
-
-	dprintf("vm: copied private region %p (map: %p) to %p (map: %p)\n",
-		src, src->amap, dest, dest->amap);
-	mutex_unlock(&src->amap->lock);
-	return dest;
-}
-
-/** Searches for a region containing an address.
- * @param as		Address space to search in (should be locked).
- * @param addr		Address to search for.
- * @param unused	Whether to include unused regions in the search.
- * @return		Pointer to region if found, false if not. If including
- *			unused regions, this will always succeed unless the
- *			given address is invalid. */
-static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
-	avl_tree_node_t *node;
-	vm_region_t *region, *near = NULL;
-
-	/* Check if the cached pointer matches. Caching the last found region
-	 * helps mainly for page fault handling when code is hitting different
-	 * parts of a newly-mapped region in succession. */
-	if(as->find_cache && vm_region_contains(as->find_cache, addr))
-		return as->find_cache;
-
-	/* Fall back on searching through the AVL tree. */
-	node = as->tree.root;
-	while(node) {
-		region = avl_tree_entry(node, vm_region_t, tree_link);
-		assert(region->state == VM_REGION_ALLOCATED);
-		if(addr >= region->start) {
-			if(vm_region_contains(region, addr)) {
-				as->find_cache = region;
-				return region;
-			}
-
-			near = avl_tree_entry(node, vm_region_t, tree_link);
-			node = node->right;
-		} else {
-			node = node->left;
-		}
-	}
-
-	/* We couldn't find a matching allocated region. We do however have the
-	 * nearest allocated region on the left. If we want to include unused
-	 * regions in the search, search forward from this region in the region
-	 * list to find the required region. */
-	if(unused) {
-		if(near) {
-			region = vm_region_next(near);
-		} else {
-			/* Should never be empty. */
-			assert(!list_empty(&as->regions));
-			region = list_first(&as->regions, vm_region_t, header);
-		}
-
-		while(region) {
-			if(vm_region_contains(region, addr)) {
-				assert(region->state != VM_REGION_ALLOCATED);
-				return region;
-			}
-
-			region = vm_region_next(region);
-		}
-	}
-
-	return NULL;
-}
-
-/** Unmap all or part of a region.
- * @note		This function is called whenever part of a region is
- *			going to be removed. It unmaps pages covering the area,
- *			and updates the region's anonymous map (if it has one).
- * @note		Does not release the anonymous map and object if the
- *			entire region is being removed - this is done in
- *			vm_region_destroy() since only that function should be
- *			used to remove an entire region.
- * @param region	Region being unmapped (should not be reserved).
- * @param start		Start of range to unmap.
- * @param size		Size of range to unmap. */
-static void vm_region_unmap(vm_region_t *region, ptr_t start, size_t size) {
-	phys_ptr_t phys;
-	offset_t offset;
-	size_t i, idx;
-
-	assert(region->state == VM_REGION_ALLOCATED);
-	assert(region->handle || region->amap);
-
-	mmu_context_lock(region->as->mmu);
-
-	for(i = 0; i < size; i += PAGE_SIZE) {
-		offset = (start - region->start) + i;
-
-		/* Unmap the page and release it from its source. */
-		if(mmu_context_unmap(region->as->mmu, start + i, true, &phys)) {
-			if(region->amap) {
-				offset += region->amap_offset;
-				idx = offset >> PAGE_WIDTH;
-
-				assert(idx < region->amap->max_size);
-
-				/* If page is in the object, then do nothing. */
-				if(region->amap->pages[idx]) {
-					assert(region->amap->pages[idx]->addr == phys);
-					continue;
-				}
-
-				assert(region->handle);
-				assert(region->handle->object->type->release_page);
-			}
-
-			if(region->handle->object->type->release_page) {
-				offset += region->obj_offset;
-				region->handle->object->type->release_page(
-					region->handle, offset, phys);
-			}
-		}
-	}
-
-	mmu_context_unlock(region->as->mmu);
-
-	/* Release the pages in the anonymous map. */
-	if(region->amap) {
-		offset = (start - region->start) + region->amap_offset;
-		vm_amap_unmap(region->amap, offset, size);
-	}
-}
-
-/** Unmap an entire region.
- * @param region	Region to destroy. */
-static void vm_region_destroy(vm_region_t *region) {
-	/* Unmap the region and drop references to the object/anonymous map,
-	 * and remove it from the tree or freelist. */
-	if(region->state == VM_REGION_ALLOCATED) {
-		vm_region_unmap(region, region->start, region->size);
-
-		if(region->amap)
-			vm_amap_release(region->amap);
-		if(region->handle)
-			object_handle_release(region->handle);
-
-		avl_tree_remove(&region->as->tree, &region->tree_link);
-	} else if(region->state == VM_REGION_FREE) {
-		vm_freelist_remove(region);
-	}
-
-	/* Remove from the main region list. */
-	list_remove(&region->header);
-
-	/* If the region was the cached find pointer, get rid of it. */
-	if(region == region->as->find_cache)
-		region->as->find_cache = NULL;
-
-	assert(list_empty(&region->free_link));
-	slab_cache_free(vm_region_cache, region);
-}
+/**
+ * Page mapping functions.
+ */
 
 /** Map a page for an anonymous region into an address space.
- * @param region	Region to map for.
+ * @note		Address space and MMU context should be locked.
+ * @param region	Region to map in.
  * @param addr		Virtual address to map.
  * @param access	Required access for the page.
  * @param physp		Where to store physical address of page.
@@ -779,7 +573,8 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 }
 
 /** Map a page from an object into an address space.
- * @param region	Region to map for.
+ * @note		Address space and MMU context should be locked.
+ * @param region	Region to map in.
  * @param addr		Virtual address to map.
  * @param physp		Where to store physical address of page.
  * @return		Status code describing the result of the operation. */
@@ -827,6 +622,332 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *phy
 		phys, addr, region->as, region->protection);
 	return STATUS_SUCCESS;
 }
+
+/** Map a page for a region into its address space.
+ * @note		Address space and MMU context should be locked.
+ * @param region	Region to map in.
+ * @param addr		Virtual address to map.
+ * @param access	Required access for the page.
+ * @param physp		Where to store physical address of page.
+ * @return		Status code describing the result of the operation. */
+static status_t map_page(vm_region_t *region, ptr_t addr, uint32_t access, phys_ptr_t *physp) {
+	assert(vm_region_contains(region, addr));
+
+	return (region->amap)
+		? map_anon_page(region, addr, access, physp)
+		: map_object_page(region, addr, physp);
+}
+
+/** Unmap a page within a region.
+ * @note		Address space and MMU context should be locked.
+ * @param region	Region to unmap in.
+ * @param addr		Address to unmap.
+ * @return		Whether the page was mapped. */
+static bool unmap_page(vm_region_t *region, ptr_t addr) {
+	offset_t offset;
+	phys_ptr_t phys;
+	size_t idx;
+
+	assert(vm_region_contains(region, addr));
+
+	offset = addr - region->start;
+
+	if(!mmu_context_unmap(region->as->mmu, addr, true, &phys))
+		return false;
+
+	/* Release the page from the source. */
+	if(region->amap) {
+		offset += region->amap_offset;
+		idx = offset >> PAGE_WIDTH;
+
+		assert(idx < region->amap->max_size);
+
+		/* If page is in the object, then do nothing. */
+		if(region->amap->pages[idx]) {
+			assert(region->amap->pages[idx]->addr == phys);
+			return true;
+		}
+
+		assert(region->handle);
+		assert(region->handle->object->type->release_page);
+	}
+
+	if(region->handle->object->type->release_page) {
+		offset += region->obj_offset;
+		region->handle->object->type->release_page(region->handle,
+			offset, phys);
+	}
+
+	return true;
+}
+
+
+/**
+ * Region functions.
+ */
+
+/** Allocate a new region structure. Caller must attach object to it.
+ * @param as		Address space of the region.
+ * @param start		Start address of the region.
+ * @param size		Size of the region.
+ * @param protection	Protection flags for the region.
+ * @param flags		Flags for the region.
+ * @param state		Allocation state of the region.
+ * @param name		Name of the region (will be copied).
+ * @return		Pointer to region structure. */
+static vm_region_t *vm_region_create(vm_aspace_t *as, ptr_t start, size_t size,
+	uint32_t protection, uint32_t flags, int state, const char *name)
+{
+	vm_region_t *region;
+
+	assert(!(start % PAGE_SIZE));
+	assert(!(size % PAGE_SIZE));
+	assert(state == VM_REGION_ALLOCATED || !name);
+
+	region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
+	region->as = as;
+	region->start = start;
+	region->size = size;
+	region->protection = protection;
+	region->flags = flags;
+	region->state = state;
+	region->handle = NULL;
+	region->obj_offset = 0;
+	region->amap = NULL;
+	region->amap_offset = 0;
+	region->name = (name) ? kstrdup(name, MM_KERNEL) : NULL;
+	return region;
+}
+
+/** Clone a region.
+ * @param src		Region to clone.
+ * @param as		Address space for new region.
+ * @return		Pointer to cloned region. */
+static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
+	vm_region_t *dest;
+
+	dest = vm_region_create(as, src->start, src->size, src->protection,
+		src->flags, src->state, src->name);
+	if(src->state != VM_REGION_ALLOCATED)
+		return dest;
+
+	/* Copy the object handle. */
+	if(src->handle) {
+		object_handle_retain(src->handle);
+		dest->handle = src->handle;
+		dest->obj_offset = src->obj_offset;
+	}
+
+	/* If this is not a private mapping, just point the new region at the
+	 * old anonymous map and return. */
+	if(!(src->flags & VM_MAP_PRIVATE)) {
+		if(src->amap) {
+			refcount_inc(&src->amap->count);
+			vm_amap_map(src->amap, src->amap_offset, src->size);
+			dest->amap = src->amap;
+			dest->amap_offset = src->amap_offset;
+		}
+
+		return dest;
+	}
+
+	/* This is a private region. Write-protect all mappings on the source
+	 * region and then clone the anonymous map. */
+	mmu_context_lock(src->as->mmu);
+	mmu_context_protect(src->as->mmu, src->start, src->size,
+		src->protection & ~VM_PROT_WRITE);
+	mmu_context_unlock(src->as->mmu);
+
+	assert(src->amap);
+	dest->amap = vm_amap_clone(src->amap, src->amap_offset, src->size);
+
+	dprintf("vm: copied private region %p (map: %p) to %p (map: %p)\n",
+		src, src->amap, dest, dest->amap);
+	return dest;
+}
+
+/** Searches for a region containing an address.
+ * @param as		Address space to search in (should be locked).
+ * @param addr		Address to search for.
+ * @param unused	Whether to include unused regions in the search.
+ * @return		Pointer to region if found, false if not. If including
+ *			unused regions, this will always succeed unless the
+ *			given address is invalid. */
+static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
+	avl_tree_node_t *node;
+	vm_region_t *region, *near = NULL;
+
+	/* Check if the cached pointer matches. Caching the last found region
+	 * helps mainly for page fault handling when code is hitting different
+	 * parts of a newly-mapped region in succession. */
+	if(as->find_cache && vm_region_contains(as->find_cache, addr))
+		return as->find_cache;
+
+	/* Fall back on searching through the AVL tree. */
+	node = as->tree.root;
+	while(node) {
+		region = avl_tree_entry(node, vm_region_t, tree_link);
+		assert(region->state == VM_REGION_ALLOCATED);
+		if(addr >= region->start) {
+			if(vm_region_contains(region, addr)) {
+				as->find_cache = region;
+				return region;
+			}
+
+			near = avl_tree_entry(node, vm_region_t, tree_link);
+			node = node->right;
+		} else {
+			node = node->left;
+		}
+	}
+
+	/* We couldn't find a matching allocated region. We do however have the
+	 * nearest allocated region on the left. If we want to include unused
+	 * regions in the search, search forward from this region in the region
+	 * list to find the required region. */
+	if(unused) {
+		if(near) {
+			region = vm_region_next(near);
+		} else {
+			/* Should never be empty. */
+			assert(!list_empty(&as->regions));
+			region = list_first(&as->regions, vm_region_t, header);
+		}
+
+		while(region) {
+			if(vm_region_contains(region, addr)) {
+				assert(region->state != VM_REGION_ALLOCATED);
+				return region;
+			}
+
+			region = vm_region_next(region);
+		}
+	}
+
+	return NULL;
+}
+
+/** Unmap all or part of a region.
+ * @note		This function is called whenever part of a region is
+ *			going to be removed. It unmaps pages covering the area,
+ *			and updates the region's anonymous map (if it has one).
+ * @note		Does not release the anonymous map and object if the
+ *			entire region is being removed - this is done in
+ *			vm_region_destroy() since only that function should be
+ *			used to remove an entire region.
+ * @param region	Region being unmapped (should not be reserved).
+ * @param start		Start of range to unmap.
+ * @param size		Size of range to unmap. */
+static void vm_region_unmap(vm_region_t *region, ptr_t start, size_t size) {
+	size_t i;
+	offset_t offset;
+
+	assert(region->state == VM_REGION_ALLOCATED);
+	assert(region->handle || region->amap);
+
+	mmu_context_lock(region->as->mmu);
+
+	/* Unmap pages covering the region. */
+	for(i = 0; i < size; i += PAGE_SIZE)
+		unmap_page(region, start + i);
+
+	mmu_context_unlock(region->as->mmu);
+
+	/* Release the pages in the anonymous map. */
+	if(region->amap) {
+		offset = (start - region->start) + region->amap_offset;
+		vm_amap_unmap(region->amap, offset, size);
+	}
+}
+
+/** Unmap an entire region.
+ * @param region	Region to destroy. */
+static void vm_region_destroy(vm_region_t *region) {
+	/* Unmap the region and drop references to the object/anonymous map,
+	 * and remove it from the tree or freelist. */
+	if(region->state == VM_REGION_ALLOCATED) {
+		vm_region_unmap(region, region->start, region->size);
+
+		if(region->amap)
+			vm_amap_release(region->amap);
+		if(region->handle)
+			object_handle_release(region->handle);
+
+		avl_tree_remove(&region->as->tree, &region->tree_link);
+	} else if(region->state == VM_REGION_FREE) {
+		vm_freelist_remove(region);
+	}
+
+	/* Remove from the main region list. */
+	list_remove(&region->header);
+
+	/* If the region was the cached find pointer, get rid of it. */
+	if(region == region->as->find_cache)
+		region->as->find_cache = NULL;
+
+	assert(list_empty(&region->free_link));
+	slab_cache_free(vm_region_cache, region);
+}
+
+/**
+ * Kernel internal API functions.
+ */
+
+/**
+ * Lock a single page in an address space.
+ *
+ * Locks a single page into an address space for access with the specified
+ * access. While the page is locked, it will not be evicted from the address
+ * space, and it is guaranteed to be safe to access when the address space is
+ * active.
+ *
+ * @param as		Address space to lock in.
+ * @param addr		Address of page to lock.
+ * @param access	Required access to the page.
+ * @param physp		Where to store physical address of page.
+ *
+ * @return		Status code describing the result of the operation.
+ */
+status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access, phys_ptr_t *physp) {
+	vm_region_t *region;
+	status_t ret;
+
+	assert(!(addr % PAGE_SIZE));
+
+	mutex_lock(&as->lock);
+
+	region = vm_region_find(as, addr, false);
+	if(!region || region->state != VM_REGION_ALLOCATED) {
+		mutex_unlock(&as->lock);
+		return STATUS_INVALID_ADDR;
+	}
+
+	/* Check whether the access is allowed. */
+	if((region->protection & access) != access) {
+		mutex_unlock(&as->lock);
+		return STATUS_ACCESS_DENIED;
+	}
+
+	/* For now we just ensure that the page is mapped for the requested
+	 * access, as we don't evict pages at all. */
+	mmu_context_lock(as->mmu);
+	ret = map_page(region, addr, access, physp);
+	mmu_context_unlock(as->mmu);
+
+	mutex_unlock(&as->lock);
+	return ret;
+}
+
+/** Unlock a previously locked page.
+ * @param as		Address space to unlock in.
+ * @param addr		Address of page to unlock. */
+void vm_unlock_page(vm_aspace_t *as, ptr_t addr) {
+	/* Nothing happens, for now. */
+}
+
+/**
+ * Page fault handler.
+ */
 
 /** Page fault handler.
  * @param addr		Address the fault occurred at.
@@ -960,60 +1081,8 @@ out:
 }
 
 /**
- * Lock a single page in an address space.
- *
- * Locks a single page into an address space for access with the specified
- * access. While the page is locked, it will not be evicted from the address
- * space, and it is guaranteed to be safe to access when the address space is
- * active.
- *
- * @param as		Address space to lock in.
- * @param addr		Address of page to lock.
- * @param access	Required access to the page.
- * @param physp		Where to store physical address of page.
- *
- * @return		Status code describing the result of the operation.
+ * Public API implementation.
  */
-status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access, phys_ptr_t *physp) {
-	vm_region_t *region;
-	status_t ret;
-
-	assert(!(addr % PAGE_SIZE));
-
-	mutex_lock(&as->lock);
-
-	region = vm_region_find(as, addr, false);
-	if(!region || region->state != VM_REGION_ALLOCATED) {
-		mutex_unlock(&as->lock);
-		return STATUS_INVALID_ADDR;
-	}
-
-	/* Check whether the access is allowed. */
-	if((region->protection & access) != access) {
-		mutex_unlock(&as->lock);
-		return STATUS_ACCESS_DENIED;
-	}
-
-	mmu_context_lock(as->mmu);
-
-	/* For now we just ensure that the page is mapped for the requested
-	 * access, as we don't evict pages at all. */
-	ret = (region->amap)
-		? map_anon_page(region, addr, access, physp)
-		: map_object_page(region, addr, physp);
-
-	mmu_context_unlock(as->mmu);
-
-	mutex_unlock(&as->lock);
-	return ret;
-}
-
-/** Unlock a previously locked page.
- * @param as		Address space to unlock in.
- * @param addr		Address of page to unlock. */
-void vm_unlock_page(vm_aspace_t *as, ptr_t addr) {
-	/* Nothing happens, for now. */
-}
 
 /** Cut out the specified space from the address space.
  * @param as		Address space to trim.
@@ -1895,6 +1964,10 @@ __init_text void vm_init(void) {
 	kdb_register_command("aspace", "Print details about an address space.",
 		kdb_cmd_aspace);
 }
+
+/**
+ * User API.
+ */
 
 /**
  * Map an object into memory.

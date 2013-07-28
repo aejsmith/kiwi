@@ -29,6 +29,8 @@
 #include <lib/avl_tree.h>
 #include <lib/utility.h>
 
+#include <mm/page.h>
+
 #include <sync/mutex.h>
 
 #include <cpu.h>
@@ -36,7 +38,7 @@
 
 struct intr_frame;
 struct mmu_context;
-struct vm_region;
+struct vm_aspace;
 
 /** Number of free lists to use. */
 #define VM_FREELISTS		(((unsigned)BITS(ptr_t)) - PAGE_WIDTH)
@@ -44,13 +46,51 @@ struct vm_region;
 /** Maximum length of a region name. */
 #define REGION_NAME_MAX		32
 
+/** Structure containing an anonymous memory map. */
+typedef struct vm_amap {
+	refcount_t count;		/**< Count of regions referring to this object. */
+	mutex_t lock;			/**< Lock to protect map. */
+
+	size_t curr_size;		/**< Number of pages currently contained in object. */
+	size_t max_size;		/**< Maximum number of pages in object. */
+	page_t **pages;			/**< Array of pages currently in object. */
+	uint16_t *rref;			/**< Region reference count array. */
+} vm_amap_t;
+
+/** Structure representing a region in an address space. */
+typedef struct vm_region {
+	list_t header;			/**< Link to the region list. */
+	list_t free_link;		/**< Link to free region lists. */
+	avl_tree_node_t tree_link;	/**< Link to allocated region tree. */
+
+	struct vm_aspace *as;		/**< Address space that the region belongs to. */
+	ptr_t start;			/**< Base address of the region. */
+	size_t size;			/**< Size of the region. */
+	uint32_t protection;		/**< Protection flags for the region. */
+	uint32_t flags;			/**< Region behaviour flags. */
+
+	/** Allocation state of the region. */
+	enum {
+		VM_REGION_FREE,		/**< Region is free. */
+		VM_REGION_ALLOCATED,	/**< Region is in use. */
+		VM_REGION_RESERVED,	/**< Region is reserved, must not be allocated. */
+	} state;
+
+	object_handle_t *handle;	/**< Handle to object that this region is mapping. */
+	offset_t obj_offset;		/**< Offset into the object. */
+	vm_amap_t *amap;		/**< Anonymous map. */
+	offset_t amap_offset;		/**< Offset into the anonymous map. */
+
+	char *name;			/**< Name of the region (can be NULL). */
+} vm_region_t;
+
 /** Structure containing a virtual address space. */
 typedef struct vm_aspace {
 	mutex_t lock;			/**< Lock to protect address space. */
 	refcount_t count;		/**< Reference count of CPUs using address space. */
 
 	/** Address lookup stuff. */
-	struct vm_region *find_cache;	/**< Cached pointer to last region searched for. */
+	vm_region_t *find_cache;	/**< Cached pointer to last region searched for. */
 	avl_tree_t tree;		/**< Tree of mapped regions for address lookups. */
 
 	/** Underlying MMU context for address space. */
@@ -73,12 +113,12 @@ enum {
 	VM_FAULT_PROTECTION,		/**< Fault caused by a protection violation. */
 };
 
-extern status_t vm_fault(struct intr_frame *frame, ptr_t addr, int reason,
-	uint32_t access);
-
 extern status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access,
 	phys_ptr_t *physp);
 extern void vm_unlock_page(vm_aspace_t *as, ptr_t addr);
+
+extern status_t vm_fault(struct intr_frame *frame, ptr_t addr, int reason,
+	uint32_t access);
 
 extern status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 	uint32_t protection, uint32_t flags, object_handle_t *handle,
