@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,11 +19,9 @@
  * @brief		AMD64 setjmp/longjmp functions.
  */
 
-.section .text
+#include <amd64/asm.h>
 
-.global setjmp
-.type setjmp, @function
-setjmp:
+FUNCTION_START(setjmp)
 	/* Save return address */
 	movq	0(%rsp), %rcx
 	movq	%rcx, 0(%rdi)
@@ -40,11 +38,9 @@ setjmp:
 	/* Return 0 */
 	movq	$0, %rax
 	ret
-.size setjmp, .-setjmp
+FUNCTION_END(setjmp)
 
-.global longjmp
-.type longjmp, @function
-longjmp:
+FUNCTION_START(longjmp)
 	/* Restore registers */
 	movq	8(%rdi), %rbp
 	movq	16(%rdi), %rsp
@@ -64,4 +60,4 @@ longjmp:
 	movl	$1, %esi
 1:	movl	%esi, %eax
 	ret
-.size longjmp, .-longjmp
+FUNCTION_END(longjmp)
