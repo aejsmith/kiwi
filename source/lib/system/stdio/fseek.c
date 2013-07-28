@@ -20,41 +20,29 @@
  */
 
 #include <unistd.h>
+
 #include "stdio_priv.h"
 
-/** Reposition file pointer.
- *
- * Repositions the file pointer for a file stream according to the action
- * specified.
- *
+/** Reposition a stream's file pointer.
  * @param stream	Stream to reposition.
  * @param off		New offset.
  * @param act		How to set the offset.
- *
- * @return		0 on success, -1 on failure.
- */
+ * @return		0 on success, -1 on failure. */
 int fseeko(FILE *stream, off_t off, int act) {
 	off_t ret;
 
 	ret = lseek(stream->fd, off, act);
-	if(ret < 0) {
+	if(ret < 0)
 		return -1;
-	}
 
 	return 0;
 }
 
-/** Reposition file pointer.
- *
- * Repositions the file pointer for a file stream according to the action
- * specified.
- *
+/** Reposition a stream's file pointer.
  * @param stream	Stream to reposition.
  * @param off		New offset.
  * @param act		How to set the offset.
- *
- * @return		0 on success, -1 on failure.
- */
+ * @return		0 on success, -1 on failure. */
 int fseek(FILE *stream, long off, int act) {
 	return fseeko(stream, (off_t)off, act);
 }
@@ -66,14 +54,14 @@ void rewind(FILE *stream) {
 	clearerr(stream);
 }
 
-/** Get file pointer.
+/** Get a stream's file pointer.
  * @param stream	Stream to get pointer for.
  * @return		File pointer on success, -1 on failure. */
 off_t ftello(FILE *stream) {
 	return lseek(stream->fd, 0, SEEK_CUR);
 }
 
-/** Get file pointer.
+/** Get a stream's file pointer.
  * @param stream	Stream to get pointer for.
  * @return		File pointer on success, -1 on failure. */
 long ftell(FILE *stream) {

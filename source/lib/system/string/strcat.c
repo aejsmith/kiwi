@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,15 +21,12 @@
 
 #include <string.h>
 
-/** Concatenate 2 strings.
- *
- * Appends one string to another.
- *
- * @param dest		Pointer to the string to append to.
+/** Concatenate two strings.
+ * @param dest		Pointer to the string to append to. The containing
+ *			buffer must have enough extra space for the source
+ *			string.
  * @param src		Pointer to the string to append.
- * 
- * @return		Pointer to dest.
- */
+ * @return		Pointer to dest. */
 char *strcat(char *restrict dest, const char *restrict src) {
 	size_t destlen = strlen(dest);
 	char *d = dest + destlen;
@@ -38,7 +35,8 @@ char *strcat(char *restrict dest, const char *restrict src) {
 	return dest;
 }
 
-/** Concatenate 2 strings.
+/**
+ * Concatenate 2 strings.
  *
  * Appends one string to another, with a maximum limit on how much of the
  * source string to copy.
@@ -53,9 +51,8 @@ char *strncat(char *restrict dest, const char *restrict src, size_t max) {
 	size_t i, destlen = strlen(dest);
 	char *d = dest + destlen;
 
-	for(i = 0; i < max && src[i] != 0; i++) {
+	for(i = 0; i < max && src[i] != 0; i++)
 		d[i] = src[i];
-	}
 
 	d[i] = 0;
 	return dest;

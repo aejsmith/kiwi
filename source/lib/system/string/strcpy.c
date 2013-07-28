@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,14 +21,15 @@
 
 #include <string.h>
 
-/** Copy a string.
+/**
+ * Copy a string.
  *
  * Copies a string from one place to another. Assumes that the destination
  * is big enough to hold the string.
  *
  * @param dest		Pointer to the destination buffer.
  * @param src		Pointer to the source buffer.
- * 
+ *
  * @return		The value specified for dest.
  */
 char *strcpy(char *restrict dest, const char *restrict src) {
@@ -38,7 +39,8 @@ char *strcpy(char *restrict dest, const char *restrict src) {
 	return dest;
 }
 
-/** Copy a string with a length limit.
+/**
+ * Copy a string with a length limit.
  *
  * Copies a string from one place to another. Will copy at most the number
  * of bytes specified.
@@ -46,7 +48,7 @@ char *strcpy(char *restrict dest, const char *restrict src) {
  * @param dest		Pointer to the destination buffer.
  * @param src		Pointer to the source buffer.
  * @param count		Maximum number of bytes to copy.
- * 
+ *
  * @return		The value specified for dest.
  */
 char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
@@ -54,14 +56,15 @@ char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
 
 	for(i = 0; i < count; i++) {
 		dest[i] = src[i];
-		if(!src[i]) {
+		if(!src[i])
 			break;
-		}
 	}
+
 	return dest;
 }
 
-/** Transform a string.
+/**
+ * Transform a string.
  *
  * Transforms a string so that the result of strcmp() on the transformed string
  * is the same as the result of strcoll() on the string.
@@ -80,9 +83,9 @@ size_t strxfrm(char *restrict dest, const char *restrict src, size_t count) {
 
 	for(i = 0; i < count; i++) {
 		dest[i] = src[i];
-		if(!src[i]) {
+		if(!src[i])
 			break;
-		}
 	}
+
 	return i;
 }

@@ -22,31 +22,19 @@
 #include <stdlib.h>
 
 /** Compute the absolute value of an integer.
- *
- * Computes the absolute value of the given integer.
- *
- * @param j		Integer to compute from.
- */
+ * @param j		Integer to compute from. */
 int abs(int j) {
 	return (j < 0) ? -j : j;
 }
 
-/** Compute the absolute value of a long.
- *
- * Computes the absolute value of the given long integer.
- *
- * @param j		Long integer to compute from.
- */
+/** Compute the absolute value of a long integer.
+ * @param j		Long integer to compute from. */
 long labs(long j) {
 	return (j < 0) ? -j : j;
 }
 
-/** Compute the absolute value of a long long.
- *
- * Computes the absolute value of the given long long integer.
- *
- * @param j		Long long integer to compute from.
- */
+/** Compute the absolute value of a long long integer.
+ * @param j		Long long integer to compute from. */
 long long llabs(long long j) {
 	return (j < 0) ? -j : j;
 }

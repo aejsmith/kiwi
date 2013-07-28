@@ -27,9 +27,11 @@
 #include <unistd.h>
 
 /** Letters to use for mkstemp(). */
-static const char *mkstemp_letters = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+static const char *mkstemp_letters
+	= "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-/** Create and open a temporary file.
+/**
+ * Create and open a temporary file.
  *
  * Creates and opens a new temporary file, with a name based on the given
  * template. The last 6 characters of the template must be XXXXXX, which
@@ -57,9 +59,8 @@ int mkstemp(char *tpl) {
 
 	lcount = strlen(mkstemp_letters);
 	for(i = 0; i < TMP_MAX; i++) {
-		for(j = 0; j < 6; j++) {
+		for(j = 0; j < 6; j++)
 			dest[j] = mkstemp_letters[rand() % lcount];
-		}
 
 		fd = open(tpl, O_RDWR | O_CREAT | O_EXCL, 0600);
 		if(fd >= 0) {
@@ -73,7 +74,8 @@ int mkstemp(char *tpl) {
 	return -1;
 }
 
-/** Create temporary file.
+/**
+ * Create a temporary file.
  *
  * Creates new temporary file, with a name based on the given template. The
  * last 6 characters of the template must be XXXXXX, which will be overwritten

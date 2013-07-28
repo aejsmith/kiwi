@@ -44,7 +44,8 @@ static int vsscanf_putch(int c, void *_data) {
 	return (*(--data->buf) == c)? c : -1;
 }
 
-/** Unformat a buffer.
+/**
+ * Unformat a buffer.
  *
  * Unformats a buffer into a list of arguments according to the given format
  * string.
@@ -62,7 +63,8 @@ int vsscanf(const char *restrict buf, const char *restrict fmt, va_list args) {
 	return do_scanf(&sdata, fmt, args);
 }
 
-/** Unformat a buffer.
+/**
+ * Unformat a buffer.
  *
  * Unformats a buffer into a list of arguments according to the given format
  * string.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,9 +22,11 @@
 #ifndef __LIMITS_H
 #define __LIMITS_H
 
+#include <kernel/limits.h>
+
 /** Various system limitations. */
-#define PATH_MAX		4096	/**< Maximum length of a path string. */
-#define SYMLINK_MAX		4096	/**< Maximum length of a symbolic link destination. */
+#define PATH_MAX	FS_PATH_MAX	/**< Maximum length of a path string. */
+#define SYMLINK_MAX	FS_PATH_MAX	/**< Maximum length of a symbolic link destination. */
 
 #ifndef _GCC_LIMITS_H_
 # include_next <limits.h>

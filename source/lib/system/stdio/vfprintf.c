@@ -30,30 +30,20 @@ static void vfprintf_helper(char ch, void *data, int *total) {
 	*total = *total + 1;
 }
 
-/** Output a formatted message to a file stream.
- * 
- * Outputs a formatted string to a file stream.
- *
+/** Output a formatted string to a file stream.
  * @param stream	Stream to output to.
  * @param fmt		Format string used to create the message.
  * @param args		Arguments to substitute into format.
- *
- * @return		Number of characters printed.
- */
+ * @return		Number of characters printed. */
 int vfprintf(FILE *restrict stream, const char *restrict fmt, va_list args) {
 	return do_printf(vfprintf_helper, stream, fmt, args);
 }
 
-/** Output a formatted message to a file stream.
- * 
- * Outputs a formatted string to a file stream.
- *
+/** Output a formatted string to a file stream.
  * @param stream	Stream to output to.
  * @param fmt		Format string used to create the message.
  * @param args		Arguments to substitute into format.
- *
- * @return		Number of characters printed.
- */
+ * @return		Number of characters printed. */
 int fprintf(FILE *restrict stream, const char *restrict fmt, ...) {
 	va_list args;
 	int ret;
@@ -65,28 +55,18 @@ int fprintf(FILE *restrict stream, const char *restrict fmt, ...) {
 	return ret;
 }
 
-/** Output a formatted message.
- * 
- * Outputs a formatted string to the console.
- *
+/** Output a formatted string to standard output.
  * @param fmt		Format string used to create the message.
  * @param args		Arguments to substitute into format.
- *
- * @return		Number of characters printed.
- */
+ * @return		Number of characters printed. */
 int vprintf(const char *restrict fmt, va_list args) {
 	return vfprintf(stdout, fmt, args);
 }
 
-/** Output a formatted message.
- * 
- * Outputs a formatted string to the console.
- *
+/** Output a formatted string to standard output.
  * @param fmt		Format string used to create the message.
  * @param ...		Arguments to substitute into format.
- *
- * @return		Number of characters printed.
- */
+ * @return		Number of characters printed. */
 int printf(const char *restrict fmt, ...) {
 	va_list args;
 	int ret;

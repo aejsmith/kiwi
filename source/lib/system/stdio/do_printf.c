@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,10 @@
 /**
  * @file
  * @brief		Formatted output function.
+ *
+ * @todo		Floating point support.
+ * @todo		Support the 'n' conversion specifier and the 't' length
+ *			modifier.
  */
 
 #include <ctype.h>
@@ -35,35 +39,43 @@
 #define PRINTF_LOW_CASE		(1<<5)	/**< Print hexadecimal characters in lower case. */
 #define PRINTF_SIGNED		(1<<6)	/**< Treat number as a signed value. */
 
+/** Internal printf() state. */
+typedef struct printf_state {
+	printf_helper_t helper;		/**< Helper function. */
+	void *data;			/**< Argument to helper. */
+	int total;			/**< Current output total. */
+	unsigned flags;			/**< Flags for the current item. */
+	long width;			/**< Width of current item. */
+	long precision;			/**< Precision of current item. */
+	int base;			/**< Base of current item. */
+} printf_state_t;
+
 /** Digits to use for printing numbers. */
 static const char printf_digits_upper[] = "0123456789ABCDEF";
 static const char printf_digits_lower[] = "0123456789abcdef";
 
+/** Print a single character.
+ * @param state		Internal state structure.
+ * @param ch		Character to write. */
+static void print_char(printf_state_t *state, char ch) {
+	state->helper(ch, state->data, &state->total);
+}
+
 /** Helper to print a string of characters.
+ * @param state		Internal state structure.
  * @param str		String to write.
- * @param len		Length to print.
- * @param helper	Helper function.
- * @param data		Data for helper function.
- * @param total		Pointer to integer containing total characters printed. */
-static void printf_string_helper(const char *str, size_t len, printf_helper_t helper, void *data, int *total) {
+ * @param len		Length to print. */
+static void print_string(printf_state_t *state, const char *str, size_t len) {
 	size_t i;
 
-	for(i = 0; i < len; i++) {
-		helper(str[i], data, total);
-	}
+	for(i = 0; i < len; i++)
+		print_char(state, str[i]);
 }
 
 /** Helper to print a number.
- * @param num		Number to print.
- * @param width		Field width.
- * @param precision	Precision.
- * @param base		Number base to use.
- * @param flags		Internal behaviour flags.
- * @param helper	Helper function.
- * @param data		Data for helper function.
- * @param total		Pointer to integer containing total characters printed. */
-static void printf_number_helper(uint64_t num, long width, long precision, int base, int flags,
-                                 printf_helper_t helper, void *data, int *total) {
+ * @param state		Internal state structure.
+ * @param num		Number to print. */
+static void print_number(printf_state_t *state, uint64_t num) {
 	char buffer[64];
 	char sign = 0;
 	uint32_t tmp;
@@ -71,34 +83,35 @@ static void printf_number_helper(uint64_t num, long width, long precision, int b
 
 	/* Work out the sign character to use, if any. Always print a sign
 	 * character if the number is negative. */
-	if(flags & PRINTF_SIGNED) {
+	if(state->flags & PRINTF_SIGNED) {
 		if((int64_t)num < 0) {
 			sign = '-';
 			num = -((int64_t)num);
-			width--;
-		} else if(flags & PRINTF_SIGN_CHAR) {
+			state->width--;
+		} else if(state->flags & PRINTF_SIGN_CHAR) {
 			sign = '+';
-			width--;
-		} else if(flags & PRINTF_SPACE_CHAR) {
+			state->width--;
+		} else if(state->flags & PRINTF_SPACE_CHAR) {
 			sign = ' ';
-			width--;
+			state->width--;
 		}
 	}
 
 	/* Reduce field width to accomodate any prefixes required. */
-	if(flags & PRINTF_PREFIX) {
-		if(base == 8) {
-			width -= 1;
-		} else if(base == 16) {
-			width -= 2;
+	if(state->flags & PRINTF_PREFIX) {
+		if(state->base == 8) {
+			state->width -= 1;
+		} else if(state->base == 16) {
+			state->width -= 2;
 		}
 	}
 
 	/* Write the number out to the temporary buffer, in reverse order. */
 	while(num != 0) {
-		tmp = (uint32_t)(num % base);
-		num /= base;
-		buffer[i++] = (flags & PRINTF_LOW_CASE) ? printf_digits_lower[tmp] : printf_digits_upper[tmp];
+		tmp = (uint32_t)(num % state->base);
+		num /= state->base;
+		buffer[i++] = (state->flags & PRINTF_LOW_CASE)
+			? printf_digits_lower[tmp] : printf_digits_upper[tmp];
 	}
 
 	/* Modify precision to store the number of actual digits we are going
@@ -106,68 +119,57 @@ static void printf_number_helper(uint64_t num, long width, long precision, int b
 	 * so if the digit count is higher than the precision, set precision
 	 * to the digit count. Width then becomes the amount of padding we
 	 * require. */
-	if(i > precision) {
-		precision = i;
-	}
-	width -= precision;
+	if(i > state->precision)
+		state->precision = i;
+	state->width -= state->precision;
 
 	/* If we're not left aligned and require space padding, write it.
 	 * Do not handle zero padding here, sign and prefix characters must
 	 * be before zero padding but after space padding. */
-	if(!(flags & (PRINTF_LEFT_JUSTIFY | PRINTF_ZERO_PAD))) {
-		while(--width >= 0) {
-			helper(' ', data, total);
-		}
+	if(!(state->flags & (PRINTF_LEFT_JUSTIFY | PRINTF_ZERO_PAD))) {
+		while(--state->width >= 0)
+			print_char(state, ' ');
 	}
 
 	/* Write out the sign character, if any. */
-	if(sign) {
-		helper(sign, data, total);
-	}
+	if(sign)
+		print_char(state, sign);
 
 	/* Write out any prefix required. Base 8 has a '0' prefix, base 16
 	 * has a '0x' or '0X' prefix, depending on whether lower or upper
 	 * case. */
-	if(flags & PRINTF_PREFIX && (base == 8 || base == 16)) {
-		helper('0', data, total);
-		if(base == 16) {
-			helper((flags & PRINTF_LOW_CASE) ? 'x' : 'X', data, total);
-		}
+	if(state->flags & PRINTF_PREFIX && (state->base == 8 || state->base == 16)) {
+		print_char(state, '0');
+		if(state->base == 16)
+			print_char(state, (state->flags & PRINTF_LOW_CASE) ? 'x' : 'X');
 	}
 
 	/* Do zero padding. */
-	if(flags & PRINTF_ZERO_PAD) {
-		while(--width >= 0) {
-			helper('0', data, total);
-		}
+	if(state->flags & PRINTF_ZERO_PAD) {
+		while(--state->width >= 0)
+			print_char(state, '0');
 	}
-	while(i <= --precision) {
-		helper('0', data, total);
-	}
+	while(i <= --state->precision)
+		print_char(state, '0');
 
 	/* Write out actual digits, reversed to the correct direction. */
-	while(--i >= 0) {
-		helper(buffer[i], data, total);
-	}
+	while(--i >= 0)
+		print_char(state, buffer[i]);
 
 	/* Finally handle space padding caused by left justification. */
-	if(flags & (PRINTF_LEFT_JUSTIFY)) {
-		while(--width >= 0) {
-			helper(' ', data, total);
-		}
+	if(state->flags & PRINTF_LEFT_JUSTIFY) {
+		while(--state->width >= 0)
+			print_char(state, ' ');
 	}
 }
 
-/** Internal implementation of printf()-style functions.
+/**
+ * Internal implementation of printf()-style functions.
  *
  * This function does the main work of printf()-style functions. It parses
  * the format string, and uses a supplied helper function to actually put
  * characters in the desired output location (for example the console or a
  * string buffer).
- *
- * @note		Floating point values are not supported.
- * @note		The 'n' conversion specifier is not supported.
- * @note		The 't' length modifier is not supported.
  *
  * @param helper	Helper function to use.
  * @param data		Data to pass to helper function.
@@ -177,42 +179,44 @@ static void printf_number_helper(uint64_t num, long width, long precision, int b
  * @return		Number of characters written.
  */
 int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_list args) {
-	int total = 0, flags, base;
-	long width, precision;
+	printf_state_t state;
 	unsigned char ch;
 	const char *str;
 	uint64_t num;
 	int32_t len;
 
+	state.helper = helper;
+	state.data = data;
+	state.total = 0;
+
 	for(; *fmt; fmt++) {
 		if(*fmt != '%') {
-			helper(*fmt, data, &total);
+			print_char(&state, *fmt);
 			continue;
 		}
 
 		/* Parse flags in the format string. */
-		flags = 0;
+		state.flags = 0;
 		while(true) {
 			switch(*(++fmt)) {
 			case '#':
-				flags |= PRINTF_PREFIX;
+				state.flags |= PRINTF_PREFIX;
 				continue;
 			case '0':
 				/* Left justify has greater priority than
 				 * zero padding. */
-				if(!(flags & PRINTF_LEFT_JUSTIFY)) {
-					flags |= PRINTF_ZERO_PAD;
-				}
+				if(!(state.flags & PRINTF_LEFT_JUSTIFY))
+					state.flags |= PRINTF_ZERO_PAD;
 				continue;
 			case '-':
-				flags &= ~PRINTF_ZERO_PAD;
-				flags |= PRINTF_LEFT_JUSTIFY;
+				state.flags &= ~PRINTF_ZERO_PAD;
+				state.flags |= PRINTF_LEFT_JUSTIFY;
 				continue;
 			case ' ':
-				flags |= PRINTF_SPACE_CHAR;
+				state.flags |= PRINTF_SPACE_CHAR;
 				continue;
 			case '+':
-				flags |= PRINTF_SIGN_CHAR;
+				state.flags |= PRINTF_SIGN_CHAR;
 				continue;
 			}
 			break;
@@ -225,16 +229,16 @@ int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_l
 		 * implies left justification, and the width will be made
 		 * positive). */
 		if(isdigit(*fmt)) {
-			width = strtol(fmt, (char **)&fmt, 10);
+			state.width = strtol(fmt, (char **)&fmt, 10);
 		} else if(*fmt == '*') {
-			width = (long)va_arg(args, int);
-			if(width < 0) {
-				flags |= PRINTF_LEFT_JUSTIFY;
-				width = -width;
+			state.width = (long)va_arg(args, int);
+			if(state.width < 0) {
+				state.flags |= PRINTF_LEFT_JUSTIFY;
+				state.width = -state.width;
 			}
 			fmt++;
 		} else {
-			width = -1;
+			state.width = -1;
 		}
 
 		/* If there is a period character in the string, there is a
@@ -243,19 +247,17 @@ int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_l
 		if(*fmt == '.') {
 			fmt++;
 			if(isdigit(*fmt)) {
-				if((precision = strtol(fmt, (char **)&fmt, 10)) < 0) {
-					precision = 0;
-				}
+				if((state.precision = strtol(fmt, (char **)&fmt, 10)) < 0)
+					state.precision = 0;
 			} else if(*fmt == '*') {
-				if((precision = (long)va_arg(args, int)) < 0) {
-					precision = 0;
-				}
+				if((state.precision = (long)va_arg(args, int)) < 0)
+					state.precision = 0;
 				fmt++;
 			} else {
-				precision = 0;
+				state.precision = 0;
 			}
 		} else {
-			precision = -1;
+			state.precision = -1;
 		}
 
 		/* Get the length modifier. */
@@ -280,95 +282,81 @@ int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_l
 		 * conversions, we break out of the switch to get to the
 		 * number handling code. For anything else, continue to the
 		 * next iteration of the main loop. */
-		base = 10;
+		state.base = 10;
 		switch(*fmt) {
 		case '%':
-			helper('%', data, &total);
+			print_char(&state, '%');
 			continue;
 		case 'c':
 			ch = (unsigned char)va_arg(args, int);
-			if(flags & PRINTF_LEFT_JUSTIFY) {
-				helper(ch, data, &total);
-				while(--width > 0) {
-					helper(' ', data, &total);
-				}
+			if(state.flags & PRINTF_LEFT_JUSTIFY) {
+				print_char(&state, ch);
+				while(--state.width > 0)
+					print_char(&state, ' ');
 			} else {
-				while(--width > 0) {
-					helper(' ', data, &total);
-				}
-				helper(ch, data, &total);
+				while(--state.width > 0)
+					print_char(&state, ' ');
+				print_char(&state, ch);
 			}
 			continue;
 		case 'd':
 		case 'i':
-			flags |= PRINTF_SIGNED;
+			state.flags |= PRINTF_SIGNED;
 			break;
 		case 'o':
-			base = 8;
+			state.base = 8;
 			break;
 		case 'p':
-			/* Print lower-case and as though # was specified.
-			 * Also zero pad up to the width of a pointer, because
-			 * I like it like that. */
-			flags |= (PRINTF_LOW_CASE | PRINTF_PREFIX | PRINTF_ZERO_PAD);
-			if(precision == -1) {
-				precision = 1;
-			}
-			if(width == -1) {
-				width = (sizeof(void *) * 2) + 2;
-			}
+			/* Print lower-case and as though # was specified. */
+			state.flags |= PRINTF_LOW_CASE | PRINTF_PREFIX;
+			if(state.precision == -1)
+				state.precision = 1;
 
-			/* Pointers should not go through number conversion. */
-			printf_number_helper((uintptr_t)va_arg(args, void *),
-			                     width, precision, 16, flags,
-			                     helper, data, &total);
+			state.base = 16;
+			print_number(&state, va_arg(args, uintptr_t));
 			continue;
 		case 's':
 			/* We won't need the length modifier here, can use the
 			 * len variable. */
 			str = va_arg(args, const char *);
-			len = strnlen(str, precision);
-			if(flags & PRINTF_LEFT_JUSTIFY) {
-				printf_string_helper(str, len, helper, data, &total);
-				while(len < width--) {
-					helper(' ', data, &total);
-				}
+			len = strnlen(str, state.precision);
+			if(state.flags & PRINTF_LEFT_JUSTIFY) {
+				print_string(&state, str, len);
+				while(len < state.width--)
+					print_char(&state, ' ');
 			} else {
-				while(len < width--) {
-					helper(' ', data, &total);
-				}
-				printf_string_helper(str, len, helper, data, &total);
+				while(len < state.width--)
+					print_char(&state, ' ');
+				print_string(&state, str, len);
 			}
 			continue;
 		case 'u':
 			break;
 		case 'x':
-			flags |= PRINTF_LOW_CASE;
+			state.flags |= PRINTF_LOW_CASE;
 		case 'X':
-			base = 16;
+			state.base = 16;
 			break;
 		default:
 			/* Unknown character, go back and reprint what we
 			 * skipped over. */
-			helper('%', data, &total);
-			while(fmt[-1] != '%') {
+			print_char(&state, '%');
+			while(fmt[-1] != '%')
 				fmt--;
-			}
+
 			continue;
 		}
 
 		/* Default precision for numbers should be 1. */
-		if(precision == -1) {
-			precision = 1;
-		}
+		if(state.precision == -1)
+			state.precision = 1;
 
 		/* Perform conversions according to the length modifiers. */
 		switch(len & 0xff) {
 		case 'h':
 			num = (unsigned short)va_arg(args, int);
-			if(flags & PRINTF_SIGNED) {
+			if(state.flags & PRINTF_SIGNED)
 				num = (signed short)num;
-			}
 			break;			
 		case 'l':
 			/* Bit 8 is set to mean 'll' rather than 'l'. */
@@ -376,9 +364,8 @@ int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_l
 				num = va_arg(args, unsigned long long);
 			} else {
 				num = va_arg(args, unsigned long);
-				if(flags & PRINTF_SIGNED) {
+				if(state.flags & PRINTF_SIGNED)
 					num = (signed long)num;
-				}
 			}
 			break;
 		case 'z':
@@ -386,14 +373,13 @@ int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_l
 			break;
 		default:
 			num = va_arg(args, unsigned int);
-			if(flags & PRINTF_SIGNED) {
+			if(state.flags & PRINTF_SIGNED)
 				num = (signed int)num;
-			}
 		}
 
 		/* Print the number. */
-		printf_number_helper(num, width, precision, base, flags, helper, data, &total);
+		print_number(&state, num);
 	}
 
-	return total;
+	return state.total;
 }

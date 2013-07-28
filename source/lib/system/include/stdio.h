@@ -23,6 +23,7 @@
 #define __STDIO_H
 
 #include <sys/types.h>
+
 #define __need_NULL
 #include <stddef.h>
 #include <stdarg.h>
@@ -89,8 +90,10 @@ extern FILE *fopen(const char *__restrict path, const char *__restrict mode);
 extern int fprintf(FILE *__restrict stream, const char *__restrict fmt, ...);
 extern int fputc(int ch, FILE *stream);
 extern int fputs(const char *__restrict s, FILE *__restrict stream);
-extern size_t fread(void *__restrict ptr, size_t size, size_t nmemb, FILE *__restrict stream);
-extern FILE *freopen(const char *__restrict path, const char *__restrict mode, FILE *__restrict stream);
+extern size_t fread(void *__restrict ptr, size_t size, size_t nmemb,
+	FILE *__restrict stream);
+extern FILE *freopen(const char *__restrict path, const char *__restrict mode,
+	FILE *__restrict stream);
 extern int fscanf(FILE *__restrict stream, const char *__restrict fmt, ...);
 extern int fseek(FILE *stream, long off, int act);
 extern int fseeko(FILE *stream, off_t off, int act);
@@ -99,7 +102,8 @@ extern long ftell(FILE *stream);
 extern off_t ftello(FILE *stream);
 /* int ftrylockfile(FILE *); */
 /* void funlockfile(FILE *); */
-extern size_t fwrite(const void *__restrict ptr, size_t size, size_t nmemb, FILE *__restrict stream);
+extern size_t fwrite(const void *__restrict ptr, size_t size, size_t nmemb,
+	FILE *__restrict stream);
 extern int getc(FILE *stream);
 extern int getchar(void);
 /* int getc_unlocked(FILE *); */
@@ -139,6 +143,7 @@ extern int vsnprintf(char *__restrict buf, size_t size, const char *__restrict f
 extern int vsprintf(char *__restrict buf, const char *__restrict fmt, va_list args);
 extern int vsscanf(const char *__restrict buf, const char *__restrict fmt, va_list args);
 
+// FIXME: Temporary to make libstdc++ compile.
 #ifdef __cplusplus
 extern int fgetpos(FILE *, fpos_t *);
 extern int fsetpos(FILE *, const fpos_t *);

@@ -32,6 +32,6 @@ int gettimeofday(struct timeval *tv, void *tz) {
 
 	kern_unix_time(&ktime);
 	tv->tv_sec = ktime / 1000000000;
-	tv->tv_usec = ktime % 1000000000;
+	tv->tv_usec = (ktime % 1000000000) / 1000;
 	return 0;
 }

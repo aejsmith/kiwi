@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2010 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,9 +20,11 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
-/** Copy data in memory.
+/**
+ * Copy data in memory.
  *
  * Copies bytes from a source memory area to a destination memory area,
  * where both areas may not overlap.
@@ -38,12 +40,12 @@
  */
 void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
 	const char *s = (const char *)src;
-	char *d = (char *)dest;
 	const unsigned long *ns;
+	char *d = (char *)dest;
 	unsigned long *nd;
 
 	/* Align the destination. */
-	while((ptrdiff_t)d & (sizeof(unsigned long) - 1)) {
+	while((uintptr_t)d & (sizeof(unsigned long) - 1)) {
 		if(count--) {
 			*d++ = *s++;
 		} else {
@@ -74,8 +76,8 @@ void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
 	}
 
 	/* Write remaining bytes. */
-	while(count--) {
+	while(count--)
 		*d++ = *s++;
-	}
+
 	return dest;
 }

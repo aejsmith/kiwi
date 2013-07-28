@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,25 +22,20 @@
 #include <string.h>
 
 /** Compare 2 chunks of memory.
- *
- * Compares the two chunks of memory specified.
- *
  * @param p1		Pointer to the first chunk.
  * @param p2		Pointer to the second chunk.
  * @param count		Number of bytes to compare.
- * 
  * @return		An integer less than, equal to or greater than 0 if
  *			p1 is found, respectively, to be less than, to match,
- *			or to be greater than p2.
- */
+ *			or to be greater than p2. */
 int memcmp(const void *p1, const void *p2, size_t count) {
-	unsigned char *s1 = (unsigned char *)p1;
-	unsigned char *s2 = (unsigned char *)p2;
+	const unsigned char *s1 = (const unsigned char *)p1;
+	const unsigned char *s2 = (const unsigned char *)p2;
 
 	while(count--) {
-		if(*s1 != *s2) {
+		if(*s1 != *s2)
 			return *s1 - *s2;
-		}
+
 		s1++;
 		s2++;
 	}

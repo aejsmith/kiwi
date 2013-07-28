@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,7 +21,8 @@
 
 #include <string.h>
 
-/** Copy overlapping data in memory.
+/**
+ * Copy overlapping data in memory.
  *
  * Copies bytes from a source memory area to a destination memory area,
  * where both areas may overlap.

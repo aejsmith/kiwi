@@ -23,7 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 
-/** Print an error message.
+/**
+ * Print an error message.
  *
  * Prints the given error message followed by the string returned from
  * strerror() for the current errno value and a newline character to stderr. If

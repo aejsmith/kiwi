@@ -58,6 +58,7 @@ env.KiwiLibrary('kernel',
             Dir('.'),
             Dir('arch/%s' % (config['ARCH'])),
             Dir('../system/include'),
+            Dir('../system/arch/%s/include' % (config['ARCH'])),
         ],
     },
 )

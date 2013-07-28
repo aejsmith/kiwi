@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,7 +21,8 @@
 
 #include <string.h>
 
-/** Separate a string.
+/**
+ * Separate a string.
  *
  * Finds the first occurrence of a symbol in the string delim in *stringp.
  * If one is found, the delimeter is replaced by a NULL byte and the pointer
@@ -31,31 +32,31 @@
  *
  * @param stringp	Pointer to a pointer to the string to separate.
  * @param delim		String containing all possible delimeters.
- * 
+ *
  * @return		NULL if stringp is NULL, otherwise a pointer to the
  *			token found.
  */
 char *strsep(char **stringp, const char *delim) {
-	char *s;
 	const char *spanp;
+	char *tok, *s;
 	int c, sc;
-	char *tok;
 
-	if((s = *stringp) == NULL)
-		return (NULL);
+	if(!(s = *stringp))
+		return s;
 
 	for(tok = s;;) {
 		c = *s++;
 		spanp = delim;
 		do {
 			if((sc = *spanp++) == c) {
-				if (c == 0)
+				if(c == 0) {
 					s = NULL;
-				else
+				} else {
 					s[-1] = 0;
+				}
 
 				*stringp = s;
-				return (tok);
+				return tok;
 			}
 		} while(sc != 0);
 	}

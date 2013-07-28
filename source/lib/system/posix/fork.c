@@ -65,9 +65,8 @@ static pid_t fork_parent(posix_process_t *proc, jmp_buf state, char *stack) {
 	list_init(&proc->header);
 	proc->handle = handle;
 	proc->pid = kern_process_id(proc->handle);
-	if(proc->pid < 1) {
+	if(proc->pid < 1)
 		libsystem_fatal("could not get ID of child");
-	}
 
 	/* Add it to the child list so that wait*() knows about it. */
 	//libc_mutex_lock(&child_processes_lock, -1);
@@ -105,7 +104,8 @@ static pid_t fork_child(posix_process_t *proc, char *stack) {
 	return 0;
 }
 
-/** Create a clone of the calling process.
+/**
+ * Create a clone of the calling process.
  *
  * Creates a clone of the calling process. The new process will have a clone of
  * the original process' address space. Data in private mappings will be copied
@@ -129,9 +129,8 @@ pid_t fork(void) {
 	 * the child is started so that we don't discover we are unable to
 	 * allocate the structure after the child is started. */
 	proc = malloc(sizeof(*proc));
-	if(!proc) {
+	if(!proc)
 		return -1;
-	}
 
 	/* Create a temporary stack. FIXME: Page size is arch-dependent. */
 	ret = kern_vm_map(NULL, 0x1000, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &stack);

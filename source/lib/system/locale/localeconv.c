@@ -50,12 +50,8 @@ static const struct lconv __libsystem_locale = {
 	.thousands_sep = (char *)"",
 };
 
-/** Get locale information.
- *
- * Gets locale-specific information for the current locale.
- *
- * @return		Pointer to locale information structure.
- */
+/** Get information about the current locale.
+ * @return		Pointer to locale information structure. */
 struct lconv *localeconv(void) {
 	return (struct lconv *)&__libsystem_locale;
 }

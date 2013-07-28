@@ -24,7 +24,8 @@
 
 #include "stdio_priv.h"
 
-/** Unformat data from a stream.
+/**
+ * Unformat data from a stream.
  *
  * Unformats data from a file stream into a list of arguments according to the
  * given format string.
@@ -41,7 +42,8 @@ int vfscanf(FILE *restrict stream, const char *restrict fmt, va_list args) {
 	return do_scanf(&sdata, fmt, args);
 }
 
-/** Unformat data from a stream.
+/**
+ * Unformat data from a stream.
  *
  * Unformats data from a file stream into a list of arguments according to the
  * given format string.
@@ -63,7 +65,8 @@ int fscanf(FILE *restrict stream, const char *restrict fmt, ...) {
 	return ret;
 }
 
-/** Unformat data from standard input.
+/**
+ * Unformat data from standard input.
  *
  * Unformats data from standard input into a list of arguments according to
  * the given format string.
@@ -77,7 +80,8 @@ int vscanf(const char *restrict fmt, va_list args) {
 	return vfscanf(stdin, fmt, args);
 }
 
-/** Unformat data from standard input.
+/**
+ * Unformat data from standard input.
  *
  * Unformats data from standard input into a list of arguments according to
  * the given format string.

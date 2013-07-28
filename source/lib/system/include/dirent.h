@@ -43,8 +43,9 @@ extern int closedir(DIR *dir);
 extern DIR *opendir(const char *path);
 extern struct dirent *readdir(DIR *dir);
 extern void rewinddir(DIR *dir);
-extern int scandir(const char *path, struct dirent ***namelist, int (*filter)(const struct dirent *),
-                   int(*compar)(const void *, const void *));
+extern int scandir(const char *path, struct dirent ***namelist,
+	int (*filter)(const struct dirent *),
+	int (*compar)(const void *, const void *));
 
 /* void seekdir(DIR *, long); */
 /* long telldir(DIR *); */

@@ -20,6 +20,7 @@
  */
 
 #include <kernel/process.h>
+
 #include <unistd.h>
 
 /** Get the current process ID.

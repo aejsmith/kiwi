@@ -59,7 +59,8 @@ char *strsignal(int sig) {
 	return (char *)sys_siglist[sig];
 }
 
-/** Print string representation of signal.
+/**
+ * Print string representation of signal.
  *
  * Display a message on standard error followed by a string representation
  * of a signal.
@@ -75,7 +76,8 @@ void psignal(int sig, const char *s) {
 	}
 }
 
-/** Print string representation of signal.
+/**
+ * Print string representation of signal.
  *
  * Display a message on standard error followed by a string representation
  * of a signal.

@@ -65,6 +65,7 @@ extern size_t strftime(char *__restrict buf, size_t max, const char *__restrict 
 //extern char *strptime(const char *__restrict, const char *__restrict, struct tm *__restrict);
 extern time_t time(time_t *timep);
 
+// FIXME: Needed for libstdc++ compilation.
 #ifdef __cplusplus
 extern clock_t clock(void);
 extern double difftime(time_t, time_t);

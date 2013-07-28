@@ -20,6 +20,7 @@
  */
 
 #include <unistd.h>
+
 #include "stdio_priv.h"
 
 /** Write a character to a stream.

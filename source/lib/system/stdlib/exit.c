@@ -140,7 +140,8 @@ restart:
 	}
 }
 
-/** Define a function to run at process exit.
+/**
+ * Define a function to run at process exit.
  *
  * Defines a function to be run at normal (i.e. invocation of exit())
  * process termination. Use of _exit() or _Exit(), or involuntary process
@@ -155,7 +156,8 @@ int atexit(void (*function)(void)) {
 	return __cxa_atexit((void (*)(void *))function, NULL, (&__dso_handle) ? __dso_handle : NULL);
 }
 
-/** Call at-exit functions and terminate execution.
+/**
+ * Call at-exit functions and terminate execution.
  *
  * Calls all functions previously defined with atexit() and terminates
  * the process.

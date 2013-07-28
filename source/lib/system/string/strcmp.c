@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,57 +21,37 @@
 
 #include <string.h>
 
-/** Compare 2 strings.
- *
- * Compares the two strings specified.
- *
+/** Compare two strings.
  * @param s1		Pointer to the first string.
  * @param s2		Pointer to the second string.
- * 
  * @return		An integer less than, equal to or greater than 0 if
  *			s1 is found, respectively, to be less than, to match,
- *			or to be greater than s2.
- */
+ *			or to be greater than s2. */
 int strcmp(const char *s1, const char *s2) {
-	char x;
-
-	for(;;) {
-		x = *s1;
-		if(x != *s2)
-			break;
-		if(!x)
-			break;
-		s1++;
-		s2++;
-	}
-	return x - *s2;
+	for(; *s1 && *s2 && *s1 == *s2; s1++, s2++);
+	return *s1 - *s2;
 }
 
-/** Compare 2 strings with a length limit.
- *
- * Compares the two strings specified. Compares at most the number of bytes
- * specified.
- *
+/** Compare two strings with a length limit.
  * @param s1		Pointer to the first string.
  * @param s2		Pointer to the second string.
  * @param count		Maximum number of bytes to compare.
- * 
  * @return		An integer less than, equal to or greater than 0 if
  *			s1 is found, respectively, to be less than, to match,
- *			or to be greater than s2.
- */
+ *			or to be greater than s2. */
 int strncmp(const char *s1, const char *s2, size_t count) {
-	const char *a = s1;
-	const char *b = s2;
-	const char *fini = a + count;
+	const char *a = s1, *b = s2, *fini = a + count;
+	int res;
 
 	while(a < fini) {
-		int res = *a - *b;
+		res = *a - *b;
 		if(res)
 			return res;
 		if(!*a)
 			return 0;
-		a++; b++;
+
+		a++;
+		b++;
 	}
 	return 0;
 }

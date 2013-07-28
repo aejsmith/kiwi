@@ -56,9 +56,8 @@ sighandler_t signal(int num, sighandler_t handler) {
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
 
-	if(sigaction(num, &act, &act) != 0) {
+	if(sigaction(num, &act, &act) != 0)
 		return SIG_ERR;
-	}
 
 	return act.sa_handler;
 }

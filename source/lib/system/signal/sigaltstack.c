@@ -26,7 +26,8 @@
 
 #include "libsystem.h"
 
-/** Get and set the alternate signal stack.
+/**
+ * Get and set the alternate signal stack.
  *
  * Gets and sets the alternate signal stack for the current thread. This stack
  * is used to execute signal handlers with the SA_ONSTACK flag set. The

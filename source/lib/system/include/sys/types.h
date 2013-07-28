@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,11 +17,6 @@
 /**
  * @file
  * @brief		POSIX type definitions.
- *
- * @todo		I'm not sure if useconds_t should be defined here. It
- *			is not mentioned at all by POSIX-2008, however it is in
- *			2004. If it is needed, it could be a problem, because
- *			the kernel defines a useconds_t which is signed.
  */
 
 #ifndef __SYS_TYPES_H
@@ -39,7 +34,8 @@ typedef int64_t clock_t;		/**< Used to store clock ticks since process start. */
 typedef int32_t pid_t;			/**< Used to store a POSIX process ID. */
 typedef int64_t off_t;			/**< Used for file sizes/offsets. */
 typedef uint32_t mode_t;		/**< Used to store file attributes. */
-typedef int64_t suseconds_t;		/**< Used to store a number of microseconds. */
+typedef int64_t suseconds_t;		/**< Used to store a (signed) number of microseconds. */
+typedef uint64_t useconds_t;		/**< Used to store a number of microseconds. */
 typedef int32_t blkcnt_t;		/**< Used to store a count of blocks. */
 typedef int32_t blksize_t;		/**< Used to store the size of a block. */
 typedef uint32_t dev_t;			/**< Used to store a device number. */

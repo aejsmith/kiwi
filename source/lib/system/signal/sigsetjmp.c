@@ -23,7 +23,8 @@
 #include <signal.h>
 #include <stddef.h>
 
-/** Save current environment.
+/**
+ * Save current environment.
  *
  * Saves the current execution environment to be restored by a call to
  * siglongjmp(). If specified, the current signal mask will also be saved.
@@ -35,15 +36,15 @@
  *			returning from siglongjmp().
  */
 int sigsetjmp(sigjmp_buf env, int savemask) {
-	if(savemask) {
+	if(savemask)
 		sigprocmask(SIG_BLOCK, NULL, &env->mask);
-	}
 
 	env->restore_mask = savemask;
 	return setjmp(env->buf);
 }
 
-/** Restore environment.
+/**
+ * Restore environment.
  *
  * Restores an execution environment saved by a previous call to sigsetjmp().
  * If the original call to sigsetjmp() specified savemask as non-zero, the
@@ -53,8 +54,8 @@ int sigsetjmp(sigjmp_buf env, int savemask) {
  * @param val		Value that the original sigsetjmp() call should return.
  */
 void siglongjmp(sigjmp_buf env, int val) {
-	if(env->restore_mask) {
+	if(env->restore_mask)
 		sigprocmask(SIG_SETMASK, &env->mask, NULL);
-	}
+
 	longjmp(env->buf, val);
 }

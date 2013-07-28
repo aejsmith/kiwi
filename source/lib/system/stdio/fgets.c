@@ -21,7 +21,8 @@
 
 #include "stdio_priv.h"
 
-/** Read string from standard input.
+/**
+ * Read a string from standard input.
  *
  * Reads a string from standard input to a buffer. Use of this function is
  * not wise as it is not possible to tell whether a buffer-overrun occurs,
@@ -47,9 +48,8 @@ char *gets(char *s) {
 			s[i] = '\0';
 			return s;
 		} else if(ch == '\b') {
-			if(i) {
+			if(i)
 				s[--i] = 0;
-			}
 		} else {
 			s[i] = ch;
 		}
@@ -58,16 +58,11 @@ char *gets(char *s) {
 	}
 }
 
-/** Read string from a file stream.
- *
- * Reads a string from a file stream into a buffer.
- *
+/** Read a string from a file stream.
  * @param s		Buffer to read into.
  * @param size		Maximum number of characters to read.
  * @param stream	Stream to read from.
- *
- * @return		Buffer on success, NULL on failure or EOF.
- */
+ * @return		Buffer on success, NULL on failure or EOF. */
 char *fgets(char *s, int size, FILE *stream) {
 	int i, ch;
 
@@ -94,5 +89,6 @@ char *fgets(char *s, int size, FILE *stream) {
 			s[i] = ch;
 		}
 	}
+
 	return s;
 }

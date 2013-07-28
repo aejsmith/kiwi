@@ -26,23 +26,14 @@
 
 static unsigned long long __rand_next = 1;
 
-/** Set random seed.
- *
- * Sets the seed for the rand() function to the given value.
- *
- * @param seed		New random seed.
- */
+/** Set the seed for rand().
+ * @param seed		New random seed. */
 void srand(unsigned int seed) {
 	__rand_next = seed;
 }
 
-/** Generate a random number.
- *
- * Generates a random number in the range [0,RAND_MAX) based on the current
- * random seed.
- *
- * @return		Generated random number.
- */
+/** Generate a random number in the range [0,RAND_MAX).
+ * @return		Generated random number. */
 int rand(void) {
 	/* This multiplier was obtained from Knuth, D.E., "The Art of
 	   Computer Programming," Vol 2, Seminumerical Algorithms, Third

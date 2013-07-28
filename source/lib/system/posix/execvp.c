@@ -29,7 +29,8 @@
 
 extern char **environ;
 
-/** Execute a binary in the PATH.
+/**
+ * Execute a binary in the PATH.
  *
  * If the given path contains a / character, this function will simply call
  * execve() with the given arguments and the current process' environment.
@@ -48,20 +49,17 @@ int execvp(const char *file, char *const argv[]) {
 	size_t len;
 
 	/* Use the default path if PATH is not set in the environment */
-	if(path == NULL) {
-		path = "/system/binaries";
-	}
+	if(path == NULL)
+		path = "/system/bin";
 
 	/* If file contains a /, just run it */
-	if(strchr(file, '/') != NULL) {
+	if(strchr(file, '/'))
 		return execve(file, argv, environ);
-	}
 
 	for(cur = (char *)path; cur; cur = next) {
 		next = strchr(cur, ':');
-		if(next == NULL) {
+		if(!next)
 			next = cur + strlen(cur);
-		}
 
 		if(next == cur) {
 			buf[0] = '.';
@@ -84,21 +82,20 @@ int execvp(const char *file, char *const argv[]) {
 
 		memmove(&buf[next - cur + 1], file, len + 1);
 		if(execve(buf, argv, environ) == -1) {
-			if((errno != EACCES) && (errno != ENOENT) && (errno != ENOTDIR)) {
+			if((errno != EACCES) && (errno != ENOENT) && (errno != ENOTDIR))
 				return -1;
-			}
 		}
 
-		if(*next == 0) {
+		if(*next == 0)
 			break;
-		}
 		next++;
 	}
 
 	return -1;
 }
 
-/** Execute a binary.
+/**
+ * Execute a binary.
  *
  * Executes a binary with the given arguments and a copy of the calling
  * process' environment.

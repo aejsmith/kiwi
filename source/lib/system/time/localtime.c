@@ -23,7 +23,8 @@
 
 static struct tm __localtime_tm;
 
-/** Get the local time.
+/**
+ * Get the local time.
  *
  * Gets the local time equivalent of the given timestamp (seconds from the
  * UNIX epoch).
@@ -37,7 +38,8 @@ struct tm *localtime_r(const time_t *restrict timep, struct tm *restrict tm) {
 	return gmtime_r(timep, tm);
 }
 
-/** Get the local time.
+/**
+ * Get the local time.
  *
  * Gets the local time equivalent of the given timestamp (seconds from the
  * UNIX epoch).

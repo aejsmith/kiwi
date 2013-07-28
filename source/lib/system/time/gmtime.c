@@ -45,7 +45,8 @@ static int days_before_month[12] = {
 
 static struct tm __gmtime_tm;
 
-/** Get the UTC time.
+/**
+ * Get the UTC time.
  *
  * Gets the UTC time equivalent of the given timestamp (seconds from the
  * UNIX epoch).
@@ -69,18 +70,16 @@ struct tm *gmtime_r(const time_t *restrict timep, struct tm *restrict tm) {
 	/* Add 4 because January 1st 1970 == Thursday, 4th day of week. */
 	tm->tm_wday = (4 + time) % 7;
 
-	for(i = 1970; time >= DAYS(i); i++) {
+	for(i = 1970; time >= DAYS(i); i++)
 		time -= DAYS(i);
-	}
 
 	tm->tm_year = i - 1900;
 	tm->tm_yday = time;
 
 	tm->tm_mday = 1;
 	if(LEAPYR(i) && (time >= days_before_month[2])) {
-		if(time == days_before_month[2]) {
+		if(time == days_before_month[2])
 			tm->tm_mday = 2;
-		}
 
 		time -= 1;
 	}
@@ -92,7 +91,8 @@ struct tm *gmtime_r(const time_t *restrict timep, struct tm *restrict tm) {
 	return tm;
 }
 
-/** Get the UTC time.
+/**
+ * Get the UTC time.
  *
  * Gets the UTC time equivalent of the given timestamp (seconds from the
  * UNIX epoch).

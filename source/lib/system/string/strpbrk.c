@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,31 +21,23 @@
 
 #include <string.h>
 
-/** Find characters in a string
- *
- * Searches the given string for any of the specified characters.
- *
+/** Find characters in a string.
  * @param s		Pointer to the string to search in.
  * @param accept	Array of characters to search for.
- * 
- * @return		Pointer to character found, or NULL if none found.
- */
+ * @return		Pointer to character found, or NULL if none found. */
 char *strpbrk(const char *s, const char *accept) {
 	const char *c = NULL;
 
-	if(!*s) {
+	if(!*s)
 		return NULL;
-	}
 
 	while(*s) {
 		for(c = accept; *c; c++) {
-			if(*s == *c) {
+			if(*s == *c)
 				break;
-			}
 		}
-		if(*c) {
+		if(*c)
 			break;
-		}
 		s++;
 	}
 

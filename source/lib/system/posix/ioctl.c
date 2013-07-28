@@ -104,6 +104,7 @@ int ioctl(int fd, int request, ...) {
 		} else {
 			libsystem_status_to_errno(ret);
 		}
+
 		return -1;
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,22 +21,25 @@
 
 #include <string.h>
 
-/** Get length of string.
+/**
+ * Get the length of string.
  *
  * Gets the length of the string specified. The length is the number of
  * characters found before a NULL byte.
  *
  * @param str		Pointer to the string.
- * 
+ *
  * @return		Length of the string.
  */
 size_t strlen(const char *str) {
-	size_t retval;
-	for(retval = 0; *str != '\0'; str++) retval++;
-	return retval;
+	size_t ret;
+
+	for(ret = 0; *str != '\0'; ret++, str++);
+	return ret;
 }
 
-/** Get length of string with limit.
+/**
+ * Get length of string with limit.
  *
  * Gets the length of the string specified. The length is the number of
  * characters found either before a NULL byte or before the maximum length
@@ -44,11 +47,12 @@ size_t strlen(const char *str) {
  *
  * @param str		Pointer to the string.
  * @param count		Maximum length of the string.
- * 
+ *
  * @return		Length of the string.
  */
 size_t strnlen(const char *str, size_t count) {
-	size_t retval;
-	for(retval = 0; *str != '\0' && retval < count; str++) retval++;
-	return retval;
+	size_t ret;
+
+	for(ret = 0; *str != '\0' && ret < count; ret++, str++);
+	return ret;
 }

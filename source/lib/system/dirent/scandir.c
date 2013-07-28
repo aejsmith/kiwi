@@ -25,7 +25,8 @@
 
 #include "dirent_priv.h"
 
-/** Get array of directory entries.
+/**
+ * Get an array of directory entries.
  *
  * Gets an array of directory entries from a directory, filters them and
  * sorts them using the given functions.
@@ -38,25 +39,25 @@
  *
  * @return		Number of entries.
  */
-int scandir(const char *path, struct dirent ***namelist, int (*filter)(const struct dirent *),
-            int(*compar)(const void *, const void *)) {
+int scandir(const char *path, struct dirent ***namelist,
+	int (*filter)(const struct dirent *),
+        int (*compar)(const void *, const void *))
+{
 	struct dirent **list = NULL, **nlist, *dent;
 	int count = 0, i;
 	DIR *dir;
 
 	dir = opendir(path);
-	if(dir == NULL) {
+	if(dir == NULL)
 		return -1;
-	}
 
 	/* Clear errno so we can detect failures. */
 	errno = 0;
 
 	/** Loop through all directory entries. */
 	while((dent = readdir(dir)) != NULL) {
-		if(filter != NULL && filter(dent) == 0) {
+		if(filter != NULL && filter(dent) == 0)
 			continue;
-		}
 
 		if((nlist = realloc(list, sizeof(void *) * (count + 1))) == NULL) {
 			break;
@@ -65,18 +66,17 @@ int scandir(const char *path, struct dirent ***namelist, int (*filter)(const str
 		}
 
 		/* Insert it into the list. */
-		if((list[count] = malloc(dent->d_reclen)) == NULL) {
+		if((list[count] = malloc(dent->d_reclen)) == NULL)
 			break;
-		}
 
 		memcpy(list[count], dent, dent->d_reclen);
 		count++;
 	}
 
 	if(errno != 0) {
-		for(i = 0; i < count; i++) {
+		for(i = 0; i < count; i++)
 			free(list[i]);
-		}
+
 		free(list);
 		closedir(dir);
 		return -1;
@@ -84,9 +84,8 @@ int scandir(const char *path, struct dirent ***namelist, int (*filter)(const str
 
 	closedir(dir);
 
-	if(compar != NULL) {
+	if(compar != NULL)
 		qsort(list, count, sizeof(void *), compar);
-	}
 
 	*namelist = list;
         return count;

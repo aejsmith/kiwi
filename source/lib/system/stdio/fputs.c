@@ -20,41 +20,29 @@
  */
 
 #include <string.h>
+
 #include "stdio_priv.h"
 
-/** Write string to a stream.
- *
- * Writes the contents of a string into a file stream.
- *
+/** Write a string to a file stream.
  * @param s		String to write.
  * @param stream	Stream to write to.
- *
- * @return		0 on success, EOF on failure or EOF.
- */
+ * @return		0 on success, EOF on failure or EOF. */
 int fputs(const char *restrict s, FILE *restrict stream) {
-	if(fwrite(s, strlen(s), 1, stream) != 1) {
+	if(fwrite(s, strlen(s), 1, stream) != 1)
 		return EOF;
-	}
 
 	return 0;
 }
 
-/** Write string to standard output.
- *
- * Writes the contents of a string to standard output.
- *
+/** Write a string to standard output.
  * @param s		String to write.
- *
- * @return		0 on success, EOF on failure or EOF.
- */
+ * @return		0 on success, EOF on failure or EOF. */
 int puts(const char *s) {
-	if(fputs(s, stdout) != 0) {
+	if(fputs(s, stdout) != 0)
 		return EOF;
-	}
 
-	if(fputc('\n', stdout) != '\n') {
+	if(fputc('\n', stdout) != '\n')
 		return EOF;
-	}
 
 	return 0;
 }

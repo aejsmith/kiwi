@@ -43,7 +43,8 @@ static int days_before_month[12] = {
 	/* Dec. */ 31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
 };
 
-/** Convert a time to a UNIX time.
+/**
+ * Convert a time to a UNIX time.
  *
  * Converts the time described by the given time structure to a UNIX
  * timestamp.
@@ -67,14 +68,12 @@ time_t mktime(struct tm *timep) {
 
 	/* If this year is a leap year, and we're past February, we need to
 	 * add another day. */
-	if(timep->tm_mon > 1 && LEAPYR(timep->tm_year + 1900)) {
+	if(timep->tm_mon > 1 && LEAPYR(timep->tm_year + 1900))
 		time += 24 * 60 * 60;
-	}
 
 	/* Add the days in each year before this year from 1970. */
-	for(i = 1970; i < (timep->tm_year + 1900); i++) {
+	for(i = 1970; i < (timep->tm_year + 1900); i++)
 		time += DAYS(i) * 24 * 60 * 60;
-	}
 
 	return time;
 }

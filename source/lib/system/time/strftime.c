@@ -69,7 +69,8 @@ static const char *am_pm[] = {
 	"AM", "am", "PM", "pm",
 };
 
-/** Format a date and time.
+/**
+ * Format a date and time.
  *
  * Creates a string describing the date and time in the given tm struct,
  * according to the given format string.
@@ -87,9 +88,8 @@ size_t strftime(char *restrict buf, size_t max, const char *restrict fmt, const 
 	int state = 0;
 	char ch;
 
-	if(max == 0) {
+	if(max == 0)
 		return 0;
-	}
 
 	/* Always leave space for the NULL terminator. */
 	max -= 1;
@@ -126,9 +126,8 @@ size_t strftime(char *restrict buf, size_t max, const char *restrict fmt, const 
 				break;
 			}
 
-			if(state == 0 || modif_e || modif_o) {
+			if(state == 0 || modif_e || modif_o)
 				break;
-			}
 
 			/* Fall through. */
 		case 2:

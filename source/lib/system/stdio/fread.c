@@ -20,9 +20,11 @@
  */
 
 #include <unistd.h>
+
 #include "stdio_priv.h"
 
-/** Read from a file stream.
+/**
+ * Read from a file stream.
  *
  * Reads nmemb elements of data, each size bytes long, from a file stream
  * into a buffer.
@@ -40,9 +42,8 @@ size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict strea
 	ssize_t ret;
 
 	total = size * nmemb;
-	if(!total) {
+	if(!total)
 		return 0;
-	}
 
 	/* Read the pushed back character if there is one. */
 	if(stream->have_pushback) {
@@ -53,9 +54,8 @@ size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict strea
 	/* Read remaining data. */
 	if(count < total) {
 		ret = read(stream->fd, &buf[count], total - count);
-		if(ret > 0) {
+		if(ret > 0)
 			count += ret;
-		}
 	}
 
 	return count / size;

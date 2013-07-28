@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,47 +21,39 @@
 
 #include <string.h>
 
-/** Find a character in a string.
- *
- * Finds the first occurrence of a character in the specified string.
- *
+/** Find the first occurrence of a character in a string.
  * @param s		Pointer to the string to search.
  * @param c		Character to search for.
- * 
- * @return		NULL if token not found, otherwise pointer to token.
- */
+ * @return		NULL if token not found, otherwise pointer to token. */
 char *strchr(const char *s, int c) {
 	char ch = c;
 
 	for (;;) {
-		if(*s == ch)
+		if(*s == ch) {
 			break;
-		else if(!*s)
+		} else if(!*s) {
 			return NULL;
-		else
+		} else {
 			s++;
+		}
 	}
 
 	return (char *)s;
 }
 
-/** Find a character in a string.
- *
- * Finds the last occurrence of a character in the specified string.
- *
+/** Find the last occurrence of a character in a string.
  * @param s		Pointer to the string to search.
  * @param c		Character to search for.
- * 
- * @return		NULL if token not found, otherwise pointer to token.
- */
+ * @return		NULL if token not found, otherwise pointer to token. */
 char *strrchr(const char *s, int c) {
 	const char *l = NULL;
 
 	for(;;) {
 		if(*s == c)
 			l = s;
-		if (!*s)
+		if(!*s)
 			return (char *)l;
+
 		s++;
 	}
 

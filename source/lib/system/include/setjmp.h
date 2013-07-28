@@ -24,6 +24,8 @@
 
 #include <arch/setjmp.h>
 
+#include <system/_internal.h>
+
 #include <signal.h>
 
 #ifdef __cplusplus
@@ -40,9 +42,9 @@ typedef struct _sigjmp_buf {
        	sigset_t mask;
 } sigjmp_buf[1];
 
-extern void longjmp(jmp_buf env, int val) __attribute__((noreturn));
+extern void longjmp(jmp_buf env, int val) __libsystem_noreturn;
 extern int setjmp(jmp_buf env);
-extern void siglongjmp(sigjmp_buf env, int val) __attribute__((noreturn));
+extern void siglongjmp(sigjmp_buf env, int val) __libsystem_noreturn;
 extern int sigsetjmp(sigjmp_buf env, int savemask);
 
 #ifdef __cplusplus

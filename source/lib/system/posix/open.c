@@ -167,7 +167,8 @@ int open(const char *path, int oflag, ...) {
 	return (int)handle;
 }
 
-/** Open and possibly create a file.
+/**
+ * Open and possibly create a file.
  *
  * Opens a file, creating it if it does not exist. If it does exist, it will be
  * truncated to zero length.

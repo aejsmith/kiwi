@@ -102,8 +102,6 @@ sources = map(File, [
     'stdlib/abort.c',
     'stdlib/abs.c',
     'stdlib/atoi.c',
-    'stdlib/atoll.c',
-    'stdlib/atof.c',
     'stdlib/bsearch.c',
     'stdlib/environ.c',
     'stdlib/exit.c',

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,24 +21,19 @@
 
 #include <string.h>
 
-/** Find a character in an area of memory.
- *
- * Finds the first occurrence of a character in an area of memory.
- *
+/** Find the first occurrence of a character in an area of memory.
  * @param s		Pointer to the memory to search.
  * @param c		Character to search for.
  * @param n		Size of memory.
- * 
- * @return		NULL if token not found, otherwise pointer to token.
- */
+ * @return		NULL if token not found, otherwise pointer to token. */
 void *memchr(const void *s, int c, size_t n) {
 	const unsigned char *src = (const unsigned char *)s;
 	unsigned char ch = c;
 
 	for (; n != 0; n--) {
-		if(*src == ch) {
+		if(*src == ch)
 			return (void *)src;
-		}
+
 		src++;
 	}
 

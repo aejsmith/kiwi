@@ -47,7 +47,7 @@ extern void psiginfo(const siginfo_t *info, const char *s);
 /* int pthread_sigmask(int, const sigset_t *, sigset_t *); */
 extern int raise(int num);
 extern int sigaction(int num, const struct sigaction *__restrict act,
-                     struct sigaction *__restrict oldact);
+	struct sigaction *__restrict oldact);
 extern int sigaltstack(const stack_t *__restrict ss, stack_t *__restrict oldss);
 extern int sigaddset(sigset_t *set, int num);
 extern int sigdelset(sigset_t *set, int num);
@@ -60,7 +60,8 @@ extern int sigismember(const sigset_t *set, int num);
 extern sighandler_t signal(int num, sighandler_t handler);
 /* int sigpause(int); */
 /* int sigpending(sigset_t *); */
-extern int sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict oset);
+extern int sigprocmask(int how, const sigset_t *__restrict set,
+	sigset_t *__restrict oset);
 extern int sigsuspend(const sigset_t *mask);
 /* int sigwait(const sigset_t *, int *); */
 

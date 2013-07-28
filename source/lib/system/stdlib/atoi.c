@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,19 +16,36 @@
 
 /**
  * @file
- * @brief		String to integer function.
+ * @brief		String to integer functions.
  */
 
 #include <stdlib.h>
 
-/** Convert string to integer.
- *
- * Converts the initial part of a string to an integer.
- *
+/** Convert a string to an integer.
  * @param s		String to convert.
- *
- * @return		Converted value.
- */
+ * @return		Converted value. */
 int atoi(const char *s) {
 	return (int)strtol(s, NULL, 10);
+}
+
+/** Convert a string to a double.
+ * @param s		String to convert.
+ * @return		Converted value. */
+double atof(const char *s) {
+	return strtod(s, NULL);
+}
+
+/** Convert a string to a long long.
+ * @param s		String to convert.
+ * @return		Converted value. */
+long long atoll(const char *s) {
+	return strtoll(s, NULL, 10);
+}
+
+/** Convert a string to a long.
+ * @param s		String to convert.
+ * @return		Converted value.
+ */
+long atol(const char *s) {
+	return strtol(s, NULL, 10);
 }

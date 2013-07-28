@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,8 @@
 
 #define ARGV_MAX	512
 
-/** Execute a binary in the PATH.
+/**
+ * Execute a binary in the PATH.
  *
  * If the given path contains a / character, this function will simply call
  * execve() with the given arguments and the current process' environment.
@@ -46,16 +47,16 @@ int execlp(const char *file, const char *arg, ...) {
 
 	for(i = 1; i < ARGV_MAX; i++) {
 		argv[i] = va_arg(ap, const char *);
-		if(argv[i] == NULL) {
+		if(!argv[i])
 			break;
-		}
 	}
 
 	va_end(ap);
 	return execvp(file, (char *const *)argv);
 }
 
-/** Execute a binary.
+/**
+ * Execute a binary.
  *
  * Executes a binary with the given arguments and the current process'
  * environment.
@@ -75,9 +76,8 @@ int execl(const char *path, const char *arg, ...) {
 
 	for(i = 1; i < ARGV_MAX; i++) {
 		argv[i] = va_arg(ap, const char *);
-		if(argv[i] == NULL) {
+		if(!argv[i])
 			break;
-		}
 	}
 
 	va_end(ap);

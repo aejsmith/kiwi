@@ -23,7 +23,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-/** Sort directory entries in alphabetical order.
+/**
+ * Sort directory entries in alphabetical order.
  *
  * Sort function to be used with scandir() to sort entries in alphabetical
  * order.

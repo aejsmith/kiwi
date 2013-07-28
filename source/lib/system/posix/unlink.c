@@ -26,7 +26,8 @@
 
 #include "libsystem.h"
 
-/** Remove a directory entry.
+/**
+ * Remove a directory entry.
  *
  * Removes an entry from a directory in the filesystem. If no more links remain
  * to the file the entry refers to, it will be removed.

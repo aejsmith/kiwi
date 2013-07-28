@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,8 @@
 /** Buffer for asctime(). */
 static char asctime_buf[64];
 
-/** Convert time/date to string.
+/**
+ * Convert time/date to string.
  *
  * Converts the time and date described in the given time structure to a
  * string representation.
@@ -39,7 +40,8 @@ char *asctime_r(const struct tm *restrict tm, char *restrict buf) {
 	return buf;
 }
 
-/** Convert time/date to string.
+/**
+ * Convert time/date to string.
  *
  * Converts the time and date described in the given time structure to a
  * string representation. The returned string is statically allocated and
@@ -53,7 +55,8 @@ char *asctime(const struct tm *tm) {
 	return asctime_r(tm, asctime_buf);
 }
 
-/** Convert time/date to string.
+/**
+ * Convert time/date to string.
  *
  * Converts the time and date described in the given UNIX timestamp to a
  * string representation. The returned string is statically allocated and

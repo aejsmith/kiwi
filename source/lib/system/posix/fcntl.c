@@ -120,7 +120,8 @@ static int fcntl_setfl(int fd, int flags) {
 	return 0;
 }
 
-/** Control file descriptor behaviour.
+/**
+ * Control file descriptor behaviour.
  *
  * Controls the behaviour of a file descriptor according to the specified
  * command. The following commands are currently recognised:

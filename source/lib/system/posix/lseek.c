@@ -27,7 +27,8 @@
 
 #include "libsystem.h"
 
-/** Change a file descriptor's offset.
+/**
+ * Change a file descriptor's offset.
  *
  * Changes the offset of a file descriptor according to the specified action.
  * If the action is SEEK_SET, the offset will be set to the exact value given.

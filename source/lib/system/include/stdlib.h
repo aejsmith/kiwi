@@ -26,7 +26,10 @@
 #define __need_wchar_t
 #define __need_NULL
 #include <stddef.h>
+
 #include <sys/wait.h>
+
+#include <system/_internal.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,7 +52,7 @@ typedef struct {
 	long int quot, rem;
 } ldiv_t;
 
-extern void _Exit(int status) __attribute__((noreturn));
+extern void _Exit(int status) __libsystem_noreturn;
 extern void abort(void);
 extern int abs(int j);
 extern int atexit(void (*func)(void));
@@ -57,10 +60,11 @@ extern double atof(const char *s);
 extern int atoi(const char *s);
 extern long atol(const char *s);
 extern long long atoll(const char *s);
-extern void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
+extern void *bsearch(const void *key, const void *base, size_t nmemb, size_t size,
+	int (*compar)(const void *, const void *));
 extern void *calloc(size_t nmemb, size_t size);
 extern div_t div(int num, int denom);
-extern void exit(int status) __attribute__((noreturn));
+extern void exit(int status) __libsystem_noreturn;
 extern void free(void *ptr);
 extern char *getenv(const char *name);
 //extern int getsubopt(char **optionp, char *const *keylistp, char **valuep);
@@ -76,7 +80,8 @@ extern char *mktemp(char *tpl);
 //extern char *mkdtemp(char *tpl);
 extern int mkstemp(char *tpl);
 extern int putenv(char *str);
-extern void qsort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
+extern void qsort(void *base, size_t nmemb, size_t size,
+	int (*compar)(const void *, const void *));
 extern int rand(void);
 extern int rand_r(unsigned int *seed);
 extern void *realloc(void *ptr, size_t size);
@@ -86,9 +91,12 @@ extern double strtod(const char *__restrict s, char **__restrict endptr);
 //extern float strtof(const char *__restrict s, char **__restrict endptr);
 extern long strtol(const char *__restrict cp, char **__restrict endp, int base);
 //extern long double strtold(const char *__restrict str, char **__restrict endptr);
-extern long long int strtoll(const char *__restrict cp, char **__restrict endp, int base);
-extern unsigned long strtoul(const char *__restrict cp, char **__restrict endp, int base);
-extern unsigned long long int strtoull(const char *__restrict cp, char **__restrict endp, int base);
+extern long long int strtoll(const char *__restrict cp, char **__restrict endp,
+	int base);
+extern unsigned long strtoul(const char *__restrict cp, char **__restrict endp,
+	int base);
+extern unsigned long long int strtoull(const char *__restrict cp,
+	char **__restrict endp, int base);
 extern int system(const char *command);
 extern int unsetenv(const char *name);
 //extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);

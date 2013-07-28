@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,7 +21,8 @@
 
 #include <string.h>
 
-/** Parse a string into tokens.
+/**
+ * Parse a string into tokens.
  *
  * Parses a string into a sequence of tokens using the given delimiters.
  * The first call to this function should specify the string to parse
@@ -38,24 +39,23 @@ char *strtok_r(char *restrict str, const char *restrict delim, char **restrict s
 	char *ret = NULL;
 
 	/* If string is NULL, continue with last operation. */
-	if(str == NULL) {
+	if(!str)
 		str = *saveptr;
-	}
 
 	str += strspn(str, delim);
 	if(*str) {
 		ret = str;
 		str += strcspn(str, delim);
-		if(*str) {
+		if(*str)
 			*str++ = 0;
-		}
 	}
 
 	*saveptr = str;
 	return ret;
 }
 
-/** Parse a string into tokens.
+/**
+ * Parse a string into tokens.
  *
  * Parses a string into a sequence of tokens using the given delimiters.
  * The first call to this function should specify the string to parse

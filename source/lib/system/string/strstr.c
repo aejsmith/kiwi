@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,21 +21,18 @@
 
 #include <string.h>
 
-/** Find a string within a string.
- *
- * Finds the first occurrence of a string within the specified string.
- *
- * @param haystack	Pointer to the string to search.
- * @param needle	String to search for.
- * 
- * @return		NULL if token not found, otherwise pointer to string.
- */
-char *strstr(const char *haystack, const char *needle) {
-	while(*haystack) {
-		if(strncmp(haystack, needle, strlen(needle)) == 0) {
-			return (char *)haystack;
-		}
-		haystack++;
+/** Find the first occurrence of a substring in a string.
+ * @param s		String to search.
+ * @param what		Substring to search for.
+ * @return		Pointer to start of match if found, null if not. */
+char *strstr(const char *s, const char *what) {
+	size_t len = strlen(what);
+
+	while(*s) {
+		if(strncmp(s, what, len) == 0)
+			return (char *)s;
+
+		s++;
 	}
 
 	return NULL;

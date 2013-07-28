@@ -63,63 +63,43 @@
 	})
 
 /** Convert a string to an unsigned long.
- *
- * Converts a string to an unsigned long using the specified number base.
- *
  * @param cp		The start of the string.
  * @param endp		Pointer to the end of the parsed string placed here.
  * @param base		The number base to use (if zero will guess).
- *
- * @return		Converted value.
- */
+ * @return		Converted value. */
 unsigned long strtoul(const char *restrict cp, char **restrict endp, int base) {
 	return __strtoux(unsigned long, ULONG_MAX, cp, endp, base);
 }
 
 /** Convert a string to a signed long.
- *
- * Converts a string to an signed long using the specified number base.
- *
  * @param cp		The start of the string.
  * @param endp		Pointer to the end of the parsed string placed here.
  * @param base		The number base to use.
- *
- * @return		Converted value.
- */
+ * @return		Converted value. */
 long strtol(const char *restrict cp, char **restrict endp, int base) {
-	if(*cp == '-') {
+	if(*cp == '-')
 		return -strtoul(cp + 1, endp, base);
-	}
+
 	return strtoul(cp, endp, base);
 }
 
 /** Convert a string to an unsigned long long.
- *
- * Converts a string to an unsigned long long using the specified number base.
- *
  * @param cp		The start of the string.
  * @param endp		Pointer to the end of the parsed string placed here.
  * @param base		The number base to use.
- *
- * @return		Converted value.
- */
+ * @return		Converted value. */
 unsigned long long int strtoull(const char *restrict cp, char **restrict endp, int base) {
 	return __strtoux(unsigned long long int, ULLONG_MAX, cp, endp, base);
 }
 
-/** Convert a string to an signed long long.
- *
- * Converts a string to an signed long long using the specified number base.
- *
+/** Convert a string to a signed long long.
  * @param cp		The start of the string.
  * @param endp		Pointer to the end of the parsed string placed here.
  * @param base		The number base to use.
- *
- * @return		Converted value.
- */
+ * @return		Converted value. */
 long long int strtoll(const char *restrict cp, char **restrict endp, int base) {
-	if(*cp == '-') {
+	if(*cp == '-')
 		return -strtoull(cp + 1, endp, base);
-	}
+
 	return strtoull(cp, endp, base);
 }

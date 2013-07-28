@@ -32,7 +32,7 @@ int system(const char *command) {
 
 	pid = fork();
 	if(pid == 0) {
-		execl("/system/binaries/sh", "/system/binaries/sh", "-c", command, NULL);
+		execl("/system/bin/sh", "/system/bin/sh", "-c", command, NULL);
 		exit(127);
 	} else if(pid > 0) {
 		pid = waitpid(pid, &status, 0);

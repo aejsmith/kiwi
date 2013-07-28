@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,16 +21,16 @@
 
 #include <string.h>
 
-/** Count characters not in a string.
+/**
+ * Find the index of the first character in the given set.
  *
- * Counts the length of the initial part of the given string which consists
- * of characters not from the given disallowed characters, excluding the
- * terminating NULL byte.
+ * Returns the index of the first character in the given string which is in
+ * the the supplied set of characters.
  *
- * @param s		String to count in.
+ * @param s		String to span.
  * @param reject	Characters to reject.
  *
- * @return		Count of characters.
+ * @return		Index of character.
  */
 size_t strcspn(const char *s, const char *reject) {
 	size_t count = 0;
@@ -38,26 +38,26 @@ size_t strcspn(const char *s, const char *reject) {
 
 	for(i = 0; s[i]; i++) {
 		for(j = 0; reject[j]; j++) {
-			if(s[i] == reject[j]) {
+			if(s[i] == reject[j])
 				return count;
-			}
 		}
+
 		count++;
 	}
 
 	return count;
 }
 
-/** Get length of segment of string.
+/**
+ * Find the index of the first character not in the given set.
  *
- * Gets the length of the initial part of the given string which consists
- * of characters from the given allowed characters, excluding the terminating
- * NULL byte.
+ * Returns the index of the first character in the given string which is not in
+ * the the supplied set of characters.
  *
- * @param s		String to count in.
+ * @param s		String to span.
  * @param accept	Characters to accept.
  *
- * @return		Count of characters.
+ * @return		Index of character.
  */
 size_t strspn(const char *s, const char *accept) {
 	size_t count = 0;
@@ -66,10 +66,11 @@ size_t strspn(const char *s, const char *accept) {
 
 	for(i = 0; s[i]; i++) {
 		for(a = accept; *a && s[i] != *a; a++);
-		if(!*a) {
+		if(!*a)
 			break;
-		}
+
 		count++;
 	}
+
 	return count;
 }

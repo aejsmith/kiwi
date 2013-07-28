@@ -27,7 +27,8 @@
 char *optarg;
 int optind = 1, opterr = 1, optopt;
 
-/** Parse command line options.
+/**
+ * Parse command line options.
  *
  * Parses command line options according to the provided option string.
  * The option string should be a string of valid option characters. If an
@@ -49,7 +50,7 @@ int getopt(int argc, char *const argv[], const char *opts) {
 	char *ptr, *tmp;
 	int ret;
 
-	if(optind >= argc || argv[optind] == NULL || *argv[optind] != '-' || strcmp(argv[optind], "-") == 0) {
+	if(optind >= argc || !argv[optind] || *argv[optind] != '-' || strcmp(argv[optind], "-") == 0) {
 		return -1;
 	} else if(strcmp(argv[optind], "--") == 0) {
 		optind++;
@@ -61,9 +62,8 @@ int getopt(int argc, char *const argv[], const char *opts) {
 	ptr = strchr(opts, ret);
 	if(ptr == NULL) {
 		optopt = ret;
-		if(opterr != 0) {
+		if(opterr != 0)
 			fprintf(stderr, "%s: illegal option -- %c\n", argv[0], ret);
-		}
 		ret = '?';
 		goto out;
 	}

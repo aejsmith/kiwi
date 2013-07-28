@@ -24,23 +24,17 @@
 #include <ctype.h>
 
 /** Convert a string to a double precision number.
- *
- * Converts a string to a double-precision number.
- *
  * @param s		String to convert.
  * @param endptr	Pointer to store end of string in (can be NULL).
- *
- * @return		Converted number.
- */
+ * @return		Converted number. */
 double strtod(const char *restrict s, char **restrict endptr) {
 	const char *p = s;
 	long double factor, value = 0.L;
 	int sign = 1;
 	unsigned int expo = 0;
 
-	while(isspace(*p)) {
+	while(isspace(*p))
 		p++;
-	}
 
 	switch(*p) {
 	case '-':
@@ -51,9 +45,8 @@ double strtod(const char *restrict s, char **restrict endptr) {
 		break;
 	}
 
-	while((unsigned int)(*p - '0') < 10u) {
+	while((unsigned int)(*p - '0') < 10u)
 		value = value * 10 + (*p++ - '0');
-	}
 
 	if(*p == '.') {
 		factor = 1.;
@@ -82,24 +75,20 @@ double strtod(const char *restrict s, char **restrict endptr) {
 			goto done;
 		}
 
-		while((unsigned int)(*p - '0') < 10u) {
+		while((unsigned int)(*p - '0') < 10u)
 			expo = 10 * expo + (*p++ - '0');
-		}
 
 		while(1) {
-			if(expo & 1) {
+			if(expo & 1)
 				value *= factor;
-			}
-			if((expo >>= 1) == 0) {
+			if((expo >>= 1) == 0)
 				break;
-			}
 			factor *= factor;
 		}
 	}
 done:
-	if(endptr != NULL) {
+	if(endptr)
 		*endptr = (char *)p;
-	}
 
 	return value * sign;
 }

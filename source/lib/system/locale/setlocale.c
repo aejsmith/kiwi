@@ -22,7 +22,8 @@
 #include <locale.h>
 #include <string.h>
 
-/** Set the current locale.
+/**
+ * Set the current locale.
  *
  * Sets the current locale for the given category to the locale corresponding
  * to the given string.
@@ -34,9 +35,9 @@
  */
 char *setlocale(int category, const char *name) {
 	if(name != NULL) {
-		if(strcmp(name, "C") && strcmp(name, "POSIX") && strcmp(name, "")) {
+		if(strcmp(name, "C") && strcmp(name, "POSIX") && strcmp(name, ""))
 			return NULL;
-		}
 	}
+
 	return (char *)"C";
 }

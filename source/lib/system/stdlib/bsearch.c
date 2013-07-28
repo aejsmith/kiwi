@@ -22,18 +22,15 @@
 #include <stdlib.h>
 
 /** Search a sorted array.
- *
- * Searches a sorted array of items for the given key.
- *
  * @param key		Key to search for.
  * @param base		Start of the array.
  * @param nmemb		Number of array elements.
  * @param size		Size of each array element.
  * @param compar	Comparison function.
- *
- * @return		Pointer to found key, or NULL if not found.
- */
-void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *)) {
+ * @return		Pointer to found key, or NULL if not found. */
+void *bsearch(const void *key, const void *base, size_t nmemb, size_t size,
+	int (*compar)(const void *, const void *))
+{
 	size_t low;
 	size_t mid;
 	char *p;

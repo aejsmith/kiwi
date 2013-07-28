@@ -59,7 +59,8 @@ int getchar(void) {
 	return fgetc(stdin);
 }
 
-/** Push a character back to a stream.
+/**
+ * Push a character back to a stream.
  *
  * Pushes the given character back onto the given input stream, to be read
  * by the next call to fgetc() or fread(). Only one character is stored: this

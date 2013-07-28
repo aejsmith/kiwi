@@ -28,9 +28,9 @@
  * @param stream	File stream to close.
  * @return		0 on success, EOF on failure. */
 int fclose(FILE *stream) {
-	if(close(stream->fd) != 0) {
+	if(close(stream->fd) != 0)
 		return EOF;
-	}
+
 	free(stream);
 	return 0;
 }

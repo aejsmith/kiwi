@@ -41,7 +41,8 @@ speed_t cfgetospeed(const struct termios *tio) {
 	return tio->c_ospeed;
 }
 
-/** Set the input baud rate in a termios structure.
+/**
+ * Set the input baud rate in a termios structure.
  *
  * Sets the input baud rate in a termios structure. This will have no effect on
  * the settings of a terminal until the attributes are set using tcsetattr().
@@ -56,7 +57,8 @@ int cfsetispeed(struct termios *tio, speed_t speed) {
 	return 0;
 }
 
-/** Set the output baud rate in a termios structure.
+/**
+ * Set the output baud rate in a termios structure.
  *
  * Sets the output baud rate in a termios structure. This will have no effect
  * on the settings of a terminal until the attributes are set using tcsetattr().
@@ -159,9 +161,8 @@ int tcsetattr(int fd, int action, const struct termios *tio) {
 pid_t tcgetpgrp(int fd) {
 	pid_t pgid;
 
-	if(ioctl(fd, TIOCGPGRP, &pgid) < 0) {
+	if(ioctl(fd, TIOCGPGRP, &pgid) < 0)
 		return -1;
-	}
 
 	return pgid;
 }
