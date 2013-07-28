@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
- *
+ * Copyright (C) 2011-2013 Alex Smith
+ * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
@@ -16,48 +16,58 @@
 
 /**
  * @file
- * @brief		AMD64 setjmp/longjmp functions.
+ * @brief		AMD64 non-local jump functions.
  */
 
 #include <amd64/asm.h>
 
+/** Context offsets. */
+#define JMP_OFF_IP		0	/**< RIP offset. */
+#define JMP_OFF_SP		8	/**< RSP offset. */
+#define JMP_OFF_BP		16	/**< RBP offset. */
+#define JMP_OFF_BX		24	/**< RBX offset. */
+#define JMP_OFF_R12		32	/**< R12 offset. */
+#define JMP_OFF_R13		40	/**< R13 offset. */
+#define JMP_OFF_R14		48	/**< R14 offset. */
+#define JMP_OFF_R15		56	/**< R15 offset. */
+
 FUNCTION_START(setjmp)
-	/* Save return address */
-	movq	0(%rsp), %rcx
-	movq	%rcx, 0(%rdi)
+	/* Save instruction/stack pointers. */
+	movq	(%rsp), %rax
+	movq	%rax, JMP_OFF_IP(%rdi)
+	movq	%rsp, JMP_OFF_SP(%rdi)
 
-	/* Save registers: rbp, rsp, rbx, r12, r13, r14 and r15 */
-	movq	%rbp, 8(%rdi)
-	movq	%rsp, 16(%rdi)
-	movq	%rbx, 24(%rdi)
-	movq	%r12, 32(%rdi)
-	movq	%r13, 40(%rdi)
-	movq	%r14, 48(%rdi)
-	movq	%r15, 56(%rdi)
+	/* Save callee-save registers. */
+	movq	%rbp, JMP_OFF_BP(%rdi)
+	movq	%rbx, JMP_OFF_BX(%rdi)
+	movq	%r12, JMP_OFF_R12(%rdi)
+	movq	%r13, JMP_OFF_R13(%rdi)
+	movq	%r14, JMP_OFF_R14(%rdi)
+	movq	%r15, JMP_OFF_R15(%rdi)
 
-	/* Return 0 */
-	movq	$0, %rax
+	/* Return 0 from setjmp(). */
+	xorl	%eax, %eax
 	ret
 FUNCTION_END(setjmp)
 
 FUNCTION_START(longjmp)
-	/* Restore registers */
-	movq	8(%rdi), %rbp
-	movq	16(%rdi), %rsp
-	movq	24(%rdi), %rbx
-	movq	32(%rdi), %r12
-	movq	40(%rdi), %r13
-	movq	48(%rdi), %r14
-	movq	56(%rdi), %r15
+	/* Restore new callee-save registers. */
+	movq	JMP_OFF_R15(%rdi), %r15
+	movq	JMP_OFF_R14(%rdi), %r14
+	movq	JMP_OFF_R13(%rdi), %r13
+	movq	JMP_OFF_R12(%rdi), %r12
+	movq	JMP_OFF_BX(%rdi), %rbx
+	movq	JMP_OFF_BP(%rdi), %rbp
 
-	/* Restore return address */
-	movq	0(%rdi), %rcx
-	movq	%rcx, 0(%rsp)
+	/* Restore new instruction/stack pointers. */
+	movq	JMP_OFF_SP(%rdi), %rsp
+	movq	JMP_OFF_IP(%rdi), %rax
+	movq	%rax, (%rsp)
 
-	/* Check return code */
-	cmpl	$0, %esi
-	jne	1f
-	movl	$1, %esi
+	/* Cause setjmp() to return the specified value (change 0 to 1 if given). */
+	test	%esi, %esi
+	jnz	1f
+	inc	%esi
 1:	movl	%esi, %eax
 	ret
 FUNCTION_END(longjmp)
