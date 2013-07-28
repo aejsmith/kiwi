@@ -229,7 +229,7 @@ class ToolchainManager:
         #os.symlink(os.path.join(os.getcwd(), 'source', 'include'),
         #    os.path.join(self.targetdir, 'sysroot', 'include'))
         os.symlink(os.path.join(os.getcwd(), 'build',
-                '%s-%s' % (self.config['ARCH'], self.config['PLATFORM']), 'libraries'),
+                '%s-%s' % (self.config['ARCH'], self.config['PLATFORM']), 'lib'),
             os.path.join(self.targetdir, 'sysroot', 'lib'))
 
     # Remove a file, symbolic link or directory tree.
