@@ -35,6 +35,8 @@
 #include <arch/mmu.h>
 #include <arch/page.h>
 
+#include <kernel/vm.h>
+
 #include <mm/mm.h>
 
 #include <sync/mutex.h>
@@ -61,7 +63,7 @@ typedef struct mmu_ops {
 	 * @param mmflag	Allocation behaviour flags.
 	 * @return		Status code describing result of the operation. */
 	status_t (*map)(struct mmu_context *ctx, ptr_t virt, phys_ptr_t phys,
-		unsigned protect, unsigned mmflag);
+		uint32_t protect, unsigned mmflag);
 
 	/** Modify protection flags on a range of mappings.
 	 * @param ctx		Context to modify.
@@ -69,7 +71,7 @@ typedef struct mmu_ops {
 	 * @param size		Size of range to update.
 	 * @param protect	New protection flags. */
 	void (*protect)(struct mmu_context *ctx, ptr_t virt, size_t size,
-		unsigned protect);
+		uint32_t protect);
 
 	/** Unmap a page in a context.
 	 * @param ctx		Context to unmap in.
@@ -91,7 +93,7 @@ typedef struct mmu_ops {
 	 * @param protectp	Where to store protection flags for the mapping.
 	 * @return		Whether a page is mapped at the virtual address. */
 	bool (*query)(struct mmu_context *ctx, ptr_t virt, phys_ptr_t *physp,
-		unsigned *protectp);
+		uint32_t *protectp);
 
 	/** Flush a context prior to unlocking.
 	 * @param ctx		Context to flush. */
@@ -112,10 +114,6 @@ typedef struct mmu_context {
 	arch_mmu_context_t arch;	/**< Architecture implementation details. */
 } mmu_context_t;
 
-/** Mapping protection flags. */
-#define MMU_MAP_WRITE		(1<<0)	/**< Mapping should be writeable. */
-#define MMU_MAP_EXECUTE		(1<<1)	/**< Mapping should be executable. */
-
 extern mmu_context_t kernel_mmu_context;
 extern mmu_ops_t *mmu_ops;
 
@@ -123,13 +121,13 @@ extern void mmu_context_lock(mmu_context_t *ctx);
 extern void mmu_context_unlock(mmu_context_t *ctx);
 
 extern status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-	unsigned protect, unsigned mmflag);
+	uint32_t protect, unsigned mmflag);
 extern void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size,
-	unsigned protect);
+	uint32_t protect);
 extern bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared,
 	phys_ptr_t *physp);
 extern bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp,
-	unsigned *protectp);
+	uint32_t *protectp);
 
 extern void mmu_context_load(mmu_context_t *ctx);
 extern void mmu_context_unload(mmu_context_t *ctx);

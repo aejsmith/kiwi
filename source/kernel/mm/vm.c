@@ -60,7 +60,13 @@
  * @todo		Swap support.
  * @todo		Implement VM_MAP_OVERCOMMIT (at the moment we just
  *			overcommit regardless).
- * @todo		Memory locking.
+ * @todo		Proper memory locking. Note that when eviction gets
+ *			implemented we need to make sure that the userspace
+ *			locking APIs cannot unlock any locks that the kernel
+ *			makes, as the kernel locking functions make the
+ *			guarantee that the locked range is safe to access from
+ *			kernel mode. Furthermore, we need to make sure that
+ *			we don't vm_unmap() a locked region.
  * @todo		Shouldn't use MM_KERNEL for user address spaces? Note
  *			that MM_USER will at some point use interruptible sleep
  *			so interrupting a process waiting for memory leaves us
@@ -426,7 +432,7 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	/* Write-protect all mappings on the source region. */
 	mmu_context_lock(src->as->mmu);
 	mmu_context_protect(src->as->mmu, src->start, src->size,
-		(src->protection & VM_PROT_EXECUTE) ? MMU_MAP_EXECUTE : 0);
+		src->protection & ~VM_PROT_WRITE);
 	mmu_context_unlock(src->as->mmu);
 
 	/* Point all of the pages in the new map to the pages from the source
@@ -598,21 +604,37 @@ static void vm_region_destroy(vm_region_t *region) {
 	slab_cache_free(vm_region_cache, region);
 }
 
-/** Handle an fault on a region with an anonymous map.
- * @param region	Region fault occurred in.
- * @param addr		Virtual address of fault (rounded down to base of page).
- * @param reason	Reason for the fault.
- * @param access	Type of access that caused the fault.
+/** Map a page for an anonymous region into an address space.
+ * @param region	Region to map for.
+ * @param addr		Virtual address to map.
+ * @param access	Required access for the page.
+ * @param physp		Where to store physical address of page.
  * @return		Status code describing the result of the operation. */
-static status_t vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, uint32_t access) {
+static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, phys_ptr_t *physp) {
 	object_handle_t *handle = region->handle;
 	vm_amap_t *amap = region->amap;
 	phys_ptr_t phys;
+	uint32_t protect;
+	bool exist;
 	offset_t offset;
+	size_t idx;
 	page_t *page;
 	status_t ret;
-	size_t idx;
-	unsigned protect;
+
+	/* Check if the page is already mapped. If it is and the protection
+	 * flags are sufficient for the required acesss, we don't need to do
+	 * anything. */
+	exist = mmu_context_query(region->as->mmu, addr, &phys, &protect);
+	if(exist && (protect & access) == access) {
+		if(physp)
+			*physp = phys;
+
+		return STATUS_SUCCESS;
+	}
+
+	/* Protection flags to map with. The write flag is cleared later on if
+	 * the page needs to be mapped read only. */
+	protect = region->protection;
 
 	/* Work out the offset into the object. */
 	offset = region->amap_offset + (addr - region->start);
@@ -622,28 +644,6 @@ static status_t vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, uint3
 
 	assert(idx < amap->max_size);
 
-	/* Do some sanity checks if this is a protection fault. The main fault
-	 * handler verifies that the access is allowed by the region protection,
-	 * so the only access type protection faults should be is write. COW
-	 * faults should never occur on non-private regions, either. */
-	if(reason == VM_FAULT_PROTECTION) {
-		if(access != VM_PROT_WRITE) {
-			fatal("Non-write protection fault at %p on %p (%d)",
-				addr, amap, access);
-		} else if(!(region->flags & VM_MAP_PRIVATE)) {
-			fatal("Copy-on-write fault at %p on non-private region",
-				addr);
-		}
-	}
-
-	/* Protection flags to map with. The write flag is cleared later on if
-	 * the page needs to be mapped read only. */
-	protect = 0;
-	if(region->protection & VM_PROT_WRITE)
-		protect |= MMU_MAP_WRITE;
-	if(region->protection & VM_PROT_EXECUTE)
-		protect |= MMU_MAP_EXECUTE;
-
 	if(!amap->pages[idx] && !handle) {
 		/* No page existing and no source. Allocate a zeroed page. */
 		dprintf("vm:  anon fault: no existing page and no source, allocating new\n");
@@ -651,7 +651,7 @@ static status_t vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, uint3
 		refcount_inc(&amap->pages[idx]->count);
 		amap->curr_size++;
 		phys = amap->pages[idx]->addr;
-	} else if(access == VM_PROT_WRITE) {
+	} else if(access & VM_PROT_WRITE) {
 		if(amap->pages[idx]) {
 			assert(refcount_get(&amap->pages[idx]->count) > 0);
 
@@ -684,14 +684,11 @@ static status_t vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, uint3
 			assert(region->flags & VM_MAP_PRIVATE);
 			assert(handle);
 
-			/* Find the page to copy. If handling a protection
-			 * fault, use the existing mapping address. */
-			if(reason == VM_FAULT_PROTECTION) {
-				if(!mmu_context_query(region->as->mmu, addr, &phys, NULL)) {
-					fatal("No mapping for %p, but protection "
-						"fault on it", addr);
-				}
-			} else {
+			/* Find the page to copy. If there was an existing
+			 * mapping, we already have its address in phys so we
+			 * don't need to bother getting a page from the object
+			 * again. */
+			if(!exist) {
 				assert(handle->object->type->get_page);
 
 				ret = handle->object->type->get_page(handle,
@@ -733,7 +730,7 @@ static status_t vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, uint3
 			 * page. */
 			if(refcount_get(&amap->pages[idx]->count) > 1) {
 				assert(region->flags & VM_MAP_PRIVATE);
-				protect &= ~MMU_MAP_WRITE;
+				protect &= ~VM_PROT_WRITE;
 			}
 
 			phys = amap->pages[idx]->addr;
@@ -758,14 +755,13 @@ static status_t vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, uint3
 				" from %p (object: %p) as read-only\n", phys,
 				handle, handle->object);
 
-			protect &= ~MMU_MAP_WRITE;
+			protect &= ~VM_PROT_WRITE;
 		}
 	}
 
 	/* The page address should now be stored in phys, and protection flags
-	 * should be set correctly. If this is a protection fault, remove the
-	 * existing mapping. */
-	if(reason == VM_FAULT_PROTECTION) {
+	 * should be set correctly. If there is an existing mapping, remove it. */
+	if(exist) {
 		if(!mmu_context_unmap(region->as->mmu, addr, true, NULL))
 			fatal("Could not remove previous mapping for %p", addr);
 	}
@@ -773,24 +769,39 @@ static status_t vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, uint3
 	/* Map the entry in. Should always succeed with MM_KERNEL set. */
 	mmu_context_map(region->as->mmu, addr, phys, protect, MM_KERNEL);
 
+	if(physp)
+		*physp = phys;
+
 	dprintf("vm: mapped 0x%" PRIxPHYS " at %p (as: %p, protect: 0x%x)\n",
 		phys, addr, region->as, protect);
 	mutex_unlock(&amap->lock);
 	return STATUS_SUCCESS;
 }
 
-/** Handle an fault on regions without an anonymous map.
- * @param region	Region fault occurred in.
- * @param addr		Virtual address of fault (rounded down to base of page).
+/** Map a page from an object into an address space.
+ * @param region	Region to map for.
+ * @param addr		Virtual address to map.
+ * @param physp		Where to store physical address of page.
  * @return		Status code describing the result of the operation. */
-static status_t vm_object_fault(vm_region_t *region, ptr_t addr) {
-	phys_ptr_t phys, exist;
-	unsigned protect;
+static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *physp) {
 	offset_t offset;
+	phys_ptr_t phys;
+	uint32_t protect;
 	status_t ret;
 
 	assert(region->handle);
 	assert(region->handle->object->type->get_page);
+
+	/* Check if the page is already mapped. */
+	if(mmu_context_query(region->as->mmu, addr, &phys, &protect)) {
+		/* Should always have the correct mapping flags. */
+		assert((protect & region->protection) == region->protection);
+
+		if(physp)
+			*physp = phys;
+
+		return STATUS_SUCCESS;
+	}
 
 	/* Get a page from the object. */
 	offset = (offset_t)(addr - region->start) + region->obj_offset;
@@ -802,38 +813,18 @@ static status_t vm_object_fault(vm_region_t *region, ptr_t addr) {
 		return ret;
 	}
 
-	/* Check if a mapping already exists. This is possible if two threads
-	 * in a process on different CPUs fault on the same address
-	 * simultaneously. */
-	if(mmu_context_query(region->as->mmu, addr, &exist, NULL)) {
-		if(exist != phys) {
-			fatal("Incorrect existing mapping found (found 0x%"
-				PRIxPHYS ", should be 0x%" PRIxPHYS ")",
-				exist, phys);
-		} else if(region->handle->object->type->release_page) {
-			region->handle->object->type->release_page(region->handle,
-				offset, phys);
-		}
-
-		return STATUS_SUCCESS;
-	}
-
-	/* Work out the protection flags to map with. */
-	protect = 0;
-	if(region->protection & VM_PROT_WRITE)
-		protect |= MMU_MAP_WRITE;
-	if(region->protection & VM_PROT_EXECUTE)
-		protect |= MMU_MAP_EXECUTE;
-
 	/* Map the entry in. FIXME: Once page reservations are implemented we
 	 * should reserve pages right at the beginning of the fault handler
 	 * before locking the address space, as if pages need to be reclaimed
 	 * we could run into issues because we're holding the address space and
 	 * context locks. */
-	mmu_context_map(region->as->mmu, addr, phys, protect, MM_KERNEL);
+	mmu_context_map(region->as->mmu, addr, phys, region->protection, MM_KERNEL);
+
+	if(physp)
+		*physp = phys;
 
 	dprintf("vm: mapped 0x%" PRIxPHYS " at %p (as: %p, protect: 0x%x)\n",
-		phys, addr, region->as, protect);
+		phys, addr, region->as, region->protection);
 	return STATUS_SUCCESS;
 }
 
@@ -908,16 +899,28 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 	}
 
 	mmu_context_lock(as->mmu);
-
 	local_irq_enable();
 
-	/* Call the anonymous fault handler if there is an anonymous map, else
-	 * use the object fault handler. */
-	ret = (region->amap) ? vm_anon_fault(region, base, reason, access)
-		: vm_object_fault(region, base);
+	if(region->amap) {
+		/* Do some sanity checks if this is a protection fault. The only
+		 * access type protection faults should be is write. COW faults
+		 * should never occur on non-private regions, either. */
+		if(reason == VM_FAULT_PROTECTION) {
+			if(access != VM_PROT_WRITE) {
+				fatal("Non-write protection fault at %p on %p (%d)",
+					addr, region->amap, access);
+			} else if(!(region->flags & VM_MAP_PRIVATE)) {
+				fatal("Copy-on-write fault at %p on non-private region",
+					addr);
+			}
+		}
+
+		ret = map_anon_page(region, base, access, NULL);
+	} else {
+		ret = map_object_page(region, base, NULL);
+	}
 
 	local_irq_disable();
-
 	mmu_context_unlock(as->mmu);
 
 	if(ret != STATUS_SUCCESS) {
@@ -954,6 +957,62 @@ out:
 	}
 
 	return ret;
+}
+
+/**
+ * Lock a single page in an address space.
+ *
+ * Locks a single page into an address space for access with the specified
+ * access. While the page is locked, it will not be evicted from the address
+ * space, and it is guaranteed to be safe to access when the address space is
+ * active.
+ *
+ * @param as		Address space to lock in.
+ * @param addr		Address of page to lock.
+ * @param access	Required access to the page.
+ * @param physp		Where to store physical address of page.
+ *
+ * @return		Status code describing the result of the operation.
+ */
+status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access, phys_ptr_t *physp) {
+	vm_region_t *region;
+	status_t ret;
+
+	assert(!(addr % PAGE_SIZE));
+
+	mutex_lock(&as->lock);
+
+	region = vm_region_find(as, addr, false);
+	if(!region || region->state != VM_REGION_ALLOCATED) {
+		mutex_unlock(&as->lock);
+		return STATUS_INVALID_ADDR;
+	}
+
+	/* Check whether the access is allowed. */
+	if((region->protection & access) != access) {
+		mutex_unlock(&as->lock);
+		return STATUS_ACCESS_DENIED;
+	}
+
+	mmu_context_lock(as->mmu);
+
+	/* For now we just ensure that the page is mapped for the requested
+	 * access, as we don't evict pages at all. */
+	ret = (region->amap)
+		? map_anon_page(region, addr, access, physp)
+		: map_object_page(region, addr, physp);
+
+	mmu_context_unlock(as->mmu);
+
+	mutex_unlock(&as->lock);
+	return ret;
+}
+
+/** Unlock a previously locked page.
+ * @param as		Address space to unlock in.
+ * @param addr		Address of page to unlock. */
+void vm_unlock_page(vm_aspace_t *as, ptr_t addr) {
+	/* Nothing happens, for now. */
 }
 
 /** Cut out the specified space from the address space.

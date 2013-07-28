@@ -86,7 +86,7 @@ void mmu_context_unlock(mmu_context_t *ctx) {
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing the result of the operation. */
 status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-	unsigned protect, unsigned mmflag)
+	uint32_t protect, unsigned mmflag)
 {
 	assert(mutex_held(&ctx->lock));
 	assert(!(virt % PAGE_SIZE));
@@ -109,7 +109,7 @@ status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
  * @param virt		Start of range to update.
  * @param size		Size of range to update.
  * @param protect	New protection flags. */
-void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size, unsigned protect) {
+void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t protect) {
 	assert(mutex_held(&ctx->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(!(size % PAGE_SIZE));
@@ -155,7 +155,7 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_ptr_t *
  * @param physp		Where to store physical address the page is mapped to.
  * @param protectp	Where to store protection flags for the mapping.
  * @return		Whether a page is mapped at the virtual address. */
-bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, unsigned *protectp) {
+bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, uint32_t *protectp) {
 	bool ret;
 
 	assert(mutex_held(&ctx->lock));
@@ -252,7 +252,8 @@ __init_text void mmu_init(void) {
 
 		for(i = 0; i < range->size; i += PAGE_SIZE) {
 			mmu_context_map(&kernel_mmu_context, range->start + i,
-				range->phys + i, MMU_MAP_WRITE, MM_BOOT);
+				range->phys + i, VM_PROT_READ | VM_PROT_WRITE,
+				MM_BOOT);
 		}
 	}
 

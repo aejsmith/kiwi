@@ -71,7 +71,7 @@ __init_text void arch_smp_boot_prepare(void) {
 	ap_mmu_context = mmu_context_create(MM_BOOT);
 	mmu_context_lock(ap_mmu_context);
 	mmu_context_map(ap_mmu_context, (ptr_t)ap_bootstrap_page, ap_bootstrap_page,
-		MMU_MAP_WRITE | MMU_MAP_EXECUTE, MM_BOOT);
+		VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE, MM_BOOT);
 	mmu_context_unlock(ap_mmu_context);
 }
 

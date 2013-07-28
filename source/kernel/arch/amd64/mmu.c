@@ -100,15 +100,15 @@ static inline uint64_t table_mapping_flags(mmu_context_t *ctx) {
  * @param phys		Physical address being mapped.
  * @param protect	Protection flags.
  * @return		Flags to map page with. */
-static inline uint64_t mapping_flags(mmu_context_t *ctx, phys_ptr_t phys, unsigned protect) {
+static inline uint64_t mapping_flags(mmu_context_t *ctx, phys_ptr_t phys, uint32_t protect) {
 	uint64_t flags;
 	unsigned type;
 
 	/* Determine mapping flags. Kernel mappings have the global flag set. */
 	flags = X86_PTE_PRESENT;
-	if(protect & MMU_MAP_WRITE)
+	if(protect & VM_PROT_WRITE)
 		flags |= X86_PTE_WRITE;
-	if(!(protect & MMU_MAP_EXECUTE) && cpu_features.xd)
+	if(!(protect & VM_PROT_EXECUTE) && cpu_features.xd)
 		flags |= X86_PTE_NOEXEC;
 	if(is_kernel_context(ctx)) {
 		flags |= X86_PTE_GLOBAL;
@@ -357,7 +357,7 @@ static void amd64_mmu_destroy(mmu_context_t *ctx) {
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing result of the operation. */
 static status_t amd64_mmu_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-	unsigned protect, unsigned mmflag)
+	uint32_t protect, unsigned mmflag)
 {
 	uint64_t *ptbl;
 	unsigned pte;
@@ -382,7 +382,7 @@ static status_t amd64_mmu_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
  * @param virt		Start of range to update.
  * @param size		Size of range to update.
  * @param protect	New protection flags. */
-static void amd64_mmu_protect(mmu_context_t *ctx, ptr_t virt, size_t size, unsigned protect) {
+static void amd64_mmu_protect(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t protect) {
 	uint64_t *ptbl = NULL, prev, entry;
 	unsigned pte;
 	ptr_t end;
@@ -410,9 +410,9 @@ static void amd64_mmu_protect(mmu_context_t *ctx, ptr_t virt, size_t size, unsig
 				prev = ptbl[pte];
 
 				entry = (prev & X86_PTE_PROTECT_MASK);
-				if(protect & MMU_MAP_WRITE)
+				if(protect & VM_PROT_WRITE)
 					entry |= X86_PTE_WRITE;
-				if(!(protect & MMU_MAP_EXECUTE) && cpu_features.xd)
+				if(!(protect & VM_PROT_EXECUTE) && cpu_features.xd)
 					entry |= X86_PTE_NOEXEC;
 
 				if(test_and_set_pte(&ptbl[pte], prev, entry) == prev)
@@ -479,7 +479,7 @@ static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_pt
  * @param physp		Where to store physical address the page is mapped to.
  * @param protectp	Where to store protection flags for the mapping.
  * @return		Whether a page is mapped at the virtual address. */
-static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, unsigned *protectp) {
+static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, uint32_t *protectp) {
 	uint64_t *pdir, *ptbl, entry;
 	phys_ptr_t phys;
 	unsigned pde, pte;
@@ -514,8 +514,9 @@ static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, u
 		if(physp)
 			*physp = phys;
 		if(protectp) {
-			*protectp = ((entry & X86_PTE_WRITE) ? MMU_MAP_WRITE : 0)
-				| ((entry & X86_PTE_NOEXEC) ? 0 : MMU_MAP_EXECUTE);
+			*protectp = VM_PROT_READ
+				| ((entry & X86_PTE_WRITE) ? VM_PROT_WRITE : 0)
+				| ((entry & X86_PTE_NOEXEC) ? 0 : VM_PROT_EXECUTE);
 		}
 	}
 
@@ -607,7 +608,7 @@ static mmu_ops_t amd64_mmu_ops = {
  * @param start		Start of the section.
  * @param end		End of the section.
  * @param protect	Mapping protection flags. */
-static void map_kernel(const char *name, ptr_t start, ptr_t end, unsigned protect) {
+static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t protect) {
 	kboot_tag_core_t *core;
 	phys_ptr_t phys, i;
 	uint64_t *pdir, *ptbl;
@@ -661,15 +662,15 @@ __init_text void arch_mmu_init(void) {
 	map_kernel("text",
 		ROUND_DOWN((ptr_t)__text_seg_start, LARGE_PAGE_SIZE),
 		ROUND_UP((ptr_t)__text_seg_end, LARGE_PAGE_SIZE),
-		MMU_MAP_EXECUTE);
+		VM_PROT_READ | VM_PROT_EXECUTE);
 	map_kernel("data",
 		ROUND_DOWN((ptr_t)__data_seg_start, LARGE_PAGE_SIZE),
 		ROUND_UP((ptr_t)__data_seg_end, LARGE_PAGE_SIZE),
-		MMU_MAP_WRITE);
+		VM_PROT_READ | VM_PROT_WRITE);
 	map_kernel("init",
 		ROUND_DOWN((ptr_t)__init_seg_start, PAGE_SIZE),
 		ROUND_UP((ptr_t)__init_seg_end, PAGE_SIZE),
-		MMU_MAP_WRITE | MMU_MAP_EXECUTE);
+		VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE);
 
 	/* Search for the highest physical address we have in the memory map. */
 	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
