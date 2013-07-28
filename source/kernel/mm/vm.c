@@ -1689,9 +1689,26 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
 /** Display details of a region.
  * @param region	Region to display. */
 static void dump_region(vm_region_t *region) {
-	kdb_printf("%-18p 0x%-12zx 0x%-5" PRIx32 " 0x%-3" PRIx32 " %-5d 0x%-8" PRIx64
-		" %s\n", region->start, region->size, region->protection,
-		region->flags, region->state, region->obj_offset,
+	kdb_printf("%-18p 0x%-12zx 0x%-5" PRIx32 " 0x%-3" PRIx32 " ",
+		region->start, region->size, region->protection,
+		region->flags);
+
+	switch(region->state) {
+	case VM_REGION_FREE:
+		kdb_printf("Free  ");
+		break;
+	case VM_REGION_ALLOCATED:
+		kdb_printf("Alloc ");
+		break;
+	case VM_REGION_RESERVED:
+		kdb_printf("Rsvd  ");
+		break;
+	default:
+		kdb_printf("????? ");
+		break;
+	}
+
+	kdb_printf("0x%-8" PRIx64 " %s\n", region->obj_offset,
 		(region->name) ? region->name : "<unnamed>");
 }
 
