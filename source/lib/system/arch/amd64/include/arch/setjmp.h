@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,13 +16,25 @@
 
 /**
  * @file
- * @brief		Signal wait functions.
+ * @brief		AMD64 setjmp definitions.
  */
 
-#include <signal.h>
-#include "libsystem.h"
+#ifndef __ARCH_SETJMP_H
+#define __ARCH_SETJMP_H
 
-int sigsuspend(const sigset_t *mask) {
-	libsystem_stub("sigsuspend", true);
-	return -1;
-}
+/**
+ * Jump buffer size.
+ *
+ * On AMD64 we have the following layout:
+ *  jmp_buf[0] = Return address
+ *  jmp_buf[1] = rbp
+ *  jmp_buf[2] = rsp
+ *  jmp_buf[3] = rbx
+ *  jmp_buf[4] = r12
+ *  jmp_buf[5] = r13
+ *  jmp_buf[6] = r14
+ *  jmp_buf[7] = r15
+ */
+#define JMP_BUF_SIZE		8
+
+#endif /* __ARCH_SETJMP_H */

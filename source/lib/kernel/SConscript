@@ -43,7 +43,7 @@ env.Command(
     Action('$GENERRLIST $SOURCE __kernel_status_strings __kernel_status_size > $TARGET', '$GENCOMSTR'))
 
 # Get a list of architecture-specific source files.
-arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
+arch_sources = SConscript(dirs = ['arch/%s' % (config['ARCH'])], exports = ['env'])
 
 # Copy the architecture header in.
 Command('arch.h', 'arch/%s/arch.h' % (config['ARCH']), Action('cp $SOURCE $TARGET', None))

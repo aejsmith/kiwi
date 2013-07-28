@@ -22,6 +22,8 @@
 #ifndef __UNISTD_H
 #define __UNISTD_H
 
+#include <arch/unistd.h>
+
 #include <stdio.h>
 
 #ifdef __cplusplus
@@ -30,33 +32,21 @@ extern "C" {
 
 /** POSIX version/feature definitions.
  * @note		Not actually compliant to these versions yet. :P */
-#define _POSIX_VERSION			200809L
-#define _POSIX2_VERSION			200809L
-#define _XOPEN_VERSION			700
-#define _XOPEN_UNIX			1
-// FIXME: Wordsize header.
-#ifdef __x86_64__
-# define _POSIX_V7_LP64_OFF64		1
-# define _POSIX_V6_LP64_OFF64		1
-# define _XBS5_LP64_OFF64		1
-#elif defined(__i386__)
-# define _POSIX_V6_ILP32_OFFBIG		1
-# define _POSIX_V7_ILP32_OFFBIG		1
-# define _XBS5_ILP32_OFFBIG		1
-#else
-# error "Please define these."
-#endif
+#define _POSIX_VERSION		200809L
+#define _POSIX2_VERSION		200809L
+#define _XOPEN_VERSION		700
+#define _XOPEN_UNIX		1
 
 /** Standard stream file descriptor numbers. */
-#define STDIN_FILENO			0
-#define STDOUT_FILENO			1
-#define STDERR_FILENO			2
+#define STDIN_FILENO		0
+#define STDOUT_FILENO		1
+#define STDERR_FILENO		2
 
 /** Mode flags for access(). */
-#define F_OK				0	/**< Check for file existance. */
-#define R_OK				0x0001	/**< Check for read permission. */
-#define W_OK				0x0002	/**< Check for write permission. */
-#define X_OK				0x0004	/**< Check for execute permission. */
+#define F_OK			0	/**< Check for file existance. */
+#define R_OK			0x0001	/**< Check for read permission. */
+#define W_OK			0x0002	/**< Check for write permission. */
+#define X_OK			0x0004	/**< Check for execute permission. */
 
 extern char *optarg;
 extern int optind, opterr, optopt;

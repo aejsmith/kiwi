@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Check whether access to a file is allowed.
  * @param path		Path to file to check.
@@ -41,37 +41,25 @@ int access(const char *path, int mode) {
 
 	ret = kern_fs_info(path, true, &info);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
 	if(mode != F_OK) {
-		if(mode & R_OK) {
+		if(mode & R_OK)
 			rights |= FILE_RIGHT_READ;
-		}
-		if(mode & W_OK) {
+		if(mode & W_OK)
 			rights |= FILE_RIGHT_WRITE;
-		}
-		if(mode & X_OK) {
+		if(mode & X_OK)
 			rights |= FILE_RIGHT_EXECUTE;
-		}
 	}
 
-	switch(info.type) {
-	case FILE_TYPE_REGULAR:
-	case FILE_TYPE_DIR:
-		ret = kern_file_open(path, rights, 0, 0, NULL, &handle);
-		if(ret != STATUS_SUCCESS) {
-			libc_status_to_errno(ret);
-			return -1;
-		}
-
-		kern_handle_close(handle);
-		break;
-	default:
-		/* Presume it's OK. */
-		break;
+	ret = kern_fs_open(path, rights, 0, 0, &handle);
+	if(ret != STATUS_SUCCESS) {
+		libsystem_status_to_errno(ret);
+		return -1;
 	}
 
+	kern_handle_close(handle);
 	return 0;
 }

@@ -16,10 +16,4 @@
 
 Import('env')
 
-env.KiwiApplication('test',
-    sources = ['main.c'],
-    libraries = ['kernel'],
-    flags = {
-        'LINKFLAGS': ['-nostdlib'],
-    }
-)
+env.KiwiApplication('test', ['main.c'])

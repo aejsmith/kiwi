@@ -27,7 +27,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Perform the F_GETFD command.
  * @param fd		File descriptor.
@@ -38,7 +38,7 @@ static int fcntl_getfd(int fd) {
 
 	ret = kern_handle_control(fd, HANDLE_GET_LFLAGS, 0, &kflags);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
@@ -58,7 +58,7 @@ static int fcntl_setfd(int fd, int flags) {
 
 	ret = kern_handle_control(fd, HANDLE_SET_LFLAGS, kflags, NULL);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
@@ -75,7 +75,7 @@ static int fcntl_dupfd(int fd, int dest) {
 
 	ret = kern_handle_duplicate(fd, dest, false, &new);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
@@ -91,7 +91,7 @@ static int fcntl_getfl(int fd) {
 
 	ret = kern_handle_control(fd, HANDLE_GET_FLAGS, 0, &kflags);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
@@ -113,7 +113,7 @@ static int fcntl_setfl(int fd, int flags) {
 
 	ret = kern_handle_control(fd, HANDLE_SET_FLAGS, kflags, NULL);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

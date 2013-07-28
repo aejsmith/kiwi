@@ -34,27 +34,34 @@
  * @param krightsp	Where to store kernel rights.
  * @param kflagsp	Where to store kernel flags.
  * @param kcreatep	Where to store kernel creation flags. */
-static inline void convert_open_flags(int oflag, object_rights_t *krightsp, int *kflagsp, int *kcreatep) {
+static inline void convert_open_flags(int oflag, object_rights_t *krightsp,
+	uint32_t *kflagsp, unsigned *kcreatep)
+{
 	object_rights_t krights = 0;
-	int kflags = 0;
+	uint32_t kflags = 0;
 
-	krights |= ((oflag & O_RDONLY) ? FILE_RIGHT_READ : 0);
-	krights |= ((oflag & O_WRONLY) ? FILE_RIGHT_WRITE : 0);
-
-	kflags |= ((oflag & O_NONBLOCK) ? FILE_NONBLOCK : 0);
-	kflags |= ((oflag & O_APPEND) ? FILE_APPEND : 0);
+	if(oflag & O_RDONLY)
+		krights |= FILE_RIGHT_READ;
+	if(oflag & O_WRONLY)
+		krights |= FILE_RIGHT_WRITE;
 
 	*krightsp = krights;
+
+	if(oflag & O_NONBLOCK)
+		kflags |= FILE_NONBLOCK;
+	if(oflag & O_APPEND)
+		kflags |= FILE_APPEND;
+
 	*kflagsp = kflags;
+
 	if(oflag & O_CREAT) {
-		*kcreatep = (oflag & O_EXCL) ? FILE_CREATE_ALWAYS : FILE_CREATE;
+		*kcreatep = (oflag & O_EXCL) ? FS_MUST_CREATE : FS_CREATE;
 	} else {
 		*kcreatep = 0;
 	}
 }
 
 /** Open a file or directory.
- * @todo		Convert mode to kernel ACL.
  * @param path		Path to file to open.
  * @param oflag		Flags controlling how to open the file.
  * @param ...		Mode to create the file with if O_CREAT is specified.
@@ -62,15 +69,13 @@ static inline void convert_open_flags(int oflag, object_rights_t *krightsp, int 
  *			success, -1 on failure (errno will be set to the error
  *			reason). */
 int open(const char *path, int oflag, ...) {
-	object_security_t security = { -1, -1, NULL };
-	object_rights_t rights;
-	int kflags, kcreate;
 	file_type_t type;
 	file_info_t info;
+	object_rights_t rights;
+	uint32_t kflags;
+	unsigned kcreate;
 	handle_t handle;
-	uint16_t mode;
 	status_t ret;
-	va_list args;
 
 	/* Check whether the arguments are valid. I'm not sure if the second
 	 * check is correct, POSIX doesn't say anything about O_CREAT with
@@ -93,16 +98,14 @@ int open(const char *path, int oflag, ...) {
 	if(oflag & O_CREAT) {
 		type = FILE_TYPE_REGULAR;
 	} else {
-		/* Determine the filesystem entry type. */
 		ret = kern_fs_info(path, true, &info);
 		if(ret != STATUS_SUCCESS) {
-			libc_status_to_errno(ret);
+			libsystem_status_to_errno(ret);
 			return -1;
 		}
 
 		type = info.type;
 
-		/* Handle the O_DIRECTORY flag. */
 		if(oflag & O_DIRECTORY && type != FILE_TYPE_DIR) {
 			errno = ENOTDIR;
 			return -1;
@@ -120,26 +123,25 @@ int open(const char *path, int oflag, ...) {
 			return -1;
 		}
 	case FILE_TYPE_REGULAR:
-		if(oflag & O_CREAT) {
-			/* Obtain the creation mask. */
-			va_start(args, oflag);
-			mode = va_arg(args, mode_t);
-			va_end(args);
+		//if(oflag & O_CREAT) {
+			///* Obtain the creation mask. */
+			//va_start(args, oflag);
+			//mode = va_arg(args, mode_t);
+			//va_end(args);
 
 			/* Apply the creation mode mask. */
-			mode &= ~current_umask;
+			//mode &= ~current_umask;
 
 			/* Convert the mode to a kernel ACL. */
-			security.acl = posix_mode_to_acl(NULL, mode);
-			if(!security.acl) {
-				return -1;
-			}
-		}
+			//security.acl = posix_mode_to_acl(NULL, mode);
+			//if(!security.acl)
+			//	return -1;
+		//}
 
 		/* Open the file, creating it if necessary. */
-		ret = kern_file_open(path, rights, kflags, kcreate, &security, &handle);
+		ret = kern_fs_open(path, rights, kflags, kcreate, &handle);
 		if(ret != STATUS_SUCCESS) {
-			libc_status_to_errno(ret);
+			libsystem_status_to_errno(ret);
 			return -1;
 		}
 
@@ -148,7 +150,7 @@ int open(const char *path, int oflag, ...) {
 			ret = kern_file_resize(handle, 0);
 			if(ret != STATUS_SUCCESS) {
 				kern_handle_close(handle);
-				libc_status_to_errno(ret);
+				libsystem_status_to_errno(ret);
 				return -1;
 			}
 		}
@@ -159,9 +161,8 @@ int open(const char *path, int oflag, ...) {
 	}
 
 	/* Mark the handle as inheritable if not opening with O_CLOEXEC. */
-	if(!(oflag & O_CLOEXEC)) {
-		kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
-	}
+	if(!(oflag & O_CLOEXEC))
+		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
 
 	return (int)handle;
 }

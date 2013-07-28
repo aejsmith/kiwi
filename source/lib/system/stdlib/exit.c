@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,13 +22,12 @@
 #include <kernel/process.h>
 
 #include <util/list.h>
-#include <util/mutex.h>
 
 #include <stddef.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 extern void *__dso_handle __attribute__((__weak__));
 
@@ -57,7 +56,7 @@ static LIST_DECLARE(atexit_funcs);
 static size_t atexit_count = 0;
 
 /** Locking to protect at-exit lists. */
-static LIBC_MUTEX_DECLARE(atexit_lock);
+//static LIBC_MUTEX_DECLARE(atexit_lock);
 
 /** Allocate an at-exit function structure.
  * @return		Function structure pointer, or NULL if none free. */
@@ -76,9 +75,8 @@ static atexit_func_t *atexit_alloc(void) {
 	}
 
 	if(atexit_free_count) {
-		if(list_empty(&atexit_free_funcs)) {
-			libc_fatal("atexit data is corrupted");
-		}
+		if(list_empty(&atexit_free_funcs))
+			libsystem_fatal("atexit data is corrupted");
 
 		func = list_entry(atexit_free_funcs.next, atexit_func_t, header);
 		list_remove(&func->header);
@@ -102,10 +100,10 @@ static void atexit_free(atexit_func_t *func) {
 int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
 	atexit_func_t *func;
 
-	libc_mutex_lock(&atexit_lock, -1);
+	//libc_mutex_lock(&atexit_lock, -1);
 
 	if(!(func = atexit_alloc())) {
-		libc_mutex_unlock(&atexit_lock);
+		//libc_mutex_unlock(&atexit_lock);
 		return -1;
 	}
 
@@ -115,7 +113,7 @@ int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
 
 	list_prepend(&atexit_funcs, &func->header);
 	atexit_count++;
-	libc_mutex_unlock(&atexit_lock);
+	//libc_mutex_unlock(&atexit_lock);
 	return 0;
 }
 

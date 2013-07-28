@@ -24,7 +24,7 @@
 
 #include <stdio.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Rename a filesystem entry.
  * @param source	Path to rename.
@@ -35,7 +35,7 @@ int rename(const char *source, const char *dest) {
 
 	ret = kern_fs_rename(source, dest);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

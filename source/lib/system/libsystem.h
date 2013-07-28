@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,11 +16,11 @@
 
 /**
  * @file
- * @brief		Internal C library functions.
+ * @brief		Internal libsystem definitions.
  */
 
-#ifndef __LIBC_H
-#define __LIBC_H
+#ifndef __LIBSYSTEM_H
+#define __LIBSYSTEM_H
 
 #include <kernel/types.h>
 
@@ -36,15 +36,15 @@
 struct process_args;
 
 extern char **environ;
-extern const char *__libc_error_list[];
-extern size_t __libc_error_size;
+extern const char *__errno_list[];
+extern size_t __errno_count;
 
-extern void libc_init(struct process_args *args);
-extern void libc_fatal(const char *fmt, ...) __noreturn __hidden;
-extern void libc_stub(const char *name, bool fatal) __hidden;
+extern void libsystem_init(struct process_args *args);
+extern void libsystem_fatal(const char *fmt, ...) __noreturn __hidden;
+extern void libsystem_stub(const char *name, bool fatal) __hidden;
 
-extern void libc_status_to_errno(status_t status) __hidden;
+extern void libsystem_status_to_errno(status_t status) __hidden;
 
 extern int main(int argc, char **argv, char **envp);
 
-#endif /* __LIBC_H */
+#endif /* __LIBSYSTEM_H */

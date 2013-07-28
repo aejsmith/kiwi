@@ -22,10 +22,11 @@
 #include <kernel/object.h>
 #include <kernel/status.h>
 
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Duplicate a file descriptor.
  * @param fd		File descriptor to duplicate.
@@ -43,9 +44,14 @@ int dup2(int fd, int newfd) {
 	status_t ret;
 	handle_t new;
 
-	ret = kern_handle_duplicate(fd, newfd, true, &new);
+	if(newfd < 0) {
+		errno = EBADF;
+		return -1;
+	}
+
+	ret = kern_handle_duplicate(fd, newfd, &new);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

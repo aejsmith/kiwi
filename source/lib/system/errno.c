@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,12 +20,14 @@
  */
 
 #include <kernel/status.h>
+
 #include <errno.h>
-#include "libc.h"
+
+#include "libsystem.h"
 
 /** Mappings of kernel status codes to POSIX error numbers.
  * @note		If a value maps to -1, a fatal error will be raised if
- *			libc_status_to_errno() is called with that status, as
+ *			libsystem_status_to_errno() is called with that status, as
  *			that status is either caused by an internal library
  *			error or should be handled by the caller. */
 static int status_to_errno_table[] = {
@@ -82,7 +84,7 @@ static __thread int __errno = 0;
 
 /** Get the location of errno.
  * @return		Pointer to errno. */
-int *__libc_errno_location(void) {
+int *__errno_location(void) {
 	return &__errno;
 }
 
@@ -91,12 +93,11 @@ int *__libc_errno_location(void) {
  *			annoyingly inconsistent about error codes. Callers
  *			should be careful.
  * @param status	Status to set. */
-void libc_status_to_errno(status_t status) {
-	if(status < 0 || (size_t)status >= ARRAY_SIZE(status_to_errno_table)) {
-		libc_fatal("unknown status code passed to status_to_errno()");
-	}
+void libsystem_status_to_errno(status_t status) {
+	if(status < 0 || (size_t)status >= ARRAY_SIZE(status_to_errno_table))
+		libsystem_fatal("unknown status code passed to status_to_errno()");
+
 	__errno = status_to_errno_table[status];
-	if(__errno == -1) {
-		libc_fatal("trying to map disallowed status to errno");
-	}
+	if(__errno == -1)
+		libsystem_fatal("trying to map disallowed status to errno");
 }

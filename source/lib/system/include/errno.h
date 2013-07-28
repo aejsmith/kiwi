@@ -113,8 +113,8 @@ extern "C" {
 #define EXDEV			80	/**< Cross-device link. */
 #define EWOULDBLOCK		EAGAIN	/**< Operation would block. */
 
-extern int *__libc_errno_location(void);
-#define errno (*__libc_errno_location())
+extern int *__errno_location(void);
+#define errno (*__errno_location())
 
 #ifdef __cplusplus
 }

@@ -34,7 +34,7 @@
 
 /** List of child processes created via fork(). */
 LIST_DECLARE(child_processes);
-LIBC_MUTEX_DECLARE(child_processes_lock);
+//LIBC_MUTEX_DECLARE(child_processes_lock);
 
 /** Fork entry point.
  * @param arg		Pointer to jump buffer. */
@@ -57,7 +57,7 @@ static pid_t fork_parent(posix_process_t *proc, jmp_buf state, char *stack) {
 	                         PROCESS_RIGHT_QUERY, &handle);
 	kern_vm_unmap(stack, 0x1000);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		free(proc);
 		return ret;
 	}
@@ -66,13 +66,13 @@ static pid_t fork_parent(posix_process_t *proc, jmp_buf state, char *stack) {
 	proc->handle = handle;
 	proc->pid = kern_process_id(proc->handle);
 	if(proc->pid < 1) {
-		libc_fatal("could not get ID of child");
+		libsystem_fatal("could not get ID of child");
 	}
 
 	/* Add it to the child list so that wait*() knows about it. */
-	libc_mutex_lock(&child_processes_lock, -1);
+	//libc_mutex_lock(&child_processes_lock, -1);
 	list_append(&child_processes, &proc->header);
-	libc_mutex_unlock(&child_processes_lock);
+	//libc_mutex_unlock(&child_processes_lock);
 
 	/* Parent returns PID of new process. */
 	return proc->pid;
@@ -92,14 +92,14 @@ static pid_t fork_child(posix_process_t *proc, char *stack) {
 
 	/* Empty the child processes list: anything in there is not our child,
 	 * but a child of our parent. */
-	libc_mutex_lock(&child_processes_lock, -1);
+	//libc_mutex_lock(&child_processes_lock, -1);
 	LIST_FOREACH_SAFE(&child_processes, iter) {
 		proc = list_entry(iter, posix_process_t, header);
 		kern_handle_close(proc->handle);
 		list_remove(&proc->header);
 		free(proc);
 	}
-	libc_mutex_unlock(&child_processes_lock);
+	//libc_mutex_unlock(&child_processes_lock);
 
 	/* Child returns 0. */
 	return 0;
@@ -136,7 +136,7 @@ pid_t fork(void) {
 	/* Create a temporary stack. FIXME: Page size is arch-dependent. */
 	ret = kern_vm_map(NULL, 0x1000, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &stack);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

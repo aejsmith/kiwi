@@ -25,11 +25,11 @@
 #include <kernel/object.h>
 
 #include <util/list.h>
-#include <util/mutex.h>
+//#include <util/mutex.h>
 
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Structure containing details of a POSIX process. */
 typedef struct posix_process {
@@ -39,10 +39,10 @@ typedef struct posix_process {
 } posix_process_t;
 
 extern list_t __hidden child_processes;
-extern libc_mutex_t __hidden child_processes_lock;
+//extern libc_mutex_t __hidden child_processes_lock;
 
 extern mode_t __hidden current_umask;
 
-extern object_acl_t *posix_mode_to_acl(object_acl_t *current, mode_t mode) __hidden;
+//extern object_acl_t *posix_mode_to_acl(object_acl_t *current, mode_t mode) __hidden;
 
 #endif /* __POSIX_PRIV_H */

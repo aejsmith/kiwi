@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,23 +33,22 @@ DIR *opendir(const char *path) {
 	DIR *dir;
 
 	dir = malloc(sizeof(*dir));
-	if(!dir) {
+	if(!dir)
 		return NULL;
-	}
 
-	ret = kern_file_open(path, FILE_RIGHT_READ, 0, 0, NULL, &dir->handle);
+	ret = kern_fs_open(path, FILE_RIGHT_READ, 0, 0, &dir->handle);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		free(dir);
 		return NULL;
 	}
 
 	ret = kern_file_info(dir->handle, &info);
-	if(ret == STATUS_SUCCESS && info.type != FILE_TYPE_DIR) {
+	if(ret == STATUS_SUCCESS && info.type != FILE_TYPE_DIR)
 		ret = STATUS_NOT_DIR;
-	}
+
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		kern_handle_close(dir->handle);
 		free(dir);
 		return NULL;

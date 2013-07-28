@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,9 +32,10 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
-/** Read from a particular position in a file.
+/**
+ * Read from a particular position in a file.
  *
  * Reads from the specified position in a file. The file descriptor's current
  * offset will be ignored, and will not be updated after the read.
@@ -48,43 +49,30 @@
  *			will be set appropriately).
  */
 ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
-	status_t ret;
 	size_t bytes;
+	status_t ret;
 
 	if(offset < 0) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	switch(kern_object_type(fd)) {
-	case OBJECT_TYPE_FILE:
-		ret = kern_file_pread(fd, buf, count, offset, &bytes);
-		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
-			if(ret == STATUS_ACCESS_DENIED) {
-				errno = EBADF;
-			} else {
-				libc_status_to_errno(ret);
-			}
-			return -1;
+	ret = kern_file_read(fd, buf, count, offset, &bytes);
+	if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
+		if(ret == STATUS_ACCESS_DENIED) {
+			errno = EBADF;
+		} else {
+			libsystem_status_to_errno(ret);
 		}
-		return (ssize_t)bytes;
-	case OBJECT_TYPE_DEVICE:
-		ret = kern_device_read(fd, buf, count, offset, &bytes);
-		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
-			libc_status_to_errno(ret);
-			return -1;
-		}
-		return (ssize_t)bytes;
-	case -1:
-		errno = EBADF;
-		return -1;
-	default:
-		errno = ENOTSUP;
+
 		return -1;
 	}
+
+	return (ssize_t)bytes;
 }
 
-/** Read from a file.
+/**
+ * Read from a file.
  *
  * Reads from a file. After the read, the file descriptor's offset will be
  * updated by the number of bytes written.
@@ -97,33 +85,19 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
  *			will be set appropriately).
  */
 ssize_t read(int fd, void *buf, size_t count) {
-	status_t ret;
 	size_t bytes;
+	status_t ret;
 
-	switch(kern_object_type(fd)) {
-	case OBJECT_TYPE_FILE:
-		ret = kern_file_read(fd, buf, count, &bytes);
-		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
-			if(ret == STATUS_ACCESS_DENIED) {
-				errno = EBADF;
-			} else {
-				libc_status_to_errno(ret);
-			}
-			return -1;
+	ret = kern_file_read(fd, buf, count, -1, &bytes);
+	if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
+		if(ret == STATUS_ACCESS_DENIED) {
+			errno = EBADF;
+		} else {
+			libsystem_status_to_errno(ret);
 		}
-		return (ssize_t)bytes;
-	case OBJECT_TYPE_DEVICE:
-		ret = kern_device_read(fd, buf, count, 0, &bytes);
-		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
-			libc_status_to_errno(ret);
-			return -1;
-		}
-		return (ssize_t)bytes;
-	case -1:
-		errno = EBADF;
-		return -1;
-	default:
-		errno = ENOTSUP;
+
 		return -1;
 	}
+
+	return (ssize_t)bytes;
 }

@@ -52,7 +52,7 @@ static inline int convert_exit_status(int status, int reason) {
 	case EXIT_REASON_SIGNAL:
 		return (status << 8) | __WSIGNALED;
 	default:
-		libc_fatal("unhandled exit reason %s", reason);
+		libsystem_fatal("unhandled exit reason %s", reason);
 	}
 }
 
@@ -76,7 +76,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		return -1;
 	}
 
-	libc_mutex_lock(&child_processes_lock, -1);
+	//libc_mutex_lock(&child_processes_lock, -1);
 
 	/* Build an array of handles to wait for. */
 	LIST_FOREACH(&child_processes, iter) {
@@ -99,7 +99,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		goto fail;
 	}
 
-	libc_mutex_unlock(&child_processes_lock);
+	//libc_mutex_unlock(&child_processes_lock);
 
 	/* Wait for any of them to exit. */
 	ret = kern_object_wait(events, count, (flags & WNOHANG) ? 0 : -1);
@@ -108,11 +108,11 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		if(ret == STATUS_WOULD_BLOCK) {
 			return 0;
 		}
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
-	libc_mutex_lock(&child_processes_lock, -1);
+	//libc_mutex_lock(&child_processes_lock, -1);
 
 	/* Only take the first exited process. */
 	for(i = 0; i < count; i++) {
@@ -142,6 +142,6 @@ fail:
 	ret = -1;
 out:
 	if(events) { free(events); }
-	libc_mutex_unlock(&child_processes_lock);
+	//libc_mutex_unlock(&child_processes_lock);
 	return ret;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,6 @@
 /**
  * @file
  * @brief		POSIX nanosecond sleep function.
- *
- * @todo		This is currently only microsecond resolution.
  */
 
 #include <kernel/status.h>
@@ -32,23 +30,23 @@
  * @param rmtp		Where to store remaining time if interrupted.
  * @return		0 on success, -1 on failure. */
 int nanosleep(const struct timespec *rqtp, struct timespec *rmtp) {
-	useconds_t rem;
+	nstime_t ns, rem;
 	status_t ret;
-	uint64_t ns;
 
 	if(rqtp->tv_sec < 0 || rqtp->tv_nsec < 0 || rqtp->tv_nsec >= 1000000000) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	ns = ((uint64_t)rqtp->tv_sec * 1000000000) + rqtp->tv_nsec;
-	ret = kern_thread_usleep(ns / 1000, &rem);
+	ns = ((nstime_t)rqtp->tv_sec * 1000000000) + rqtp->tv_nsec;
+
+	ret = kern_thread_sleep(ns, &rem);
 	if(ret == STATUS_INTERRUPTED) {
 		if(rmtp) {
-			ns = rem * 1000;
-			rmtp->tv_nsec = ns % 1000000000;
-			rmtp->tv_sec = ns / 1000000000;
+			rmtp->tv_nsec = rem % 1000000000;
+			rmtp->tv_sec = rem / 1000000000;
 		}
+
 		errno = EINTR;
 		return -1;
 	}

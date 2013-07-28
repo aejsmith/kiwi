@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,47 +29,41 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
+#if 0
 /** Convert a set of rights to a mode.
  * @param rights	Rights to convert.
  * @return		Converted mode (only lowest 3 bits). */
 static inline uint16_t rights_to_mode(object_rights_t rights) {
 	uint16_t mode = 0;
 
-	if(rights & FILE_RIGHT_READ) {
+	if(rights & FILE_RIGHT_READ)
 		mode |= S_IROTH;
-	}
-	if(rights & FILE_RIGHT_WRITE) {
+	if(rights & FILE_RIGHT_WRITE)
 		mode |= S_IWOTH;
-	}
-	if(rights & FILE_RIGHT_EXECUTE) {
+	if(rights & FILE_RIGHT_EXECUTE)
 		mode |= S_IXOTH;
-	}
+
 	return mode;
 }
+#endif
 
 /** Convert a kernel information structure to a stat structure.
  * @param info		Kernel information structure.
- * @param security	Security attributes for the entry.
  * @param statp		Stat structure. */
-static void file_info_to_stat(file_info_t *info, object_security_t *security, struct stat *restrict statp) {
-	uint16_t umode = 0, gmode = 0, omode = 0;
-	bool user = false, group = false;
-	object_acl_t *acl;
-	size_t i;
-
+static void file_info_to_stat(file_info_t *info, struct stat *restrict statp) {
 	memset(statp, 0, sizeof(*statp));
 	statp->st_dev = info->mount;
 	statp->st_ino = info->id;
 	statp->st_nlink = info->links;
 	statp->st_size = info->size;
 	statp->st_blksize = info->block_size;
-	statp->st_atime = (info->accessed / 1000000);
-	statp->st_mtime = (info->modified / 1000000);
-	statp->st_ctime = (info->created / 1000000);
-	statp->st_uid = security->uid;
-	statp->st_gid = security->gid;
+	statp->st_atime = (info->accessed / 1000000000);
+	statp->st_mtime = (info->modified / 1000000000);
+	statp->st_ctime = (info->created / 1000000000);
+	statp->st_uid = 0;//security->uid;
+	statp->st_gid = 0;//security->gid;
 
 	/* TODO. */
 	statp->st_blocks = 0;
@@ -85,20 +79,21 @@ static void file_info_to_stat(file_info_t *info, object_security_t *security, st
 	case FILE_TYPE_SYMLINK:
 		statp->st_mode = S_IFLNK;
 		break;
-	case FILE_TYPE_BLKDEV:
+	case FILE_TYPE_BLOCK:
 		statp->st_mode = S_IFBLK;
 		break;
-	case FILE_TYPE_CHRDEV:
+	case FILE_TYPE_CHAR:
 		statp->st_mode = S_IFCHR;
 		break;
 	case FILE_TYPE_FIFO:
 		statp->st_mode = S_IFIFO;
 		break;
-	case FILE_TYPE_SOCK:
+	case FILE_TYPE_SOCKET:
 		statp->st_mode = S_IFSOCK;
 		break;
 	}
 
+#if 0
 	/* Convert the ACL to a set of file permission bits. */
 	acl = object_security_acl(security);
 	for(i = 0; i < acl->count; i++) {
@@ -126,6 +121,8 @@ static void file_info_to_stat(file_info_t *info, object_security_t *security, st
 	statp->st_mode |= (((user) ? umode : omode) << 6);
 	statp->st_mode |= (((group) ? gmode : omode) << 3);
 	statp->st_mode |= omode;
+#endif
+	statp->st_mode |= 0755;
 }
 
 /** Get information about a filesystem entry.
@@ -133,42 +130,16 @@ static void file_info_to_stat(file_info_t *info, object_security_t *security, st
  * @param statp		Structure to fill in.
  * @return		0 on success, -1 on failure. */
 int fstat(int fd, struct stat *statp) {
-	object_security_t security;
 	file_info_t info;
 	status_t ret;
 
-	switch(kern_object_type(fd)) {
-	case OBJECT_TYPE_FILE:
-		ret = kern_file_info(fd, &info);
-		if(ret != STATUS_SUCCESS) {
-			libc_status_to_errno(ret);
-			return -1;
-		}
-		break;
-	case OBJECT_TYPE_DEVICE:
-		memset(&info, 0, sizeof(info));
-		info.type = (isatty(fd)) ? FILE_TYPE_CHRDEV : FILE_TYPE_BLKDEV;
-		/* FIXME: Get correct values for block devices here. */
-		info.block_size = 1;
-		info.size = 1;
-		info.links = 1;
-		break;
-	case -1:
-		errno = EBADF;
-		return -1;
-	default:
-		errno = ENOTSUP;
-		return -1;
-	}
-
-	ret = kern_object_security(fd, &security);
+	ret = kern_file_info(fd, &info);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
-	file_info_to_stat(&info, &security, statp);
-	object_security_destroy(&security);
+	file_info_to_stat(&info, statp);
 	return 0;
 }
 
@@ -178,24 +149,16 @@ int fstat(int fd, struct stat *statp) {
  * @param statp		Structure to fill in.
  * @param		0 on success, -1 on failure. */
 int lstat(const char *restrict path, struct stat *restrict statp) {
-	object_security_t security;
 	file_info_t info;
 	status_t ret;
 
 	ret = kern_fs_info(path, false, &info);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
-	ret = kern_fs_security(path, false, &security);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
-		return -1;
-	}
-
-	file_info_to_stat(&info, &security, statp);
-	object_security_destroy(&security);
+	file_info_to_stat(&info, statp);
 	return 0;
 }
 
@@ -205,23 +168,15 @@ int lstat(const char *restrict path, struct stat *restrict statp) {
  * @param statp		Structure to fill in.
  * @param		0 on success, -1 on failure. */
 int stat(const char *restrict path, struct stat *restrict statp) {
-	object_security_t security;
 	file_info_t info;
 	status_t ret;
 
 	ret = kern_fs_info(path, true, &info);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
-	ret = kern_fs_security(path, true, &security);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
-		return -1;
-	}
-
-	file_info_to_stat(&info, &security, statp);
-	object_security_destroy(&security);
+	file_info_to_stat(&info, statp);
 	return 0;
 }

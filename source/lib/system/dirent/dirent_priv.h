@@ -28,7 +28,7 @@
 
 #include <dirent.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Size of the internal directory entry buffer. */
 #define DIRSTREAM_BUF_SIZE	0x1000

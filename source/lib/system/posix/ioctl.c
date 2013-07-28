@@ -29,7 +29,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Control a device.
  * @note		The Kiwi implementation of this function only works for
@@ -102,7 +102,7 @@ int ioctl(int fd, int request, ...) {
 		if(ret == STATUS_INVALID_REQUEST) {
 			errno = ENOTTY;
 		} else {
-			libc_status_to_errno(ret);
+			libsystem_status_to_errno(ret);
 		}
 		return -1;
 	}

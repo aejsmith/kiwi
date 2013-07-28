@@ -26,7 +26,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Get the process' effective group ID.
  * @return		Effective group ID of the process. */
@@ -36,7 +36,7 @@ gid_t getegid(void) {
 
 	ret = kern_process_control(-1, PROCESS_GET_SECTX, NULL, &context);
 	if(ret != STATUS_SUCCESS) {
-		libc_fatal("failed to obtain security context: %d", ret);
+		libsystem_fatal("failed to obtain security context: %d", ret);
 	}
 
 	return context.groups[0];
@@ -50,7 +50,7 @@ uid_t geteuid(void) {
 
 	ret = kern_process_control(-1, PROCESS_GET_SECTX, NULL, &context);
 	if(ret != STATUS_SUCCESS) {
-		libc_fatal("failed to obtain security context: %d", ret);
+		libsystem_fatal("failed to obtain security context: %d", ret);
 	}
 
 	return context.uid;
@@ -72,7 +72,7 @@ uid_t getuid(void) {
  * @param gid		Group ID to set.
  * @return		0 on success, -1 on failure. */
 int setgid(gid_t gid) {
-	libc_stub("setgid", false);
+	libsystem_stub("setgid", false);
 	return -1;
 }
 
@@ -80,6 +80,6 @@ int setgid(gid_t gid) {
  * @param uid		User ID to set.
  * @return		0 on success, -1 on failure. */
 int setuid(uid_t uid) {
-	libc_stub("setuid", false);
+	libsystem_stub("setuid", false);
 	return -1;
 }

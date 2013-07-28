@@ -24,7 +24,7 @@
 #include <pwd.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 static struct passwd stub_pwd = {
         .pw_name = (char *)"admin",

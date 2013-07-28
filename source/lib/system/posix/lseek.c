@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Change a file descriptor's offset.
  *
@@ -57,7 +57,7 @@ off_t lseek(int fd, off_t off, int act) {
 
 	ret = kern_file_seek(fd, kact, off, &new);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

@@ -27,5 +27,5 @@
 /** Reset directory stream position to beginning of directory.
  * @param dir		Directory stream to rewind. */
 void rewinddir(DIR *dir) {
-	kern_file_seek(dir->handle, FILE_SEEK_SET, 0, NULL);
+	kern_file_rewind_dir(dir->handle);
 }

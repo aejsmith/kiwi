@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Set the current working directory.
  * @param path		Path to change to.
@@ -38,9 +38,9 @@ int chdir(const char *path) {
 		return -1;
 	}
 
-	ret = kern_fs_setcwd(path);
+	ret = kern_fs_set_curr_dir(path);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

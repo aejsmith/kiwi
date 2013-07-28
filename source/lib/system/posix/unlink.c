@@ -24,7 +24,7 @@
 
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Remove a directory entry.
  *
@@ -40,7 +40,7 @@ int unlink(const char *path) {
 
 	ret = kern_fs_unlink(path);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

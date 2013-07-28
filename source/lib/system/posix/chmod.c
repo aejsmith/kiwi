@@ -126,7 +126,7 @@ int chmod(const char *path, mode_t mode) {
 	 * ACL entries. */
 	ret = kern_fs_security(path, true, &security);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
@@ -143,7 +143,7 @@ int chmod(const char *path, mode_t mode) {
 	ret = kern_fs_set_security(path, true, &security);
 	object_security_destroy(&security);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
@@ -162,7 +162,7 @@ int fchmod(int fd, mode_t mode) {
 	 * ACL entries. */
 	ret = kern_object_security(fd, &security);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
@@ -179,7 +179,7 @@ int fchmod(int fd, mode_t mode) {
 	ret = kern_object_set_security(fd, &security);
 	object_security_destroy(&security);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

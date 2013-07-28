@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,20 +25,20 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "libc.h"
+#include "libsystem.h"
 #include "../kernel/libkernel.h"
 
 /** Heap operations for libkernel. */
-static libkernel_heap_ops_t libc_heap_ops = {
+static libkernel_heap_ops_t libsystem_heap_ops = {
 	.alloc = malloc,
 	.realloc = realloc,
 	.free = free,
 };
 
-/** Early C library initialisation. */
-static void __attribute__((constructor)) libc_early_init(void) {
+/** Early system library initialisation. */
+static void __attribute__((constructor)) libsystem_early_init(void) {
 	/* Tell libkernel to use our allocation functions. */
-	libkernel_heap_configure(&libc_heap_ops);
+	libkernel_heap_configure(&libsystem_heap_ops);
 
 	/* Attempt to open standard I/O streams from existing handles. */
 	stdin = fdopen(STDIN_FILENO, "r");
@@ -46,18 +46,18 @@ static void __attribute__((constructor)) libc_early_init(void) {
 	stderr = fdopen(STDERR_FILENO, "a");
 }
 
-/** C library initialisation function.
+/** System library initialisation function.
  * @param args		Process arguments structure. */
-void libc_init(process_args_t *args) {
+void libsystem_init(process_args_t *args) {
 	/* Save the environment pointer. */
 	environ = args->env;
 
 	/* If we're process 1, set default environment variables. */
 	if(kern_process_id(-1) == 1) {
-		setenv("PATH", "/system/binaries", 1);
+		setenv("PATH", "/system/bin", 1);
 		setenv("HOME", "/users/admin", 1);
 	}
 
 	/* Call the main function. */
-	exit(main(args->args_count, args->args, args->env));
+	exit(main(args->arg_count, args->args, args->env));
 }

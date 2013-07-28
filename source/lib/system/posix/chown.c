@@ -24,7 +24,7 @@
 
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Change the owner of a filesystem entry.
  * @param path		Path to entry.
@@ -41,7 +41,7 @@ int chown(const char *path, uid_t uid, gid_t gid) {
 
 	ret = kern_fs_set_security(path, true, &security);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
@@ -64,7 +64,7 @@ int lchown(const char *path, uid_t uid, gid_t gid) {
 
 	ret = kern_fs_set_security(path, false, &security);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
@@ -86,7 +86,7 @@ int fchown(int fd, uid_t uid, gid_t gid) {
 
 	ret = kern_object_set_security(fd, &security);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

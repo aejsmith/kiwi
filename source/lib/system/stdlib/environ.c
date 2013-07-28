@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,7 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Pointer to the environment variable array. */
 char **environ;
@@ -48,9 +48,8 @@ static bool ensure_environ_alloced(void) {
 		for(count = 0; environ[count] != NULL; count++);
 
 		new = malloc((count + 1) * sizeof(char *));
-		if(new == NULL) {
+		if(new == NULL)
 			return false;
-		}
 
 		memcpy(new, environ, (count + 1) * sizeof(char *));
 		environ = new;
@@ -60,7 +59,8 @@ static bool ensure_environ_alloced(void) {
 	return true;
 }
 
-/** Get the value of an environment variable.
+/**
+ * Get the value of an environment variable.
  *
  * Gets the value of an environment variable stored in the environ array.
  * The string returned should not be modified.
@@ -73,30 +73,28 @@ char *getenv(const char *name) {
 	char *key, *val;
 	size_t i, len;
 
-	if(name == NULL) {
+	if(!name)
 		return NULL;
-	}
 
 	for(i = 0; environ[i] != NULL; i++) {
 		key = environ[i];
 		val = strchr(key, '=');
 
-		if(val == NULL) {
-			libc_fatal("value '%s' found in environment without an =", key);
-		}
+		if(val == NULL)
+			libsystem_fatal("value '%s' found in environment without an =", key);
 
 		len = strlen(name);
 		if(strncmp(key, name, len) == 0) {
-			if(environ[i][len] == '=') {
+			if(environ[i][len] == '=')
 				return val + 1;
-			}
 		}
 	}
 
 	return NULL;
 }
 
-/** Set or change an environment variable.
+/**
+ * Set or change an environment variable.
  *
  * Sets or changes an environment variable. The variable will be set to the
  * given string, so changing it will change the environment. The string
@@ -110,7 +108,7 @@ int putenv(char *str) {
 	size_t count, len, tmp, i;
 	char **new;
 
-	if(!str || strchr(str, '=') == NULL) {
+	if(!str || !strchr(str, '=')) {
 		errno = EINVAL;
 		return -1;
 	} else if((len = strchr(str, '=') - str) == 0) {
@@ -119,12 +117,11 @@ int putenv(char *str) {
 	}
 
 	/* Ensure the environment array can be modified. */
-	if(!ensure_environ_alloced()) {
+	if(!ensure_environ_alloced())
 		return -1;
-	}
 
 	/* Check for an existing entry with the same name. */
-	for(i = 0; environ[i] != NULL; i++) {
+	for(i = 0; environ[i]; i++) {
 		tmp = strchr(environ[i], '=') - environ[i];
 
 		if(len != tmp) {
@@ -136,11 +133,11 @@ int putenv(char *str) {
 	}
 
 	/* Doesn't exist at all. Reallocate environment to fit. */
-	for(count = 0; environ[count] != NULL; count++);
+	for(count = 0; environ[count]; count++);
 	new = realloc(environ, (count + 2) * sizeof(char *));
-	if(new == NULL) {
+	if(!new)
 		return -1;
-	}
+
 	environ = new;
 
 	/* Set new entry. */
@@ -149,7 +146,8 @@ int putenv(char *str) {
 	return 0;
 }
 
-/** Set an environment variable.
+/**
+ * Set an environment variable.
  *
  * Sets an environment variable to the given value. The strings given will
  * be duplicated.
@@ -164,15 +162,14 @@ int setenv(const char *name, const char *value, int overwrite) {
 	char **new, *exist, *val;
 	size_t count, len;
 
-	if(!name || name[0] == 0 || strchr(name, '=') != NULL) {
+	if(!name || name[0] == 0 || strchr(name, '=')) {
 		errno = EINVAL;
 		return -1;
 	}
 
 	/* Ensure the environment array can be modified. */
-	if(!ensure_environ_alloced()) {
+	if(!ensure_environ_alloced())
 		return -1;
-	}
 
 	/* Work out total length. */
 	len = strlen(name) + strlen(value) + 2;
@@ -180,9 +177,8 @@ int setenv(const char *name, const char *value, int overwrite) {
 	/* If it exists already, and the current value is big enough, just
 	 * overwrite it. */
 	if((exist = getenv(name))) {
-		if(!overwrite) {
+		if(!overwrite)
 			return 0;
-		}
 
 		if(strlen(exist) >= strlen(value)) {
 			strcpy(exist, value);
@@ -191,35 +187,33 @@ int setenv(const char *name, const char *value, int overwrite) {
 
 		/* Find the entry in the environment array and reallocate
 		 * it. */
-		for(count = 0; environ[count] != NULL; count++) {
-			if(strncmp(environ[count], name, strlen(name)) != 0) {
+		for(count = 0; environ[count]; count++) {
+			if(strncmp(environ[count], name, strlen(name)) != 0)
 				continue;
-			}
 
 			val = malloc(len);
-			if(val == NULL) {
+			if(val == NULL)
 				return -1;
-			}
 
 			sprintf(val, "%s=%s", name, value);
 			environ[count] = val;
 			return 0;
 		}
 
-		libc_fatal("shouldn't get here in setenv");
+		libsystem_fatal("shouldn't get here in setenv");
 	}
 
 	/* Fill out the new entry. */
 	val = malloc(len);
-	if(val == NULL) {
+	if(!val)
 		return -1;
-	}
+
 	sprintf(val, "%s=%s", name, value);
 
 	/* Doesn't exist at all. Reallocate environment to fit. */
-	for(count = 0; environ[count] != NULL; count++);
+	for(count = 0; environ[count]; count++);
 	new = realloc(environ, (count + 2) * sizeof(char *));
-	if(new == NULL) {
+	if(!new) {
 		free(val);
 		return -1;
 	}
@@ -238,32 +232,30 @@ int unsetenv(const char *name) {
 	char **new, *key, *val;
 	size_t i, len, count;
 
-	if(!name || name[0] == 0 || strchr(name, '=') != NULL) {
+	if(!name || name[0] == 0 || strchr(name, '=')) {
 		errno = EINVAL;
 		return -1;
 	}
 
 	/* Ensure the environment array can be modified. */
-	if(!ensure_environ_alloced()) {
+	if(!ensure_environ_alloced())
 		return -1;
-	}
 
-	for(i = 0; environ[i] != NULL; i++) {
+	for(i = 0; environ[i]; i++) {
 		key = environ[i];
 		val = strchr(key, '=');
 
-		if(val == NULL) {
-			libc_fatal("value '%s' found in environment without an =", key);
-		}
+		if(val == NULL)
+			libsystem_fatal("value '%s' found in environment without an =", key);
 
 		len = strlen(name);
 		if(strncmp(key, name, len) == 0 && environ[i][len] == '=') {
-			for(count = 0; environ[count] != NULL; count++);
+			for(count = 0; environ[count]; count++);
 			memcpy(&environ[i], &environ[i + 1], (count - i) * sizeof(char *));
 			new = realloc(environ, count * sizeof(char *));
-			if(new) {
+			if(new)
 				environ = new;
-			}
+
 			return 0;
 		}
 	}

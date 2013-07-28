@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,10 +28,10 @@
  * @param tz		Pointer to timezone (ignored).
  * @return		0 on success, -1 on failure. */
 int gettimeofday(struct timeval *tv, void *tz) {
-	useconds_t ktime;
+	nstime_t ktime;
 
 	kern_unix_time(&ktime);
-	tv->tv_sec = ktime / 1000000;
-	tv->tv_usec = ktime % 1000000;
+	tv->tv_sec = ktime / 1000000000;
+	tv->tv_usec = ktime % 1000000000;
 	return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,14 +20,15 @@
  */
 
 #include <string.h>
-#include "../libc.h"
+
+#include "libsystem.h"
 
 /** Get string representation of an error number.
  * @param err		Error number.
  * @return		Pointer to string (should NOT be modified). */
 char *strerror(int err) {
-	if((size_t)err >= __libc_error_size || __libc_error_list[err] == NULL) {
+	if((size_t)err >= __errno_count || !__errno_list[err])
 		return (char *)"Unknown error";
-	}
-	return (char *)__libc_error_list[err];
+
+	return (char *)__errno_list[err];
 }

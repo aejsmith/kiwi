@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <signal.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Set the signal mask.
  * @param how		How to set the mask.
@@ -42,7 +42,7 @@ int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict oset) 
 
 	ret = kern_signal_mask(how, set, oset);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

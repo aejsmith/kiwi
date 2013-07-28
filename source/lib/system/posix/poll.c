@@ -146,7 +146,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 
 	ret = kern_object_wait(events, count, (timeout < 0) ? -1 : (timeout * 1000));
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		goto fail;
 	}
 

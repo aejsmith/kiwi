@@ -24,7 +24,7 @@
 
 #include <signal.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Get and set the alternate signal stack.
  *
@@ -44,7 +44,7 @@ int sigaltstack(const stack_t *restrict ss, stack_t *restrict oldss) {
 
 	ret = kern_signal_stack(ss, oldss);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

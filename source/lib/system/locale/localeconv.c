@@ -23,7 +23,7 @@
 #include <locale.h>
 
 /** Structure defining the C locale. */
-static const struct lconv __libc_locale = {
+static const struct lconv __libsystem_locale = {
 	.currency_symbol = (char *)"",
 	.decimal_point = (char *)".",
 	.frac_digits = CHAR_MAX,
@@ -57,5 +57,5 @@ static const struct lconv __libc_locale = {
  * @return		Pointer to locale information structure.
  */
 struct lconv *localeconv(void) {
-	return (struct lconv *)&__libc_locale;
+	return (struct lconv *)&__libsystem_locale;
 }

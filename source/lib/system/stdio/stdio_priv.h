@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,7 +25,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Internal structure of an I/O stream (FILE). */
 struct __fstream_internal {
@@ -46,7 +46,9 @@ struct scanf_args {
 /** Type for a do_printf() helper function. */
 typedef void (*printf_helper_t)(char, void *, int *);
 
-extern int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_list args) __hidden;
-extern int do_scanf(struct scanf_args *data, const char *restrict fmt, va_list args) __hidden;
+extern int do_printf(printf_helper_t helper, void *data, const char *restrict fmt,
+	va_list args) __hidden;
+extern int do_scanf(struct scanf_args *data, const char *restrict fmt,
+	va_list args) __hidden;
 
 #endif /* __STDIO_PRIV_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,13 +16,15 @@
 
 /**
  * @file
- * @brief		Signal wait functions.
+ * @brief		AMD64 POSIX definitions.
  */
 
-#include <signal.h>
-#include "libsystem.h"
+#ifndef __ARCH_UNISTD_H
+#define __ARCH_UNISTD_H
 
-int sigsuspend(const sigset_t *mask) {
-	libsystem_stub("sigsuspend", true);
-	return -1;
-}
+/** POSIX environment definitions. */
+#define _POSIX_V7_LP64_OFF64		1
+#define _POSIX_V6_LP64_OFF64		1
+#define _XBS5_LP64_OFF64		1
+
+#endif /* __ARCH_UNISTD_H */

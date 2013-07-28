@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,34 +22,16 @@
 #ifndef __SETJMP_H
 #define __SETJMP_H
 
+#include <arch/setjmp.h>
+
 #include <signal.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Buffer for setjmp()/longjmp(). TODO: Seperate arch include */
-#ifdef __i386__
-/* jmp_buf[0] = Return address
- * jmp_buf[1] = ebp
- * jmp_buf[2] = esp
- * jmp_buf[3] = ebx
- * jmp_buf[4] = edi
- * jmp_buf[5] = esi
- */
-typedef unsigned long jmp_buf[6];
-#elif defined(__x86_64__)
-/* jmp_buf[0] = Return address
- * jmp_buf[1] = rbp
- * jmp_buf[2] = rsp
- * jmp_buf[3] = rbx
- * jmp_buf[4] = r12
- * jmp_buf[5] = r13
- * jmp_buf[6] = r14
- * jmp_buf[7] = r15
- */
-typedef unsigned long jmp_buf[8];
-#endif
+/** Type containing setjmp() saved state. */
+typedef unsigned long jmp_buf[JMP_BUF_SIZE];
 
 /** Buffer for sigsetjmp()/siglongjmp(). */
 typedef struct _sigjmp_buf {

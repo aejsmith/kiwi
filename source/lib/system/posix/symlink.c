@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,7 @@
 
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Create a symbolic link.
  * @param dest		Destination of the link.
@@ -33,9 +33,9 @@
 int symlink(const char *dest, const char *path) {
 	status_t ret;
 
-	ret = kern_symlink_create(path, dest);
+	ret = kern_fs_create_symlink(path, dest);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

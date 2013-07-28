@@ -20,14 +20,15 @@
  */
 
 #include <stdio.h>
-#include "../libc.h"
+
+#include "libsystem.h"
 
 FILE *tmpfile(void) {
-	libc_stub("tmpfile", true);
+	libsystem_stub("tmpfile", true);
 	return NULL;
 }
 
 char *tmpnam(char *s) {
-	libc_stub("tmpnam", true);
+	libsystem_stub("tmpnam", true);
 	return NULL;
 }

@@ -24,7 +24,7 @@
 
 #include <sys/stat.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Create a directory.
  * @todo		Convert mode to ACL.
@@ -34,9 +34,9 @@
 int mkdir(const char *path, mode_t mode) {
 	status_t ret;
 
-	ret = kern_dir_create(path, NULL);
+	ret = kern_fs_create_dir(path);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

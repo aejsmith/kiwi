@@ -30,20 +30,19 @@
  *			Data returned may be overwritten by a subsequent call
  *			to readdir(). */
 struct dirent *readdir(DIR *dir) {
-	struct dirent *dent;
 	dir_entry_t *entry;
+	struct dirent *dent;
 	status_t ret;
 
 	entry = malloc(DIRSTREAM_BUF_SIZE);
-	if(!entry) {
+	if(!entry)
 		return NULL;
-	}
 
-	ret = kern_dir_read(dir->handle, entry, DIRSTREAM_BUF_SIZE);
+	ret = kern_file_read_dir(dir->handle, entry, DIRSTREAM_BUF_SIZE);
 	if(ret != STATUS_SUCCESS) {
-		if(ret != STATUS_NOT_FOUND) {
-			libc_status_to_errno(ret);
-		}
+		if(ret != STATUS_NOT_FOUND)
+			libsystem_status_to_errno(ret);
+
 		return NULL;
 	}
 

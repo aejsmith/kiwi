@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		C library fatal error functions.
+ * @brief		Fatal error functions.
  */
 
 #include <assert.h>
@@ -24,17 +24,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "libc.h"
+#include "libsystem.h"
 #include "stdio/stdio_priv.h"
 
-/** Helper for libc_fatal().
+/** Helper for libsystem_fatal().
  * @param ch		Character to print.
  * @param data		Pointer to file stream.
  * @param total		Pointer to total character count. */
-static void libc_fatal_helper(char ch, void *data, int *total) {
-	if(data) {
+static void libsystem_fatal_helper(char ch, void *data, int *total) {
+	if(data)
 		fputc(ch, (FILE *)data);
-	}
 		
 	*total = *total + 1;
 }
@@ -42,20 +41,19 @@ static void libc_fatal_helper(char ch, void *data, int *total) {
 /** Print out a fatal error and terminate the process.
  * @param fmt		Format string.
  * @param ...		Arguments to substitute into format. */
-void libc_fatal(const char *fmt, ...) {
+void libsystem_fatal(const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
-	do_printf(libc_fatal_helper, stderr, "*** libc fatal: ", args);
+	do_printf(libsystem_fatal_helper, stderr, "*** libsystem fatal: ", args);
 	va_end(args);
 
 	va_start(args, fmt);
-	do_printf(libc_fatal_helper, stderr, fmt, args);
+	do_printf(libsystem_fatal_helper, stderr, fmt, args);
 	va_end(args);
 
-	if(stderr) {
+	if(stderr)
 		fputc('\n', stderr);
-	}
 
 	abort();
 }
@@ -63,9 +61,9 @@ void libc_fatal(const char *fmt, ...) {
 /** Handle a call to a stub function.
  * @param name		Name of function.
  * @param fatal		Whether the error is considered fatal. */
-void libc_stub(const char *name, bool fatal) {
+void libsystem_stub(const char *name, bool fatal) {
 	if(fatal) {
-		libc_fatal("unimplemented function: %s", name);
+		libsystem_fatal("unimplemented function: %s", name);
 	} else {
 		fprintf(stderr, "STUB: %s\n", name);
 		errno = ENOSYS;
@@ -83,5 +81,6 @@ void __assert_fail(const char *cond, const char *file, unsigned int line, const 
 	} else {
 		fprintf(stderr, "Assertion '%s' failed at %s:%d (%s)\n", cond, file, line, func);
 	}
+
 	abort();
 }

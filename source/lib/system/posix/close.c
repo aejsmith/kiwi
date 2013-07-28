@@ -24,7 +24,7 @@
 
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Close a file descriptor.
  * @param fd		File descriptor to close.
@@ -34,7 +34,7 @@ int close(int fd) {
 
 	ret = kern_handle_close(fd);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 	return 0;

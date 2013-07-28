@@ -19,9 +19,14 @@
  * @brief		Test application.
  */
 
-#include <kernel/private/process.h>
+#include <stdio.h>
 
-void _start(process_args_t *args) {
-	__asm__ volatile("ud2a");
-	while(1);
+int main(int argc, char **argv) {
+	int i;
+
+	printf("Hello, World! My arguments are:\n");
+	for(i = 0; i < argc; i++)
+		printf(" argv[%d] = '%s'\n", i, argv[i]);
+
+	return 0;
 }

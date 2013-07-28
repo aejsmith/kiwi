@@ -20,7 +20,7 @@
  */
 
 #include <sys/stat.h>
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Create a filesystem node.
  * @param path		Path to node to create.
@@ -28,6 +28,6 @@
  * @param dev		Device number.
  * @return		0 on success, -1 on failure. */
 int mknod(const char *path, mode_t mode, dev_t dev) {
-	libc_stub("mknod", false);
+	libsystem_stub("mknod", false);
 	return -1;
 }

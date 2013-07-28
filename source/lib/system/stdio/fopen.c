@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,7 +30,9 @@
 #include "stdio_priv.h"
 
 /** Standard input/output streams. */
-FILE *stdin, *stdout, *stderr;
+FILE *stdin = NULL;
+FILE *stdout = NULL;
+FILE *stderr = NULL;
 
 /** Internal part of fopen() and freopen().
  * @param path		Path to open.
@@ -60,7 +62,8 @@ static int fopen_internal(const char *restrict path, const char *restrict mode) 
 	return open(path, flags, 0644);
 }
 
-/** Open file stream.
+/**
+ * Open file stream.
  *
  * Opens a new file stream for the file specified. The mode string specifies
  * the behaviour of the file stream. It can be any of the following:
@@ -88,9 +91,8 @@ FILE *fopen(const char *restrict path, const char *restrict mode) {
 	FILE *stream;
 
 	stream = malloc(sizeof(FILE));
-	if(!stream) {
+	if(!stream)
 		return NULL;
-	}
 
 	stream->fd = fopen_internal(path, mode);
 	if(stream->fd < 0) {
@@ -104,7 +106,8 @@ FILE *fopen(const char *restrict path, const char *restrict mode) {
 	return stream;
 }
 
-/** Create file stream from file descriptor
+/**
+ * Create a file stream from a file descriptor.
  *
  * Creates a new file stream referring to an existing file descriptor. The
  * given mode string should match the access flags of the file descriptor.
@@ -118,19 +121,14 @@ FILE *fdopen(int fd, const char *mode) {
 	FILE *stream;
 
 	/* Check if the file descriptor is valid. */
-	switch(kern_object_type(fd)) {
-	case OBJECT_TYPE_FILE:
-	case OBJECT_TYPE_DEVICE:
-		break;
-	default:
+	if(kern_object_type(fd) != OBJECT_TYPE_FILE) {
 		errno = EBADF;
 		return NULL;
 	}
 
 	stream = malloc(sizeof(FILE));
-	if(!stream) {
+	if(!stream)
 		return NULL;
-	}
 
 	stream->fd = fd;
 	stream->err = false;
@@ -139,7 +137,8 @@ FILE *fdopen(int fd, const char *mode) {
 	return stream;
 }
 
-/** Open file stream.
+/**
+ * Open file stream.
  *
  * Opens a new file stream for the file specified. The mode string specifies
  * the behaviour of the file stream. It can be any of the following:

@@ -26,7 +26,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Flush changes to a file to disk.
  * @param fd		Descriptor for file to flush. */
@@ -37,7 +37,7 @@ int fsync(int fd) {
 	case OBJECT_TYPE_FILE:
 		ret = kern_file_sync(fd);
 		if(ret != STATUS_SUCCESS) {
-			libc_status_to_errno(ret);
+			libsystem_status_to_errno(ret);
 			return -1;
 		}
 		return 0;

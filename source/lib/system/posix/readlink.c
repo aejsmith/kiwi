@@ -26,7 +26,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Read the destination of a symbolic link.
  * @param path		Path to symbolc link.
@@ -35,8 +35,8 @@
  * @return		Number of bytes written to the buffer on success, or -1
  *			on failure. */
 ssize_t readlink(const char *path, char *buf, size_t size) {
-	char *tmp = NULL;
 	file_info_t info;
+	char *tmp = NULL;
 	status_t ret;
 
 	/* The kernel will not do anything if the buffer provided is too small,
@@ -45,18 +45,17 @@ ssize_t readlink(const char *path, char *buf, size_t size) {
 	 * is too small. */
 	ret = kern_fs_info(path, false, &info);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
-	} else if(info.size >= size) {
+	} else if(info.size >= (offset_t)size) {
 		tmp = malloc(info.size + 1);
-		if(!tmp) {
+		if(!tmp)
 			return -1;
-		}
 	}
 
-	ret = kern_symlink_read(path, (tmp) ? tmp : buf, info.size + 1);
+	ret = kern_fs_read_symlink(path, (tmp) ? tmp : buf, info.size + 1);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

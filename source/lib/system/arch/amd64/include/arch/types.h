@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,13 +16,13 @@
 
 /**
  * @file
- * @brief		Signal wait functions.
+ * @brief		AMD64 type definitions.
  */
 
-#include <signal.h>
-#include "libsystem.h"
+#ifndef __ARCH_TYPES_H
+#define __ARCH_TYPES_H
 
-int sigsuspend(const sigset_t *mask) {
-	libsystem_stub("sigsuspend", true);
-	return -1;
-}
+/** Word size of the architecture. */
+#define __WORDSIZE	64
+
+#endif /* __ARCH_TYPES_H */

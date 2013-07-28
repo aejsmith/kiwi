@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <signal.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Examine or change the action of a signal.
  * @param num		Signal number to modify.
@@ -38,7 +38,7 @@ int sigaction(int num, const struct sigaction *restrict act, struct sigaction *r
 
 	ret = kern_signal_action(num, act, oldact);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return -1;
 	}
 

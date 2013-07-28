@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,7 +26,7 @@
 #include <limits.h>
 #include <unistd.h>
 
-#include "../libc.h"
+#include "libsystem.h"
 
 /** Get the path to the current working directory.
  * @param buf		Buffer to place path string in.
@@ -41,9 +41,9 @@ char *getcwd(char *buf, size_t size) {
 		return NULL;
 	}
 
-	ret = kern_fs_getcwd(buf, size);
+	ret = kern_fs_curr_dir(buf, size);
 	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+		libsystem_status_to_errno(ret);
 		return NULL;
 	}
 
@@ -56,10 +56,11 @@ char *getcwd(char *buf, size_t size) {
  * @return		Pointer to buffer or NULL on failure. */
 char *getwd(char *buf) {
 	if(!getcwd(buf, PATH_MAX)) {
-		if(errno == ERANGE) {
+		if(errno == ERANGE)
 			errno = ENAMETOOLONG;
-		}
+
 		return NULL;
 	}
+
 	return buf;
 }
