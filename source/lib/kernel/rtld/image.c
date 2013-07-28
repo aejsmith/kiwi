@@ -42,7 +42,7 @@ extern char _end[];
 /** Array of directories to search for libraries in. */
 static const char *library_search_dirs[] = {
 	".",
-	"/system/libraries",
+	"/system/lib",
 	NULL
 };
 
