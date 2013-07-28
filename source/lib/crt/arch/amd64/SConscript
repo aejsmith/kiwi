@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2010-2013 Alex Smith
+# Copyright (C) 2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -16,8 +16,13 @@
 
 Import('env')
 
-sources = map(File, [
-    'setjmp.S',
-])
-
-Return('sources')
+# Build rule to create required CRT files.
+env.Object('%s/crt1.o' % (str(env['LIBOUTDIR'])), ['crt1.S'])
+env.Object('%s/crti.o' % (str(env['LIBOUTDIR'])), ['crti.S'])
+env.Object('%s/crtn.o' % (str(env['LIBOUTDIR'])), ['crtn.S'])
+env.Object('%s/crtbegin.o' % (str(env['LIBOUTDIR'])), ['crtbegin.S'])
+env.Object('%s/crtend.o' % (str(env['LIBOUTDIR'])), ['crtend.S'])
+env.Object('%s/crtbeginS.o' % (str(env['LIBOUTDIR'])), ['crtbegin.S'],
+    CPPDEFINES = {'PIC': None, 'SHARED': None })
+env.Object('%s/crtendS.o' % (str(env['LIBOUTDIR'])), ['crtend.S'],
+    CPPDEFINES = {'PIC': None, 'SHARED': None })

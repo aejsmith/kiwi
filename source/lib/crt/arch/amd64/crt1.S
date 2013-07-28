@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,8 +25,8 @@
 .global _start
 .type _start, @function
 _start:
-	/* Call the real C library initialisation function. The libkernel
-	 * initialisation code calls us with a pointer to the process argument
-	 * block as the first argument, so this will be passed through. */
-	jmp	libc_init
+	/* Call the libsystem initialisation function. We're entered from
+	 * libkernel with a pointer to the process argument block as the first
+	 * argument, so this will be passed through. */
+	jmp	libsystem_init
 .size _start, .-_start
