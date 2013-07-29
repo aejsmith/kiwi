@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,12 +29,13 @@
  * @todo		We should restrict what type of memory futexes can be
  *			placed in. For example, it makes little sense to allow
  *			one to be placed in a device's memory.
+ * @todo		Use a hash table instead of an AVL tree for the global
+ *			table?
  */
 
 #include <lib/utility.h>
 
-#include <mm/mmu.h>
-#include <mm/phys.h>
+#include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
@@ -58,10 +59,16 @@ typedef struct futex {
 	avl_tree_node_t tree_link;	/**< Link to global futex tree. */
 } futex_t;
 
-/** Futex allocator. */
-static slab_cache_t *futex_cache;
+/** Structure linking a futex to a process. */
+typedef struct futex_link {
+	futex_t *futex;			/**< Futex. */
+	avl_tree_node_t node;		/**< AVL tree node. */
+} futex_link_t;
 
-/** Tree of all futexes. */
+/** Futex allocator. */
+static slab_cache_t *futex_cache = NULL;
+
+/** Tree of all futexes, keyed by physical address. */
 static AVL_TREE_DECLARE(futex_tree);
 static MUTEX_DECLARE(futex_tree_lock, 0);
 
@@ -78,14 +85,17 @@ static void futex_ctor(void *obj, void *data) {
 /** Clean up a process' futexes.
  * @param proc		Process to clean up. */
 void futex_cleanup(process_t *proc) {
+	futex_link_t *link;
 	futex_t *futex;
 
 	mutex_lock(&futex_tree_lock);
 
 	AVL_TREE_FOREACH_SAFE(&proc->futexes, iter) {
-		futex = avl_tree_entry(iter, futex_t);
+		link = avl_tree_entry(iter, futex_link_t, node);
 
-		avl_tree_dyn_remove(&proc->futexes, futex->phys);
+		futex = link->futex;
+		avl_tree_remove(&proc->futexes, &link->node);
+		kfree(link);
 
 		/* If no more processes refer to the futex we can free it. */
 		if(refcount_dec(&futex->count) == 0) {
@@ -99,44 +109,34 @@ void futex_cleanup(process_t *proc) {
 
 /** Look up a futex.
  * @param addr		Virtual address in current process.
- * @return		Pointer to futex structure. Can only fail if the
- *			virtual address is invalid, in which case NULL will be
- *			returned. */
-static futex_t *futex_lookup(int32_t *addr) {
+ * @param futexp	Where to store pointer to futex structure.
+ * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR or
+ *			STATUS_ACCESS_DENIED if the address is invalid or is
+ *			not writeable. */
+static status_t futex_lookup(int32_t *addr, futex_t **futexp) {
 	ptr_t base, offset;
 	phys_ptr_t phys;
+	futex_link_t *link;
 	futex_t *futex;
-	int32_t tmp;
+	status_t ret;
 
 	/* Check if the address is 4 byte aligned. This will ensure that the
 	 * address does not cross a page boundary because page sizes are
 	 * powers of 2. */
 	if((ptr_t)addr % sizeof(int32_t))
-		return NULL;
+		return STATUS_INVALID_ARG;
 
 	/* Get the page containing the address and the offset within it. */
 	base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
 	offset = (ptr_t)addr - base;
 
-	/* Look up the physical address. */
-	mmu_context_lock(curr_aspace->mmu);
-	if(!mmu_context_query(curr_aspace->mmu, base, &phys, NULL)) {
-		mmu_context_unlock(curr_aspace->mmu);
+	/* Lock the page for read and write access and look up the physical
+	 * address of it. */
+	ret = vm_lock_page(curr_aspace, base, VM_PROT_READ | VM_PROT_WRITE, &phys);
+	if(ret != STATUS_SUCCESS)
+		return ret;
 
-		/* The page may not be mapped in. Try to trigger a fault, then
-		 * check again. */
-		if(memcpy_from_user(&tmp, addr, sizeof(tmp)) != STATUS_SUCCESS)
-			return NULL;
-
-		mmu_context_lock(curr_aspace->mmu);
-
-		if(!mmu_context_query(curr_aspace->mmu, base, &phys, NULL)) {
-			mmu_context_unlock(curr_aspace->mmu);
-			return NULL;
-		}
-	}
 	phys += offset;
-	mmu_context_unlock(curr_aspace->mmu);
 
 	mutex_lock(&curr_proc->lock);
 
@@ -144,12 +144,12 @@ static futex_t *futex_lookup(int32_t *addr) {
 	 * than searching the global tree (after the first access to the futex
 	 * by the process), as a process will only use a small subset of all of
 	 * the futexes in the system. */
-	futex = avl_tree_lookup(&curr_proc->futexes, phys);
-	if(!futex) {
+	link = avl_tree_lookup(&curr_proc->futexes, phys, futex_link_t, node);
+	if(!link) {
 		mutex_lock(&futex_tree_lock);
 
 		/* Use the global tree. */
-		futex = avl_tree_lookup(&futex_tree, phys);
+		futex = avl_tree_lookup(&futex_tree, phys, futex_t, tree_link);
 		if(!futex) {
 			/* Couldn't find it, this means that this is the first
 			 * access to this futex. Create a structure for it. */
@@ -158,19 +158,31 @@ static futex_t *futex_lookup(int32_t *addr) {
 			futex->phys = phys;
 
 			/* Attach it to the global tree. */
-			avl_tree_insert(&futex_tree, &futex->tree_link, phys, futex);
+			avl_tree_insert(&futex_tree, phys, &futex->tree_link);
 		} else {
 			refcount_inc(&futex->count);
 		}
 
-		/* Attach to the process' tree. */
-		avl_tree_dyn_insert(&curr_proc->futexes, phys, futex);
-
 		mutex_unlock(&futex_tree_lock);
+
+		/* Attach to the process' tree. */
+		link = kmalloc(sizeof(*link), MM_KERNEL);
+		link->futex = futex;
+		avl_tree_insert(&curr_proc->futexes, phys, &link->node);
 	}
 
 	mutex_unlock(&curr_proc->lock);
-	return futex;
+	*futexp = link->futex;
+	return STATUS_SUCCESS;
+}
+
+/** Unlock the page containing a futex.
+ * @param addr		Address of futex. */
+static void futex_finish(int32_t *addr) {
+	ptr_t base;
+
+	base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
+	vm_unlock_page(curr_aspace, base);
 }
 
 /** Wait for a futex.
@@ -185,26 +197,20 @@ static futex_t *futex_lookup(int32_t *addr) {
  *			will be returned immediately.
  * @return		Status code describing result of the operation. */
 status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
-	int32_t *mapping;
 	futex_t *futex;
 	status_t ret;
 
 	/* Find the futex. */
-	futex = futex_lookup(addr);
-	if(!futex)
-		return STATUS_INVALID_ADDR;
-
-	/* Map the futex into memory so that we can check its value.
-	 * Wire ourself to the current CPU to make a remote TLB invalidation
-	 * unnecessary when unmapping. */
-	thread_wire(curr_thread);
-	mapping = phys_map(futex->phys, sizeof(*mapping), MM_KERNEL);
+	ret = futex_lookup(addr, &futex);
+	if(ret != STATUS_SUCCESS)
+		return ret;
 
 	spinlock_lock(&futex->lock);
 
 	/* Now check the value to see if it has changed (see parameter
-	 * description above). */
-	if(*mapping == val) {
+	 * description above). The page is locked meaning it is safe to access
+	 * it directly. */
+	if(*addr == val) {
 		list_append(&futex->threads, &curr_thread->wait_link);
 		ret = thread_sleep(&futex->lock, timeout, "futex", SLEEP_INTERRUPTIBLE);
 	} else {
@@ -212,8 +218,7 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
 		ret = STATUS_TRY_AGAIN;
 	}
 
-	phys_unmap(mapping, sizeof(*mapping), false);
-	thread_unwire(curr_thread);
+	futex_finish(addr);
 	return ret;
 }
 
@@ -223,17 +228,18 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
  * @param wokenp	Where to store number of threads actually woken.
  * @return		Status code describing result of the operation. */
 status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
+	futex_t *futex;
 	size_t woken = 0;
 	thread_t *thread;
-	futex_t *futex;
+	status_t ret;
 
 	if(!count)
 		return STATUS_INVALID_ARG;
 
 	/* Find the futex. */
-	futex = futex_lookup(addr);
-	if(!futex)
-		return STATUS_INVALID_ADDR;
+	ret = futex_lookup(addr, &futex);
+	if(ret != STATUS_SUCCESS)
+		return ret;
 
 	spinlock_lock(&futex->lock);
 
@@ -247,12 +253,12 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 		woken++;
 	}
 
+	futex_finish(addr);
+
 	/* Store the number of woken threads if requested. */
-	if(wokenp) {
-		return memcpy_to_user(wokenp, &woken, sizeof(*wokenp));
-	} else {
-		return STATUS_SUCCESS;
-	}
+	return (wokenp)
+		? memcpy_to_user(wokenp, &woken, sizeof(*wokenp))
+		: STATUS_SUCCESS;
 }
 
 /** Initialize the futex cache. */

@@ -125,7 +125,7 @@ void process_retain(process_t *process) {
 /** Free a process' resources after it has died.
  * @param process	Process to clean up. */
 static void process_cleanup(process_t *process) {
-	//futex_cleanup(process);
+	futex_cleanup(process);
 
 	if(process->aspace) {
 		vm_aspace_destroy(process->aspace);

@@ -119,8 +119,8 @@ syscall kern_thread_control(uint, ptr_t, ptr_t) hidden;
 #syscall kern_area_size(handle_t);
 #syscall kern_area_resize(handle_t, size_t);
 
-#syscall kern_futex_wait(ptr_t, int32_t, nstime_t);
-#syscall kern_futex_wake(ptr_t, size_t, ptr_t);
+syscall kern_futex_wait(ptr_t, int32_t, nstime_t);
+syscall kern_futex_wake(ptr_t, size_t, ptr_t);
 
 syscall kern_timer_create(int, ptr_t);
 syscall kern_timer_start(handle_t, nstime_t, int);
