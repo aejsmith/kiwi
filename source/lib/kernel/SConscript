@@ -25,6 +25,7 @@ sources = map(File, [
     'support/string.c',
 
     'init.c',
+    'mutex.c',
     'process.c',
     'signal.c',
     'status_list.c',

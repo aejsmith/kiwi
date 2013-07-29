@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,11 +16,11 @@
 
 /**
  * @file
- * @brief		C library mutex implementation.
+ * @brief		Mutex implementation.
  */
 
-#ifndef __UTIL_MUTEX_H
-#define __UTIL_MUTEX_H
+#ifndef __KERNEL_MUTEX_H
+#define __KERNEL_MUTEX_H
 
 #include <kernel/types.h>
 
@@ -28,25 +28,19 @@
 extern "C" {
 #endif
 
-/** Structure containing a mutex. */
-typedef struct libc_mutex {
-	volatile int32_t futex;		/**< Futex value. */
-} __attribute__((aligned(4))) libc_mutex_t;
+/** Initializer for a mutex. */
+#define MUTEX_INITIALIZER		0
 
-/** Initialises a statically declared mutex. */
-#define LIBC_MUTEX_INITIALISER		{ 0 }
+#ifndef KERNEL
 
-/** Statically declares a new mutex. */
-#define LIBC_MUTEX_DECLARE(_var)	\
-	libc_mutex_t _var = LIBC_MUTEX_INITIALISER
+extern bool kern_mutex_held(int32_t *mutex);
+extern status_t kern_mutex_lock(int32_t *lock, nstime_t timeout);
+extern void kern_mutex_unlock(int32_t *lock);
 
-extern bool libc_mutex_held(libc_mutex_t *lock);
-extern status_t libc_mutex_lock(libc_mutex_t *lock, useconds_t timeout);
-extern void libc_mutex_unlock(libc_mutex_t *lock);
-extern void libc_mutex_init(libc_mutex_t *lock);
+#endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __UTIL_MUTEX_H */
+#endif /* __KERNEL_MUTEX_H */

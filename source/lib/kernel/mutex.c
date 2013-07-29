@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,52 +32,50 @@
  */
 
 #include <kernel/futex.h>
+#include <kernel/mutex.h>
 #include <kernel/status.h>
 
-#include <util/mutex.h>
+#include "libkernel.h"
 
 /** Check whether a mutex is held.
  * @param lock		Lock to check.
  * @return		Whether the lock is held. */
-bool libc_mutex_held(libc_mutex_t *lock) {
-	return (lock->futex != 0);
+__export bool kern_mutex_held(int32_t *lock) {
+	return (*(volatile int32_t *)lock != 0);
 }
 
 /** Acquire a mutex.
  * @param lock		Lock to acquire.
- * @param timeout	Timeout in microseconds. If -1, the function will block
+ * @param timeout	Timeout in nanoseconds. If -1, the function will block
  *			indefinitely until able to acquire the mutex. If 0, an
  *			error will be returned if the lock cannot be acquired
  *			immediately.
  * @return		Status code describing result of the operation. */
-status_t libc_mutex_lock(libc_mutex_t *lock, useconds_t timeout) {
+__export status_t kern_mutex_lock(int32_t *lock, nstime_t timeout) {
 	status_t ret;
 	int32_t val;
 
 	/* If the futex is currently 0 (unlocked), just set it to 1 (locked, no
 	 * waiters) and return. */
-	val = __sync_val_compare_and_swap(&lock->futex, 0, 1);
+	val = __sync_val_compare_and_swap((volatile int32_t *)lock, 0, 1);
 	if(val != 0) {
-		if(timeout == 0) {
+		if(timeout == 0)
 			return STATUS_TIMED_OUT;
-		}
 
 		/* Set futex to 2 (locked with waiters). */
-		if(val != 2) {
-			val = __sync_lock_test_and_set(&lock->futex, 2);
-		}
+		if(val != 2)
+			val = __sync_lock_test_and_set((volatile int32_t *)lock, 2);
 
 		/* Loop until we can acquire the futex. */
 		while(val != 0) {
-			ret = kern_futex_wait((int32_t *)&lock->futex, 2, timeout);
-			if(ret != STATUS_SUCCESS && ret != STATUS_TRY_AGAIN) {
+			ret = kern_futex_wait(lock, 2, timeout);
+			if(ret != STATUS_SUCCESS && ret != STATUS_TRY_AGAIN)
 				return ret;
-			}
 
 			/* We cannot know whether there are waiters or not.
 			 * Therefore, to be on the safe side, set that there
 			 * are (see paper linked above). */
-			val = __sync_lock_test_and_set(&lock->futex, 2);
+			val = __sync_lock_test_and_set((volatile int32_t *)lock, 2);
 		}
 	}
 
@@ -86,16 +84,10 @@ status_t libc_mutex_lock(libc_mutex_t *lock, useconds_t timeout) {
 
 /** Release a mutex.
  * @param lock		Lock to release. */
-void libc_mutex_unlock(libc_mutex_t *lock) {
-	if(__sync_fetch_and_sub(&lock->futex, 1) != 1) {
+__export void kern_mutex_unlock(int32_t *lock) {
+	if(__sync_fetch_and_sub((volatile int32_t *)lock, 1) != 1) {
 		/* There were waiters. Wake one up. */
-		lock->futex = 0;
-		kern_futex_wake((int32_t *)&lock->futex, 1, NULL);
+		*(volatile int32_t *)lock = 0;
+		kern_futex_wake(lock, 1, NULL);
 	}
-}
-
-/** Initialise a mutex.
- * @param lock		Lock to initialise. */
-void libc_mutex_init(libc_mutex_t *lock) {
-	lock->futex = 0;
 }
