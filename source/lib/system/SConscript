@@ -143,8 +143,6 @@ sources = map(File, [
     'time/strftime.c',
     'time/time.c',
 
-    #'util/mutex.c',
-
     'ctype.c',
     'errno.c',
     'error_list.c',

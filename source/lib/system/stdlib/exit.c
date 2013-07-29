@@ -19,6 +19,7 @@
  * @brief		Exit functions.
  */
 
+#include <kernel/mutex.h>
 #include <kernel/process.h>
 
 #include <util/list.h>
@@ -56,7 +57,7 @@ static LIST_DECLARE(atexit_funcs);
 static size_t atexit_count = 0;
 
 /** Locking to protect at-exit lists. */
-//static LIBC_MUTEX_DECLARE(atexit_lock);
+static int32_t atexit_lock = MUTEX_INITIALIZER;
 
 /** Allocate an at-exit function structure.
  * @return		Function structure pointer, or NULL if none free. */
@@ -100,10 +101,10 @@ static void atexit_free(atexit_func_t *func) {
 int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
 	atexit_func_t *func;
 
-	//libc_mutex_lock(&atexit_lock, -1);
+	kern_mutex_lock(&atexit_lock, -1);
 
 	if(!(func = atexit_alloc())) {
-		//libc_mutex_unlock(&atexit_lock);
+		kern_mutex_unlock(&atexit_lock);
 		return -1;
 	}
 
@@ -113,7 +114,7 @@ int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
 
 	list_prepend(&atexit_funcs, &func->header);
 	atexit_count++;
-	//libc_mutex_unlock(&atexit_lock);
+	kern_mutex_unlock(&atexit_lock);
 	return 0;
 }
 
@@ -153,7 +154,8 @@ restart:
  * @return		0 on success, -1 on failure.
  */
 int atexit(void (*function)(void)) {
-	return __cxa_atexit((void (*)(void *))function, NULL, (&__dso_handle) ? __dso_handle : NULL);
+	return __cxa_atexit((void (*)(void *))function, NULL,
+		(&__dso_handle) ? __dso_handle : NULL);
 }
 
 /**

@@ -1,8 +1,7 @@
+#include <kernel/mutex.h>
 #include <kernel/object.h>
 #include <kernel/status.h>
 #include <kernel/vm.h>
-
-//#include <util/mutex.h>
 
 #include <errno.h>
 #include <stddef.h>
@@ -55,13 +54,13 @@ static inline int munmap_wrapper(void *start, size_t length) {
 #define MUNMAP(a, s)		munmap_wrapper((a), (s))
 
 /* Locking. */
-//#define USE_LOCKS 0
+#define USE_LOCKS		2
 
-//#define MLOCK_T			libc_mutex_t
-//#define INITIAL_LOCK(sl)	libc_mutex_init(sl)
-//#define ACQUIRE_LOCK(sl)	libc_mutex_lock(sl, -1)
-//#define RELEASE_LOCK(sl)	libc_mutex_unlock(sl)
+#define MLOCK_T			int32_t
+#define INITIAL_LOCK(sl)	do { *(sl) = MUTEX_INITIALIZER; } while(0)
+#define ACQUIRE_LOCK(sl)	kern_mutex_lock((sl), -1)
+#define RELEASE_LOCK(sl)	kern_mutex_unlock((sl))
 
-//static MLOCK_T malloc_global_mutex = LIBC_MUTEX_INITIALISER;
+static MLOCK_T malloc_global_mutex = MUTEX_INITIALIZER;
 
 #include "dlmalloc.c"

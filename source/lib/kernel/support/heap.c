@@ -19,9 +19,8 @@
  * @brief		Kernel library heap functions.
  */
 
+#include <kernel/mutex.h>
 #include <kernel/vm.h>
-
-//#include <util/mutex.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +35,7 @@ typedef struct heap_chunk {
 } heap_chunk_t;
 
 /** Lock to protect the heap. */
-//static LIBC_MUTEX_DECLARE(heap_lock);
+static int32_t heap_lock = MUTEX_INITIALIZER;
 
 /** Statically allocated heap. */
 static LIST_DECLARE(heap_chunks);
@@ -76,7 +75,7 @@ void *malloc(size_t size) {
 	size = ROUND_UP(size, 8);
 	total = size + sizeof(heap_chunk_t);
 
-	//libc_mutex_lock(&heap_lock, -1);
+	kern_mutex_lock(&heap_lock, -1);
 
 	/* Search for a free chunk. */
 	LIST_FOREACH(&heap_chunks, iter) {
@@ -91,7 +90,7 @@ void *malloc(size_t size) {
 	if(!chunk) {
 		chunk = map_chunk(total);
 		if(!chunk) {
-			//libc_mutex_unlock(&heap_lock, -1);
+			kern_mutex_unlock(&heap_lock);
 			return NULL;
 		}
 	}
@@ -108,7 +107,7 @@ void *malloc(size_t size) {
 	}
 
 	chunk->allocated = true;
-	//libc_mutex_unlock(&heap_lock, -1);
+	kern_mutex_unlock(&heap_lock);
 	return ((char *)chunk + sizeof(heap_chunk_t));
 }
 
@@ -143,6 +142,8 @@ void free(void *addr) {
 	if(!addr)
 		return;
 
+	kern_mutex_lock(&heap_lock, -1);
+
 	chunk = (heap_chunk_t *)((char *)addr - sizeof(heap_chunk_t));
 	if(!chunk->allocated) {
 		printf("libkernel: double free on internal heap (%p)\n", addr);
@@ -166,4 +167,6 @@ void free(void *addr) {
 			list_remove(&chunk->header);
 		}
 	}
+
+	kern_mutex_unlock(&heap_lock);
 }

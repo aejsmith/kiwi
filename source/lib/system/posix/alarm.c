@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,10 +19,9 @@
  * @brief		POSIX alarm function.
  */
 
+#include <kernel/mutex.h>
 #include <kernel/time.h>
 #include <kernel/status.h>
-
-//#include <util/mutex.h>
 
 #include <unistd.h>
 
@@ -30,7 +29,7 @@
 
 /** Alarm timer handle. */
 static handle_t alarm_handle = -1;
-//static LIBC_MUTEX_DECLARE(alarm_lock);
+static int32_t alarm_lock = MUTEX_INITIALIZER;
 
 /** Arrange for a SIGALRM signal to be delivered after a certain time.
  * @param seconds	Seconds to wait for.
@@ -40,7 +39,7 @@ unsigned int alarm(unsigned int seconds) {
 	useconds_t rem;
 	status_t ret;
 
-	//libc_mutex_lock(&alarm_lock, -1);
+	kern_mutex_lock(&alarm_lock, -1);
 
 	/* Create the alarm timer if it has not already been created. */
 	if(alarm_handle < 0) {
@@ -53,6 +52,6 @@ unsigned int alarm(unsigned int seconds) {
 
 	kern_timer_stop(alarm_handle, &rem);
 	kern_timer_start(alarm_handle, seconds * 1000000000, TIMER_ONESHOT);
-	//libc_mutex_unlock(&alarm_lock);
+	kern_mutex_unlock(&alarm_lock);
 	return rem / 1000000000;
 }
