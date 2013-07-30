@@ -65,8 +65,7 @@
  *			locking APIs cannot unlock any locks that the kernel
  *			makes, as the kernel locking functions make the
  *			guarantee that the locked range is safe to access from
- *			kernel mode. Furthermore, we need to make sure that
- *			we don't vm_unmap() a locked region.
+ *			kernel mode.
  * @todo		Shouldn't use MM_KERNEL for user address spaces? Note
  *			that MM_USER will at some point use interruptible sleep
  *			so interrupting a process waiting for memory leaves us
@@ -142,6 +141,8 @@ static void vm_region_ctor(void *obj, void *data) {
 
 	list_init(&region->header);
 	list_init(&region->free_link);
+	condvar_init(&region->waiters, "vm_region_waiters");
+	region->locked = 0;
 }
 
 /** Constructor for anonymous map objects.
@@ -845,6 +846,12 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, size_t size) {
 	assert(region->state == VM_REGION_ALLOCATED);
 	assert(region->handle || region->amap);
 
+	/* Wait until the region becomes unlocked. TODO: we should keep track
+	 * of which parts of a region are locked and only wait if we're trying
+	 * to unmap over that part. */
+	while(region->locked)
+		condvar_wait(&region->waiters, &region->as->lock);
+
 	mmu_context_lock(region->as->mmu);
 
 	/* Unmap pages covering the region. */
@@ -899,7 +906,10 @@ static void vm_region_destroy(vm_region_t *region) {
  * Locks a single page into an address space for access with the specified
  * access. While the page is locked, it will not be evicted from the address
  * space, and it is guaranteed to be safe to access when the address space is
- * active.
+ * active. Note that this function places a lock on the whole region, preventing
+ * it from being unmapped. Any thread that attempts to do so will block until
+ * it is unlocked. Therefore, locks placed using this function should be short
+ * lived.
  *
  * @param as		Address space to lock in.
  * @param addr		Address of page to lock.
@@ -934,6 +944,10 @@ status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access, phys_ptr_t *
 	ret = map_page(region, addr, access, physp);
 	mmu_context_unlock(as->mmu);
 
+	/* Increase the locking count. */
+	if(ret == STATUS_SUCCESS)
+		region->locked++;
+
 	mutex_unlock(&as->lock);
 	return ret;
 }
@@ -942,7 +956,22 @@ status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access, phys_ptr_t *
  * @param as		Address space to unlock in.
  * @param addr		Address of page to unlock. */
 void vm_unlock_page(vm_aspace_t *as, ptr_t addr) {
-	/* Nothing happens, for now. */
+	vm_region_t *region;
+
+	mutex_lock(&as->lock);
+
+	/* This should only be done after a call to vm_lock_page() so the
+	 * region should exist. */
+	region = vm_region_find(as, addr, false);
+	if(!region || region->state != VM_REGION_ALLOCATED)
+		fatal("Invalid call to vm_unlock_page(%p)", addr);
+
+	/* Unblock any threads waiting for the region to be unlocked. */
+	assert(region->locked);
+	if(--region->locked == 0)
+		condvar_broadcast(&region->waiters);
+
+	mutex_unlock(&as->lock);
 }
 
 /**

@@ -31,6 +31,7 @@
 
 #include <mm/page.h>
 
+#include <sync/condvar.h>
 #include <sync/mutex.h>
 
 #include <cpu.h>
@@ -80,6 +81,10 @@ typedef struct vm_region {
 	offset_t obj_offset;		/**< Offset into the object. */
 	vm_amap_t *amap;		/**< Anonymous map. */
 	offset_t amap_offset;		/**< Offset into the anonymous map. */
+
+	/** Kernel locking state. */
+	size_t locked;			/**< Number of calls to vm_lock_page() on the region. */
+	condvar_t waiters;		/**< Condition to wait for region to be unlocked on. */
 
 	char *name;			/**< Name of the region (can be NULL). */
 } vm_region_t;
