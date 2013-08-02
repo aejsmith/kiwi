@@ -473,7 +473,7 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 
 				amap->pages[idx] = page;
 			}
-			
+
 			phys = amap->pages[idx]->addr;
 		} else {
 			assert(region->flags & VM_MAP_PRIVATE);
@@ -936,6 +936,12 @@ status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access, phys_ptr_t *
 	if((region->protection & access) != access) {
 		mutex_unlock(&as->lock);
 		return STATUS_ACCESS_DENIED;
+	}
+
+	/* Don't allow locking the guard page of a stack. TODO: Stack direction. */
+	if(region->flags & VM_MAP_STACK && addr == region->start) {
+		mutex_unlock(&as->lock);
+		return STATUS_INVALID_ADDR;
 	}
 
 	/* For now we just ensure that the page is mapped for the requested
