@@ -23,7 +23,7 @@
 #include <lib/string.h>
 #include <lib/printf.h>
 
-#include <symbol.h>
+#include <module.h>
 #include <types.h>
 
 /* Flags to specify special behaviour. */
@@ -164,10 +164,11 @@ static void print_number(printf_state_t *state, uint64_t num) {
  * @param ptr		Address of symbol to print.
  * @param ext		Character specifying behaviour. */
 static void print_symbol(printf_state_t *state, void *ptr, char ext) {
-	symbol_t *sym;
+	symbol_t sym;
 	long delta;
 	size_t off;
 	int width;
+	bool ret;
 
 	/* Zero pad up to the width of a pointer. */
 	width = (sizeof(void *) * 2) + 2;
@@ -178,14 +179,13 @@ static void print_symbol(printf_state_t *state, void *ptr, char ext) {
 	 * compiler has produced a tail call. */
 	delta = (ext == 'B') ? -1 : 0;
 
-	sym = symbol_lookup_addr((ptr_t)ptr + delta, &off);
+	ret = symbol_from_addr((ptr_t)ptr + delta, &sym, &off);
 	if(isupper(ext)) {
 		state->total += do_printf(state->helper, state->data, "[%0*p] %s+0x%zx",
-			width, ptr, (sym) ? sym->name : "<unknown>",
-			(sym) ? off - delta : 0);
+			width, ptr, sym.name, (ret) ? off - delta : 0);
 	} else {
 		state->total += do_printf(state->helper, state->data, "[%0*p] %s",
-			width, ptr, (sym) ? sym->name : "<unknown>");
+			width, ptr, sym.name);
 	}
 }
 

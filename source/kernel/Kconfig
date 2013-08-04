@@ -73,41 +73,17 @@ config SLAB_DEBUG
 	help
 	  Enable extra debug output from the slab allocator.
 
-config MODULE_DEBUG
-	bool "Module loader debug output"
-	default n
-	help
-	  Enable debug output from the module loader.
-
-config OBJECT_DEBUG
-	bool "Object manager debug output"
-	default n
-	help
-	  Enable debug output from the object manager.
-
 config CACHE_DEBUG
 	bool "Page cache debug output"
 	default n
 	help
 	  Enable debug output from the page cache.
 
-config DEVICE_DEBUG
-	bool "Device manager debug output"
-	default n
-	help
-	  Enable debug output from the device manager.
-
 config IPC_DEBUG
 	bool "IPC debug output"
 	default n
 	help
 	  Enable debug output from the IPC code.
-
-config LRM_DEBUG
-	bool "LRM debug output"
-	default n
-	help
-	  Enable debug output from the low resource manager.
 
 #######
 endmenu

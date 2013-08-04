@@ -60,6 +60,7 @@
 extern char __text_seg_start[], __text_seg_end[];
 extern char __data_seg_start[], __data_seg_end[];
 extern char __init_seg_start[], __init_seg_end[];
+extern char __end[];
 #endif
 
 #endif /* __ARCH_MEMORY_H */

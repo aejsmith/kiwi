@@ -77,6 +77,8 @@ typedef struct process {
 	io_context_t ioctx;		/**< I/O context structure. */
 	list_t threads;			/**< List of threads. */
 	avl_tree_t futexes;		/**< Tree of futexes that the process has accessed. */
+	list_t images;			/**< List of loaded images. */
+	image_id_t next_image_id;	/**< Next image ID. */
 
 	/** Signal information. */
 	sigset_t signal_mask;		/**< Bitmap of masked signals. */

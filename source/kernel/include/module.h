@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,7 +29,9 @@
 
 #include <elf.h>
 #include <object.h>
-#include <symbol.h>
+
+/** Module information section name. */
+#define MODULE_INFO_SECTION	".module_info"
 
 /** Module initialization function type. */
 typedef status_t (*module_init_t)(void);
@@ -41,10 +43,17 @@ typedef status_t (*module_unload_t)(void);
 typedef struct module {
 	list_t header;			/**< Link to loaded modules list. */
 
-	/** Internally-used information. */
-	symbol_table_t symtab;		/**< Symbol table for the module. */
 	refcount_t count;		/**< Count of modules depending on this module. */
-	object_handle_t *handle;	/**< Handle to module file (only valid while loading). */
+	elf_image_t image;		/**< ELF image for the module. */
+
+	/** State of the module. */
+	enum {
+		MODULE_LOADED,		/**< Module loaded into memory, deps not resolved. */
+		MODULE_DEPS,		/**< Resolving dependencies on the module. */
+		MODULE_INIT,		/**< Module initialization function being called. */
+		MODULE_READY,		/**< Module is initialized and ready for use. */
+		MODULE_UNLOAD,		/**< Module is being unloaded. */
+	} state;
 
 	/** Module information. */
 	const char *name;		/**< Name of module. */
@@ -52,13 +61,16 @@ typedef struct module {
 	const char **deps;		/**< Module dependencies. */
 	module_init_t init;		/**< Module initialization function. */
 	module_unload_t unload;		/**< Module unload function. */
-
-	/** ELF loader information. */
-	elf_ehdr_t ehdr;		/**< ELF executable header. */
-	elf_shdr_t *shdrs;		/**< ELF section headers. */
-	void *load_base;		/**< Address of allocation module is loaded to. */
-	size_t load_size;		/**< Size of allocation module is loaded to. */
 } module_t;
+
+/** Information about a symbol in an image. */
+typedef struct symbol {
+	ptr_t addr;			/**< Address that the symbol points to. */
+	size_t size;			/**< Size of symbol. */
+	const char *name;		/**< Name of the symbol. */
+	bool global : 1;		/**< Whether the symbol is global. */
+	bool exported : 1;		/**< Whether the symbol is exported. */
+} symbol_t;
 
 /** Set the name of a module. */
 #define MODULE_NAME(mname)		\
@@ -80,14 +92,17 @@ typedef struct module {
                 NULL \
         }
 
-/** Export a symbol from a module. */
-#define MODULE_EXPORT(msym)             \
-        static const char *__module_export_##msym \
-                __section(MODULE_EXPORT_SECTION) __used = #msym
+extern module_t kernel_module;
 
-extern void *module_mem_alloc(size_t size);
+extern ptr_t module_mem_alloc(size_t size);
+extern void module_mem_free(ptr_t base, size_t size);
 
-extern status_t module_name(object_handle_t *handle, char *namebuf);
-extern status_t module_load(object_handle_t *handle, char *depbuf);
+extern status_t module_load(const char *path, char *depbuf);
+
+extern bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *offp);
+extern bool symbol_lookup(const char *name, bool global, bool exported, symbol_t *symbol);
+
+extern void module_early_init(void);
+extern void module_init(void);
 
 #endif /* __MODULE_H */

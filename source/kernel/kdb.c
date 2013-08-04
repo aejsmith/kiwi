@@ -49,8 +49,8 @@
 #include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
+#include <module.h>
 #include <setjmp.h>
-#include <symbol.h>
 
 /** KDB heap size. */
 #define KDB_HEAP_SIZE		16384
@@ -284,7 +284,7 @@ kdb_status_t kdb_parse_expression(char *exp, uint64_t *valp, char **strp) {
 
 	uint64_t val = 0, current;
 	unsigned long reg;
-	symbol_t *sym;
+	symbol_t sym;
 	char oper = 0;
 	size_t len;
 
@@ -340,13 +340,12 @@ kdb_status_t kdb_parse_expression(char *exp, uint64_t *valp, char **strp) {
 			strncpy(namebuf, exp + 1, len - 1);
 			namebuf[len - 1] = 0;
 
-			sym = symbol_lookup_name(namebuf, false, false);
-			if(!sym) {
+			if(!symbol_lookup(namebuf, false, false, &sym)) {
 				kdb_printf("KDB: Symbol '%s' not found.\n", namebuf);
 				return KDB_FAILURE;
 			}
 
-			current = (uint64_t)sym->addr;
+			current = (uint64_t)sym.addr;
 		} else {
 			/* Safe to use strtoull() here - it'll stop after it
 			 * encounters a non-digit character. */
@@ -1410,9 +1409,7 @@ static kdb_status_t kdb_cmd_grep(int argc, char **argv, kdb_filter_t *filter) {
  * @return		KDB status code. */
 static kdb_status_t kdb_cmd_break(int argc, char **argv, kdb_filter_t *filter) {
 	uint64_t value;
-	symbol_t *sym;
 	unsigned i;
-	size_t off;
 	ptr_t addr;
 	int ret;
 
@@ -1451,9 +1448,7 @@ static kdb_status_t kdb_cmd_break(int argc, char **argv, kdb_filter_t *filter) {
 		if(ret < 0)
 			return KDB_FAILURE;
 
-		sym = symbol_lookup_addr(addr, &off);
-		kdb_printf("Created breakpoint %d [%p] %s+0x%zx\n", ret, addr,
-			(sym) ? sym->name : "<unknown>", off);
+		kdb_printf("Created breakpoint %d %pS\n", ret, addr);
 	} else if(strcmp(argv[1], "list") == 0) {
 		if(argc != 2) {
 			kdb_printf("Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
@@ -1464,8 +1459,7 @@ static kdb_status_t kdb_cmd_break(int argc, char **argv, kdb_filter_t *filter) {
 			if(!arch_kdb_get_breakpoint(i, &addr))
 				continue;
 
-			sym = symbol_lookup_addr(addr, &off);
-			kdb_printf("%u: [%p] %s+0x%zx\n", i, addr, (sym) ? sym->name : "<unknown>", off);
+			kdb_printf("%u: %pS\n", i, addr);
 		}
 	} else if(strcmp(argv[1], "delete") == 0) {
 		if(argc != 3) {
@@ -1491,9 +1485,8 @@ static kdb_status_t kdb_cmd_break(int argc, char **argv, kdb_filter_t *filter) {
  * @param filter	Ignored.
  * @return		KDB status code. */
 static kdb_status_t kdb_cmd_watch(int argc, char **argv, kdb_filter_t *filter) {
-	size_t size, off;
+	size_t size;
 	uint64_t value;
-	symbol_t *sym;
 	unsigned i;
 	ptr_t addr;
 	bool rw;
@@ -1548,10 +1541,8 @@ static kdb_status_t kdb_cmd_watch(int argc, char **argv, kdb_filter_t *filter) {
 		if(ret < 0)
 			return KDB_FAILURE;
 
-		sym = symbol_lookup_addr(addr, &off);
-		kdb_printf("Created %zu byte %swrite watchpoint %d [%p] %s+0x%zx\n",
-			size, (rw) ? "read-" : "", ret, addr,
-			(sym) ? sym->name : "<unknown>", off);
+		kdb_printf("Created %zu byte %swrite watchpoint %d %pS\n",
+			size, (rw) ? "read-" : "", ret, addr);
 	} else if(strcmp(argv[1], "list") == 0) {
 		if(argc != 2) {
 			kdb_printf("Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
@@ -1562,9 +1553,8 @@ static kdb_status_t kdb_cmd_watch(int argc, char **argv, kdb_filter_t *filter) {
 			if(!arch_kdb_get_watchpoint(i, &addr, &size, &rw))
 				continue;
 
-			sym = symbol_lookup_addr(addr, &off);
-			kdb_printf("%u: %zu byte %swrite [%p] %s+0x%zx\n", i, size, (rw) ? "read-" : "",
-				addr, (sym) ? sym->name : "<unknown>", off);
+			kdb_printf("%u: %zu byte %swrite %pS\n", i, size,
+				(rw) ? "read-" : "", addr);
 		}
 	} else if(strcmp(argv[1], "delete") == 0) {
 		if(argc != 3) {

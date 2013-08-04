@@ -17,7 +17,6 @@
 Import('env', 'manager')
 
 # Set paths to build utilities.
-manager.AddVariable('GENSYMTAB', File('../../utilities/gensymtab.py'))
 manager.AddVariable('GENERRLIST', File('../../utilities/generrlist.py'))
 manager.AddVariable('BIN2HEX', File('../../utilities/bin2hex.py'))
 

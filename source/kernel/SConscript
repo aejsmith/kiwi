@@ -83,7 +83,6 @@ sources = FeatureSources(config, [
     'object.c',
     'shutdown.c',
     ('SMP', 'smp.c'),
-    'symbol.c',
     'syscall_table.c',
     'time.c',
     'version.c',
@@ -146,41 +145,16 @@ env.Command('console/copyright.c', ['console/copyright.ppm'],
 
 # Generate the system call table.
 env['SYSCALLS'] = File('syscalls.def')
-env.SyscallTable('syscall_table.c', env['SYSCALLS'], TABLE='syscall_table')
-env.SyscallHeader('include/syscall_table.h', env['SYSCALLS'], GUARD='__SYSCALL_TABLE_H')
+env.SyscallTable('syscall_table.c', env['SYSCALLS'], TABLE = 'syscall_table')
+env.SyscallHeader('include/syscall_table.h', env['SYSCALLS'], GUARD = '__SYSCALL_TABLE_H')
 
 # Get the list of source files from the architecture/platform.
 arch_sources = SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])
 platform_sources = SConscript(dirs = ['platform/' + config['PLATFORM']], exports = ['env'])
 sources = arch_sources + platform_sources + sources
 
-# Create a fake symbol table used for the first linking stage.
-def fake_symtab_func(target, source, env):
-    f = open(str(target[0]), 'w')
-    f.write('/* This file is auto-generated, changes will be overwritten. */\n')
-    f.write('#include <symbol.h>\n')
-    f.write('static symbol_t kernel_symtab_array[] = { { { NULL, NULL }, 0x0, 0x0, "dummy", 0, false } };\n')
-    f.write('symbol_table_t kernel_symtab = { .symbols = kernel_symtab_array, .count = 1 };\n')
-    f.close()
-    return None
-
-# Link the first kernel image using a fake symbol table.
-env.Command('fake-symtab.c', [], Action(fake_symtab_func, '$GENCOMSTR'))
-env.Program('kernel-pass1', map(env.Object, sources) + ['fake-symtab.c'],
-    LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
-Depends('kernel-pass1', env['LDSCRIPT'])
-
-# Generate the first real symbol table and relink the kernel with it.
-env.Command('symtab-pass1.c', ['kernel-pass1'],
-    Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
-env.Program('kernel-pass2', map(env.Object, sources) + ['symtab-pass1.c'],
-    LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
-Depends('kernel-pass2', env['LDSCRIPT'])
-
-# Generate the final symbol table with correct symbol addresses.
-env.Command('symtab-pass2.c', ['kernel-pass2'],
-    Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
-env.Program('kernel-unstripped', map(env.Object, sources) + ['symtab-pass2.c'],
+# Link the kernel image.
+env.Program('kernel-unstripped', map(env.Object, sources),
     LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
 Depends('kernel-unstripped', env['LDSCRIPT'])
 
@@ -196,4 +170,4 @@ env.Command(['kernel', 'kernel.lst', 'kernel.rde', 'kernel.sym'], 'kernel-unstri
 manager['dist']['KERNEL'] = File('kernel')
 
 # Build kernel modules.
-#SConscript(dirs = ['modules'])
+SConscript(dirs = ['modules'])

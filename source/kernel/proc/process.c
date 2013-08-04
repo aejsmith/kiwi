@@ -44,6 +44,7 @@
 #include <elf.h>
 #include <kdb.h>
 #include <kernel.h>
+#include <module.h>
 #include <status.h>
 #include <time.h>
 
@@ -61,7 +62,6 @@
 
 /** Structure containing process loading information. */
 typedef struct process_load {
-	/** Arguments provided by the caller. */
 	const char *path;		/**< Path to program. */
 	const char *const *args;	/**< Argument array. */
 	size_t arg_count;		/**< Argument count. */
@@ -69,13 +69,11 @@ typedef struct process_load {
 	size_t env_count;		/**< Environment variable count. */
 	handle_t (*map)[2];		/**< Handle mapping array. */
 
-	/** Information used internally by the loader. */
 	struct vm_aspace *aspace;	/**< Address space for the process. */
-	void *data;			/**< Data pointer for the ELF loader. */
+	elf_image_t *image;		/**< ELF loader data. */
 	ptr_t arg_block;		/**< Address of argument block mapping. */
 	ptr_t stack;			/**< Address of stack mapping. */
 
-	/** Information to return to the caller. */
 	semaphore_t sem;		/**< Semaphore to wait for completion on. */
 	status_t status;		/**< Status code to return from the call. */
 } process_load_t;
@@ -106,6 +104,7 @@ static void process_ctor(void *obj, void *data) {
 	refcount_set(&process->running, 0);
 	list_init(&process->threads);
 	avl_tree_init(&process->futexes);
+	list_init(&process->images);
 	notifier_init(&process->death_notifier, process);
 }
 
@@ -126,6 +125,7 @@ void process_retain(process_t *process) {
  * @param process	Process to clean up. */
 static void process_cleanup(process_t *process) {
 	futex_cleanup(process);
+	elf_cleanup(process);
 
 	if(process->aspace) {
 		vm_aspace_destroy(process->aspace);
@@ -399,6 +399,7 @@ static status_t process_alloc(const char *name, process_id_t id, int priority,
 	process->priority = priority;
 	process->aspace = aspace;
 	process->handles = handles;
+	process->next_image_id = 0;
 	process->signal_mask = 0;
 	process->state = PROCESS_CREATED;
 	process->id = id;
@@ -458,8 +459,8 @@ static status_t process_load(process_load_t *load, process_t *parent) {
 	}
 
 	/* Map the kernel library. */
-	ret = elf_binary_load(kernel_library, load->aspace, LIBKERNEL_BASE,
-		LIBKERNEL_PATH, &load->data);
+	ret = elf_binary_load(kernel_library, LIBKERNEL_PATH, load->aspace,
+		LIBKERNEL_BASE, &load->image);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -557,7 +558,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	addr = load->arg_block;
 
 	/* Get the ELF loader to clear BSS and get the entry pointer. */
-	entry = elf_binary_finish(load->data);
+	entry = elf_binary_finish(load->image);
 
 	/* If there the information structure pointer is NULL, the process is
 	 * being created via kern_process_exec() and we don't need to wait for
@@ -703,9 +704,11 @@ __init_text void process_init(void) {
 	/* Register the KDB command. */
 	kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);
 
-	/* Create the kernel process. */
+	/* Create the kernel process and register the kernel image to it. */
 	process_alloc("[kernel]", 0, PRIORITY_CLASS_SYSTEM, NULL, NULL, NULL, &kernel_proc);
 	kernel_proc->flags |= PROCESS_CRITICAL;
+	kernel_proc->next_image_id = 1;
+	list_append(&kernel_proc->images, &kernel_module.image.header);
 }
 
 /** Terminate all running processes. */
@@ -1039,6 +1042,10 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	curr_thread->signal_stack.ss_size = 0;
 	curr_thread->signal_stack.ss_flags = SS_DISABLE;
 
+	/* Free all currently loaded images. */
+	elf_cleanup(curr_proc);
+	curr_proc->next_image_id = 0;
+
 	mutex_unlock(&curr_proc->lock);
 
 	/* Free up old data. */
@@ -1096,6 +1103,10 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, handle_t 
 	//	assert(parent);
 	//	memcpy(process->signal_act, parent->signal_act, sizeof(process->signal_act));
 	//	process->signal_mask = parent->signal_mask;
+
+
+	// dup images!
+
 
 	/* Create the new process and a handle to it. */
 	ret = process_alloc(curr_proc->name, 0, PRIORITY_CLASS_NORMAL, as, table,

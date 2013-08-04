@@ -50,19 +50,9 @@
 #include <object.h>
 #include <smp.h>
 #include <status.h>
-#include <symbol.h>
 #include <time.h>
 
-KBOOT_IMAGE(KBOOT_IMAGE_LOG);
-
-/** Structure describing a boot module. */
-typedef struct boot_module {
-	list_t header;			/**< Link to modules list. */
-	void *mapping;			/**< Pointer to mapped module data. */
-	size_t size;			/**< Size of the module data. */
-	object_handle_t *handle;	/**< File handle for the module data. */
-	char *name;			/**< Name of the module. */
-} boot_module_t;
+KBOOT_IMAGE(KBOOT_IMAGE_LOG | KBOOT_IMAGE_SECTIONS);
 
 extern void kmain_bsp(uint32_t magic, kboot_tag_t *tags);
 #if CONFIG_SMP
@@ -76,14 +66,6 @@ static void init_thread(void *arg1, void *arg2);
 
 /** Address of the KBoot tag list. */
 static kboot_tag_t *kboot_tag_list __init_data;
-
-/** The amount to increment the boot progress for each module. */
-static int progress_per_module __init_data;
-static int current_init_progress __init_data = 10;
-
-/** List of modules/FS images from the loader. */
-static LIST_DECLARE(boot_module_list);
-static LIST_DECLARE(boot_fsimage_list);
 
 /** Main entry point of the kernel.
  * @param magic		KBoot magic number.
@@ -119,6 +101,10 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	slab_init();
 	malloc_init();
 
+	/* We can now get to the ELF information passed by KBoot to enable us
+	 * to do symbol lookups. */
+	module_early_init();
+
 	/* Properly set up the console. */
 	console_init();
 
@@ -138,7 +124,6 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	#endif
 
 	/* Perform other initialization tasks. */
-	symbol_init();
 	handle_init();
 	process_init();
 	thread_init();
@@ -181,118 +166,16 @@ __init_text void kmain_ap(cpu_t *cpu) {
 }
 #endif
 
-/** Remove a module from the module list.
- * @param mod		Module to remove. */
-static __init_text void boot_module_remove(boot_module_t *mod) {
-	list_remove(&mod->header);
-	if(mod->name)
-		kfree(mod->name);
-
-	object_handle_release(mod->handle);
-	phys_unmap(mod->mapping, mod->size, true);
-	kfree(mod);
-
-	/* Update progress. */
-	current_init_progress += progress_per_module;
-	update_boot_progress(current_init_progress);
-}
-
-/** Look up a kernel module in the boot module list.
- * @param name		Name to look for.
- * @return		Pointer to module if found, NULL if not. */
-static __init_text boot_module_t *boot_module_lookup(const char *name) {
-	boot_module_t *mod;
-
-	LIST_FOREACH(&boot_module_list, iter) {
-		mod = list_entry(iter, boot_module_t, header);
-
-		if(mod->name && strcmp(mod->name, name) == 0)
-			return mod;
-	}
-
-	return NULL;
-}
-
-/** Load a kernel module provided at boot.
- * @param mod		Module to load. */
-static __init_text void load_boot_kmod(boot_module_t *mod) {
-	char name[MODULE_NAME_MAX + 1];
-	boot_module_t *dep;
-	status_t ret;
-
-	/* Try to load the module and all dependencies. */
-	while(true) {
-		ret = module_load(mod->handle, name);
-		if(ret == STATUS_SUCCESS) {
-			boot_module_remove(mod);
-			return;
-		} else if(ret != STATUS_MISSING_LIBRARY) {
-			fatal("Could not load module %s (%d)", (mod->name) ? mod->name : "<noname>", ret);
-		}
-
-		/* Unloaded dependency, try to find it and load it. */
-		dep = boot_module_lookup(name);
-		if(!dep)
-			fatal("Dependency on '%s' which is not available", name);
-
-		load_boot_kmod(dep);
-	}
-}
-
-/** Load boot-time kernel modules. */
-static __init_text void load_modules(void) {
-	boot_module_t *mod;
-	size_t count = 0;
-	char *tmp;
-
-	/* Firstly, populate our module list with the module details from the
-	 * loader. This is done so that it's much easier to look up module
-	 * dependencies, and also because the module loader requires handles
-	 * rather than a chunk of memory. */
-	KBOOT_ITERATE(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
-		mod = kmalloc(sizeof(boot_module_t), MM_BOOT);
-		list_init(&mod->header);
-		mod->name = NULL;
-		mod->size = tag->size;
-		mod->mapping = phys_map(tag->addr, tag->size, MM_BOOT);
-		mod->handle = file_from_memory(mod->mapping, tag->size);
-
-		/* Figure out the module name, which is needed to resolve
-		 * dependencies. If unable to get the name, assume the module
-		 * is a filesystem image. */
-		tmp = kmalloc(MODULE_NAME_MAX + 1, MM_BOOT);
-		if(module_name(mod->handle, tmp) != STATUS_SUCCESS) {
-			kfree(tmp);
-			list_append(&boot_fsimage_list, &mod->header);
-		} else {
-			mod->name = tmp;
-			list_append(&boot_module_list, &mod->header);
-		}
-
-		count++;
-	}
-
-	if(!count)
-		fatal("No modules were provided, cannot do anything!");
-
-	/* Determine how much to increase the boot progress by for each
-	 * module loaded. */
-	progress_per_module = 80 / count;
-
-	/* Load all kernel modules. */
-	while(!list_empty(&boot_module_list)) {
-		mod = list_first(&boot_module_list, boot_module_t, header);
-		load_boot_kmod(mod);
-	}
-}
-
 /** Second-stage intialization thread.
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void init_thread(void *arg1, void *arg2) {
 	const char *pargs[] = { "/system/bin/test", NULL }, *penv[] = { "LIBKERNEL_DEBUG=1", NULL };
 	initcall_t *initcall;
-	boot_module_t *mod;
+	size_t count = 0;
+	const char *name;
+	void *mapping;
+	object_handle_t *handle;
 	status_t ret;
 
 	/* Bring up all detected secondary CPUs. */
@@ -317,30 +200,34 @@ static void init_thread(void *arg1, void *arg2) {
 	/* Load modules, then any FS images supplied. Wait until after loading
 	 * kernel modules to do FS images, so that we only load FS images if the
 	 * boot filesystem could not be mounted. */
-	load_modules();
+	module_init();
 	if(!root_mount) {
-		if(list_empty(&boot_fsimage_list))
-			fatal("Could not find boot filesystem");
-
 		/* Mount a ramfs at the root to extract the images to. */
 		ret = fs_mount(NULL, "/", "ramfs", 0, NULL);
 		if(ret != STATUS_SUCCESS)
 			fatal("Could not mount ramfs for root (%d)", ret);
 
-		while(!list_empty(&boot_fsimage_list)) {
-			mod = list_first(&boot_fsimage_list, boot_module_t, header);
+		/* Search the KBoot module list for any filesystem images. */
+		KBOOT_ITERATE(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
+			name = kboot_tag_data(tag, 0);
+			mapping = phys_map(tag->addr, tag->size, MM_BOOT);
+			handle = file_from_memory(mapping, tag->size);
 
-			ret = tar_extract(mod->handle, "/");
-			if(ret != STATUS_SUCCESS)
-				fatal("Failed to load FS image (%d)", ret);
+			ret = tar_extract(handle, "/");
+			object_handle_release(handle);
+			phys_unmap(mapping, tag->size, true);
+			if(ret == STATUS_UNKNOWN_IMAGE) {
+				continue;
+			} else if(ret != STATUS_SUCCESS) {
+				fatal("Failed to load FS image %s (%d)", name, ret);
+			}
 
-			boot_module_remove(mod);
+			count++;
 		}
-	} else {
-		while(!list_empty(&boot_fsimage_list)) {
-			mod = list_first(&boot_fsimage_list, boot_module_t, header);
-			boot_module_remove(mod);
-		}
+
+		/* If there were no images, there's not much we can do. */
+		if(!count)
+			fatal("Could not find root filesystem");
 	}
 
 	/* Reclaim memory taken up by initialization code/data. */

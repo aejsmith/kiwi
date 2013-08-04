@@ -38,4 +38,8 @@
 #define DEVICE_ATTR_MAX		256	/**< Maximum length of a device attribute string value. */
 #define DEVICE_PATH_MAX		256	/**< Maximum length of a device tree path. */
 
+/** Kernel module limits. */
+#define MODULE_NAME_MAX		16	/** Maximum length of a module name. */
+#define MODULE_DESC_MAX		80	/** Maximum length of a module description. */
+
 #endif /* __KERNEL_LIMITS_H */

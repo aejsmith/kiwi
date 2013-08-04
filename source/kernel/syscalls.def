@@ -28,6 +28,7 @@ type offset_t int64_t;
 type object_rights_t uint32_t;
 type user_id_t int16_t;
 type group_id_t int16_t;
+type image_id_t int16_t;
 
 syscall kern_fatal(ptr_t);
 syscall kern_shutdown(int);
@@ -35,7 +36,7 @@ syscall kern_system_time(ptr_t);
 syscall kern_unix_time(ptr_t);
 
 syscall kern_module_load(ptr_t, ptr_t);
-syscall kern_module_info(ptr_t, ptr_t);
+#syscall kern_module_info(ptr_t, ptr_t);
 
 syscall kern_object_type(handle_t);
 syscall kern_object_wait(ptr_t, size_t, uint32_t, nstime_t);
@@ -131,3 +132,6 @@ syscall kern_signal_action(int, ptr_t, ptr_t) wrapped;
 syscall kern_signal_mask(int, ptr_t, ptr_t);
 syscall kern_signal_stack(ptr_t, ptr_t);
 syscall kern_signal_return() hidden;
+
+syscall kern_image_register(ptr_t, ptr_t) hidden;
+syscall kern_image_unregister(image_id_t) hidden;

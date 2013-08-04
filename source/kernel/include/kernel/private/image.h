@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Alex Smith
+ * Copyright (C) 2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,32 +16,32 @@
 
 /**
  * @file
- * @brief		Kernel module functions.
+ * @brief		Internal image loader functions.
  */
 
-#ifndef __KERNEL_MODULE_H
-#define __KERNEL_MODULE_H
+#ifndef __KERNEL_PRIVATE_IMAGE_H
+#define __KERNEL_PRIVATE_IMAGE_H
 
-#include <kernel/limits.h>
-#include <kernel/types.h>
+#include <kernel/image.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Module information structure. */
-typedef struct module_info {
-	char name[MODULE_NAME_MAX];	/**< Name of the module. */
-	char desc[MODULE_DESC_MAX];	/**< Description of the module. */
-	size_t count;			/**< Reference count of the module. */
-	size_t load_size;		/**< Size of the module in memory. */
-} module_info_t;
+/** Structure containing image information for the kernel. */
+typedef struct image_info {
+	const char *name;		/**< Name of the image. */
+	void *ehdr;			/**< ELF executable header. */
+	void *shdrs;			/**< ELF section headers. */
+	void *load_base;		/**< Address of allocation module is loaded to. */
+	size_t load_size;		/**< Size of allocation module is loaded to. */
+} image_info_t;
 
-extern status_t kern_module_load(const char *path, char *depbuf);
-extern status_t kern_module_info(module_info_t *infop, size_t *countp);
+extern status_t kern_image_register(image_info_t *info, image_id_t **idp);
+extern status_t kern_image_unregister(image_id_t id);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __KERNEL_MODULE_H */
+#endif /* __KERNEL_PRIVATE_IMAGE_H */

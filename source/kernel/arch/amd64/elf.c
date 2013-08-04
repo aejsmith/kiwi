@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,28 +26,22 @@
 #include <module.h>
 #include <status.h>
 
-#if CONFIG_MODULE_DEBUG
-# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
-#else
-# define dprintf(fmt...)	
-#endif
-
 /** Perform a REL relocation on an ELF module.
- * @param module	Module to relocate.
+ * @param image		Image to relocate.
  * @param rel		Relocation to perform.
  * @param target	Section to perform relocation on.
  * @return		Status code describing result of the operation. */
-status_t elf_module_apply_rel(module_t *module, elf_rel_t *rel, elf_shdr_t *target) {
-	dprintf("elf: ELF_SHT_REL relocation section unsupported\n");
+status_t arch_elf_module_relocate_rel(elf_image_t *image, elf_rel_t *rel, elf_shdr_t *target) {
+	kprintf(LOG_WARN, "elf: REL relocation section unsupported\n");
 	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Perform a RELA relocation on an ELF module.
- * @param module	Module to relocate.
+ * @param image		Image to relocate.
  * @param rel		Relocation to perform.
  * @param target	Section to perform relocation on.
  * @return		Status code describing result of the operation. */
-status_t elf_module_apply_rela(module_t *module, elf_rela_t *rel, elf_shdr_t *target) {
+status_t arch_elf_module_relocate_rela(elf_image_t *image, elf_rela_t *rel, elf_shdr_t *target) {
 	Elf64_Addr *where64, val = 0;
 	Elf32_Addr *where32;
 	status_t ret;
@@ -57,7 +51,7 @@ status_t elf_module_apply_rela(module_t *module, elf_rela_t *rel, elf_shdr_t *ta
 	where32 = (Elf32_Addr *)(target->sh_addr + rel->r_offset);
 
 	/* Obtain the symbol value. */
-	ret = elf_module_lookup_symbol(module, ELF64_R_SYM(rel->r_info), &val);
+	ret = elf_module_resolve(image, ELF64_R_SYM(rel->r_info), &val);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -78,7 +72,7 @@ status_t elf_module_apply_rela(module_t *module, elf_rela_t *rel, elf_shdr_t *ta
 		*where32 = val + rel->r_addend;
 		break;
 	default:
-		dprintf("elf: encountered unknown relocation type: %lu\n",
+		kprintf(LOG_WARN, "elf: encountered unknown relocation type: %lu\n",
 			ELF64_R_TYPE(rel->r_info));
 		return STATUS_MALFORMED_IMAGE;
 	}

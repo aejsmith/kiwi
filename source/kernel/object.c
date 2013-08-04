@@ -49,7 +49,10 @@
 #include <object.h>
 #include <status.h>
 
-#if CONFIG_OBJECT_DEBUG
+/** Define to enable debug output on handle creation/close. */
+//#define DEBUG_HANDLE
+
+#ifdef DEBUG_HANDLE
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
 #else
 # define dprintf(fmt...)	

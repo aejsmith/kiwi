@@ -56,5 +56,6 @@ typedef int16_t user_id_t;		/**< Type used to store a user ID. */
 typedef int16_t group_id_t;		/**< Type used to store a group ID. */
 typedef uint16_t mount_id_t;		/**< Type used to store a mount ID. */
 typedef uint64_t node_id_t;		/**< Type used to store a filesystem node ID. */
+typedef int16_t image_id_t;		/**< Type used to store a image ID. */
 
 #endif /* __KERNEL_TYPES_H */
