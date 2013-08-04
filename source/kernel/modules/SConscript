@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,33 +14,34 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-subdirs = ['fs', 'platform', 'tty']
+subdirs = ['test']
 
 #############################
 # Build environment set-up. #
 #############################
 
-Import('config', 'envmgr')
+Import('config', 'manager')
 
 # Create the module environment.
-env = envmgr.Clone('module', 'kernel', {
-	'MODULES': [],
-	'CCFLAGS': ['-fno-common'],
-	'LINKFLAGS': ['-r'],
+env = manager.Clone('module', 'kernel', {
+    'CCFLAGS': ['-fno-common'],
 })
 
 # Add a builder to create kernel modules. The emitter adds all modules to the
 # distribution environment's module list.
 def module_emitter(target, source, env):
-	envmgr['dist']['MODULES'].append(target[0])
-	return target, source
+    manager['dist']['MODULES'].append(target[0])
+    return target, source
 env['BUILDERS']['Module'] = Builder(
-	action=Action('$LINKCOM && $STRIP --strip-debug $TARGET', '$LINKCOMSTR'),
-	suffix='.km',
-	src_suffix='$OBJSUFFIX',
-	src_builder='Object',
-	emitter=module_emitter
+    action = [
+        Action('$LD -r -o $TARGET $SOURCES', '$LINKCOMSTR'),
+        Action('$STRIP --strip-debug $TARGET', None),
+    ],
+    suffix = '.km',
+    src_suffix = '$OBJSUFFIX',
+    src_builder = 'Object',
+    emitter = module_emitter
 )
 
 # Get all of the modules and include directories into the array.
-SConscript(dirs=subdirs, exports=['env'])
+SConscript(dirs = subdirs, exports = ['env'])
