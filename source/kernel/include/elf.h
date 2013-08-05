@@ -40,17 +40,16 @@ typedef struct elf_image {
 	char *name;			/**< Name of the image. */
 	ptr_t load_base;		/**< Base address of image.. */
 	size_t load_size;		/**< Total size of image. */
-
-	/**
-	 * ELF information.
-	 *
-	 * For images registered in anything other than the kernel process,
-	 * these are all user pointers. Therefore, don't access them.
-	 */
 	elf_ehdr_t *ehdr;		/**< ELF executable header. */
 	elf_phdr_t *phdrs;		/**< Program headers (only valid during loading). */
 	elf_shdr_t *shdrs;		/**< ELF section headers. */
-	size_t symtab;			/**< Index of symbol table section. */
+
+	/** Symbol/string tables.
+	 * @warning		For user images, these are user pointers. */
+	void *symtab;			/**< Symbol table. */
+	uint32_t sym_size;		/**< Size of symbol table. */
+	uint32_t sym_entsize;		/**< Size of a single symbol table entry. */
+	void *strtab;			/**< String table. */
 } elf_image_t;
 
 extern status_t elf_binary_reserve(object_handle_t *handle, struct vm_aspace *as);

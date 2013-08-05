@@ -32,8 +32,6 @@
 
 extern void libkernel_init_stage2(process_args_t *args, void *load_base);
 
-extern elf_dyn_t _DYNAMIC[];
-
 /**
  * Kernel library 1st stage initialisation.
  *

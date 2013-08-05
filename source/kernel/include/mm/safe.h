@@ -31,15 +31,15 @@
 /** Check whether an address is a user address.
  * @param addr		Address to check.
  * @return		Whether the address is a user address. */
-static inline bool is_user_address(ptr_t addr) {
+static inline bool is_user_address(void *addr) {
 	#if USER_BASE > 0
-	return (addr >= USER_BASE && addr < (USER_BASE + USER_SIZE));
+	return ((ptr_t)addr >= USER_BASE && (ptr_t)addr < (USER_BASE + USER_SIZE));
 	#else
-	return (addr < USER_SIZE);
+	return ((ptr_t)addr < USER_SIZE);
 	#endif 
 }
 
-extern status_t validate_user_address(void *dest, size_t size);
+extern bool validate_user_range(void *dest, size_t size);
 
 extern status_t memcpy_from_user(void *dest, const void *src, size_t count);
 extern status_t memcpy_to_user(void *dest, const void *src, size_t count);

@@ -26,6 +26,7 @@
 
 #include <kernel/fs.h>
 #include <kernel/object.h>
+#include <kernel/private/image.h>
 #include <kernel/vm.h>
 
 #include <alloca.h>
@@ -60,10 +61,25 @@ rtld_image_t libkernel_image = {
 /** Pointer to the application image. */
 rtld_image_t *application_image;
 
-/** Check if a library exists.
+/** Check if a library is already loaded.
+ * @param name		Name of library.
+ * @return		Pointer to image structure if found. */
+static rtld_image_t *rtld_image_lookup(const char *name) {
+	rtld_image_t *image;
+
+	LIST_FOREACH_SAFE(&loaded_images, iter) {
+		image = list_entry(iter, rtld_image_t, header);
+		if(strcmp(image->name, name) == 0)
+			return image;
+	}
+
+	return NULL;
+}
+
+/** Check if a path exists.
  * @param path		Path to check.
  * @return		True if exists, false if not. */
-static bool rtld_library_exists(const char *path) {
+static bool path_exists(const char *path) {
 	handle_t handle;
 	status_t ret;
 
@@ -81,28 +97,13 @@ static bool rtld_library_exists(const char *path) {
 	return true;
 }
 
-/** Check if a library is already loaded.
- * @param name		Name of library.
- * @return		Pointer to image structure if found. */
-static rtld_image_t *rtld_image_lookup(const char *name) {
-	rtld_image_t *image;
-
-	LIST_FOREACH_SAFE(&loaded_images, iter) {
-		image = list_entry(iter, rtld_image_t, header);
-		if(strcmp(image->name, name) == 0)
-			return image;
-	}
-
-	return NULL;
-}
-
 /** Search for a library and then load it.
  * @param name		Name of library to load.
  * @param req		Image that requires this library.
  * @param imagep	Where to store pointer to image structure.
  * @return		STATUS_SUCCESS if loaded, STATUS_MISSING_LIBRARY if not
  *			found or another status code for failures. */
-static status_t rtld_library_load(const char *name, rtld_image_t *req, rtld_image_t **imagep) {
+static status_t load_library(const char *name, rtld_image_t *req, rtld_image_t **imagep) {
 	char buf[FS_PATH_MAX];
 	rtld_image_t *exist;
 	size_t i;
@@ -125,7 +126,7 @@ static status_t rtld_library_load(const char *name, rtld_image_t *req, rtld_imag
 		strcpy(buf, library_search_dirs[i]);
 		strcat(buf, "/");
 		strcat(buf, name);
-		if(rtld_library_exists(buf))
+		if(path_exists(buf))
 			return rtld_image_load(buf, req, ELF_ET_DYN, NULL, imagep);
 	}
 
@@ -229,13 +230,14 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp,
 	rtld_image_t **imagep)
 {
-	rtld_image_t *image = NULL;
-	size_t bytes, size, i;
-	char *interp = NULL;
-	elf_phdr_t *phdrs;
-	const char *dep;
-	elf_ehdr_t ehdr;
 	handle_t handle;
+	size_t bytes, size, i;
+	elf_ehdr_t ehdr;
+	rtld_image_t *image = NULL;
+	elf_phdr_t *phdrs;
+	char *interp = NULL;
+	const char *dep;
+	image_info_t info;
 	status_t ret;
 
 	/* Try to open the image. */
@@ -254,11 +256,16 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 		dprintf("rtld: %s: not a valid ELF file\n", path);
 		ret = STATUS_UNKNOWN_IMAGE;
 		goto fail;
-	} else if(ehdr.e_ident[ELF_EI_CLASS] != ELF_CLASS
-		|| ehdr.e_ident[ELF_EI_DATA] != ELF_ENDIAN
-		|| ehdr.e_machine != ELF_MACHINE)
-	{
-		dprintf("rtld: %s: not for the machine we are running on\n", path);
+	} else if(ehdr.e_ident[ELF_EI_CLASS] != ELF_CLASS) {
+		dprintf("rtld: %s: incorrect ELF class\n", path);
+		ret = STATUS_UNKNOWN_IMAGE;
+		goto fail;
+	} else if(ehdr.e_ident[ELF_EI_DATA] != ELF_ENDIAN) {
+		dprintf("rtld: %s: incorrect endianness\n", path);
+		ret = STATUS_UNKNOWN_IMAGE;
+		goto fail;
+	} else if(ehdr.e_machine != ELF_MACHINE) {
+		dprintf("rtld: %s: not for this machine\n", path);
 		ret = STATUS_UNKNOWN_IMAGE;
 		goto fail;
 	} else if(ehdr.e_ident[ELF_EI_VERSION] != 1 || ehdr.e_version != 1) {
@@ -443,7 +450,8 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	}
 
 	/* Set name and loading state, and fill out hash information.
-	 * FIXME: Use base of library path if SONAME not set. */
+	 * FIXME: Just use basename of path for application, and for library
+	 * if SONAME not set. */
 	if(type == ELF_ET_DYN) {
 		image->name = (const char *)(image->dynamic[ELF_DT_SONAME]
 			+ image->dynamic[ELF_DT_STRTAB]);
@@ -477,7 +485,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 
 		dep = (const char *)(image->dyntab[i].d_un.d_ptr + image->dynamic[ELF_DT_STRTAB]);
 		dprintf("rtld: %s: dependency on %s, loading...\n", path, dep);
-		ret = rtld_library_load(dep, image, NULL);
+		ret = load_library(dep, image, NULL);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
 	}
@@ -490,6 +498,23 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	/* We are loaded. Set the state to loaded and return required info. */
 	image->refcount = 1;
 	image->state = RTLD_IMAGE_LOADED;
+
+	/* Register the image with the kernel. FIXME: See above about basename.
+	 * TODO: Load in full symbol table if possible as the dynsym table only
+	 * contains exported symbols (perhaps only for debug builds). */
+	info.name = (type == ELF_ET_DYN) ? image->name : image->path;
+	info.load_base = image->load_base;
+	info.load_size = image->load_size;
+	info.symtab = (void *)image->dynamic[ELF_DT_SYMTAB];
+	info.sym_entsize = image->dynamic[ELF_DT_SYMENT];
+	info.sym_size = image->h_nchain * info.sym_entsize;
+	info.strtab = (void *)image->dynamic[ELF_DT_STRTAB];
+
+	ret = kern_image_register(&info, &image->id);
+	if(ret != STATUS_SUCCESS) {
+		printf("rtld: failed to register image with kernel (%d)\n", ret);
+		goto fail;
+	}
 
 	if(entryp)
 		*entryp = (void *)ehdr.e_entry;
@@ -563,6 +588,7 @@ void rtld_image_unload(rtld_image_t *image) {
  * @return		Entry point for the program. */
 void *rtld_init(process_args_t *args, bool dry_run) {
 	rtld_image_t *image;
+	image_info_t info;
 	status_t ret;
 	void *entry;
 
@@ -573,6 +599,21 @@ void *rtld_init(process_args_t *args, bool dry_run) {
 	rtld_symbol_init(&libkernel_image);
 	list_init(&libkernel_image.header);
 	list_append(&loaded_images, &libkernel_image.header);
+
+	/* Register the image with the kernel. */
+	info.name = libkernel_image.name;
+	info.load_base = libkernel_image.load_base;
+	info.load_size = libkernel_image.load_size;
+	info.symtab = (void *)libkernel_image.dynamic[ELF_DT_SYMTAB];
+	info.sym_entsize = libkernel_image.dynamic[ELF_DT_SYMENT];
+	info.sym_size = libkernel_image.h_nchain * info.sym_entsize;
+	info.strtab = (void *)libkernel_image.dynamic[ELF_DT_STRTAB];
+
+	ret = kern_image_register(&info, &libkernel_image.id);
+	if(ret != STATUS_SUCCESS) {
+		printf("rtld: failed to register libkernel image (%d)\n", ret);
+		kern_process_exit(ret);
+	}
 
 	/* Load the program. */
 	dprintf("rtld: loading program %s...\n", args->path);

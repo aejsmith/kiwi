@@ -55,7 +55,6 @@
 status_t io_request_init(io_request_t *request, const io_vec_t *vecs, size_t count,
 	offset_t offset, io_op_t op, io_target_t target)
 {
-	status_t ret;
 	size_t i;
 
 	request->offset = offset;
@@ -74,10 +73,9 @@ status_t io_request_init(io_request_t *request, const io_vec_t *vecs, size_t cou
 
 		/* Validate addresses on user address spaces. */
 		if(target == IO_TARGET_USER) {
-			ret = validate_user_address(vecs[i].buffer, vecs[i].size);
-			if(ret != STATUS_SUCCESS) {
+			if(!validate_user_range(vecs[i].buffer, vecs[i].size)) {
 				kfree(request->vecs);
-				return ret;
+				return STATUS_INVALID_ADDR;
 			}
 		}
 

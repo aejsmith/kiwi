@@ -67,13 +67,13 @@
 	stmt; \
 	USERMEM_SUCCESS()
 
-/** Check if an address range points with userspace memory.
+/** Check if an address range is within userspace memory.
  * @note		Does not check if the memory is actually accessible!
  * @param dest		Base address.
  * @param size		Size of range.
- * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on failure. */
-status_t validate_user_address(void *dest, size_t size) {
-	return (VALID((ptr_t)dest, size)) ? STATUS_SUCCESS : STATUS_INVALID_ADDR;
+ * @return		Whether the address range is valid. */
+bool validate_user_range(void *dest, size_t size) {
+	return VALID((ptr_t)dest, size);
 }
 
 /** Copy data from user memory.

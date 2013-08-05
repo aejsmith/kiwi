@@ -230,7 +230,7 @@ static void page_fault(intr_frame_t *frame) {
 	ret = vm_fault(frame, addr, reason, access);
 	if(ret != STATUS_SUCCESS) {
 		/* Handle faults in safe user memory access functions. */
-		if(curr_thread && curr_thread->in_usermem && is_user_address(addr)) {
+		if(curr_thread && curr_thread->in_usermem && is_user_address((void *)addr)) {
 			kprintf(LOG_DEBUG, "arch: thread %" PRId32 " (%s) faulted "
 				"in usermem at %p (ip: %p)\n", curr_thread->id,
 				curr_thread->name, addr, frame->ip);

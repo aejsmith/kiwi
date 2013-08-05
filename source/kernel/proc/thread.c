@@ -1041,9 +1041,8 @@ status_t kern_thread_create(const char *name, thread_entry_t *entry,
 		if(!kentry.stack_size)
 			return STATUS_INVALID_ARG;
 
-		ret = validate_user_address(kentry.stack, kentry.stack_size);
-		if(ret != STATUS_SUCCESS)
-			return ret;
+		if(!validate_user_range(kentry.stack, kentry.stack_size))
+			return STATUS_INVALID_ADDR;
 	}
 
 	ret = strndup_from_user(name, THREAD_NAME_MAX, &kname);

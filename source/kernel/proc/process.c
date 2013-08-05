@@ -213,6 +213,11 @@ void process_thread_exited(thread_t *thread) {
 		 * state and clean up its resources. */
 		process->state = PROCESS_DEAD;
 
+		if(process->flags & PROCESS_CRITICAL && !shutdown_in_progress) {
+			fatal("Critical process %" PRId32 " (%s) terminated",
+				process->id, process->name);
+		}
+
 		/* Don't bother running callbacks during shutdown. */
 		if(!shutdown_in_progress)
 			notifier_run(&process->death_notifier, NULL, true);
@@ -225,9 +230,6 @@ void process_thread_exited(thread_t *thread) {
 			process->load->status = process->status;
 			semaphore_up(&process->load->sem, 1);
 			process->load = NULL;
-		} else if(process->flags & PROCESS_CRITICAL && !shutdown_in_progress) {
-			fatal("Critical process %" PRId32 " (%s) terminated",
-				process->id, process->name);
 		}
 	}
 }
@@ -1093,7 +1095,7 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, handle_t 
 	handle_t handle;
 	status_t ret;
 
-	if(validate_user_address(sp, 0) != STATUS_SUCCESS)
+	if(!is_user_address(sp))
 		return STATUS_INVALID_ADDR;
 
 	/* Create a clone of the process' address space and handle table. */

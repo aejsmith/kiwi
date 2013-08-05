@@ -297,7 +297,7 @@ status_t elf_binary_load(object_handle_t *handle, const char *path, vm_aspace_t 
 		image->load_base = dest;
 		ret = vm_map(as, &image->load_base, image->load_size,
 			(dest) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY, VM_PROT_READ,
-			VM_MAP_PRIVATE, NULL, 0, path);
+			VM_MAP_PRIVATE, NULL, 0, image->name);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
 	} else {
@@ -404,20 +404,17 @@ ptr_t elf_binary_finish(elf_image_t *image) {
  * @param valp		Where to store symbol value.
  * @return		Status code describing result of the operation. */
 status_t elf_module_resolve(elf_image_t *image, size_t num, elf_addr_t *valp) {
-	elf_shdr_t *symtab, *strtab;
 	elf_sym_t *sym;
 	const char *name;
 	symbol_t ksym;
 
-	symtab = get_image_section(image, image->symtab);
-	if(num >= (symtab->sh_size / symtab->sh_entsize))
+	if(num >= (image->sym_size / image->sym_entsize))
 		return STATUS_MALFORMED_IMAGE;
 
-	strtab = get_image_section(image, symtab->sh_link);
-	sym = (elf_sym_t *)(symtab->sh_addr + (symtab->sh_entsize * num));
+	sym = (elf_sym_t *)(image->symtab + (image->sym_entsize * num));
 	if(sym->st_shndx == ELF_SHN_UNDEF) {
 		/* External symbol, look up in the kernel and other modules. */
-		name = (const char *)strtab->sh_addr + sym->st_name;
+		name = (const char *)image->strtab + sym->st_name;
 		if(!symbol_lookup(name, true, true, &ksym)) {
 			kprintf(LOG_WARN, "elf: %s: reference to undefined symbol `%s'\n",
 				image->name, name);
@@ -534,14 +531,18 @@ static status_t load_module_sections(elf_image_t *image, object_handle_t *handle
  * @return		Status code describing result of the operation. */
 static status_t fix_module_symbols(elf_image_t *image) {
 	size_t i;
-	elf_shdr_t *symtab, *strtab, *shdr;
+	elf_shdr_t *shdr;
 	elf_sym_t *sym;
 
-	/* Look for the symbol table. */
+	/* Look for the symbol and string tables. */
 	for(i = 0; i < image->ehdr->e_shnum; i++) {
-		symtab = get_image_section(image, i);
-		if(symtab->sh_type == ELF_SHT_SYMTAB) {
-			image->symtab = i;
+		shdr = get_image_section(image, i);
+		if(shdr->sh_type == ELF_SHT_SYMTAB) {
+			image->symtab = (void *)shdr->sh_addr;
+			image->sym_size = shdr->sh_size;
+			image->sym_entsize = shdr->sh_entsize;
+			shdr = get_image_section(image, shdr->sh_link);
+			image->strtab = (void *)shdr->sh_addr;
 			break;
 		}
 	}
@@ -551,10 +552,8 @@ static status_t fix_module_symbols(elf_image_t *image) {
 		return STATUS_MALFORMED_IMAGE;
 	}
 
-	strtab = get_image_section(image, symtab->sh_link);
-
-	for(i = 0; i < symtab->sh_size / symtab->sh_entsize; i++) {
-		sym = (elf_sym_t *)(symtab->sh_addr + (symtab->sh_entsize * i));
+	for(i = 0; i < image->sym_size / image->sym_entsize; i++) {
+		sym = (elf_sym_t *)(image->symtab + (image->sym_entsize * i));
 		if(sym->st_shndx == ELF_SHN_UNDEF || sym->st_shndx > image->ehdr->e_shnum)
 			continue;
 
@@ -797,17 +796,14 @@ void elf_module_destroy(elf_image_t *image) {
  * @param offp		Where to store symbol offset (can be NULL).
  * @return		Whether a symbol was found for the address. */
 bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size_t *offp) {
-	elf_shdr_t *symtab, *strtab, *shdr;
+	elf_shdr_t *shdr;
 	size_t i;
 	elf_sym_t *sym;
 	uint8_t type;
 	ptr_t value;
 
-	symtab = get_image_section(image, image->symtab);
-	strtab = get_image_section(image, symtab->sh_link);
-
-	for(i = 0; i < symtab->sh_size / symtab->sh_entsize; i++) {
-		sym = (elf_sym_t *)(symtab->sh_addr + (symtab->sh_entsize * i));
+	for(i = 0; i < image->sym_size / image->sym_entsize; i++) {
+		sym = (elf_sym_t *)(image->symtab + (image->sym_entsize * i));
 		if(sym->st_shndx == ELF_SHN_UNDEF || sym->st_shndx > image->ehdr->e_shnum)
 			continue;
 
@@ -828,7 +824,7 @@ bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size
 
 			symbol->addr = value;
 			symbol->size = sym->st_size;
-			symbol->name = (const char *)strtab->sh_addr + sym->st_name;
+			symbol->name = (const char *)image->strtab + sym->st_name;
 			symbol->global = (ELF_ST_BIND(sym->st_info)) ? true : false;
 			symbol->exported = false; // FIXME
 			return true;
@@ -848,16 +844,13 @@ bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size
 bool elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
 	bool exported, symbol_t *symbol)
 {
-	elf_shdr_t *symtab, *strtab, *shdr;
+	elf_shdr_t *shdr;
 	size_t i;
 	elf_sym_t *sym;
 	uint8_t type;
 
-	symtab = get_image_section(image, image->symtab);
-	strtab = get_image_section(image, symtab->sh_link);
-
-	for(i = 0; i < symtab->sh_size / symtab->sh_entsize; i++) {
-		sym = (elf_sym_t *)(symtab->sh_addr + (symtab->sh_entsize * i));
+	for(i = 0; i < image->sym_size / image->sym_entsize; i++) {
+		sym = (elf_sym_t *)(image->symtab + (image->sym_entsize * i));
 		if(sym->st_shndx == ELF_SHN_UNDEF || sym->st_shndx > image->ehdr->e_shnum)
 			continue;
 
@@ -871,10 +864,10 @@ bool elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
 		if(!(shdr->sh_flags & ELF_SHF_ALLOC))
 			continue;
 
-		if(strcmp((const char *)strtab->sh_addr + sym->st_name, name) == 0) {
+		if(strcmp((const char *)image->strtab + sym->st_name, name) == 0) {
 			symbol->addr = sym->st_value + image->load_base;
 			symbol->size = sym->st_size;
-			symbol->name = (const char *)strtab->sh_addr + sym->st_name;
+			symbol->name = (const char *)image->strtab + sym->st_name;
 			symbol->global = (ELF_ST_BIND(sym->st_info)) ? true : false;
 			symbol->exported = false; // FIXME
 			return true;
@@ -891,7 +884,15 @@ bool elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
 /** Clean up ELF images attached to a process.
  * @param process	Process to clean up. */
 void elf_cleanup(process_t *process) {
+	elf_image_t *image;
 
+	LIST_FOREACH_SAFE(&process->images, iter) {
+		image = list_entry(iter, elf_image_t, header);
+
+		list_remove(&image->header);
+		kfree(image->name);
+		kfree(image);
+	}
 }
 
 /** Print a list of loaded images in a process.
@@ -982,11 +983,15 @@ __init_text void elf_init(elf_image_t *image) {
 	image->ehdr = kmemdup((elf_ehdr_t *)KERNEL_VIRT_BASE, sizeof(*image->ehdr), MM_BOOT);
 	image->shdrs = kmemdup(sections->sections, sections->num * sections->entsize, MM_BOOT);
 
-	/* Find the symbol table. */
+	/* Look for the symbol and string tables. */
 	for(i = 0; i < image->ehdr->e_shnum; i++) {
 		shdr = get_image_section(image, i);
 		if(shdr->sh_type == ELF_SHT_SYMTAB) {
-			image->symtab = i;
+			image->symtab = (void *)shdr->sh_addr;
+			image->sym_size = shdr->sh_size;
+			image->sym_entsize = shdr->sh_entsize;
+			shdr = get_image_section(image, shdr->sh_link);
+			image->strtab = (void *)shdr->sh_addr;
 			break;
 		}
 	}
@@ -1003,10 +1008,95 @@ __init_text void elf_init(elf_image_t *image) {
  * User image management.
  */
 
-status_t kern_image_register(image_info_t *info, image_id_t **idp) {
-	return STATUS_NOT_IMPLEMENTED;
+/** Register an ELF image with the kernel.
+ * @param info		Image information structure.
+ * @param idp		Where to store ID for image.
+ * @return		Status code describing the result of the operation. */
+status_t kern_image_register(image_info_t *info, image_id_t *idp) {
+	image_info_t kinfo;
+	elf_image_t *image;
+	char *name;
+	status_t ret;
+
+	if(!info || !idp)
+		return STATUS_INVALID_ARG;
+
+	ret = memcpy_from_user(&kinfo, info, sizeof(kinfo));
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	if(kinfo.load_base && !validate_user_range(kinfo.load_base, kinfo.load_size)) {
+		return STATUS_INVALID_ADDR;
+	} else if(kinfo.symtab && !validate_user_range(kinfo.symtab, kinfo.sym_size)) {
+		return STATUS_INVALID_ADDR;
+	} else if(kinfo.strtab && !is_user_address(kinfo.strtab)) {
+		return STATUS_INVALID_ADDR;
+	}
+
+	image = kmalloc(sizeof(*image), MM_KERNEL);
+	list_init(&image->header);
+	image->load_base = (ptr_t)kinfo.load_base;
+	image->load_size = kinfo.load_size;
+	image->symtab = kinfo.symtab;
+	image->sym_size = kinfo.sym_size;
+	image->sym_entsize = kinfo.sym_entsize;
+	image->strtab = kinfo.strtab;
+
+	ret = strndup_from_user(kinfo.name, FS_PATH_MAX, &name);
+	if(ret != STATUS_SUCCESS) {
+		kfree(image);
+		return ret;
+	}
+
+	image->name = kbasename(name, MM_KERNEL);
+	kfree(name);
+
+	mutex_lock(&curr_proc->lock);
+
+	ret = memcpy_to_user(idp, &curr_proc->next_image_id, sizeof(*idp));
+	if(ret != STATUS_SUCCESS) {
+		mutex_unlock(&curr_proc->lock);
+		kfree(image->name);
+		kfree(image);
+		return ret;
+	}
+
+	image->id = curr_proc->next_image_id++;
+	list_append(&curr_proc->images, &image->header);
+
+	dprintf("elf: registered image %" PRIu16 " (%s) in process %" PRIu32
+		" (load_base: %p, load_size: 0x%zx)\n", image->id, image->name,
+		curr_proc->id, image->load_base, image->load_size);
+
+	mutex_unlock(&curr_proc->lock);
+	return STATUS_SUCCESS;
 }
 
+/** Unregister an ELF image.
+ * @param id		ID of the image to unregister.
+ * @return		Status code describing the result of the operation. */
 status_t kern_image_unregister(image_id_t id) {
-	return STATUS_NOT_IMPLEMENTED;
+	elf_image_t *image;
+
+	mutex_lock(&curr_proc->lock);
+
+	LIST_FOREACH(&curr_proc->images, iter) {
+		image = list_entry(iter, elf_image_t, header);
+
+		if(image->id == id) {
+			list_remove(&image->header);
+
+			dprintf("elf: unregistered image %" PRIu16 " (%s) in process %"
+				PRIu32 "\n", image->id, image->name, curr_proc->id);
+
+			kfree(image->name);
+			kfree(image);
+
+			mutex_unlock(&curr_proc->lock);
+			return STATUS_SUCCESS;
+		}
+	}
+
+	mutex_unlock(&curr_proc->lock);
+	return STATUS_NOT_FOUND;
 }

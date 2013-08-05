@@ -72,6 +72,7 @@ typedef struct rtld_image {
 	list_t header;			/**< Link to loaded images library. */
 
 	/** Basic image information. */
+	image_id_t id;			/**< ID of the image. */
 	const char *name;		/**< Shared object name of the library. */
 	const char *path;		/**< Full path to image file. */
 	int refcount;			/**< Reference count (tracks what is using the image). */
@@ -107,6 +108,8 @@ typedef struct rtld_image {
 #define APPLICATION_TLS_ID	1	/**< Application always has module ID 1. */
 #define LIBKERNEL_TLS_ID	2	/**< If libkernel has TLS, this will be its ID. */
 #define DYNAMIC_TLS_START	2	/**< Start of dynamically allocated IDs. */
+
+extern elf_dyn_t _DYNAMIC[];
 
 extern list_t loaded_images;
 extern rtld_image_t libkernel_image;
