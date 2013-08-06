@@ -47,7 +47,7 @@ host_flags = {
 
 # Variables to set in target environments.
 target_flags = {
-    'CCFLAGS': cc_warning_flags + ['-gdwarf-2', '-pipe'],
+    'CCFLAGS': cc_warning_flags + ['-gdwarf-2', '-pipe', '-fno-omit-frame-pointer'],
     'CFLAGS': ['-std=gnu99'],
     'CXXFLAGS': cxx_warning_flags,
 

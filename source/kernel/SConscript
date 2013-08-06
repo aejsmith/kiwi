@@ -102,9 +102,8 @@ env = manager.Create('kernel', {
     ],
     'CCFLAGS': [
         '-nostdlib', '-nostdinc', '-ffreestanding',
-        '-fno-omit-frame-pointer', '-fno-optimize-sibling-calls',
-        '-fno-stack-protector', '-include',
-        'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
+        '-fno-optimize-sibling-calls', '-fno-stack-protector',
+        '-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
     ],
     'CXXFLAGS': [
         '-fno-exceptions', '-fno-rtti',

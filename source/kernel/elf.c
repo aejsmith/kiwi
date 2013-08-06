@@ -796,7 +796,6 @@ void elf_module_destroy(elf_image_t *image) {
  * @param offp		Where to store symbol offset (can be NULL).
  * @return		Whether a symbol was found for the address. */
 bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size_t *offp) {
-	elf_shdr_t *shdr;
 	size_t i;
 	elf_sym_t *sym;
 	uint8_t type;
@@ -804,17 +803,12 @@ bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size
 
 	for(i = 0; i < image->sym_size / image->sym_entsize; i++) {
 		sym = (elf_sym_t *)(image->symtab + (image->sym_entsize * i));
-		if(sym->st_shndx == ELF_SHN_UNDEF || sym->st_shndx > image->ehdr->e_shnum)
+		if(sym->st_shndx == ELF_SHN_UNDEF)
 			continue;
 
 		/* Ignore certain symbol types. */
 		type = ELF_ST_TYPE(sym->st_info);
-		if(type == ELF_STT_SECTION || type == ELF_STT_FILE)
-			continue;
-
-		/* Ignore symbols in unallocated sections. */
-		shdr = get_image_section(image, sym->st_shndx);
-		if(!(shdr->sh_flags & ELF_SHF_ALLOC))
+		if(type == ELF_STT_NOTYPE || type == ELF_STT_SECTION || type == ELF_STT_FILE)
 			continue;
 
 		value = sym->st_value + image->load_base;
@@ -826,7 +820,7 @@ bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size
 			symbol->size = sym->st_size;
 			symbol->name = (const char *)image->strtab + sym->st_name;
 			symbol->global = (ELF_ST_BIND(sym->st_info)) ? true : false;
-			symbol->exported = false; // FIXME
+			symbol->exported = true; // FIXME
 			return true;
 		}
 	}
@@ -851,12 +845,12 @@ bool elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
 
 	for(i = 0; i < image->sym_size / image->sym_entsize; i++) {
 		sym = (elf_sym_t *)(image->symtab + (image->sym_entsize * i));
-		if(sym->st_shndx == ELF_SHN_UNDEF || sym->st_shndx > image->ehdr->e_shnum)
+		if(sym->st_shndx == ELF_SHN_UNDEF)
 			continue;
 
 		/* Ignore certain symbol types. */
 		type = ELF_ST_TYPE(sym->st_info);
-		if(type == ELF_STT_SECTION || type == ELF_STT_FILE)
+		if(type == ELF_STT_NOTYPE || type == ELF_STT_SECTION || type == ELF_STT_FILE)
 			continue;
 
 		/* Ignore symbols in unallocated sections. */
@@ -865,34 +859,19 @@ bool elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
 			continue;
 
 		if(strcmp((const char *)image->strtab + sym->st_name, name) == 0) {
+			if(global && !ELF_ST_BIND(sym->st_info))
+				continue;
+
 			symbol->addr = sym->st_value + image->load_base;
 			symbol->size = sym->st_size;
 			symbol->name = (const char *)image->strtab + sym->st_name;
 			symbol->global = (ELF_ST_BIND(sym->st_info)) ? true : false;
-			symbol->exported = false; // FIXME
+			symbol->exported = true; // FIXME: should check exported
 			return true;
 		}
 	}
 
 	return false;
-}
-
-/**
- * Other functions.
- */
-
-/** Clean up ELF images attached to a process.
- * @param process	Process to clean up. */
-void elf_cleanup(process_t *process) {
-	elf_image_t *image;
-
-	LIST_FOREACH_SAFE(&process->images, iter) {
-		image = list_entry(iter, elf_image_t, header);
-
-		list_remove(&image->header);
-		kfree(image->name);
-		kfree(image);
-	}
 }
 
 /** Print a list of loaded images in a process.
@@ -1007,6 +986,20 @@ __init_text void elf_init(elf_image_t *image) {
 /**
  * User image management.
  */
+
+/** Clean up ELF images attached to a process.
+ * @param process	Process to clean up. */
+void elf_cleanup(process_t *process) {
+	elf_image_t *image;
+
+	LIST_FOREACH_SAFE(&process->images, iter) {
+		image = list_entry(iter, elf_image_t, header);
+
+		list_remove(&image->header);
+		kfree(image->name);
+		kfree(image);
+	}
+}
 
 /** Register an ELF image with the kernel.
  * @param info		Image information structure.

@@ -121,7 +121,7 @@ static void de_fault(intr_frame_t *frame) {
 			"due to exception %lu (%s) at %p\n", curr_thread->id,
 			curr_thread->name, frame->num, except_strings[frame->num],
 			frame->ip);
-
+		kdb_enter(KDB_REASON_USER, frame);
 
 		memset(&info, 0, sizeof(info));
 		info.si_code = FPE_INTDIV;
@@ -155,6 +155,7 @@ static void ud_fault(intr_frame_t *frame) {
 			"due to exception %lu (%s) at %p\n", curr_thread->id,
 			curr_thread->name, frame->num, except_strings[frame->num],
 			frame->ip);
+		kdb_enter(KDB_REASON_USER, frame);
 
 		memset(&info, 0, sizeof(info));
 		info.si_code = ILL_ILLOPC;

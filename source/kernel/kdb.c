@@ -40,12 +40,16 @@
 #include <lib/printf.h>
 #include <lib/string.h>
 
+#include <mm/safe.h>
+
+#include <proc/process.h>
 #include <proc/thread.h>
 
 #include <sync/spinlock.h>
 
 #include <console.h>
 #include <cpu.h>
+#include <elf.h>
 #include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
@@ -203,10 +207,49 @@ void kdb_printf(const char *fmt, ...) {
 	va_end(args);
 }
 
+/** Lookup a symbol in the current process.
+ * @param addr		Address to lookup.
+ * @param symbol	Symbol to fill in.
+ * @param offp		Where to store offset from symbol.
+ * @return		Whether symbol was found. */
+static bool lookup_user_symbol(ptr_t addr, symbol_t *symbol, size_t *offp) {
+	elf_image_t *image;
+
+	if(!is_user_address((void *)addr) || !curr_thread || curr_thread->owner == kernel_proc)
+		return false;
+
+	LIST_FOREACH(&curr_proc->images, iter) {
+		image = list_entry(iter, elf_image_t, header);
+
+		if(elf_symbol_from_addr(image, addr, symbol, offp))
+			return true;
+	}
+
+	symbol->addr = symbol->size = symbol->global = symbol->exported = 0;
+	symbol->name = "<unknown>";
+	return false;
+}
+
 /** Backtrace callback.
  * @param addr		Address of backtrace entry. */
 static void kdb_backtrace_cb(ptr_t addr) {
-	kdb_printf("%pB\n", addr);
+	int width;
+	symbol_t sym;
+	size_t off;
+	bool ret;
+
+	/* Zero pad up to the width of a pointer. */
+	width = (sizeof(void *) * 2) + 2;
+
+	/* For a backtrace, we want to subtract 1 from the address when looking
+	 * up the symbol (but not when printing), as backtraces use the return
+	 * address of a call which may not yield the correct symbol if the
+	 * compiler has produced a tail call. */
+	ret = symbol_from_addr(addr - 1, &sym, &off);
+	if(!ret)
+		ret = lookup_user_symbol(addr - 1, &sym, &off);
+
+	kdb_printf("[%0*p] %s+0x%zx\n", width, addr, sym.name, (ret) ? off + 1 : 0);
 }
 
 /** Read a character from the console.
@@ -845,7 +888,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 		arch_kdb_dump_registers();
 
 		kdb_printf("Backtrace:\n");
-		kdb_printf("%pS\n", frame->ip);
+		kdb_backtrace_cb(frame->ip);
 		arch_kdb_backtrace(NULL, kdb_backtrace_cb);
 
 		/* Flush and disable writing the KBoot log. */
@@ -1262,7 +1305,7 @@ static kdb_status_t kdb_cmd_backtrace(int argc, char **argv, kdb_filter_t *filte
 		thread = NULL;
 
 		kdb_printf("--- Interrupt ---\n");
-		kdb_printf("%pS\n", curr_kdb_frame->ip);
+		kdb_backtrace_cb(curr_kdb_frame->ip);
 		kdb_printf("--- Stacktrace ---\n");
 	}
 
