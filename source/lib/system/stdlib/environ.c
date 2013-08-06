@@ -17,7 +17,11 @@
 /**
  * @file
  * @brief		Environment variable functions.
+ *
+ * @todo		Use an rwlock.
  */
+
+#include <kernel/mutex.h>
 
 #include <errno.h>
 #include <stdbool.h>
@@ -33,6 +37,9 @@ char **environ;
 
 /** Whether the environment array has been allocated. */
 static bool environ_alloced = false;
+
+/** Environment lock. */
+static int32_t environ_lock = MUTEX_INITIALIZER;
 
 /** Reallocate the contents of the environment if necessary.
  * @return		Whether succesful. */
@@ -76,6 +83,8 @@ char *getenv(const char *name) {
 	if(!name)
 		return NULL;
 
+	kern_mutex_lock(&environ_lock, -1);
+
 	for(i = 0; environ[i] != NULL; i++) {
 		key = environ[i];
 		val = strchr(key, '=');
@@ -85,11 +94,14 @@ char *getenv(const char *name) {
 
 		len = strlen(name);
 		if(strncmp(key, name, len) == 0) {
-			if(environ[i][len] == '=')
+			if(environ[i][len] == '=') {
+				kern_mutex_unlock(&environ_lock);
 				return val + 1;
+			}
 		}
 	}
 
+	kern_mutex_unlock(&environ_lock);
 	return NULL;
 }
 
@@ -116,9 +128,13 @@ int putenv(char *str) {
 		return -1;
 	}
 
+	kern_mutex_lock(&environ_lock, -1);
+
 	/* Ensure the environment array can be modified. */
-	if(!ensure_environ_alloced())
+	if(!ensure_environ_alloced()) {
+		kern_mutex_unlock(&environ_lock);
 		return -1;
+	}
 
 	/* Check for an existing entry with the same name. */
 	for(i = 0; environ[i]; i++) {
@@ -128,6 +144,7 @@ int putenv(char *str) {
 			continue;
 		} else if(strncmp(environ[i], str, len) == 0) {
 			environ[i] = str;
+			kern_mutex_unlock(&environ_lock);
 			return 0;
 		}
 	}
@@ -135,14 +152,17 @@ int putenv(char *str) {
 	/* Doesn't exist at all. Reallocate environment to fit. */
 	for(count = 0; environ[count]; count++);
 	new = realloc(environ, (count + 2) * sizeof(char *));
-	if(!new)
+	if(!new) {
+		kern_mutex_unlock(&environ_lock);
 		return -1;
+	}
 
 	environ = new;
 
 	/* Set new entry. */
 	environ[count] = str;
 	environ[count + 1] = NULL;
+	kern_mutex_unlock(&environ_lock);
 	return 0;
 }
 
@@ -167,9 +187,13 @@ int setenv(const char *name, const char *value, int overwrite) {
 		return -1;
 	}
 
+	kern_mutex_lock(&environ_lock, -1);
+
 	/* Ensure the environment array can be modified. */
-	if(!ensure_environ_alloced())
+	if(!ensure_environ_alloced()) {
+		kern_mutex_unlock(&environ_lock);
 		return -1;
+	}
 
 	/* Work out total length. */
 	len = strlen(name) + strlen(value) + 2;
@@ -177,11 +201,14 @@ int setenv(const char *name, const char *value, int overwrite) {
 	/* If it exists already, and the current value is big enough, just
 	 * overwrite it. */
 	if((exist = getenv(name))) {
-		if(!overwrite)
+		if(!overwrite) {
+			kern_mutex_unlock(&environ_lock);
 			return 0;
+		}
 
 		if(strlen(exist) >= strlen(value)) {
 			strcpy(exist, value);
+			kern_mutex_unlock(&environ_lock);
 			return 0;
 		}
 
@@ -192,11 +219,14 @@ int setenv(const char *name, const char *value, int overwrite) {
 				continue;
 
 			val = malloc(len);
-			if(val == NULL)
+			if(val == NULL) {
+				kern_mutex_unlock(&environ_lock);
 				return -1;
+			}
 
 			sprintf(val, "%s=%s", name, value);
 			environ[count] = val;
+			kern_mutex_unlock(&environ_lock);
 			return 0;
 		}
 
@@ -205,8 +235,10 @@ int setenv(const char *name, const char *value, int overwrite) {
 
 	/* Fill out the new entry. */
 	val = malloc(len);
-	if(!val)
+	if(!val) {
+		kern_mutex_unlock(&environ_lock);
 		return -1;
+	}
 
 	sprintf(val, "%s=%s", name, value);
 
@@ -215,6 +247,7 @@ int setenv(const char *name, const char *value, int overwrite) {
 	new = realloc(environ, (count + 2) * sizeof(char *));
 	if(!new) {
 		free(val);
+		kern_mutex_unlock(&environ_lock);
 		return -1;
 	}
 	environ = new;
@@ -222,6 +255,7 @@ int setenv(const char *name, const char *value, int overwrite) {
 	/* Set new entry. */
 	environ[count] = val;
 	environ[count + 1] = NULL;
+	kern_mutex_unlock(&environ_lock);
 	return 0;
 }
 
@@ -237,9 +271,13 @@ int unsetenv(const char *name) {
 		return -1;
 	}
 
+	kern_mutex_lock(&environ_lock, -1);
+
 	/* Ensure the environment array can be modified. */
-	if(!ensure_environ_alloced())
+	if(!ensure_environ_alloced()) {
+		kern_mutex_unlock(&environ_lock);
 		return -1;
+	}
 
 	for(i = 0; environ[i]; i++) {
 		key = environ[i];
@@ -256,9 +294,11 @@ int unsetenv(const char *name) {
 			if(new)
 				environ = new;
 
+			kern_mutex_unlock(&environ_lock);
 			return 0;
 		}
 	}
 
+	kern_mutex_unlock(&environ_lock);
 	return 0;
 }
