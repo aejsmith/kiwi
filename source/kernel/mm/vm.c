@@ -1815,7 +1815,11 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
 	kdb_printf("as:          %p\n", region->as);
 	kdb_printf("start:       %p\n", region->start);
 	kdb_printf("size:        0x%zx\n", region->size);
-	kdb_printf("protection:  0x%" PRIx32 "\n", region->protection);
+	kdb_printf("protection:  %c%c%c (0x%" PRIx32 ")\n",
+		(region->protection & VM_PROT_READ) ? 'R' : '-',
+		(region->protection & VM_PROT_WRITE) ? 'W' : '-',
+		(region->protection & VM_PROT_EXECUTE) ? 'X' : '-',
+		region->protection);
 	kdb_printf("flags:       0x%" PRIx32 "\n", region->flags);
 	switch(region->state) {
 	case VM_REGION_FREE:
@@ -1852,8 +1856,11 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
 /** Display details of a region.
  * @param region	Region to display. */
 static void dump_region(vm_region_t *region) {
-	kdb_printf("%-18p 0x%-12zx 0x%-5" PRIx32 " 0x%-3" PRIx32 " ",
-		region->start, region->size, region->protection,
+	kdb_printf("%-18p 0x%-12zx %c%c%c     0x%-3" PRIx32 " ",
+		region->start, region->size,
+		(region->protection & VM_PROT_READ) ? 'R' : '-',
+		(region->protection & VM_PROT_WRITE) ? 'W' : '-',
+		(region->protection & VM_PROT_EXECUTE) ? 'X' : '-',
 		region->flags);
 
 	switch(region->state) {
