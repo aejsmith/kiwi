@@ -66,6 +66,30 @@ static bool ensure_environ_alloced(void) {
 	return true;
 }
 
+/** Get the value of an environment variable without taking lock.
+ * @param name		Name of variable to get.
+ * @return		Pointer to value. */
+static char *getenv_unsafe(const char *name) {
+	char *key, *val;
+	size_t i, len;
+
+	for(i = 0; environ[i] != NULL; i++) {
+		key = environ[i];
+		val = strchr(key, '=');
+
+		if(val == NULL)
+			libsystem_fatal("value '%s' found in environment without an =", key);
+
+		len = strlen(name);
+		if(strncmp(key, name, len) == 0) {
+			if(environ[i][len] == '=')
+				return val + 1;
+		}
+	}
+
+	return NULL;
+}
+
 /**
  * Get the value of an environment variable.
  *
@@ -77,32 +101,16 @@ static bool ensure_environ_alloced(void) {
  * @return		Pointer to value.
  */
 char *getenv(const char *name) {
-	char *key, *val;
-	size_t i, len;
+	char *ret;
 
 	if(!name)
 		return NULL;
 
 	kern_mutex_lock(&environ_lock, -1);
-
-	for(i = 0; environ[i] != NULL; i++) {
-		key = environ[i];
-		val = strchr(key, '=');
-
-		if(val == NULL)
-			libsystem_fatal("value '%s' found in environment without an =", key);
-
-		len = strlen(name);
-		if(strncmp(key, name, len) == 0) {
-			if(environ[i][len] == '=') {
-				kern_mutex_unlock(&environ_lock);
-				return val + 1;
-			}
-		}
-	}
-
+	ret = getenv_unsafe(name);
 	kern_mutex_unlock(&environ_lock);
-	return NULL;
+
+	return ret;
 }
 
 /**
@@ -200,7 +208,7 @@ int setenv(const char *name, const char *value, int overwrite) {
 
 	/* If it exists already, and the current value is big enough, just
 	 * overwrite it. */
-	if((exist = getenv(name))) {
+	if((exist = getenv_unsafe(name))) {
 		if(!overwrite) {
 			kern_mutex_unlock(&environ_lock);
 			return 0;
