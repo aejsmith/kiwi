@@ -1094,7 +1094,9 @@ static void process_clone_thread(void *arg1, void *arg2) {
  * when either the parent or the child writes to the pages. Non-private mappings
  * will be shared between the processes: any modifications made be either
  * process will be visible to the other. The new process will inherit all
- * handles from the parent, including non-inheritable ones.
+ * handles from the parent, including non-inheritable ones (non-inheritable
+ * handles are only closed when a new program is executed with
+ * kern_process_exec() or kern_process_create()).
  *
  * Threads other than the calling thread are NOT cloned. The new process will
  * have a single thread which will resume execution after the call to

@@ -43,6 +43,7 @@ typedef struct process_args {
 extern status_t kern_process_control(unsigned action, const void *in, void *out);
 
 #ifndef KERNEL
+extern status_t _kern_process_clone(handle_t *handlep);
 extern process_id_t _kern_process_id(handle_t handle);
 #endif
 
