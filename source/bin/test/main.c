@@ -26,12 +26,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 int main(int argc, char **argv) {
-	int i;
+	int i, status;
 	int32_t *addr;
-	handle_t handle;
 	status_t ret;
+	pid_t pid;
 
 	printf("Hello, World! My arguments are:\n");
 	for(i = 0; i < argc; i++)
@@ -45,12 +46,35 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	ret = kern_process_clone(&handle);
+	pid = fork();
+	if(pid == 0) {
+		kern_mutex_lock(addr, -1);
+		printf("Child process is process %d, sleeping\n", getpid());
+		kern_mutex_unlock(addr);
 
-	kern_mutex_lock(addr, -1);
-	printf("Returned %d (handle: %d) in process %d\n", ret, handle,
-		kern_process_id(PROCESS_SELF));
-	kern_mutex_unlock(addr);
+		sleep(5);
+		addr[1] = 0xDEADBEEF;
 
-	while(true) { kern_thread_sleep(1000000, NULL); }
+		kern_mutex_lock(addr, -1);
+		printf("Child process finishing\n");
+		kern_mutex_unlock(addr);
+
+		return 123;
+	} else if(pid > 0) {
+		kern_mutex_lock(addr, -1);
+		printf("Parent process %d got child %d, waiting\n", getpid(), pid);
+		kern_mutex_unlock(addr);
+
+		pid = wait(&status);
+		if(pid < 0) {
+			perror("wait");
+			return EXIT_FAILURE;
+		}
+
+		printf("Process %d finished (status: 0x%x/%d)\n", pid, status, WEXITSTATUS(status));
+		return EXIT_SUCCESS;
+	} else {
+		perror("fork");
+		return EXIT_FAILURE;
+	}
 }

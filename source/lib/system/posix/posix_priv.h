@@ -22,10 +22,10 @@
 #ifndef __POSIX_PRIV_H
 #define __POSIX_PRIV_H
 
+#include <kernel/mutex.h>
 #include <kernel/object.h>
 
 #include <util/list.h>
-//#include <util/mutex.h>
 
 #include <unistd.h>
 
@@ -39,9 +39,11 @@ typedef struct posix_process {
 } posix_process_t;
 
 extern list_t __hidden child_processes;
-//extern libc_mutex_t __hidden child_processes_lock;
+extern int32_t __hidden child_processes_lock;
 
 extern mode_t __hidden current_umask;
+
+extern void register_fork_handler(void (*func)(void)) __hidden;
 
 //extern object_acl_t *posix_mode_to_acl(object_acl_t *current, mode_t mode) __hidden;
 

@@ -38,7 +38,7 @@ sources = map(File, [
     'posix/execve.c',
     'posix/execvp.c',
     #'posix/fcntl.c',
-    #'posix/fork.c',
+    'posix/fork.c',
     'posix/getcwd.c',
     'posix/getopt.c',
     'posix/getpid.c',
@@ -64,7 +64,7 @@ sources = map(File, [
     #'posix/umask.c',
     'posix/unlink.c',
     'posix/utime.c',
-    #'posix/wait.c',
+    'posix/wait.c',
     'posix/write.c',
 
     'signal/kill.c',

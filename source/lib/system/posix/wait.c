@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,11 +19,9 @@
  * @brief		POSIX process wait functions.
  *
  * @todo		If a new process is created while a wait()/waitpid() is
- *			in progress, it won't be added to the wait. What is
- *			needed to fix this is to wait on the child process list
- *			lock as well, and if object_wait_multiple() signals that
- *			the lock has been released, we should rebuild the wait
- *			array and wait again.
+ *			in progress, it won't be added to the wait. Perhaps add
+ *			a kernel event object that we wait on as well, signal
+ *			that when a child is added.
  */
 
 #include <kernel/object.h>
@@ -66,30 +64,32 @@ static inline int convert_exit_status(int status, int reason) {
  * @return		ID of process that terminated, or -1 on failure. */
 pid_t waitpid(pid_t pid, int *statusp, int flags) {
 	object_event_t *events = NULL, *tmp;
-	posix_process_t *proc;
+	posix_process_t *process;
 	size_t count = 0, i;
 	int status, reason;
 	status_t ret;
 
 	if(pid == 0) {
+		// TODO: Process groups.
 		errno = ENOSYS;
 		return -1;
 	}
 
-	//libc_mutex_lock(&child_processes_lock, -1);
+	kern_mutex_lock(&child_processes_lock, -1);
 
 	/* Build an array of handles to wait for. */
 	LIST_FOREACH(&child_processes, iter) {
-		proc = list_entry(iter, posix_process_t, header);
-		if(pid == -1 || proc->pid == pid) {
+		process = list_entry(iter, posix_process_t, header);
+		if(pid == -1 || process->pid == pid) {
 			tmp = realloc(events, sizeof(*events) * (count + 1));
-			if(!tmp) {
+			if(!tmp)
 				goto fail;
-			}
+
 			events = tmp;
-			events[count].handle = proc->handle;
+			events[count].handle = process->handle;
 			events[count].event = PROCESS_EVENT_DEATH;
-			events[count++].signalled = false;
+			events[count].signalled = false;
+			count++;
 		}
 	}
 
@@ -99,41 +99,42 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		goto fail;
 	}
 
-	//libc_mutex_unlock(&child_processes_lock);
+	kern_mutex_unlock(&child_processes_lock);
 
 	/* Wait for any of them to exit. */
-	ret = kern_object_wait(events, count, (flags & WNOHANG) ? 0 : -1);
+	ret = kern_object_wait(events, count, 0, (flags & WNOHANG) ? 0 : -1);
 	if(ret != STATUS_SUCCESS) {
 		if(events) { free(events); }
-		if(ret == STATUS_WOULD_BLOCK) {
+		if(ret == STATUS_WOULD_BLOCK)
 			return 0;
-		}
+
 		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
-	//libc_mutex_lock(&child_processes_lock, -1);
+	kern_mutex_lock(&child_processes_lock, -1);
 
 	/* Only take the first exited process. */
 	for(i = 0; i < count; i++) {
-		if(!events[i].signalled) {
+		if(!events[i].signalled)
 			continue;
-		}
 
 		LIST_FOREACH(&child_processes, iter) {
-			proc = list_entry(iter, posix_process_t, header);
-			if(proc->handle == events[i].handle) {
+			process = list_entry(iter, posix_process_t, header);
+
+			if(process->handle == events[i].handle) {
 				/* Get the exit status. */
 				if(statusp) {
-					kern_process_status(proc->handle, &status, &reason);
+					kern_process_status(process->handle, &status, &reason);
 					*statusp = convert_exit_status(status, reason);
 				}
-				ret = proc->pid;
+
+				ret = process->pid;
 
 				/* Clean up the process. */
-				kern_handle_close(proc->handle);
-				list_remove(&proc->header);
-				free(proc);
+				kern_handle_close(process->handle);
+				list_remove(&process->header);
+				free(process);
 				goto out;
 			}
 		}
@@ -142,6 +143,6 @@ fail:
 	ret = -1;
 out:
 	if(events) { free(events); }
-	//libc_mutex_unlock(&child_processes_lock);
+	kern_mutex_unlock(&child_processes_lock);
 	return ret;
 }
