@@ -39,6 +39,7 @@
 #include <object.h>
 #include <time.h>
 
+struct intr_frame;
 struct process;
 
 /** Entry function for a thread. */
@@ -151,8 +152,10 @@ extern void arch_thread_destroy(thread_t *thread);
 extern void arch_thread_switch(thread_t *thread, thread_t *prev);
 extern ptr_t arch_thread_tls_addr(thread_t *thread);
 extern status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr);
-extern void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg1,
-	ptr_t arg2) __noreturn;
+extern void arch_thread_clone(thread_t *thread, thread_t *parent, struct intr_frame *frame);
+extern void arch_thread_prepare_userspace(struct intr_frame *frame, ptr_t entry,
+	ptr_t stack, ptr_t arg1, ptr_t arg2);
+extern void arch_thread_enter_userspace(struct intr_frame *frame) __noreturn;
 
 extern void thread_retain(thread_t *thread);
 extern void thread_release(thread_t *thread);

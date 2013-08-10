@@ -47,6 +47,7 @@
  * upon entry for a system call. If it is set, the thread will exit.
  */
 
+#include <arch/frame.h>
 #include <arch/memory.h>
 
 #include <kernel/private/thread.h>
@@ -998,16 +999,13 @@ __init_text void thread_init(void) {
 /** Entry function for a userspace thread.
  * @param _args		Argument structure pointer (will be freed).
  * @param arg2		Unused. */
-void thread_uspace_trampoline(void *_args, void *arg2) {
+static void thread_uspace_trampoline(void *_args, void *arg2) {
 	thread_uspace_args_t *args = _args;
-	ptr_t entry, sp, arg;
+	intr_frame_t frame;
 
-	entry = args->entry;
-	sp = args->sp;
-	arg = args->arg;
+	arch_thread_prepare_userspace(&frame, args->entry, args->sp, args->arg, 0);
 	kfree(args);
-
-	arch_thread_enter_userspace(entry, sp, arg, 0);
+	arch_thread_enter_userspace(&frame);
 }
 
 /** Create a new thread.

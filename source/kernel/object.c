@@ -617,11 +617,11 @@ int kern_object_type(handle_t handle) {
  *
  * @param events	Array of structures describing events to wait for. If
  *			the function returns STATUS_SUCCESS, STATUS_TIMED_OUT,
- *			or STATUS_INTERRUPTED, the signalled field of each
- *			structure will be updated to reflect whether or not the
- *			event was signalled, and if set to true then the data
- *			field will be updated with the data value associated
- *			with the event.
+ *			STATUS_INTERRUPTED or STATUS_WOULD_BLOCK, the signalled
+ *			field of each structure will be updated to reflect
+ *			whether or not the event was signalled, and if set to
+ *			true then the data field will be updated with the data
+ *			value associated with the event.
  * @param count		Number of array entries.
  * @param flags		Behaviour flags for waiting. See above
  * @param timeout	Maximum time to wait in nanoseconds. A value of 0 will
@@ -634,6 +634,8 @@ int kern_object_type(handle_t handle) {
  *			events is NULL.
  *			STATUS_INVALID_HANDLE if a handle does not exist.
  *			STATUS_INVALID_EVENT if an incorrect event ID is used.
+ *			STATUS_WOULD_BLOCK if the timeout is 0 and no events
+ *			have already occurred.
  *			STATUS_TIMED_OUT if the timeout expires.
  *			STATUS_INTERRUPTED if the sleep was interrupted.
  */
@@ -714,6 +716,7 @@ out:
 		case STATUS_SUCCESS:
 		case STATUS_TIMED_OUT:
 		case STATUS_INTERRUPTED:
+		case STATUS_WOULD_BLOCK:
 			err = memcpy_to_user(&events[i], &waits[i].info, sizeof(*events));
 			if(err != STATUS_SUCCESS)
 				ret = err;

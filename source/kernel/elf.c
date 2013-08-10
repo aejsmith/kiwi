@@ -990,6 +990,23 @@ __init_text void elf_init(elf_image_t *image) {
  * User image management.
  */
 
+/** Clone loaded image information.
+ * @param process	New process.
+ * @param parent	Parent process. */
+void elf_clone(process_t *process, process_t *parent) {
+	elf_image_t *image, *clone;
+
+	LIST_FOREACH(&parent->images, iter) {
+		image = list_entry(iter, elf_image_t, header);
+
+		clone = kmemdup(image, sizeof(*image), MM_KERNEL);
+		list_init(&clone->header);
+		list_append(&process->images, &clone->header);
+	}
+
+	process->next_image_id = parent->next_image_id;
+}
+
 /** Clean up ELF images attached to a process.
  * @param process	Process to clean up. */
 void elf_cleanup(process_t *process) {

@@ -294,40 +294,17 @@ FUNCTION_START(syscall_entry)
 	jmp	.Lreturn
 FUNCTION_END(syscall_entry)
 
-/** Userspace entry function. */
-FUNCTION_START(amd64_enter_userspace)
-	/* Set up a stack frame for IRET:
-	 *  - SS.
-	 *  - RSP.
-	 *  - RFLAGS.
-	 *  - CS.
-	 *  - RIP. */
-	push	$(USER_DS | 0x03)
-	push	%rsi
-	push	$(X86_FLAGS_IF | X86_FLAGS_ALWAYS1)
-	push	$(USER_CS | 0x03)
-	push	%rdi
+/** Enter userspace in the current thread.
+ * @param frame		Previously prepared frame. */
+FUNCTION_START(arch_thread_enter_userspace)
+	/* Point SP at the frame to restore. */
+	movq	%rdi, %rsp
 
-	/* Move arguments to correct place. */
-	movq	%rdx, %rdi
-	movq	%rcx, %rsi
-	
-	/* Clear general purpose registers (except arguments). */
-	xorq	%rax, %rax
-	xorq	%rbx, %rbx
-	xorq	%rcx, %rcx
-	xorq	%rdx, %rdx
-	xorq	%rbp, %rbp
-	xorq	%r8, %r8
-	xorq	%r9, %r9
-	xorq	%r10, %r10
-	xorq	%r11, %r11
-	xorq	%r12, %r12
-	xorq	%r13, %r13
-	xorq	%r14, %r14
-	xorq	%r15, %r15
+	/* Restore the registers, get rid of interrupt/error code. */
+	POP_REGS
+	addq	$16, %rsp
 
 	/* Enter userspace. */
 	swapgs
 	iretq
-FUNCTION_END(amd64_enter_userspace)
+FUNCTION_END(arch_thread_enter_userspace)

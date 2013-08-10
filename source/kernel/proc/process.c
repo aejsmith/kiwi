@@ -19,6 +19,7 @@
  * @brief		Process management functions.
  */
 
+#include <arch/frame.h>
 #include <arch/memory.h>
 
 #include <lib/id_allocator.h>
@@ -526,6 +527,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	process_load_t *load = arg1;
 	ptr_t addr, stack, entry;
 	process_args_t *uargs;
+	intr_frame_t frame;
 
 	assert(curr_aspace == load->aspace);
 
@@ -572,8 +574,8 @@ static void process_entry_thread(void *arg1, void *arg2) {
 		"%p, args: %p)\n", entry, stack, addr);
 
 	/* Need to pass the load address as second argument for libkernel. */
-	arch_thread_enter_userspace(entry, stack, addr, LIBKERNEL_BASE);
-	fatal("Failed to enter userspace!");
+	arch_thread_prepare_userspace(&frame, entry, stack, addr, LIBKERNEL_BASE);
+	arch_thread_enter_userspace(&frame);
 }
 
 /**
@@ -1064,7 +1066,26 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	thread_exit();
 }
 
-#if 0
+/** Entry thread for a cloned process.
+ * @param arg1		Pointer to cloned frame.
+ * @param arg2		User-specified handle location. */
+static void process_clone_thread(void *arg1, void *arg2) {
+	intr_frame_t frame;
+	handle_t handle;
+
+	/* Set the user's handle to INVALID_HANDLE for it to determine that it
+	 * is the child process. This should succeed as in the parent process
+	 * we wrote the address successfully. */
+	handle = INVALID_HANDLE;
+	memcpy_to_user(arg2, &handle, sizeof(handle));
+
+	/* Copy the allocated frame onto the kernel stack and free it. */
+	memcpy(&frame, arg1, sizeof(frame));
+	kfree(arg1);
+
+	arch_thread_enter_userspace(&frame);
+}
+
 /**
  * Clone the calling process.
  *
@@ -1073,84 +1094,83 @@ status_t kern_process_exec(const char *path, const char *const args[],
  * when either the parent or the child writes to the pages. Non-private mappings
  * will be shared between the processes: any modifications made be either
  * process will be visible to the other. The new process will inherit all
- * handles from the parent, including non-inheritable ones. Threads, however,
- * are not cloned: the new process will have a single thread which will begin
- * execution at the address specified on the specified stack.
+ * handles from the parent, including non-inheritable ones.
  *
- * @param func		Where to begin execution at in the new process.
- * @param arg		Argument to pass to entry function.
- * @param sp		Stack pointer to use. Depending on the architecture,
- *			this may need to have space to store the argument to
- *			the function.
- * @param handlep	Where to store handle to the child process.
+ * Threads other than the calling thread are NOT cloned. The new process will
+ * have a single thread which will resume execution after the call to
+ * kern_process_clone().
+ *
+ * @param handlep	In the parent process, the location pointed to will be
+ *			set to a handle to the child process upon success. In
+ *			the child process, it will be set to INVALID_HANDLE.
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, handle_t *handlep) {
-	thread_uspace_args_t *args;
-	process_t *process = NULL;
-	handle_table_t *table;
-	thread_t *thread;
+status_t kern_process_clone(handle_t *handlep) {
 	vm_aspace_t *as;
-	handle_t handle;
+	handle_table_t *handles;
+	process_t *process;
+	object_handle_t *khandle;
+	handle_t uhandle;
+	intr_frame_t *frame;
+	thread_t *thread;
 	status_t ret;
 
-	if(!is_user_address(sp))
-		return STATUS_INVALID_ADDR;
+	if(!handlep)
+		return STATUS_INVALID_ARG;
 
 	/* Create a clone of the process' address space and handle table. */
 	as = vm_aspace_clone(curr_proc->aspace);
-	table = handle_table_clone(curr_proc->handles);
+	handles = handle_table_clone(curr_proc->handles);
 
-	//	assert(parent);
-	//	memcpy(process->signal_act, parent->signal_act, sizeof(process->signal_act));
-	//	process->signal_mask = parent->signal_mask;
+	ret = process_alloc(curr_proc->name, -1, curr_proc->priority, as, handles,
+		curr_proc, &process);
+	if(ret != STATUS_SUCCESS) {
+		handle_table_destroy(handles);
+		vm_aspace_destroy(as);
+		return ret;
+	}
 
+	/* Clone signal handling attributes. */
+	memcpy(process->signal_act, curr_proc->signal_act, sizeof(process->signal_act));
+	process->signal_mask = curr_proc->signal_mask;
 
-	// dup images!
+	/* Clone loaded image information. */
+	elf_clone(process, curr_proc);
 
-
-	/* Create the new process and a handle to it. */
-	ret = process_alloc(curr_proc->name, 0, PRIORITY_CLASS_NORMAL, as, table,
-		curr_proc, PROCESS_CREATE_CLONE, NULL, 0, &process, &handle,
-		handlep);
-	if(ret != STATUS_SUCCESS)
-		goto fail;
+	/* Create a new handle. This takes over the initial reference added by
+	 * process_alloc(). */
+	khandle = object_handle_create(&process->obj, NULL, 0);
+	ret = object_handle_attach(khandle, &uhandle, handlep);
+	if(ret != STATUS_SUCCESS) {
+		object_handle_release(khandle);
+		return ret;
+	}
 
 	/* Create the entry thread. */
-	args = kmalloc(sizeof(*args), MM_KERNEL);
-	args->entry = (ptr_t)func;
-	args->arg = (ptr_t)arg;
-	args->sp = (ptr_t)sp;
-	ret = thread_create("main", process, 0, thread_uspace_trampoline, args,
-		NULL, &thread);
-	if(ret != STATUS_SUCCESS)
-		goto fail;
+	frame = kmalloc(sizeof(*frame), MM_KERNEL);
+	ret = thread_create(curr_thread->name, process, 0, process_clone_thread,
+		frame, handlep, &thread);
+	object_handle_release(khandle);
+	if(ret != STATUS_SUCCESS) {
+		kfree(frame);
+		object_handle_detach(uhandle);
+		return ret;
+	}
 
-	/* Inherit certain per-thread attributes such as the alternate signal
-	 * stack and TLS address from the thread that called us. */
+	/* Clone arch-specific thread attributes and get the frame to restore. */
+	spinlock_lock(&curr_thread->lock);
+	arch_thread_clone(thread, curr_thread, frame);
+	spinlock_unlock(&curr_thread->lock);
+
+	/* Inherit other per-thread attributes from the calling thread. */
 	memcpy(&thread->signal_stack, &curr_thread->signal_stack, sizeof(thread->signal_stack));
-	arch_thread_set_tls_addr(thread, arch_thread_tls_addr(curr_thread));
 
 	/* Run the new thread. */
 	thread_run(thread);
 	thread_release(thread);
 	return STATUS_SUCCESS;
-fail:
-	if(process) {
-		if(handlep) {
-			object_handle_detach(handle);
-		} else {
-			process_destroy(process);
-		}
-	} else {
-		handle_table_destroy(table);
-		vm_aspace_destroy(as);
-	}
-
-	return ret;
 }
-#endif
 
 /** Open a handle to a process.
  * @param id		ID of the process to open.

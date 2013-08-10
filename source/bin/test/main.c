@@ -19,61 +19,38 @@
  * @brief		Test application.
  */
 
-#include <kernel/object.h>
+#include <kernel/mutex.h>
+#include <kernel/process.h>
 #include <kernel/status.h>
-#include <kernel/time.h>
+#include <kernel/vm.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 
-/** Convert seconds to nanoseconds. */
-#define SECS2NSECS(secs)	((nstime_t)secs * 1000000000)
-
-static nstime_t times[5] = {
-	SECS2NSECS(5), SECS2NSECS(1), SECS2NSECS(3), SECS2NSECS(4), SECS2NSECS(2)
-};
-
 int main(int argc, char **argv) {
 	int i;
-	object_event_t events[5];
+	int32_t *addr;
+	handle_t handle;
 	status_t ret;
 
 	printf("Hello, World! My arguments are:\n");
 	for(i = 0; i < argc; i++)
 		printf(" argv[%d] = '%s'\n", i, argv[i]);
 
-	for(i = 0; i < 5; i++) {
-		ret = kern_timer_create(0, &events[i].handle);
-		if(ret != STATUS_SUCCESS) {
-			fprintf(stderr, "Failed to create timer: %d\n", ret);
-			return EXIT_FAILURE;
-		}
-
-		events[i].event = TIMER_EVENT_FIRED;
-
-		ret = kern_timer_start(events[i].handle, times[i], TIMER_ONESHOT);
-		if(ret != STATUS_SUCCESS) {
-			fprintf(stderr, "Failed to start timer: %d\n", ret);
-			return EXIT_FAILURE;
-		}
-
-		printf("Created timer %d (%d) for %lld nanoseconds\n", i,
-			events[i].handle, times[i]);
+	ret = kern_vm_map((void **)&addr, 0x1000, VM_ADDRESS_ANY,
+		VM_PROT_READ | VM_PROT_WRITE, 0, INVALID_HANDLE,
+		0, NULL);
+	if(ret != STATUS_SUCCESS) {
+		printf("Failed to create mapping: %d\n", ret);
+		return EXIT_FAILURE;
 	}
 
-	while(true) {
-		ret = kern_object_wait(events, 5, OBJECT_WAIT_ALL, 0);
-		if(ret == STATUS_TIMED_OUT) {
-			printf("Timed out\n");
-		} else if(ret != STATUS_SUCCESS) {
-			fprintf(stderr, "Failed to wait for events: %d\n", ret);
-			return EXIT_FAILURE;
-		}
+	ret = kern_process_clone(&handle);
 
-		printf("Events fired:\n");
-		for(i = 0; i < 5; i++) {
-			if(events[i].signalled)
-				printf("Timer %d (%d)\n", i, events[i].handle);
-		}
-	}
+	kern_mutex_lock(addr, -1);
+	printf("Returned %d (handle: %d) in process %d\n", ret, handle,
+		kern_process_id(PROCESS_SELF));
+	kern_mutex_unlock(addr);
+
+	while(true) { kern_thread_sleep(1000000, NULL); }
 }

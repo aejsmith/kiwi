@@ -19,12 +19,14 @@
  * @brief		AMD64 thread functions.
  */
 
+#include <arch/frame.h>
 #include <arch/memory.h>
 
 #include <x86/cpu.h>
+#include <x86/descriptor.h>
 #include <x86/fpu.h>
 
-#include <mm/safe.h>
+#include <lib/string.h>
 
 #include <proc/sched.h>
 #include <proc/thread.h>
@@ -32,7 +34,6 @@
 #include <cpu.h>
 #include <status.h>
 
-extern void amd64_enter_userspace(ptr_t entry, ptr_t sp, ptr_t arg1, ptr_t arg2) __noreturn;
 extern void amd64_context_switch(ptr_t new_rsp, ptr_t *old_rsp);
 extern void amd64_context_restore(ptr_t new_rsp);
 
@@ -153,15 +154,51 @@ status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr) {
 	return STATUS_SUCCESS;
 }
 
-/** Enter userspace in the current thread.
+/** Clone a thread.
+ * @param thread	Cloned thread.
+ * @param parent	Parent thread.
+ * @param frame		Frame to fill with a copy of the parent's current frame. */
+void arch_thread_clone(thread_t *thread, thread_t *parent, intr_frame_t *frame) {
+	thread->arch.flags = parent->arch.flags & ARCH_THREAD_HAVE_FPU;
+	thread->arch.tls_base = parent->arch.tls_base;
+
+	/* Clone the parent's FPU state. */
+	if(parent == curr_thread && x86_fpu_state()) {
+		/* FPU is currently enabled so the latest state may not have
+		 * been saved. */
+		x86_fpu_save(thread->arch.fpu);
+	} else if(parent->flags & ARCH_THREAD_HAVE_FPU) {
+		memcpy(thread->arch.fpu, parent->arch.fpu, sizeof(thread->arch.fpu));
+	}
+
+	/* Duplicate the user interrupt frame. This should be valid as we
+	 * only get here via a system call. */
+	memcpy(frame, parent->arch.user_iframe, sizeof(*frame));
+
+	/* The new thread should return success from the system call. */
+	frame->ax = STATUS_SUCCESS;
+}
+
+/** Prepare a frame to enter userspace.
+ * @param frame		Frame to prepare.
  * @param entry		Entry function.
  * @param stack		Stack pointer.
  * @param arg1		First argument to function.
  * @param arg2		Second argument to function. */
-void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg1, ptr_t arg2) {
-	/* Write a 0 return address for the entry function. */
+void arch_thread_prepare_userspace(intr_frame_t *frame, ptr_t entry, ptr_t stack,
+	ptr_t arg1, ptr_t arg2)
+{
+	/* Correctly align the stack pointer for ABI requirements. */
 	stack -= sizeof(unsigned long);
-	memset_user((void *)stack, 0, sizeof(unsigned long));
 
-	amd64_enter_userspace(entry, stack, arg1, arg2);
+	/* Clear out the frame to zero all GPRs. */
+	memset(frame, 0, sizeof(*frame));
+
+	frame->di = arg1;
+	frame->si = arg2;
+	frame->ip = entry;
+	frame->cs = USER_CS | 0x3;
+	frame->flags = X86_FLAGS_IF | X86_FLAGS_ALWAYS1;
+	frame->sp = stack;
+	frame->ss = USER_DS | 0x3;
 }
