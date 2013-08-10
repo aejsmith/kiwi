@@ -42,7 +42,7 @@
 #include <status.h>
 
 /** Define to enable debug output from the module loader. */
-#define DEBUG_MODULE
+//#define DEBUG_MODULE
 
 #ifdef DEBUG_MODULE
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

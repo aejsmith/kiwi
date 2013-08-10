@@ -104,7 +104,7 @@
 #include <status.h>
 
 /** Define to enable (very) verbose debug output. */
-#define DEBUG_VM
+//#define DEBUG_VM
 
 #ifdef DEBUG_VM
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

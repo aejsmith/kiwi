@@ -78,7 +78,7 @@
 #include <time.h>
 
 /** Define to enable debug output on thread creation/deletion. */
-#define DEBUG_THREAD
+//#define DEBUG_THREAD
 
 #ifdef DEBUG_THREAD
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

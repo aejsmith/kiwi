@@ -242,8 +242,8 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops,
 	radix_tree_insert(&parent->children, device->name, device);
 	mutex_unlock(&parent->lock);
 
-	kprintf(LOG_DEBUG, "device: created device %s (%p) in %s (%p) (ops: %p, data: %p)\n",
-		device->name, device, parent->name, parent, ops, data);
+	kprintf(LOG_DEBUG, "device: created device %s in %s (ops: %p, data: %p)\n",
+		device->name, parent->name, ops, data);
 
 	if(devicep)
 		*devicep = device;
@@ -317,8 +317,8 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 	list_append(&dest->aliases, &device->dest_link);
 	mutex_unlock(&dest->lock);
 
-	kprintf(LOG_DEBUG, "device: created alias %s (%p) in %s (%p) to %s (%p)\n",
-		device->name, device, parent->name, parent, dest->name, dest);
+	kprintf(LOG_DEBUG, "device: created alias %s in %s to %s\n",
+		device->name, parent->name, dest->name);
 
 	if(devicep)
 		*devicep = device;
@@ -383,8 +383,7 @@ status_t device_destroy(device_t *device) {
 		kfree(device->attrs);
 	}
 
-	kprintf(LOG_DEBUG, "device: destroyed device %s (%p) (parent: %p)\n",
-		device->name, device, device->parent);
+	kprintf(LOG_DEBUG, "device: destroyed device %s\n", device->name);
 
 	file_destroy(&device->file);
 	kfree(device->name);

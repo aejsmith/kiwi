@@ -43,7 +43,7 @@
 #include <status.h>
 
 /** Define to enable debug output from the ELF loader. */
-#define DEBUG_ELF
+//#define DEBUG_ELF
 
 #ifdef DEBUG_ELF
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
