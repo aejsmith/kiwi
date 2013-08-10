@@ -820,7 +820,7 @@ bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size
 			symbol->size = sym->st_size;
 			symbol->name = (const char *)image->strtab + sym->st_name;
 			symbol->global = (ELF_ST_BIND(sym->st_info)) ? true : false;
-			symbol->exported = true; // FIXME
+			symbol->exported = ELF_ST_VISIBILITY(sym->st_other) == ELF_STV_DEFAULT;
 			return true;
 		}
 	}
@@ -859,14 +859,17 @@ bool elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
 			continue;
 
 		if(strcmp((const char *)image->strtab + sym->st_name, name) == 0) {
-			if(global && !ELF_ST_BIND(sym->st_info))
+			if(global && !ELF_ST_BIND(sym->st_info)) {
 				continue;
+			} else if(exported && ELF_ST_VISIBILITY(sym->st_other) != ELF_STV_DEFAULT) {
+				continue;
+			}
 
 			symbol->addr = sym->st_value + image->load_base;
 			symbol->size = sym->st_size;
 			symbol->name = (const char *)image->strtab + sym->st_name;
 			symbol->global = (ELF_ST_BIND(sym->st_info)) ? true : false;
-			symbol->exported = true; // FIXME: should check exported
+			symbol->exported = ELF_ST_VISIBILITY(sym->st_other) == ELF_STV_DEFAULT;
 			return true;
 		}
 	}

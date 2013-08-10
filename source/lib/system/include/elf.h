@@ -557,7 +557,7 @@ typedef struct {
 #define ELF_STV_DEFAULT		0		/**< Default symbol visibility rules. */
 #define ELF_STV_INTERNAL	1		/**< Processor-specific hidden class. */
 #define ELF_STV_HIDDEN		2		/**< Symbol unavailable in other modules. */
-#define ELF_STV_PROTECTED	3		/**< Not preemptible, not exported. */
+#define ELF_STV_PROTECTED	3		/**< Not preemptible. */
 
 /** Special symbol table indices. */
 #define ELF_STN_UNDEF		0		/**< End of a chain. */

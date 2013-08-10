@@ -38,10 +38,13 @@
 #  define __init_text		
 #  define __init_data		
 #  define __section(s)		
+#  define __export		
 # else
 #  define __init_text		__attribute__((section(".init.text")))
 #  define __init_data		__attribute__((section(".init.data")))
 #  define __section(s)		__attribute__((section(s)))
+#  define __hidden		__attribute__((visibility("hidden")))
+#  define __export		__attribute__((visibility("default")))
 # endif
 # define __cacheline_aligned	__aligned(CPU_CACHE_SIZE)
 # define likely(x)		__builtin_expect(!!(x), 1)

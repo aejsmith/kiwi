@@ -197,10 +197,12 @@ static void init_thread(void *arg1, void *arg2) {
 
 	update_boot_progress(10);
 
-	/* Load modules, then any FS images supplied. Wait until after loading
-	 * kernel modules to do FS images, so that we only load FS images if the
-	 * boot filesystem could not be mounted. */
+	/* Load modules loaded by KBoot. */
 	module_init();
+
+	/* Load any FS images supplied. Wait until after loading kernel modules
+	 * to do FS images, so that we only load FS images if the boot
+	 * filesystem could not be mounted. */
 	if(!root_mount) {
 		/* Mount a ramfs at the root to extract the images to. */
 		ret = fs_mount(NULL, "/", "ramfs", 0, NULL);

@@ -24,7 +24,8 @@ Import('config', 'manager')
 
 # Create the module environment.
 env = manager.Clone('module', 'kernel', {
-    'CCFLAGS': ['-fno-common'],
+    # Modules default to not exporting symbols.
+    'CCFLAGS': ['-fno-common', '-fvisibility=hidden'],
 })
 
 # Add a builder to create kernel modules. The emitter adds all modules to the
