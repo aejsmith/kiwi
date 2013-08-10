@@ -1000,6 +1000,7 @@ void elf_clone(process_t *process, process_t *parent) {
 		image = list_entry(iter, elf_image_t, header);
 
 		clone = kmemdup(image, sizeof(*image), MM_KERNEL);
+		clone->name = kstrdup(image->name, MM_KERNEL);
 		list_init(&clone->header);
 		list_append(&process->images, &clone->header);
 	}
