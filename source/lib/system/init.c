@@ -27,8 +27,8 @@
 
 #include "libsystem.h"
 
-/** Early system library initialisation. */
-static void __attribute__((constructor)) libsystem_early_init(void) {
+/** Early system library initialisation (run in .init). */
+static __init void libsystem_early_init(void) {
 	/* Attempt to open standard I/O streams from existing handles. */
 	stdin = fdopen(STDIN_FILENO, "r");
 	stdout = fdopen(STDOUT_FILENO, "a");

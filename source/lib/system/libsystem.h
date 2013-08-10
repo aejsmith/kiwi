@@ -27,6 +27,8 @@
 #include <system/_internal.h>
 
 /** Compiler attribute/builtin macros. */
+#define __init			__attribute__((constructor))
+#define __fini			__attribute__((destructor))
 #define __hidden		__attribute__((visibility("hidden")))
 #define likely(x)		__builtin_expect(!!(x), 1)
 #define unlikely(x)		__builtin_expect(!!(x), 0)

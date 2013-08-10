@@ -104,7 +104,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 	/* Wait for any of them to exit. */
 	ret = kern_object_wait(events, count, 0, (flags & WNOHANG) ? 0 : -1);
 	if(ret != STATUS_SUCCESS) {
-		if(events) { free(events); }
+		if(events) free(events);
 		if(ret == STATUS_WOULD_BLOCK)
 			return 0;
 
@@ -142,7 +142,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 fail:
 	ret = -1;
 out:
-	if(events) { free(events); }
+	if(events) free(events);
 	kern_mutex_unlock(&child_processes_lock);
 	return ret;
 }

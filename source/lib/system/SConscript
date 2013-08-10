@@ -28,7 +28,7 @@ sources = map(File, [
     'locale/setlocale.c',
 
     'posix/access.c',
-    #'posix/alarm.c',
+    'posix/alarm.c',
     'posix/chdir.c',
     #'posix/chmod.c',
     #'posix/chown.c',

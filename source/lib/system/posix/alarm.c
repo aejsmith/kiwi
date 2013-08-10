@@ -25,18 +25,32 @@
 
 #include <unistd.h>
 
-#include "libsystem.h"
+#include "posix_priv.h"
 
 /** Alarm timer handle. */
-static handle_t alarm_handle = -1;
+static handle_t alarm_handle = INVALID_HANDLE;
 static int32_t alarm_lock = MUTEX_INITIALIZER;
+
+/** Fork handler to reset the alarm handle. */
+static void reset_alarm(void) {
+	/* POSIX specifies that after a fork "the time left until an alarm clock
+	 * signal shall be reset to zero, and the alarm, if any, shall be
+	 * canceled". The handle is not inheritable so it is already cancelled.
+	 * It will be recreated on the next call to alarm(). */
+	alarm_handle = INVALID_HANDLE;
+}
+
+/** Register the fork handler. */
+static __init void alarm_init(void) {
+	register_fork_handler(reset_alarm);
+}
 
 /** Arrange for a SIGALRM signal to be delivered after a certain time.
  * @param seconds	Seconds to wait for.
  * @return		Seconds until previously scheduled alarm was to be
  *			delivered, or 0 if no previous alarm. */
 unsigned int alarm(unsigned int seconds) {
-	useconds_t rem;
+	nstime_t rem;
 	status_t ret;
 
 	kern_mutex_lock(&alarm_lock, -1);
