@@ -610,17 +610,20 @@ int kern_object_type(handle_t handle) {
  * on a large number of objects, using the watcher API will yield better
  * performance.
  *
- * @param events	Array of structures describing events to wait for. Upon
- *			successful return, the signalled field of each
+ * If the OBJECT_WAIT_ALL flag is specified, then the function will wait until
+ * all of the given events occur, rather than just one of them. If a wait with
+ * OBJECT_WAIT_ALL times out or is interrupted, some of the events may have
+ * fired, so the events array will be updated with the status of each event.
+ *
+ * @param events	Array of structures describing events to wait for. If
+ *			the function returns STATUS_SUCCESS, STATUS_TIMED_OUT,
+ *			or STATUS_INTERRUPTED, the signalled field of each
  *			structure will be updated to reflect whether or not the
  *			event was signalled, and if set to true then the data
  *			field will be updated with the data value associated
  *			with the event.
  * @param count		Number of array entries.
- * @param flags		Behaviour flags for waiting. If the OBJECT_WAIT_ALL
- *			flag is specified, then the function will wait until
- *			all of the given events occur, rather than just one of
- *			them.
+ * @param flags		Behaviour flags for waiting. See above
  * @param timeout	Maximum time to wait in nanoseconds. A value of 0 will
  *			cause the function to return immediately if the none of
  *			the events have already occurred, and a value of -1 will
@@ -693,6 +696,7 @@ status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags,
 		ret = STATUS_SUCCESS;
 		spinlock_unlock(&sync.lock);
 	} else {
+		sync.thread = curr_thread;
 		ret = thread_sleep(&sync.lock, timeout, "object_wait",
 			SLEEP_INTERRUPTIBLE);
 	}
@@ -703,10 +707,18 @@ out:
 		handle->object->type->unwait(handle, waits[i].info.event, &waits[i]);
 		object_handle_release(handle);
 
-		if(ret == STATUS_SUCCESS) {
+		/* If we're waiting with OBJECT_WAIT_ALL and we've timed out or
+		 * been interrupted, some of the events could have fired so
+		 * return them. */
+		switch(ret) {
+		case STATUS_SUCCESS:
+		case STATUS_TIMED_OUT:
+		case STATUS_INTERRUPTED:
 			err = memcpy_to_user(&events[i], &waits[i].info, sizeof(*events));
 			if(err != STATUS_SUCCESS)
 				ret = err;
+
+			break;
 		}
 	}
 

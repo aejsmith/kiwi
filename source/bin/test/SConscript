@@ -16,4 +16,4 @@
 
 Import('env')
 
-env.KiwiApplication('test', ['main.c'])
+env.KiwiApplication('test', ['main.c'], libraries = ['kernel'])
