@@ -90,7 +90,7 @@ typedef struct timer {
 	struct cpu *cpu;		/**< CPU that the timer was started on. */
 	timer_func_t func;		/**< Function to call when the timer expires. */
 	void *data;			/**< Argument to pass to timer handler. */
-	unsigned flags;			/**< Behaviour flags. */
+	uint32_t flags;			/**< Behaviour flags. */
 	unsigned mode;			/**< Mode of the timer. */
 	nstime_t initial;		/**< Initial time (for periodic timers). */
 	const char *name;		/**< Name of the timer (for debugging purposes). */
@@ -109,7 +109,7 @@ extern nstime_t boot_time(void);
 extern void timer_device_set(timer_device_t *device);
 extern bool timer_tick(void);
 extern void timer_init(timer_t *timer, const char *name, timer_func_t func,
-	void *data, unsigned flags);
+	void *data, uint32_t flags);
 extern void timer_start(timer_t *timer, nstime_t length, unsigned mode);
 extern void timer_stop(timer_t *timer);
 

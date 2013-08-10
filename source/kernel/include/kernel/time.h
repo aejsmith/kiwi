@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 /** Timer events. */
-#define TIMER_EVENT		0	/**< Event for the timer firing. */
+#define TIMER_EVENT_FIRED	0	/**< Event for the timer firing. */
 
 /** Timer flags. */
 #define TIMER_SIGNAL		(1<<0)	/**< Send SIGALRM upon timer completion. */
@@ -38,7 +38,7 @@ extern "C" {
 #define TIMER_ONESHOT		1	/**< Fire the timer event only once. */
 #define TIMER_PERIODIC		2	/**< Fire the event at regular intervals until stopped. */
 
-extern status_t kern_timer_create(unsigned flags, handle_t *handlep);
+extern status_t kern_timer_create(uint32_t flags, handle_t *handlep);
 extern status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode);
 extern status_t kern_timer_stop(handle_t handle, nstime_t *remp);
 

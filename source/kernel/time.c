@@ -48,7 +48,7 @@
 typedef struct user_timer {
 	object_t obj;			/**< Object header. */
 
-	unsigned flags;			/**< Flags for the timer. */
+	uint32_t flags;			/**< Flags for the timer. */
 	timer_t timer;			/**< Kernel timer. */
 	notifier_t notifier;		/**< Notifier for the timer event. */
 	bool fired;			/**< Whether the event has fired. */
@@ -280,7 +280,7 @@ bool timer_tick(void) {
  * @param func		Function to call when the timer expires.
  * @param data		Data argument to pass to timer.
  * @param flags		Behaviour flags for the timer. */
-void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data, unsigned flags) {
+void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data, uint32_t flags) {
 	list_init(&timer->header);
 	timer->func = func;
 	timer->data = data;
@@ -481,7 +481,7 @@ static status_t timer_object_wait(object_handle_t *handle, unsigned event, void 
 	user_timer_t *timer = (user_timer_t *)handle->object;
 
 	switch(event) {
-	case TIMER_EVENT:
+	case TIMER_EVENT_FIRED:
 		if(timer->fired) {
 			timer->fired = false;
 			object_wait_signal(wait, 0);
@@ -503,7 +503,7 @@ static void timer_object_unwait(object_handle_t *handle, unsigned event, void *w
 	user_timer_t *timer = (user_timer_t *)handle->object;
 
 	switch(event) {
-	case TIMER_EVENT:
+	case TIMER_EVENT_FIRED:
 		notifier_unregister(&timer->notifier, object_wait_notifier, wait);
 		break;
 	}
@@ -539,7 +539,7 @@ static bool user_timer_func(void *_timer) {
  * @param flags		Flags for the timer.
  * @param handlep	Where to store handle to timer object.
  * @return		Status code describing result of the operation. */
-status_t kern_timer_create(unsigned flags, handle_t *handlep) {
+status_t kern_timer_create(uint32_t flags, handle_t *handlep) {
 	user_timer_t *timer;
 	object_handle_t *handle;
 	status_t ret;
@@ -549,7 +549,7 @@ status_t kern_timer_create(unsigned flags, handle_t *handlep) {
 
 	timer = kmalloc(sizeof(*timer), MM_KERNEL);
 	object_init(&timer->obj, &timer_object_type);
-	timer_init(&timer->timer, "user_timer", user_timer_func, timer, TIMER_THREAD);
+	timer_init(&timer->timer, "timer_object", user_timer_func, timer, TIMER_THREAD);
 	notifier_init(&timer->notifier, timer);
 	timer->flags = flags;
 	timer->fired = false;
