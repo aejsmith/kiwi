@@ -253,6 +253,7 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 		woken++;
 	}
 
+	spinlock_unlock(&futex->lock);
 	futex_finish(addr);
 
 	/* Store the number of woken threads if requested. */
