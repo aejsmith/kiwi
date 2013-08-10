@@ -350,6 +350,7 @@ static status_t object_handle_detach_unsafe(handle_t id) {
 	object_handle_release(curr_proc->handles->handles[id]);
 	curr_proc->handles->handles[id] = NULL;
 	curr_proc->handles->flags[id] = 0;
+	bitmap_clear(curr_proc->handles->bitmap, id);
 
 	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
 		id, curr_proc->id);
@@ -558,6 +559,8 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 
 	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
 		handle = process->handles->handles[i];
+		if(!handle)
+			continue;
 
 		kdb_printf("%-4zu 0x%-4" PRIx32 " %-18p %-2u (%-18p) %-5" PRId32 " %p\n",
 			i, process->handles->flags[i], handle->object,

@@ -35,7 +35,7 @@ static inline void set_bit(volatile unsigned long *addr, unsigned long bit) {
  * @param bitmap	Bitmap to clear in.
  * @param bit		Bit to clear. */
 static inline void clear_bit(volatile unsigned long *addr, unsigned long bit) {
-	__asm__ volatile ("lock btr %1, %0" : "+m"(addr) : "r"(bit) : "memory");
+	__asm__ volatile ("lock btr %1, %0" : "+m"(*addr) : "r"(bit) : "memory");
 }
 
 /** Find first set bit in a native-sized value.
