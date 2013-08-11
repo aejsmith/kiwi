@@ -633,21 +633,10 @@ status_t file_rewind_dir(object_handle_t *handle) {
 	return STATUS_SUCCESS;
 }
 
-/**
- * Modify the size of a file.
- *
- * Modifies the size of a file. If the new size is smaller than the previous
- * size of the file, then the extra data is discarded. If it is larger than the
- * previous size, then the extended space will be filled with zero bytes.
- *
- * @param handle	Handle to file to resize. Must have the FILE_RIGHT_WRITE
- *			access right.
- * @param size		New size of the file.
- *
- * @return		Status code describing result of the operation.
- */
-status_t file_resize(object_handle_t *handle, offset_t size) {
-	file_t *file;
+/** Get a file handle's flags.
+ * @param handle	Handle to get flags from.
+ * @param flagsp	Where to store handle flags. */
+status_t file_flags(object_handle_t *handle, uint32_t *flagsp) {
 	file_handle_t *data;
 
 	assert(handle);
@@ -655,18 +644,27 @@ status_t file_resize(object_handle_t *handle, offset_t size) {
 	if(handle->object->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	file = (file_t *)handle->object;
 	data = (file_handle_t *)handle->data;
 
-	if(!object_handle_rights(handle, FILE_RIGHT_WRITE)) {
-		return STATUS_ACCESS_DENIED;
-	} else if(file->type != FILE_TYPE_REGULAR) {
-		return STATUS_NOT_REGULAR;
-	} else if(!file->ops->resize) {
-		return STATUS_NOT_SUPPORTED;
-	}
+	*flagsp = data->flags;
+	return STATUS_SUCCESS;
+}
 
-	return file->ops->resize(file, data, size);
+/** Set a file handle's flags.
+ * @param handle	Handle to set flags for.
+ * @param flags		New flags to set. */
+status_t file_set_flags(object_handle_t *handle, uint32_t flags) {
+	file_handle_t *data;
+
+	assert(handle);
+
+	if(handle->object->type->id != OBJECT_TYPE_FILE)
+		return STATUS_INVALID_HANDLE;
+
+	data = (file_handle_t *)handle->data;
+
+	data->flags = flags;
+	return STATUS_SUCCESS;
 }
 
 /**
@@ -732,6 +730,42 @@ status_t file_seek(object_handle_t *handle, unsigned action, offset_t offset,
 		*resultp = result;
 
 	return STATUS_SUCCESS;
+}
+
+/**
+ * Modify the size of a file.
+ *
+ * Modifies the size of a file. If the new size is smaller than the previous
+ * size of the file, then the extra data is discarded. If it is larger than the
+ * previous size, then the extended space will be filled with zero bytes.
+ *
+ * @param handle	Handle to file to resize. Must have the FILE_RIGHT_WRITE
+ *			access right.
+ * @param size		New size of the file.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t file_resize(object_handle_t *handle, offset_t size) {
+	file_t *file;
+	file_handle_t *data;
+
+	assert(handle);
+
+	if(handle->object->type->id != OBJECT_TYPE_FILE)
+		return STATUS_INVALID_HANDLE;
+
+	file = (file_t *)handle->object;
+	data = (file_handle_t *)handle->data;
+
+	if(!object_handle_rights(handle, FILE_RIGHT_WRITE)) {
+		return STATUS_ACCESS_DENIED;
+	} else if(file->type != FILE_TYPE_REGULAR) {
+		return STATUS_NOT_REGULAR;
+	} else if(!file->ops->resize) {
+		return STATUS_NOT_SUPPORTED;
+	}
+
+	return file->ops->resize(file, data, size);
 }
 
 /** Get information about a file or directory.
@@ -1117,20 +1151,33 @@ status_t kern_file_rewind_dir(handle_t handle) {
 	return ret;
 }
 
-/**
- * Modify the size of a file.
- *
- * Modifies the size of a file. If the new size is smaller than the previous
- * size of the file, then the extra data is discarded. If it is larger than the
- * previous size, then the extended space will be filled with zero bytes.
- *
- * @param handle	Handle to file to resize. Must have the FILE_RIGHT_WRITE
- *			access right.
- * @param size		New size of the file.
- *
- * @return		Status code describing result of the operation.
- */
-status_t kern_file_resize(handle_t handle, offset_t size) {
+/** Get a file handle's flags.
+ * @param handle	Handle to get flags from.
+ * @param flagsp	Where to store handle flags. */
+status_t kern_file_flags(handle_t handle, uint32_t *flagsp) {
+	object_handle_t *khandle;
+	uint32_t flags;
+	status_t ret;
+
+	if(!flagsp)
+		return STATUS_INVALID_ARG;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	ret = file_flags(khandle, &flags);
+	if(ret == STATUS_SUCCESS)
+		ret = memcpy_to_user(flagsp, &flags, sizeof(*flagsp));
+
+	object_handle_release(khandle);
+	return ret;
+}
+
+/** Set a file handle's flags.
+ * @param handle	Handle to set flags for.
+ * @param flags		New flags to set. */
+status_t kern_file_set_flags(handle_t handle, uint32_t flags) {
 	object_handle_t *khandle;
 	status_t ret;
 
@@ -1138,7 +1185,7 @@ status_t kern_file_resize(handle_t handle, offset_t size) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = file_resize(khandle, size);
+	ret = file_set_flags(khandle, flags);
 	object_handle_release(khandle);
 	return ret;
 }
@@ -1172,6 +1219,32 @@ status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset,
 	if(ret == STATUS_SUCCESS && resultp)
 		ret = memcpy_to_user(resultp, &result, sizeof(*resultp));
 
+	object_handle_release(khandle);
+	return ret;
+}
+
+/**
+ * Modify the size of a file.
+ *
+ * Modifies the size of a file. If the new size is smaller than the previous
+ * size of the file, then the extra data is discarded. If it is larger than the
+ * previous size, then the extended space will be filled with zero bytes.
+ *
+ * @param handle	Handle to file to resize. Must have the FILE_RIGHT_WRITE
+ *			access right.
+ * @param size		New size of the file.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t kern_file_resize(handle_t handle, offset_t size) {
+	object_handle_t *khandle;
+	status_t ret;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	ret = file_resize(khandle, size);
 	object_handle_release(khandle);
 	return ret;
 }
