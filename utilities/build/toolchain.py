@@ -206,13 +206,16 @@ class ToolchainManager:
 
     # Repairs any links within the toolchain directory.
     def repair(self):
-        # Create clang wrapper scripts.
+        # Create clang wrapper scripts. The wrapper script is needed to pass
+        # the correct sysroot path for the target. The exec sets the executable
+        # name for clang to the wrapper script path - this allows clang to
+        # determine the target and the tool directory properly.
         for name in ['clang', 'clang++']:
             path = os.path.join(self.genericdir, 'bin', name)
             wrapper = os.path.join(self.targetdir, 'bin', '%s-%s' % (self.target, name))
             f = open(wrapper, 'w')
             f.write('#!/bin/sh\n\n')
-            f.write('%s -target %s --sysroot=%s/sysroot $*\n' % (path, self.target, self.targetdir))
+            f.write('exec -a $0 %s --sysroot=%s/sysroot $*\n' % (path, self.targetdir))
             f.close()
             os.chmod(wrapper, 0755)
         try:

@@ -1,6 +1,6 @@
 diff -urN llvm-3.3.src.orig/include/llvm/ADT/Triple.h llvm-3.3.src/include/llvm/ADT/Triple.h
---- llvm-3.3.src.orig/include/llvm/ADT/Triple.h	2013-07-16 17:31:18.000000000 +0100
-+++ llvm-3.3.src/include/llvm/ADT/Triple.h	2013-07-16 17:31:33.000000000 +0100
+--- llvm-3.3.src.orig/include/llvm/ADT/Triple.h	2013-08-11 18:40:43.000000000 +0100
++++ llvm-3.3.src/include/llvm/ADT/Triple.h	2013-08-11 21:00:17.000000000 +0100
 @@ -105,7 +105,8 @@
      NaCl,       // Native Client
      CNK,        // BG/P Compute-Node Kernel
@@ -12,8 +12,8 @@ diff -urN llvm-3.3.src.orig/include/llvm/ADT/Triple.h llvm-3.3.src/include/llvm/
    enum EnvironmentType {
      UnknownEnvironment,
 diff -urN llvm-3.3.src.orig/lib/Support/Triple.cpp llvm-3.3.src/lib/Support/Triple.cpp
---- llvm-3.3.src.orig/lib/Support/Triple.cpp	2013-07-16 17:31:18.000000000 +0100
-+++ llvm-3.3.src/lib/Support/Triple.cpp	2013-07-16 17:31:33.000000000 +0100
+--- llvm-3.3.src.orig/lib/Support/Triple.cpp	2013-08-11 18:40:43.000000000 +0100
++++ llvm-3.3.src/lib/Support/Triple.cpp	2013-08-11 21:00:17.000000000 +0100
 @@ -135,6 +135,7 @@
    case CNK: return "cnk";
    case Bitrig: return "bitrig";
@@ -31,8 +31,8 @@ diff -urN llvm-3.3.src.orig/lib/Support/Triple.cpp llvm-3.3.src/lib/Support/Trip
  }
  
 diff -urN llvm-3.3.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-3.3.src/tools/clang/lib/Basic/Targets.cpp
---- llvm-3.3.src.orig/tools/clang/lib/Basic/Targets.cpp	2013-07-16 17:31:21.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Basic/Targets.cpp	2013-07-16 17:31:33.000000000 +0100
+--- llvm-3.3.src.orig/tools/clang/lib/Basic/Targets.cpp	2013-08-11 18:40:46.000000000 +0100
++++ llvm-3.3.src/tools/clang/lib/Basic/Targets.cpp	2013-08-11 21:00:17.000000000 +0100
 @@ -397,6 +397,23 @@
    }
  };
@@ -85,8 +85,8 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-3.3.src/tools
        return new SolarisTargetInfo<X86_64TargetInfo>(T);
      case llvm::Triple::MinGW32:
 diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-3.3.src/tools/clang/lib/Driver/Driver.cpp
---- llvm-3.3.src.orig/tools/clang/lib/Driver/Driver.cpp	2013-07-16 17:31:21.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/Driver.cpp	2013-07-16 17:31:33.000000000 +0100
+--- llvm-3.3.src.orig/tools/clang/lib/Driver/Driver.cpp	2013-08-11 18:40:46.000000000 +0100
++++ llvm-3.3.src/tools/clang/lib/Driver/Driver.cpp	2013-08-11 21:00:17.000000000 +0100
 @@ -1747,6 +1747,9 @@
      case llvm::Triple::Minix:
        TC = new toolchains::Minix(*this, Target, Args);
@@ -98,9 +98,9 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-3.3.src/tools
        if (Target.getArch() == llvm::Triple::hexagon)
          TC = new toolchains::Hexagon_TC(*this, Target, Args);
 diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.cpp llvm-3.3.src/tools/clang/lib/Driver/ToolChains.cpp
---- llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.cpp	2013-07-16 17:31:21.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/ToolChains.cpp	2013-07-16 17:35:10.000000000 +0100
-@@ -1929,6 +1929,45 @@
+--- llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.cpp	2013-08-11 18:40:46.000000000 +0100
++++ llvm-3.3.src/tools/clang/lib/Driver/ToolChains.cpp	2013-08-11 22:02:49.000000000 +0100
+@@ -1929,6 +1929,82 @@
    return new tools::minix::Link(*this);
  }
  
@@ -109,7 +109,11 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.cpp llvm-3.3.src/t
 +Kiwi::Kiwi(const Driver &D, const llvm::Triple& Triple, const ArgList &Args)
 +  : Generic_ELF(D, Triple, Args) {
 +  getFilePaths().push_back(getDriver().Dir + "/../lib");
-+  getFilePaths().push_back(getDriver().SysRoot + "/lib");
++
++  // When using a sysroot, add '/lib' to allow '/system' to be omitted
++  // in the sysroot.
++  if(!getDriver().SysRoot.empty())
++    getFilePaths().push_back(getDriver().SysRoot + "/lib");
 +  getFilePaths().push_back(getDriver().SysRoot + "/system/lib");
 +}
 +
@@ -137,19 +141,52 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.cpp llvm-3.3.src/t
 +  if (DriverArgs.hasArg(options::OPT_nostdlibinc))
 +    return;
 +
-+  // Add both '/include' and '/system/include' in case this is a
-+  // cross-compiler.
-+  addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include");
++  if (!D.SysRoot.empty())
++    addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include");
 +  addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/system/include");
++}
++
++ToolChain::CXXStdlibType
++Kiwi::GetCXXStdlibType(const ArgList &Args) const {
++  if (Arg *A = Args.getLastArg(options::OPT_stdlib_EQ)) {
++    StringRef Value = A->getValue();
++    if (Value == "libc++")
++      return ToolChain::CST_Libcxx;
++
++    getDriver().Diag(diag::err_drv_invalid_stdlib_name)
++      << A->getAsString(Args);
++  }
++
++  return ToolChain::CST_Libcxx;
++}
++
++void Kiwi::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
++                                        ArgStringList &CC1Args) const {
++  if (DriverArgs.hasArg(options::OPT_nostdlibinc) ||
++      DriverArgs.hasArg(options::OPT_nostdincxx))
++    return;
++
++  if (!getDriver().SysRoot.empty()) {
++    addSystemInclude(DriverArgs, CC1Args,
++                     getDriver().SysRoot + "/include/c++/v1");
++  }
++  addSystemInclude(DriverArgs, CC1Args,
++                   getDriver().SysRoot + "/system/include/c++/v1");
++}
++
++void Kiwi::AddCXXStdlibLibArgs(const ArgList &Args,
++                               ArgStringList &CmdArgs) const {
++  CmdArgs.push_back("-lc++");
++  CmdArgs.push_back("-lcxxrt");
 +}
 +
  /// AuroraUX - AuroraUX tool chain which can call as(1) and ld(1) directly.
  
  AuroraUX::AuroraUX(const Driver &D, const llvm::Triple& Triple,
 diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.h llvm-3.3.src/tools/clang/lib/Driver/ToolChains.h
---- llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.h	2013-07-16 17:31:21.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/ToolChains.h	2013-07-16 17:35:47.000000000 +0100
-@@ -493,6 +493,18 @@
+--- llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.h	2013-08-11 18:40:46.000000000 +0100
++++ llvm-3.3.src/tools/clang/lib/Driver/ToolChains.h	2013-08-11 21:17:22.000000000 +0100
+@@ -493,6 +493,25 @@
    virtual Tool *buildLinker() const;
  };
  
@@ -160,6 +197,13 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.h llvm-3.3.src/too
 +  virtual void AddClangSystemIncludeArgs(const ArgList &DriverArgs,
 +                                         ArgStringList &CC1Args) const;
 +
++  virtual CXXStdlibType GetCXXStdlibType(const ArgList &Args) const;
++
++  virtual void AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
++                                            ArgStringList &CC1Args) const;
++  virtual void AddCXXStdlibLibArgs(const ArgList &Args,
++                                   ArgStringList &CmdArgs) const;
++
 +protected:
 +  virtual Tool *buildAssembler() const;
 +  virtual Tool *buildLinker() const;
@@ -169,8 +213,8 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.h llvm-3.3.src/too
  public:
    DragonFly(const Driver &D, const llvm::Triple& Triple, const ArgList &Args);
 diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/clang/lib/Driver/Tools.cpp
---- llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp	2013-07-16 17:31:21.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/Tools.cpp	2013-07-16 17:31:33.000000000 +0100
+--- llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp	2013-08-11 18:40:46.000000000 +0100
++++ llvm-3.3.src/tools/clang/lib/Driver/Tools.cpp	2013-08-11 21:43:54.000000000 +0100
 @@ -1234,6 +1234,8 @@
  
    if (Triple.getOSName().startswith("haiku"))
@@ -180,7 +224,7 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/
    if (Triple.getOSName().startswith("openbsd"))
      return "i486";
    if (Triple.getOSName().startswith("bitrig"))
-@@ -6239,6 +6241,244 @@
+@@ -6239,6 +6241,248 @@
    C.addCommand(new Command(JA, *this, Exec, CmdArgs));
  }
  
@@ -384,6 +428,10 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/
 +
 +  if (!Args.hasArg(options::OPT_nostdlib) &&
 +      !Args.hasArg(options::OPT_nodefaultlibs)) {
++    if (D.CCCIsCXX) {
++      getToolChain().AddCXXStdlibLibArgs(Args, CmdArgs);
++      CmdArgs.push_back("-lm");
++    }
 +    CmdArgs.push_back("-lsystem");
 +
 +    std::string file = "libclang_rt.";
@@ -426,8 +474,8 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/
  
  // For now, DragonFly Assemble does just about the same as for
 diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.h llvm-3.3.src/tools/clang/lib/Driver/Tools.h
---- llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.h	2013-07-16 17:31:21.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/Tools.h	2013-07-16 17:31:33.000000000 +0100
+--- llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.h	2013-08-11 18:40:46.000000000 +0100
++++ llvm-3.3.src/tools/clang/lib/Driver/Tools.h	2013-08-11 21:00:17.000000000 +0100
 @@ -486,6 +486,39 @@
    };
  } // end namespace minix
