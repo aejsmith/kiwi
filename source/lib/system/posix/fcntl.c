@@ -29,14 +29,48 @@
 
 #include "libsystem.h"
 
+/** Perform the F_DUPFD{,_CLOEXEC} commands.
+ * @param fd		File descriptor.
+ * @param dest		Minimum ID for new descriptor.
+ * @param cloexec	Whether to set the cloexec flag.
+ * @return		New FD on success, -1 on failure. */
+static int fcntl_dupfd(int fd, int dest, bool cloexec) {
+	status_t ret;
+	handle_t new;
+
+	/* TODO: Implement this. */
+	if(dest > 0) {
+		errno = ENOSYS;
+		return -1;
+	}
+
+	ret = kern_handle_duplicate(fd, INVALID_HANDLE, &new);
+	if(ret != STATUS_SUCCESS) {
+		libsystem_status_to_errno(ret);
+		return -1;
+	}
+
+	if(!cloexec) {
+		ret = kern_handle_set_flags(new, HANDLE_INHERITABLE);
+		if(ret != STATUS_SUCCESS) {
+			kern_handle_close(new);
+			libsystem_status_to_errno(ret);
+			return -1;
+		}
+	}
+
+	return new;
+}
+
 /** Perform the F_GETFD command.
  * @param fd		File descriptor.
  * @return		FD flags on success, -1 on failure. */
 static int fcntl_getfd(int fd) {
-	int kflags, flags = 0;
+	uint32_t kflags;
+	int flags = 0;
 	status_t ret;
 
-	ret = kern_handle_control(fd, HANDLE_GET_LFLAGS, 0, &kflags);
+	ret = kern_handle_flags(fd, &kflags);
 	if(ret != STATUS_SUCCESS) {
 		libsystem_status_to_errno(ret);
 		return -1;
@@ -51,12 +85,12 @@ static int fcntl_getfd(int fd) {
  * @param flags		New flags.
  * @return		0 on success, -1 on failure. */
 static int fcntl_setfd(int fd, int flags) {
-	int kflags = 0;
+	uint32_t kflags = 0;
 	status_t ret;
 
-	kflags |= ((flags & FD_CLOEXEC) ? 0 : HANDLE_INHERITABLE);
+	kflags = ((flags & FD_CLOEXEC) ? 0 : HANDLE_INHERITABLE);
 
-	ret = kern_handle_control(fd, HANDLE_SET_LFLAGS, kflags, NULL);
+	ret = kern_handle_set_flags(fd, kflags);
 	if(ret != STATUS_SUCCESS) {
 		libsystem_status_to_errno(ret);
 		return -1;
@@ -65,31 +99,15 @@ static int fcntl_setfd(int fd, int flags) {
 	return 0;
 }
 
-/** Perform the F_DUPFD command.
- * @param fd		File descriptor.
- * @param dest		Minimum ID for new descriptor.
- * @return		New FD on success, -1 on failure. */
-static int fcntl_dupfd(int fd, int dest) {
-	status_t ret;
-	handle_t new;
-
-	ret = kern_handle_duplicate(fd, dest, false, &new);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
-
-	return new;
-}
-
 /** Perform the F_GETFL command.
  * @param fd		File descriptor.
  * @return		File status flags on success, -1 on failure. */
 static int fcntl_getfl(int fd) {
-	int kflags, flags = 0;
+	uint32_t kflags;
+	int flags = 0;
 	status_t ret;
 
-	ret = kern_handle_control(fd, HANDLE_GET_FLAGS, 0, &kflags);
+	ret = kern_file_flags(fd, &kflags);
 	if(ret != STATUS_SUCCESS) {
 		libsystem_status_to_errno(ret);
 		return -1;
@@ -105,13 +123,13 @@ static int fcntl_getfl(int fd) {
  * @param flags		New flags.
  * @return		0 on success, -1 on failure. */
 static int fcntl_setfl(int fd, int flags) {
-	int kflags = 0;
+	uint32_t kflags = 0;
 	status_t ret;
 
 	kflags |= ((flags & O_NONBLOCK) ? 0 : FILE_NONBLOCK);
 	kflags |= ((flags & O_APPEND) ? 0 : FILE_APPEND);
 
-	ret = kern_handle_control(fd, HANDLE_SET_FLAGS, kflags, NULL);
+	ret = kern_file_set_flags(fd, kflags);
 	if(ret != STATUS_SUCCESS) {
 		libsystem_status_to_errno(ret);
 		return -1;
@@ -125,25 +143,28 @@ static int fcntl_setfl(int fd, int flags) {
  *
  * Controls the behaviour of a file descriptor according to the specified
  * command. The following commands are currently recognised:
- *  F_DUPFD  - Duplicates the given file descriptor. The new descriptor will be
- *             the lowest available that is greater than or equal to the third
- *             argument. It will refer to the same open file description as the
- *             old descriptor. The return value (on success) is the new file
- *             descriptor.
- *  F_GETFD  - Get file descriptor flags. These flags are associated with a
- *             single file descriptor, and do not affect other descriptors
- *             referring to the same open file. The return value (on success)
- *             is the set of flags currently set on the FD.
- *  F_SETFD  - Set file descriptor flags (see F_GETFD). The return value (on
- *             success) is 0.
- *  F_GETFL  - Get file status flags and access flags. These flags are
- *             stored for each open file description, and modifying them affects
- *             other file descriptors referring to the same description (FDs
- *             duplicated by dup()/dup2()/F_DUPFD and duplicated by fork() refer
- *             to the same file description). The return value (on success) is
- *             the set of flags currently set on the file description.
- *  F_SETFL  - Set file status flags and access flags (see F_GETFL). The return
- *             value (on success) is 0.
+ *  - F_DUPFD: Duplicates the given file descriptor. The new descriptor will be
+ *    the lowest available that is greater than or equal to the third argument.
+ *    It will refer to the same open file description as the old descriptor.
+ *    The return value (on success) is the new file descriptor. The new file
+ *    descriptor will not have the FD_CLOEXEC flag set, meaning it will remain
+ *    open after an exec*() call.
+ *  - F_DUPFD_CLOEXEC: The same as F_DUPFD, but instead sets the FD_CLOEXEC
+ *    flag on the new descriptor.
+ *  - F_GETFD: Get file descriptor flags. These flags are associated with a
+ *    single file descriptor, and do not affect other descriptors referring to
+ *    the same open file. The return value (on success) is the set of flags
+ *    currently set on the FD.
+ *  - F_SETFD: Set file descriptor flags (see F_GETFD). The return value (on
+ *    success) is 0.
+ *  - F_GETFL: Get file status flags and access flags. These flags are stored
+ *    for each open file description, and modifying them affects other file
+ *    descriptors referring to the same description (FDs duplicated by
+ *    dup()/dup2()/F_DUPFD and duplicated by fork() refer to the same file
+ *    description). The return value (on success) is the set of flags currently
+ *    set on the file description.
+ *  - F_SETFL: Set file status flags and access flags (see F_GETFL). The return
+ *    value (on success) is 0.
  * 
  * @param fd		File descriptor to control.
  * @param cmd		Command to perform.
@@ -159,16 +180,20 @@ int fcntl(int fd, int cmd, ...) {
 	va_start(args, cmd);
 
 	switch(cmd) {
+	case F_DUPFD:
+		arg = va_arg(args, int);
+		ret = fcntl_dupfd(fd, arg, false);
+		break;
+	case F_DUPFD_CLOEXEC:
+		arg = va_arg(args, int);
+		ret = fcntl_dupfd(fd, arg, true);
+		break;
 	case F_GETFD:
 		ret = fcntl_getfd(fd);
 		break;
 	case F_SETFD:
 		arg = va_arg(args, int);
 		ret = fcntl_setfd(fd, arg);
-		break;
-	case F_DUPFD:
-		arg = va_arg(args, int);
-		ret = fcntl_dupfd(fd, arg);
 		break;
 	case F_GETFL:
 		ret = fcntl_getfl(fd);
