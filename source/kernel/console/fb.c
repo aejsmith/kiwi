@@ -40,7 +40,6 @@ KBOOT_BOOLEAN_OPTION("splash_disabled", "Disable splash screen", false);
 
 extern unsigned char console_font[];
 extern unsigned char logo_ppm[];
-extern unsigned char copyright_ppm[];
 
 /** Dimensions and colours of the console font. */
 #define FONT_WIDTH		7
@@ -574,11 +573,6 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
 	if(!kboot_boolean_option("splash_disabled")) {
 		splash_enabled = true;
 		fb_console_acquired = true;
-
-		/* Draw copyright text. */
-		ppm_size(copyright_ppm, &width, &height);
-		ppm_draw(copyright_ppm, (fb_info.width / 2) - (width / 2),
-			fb_info.height - height - 5);
 
 		/* Get logo dimensions. */
 		ppm_size(logo_ppm, &width, &height);

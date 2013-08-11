@@ -236,7 +236,7 @@ static void init_thread(void *arg1, void *arg2) {
 	page_late_init();
 	kmem_late_init();
 
-	update_boot_progress(100);
+	update_boot_progress(20);
 
 	/* Run the service manager. */
 	ret = process_create(pargs, penv, PROCESS_CREATE_CRITICAL,
