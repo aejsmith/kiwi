@@ -21,7 +21,7 @@ env.Module('display', ['display.c'])
 
 # Work out the drivers to build.
 dirs = [
-	('DRIVER_DISPLAY_VBE', 'vbe'),
+    ('DRIVER_DISPLAY_VBE', 'vbe'),
 ]
 
-SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])
+SConscript(dirs = [d for (c, d) in dirs if not c or config[c]], exports = ['env'])

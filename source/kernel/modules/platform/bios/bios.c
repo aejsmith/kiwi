@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -169,7 +169,7 @@ static size_t remaining_size = BIOS_MEM_SIZE;
  *			NULL on failure. The returned addresss must not be
  *			passed to interrupts - use bios_mem_virt2phys() to
  *			convert the address to a physical address first. */
-void *bios_mem_alloc(size_t size, unsigned mmflag) {
+__export void *bios_mem_alloc(size_t size, unsigned mmflag) {
 	uint32_t ret;
 
 	mutex_lock(&bios_lock);
@@ -188,15 +188,13 @@ void *bios_mem_alloc(size_t size, unsigned mmflag) {
 	mutex_unlock(&bios_lock);
 	return bios_mem_phys2virt(ret);
 }
-MODULE_EXPORT(bios_mem_alloc);
 
 /** Free space from the BIOS memory area.
  * @param addr		Address of allocation.
  * @param size		Size of the original allocation. */
-void bios_mem_free(void *addr, size_t size) {
+__export void bios_mem_free(void *addr, size_t size) {
 
 }
-MODULE_EXPORT(bios_mem_free);
 
 /**
  * Convert a virtual address to a physical address.
@@ -208,13 +206,12 @@ MODULE_EXPORT(bios_mem_free);
  *
  * @return		Address that can be used by BIOS code.
  */
-uint32_t bios_mem_virt2phys(void *addr) {
+__export uint32_t bios_mem_virt2phys(void *addr) {
 	assert(addr >= bios_mem_mapping);
 	assert((ptr_t)addr < ((ptr_t)bios_mem_mapping + 0x100000));
 
 	return (uint32_t)((ptr_t)addr - (ptr_t)bios_mem_mapping);
 }
-MODULE_EXPORT(bios_mem_virt2phys);
 
 /**
  * Convert a BIOS memory address to a virtual address.
@@ -227,12 +224,11 @@ MODULE_EXPORT(bios_mem_virt2phys);
  *
  * @return		Virtual address, or NULL if address was invalid.
  */
-void *bios_mem_phys2virt(uint32_t addr) {
+__export void *bios_mem_phys2virt(uint32_t addr) {
 	assert(addr < 0x100000);
 
 	return (void *)((ptr_t)addr + (ptr_t)bios_mem_mapping);
 }
-MODULE_EXPORT(bios_mem_phys2virt);
 
 /**
  * Execute a BIOS interrupt.
@@ -244,7 +240,7 @@ MODULE_EXPORT(bios_mem_phys2virt);
  * @param regs		Registers to pass to interrupt. Will be updated with
  *			the register state after calling the interrupt.
  */
-void bios_interrupt(uint8_t num, bios_regs_t *regs) {
+__export void bios_interrupt(uint8_t num, bios_regs_t *regs) {
 	void *halt, *stack;
 
 	assert(regs);
@@ -304,15 +300,13 @@ void bios_interrupt(uint8_t num, bios_regs_t *regs) {
 
 	mutex_unlock(&bios_lock);
 }
-MODULE_EXPORT(bios_interrupt);
 
 /** Initialize a registers structure.
  * @param regs		Structure to initialize. */
-void bios_regs_init(bios_regs_t *regs) {
+__export void bios_regs_init(bios_regs_t *regs) {
 	memset(regs, 0, sizeof(bios_regs_t));
 	regs->eflags = X86_FLAGS_IF | X86_FLAGS_ALWAYS1;
 }
-MODULE_EXPORT(bios_regs_init);
 
 /** Map a range into the BIOS memory mapping.
  * @param addr		Address within the mapping to map.
@@ -325,7 +319,8 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
 
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		mmu_context_map(&kernel_mmu_context, (ptr_t)bios_mem_mapping + addr + i,
-			phys + i, MMU_MAP_WRITE | MMU_MAP_EXECUTE, MM_KERNEL);
+			phys + i, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE,
+			MM_KERNEL);
 	}
 
 	mmu_context_unlock(&kernel_mmu_context);

@@ -45,8 +45,7 @@ dist = manager.Create('dist', {
 #################
 
 # Build the kernel and drivers.
-#SConscript(dirs = ['kernel', 'drivers'])
-SConscript(dirs = ['kernel'])
+SConscript(dirs = ['kernel', 'drivers'])
 
 ################
 # KBoot build. #

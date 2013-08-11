@@ -86,6 +86,10 @@ typedef struct io_vec {
 #define FILE_SEEK_ADD		2	/**< Add the supplied value to the current offset. */
 #define FILE_SEEK_END		3	/**< Set to the end of the file plus the supplied value. */
 
+/** Events that can occur on file objects. */
+#define FILE_EVENT_READABLE	1	/**< Wait for the device to be readable. */
+#define FILE_EVENT_WRITABLE	2	/**< Wait for the device to be writable. */
+
 extern status_t kern_file_read(handle_t handle, void *buf, size_t size,
 	offset_t offset, size_t *bytesp);
 extern status_t kern_file_write(handle_t handle, const void *buf, size_t size,

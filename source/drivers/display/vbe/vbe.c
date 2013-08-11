@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -54,11 +54,12 @@ static status_t vbe_display_set_mode(display_device_t *_device, display_mode_t *
 			kprintf(LOG_DEBUG, "vbe: call failed with code 0x%x\n", regs.eax & 0xFFFF);
 			return STATUS_DEVICE_ERROR;
 		}
-		if((regs.ebx & ~((1<<14) | (1<<15))) == mode->id) {
-			return STATUS_SUCCESS;
-		}
 
-		kprintf(LOG_DEBUG, "vbe: switching to mode 0x%" PRIx32 " (mode: %p)\n", mode->id, mode);
+		if((regs.ebx & ~((1<<14) | (1<<15))) == mode->id)
+			return STATUS_SUCCESS;
+
+		kprintf(LOG_DEBUG, "vbe: switching to mode 0x%" PRIx32 " (mode: %p)\n",
+			mode->id, mode);
 	}
 
 	/* Set bit 14 in the mode register to use linear framebuffer model. */
@@ -131,9 +132,9 @@ static status_t vbe_init(void) {
 	kprintf(LOG_NOTICE, " capabilities: 0x%" PRIx32 "\n", info->capabilities);
 	kprintf(LOG_NOTICE, " mode pointer: 0x%" PRIx32 "\n", info->video_mode_ptr);
 	kprintf(LOG_NOTICE, " total memory: %" PRIu16 "KB\n", info->total_memory * 64);
-	if(info->vbe_version >= 0x0200) {
+	if(info->vbe_version >= 0x0200)
 		kprintf(LOG_NOTICE, " OEM revision: 0x%" PRIx16 "\n", info->oem_software_rev);
-	}
+
 	mem_size = (info->total_memory * 64) * 1024;
 
 	location = bios_mem_phys2virt(SEGOFF2LIN(info->video_mode_ptr));
@@ -179,8 +180,11 @@ static status_t vbe_init(void) {
 		} else if((minfo->mode_attributes & (1<<7)) == 0) {
 			/* Not usable in linear mode. */
 			continue;
-		} else if(minfo->bits_per_pixel != 8 && minfo->bits_per_pixel != 16 &&
-		          minfo->bits_per_pixel != 24 && minfo->bits_per_pixel != 32) {
+		}
+
+		if(minfo->bits_per_pixel != 8 && minfo->bits_per_pixel != 16 &&
+			minfo->bits_per_pixel != 24 && minfo->bits_per_pixel != 32)
+		{
 			continue;
 		}
 
@@ -195,32 +199,29 @@ static status_t vbe_init(void) {
 		count++;
 
 		/* Try to guess the memory address. */
-		if(minfo->phys_base_ptr < mem_phys) {
+		if(minfo->phys_base_ptr < mem_phys)
 			mem_phys = minfo->phys_base_ptr;
-		}
 	}
 
 	/* Now fix up mode offsets. */
-	for(i = 0; i < count; i++) {
+	for(i = 0; i < count; i++)
 		modes[i].offset = modes[i].offset - mem_phys;
-	}
 
 	/* Set the cache mode on the framebuffer to WC. */
 	phys_set_memory_type(mem_phys, ROUND_UP(mem_size, PAGE_SIZE), MEMORY_TYPE_WC);
 
 	/* Add the display device. */
-	ret = display_device_create(NULL, NULL, &vbe_display_ops, NULL, modes, count,
-	                            mem_phys, mem_size, &vbe_display_device);
+	ret = display_device_create(NULL, NULL, &vbe_display_ops, NULL, modes,
+		count, mem_phys, mem_size, &vbe_display_device);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 out:
-	if(minfo) {
+	if(minfo)
 		bios_mem_free(minfo, sizeof(vbe_mode_info_t));
-	}
-	if(info) {
+	if(info)
 		bios_mem_free(info, sizeof(vbe_info_t));
-	}
+
 	return ret;
 }
 

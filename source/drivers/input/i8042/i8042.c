@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -65,9 +65,9 @@ static inline void i8042_wait_write(void) {
 
 	/* Wait for at most a second. */
 	for(i = 0; i < 1000; i++) {
-		if(!(in8(0x64) & (1<<1))) {
+		if(!(in8(0x64) & (1<<1)))
 			return;
-		}
+
 		delay(1000);
 	}
 
@@ -80,9 +80,9 @@ static inline void i8042_wait_data(void) {
 
 	/* Wait for at most a second. */
 	for(i = 0; i < 1000; i++) {
-		if(in8(0x64) & (1<<0)) {
+		if(in8(0x64) & (1<<0))
 			return;
-		}
+
 		delay(1000);
 	}
 
@@ -112,9 +112,8 @@ static irq_status_t i8042_keyboard_irq(unsigned num, void *_device) {
 
 	assert(device == i8042_keyboard_dev);
 
-	if(!(in8(0x64) & (1<<0)) || in8(0x64) & (1<<5)) {
+	if(!(in8(0x64) & (1<<0)) || in8(0x64) & (1<<5))
 		return IRQ_UNHANDLED;
-	}
 
 	code = in8(0x60);
 
@@ -156,9 +155,8 @@ static irq_status_t i8042_keyboard_irq(unsigned num, void *_device) {
 
 	/* Translate the code into an input layer code. */
 	value = i8042_keycode_table[code][keyboard_seen_extended];
-	if(value) {
+	if(value)
 		input_device_event(device, type, value);
-	}
 
 	keyboard_seen_extended = false;
 	return IRQ_HANDLED;
@@ -185,9 +183,8 @@ static void i8042_mouse_command(uint8_t cmd) {
 
 	/* Wait for an ACK on the data port. */
 	i8042_wait_data();
-	if(in8(0x60) != 0xFA) {
+	if(in8(0x60) != 0xFA)
 		kprintf(LOG_DEBUG, "i8042: warning: mouse command was not ACKed\n");
-	}
 }
 
 /** IRQ handler for i8042 mouse.
@@ -201,9 +198,8 @@ static irq_status_t i8042_mouse_irq(unsigned num, void *_device) {
 
 	assert(device == i8042_mouse_dev);
 
-	if(!(in8(0x64) & (1<<0)) || !(in8(0x64) & (1<<5))) {
+	if(!(in8(0x64) & (1<<0)) || !(in8(0x64) & (1<<5)))
 		return IRQ_UNHANDLED;
-	}
 
 	mouse_packet[mouse_packet_num++] = in8(0x60);
 
@@ -230,12 +226,10 @@ static irq_status_t i8042_mouse_irq(unsigned num, void *_device) {
 		dy = -dy;
 
 		/* Only add in events if there is a change. */
-		if(dx != 0) {
+		if(dx != 0)
 			input_device_event(i8042_mouse_dev, INPUT_EVENT_REL_X, dx);
-		}
-		if(dy != 0) {
+		if(dy != 0)
 			input_device_event(i8042_mouse_dev, INPUT_EVENT_REL_Y, dy);
-		}
 
 		/* Check for changes in buttons. The button state is stored
 		 * in the bottom 3 bits of the first packet byte. */
@@ -243,15 +237,13 @@ static irq_status_t i8042_mouse_irq(unsigned num, void *_device) {
 		for(i = 0; i < 3; i++) {
 			/* If the new state has the button, but the old state
 			 * does not, it has been clicked. */
-			if(new_state & (1<<i) && (mouse_button_state & (1<<i)) == 0) {
+			if(new_state & (1<<i) && (mouse_button_state & (1<<i)) == 0)
 				input_device_event(device, INPUT_EVENT_BTN_DOWN, i);
-			}
 
 			/* If the old state has the button, but the new state
 			 * does not, it has been released. */
-			if((new_state & (1<<i)) == 0 && mouse_button_state & (1<<i)) {
+			if((new_state & (1<<i)) == 0 && mouse_button_state & (1<<i))
 				input_device_event(device, INPUT_EVENT_BTN_UP, i);
-			}
 		}
 
 		/* Packet done, save new button state and reset to state 0. */
@@ -280,9 +272,8 @@ static status_t i8042_init(void) {
 	status_t ret;
 
 	/* Empty i8042 buffer. */
-	while(in8(0x64) & 1) {
+	while(in8(0x64) & 1)
 		in8(0x60);
-	}
 
 	/* Get the command byte from the controller. */
 	i8042_command_write(0x20);
@@ -311,12 +302,11 @@ static status_t i8042_init(void) {
 	i8042_mouse_command(0xF4);
 
 	ret = keyboard_device_create(NULL, NULL, &i8042_keyboard_ops, NULL, &i8042_keyboard_dev);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	kprintf(LOG_DEBUG, "i8042: registered i8042 keyboard device %p(%s)\n",
-	        i8042_keyboard_dev, i8042_keyboard_dev->name);
+		i8042_keyboard_dev, i8042_keyboard_dev->name);
 
 	ret = irq_register(1, i8042_keyboard_irq, NULL, i8042_keyboard_dev);
 	if(ret != STATUS_SUCCESS) {
@@ -326,12 +316,11 @@ static status_t i8042_init(void) {
 	}
 
 	ret = mouse_device_create(NULL, NULL, &i8042_mouse_ops, NULL, &i8042_mouse_dev);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	kprintf(LOG_DEBUG, "i8042: registered i8042 mouse device %p(%s)\n",
-	        i8042_mouse_dev, i8042_mouse_dev->name);
+		i8042_mouse_dev, i8042_mouse_dev->name);
 
 	ret = irq_register(12, i8042_mouse_irq, NULL, i8042_mouse_dev);
 	if(ret != STATUS_SUCCESS) {
@@ -342,9 +331,8 @@ static status_t i8042_init(void) {
 	}
 
 	/* Empty i8042 buffer. */
-	while(in8(0x64) & 1) {
+	while(in8(0x64) & 1)
 		in8(0x60);
-	}
 
 	return STATUS_SUCCESS;
 }
@@ -355,14 +343,12 @@ static status_t i8042_unload(void) {
 	status_t ret;
 
 	ret = device_destroy(i8042_keyboard_dev);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	ret = device_destroy(i8042_mouse_dev);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	return STATUS_SUCCESS;
 }

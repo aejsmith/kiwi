@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -71,6 +71,7 @@ static uint16_t display_mode_depth(const display_mode_t *mode) {
 	case PIXEL_FORMAT_GREY8:
 		return 8;
 	}
+
 	return 0;
 }
 
@@ -91,9 +92,8 @@ static display_mode_t *display_mode_get(display_device_t *device, uint16_t id) {
 	size_t i;
 
 	for(i = 0; i < device->count; i++) {
-		if(device->modes[i].id == id) {
+		if(device->modes[i].id == id)
 			return &device->modes[i];
-		}
 	}
 
 	return NULL;
@@ -107,7 +107,8 @@ static display_mode_t *display_mode_get(display_device_t *device, uint16_t id) {
  *			will be returned.
  * @return		Pointer to mode if found, NULL if not. */
 static display_mode_t *display_mode_find(display_device_t *device, uint16_t width,
-                                         uint16_t height, uint8_t depth) {
+	uint16_t height, uint8_t depth)
+{
 	display_mode_t *ret = NULL;
 	size_t i;
 
@@ -133,28 +134,29 @@ static void display_device_destroy(device_t *_device) {
 
 /** Open a display device.
  * @param _device	Device being opened.
- * @param datap		Where to store handle-specific data pointer (Unused).
+ * @param flags		Flags being opened with.
+ * @param datap		Where to store handle-specific data pointer.
  * @return		Status code describing result of the operation. */
-static status_t display_device_open(device_t *_device, void **datap) {
+static status_t display_device_open(device_t *_device, uint32_t flags, void **datap) {
 	display_device_t *device = _device->data;
 
-	if(atomic_cas(&device->open, 0, 1) != 0) {
+	if(atomic_cas(&device->open, 0, 1) != 0)
 		return STATUS_IN_USE;
-	}
 
 	/* If this is the kernel console device, register the redraw notifier. */
 	if(device == display_console_device) {
 		fb_console_control(FB_CONSOLE_ACQUIRE, NULL);
 		notifier_register(&kdb_exit_notifier, display_console_redraw, device);
 	}
+
 	return STATUS_SUCCESS;
 }
 
 /** Close a display device.
  * @param _device	Device being closed.
- * @param data		Unused.
+ * @param handle	File handle structure
  * @return		Status code describing result of the operation. */
-static void display_device_close(device_t *_device, void *data) {
+static void display_device_close(device_t *_device, file_handle_t *handle) {
 	display_device_t *device = _device->data;
 	int old;
 
@@ -169,21 +171,24 @@ static void display_device_close(device_t *_device, void *data) {
 
 /** Signal that a display device event is being waited for.
  * @param _device	Device to wait for.
- * @param data		Unused.
- * @param event		Event to wait for.
- * @param sync		Synchronisation pointer.
+ * @param handle	File handle structure.
+ * @param event		Event that is being waited for.
+ * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t display_device_wait(device_t *_device, void *data, int event, void *sync) {
+static status_t display_device_wait(device_t *_device, file_handle_t *handle,
+	unsigned event, void *wait)
+{
 	display_device_t *device = _device->data;
 
 	switch(event) {
 	case DISPLAY_EVENT_REDRAW:
 		if(device->redraw) {
 			device->redraw = false;
-			object_wait_signal(sync);
+			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&device->redraw_notifier, object_wait_notifier, sync);
+			notifier_register(&device->redraw_notifier, object_wait_notifier, wait);
 		}
+
 		return STATUS_SUCCESS;
 	default:
 		return STATUS_INVALID_EVENT;
@@ -192,31 +197,34 @@ static status_t display_device_wait(device_t *_device, void *data, int event, vo
 
 /** Stop waiting for a display device event.
  * @param _device	Device to stop waiting for.
- * @param data		Unused.
- * @param event		Event to wait for.
- * @param sync		Synchronisation pointer. */
-static void display_device_unwait(device_t *_device, void *data, int event, void *sync) {
+ * @param handle	File handle structure.
+ * @param event		Event that is being waited for.
+ * @param wait		Internal data pointer. */
+static void display_device_unwait(device_t *_device, file_handle_t *handle,
+	unsigned event, void *wait)
+{
 	display_device_t *device = _device->data;
 
 	switch(event) {
 	case DISPLAY_EVENT_REDRAW:
-		notifier_unregister(&device->redraw_notifier, object_wait_notifier, sync);
+		notifier_unregister(&device->redraw_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
 
 /** Get a page for the device.
  * @param _device	Device to get page from.
- * @param data		Unused.
- * @param offset	Offset into device of page to get.
- * @param physp		Where to store address of page.
+ * @param handle	File handle structure.
+ * @param offset	Offset into device to get page from.
+ * @param physp		Where to store physical address of page.
  * @return		Status code describing result of the operation. */
-static status_t display_device_get_page(device_t *_device, void *data, offset_t offset, phys_ptr_t *physp) {
+static status_t display_device_get_page(device_t *_device, file_handle_t *handle,
+	offset_t offset, phys_ptr_t *physp)
+{
 	display_device_t *device = _device->data;
 
-	if(offset >= (offset_t)device->mem_size) {
+	if(offset >= (offset_t)device->mem_size)
 		return STATUS_NOT_FOUND;
-	}
 
 	*physp = device->mem_phys + offset;
 	return STATUS_SUCCESS;
@@ -266,17 +274,19 @@ static void display_mode_to_fb_info(display_device_t *device, const display_mode
 	}
 }
 
-/** Handler for display device requests.
+/** Handler for device-specific requests.
  * @param _device	Device request is being made on.
- * @param data		Unused.
+ * @param handle	File handle structure.
  * @param request	Request number.
  * @param in		Input buffer.
- * @param insz		Input buffer size.
+ * @param in_size	Input buffer size.
  * @param outp		Where to store pointer to output buffer.
- * @param outszp	Where to store output buffer size.
- * @return		Status code describing result of the operation. */
-static status_t display_device_request(device_t *_device, void *data, int request, const void *in,
-                                       size_t insz, void **outp, size_t *outszp) {
+ * @param out_sizep	Where to store output buffer size.
+ * @return		Status code describing result of operation. */
+static status_t display_device_request(device_t *_device, file_handle_t *handle,
+	unsigned request, const void *in, size_t in_size, void **outp,
+	size_t *out_sizep)
+{
 	display_device_t *device = _device->data;
 	display_mode_t *mode = NULL;
 	fb_info_t info;
@@ -285,23 +295,22 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 
 	switch(request) {
 	case DISPLAY_MODE_COUNT:
-		if(!outp || !outszp) {
+		if(!outp || !out_sizep)
 			return STATUS_INVALID_ARG;
-		}
-		*outp = kmemdup(&device->count, sizeof(size_t), MM_WAIT);
-		*outszp = sizeof(size_t);
+
+		*outp = kmemdup(&device->count, sizeof(size_t), MM_KERNEL);
+		*out_sizep = sizeof(size_t);
 		return STATUS_SUCCESS;
 	case DISPLAY_GET_MODES:
-		if(!outp || !outszp) {
+		if(!outp || !out_sizep)
 			return STATUS_INVALID_ARG;
-		}
-		*outp = kmemdup(device->modes, sizeof(display_mode_t) * device->count, MM_WAIT);
-		*outszp = sizeof(display_mode_t) * device->count;
+
+		*outp = kmemdup(device->modes, sizeof(display_mode_t) * device->count, MM_KERNEL);
+		*out_sizep = sizeof(display_mode_t) * device->count;
 		return STATUS_SUCCESS;
 	case DISPLAY_GET_PREFERRED_MODE:
-		if(!outp || !outszp) {
+		if(!outp || !out_sizep)
 			return STATUS_INVALID_ARG;
-		}
 
 		mutex_lock(&device->lock);
 
@@ -321,12 +330,12 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			}
 		}
 
-		*outp = kmemdup(mode, sizeof(display_mode_t), MM_WAIT);
-		*outszp = sizeof(display_mode_t);
+		*outp = kmemdup(mode, sizeof(display_mode_t), MM_KERNEL);
+		*out_sizep = sizeof(display_mode_t);
 		mutex_unlock(&device->lock);
 		return STATUS_SUCCESS;
 	case DISPLAY_SET_MODE:
-		if(in && insz != sizeof(uint16_t)) {
+		if(in && in_size != sizeof(uint16_t)) {
 			return STATUS_INVALID_ARG;
 		} else if(!device->ops->set_mode) {
 			return STATUS_NOT_SUPPORTED;
@@ -342,10 +351,12 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			}
 
 			if(device == display_console_device) {
-				notifier_unregister(&kdb_exit_notifier, display_console_redraw, device);
+				notifier_unregister(&kdb_exit_notifier,
+					display_console_redraw, device);
 				fb_console_control(FB_CONSOLE_RELEASE, NULL);
 				display_console_device = NULL;
 			}
+
 			device->curr_mode = NULL;
 		} else {
 			/* Look for the mode requested. */
@@ -372,7 +383,8 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 				 * to prevent kernel output. */
 				if(!display_console_device) {
 					fb_console_control(FB_CONSOLE_ACQUIRE, NULL);
-					notifier_register(&kdb_exit_notifier, display_console_redraw, device);
+					notifier_register(&kdb_exit_notifier,
+						display_console_redraw, device);
 				}
 
 				display_console_device = device;
@@ -388,7 +400,8 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 	default:
 		if(request >= DEVICE_CUSTOM_REQUEST_START && device->ops->request) {
 			mutex_lock(&device->lock);
-			ret = device->ops->request(device, request, in, insz, outp, outszp);
+			ret = device->ops->request(device, request, in, in_size,
+				outp, out_sizep);
 			mutex_unlock(&device->lock);
 			return ret;
 		} else {
@@ -399,6 +412,7 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 
 /** Display device operations structure. */
 static device_ops_t display_device_ops = {
+	.type = FILE_TYPE_CHAR,
 	.destroy = display_device_destroy,
 	.open = display_device_open,
 	.close = display_device_close,
@@ -419,10 +433,10 @@ static device_ops_t display_device_ops = {
  * @param count		Number of modes.
  * @param devicep	Where to store pointer to device structure.
  * @return		Status code describing result of the operation. */
-status_t display_device_create(const char *name, device_t *parent, display_ops_t *ops,
-                               void *data, display_mode_t *modes, size_t count,
-                               phys_ptr_t mem_phys, size_t mem_size,
-                               device_t **devicep) {
+__export status_t display_device_create(const char *name, device_t *parent, 
+	display_ops_t *ops, void *data, display_mode_t *modes, size_t count,
+	phys_ptr_t mem_phys, size_t mem_size, device_t **devicep)
+{
 	device_attr_t attrs[] = {
 		{ "type", DEVICE_ATTR_STRING, { .string = "display" } },
 	};
@@ -430,11 +444,10 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 	display_device_t *device;
 	status_t ret;
 
-	if((parent && !name) || (name && !parent) || !ops || !modes || !count || !devicep) {
+	if((parent && !name) || (name && !parent) || !ops || !modes || !count || !devicep)
 		return STATUS_INVALID_ARG;
-	}
 
-	device = kmalloc(sizeof(display_device_t), MM_WAIT);
+	device = kmalloc(sizeof(display_device_t), MM_KERNEL);
 	mutex_init(&device->lock, "display_device_lock", 0);
 	atomic_set(&device->open, 0);
 	notifier_init(&device->redraw_notifier, device);
@@ -443,7 +456,7 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 	device->data = data;
 	device->curr_mode = NULL;
 	device->redraw = false;
-	device->modes = kmemdup(modes, sizeof(display_mode_t) * count, MM_WAIT);
+	device->modes = kmemdup(modes, sizeof(display_mode_t) * count, MM_KERNEL);
 	device->count = count;
 	device->mem_phys = mem_phys;
 	device->mem_size = mem_size;
@@ -452,7 +465,7 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 	sprintf(dname, "%" PRId32, device->id);
 	if(parent) {
 		ret = device_create(name, parent, &display_device_ops, device, attrs,
-		                    ARRAY_SIZE(attrs), devicep);
+			ARRAY_SIZE(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
@@ -462,8 +475,8 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 		 * exists, and ID should be unique. */
 		device_alias(dname, display_device_dir, *devicep, NULL);
 	} else {
-		ret = device_create(dname, display_device_dir, &display_device_ops, device,
-		                    attrs, ARRAY_SIZE(attrs), devicep);
+		ret = device_create(dname, display_device_dir, &display_device_ops,
+			device, attrs, ARRAY_SIZE(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
@@ -472,13 +485,13 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 
 	return STATUS_SUCCESS;
 }
-MODULE_EXPORT(display_device_create);
 
 /** Initialisation function for the display module.
  * @return		Status code describing result of the operation. */
 static status_t display_init(void) {
 	/* Create the display device directory. */
-	return device_create("display", device_tree_root, NULL, NULL, NULL, 0, &display_device_dir);
+	return device_create("display", device_tree_root, NULL, NULL, NULL, 0,
+		&display_device_dir);
 }
 
 /** Unloading function for the display module.

@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -21,7 +21,7 @@ env.Module('input', ['input.c'])
 
 # Work out the drivers to build.
 dirs = [
-	('DRIVER_INPUT_I8042', 'i8042'),
+    ('DRIVER_INPUT_I8042', 'i8042'),
 ]
 
-SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])
+SConscript(dirs = [d for (c, d) in dirs if not c or config[c]], exports = ['env'])

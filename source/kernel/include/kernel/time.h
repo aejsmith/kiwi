@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 /** Timer events. */
-#define TIMER_EVENT_FIRED	0	/**< Event for the timer firing. */
+#define TIMER_EVENT_FIRED	1	/**< Event for the timer firing. */
 
 /** Timer flags. */
 #define TIMER_SIGNAL		(1<<0)	/**< Send SIGALRM upon timer completion. */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #include <drivers/input.h>
 
 #include <io/device.h>
+#include <io/request.h>
 
 #include <lib/atomic.h>
 #include <lib/string.h>
@@ -49,14 +50,14 @@ static void input_device_destroy(device_t *_device) {
 
 	switch(device->type) {
 	case INPUT_TYPE_KEYBOARD:
-		if(device->kops->destroy) {
+		if(device->kops->destroy)
 			device->kops->destroy(device);
-		}
+
 		break;
 	case INPUT_TYPE_MOUSE:
-		if(device->mops->destroy) {
+		if(device->mops->destroy)
 			device->mops->destroy(device);
-		}
+
 		break;
 	}
 
@@ -65,23 +66,22 @@ static void input_device_destroy(device_t *_device) {
 
 /** Open an input device.
  * @param _device	Device being opened.
- * @param datap		Where to store handle-specific data pointer (unused).
+ * @param flags		Flags being opened with.
+ * @param datap		Where to store handle-specific data pointer.
  * @return		Status code describing result of the operation. */
-static status_t input_device_open(device_t *_device, void **datap) {
+static status_t input_device_open(device_t *_device, uint32_t flags, void **datap) {
 	input_device_t *device = _device->data;
 
-	if(atomic_cas(&device->open, 0, 1) != 0) {
+	if(atomic_cas(&device->open, 0, 1) != 0)
 		return STATUS_IN_USE;
-	}
 
 	return STATUS_SUCCESS;
 }
 
 /** Close an input device.
  * @param _device	Device being closed.
- * @param data		Handle-specific data pointer (unused).
- * @return		Status code describing result of the operation. */
-static void input_device_close(device_t *_device, void *data) {
+ * @param handle	File handle structure. */
+static void input_device_close(device_t *_device, file_handle_t *handle) {
 	input_device_t *device = _device->data;
 	int old;
 
@@ -89,63 +89,25 @@ static void input_device_close(device_t *_device, void *data) {
 	assert(old == 1);
 }
 
-/** Read from an input device.
- * @param _device	Device to read from.
- * @param data		Handle-specific data pointer (unused).
- * @param _buf		Buffer to read into.
- * @param count		Number of bytes to read. Must be a multiple of
- *			sizeof(input_event_t).
- * @param offset	Offset to write to (ignored).
- * @param bytesp	Where to store number of bytes read.
- * @return		Status code describing result of the operation. */
-static status_t input_device_read(device_t *_device, void *data, void *_buf, size_t count,
-                                  offset_t offset, size_t *bytesp) {
-	input_device_t *device = _device->data;
-	status_t ret = STATUS_SUCCESS;
-	input_event_t *buf = _buf;
-	size_t i;
-
-	if(count % sizeof(input_event_t)) {
-		return STATUS_INVALID_ARG;
-	}
-
-	for(i = 0; i < (count / sizeof(input_event_t)); i++) {
-		ret = semaphore_down_etc(&device->sem, -1, SYNC_INTERRUPTIBLE);
-		if(ret != STATUS_SUCCESS) {
-			break;
-		}
-
-		spinlock_lock(&device->lock);
-
-		memcpy(&buf[i], &device->buffer[device->start], sizeof(*buf));
-		device->size--;
-		if(++device->start == INPUT_BUFFER_SIZE) {
-			device->start = 0;
-		}
-
-		spinlock_unlock(&device->lock);
-	}
-
-	*bytesp = i * sizeof(input_event_t);
-	return ret;
-}
-
 /** Signal that an input device event is being waited for.
  * @param _device	Device to wait for.
- * @param data		Handle-specific data pointer (unused).
- * @param event		Event to wait for.
- * @param sync		Synchronisation pointer.
+ * @param handle	File handle structure.
+ * @param event		Event that is being waited for.
+ * @param wait		Internal data pointer
  * @return		Status code describing result of the operation. */
-static status_t input_device_wait(device_t *_device, void *data, int event, void *sync) {
+static status_t input_device_wait(device_t *_device, file_handle_t *handle,
+	unsigned event, void *wait)
+{
 	input_device_t *device = _device->data;
 
 	switch(event) {
-	case DEVICE_EVENT_READABLE:
+	case FILE_EVENT_READABLE:
 		if(semaphore_count(&device->sem)) {
-			object_wait_signal(sync);
+			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&device->data_notifier, object_wait_notifier, sync);
+			notifier_register(&device->data_notifier, object_wait_notifier, wait);
 		}
+
 		return STATUS_SUCCESS;
 	default:
 		return STATUS_INVALID_EVENT;
@@ -154,82 +116,123 @@ static status_t input_device_wait(device_t *_device, void *data, int event, void
 
 /** Stop waiting for an input device event.
  * @param _device	Device to stop waiting for.
- * @param data		Handle-specific data pointer (unused).
- * @param event		Event to wait for.
- * @param sync		Synchronisation pointer. */
-static void input_device_unwait(device_t *_device, void *data, int event, void *sync) {
+ * @param handle	File handle structure.
+ * @param event		Event that is being waited for.
+ * @param wait		Internal data pointer. */
+static void input_device_unwait(device_t *_device, file_handle_t *handle,
+	unsigned event, void *wait)
+{
 	input_device_t *device = _device->data;
 
 	switch(event) {
-	case DEVICE_EVENT_READABLE:
-		notifier_unregister(&device->data_notifier, object_wait_notifier, sync);
+	case FILE_EVENT_READABLE:
+		notifier_unregister(&device->data_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
 
+/** Perform I/O on an input device.
+ * @param _device	Device to perform I/O on.
+ * @param handle	File handle structure.
+ * @param request	I/O request.
+ * @return		Status code describing result of the operation. */
+static status_t input_device_io(device_t *_device, file_handle_t *handle, io_request_t *request) {
+	input_device_t *device = _device->data;
+	size_t i;
+	input_event_t event;
+	status_t ret;
+
+	if(request->op == IO_OP_WRITE)
+		return STATUS_NOT_SUPPORTED;
+
+	if(request->total % sizeof(input_event_t))
+		return STATUS_INVALID_ARG;
+
+	for(i = 0; i < request->total / sizeof(input_event_t); i++) {
+		ret = semaphore_down_etc(&device->sem, -1, SLEEP_INTERRUPTIBLE);
+		if(ret != STATUS_SUCCESS)
+			return ret;
+
+		spinlock_lock(&device->lock);
+
+		memcpy(&event, &device->buffer[device->start], sizeof(event));
+		device->size--;
+		if(++device->start == INPUT_BUFFER_SIZE)
+			device->start = 0;
+
+		spinlock_unlock(&device->lock);
+
+		ret = io_request_copy(request, &event, sizeof(event));
+		if(ret != STATUS_SUCCESS)
+			return ret;
+	}
+
+	return STATUS_SUCCESS;
+}
+
 /** Handler for keyboard requests.
  * @param _device	Device request is being made on.
- * @param data		Handle-specific data pointer (unused).
+ * @param handle	File handle structure.
  * @param request	Request number.
  * @param in		Input buffer.
- * @param insz		Input buffer size.
+ * @param in_size	Input buffer size.
  * @param outp		Where to store pointer to output buffer.
- * @param outszp	Where to store output buffer size.
+ * @param out_sizep	Where to store output buffer size.
  * @return		Status code describing result of the operation. */
-static status_t keyboard_device_request(device_t *_device, void *data, int request, const void *in,
-                                        size_t insz, void **outp, size_t *outszp) {
+static status_t keyboard_device_request(device_t *_device, file_handle_t *handle,
+	unsigned request, const void *in, size_t in_size, void **outp,
+	size_t *out_sizep)
+{
 	input_device_t *device = _device->data;
 
-	switch(request) {
-	default:
-		if(request >= DEVICE_CUSTOM_REQUEST_START && device->kops->request) {
-			return device->kops->request(device, request, in, insz, outp, outszp);
-		}
-		return STATUS_INVALID_REQUEST;
-	}
+	if(request >= DEVICE_CUSTOM_REQUEST_START && device->kops->request)
+		return device->kops->request(device, request, in, in_size, outp, out_sizep);
+
+	return STATUS_INVALID_REQUEST;
 }
 
 /** Handler for mouse requests.
  * @param _device	Device request is being made on.
- * @param data		Handle-specific data pointer (unused).
+ * @param handle	File handle structure.
  * @param request	Request number.
  * @param in		Input buffer.
- * @param insz		Input buffer size.
+ * @param in_size	Input buffer size.
  * @param outp		Where to store pointer to output buffer.
- * @param outszp	Where to store output buffer size.
+ * @param out_sizep	Where to store output buffer size.
  * @return		Status code describing result of the operation. */
-static status_t mouse_device_request(device_t *_device, void *data, int request, const void *in,
-                                     size_t insz, void **outp, size_t *outszp) {
+static status_t mouse_device_request(device_t *_device, file_handle_t *handle,
+	unsigned request, const void *in, size_t in_size, void **outp,
+	size_t *out_sizep)
+{
 	input_device_t *device = _device->data;
 
-	switch(request) {
-	default:
-		if(request >= DEVICE_CUSTOM_REQUEST_START && device->mops->request) {
-			return device->mops->request(device, request, in, insz, outp, outszp);
-		}
-		return STATUS_INVALID_REQUEST;
-	}
+	if(request >= DEVICE_CUSTOM_REQUEST_START && device->mops->request)
+		return device->mops->request(device, request, in, in_size, outp, out_sizep);
+
+	return STATUS_INVALID_REQUEST;
 }
 
 /** Keyboard device operations. */
 static device_ops_t keyboard_device_ops = {
+	.type = FILE_TYPE_CHAR,
 	.destroy = input_device_destroy,
 	.open = input_device_open,
 	.close = input_device_close,
-	.read = input_device_read,
 	.wait = input_device_wait,
 	.unwait = input_device_unwait,
+	.io = input_device_io,
 	.request = keyboard_device_request,
 };
 
 /** Mouse device operations. */
 static device_ops_t mouse_device_ops = {
+	.type = FILE_TYPE_CHAR,
 	.destroy = input_device_destroy,
 	.open = input_device_open,
 	.close = input_device_close,
-	.read = input_device_read,
 	.wait = input_device_wait,
 	.unwait = input_device_unwait,
+	.io = input_device_io,
 	.request = mouse_device_request,
 };
 
@@ -243,7 +246,7 @@ static device_ops_t mouse_device_ops = {
  * @param type		Type of event.
  * @param value		Value of event.
  */
-void input_device_event(device_t *_device, uint8_t type, int32_t value) {
+__export void input_device_event(device_t *_device, uint8_t type, int32_t value) {
 	input_device_t *device = _device->data;
 	size_t i;
 
@@ -264,7 +267,6 @@ void input_device_event(device_t *_device, uint8_t type, int32_t value) {
 	notifier_run_unlocked(&device->data_notifier, NULL, false);
 	spinlock_unlock(&device->lock);
 }
-MODULE_EXPORT(input_device_event);
 
 /** Add a new input device.
  * @param name		Name to give device. Only used if parent is specified.
@@ -277,7 +279,8 @@ MODULE_EXPORT(input_device_event);
  * @param devicep	Where to store pointer to device structure.
  * @return		Status code describing result of the operation. */
 static status_t input_device_create(const char *name, device_t *parent, uint8_t type,
-                                    void *ops, void *data, device_t **devicep) {
+	void *ops, void *data, device_t **devicep)
+{
 	device_attr_t attrs[] = {
 		{ "type", DEVICE_ATTR_STRING, { .string = "input" } },
 		{ "input.type", DEVICE_ATTR_UINT8, { .uint8 = type } },
@@ -287,9 +290,8 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 	device_ops_t *iops;
 	status_t ret;
 
-	if((parent && !name) || (name && !parent) || !devicep) {
+	if((parent && !name) || (name && !parent) || !devicep)
 		return STATUS_INVALID_ARG;
-	}
 
 	device = kmalloc(sizeof(input_device_t), MM_WAIT);
 	spinlock_init(&device->lock, "input_device_lock");
@@ -307,7 +309,8 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 	iops = (type == INPUT_TYPE_KEYBOARD) ? &keyboard_device_ops : &mouse_device_ops;
 	sprintf(dname, "%" PRId32, device->id);
 	if(parent) {
-		ret = device_create(name, parent, iops, device, attrs, ARRAY_SIZE(attrs), devicep);
+		ret = device_create(name, parent, iops, device, attrs,
+			ARRAY_SIZE(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
@@ -318,7 +321,7 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 		device_alias(dname, input_device_dir, *devicep, NULL);
 	} else {
 		ret = device_create(dname, input_device_dir, iops, device, attrs,
-		                    ARRAY_SIZE(attrs), devicep);
+			ARRAY_SIZE(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
@@ -347,11 +350,11 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
  *
  * @return		Status code describing result of the operation.
  */
-status_t keyboard_device_create(const char *name, device_t *parent, keyboard_ops_t *ops,
-                                void *data, device_t **devicep) {
+__export status_t keyboard_device_create(const char *name, device_t *parent,
+	keyboard_ops_t *ops, void *data, device_t **devicep)
+{
 	return input_device_create(name, parent, INPUT_TYPE_KEYBOARD, ops, data, devicep);
 }
-MODULE_EXPORT(keyboard_device_create);
 
 /**
  * Add a new mouse device.
@@ -372,11 +375,11 @@ MODULE_EXPORT(keyboard_device_create);
  *
  * @return		Status code describing result of the operation.
  */
-status_t mouse_device_create(const char *name, device_t *parent, mouse_ops_t *ops,
-                             void *data, device_t **devicep) {
+__export status_t mouse_device_create(const char *name, device_t *parent,
+	mouse_ops_t *ops, void *data, device_t **devicep)
+{
 	return input_device_create(name, parent, INPUT_TYPE_MOUSE, ops, data, devicep);
 }
-MODULE_EXPORT(mouse_device_create);
 
 /** Initialisation function for the input module.
  * @return		Status code describing result of the operation. */

@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2010 Alex Smith
+# Copyright (C) 2009-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,17 +14,17 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('envmgr')
+Import('manager')
 
 subdirs = [
-	'bus',
-	'disk',
-	'display',
-	'input',
+    #'bus',
+    #'disk',
+    'display',
+    'input',
 ]
 
 # Get environment and add driver include directory.
-env = envmgr['module']
+env = manager['module']
 env['CPPPATH'].append(Dir('include'))
 
 SConscript(dirs = subdirs, exports = ['env'])

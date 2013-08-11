@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,7 +30,7 @@
 
 /** Input event information structure. */
 typedef struct input_event {
-	useconds_t time;		/**< Time since boot that event occurred at. */
+	nstime_t time;			/**< Time since boot that event occurred at. */
 	uint8_t type;			/**< Event type. */
 	int32_t value;			/**< Value. */
 } input_event_t;
@@ -184,12 +184,13 @@ typedef struct keyboard_ops {
 	 * @param device	Device request is being made on.
 	 * @param request	Request number.
 	 * @param in		Input buffer.
-	 * @param insz		Input buffer size.
+	 * @param in_size	Input buffer size.
 	 * @param outp		Where to store pointer to output buffer.
-	 * @param outszp	Where to store output buffer size.
+	 * @param out_sizep	Where to store output buffer size.
 	 * @return		Status code describing result of operation. */
-	status_t (*request)(struct input_device *device, int request, const void *in,
-	                    size_t insz, void **outp, size_t *outszp);
+	status_t (*request)(struct input_device *device, unsigned request,
+		const void *in, size_t in_size, void **outp,
+		size_t *out_sizep);
 } keyboard_ops_t;
 
 /** Mouse device operations structure. */
@@ -205,12 +206,13 @@ typedef struct mouse_ops {
 	 * @param device	Device request is being made on.
 	 * @param request	Request number.
 	 * @param in		Input buffer.
-	 * @param insz		Input buffer size.
+	 * @param in_size	Input buffer size.
 	 * @param outp		Where to store pointer to output buffer.
-	 * @param outszp	Where to store output buffer size.
+	 * @param out_sizep	Where to store output buffer size.
 	 * @return		Status code describing result of operation. */
-	status_t (*request)(struct input_device *device, int request, const void *in,
-	                    size_t insz, void **outp, size_t *outszp);
+	status_t (*request)(struct input_device *device, unsigned request,
+		const void *in, size_t in_size, void **outp,
+		size_t *out_sizep);
 } mouse_ops_t;
 
 /** Input device structure. */
@@ -240,10 +242,10 @@ typedef struct input_device {
 
 extern void input_device_event(device_t *_device, uint8_t type, int32_t value);
 
-extern status_t keyboard_device_create(const char *name, device_t *parent, keyboard_ops_t *ops,
-                                       void *data, device_t **devicep);
-extern status_t mouse_device_create(const char *name, device_t *parent, mouse_ops_t *ops,
-                                    void *data, device_t **devicep);
+extern status_t keyboard_device_create(const char *name, device_t *parent,
+	keyboard_ops_t *ops, void *data, device_t **devicep);
+extern status_t mouse_device_create(const char *name, device_t *parent,
+	mouse_ops_t *ops, void *data, device_t **devicep);
 
 #endif /* KERNEL */
 #endif /* __DRIVERS_INPUT_H */
