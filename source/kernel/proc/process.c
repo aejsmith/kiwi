@@ -1167,6 +1167,8 @@ status_t kern_process_clone(handle_t *handlep) {
 
 	/* Inherit other per-thread attributes from the calling thread. */
 	memcpy(&thread->signal_stack, &curr_thread->signal_stack, sizeof(thread->signal_stack));
+	thread->ustack = curr_thread->ustack;
+	thread->ustack_size = curr_thread->ustack_size;
 
 	/* Run the new thread. */
 	thread_run(thread);
