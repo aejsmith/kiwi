@@ -108,7 +108,7 @@ class BinutilsComponent(ToolchainComponent):
         confopts  = '--prefix=%s ' % (self.destdir)
         confopts += '--target=%s ' % (self.manager.target)
         confopts += '--disable-werror '
-        confopts += '--with-sysroot=%s ' % (os.path.join(self.manager.targetdir, 'sysroot'))
+        confopts += '--with-sysroot=%s ' % (os.path.join(self.destdir, 'sysroot'))
 
         # gold has bugs which cause the generated kernel image to be huge.
         #confopts += '--enable-gold=default '
@@ -142,7 +142,6 @@ class LLVMComponent(ToolchainComponent):
         confopts  = '--prefix=%s ' % (self.destdir)
         confopts += '--enable-optimized '
         confopts += '--enable-targets=x86,x86_64,arm '
-        confopts += '--with-default-sysroot=%s ' % (os.path.join(self.manager.targetdir, 'sysroot'))
 
         # Build and install it.
         os.mkdir('llvm-build')
@@ -207,12 +206,22 @@ class ToolchainManager:
 
     # Repairs any links within the toolchain directory.
     def repair(self):
-        # Set up the clang symlinks in the target directory.
+        # Create clang wrapper scripts.
         for name in ['clang', 'clang++']:
-            target = os.path.join(self.genericdir, 'bin', name)
-            path = os.path.join(self.targetdir, 'bin', '%s-%s' % (self.target, name))
-            self.remove(path)
-            os.symlink(target, path)
+            path = os.path.join(self.genericdir, 'bin', name)
+            wrapper = os.path.join(self.targetdir, 'bin', '%s-%s' % (self.target, name))
+            f = open(wrapper, 'w')
+            f.write('#!/bin/sh\n\n')
+            f.write('%s -target %s --sysroot=%s/sysroot $*\n' % (path, self.target, self.targetdir))
+            f.close()
+            os.chmod(wrapper, 0755)
+        try:
+            os.symlink('%s-clang' % (self.target),
+                os.path.join(self.targetdir, 'bin', '%s-cc' % (self.target)))
+            os.symlink('%s-clang++' % (self.target),
+                os.path.join(self.targetdir, 'bin', '%s-c++' % (self.target)))
+        except:
+            pass
         
         # Set up the sysroot to link to the source tree.
         self.remove(os.path.join(self.targetdir, 'sysroot', 'include'))
