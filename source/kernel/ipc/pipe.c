@@ -19,9 +19,12 @@
  * @brief		Unidirectional data pipe implementation.
  */
 
+#include <io/request.h>
+
 #include <ipc/pipe.h>
 
 #include <mm/kmem.h>
+#include <mm/malloc.h>
 #include <mm/slab.h>
 
 #include <proc/thread.h>
@@ -191,6 +194,43 @@ out:
 	if(bytesp)
 		*bytesp = i;
 
+	return ret;
+}
+
+/** Perform I/O on a pipe.
+ * @param pipe		Pipe to perform I/O on.
+ * @param request	I/O request.
+ * @param nonblock	Whether to allow blocking.
+ * @return		Status code describing result of the operation. */
+status_t pipe_io(pipe_t *pipe, io_request_t *request, bool nonblock) {
+	char *buf;
+	size_t count;
+	status_t ret, err;
+
+	buf = kmalloc(request->total, MM_USER);
+	if(!buf)
+		return STATUS_NO_MEMORY;
+
+	if(request->op == IO_OP_READ) {
+		ret = pipe_read(pipe, buf, request->total, nonblock, &count);
+
+		if(count) {
+			err = io_request_copy(request, buf, count);
+			if(err != STATUS_SUCCESS)
+				ret = err;
+		}
+	} else {
+		ret = io_request_copy(request, buf, request->total);
+		if(ret != STATUS_SUCCESS) {
+			kfree(buf);
+			return ret;
+		}
+
+		ret = pipe_write(pipe, buf, request->total, nonblock, &count);
+		request->transferred -= request->total - count;
+	}
+
+	kfree(buf);
 	return ret;
 }
 

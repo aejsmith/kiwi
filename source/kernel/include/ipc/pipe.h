@@ -27,6 +27,8 @@
 #include <sync/mutex.h>
 #include <sync/semaphore.h>
 
+struct io_request;
+
 /** Size of a pipe's data buffer. */
 #define PIPE_SIZE	4096
 
@@ -48,6 +50,7 @@ extern status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock,
 	size_t *bytesp);
 extern status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock,
 	size_t *bytesp);
+extern status_t pipe_io(pipe_t *pipe, struct io_request *request, bool nonblock);
 extern void pipe_wait(pipe_t *pipe, bool write, void *wait);
 extern void pipe_unwait(pipe_t *pipe, bool write, void *wait);
 

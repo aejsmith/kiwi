@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,7 @@
 #define __TTY_PRIV_H
 
 #include <io/device.h>
+#include <io/request.h>
 
 #include <ipc/pipe.h>
 
@@ -31,7 +32,7 @@
 #include <sync/mutex.h>
 #include <sync/semaphore.h>
 
-#include "../../../include/termios.h"
+#include "../../../lib/system/include/termios.h"
 
 /** Terminal buffer size. */
 #define TTY_BUFFER_SIZE		(PAGE_SIZE / sizeof(uint16_t))
@@ -71,10 +72,8 @@ typedef struct tty_device {
 	struct winsize winsize;		/**< Window size. */
 } tty_device_t;
 
-extern status_t tty_buffer_read_line(tty_buffer_t *buf, char *dest, size_t count,
-                                     bool nonblock, size_t *bytesp);
-extern status_t tty_buffer_read(tty_buffer_t *buf, char *dest, size_t count, bool nonblock,
-                                size_t *bytesp);
+extern status_t tty_buffer_read_line(tty_buffer_t *buf, io_request_t *request, bool nonblock);
+extern status_t tty_buffer_read(tty_buffer_t *buf, io_request_t *request, bool nonblock);
 extern bool tty_buffer_erase(tty_buffer_t *buf);
 extern size_t tty_buffer_kill(tty_buffer_t *buf);
 extern status_t tty_buffer_insert(tty_buffer_t *buf, uint16_t ch, bool nonblock);
