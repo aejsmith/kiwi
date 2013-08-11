@@ -41,13 +41,13 @@
  * @return		Request-dependant return code, or -1 for an error. */
 int ioctl(int fd, int request, ...) {
 	void *in = NULL, *out = NULL;
-	size_t insz = 0, outsz = 0;
+	size_t in_size = 0, out_size = 0;
 	status_t ret;
 	va_list args;
 	int arg;
 
 	if(!isatty(fd)) {
-		errno = ENOTSUP;
+		errno = ENOTTY;
 		return -1;
 	}
 
@@ -61,33 +61,33 @@ int ioctl(int fd, int request, ...) {
 	case TCFLSH:
 		arg = va_arg(args, int);
 		in = &arg;
-		insz = sizeof(arg);
+		in_size = sizeof(arg);
 		break;
 	case TCGETA:
 		out = va_arg(args, void *);
-		outsz = sizeof(struct termios);
+		out_size = sizeof(struct termios);
 		break;
 	case TCSETA:
 	case TCSETAW:
 	case TCSETAF:
 		in = va_arg(args, void *);
-		insz = sizeof(struct termios);
+		in_size = sizeof(struct termios);
 		break;
 	case TIOCGPGRP:
 		in = va_arg(args, void *);
-		insz = sizeof(int);
+		in_size = sizeof(int);
 		break;
 	case TIOCSPGRP:
 		out = va_arg(args, void *);
-		outsz = sizeof(int);
+		out_size = sizeof(int);
 		break;
 	case TIOCGWINSZ:
 		out = va_arg(args, void *);
-		outsz = sizeof(struct winsize);
+		out_size = sizeof(struct winsize);
 		break;
 	case TIOCSWINSZ:
 		in = va_arg(args, void *);
-		insz = sizeof(struct winsize);
+		in_size = sizeof(struct winsize);
 		break;
 	default:
 		errno = EINVAL;
@@ -97,7 +97,7 @@ int ioctl(int fd, int request, ...) {
 	va_end(args);
 
 	/* Perform the request. */
-	ret = kern_device_request(fd, request, in, insz, out, outsz, NULL);
+	ret = kern_device_request(fd, request, in, in_size, out, out_size, NULL);
 	if(ret != STATUS_SUCCESS) {
 		if(ret == STATUS_INVALID_REQUEST) {
 			errno = ENOTTY;

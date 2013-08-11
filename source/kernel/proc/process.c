@@ -1133,11 +1133,9 @@ status_t kern_process_clone(handle_t *handlep) {
 		return ret;
 	}
 
-	/* Clone signal handling attributes. */
+	/* Clone other per-process information. */
 	memcpy(process->signal_act, curr_proc->signal_act, sizeof(process->signal_act));
 	process->signal_mask = curr_proc->signal_mask;
-
-	/* Clone loaded image information. */
 	elf_clone(process, curr_proc);
 
 	/* Create a new handle. This takes over the initial reference added by
@@ -1170,7 +1168,6 @@ status_t kern_process_clone(handle_t *handlep) {
 	thread->ustack = curr_thread->ustack;
 	thread->ustack_size = curr_thread->ustack_size;
 
-	/* Run the new thread. */
 	thread_run(thread);
 	thread_release(thread);
 	return STATUS_SUCCESS;
