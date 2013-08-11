@@ -80,7 +80,7 @@ _scan_nan(uint32_t *words, int num_words, const char *s)
 		;
 
 	/* Scan backwards, filling in the bits in words[] as we go. */
-#if defined(CONFIG_ARCH_LITTLE_ENDIAN)
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 	for (bitpos = 0; bitpos < 32 * num_words; bitpos += 4) {
 #else
 	for (bitpos = 32 * num_words - 4; bitpos >= 0; bitpos -= 4) {
@@ -100,7 +100,7 @@ nan(const char *s)
 	} u;
 
 	_scan_nan(u.bits, 2, s);
-#if defined(CONFIG_ARCH_LITTLE_ENDIAN)
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 	u.bits[1] |= 0x7ff80000;
 #else
 	u.bits[0] |= 0x7ff80000;

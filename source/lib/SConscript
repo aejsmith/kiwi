@@ -20,6 +20,7 @@ dirs = [
     'crt',
     'kernel',
     'system',
+    'libm',
 ]
 
 SConscript(dirs = dirs, exports = ['env'])

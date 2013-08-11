@@ -40,7 +40,7 @@
 
 typedef uint32_t u_int32_t;
 
-#if defined(CONFIG_ARCH_BIG_ENDIAN) || defined(arm32)
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__ || defined(arm32)
 
 typedef union
 {
@@ -75,7 +75,7 @@ typedef union
 
 #endif
 
-#if defined(CONFIG_ARCH_LITTLE_ENDIAN) && !defined(arm32)
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ && !defined(arm32)
 
 typedef union
 {

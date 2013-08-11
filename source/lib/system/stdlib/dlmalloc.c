@@ -1,1 +1,1 @@
-../../../../3rdparty/libraries/dlmalloc.c
+../../../../3rdparty/lib/dlmalloc.c
