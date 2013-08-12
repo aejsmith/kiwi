@@ -164,6 +164,7 @@ arch_sources = SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])
 env.KiwiLibrary('system',
     sources = arch_sources + sources,
     libraries = ['kernel'],
+    build_libraries = ['kernel'],
     include_paths = [
         Dir('include'),
         Dir('arch/%s/include' % (config['ARCH']))
