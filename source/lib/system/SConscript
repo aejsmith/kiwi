@@ -47,6 +47,7 @@ sources = map(File, [
     'posix/lseek.c',
     'posix/mkdir.c',
     'posix/mknod.c',
+    'posix/mman.c',
     'posix/open.c',
     'posix/pipe.c',
     #'posix/poll.c',
