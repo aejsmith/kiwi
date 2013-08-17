@@ -33,6 +33,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define _GNU_SOURCE
+#include <link.h>
+
 #include "libkernel.h"
 
 /** Expected path to libkernel. */
@@ -323,9 +326,8 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 		}
 
 		/* Allocate a chunk of memory for it. */
-		ret = kern_vm_map((void **)&image->load_base, image->load_size,
-			VM_ADDRESS_ANY, VM_PROT_READ, VM_MAP_PRIVATE, INVALID_HANDLE,
-			0, path);
+		ret = kern_vm_map(&image->load_base, image->load_size, VM_ADDRESS_ANY,
+			VM_PROT_READ, VM_MAP_PRIVATE, INVALID_HANDLE, 0, path);
 		if(ret != STATUS_SUCCESS) {
 			dprintf("rtld: %s: unable to allocate memory (%d)\n", path, ret);
 			goto fail;
@@ -343,6 +345,17 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 			ret = do_load_phdr(image, &phdrs[i], handle, path, i);
 			if(ret != STATUS_SUCCESS)
 				goto fail;
+
+			/* Assume the first LOAD header in the image covers the
+			 * EHDR and the PHDRs. */
+			if(!image->ehdr && !image->phdrs) {
+				image->ehdr = image->load_base
+					+ ROUND_DOWN(phdrs[i].p_vaddr, PAGE_SIZE);
+				image->phdrs = image->load_base
+					+ ROUND_DOWN(phdrs[i].p_vaddr, PAGE_SIZE)
+					+ ehdr.e_phoff;
+				image->num_phdrs = ehdr.e_phnum;
+			}
 
 			break;
 		case ELF_PT_INTERP:
@@ -638,4 +651,24 @@ void *rtld_init(process_args_t *args, bool dry_run) {
 	}
 
 	return entry;
+}
+
+/* TODO: Move this out of here. */
+__export int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data) {
+	rtld_image_t *image;
+	struct dl_phdr_info info;
+	int ret;
+
+	LIST_FOREACH(&loaded_images, iter) {
+		image = list_entry(iter, rtld_image_t, header);
+
+		info.dlpi_addr = (elf_addr_t)image->load_base;
+		info.dlpi_name = image->name;
+		info.dlpi_phdr = image->phdrs;
+		info.dlpi_phnum = image->num_phdrs;
+
+		ret = callback(&info, sizeof(info), data);
+	}
+
+	return ret;
 }

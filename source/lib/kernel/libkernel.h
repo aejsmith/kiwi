@@ -76,6 +76,9 @@ typedef struct rtld_image {
 	const char *name;		/**< Shared object name of the library. */
 	const char *path;		/**< Full path to image file. */
 	int refcount;			/**< Reference count (tracks what is using the image). */
+	elf_ehdr_t *ehdr;		/**< ELF executable header. */
+	elf_phdr_t *phdrs;		/**< Address of program headers. */
+	size_t num_phdrs;		/**< Number of program headers. */
 	elf_addr_t dynamic[ELF_DT_NUM];	/**< Dynamic section entries. */
 	elf_dyn_t *dyntab;		/**< Pointer to unmodified dynamic section. */
 
