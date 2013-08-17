@@ -76,12 +76,10 @@ typedef struct stack {
 
 /** Structure describing previous machine context on a signal. */
 typedef struct mcontext {
-	#if defined(__i386__) || defined(__x86_64__)
-	unsigned long ax, bx, cx, dx, di, si, bp;
-	#ifdef __x86_64__
+	#if defined(__x86_64__)
+	unsigned long rax, rbx, rcx, rdx, rdi, rsi, rbp;
 	unsigned long r8, r9, r10, r11, r12, r13, r14, r15;
-	#endif
-	unsigned long ip, flags, sp;
+	unsigned long rip, rflags, rsp;
 	#else
 	# error "No mcontext_t defined for this architecture"
 	#endif

@@ -90,13 +90,13 @@ status_t arch_signal_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t 
 	frame.context.uc_sigmask = mask;
 	frame.context.uc_stack.ss_sp = (void *)iframe->sp;
 	frame.context.uc_stack.ss_size = USTACK_SIZE;
-	frame.context.uc_mcontext.ax = iframe->ax;
-	frame.context.uc_mcontext.bx = iframe->bx;
-	frame.context.uc_mcontext.cx = iframe->cx;
-	frame.context.uc_mcontext.dx = iframe->dx;
-	frame.context.uc_mcontext.di = iframe->di;
-	frame.context.uc_mcontext.si = iframe->si;
-	frame.context.uc_mcontext.bp = iframe->bp;
+	frame.context.uc_mcontext.rax = iframe->ax;
+	frame.context.uc_mcontext.rbx = iframe->bx;
+	frame.context.uc_mcontext.rcx = iframe->cx;
+	frame.context.uc_mcontext.rdx = iframe->dx;
+	frame.context.uc_mcontext.rdi = iframe->di;
+	frame.context.uc_mcontext.rsi = iframe->si;
+	frame.context.uc_mcontext.rbp = iframe->bp;
 	frame.context.uc_mcontext.r8 = iframe->r8;
 	frame.context.uc_mcontext.r9 = iframe->r9;
 	frame.context.uc_mcontext.r10 = iframe->r10;
@@ -105,9 +105,9 @@ status_t arch_signal_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t 
 	frame.context.uc_mcontext.r13 = iframe->r13;
 	frame.context.uc_mcontext.r14 = iframe->r14;
 	frame.context.uc_mcontext.r15 = iframe->r15;
-	frame.context.uc_mcontext.ip = iframe->ip;
-	frame.context.uc_mcontext.flags = iframe->flags;
-	frame.context.uc_mcontext.sp = iframe->sp;
+	frame.context.uc_mcontext.rip = iframe->ip;
+	frame.context.uc_mcontext.rflags = iframe->flags;
+	frame.context.uc_mcontext.rsp = iframe->sp;
 
 	/* Set the return address on the frame. When the handler is installed,
 	 * libkernel sets a private field in the sigaction structure pointing
@@ -165,13 +165,13 @@ status_t arch_signal_restore_frame(sigset_t *maskp) {
 	*maskp = frame.context.uc_sigmask;
 
 	/* Restore the context. */
-	iframe->ax = frame.context.uc_mcontext.ax;
-	iframe->bx = frame.context.uc_mcontext.bx;
-	iframe->cx = frame.context.uc_mcontext.cx;
-	iframe->dx = frame.context.uc_mcontext.dx;
-	iframe->di = frame.context.uc_mcontext.di;
-	iframe->si = frame.context.uc_mcontext.si;
-	iframe->bp = frame.context.uc_mcontext.bp;
+	iframe->ax = frame.context.uc_mcontext.rax;
+	iframe->bx = frame.context.uc_mcontext.rbx;
+	iframe->cx = frame.context.uc_mcontext.rcx;
+	iframe->dx = frame.context.uc_mcontext.rdx;
+	iframe->di = frame.context.uc_mcontext.rdi;
+	iframe->si = frame.context.uc_mcontext.rsi;
+	iframe->bp = frame.context.uc_mcontext.rbp;
 	iframe->r8 = frame.context.uc_mcontext.r8;
 	iframe->r9 = frame.context.uc_mcontext.r9;
 	iframe->r10 = frame.context.uc_mcontext.r10;
@@ -180,9 +180,9 @@ status_t arch_signal_restore_frame(sigset_t *maskp) {
 	iframe->r13 = frame.context.uc_mcontext.r13;
 	iframe->r14 = frame.context.uc_mcontext.r14;
 	iframe->r15 = frame.context.uc_mcontext.r15;
-	iframe->ip = frame.context.uc_mcontext.ip;
+	iframe->ip = frame.context.uc_mcontext.rip;
 	iframe->flags &= ~RESTORE_FLAGS;
-	iframe->flags |= frame.context.uc_mcontext.flags & RESTORE_FLAGS;
-	iframe->sp = frame.context.uc_mcontext.sp;
+	iframe->flags |= frame.context.uc_mcontext.rflags & RESTORE_FLAGS;
+	iframe->sp = frame.context.uc_mcontext.rsp;
 	return STATUS_SUCCESS;
 }

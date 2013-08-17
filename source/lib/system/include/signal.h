@@ -25,6 +25,7 @@
 
 #define __POSIX_DEFS_ONLY
 #include <kernel/signal.h>
+#undef __POSIX_DEFS_ONLY
 #include <sys/types.h>
 
 #ifdef __cplusplus
