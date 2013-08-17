@@ -1038,8 +1038,9 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 	/* Check whether the access is allowed. */
 	if(!(region->protection & access)) {
 		kprintf(LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at %p: "
-			"access violation\n", curr_thread->id, curr_thread->name,
-			addr);
+			"access violation (access: 0x%x, protection: 0x%x)\n",
+			curr_thread->id, curr_thread->name, addr, access,
+			region->protection);
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	}
