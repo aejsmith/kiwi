@@ -41,6 +41,7 @@
 #include <lib/string.h>
 
 #include <mm/safe.h>
+#include <mm/vm.h>
 
 #include <proc/process.h>
 #include <proc/thread.h>
@@ -207,49 +208,64 @@ void kdb_printf(const char *fmt, ...) {
 	va_end(args);
 }
 
-/** Lookup a symbol in the current process.
- * @param addr		Address to lookup.
- * @param symbol	Symbol to fill in.
- * @param offp		Where to store offset from symbol.
- * @return		Whether symbol was found. */
-static bool lookup_user_symbol(ptr_t addr, symbol_t *symbol, size_t *offp) {
-	elf_image_t *image;
-
-	if(!is_user_address((void *)addr) || !curr_thread || curr_thread->owner == kernel_proc)
-		return false;
-
-	LIST_FOREACH(&curr_proc->images, iter) {
-		image = list_entry(iter, elf_image_t, header);
-
-		if(elf_symbol_from_addr(image, addr, symbol, offp))
-			return true;
-	}
-
-	symbol->addr = symbol->size = symbol->global = symbol->exported = 0;
-	symbol->name = "<unknown>";
-	return false;
-}
-
-/** Backtrace callback.
- * @param addr		Address of backtrace entry. */
-static void kdb_backtrace_cb(ptr_t addr) {
+/**
+ * Print out details of a symbol corresponding to an address.
+ *
+ * Looks up the symbol corresponding to the given address and prints out
+ * details of it. The delta argument is applied to the address before looking
+ * it up (and is not applied when actually printing). This is useful when
+ * printing symbols in backtraces, as backtraces use the return address of a
+ * call which may not yield the correct symbol if the compiler has produced a
+ * tail call to a noreturn function.
+ *
+ * @param addr		Address of symbol.
+ * @param delta		Delta to apply on lookup.
+ */
+void kdb_print_symbol(ptr_t addr, int delta) {
 	int width;
 	symbol_t sym;
 	size_t off;
+	elf_image_t *image;
 	bool ret;
 
 	/* Zero pad up to the width of a pointer. */
 	width = (sizeof(void *) * 2) + 2;
 
-	/* For a backtrace, we want to subtract 1 from the address when looking
-	 * up the symbol (but not when printing), as backtraces use the return
-	 * address of a call which may not yield the correct symbol if the
-	 * compiler has produced a tail call. */
-	ret = symbol_from_addr(addr - 1, &sym, &off);
-	if(!ret)
-		ret = lookup_user_symbol(addr - 1, &sym, &off);
+	ret = symbol_from_addr(addr + delta, &sym, &off);
+	if(!ret && !sym.image) {
+		if(is_user_address((void *)addr) && curr_thread && curr_aspace) {
+			/* Look up in loaded userspace images. */
+			LIST_FOREACH(&curr_proc->images, iter) {
+				image = list_entry(iter, elf_image_t, header);
 
-	kdb_printf("[%0*p] %s+0x%zx\n", width, addr, sym.name, (ret) ? off + 1 : 0);
+				ret = elf_symbol_from_addr(image, addr + delta, &sym, &off);
+				if(ret || sym.image)
+					break;
+			}
+		}
+	}
+
+	kdb_printf("[%0*p] %s", width, addr, sym.name);
+	if(ret)
+		kdb_printf("+0x%zx", off - delta);
+
+	if(sym.image) {
+		kdb_printf(" (%s", sym.image->name);
+
+		/* No need to print the image offset if found. */
+		if(!ret)
+			kdb_printf("+0x%zx", addr - sym.image->load_base);
+
+		kdb_printf(")");
+	}
+}
+
+/** Backtrace callback.
+ * @param addr		Address of backtrace entry. */
+static void kdb_backtrace_cb(ptr_t addr) {
+	/* See above. */
+	kdb_print_symbol(addr, -1);
+	kdb_printf("\n");
 }
 
 /** Read a character from the console.
@@ -865,21 +881,24 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 
 	/* Print information about why we've entered the debugger and where from. */
 	if(reason == KDB_REASON_BREAK) {
-		kdb_printf("\nBreakpoint %u at %pS\n", index, frame->ip);
+		kdb_printf("\nBreakpoint %u at ", index);
+		kdb_print_symbol(frame->ip, 0);
 	} else if(reason == KDB_REASON_WATCH) {
-		kdb_printf("\nWatchpoint %u hit by %pS\n", index, frame->ip);
+		kdb_printf("\nWatchpoint %u hit by ");
+		kdb_print_symbol(frame->ip, 0);
 	} else if(reason == KDB_REASON_STEP) {
-		kdb_printf("Stepped to %pS\n", frame->ip);
+		kdb_printf("Stepped to ");
+		kdb_print_symbol(frame->ip, 0);
 	} else if(reason == KDB_REASON_USER) {
-		kdb_printf("\nEntered KDB from %pS\n", frame->ip);
+		kdb_printf("\nEntered KDB from ");
+		kdb_print_symbol(frame->ip, 0);
 	} else if(reason == KDB_REASON_FATAL) {
 		/* When coming from a fatal error, enable writing to the KBoot
 		 * log temporarily as we want to dump some information there. */
 		use_kboot_log = true;
-		kdb_putc('\n');
 	}
 
-	kdb_printf("Thread %" PRId32 " (%s) on CPU%u\n",
+	kdb_printf("\nThread %" PRId32 " (%s) on CPU%u\n",
 		(curr_thread) ? curr_thread->id : -1,
 		(curr_thread) ? curr_thread->name : "<none>", cpu_id());
 

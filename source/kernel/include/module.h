@@ -70,6 +70,7 @@ typedef struct symbol {
 	const char *name;		/**< Name of the symbol. */
 	bool global : 1;		/**< Whether the symbol is global. */
 	bool exported : 1;		/**< Whether the symbol is exported. */
+	elf_image_t *image;		/**< Image containing the symbol. */
 } symbol_t;
 
 /** Set the name of a module. */

@@ -794,7 +794,10 @@ void elf_module_destroy(elf_image_t *image) {
  * @param addr		Address to lookup.
  * @param symbol	Symbol structure to fill in.
  * @param offp		Where to store symbol offset (can be NULL).
- * @return		Whether a symbol was found for the address. */
+ * @return		Whether a symbol was found for the address. If a symbol
+ *			is not found, but the address lies within the image's
+ *			load region, then the image pointer in the symbol will
+ *			be set to the image, otherwise it will be set to NULL. */
 bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size_t *offp) {
 	size_t i;
 	elf_sym_t *sym;
@@ -821,8 +824,15 @@ bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size
 			symbol->name = (const char *)image->strtab + sym->st_name;
 			symbol->global = (ELF_ST_BIND(sym->st_info)) ? true : false;
 			symbol->exported = ELF_ST_VISIBILITY(sym->st_other) == ELF_STV_DEFAULT;
+			symbol->image = image;
 			return true;
 		}
+	}
+
+	if(addr >= image->load_base && addr < image->load_base + image->load_size) {
+		symbol->image = image;
+	} else {
+		symbol->image = NULL;
 	}
 
 	return false;
@@ -870,6 +880,7 @@ bool elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
 			symbol->name = (const char *)image->strtab + sym->st_name;
 			symbol->global = (ELF_ST_BIND(sym->st_info)) ? true : false;
 			symbol->exported = ELF_ST_VISIBILITY(sym->st_other) == ELF_STV_DEFAULT;
+			symbol->image = image;
 			return true;
 		}
 	}
@@ -930,7 +941,7 @@ __init_text void elf_init(elf_image_t *image) {
 	image->id = 0;
 	image->name = (char *)"kernel";
 	image->load_base = 0;
-	image->load_size = (ptr_t)__end - KERNEL_VIRT_BASE;
+	image->load_size = 0;
 
 	/* Find the loaded section information for the kernel. */
 	sections = kboot_tag_iterate(KBOOT_TAG_SECTIONS, NULL);

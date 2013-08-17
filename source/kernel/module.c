@@ -319,23 +319,30 @@ status_t module_load(const char *path, char *depbuf) {
  * symbol lookups should only be performed in KDB or by the module loader:
  * they do not take a lock and are therefore unsafe.
  *
+ * If an matching symbol is not found, the symbol structure will still be
+ * filled in. The symbol name will be set to "<unknown>". If the given address
+ * lies within a loaded image, the image pointer will be set to that image,
+ * otherwise it will be set to NULL. Everything else will be set to 0.
+ *
  * @param addr		Address to lookup.
  * @param symbol	Symbol structure to fill in.
  * @param offp		Where to store symbol offset (can be NULL).
  *
- * @return		Whether a symbol was found for the address. If a symbol
- *			is not found, the symbol structure is filled with
- *			dummy information (name set to "<unknown>", everything
- *			else set to 0).
+ * @return		Whether a symbol was found for the address.
  */
 bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *offp) {
 	module_t *module;
 
+	symbol->image = NULL;
+
 	LIST_FOREACH(&module_list, iter) {
 		module = list_entry(iter, module_t, header);
 
-		if(elf_symbol_from_addr(&module->image, addr, symbol, offp))
+		if(elf_symbol_from_addr(&module->image, addr, symbol, offp)) {
 			return true;
+		} else if(symbol->image) {
+			break;
+		}
 	}
 
 	symbol->addr = symbol->size = symbol->global = symbol->exported = 0;
@@ -359,10 +366,7 @@ bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *offp) {
  * @param exported	Whether to only look up exported symbols.
  * @param symbol	Symbol structure to fill in.
  *
- * @return		Whether a symbol by this name was found. If the symbol
- *			is not found, the symbol structure is filled with
- *			dummy information (name set to "<unknown>", everything
- *			else set to 0).
+ * @return		Whether a symbol by this name was found.
  */
 bool symbol_lookup(const char *name, bool global, bool exported, symbol_t *symbol) {
 	module_t *module;
@@ -374,8 +378,6 @@ bool symbol_lookup(const char *name, bool global, bool exported, symbol_t *symbo
 			return true;
 	}
 
-	symbol->addr = symbol->size = symbol->global = symbol->exported = 0;
-	symbol->name = "<unknown>";
 	return false;
 }
 
