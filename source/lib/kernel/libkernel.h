@@ -79,8 +79,8 @@ typedef struct rtld_image {
 	elf_ehdr_t *ehdr;		/**< ELF executable header. */
 	elf_phdr_t *phdrs;		/**< Address of program headers. */
 	size_t num_phdrs;		/**< Number of program headers. */
-	elf_addr_t dynamic[ELF_DT_NUM];	/**< Dynamic section entries. */
-	elf_dyn_t *dyntab;		/**< Pointer to unmodified dynamic section. */
+	elf_addr_t dynamic[ELF_DT_NUM];	/**< Cached dynamic section entries. */
+	elf_dyn_t *dyntab;		/**< Pointer to dynamic section. */
 
 	/** Where the image is loaded to (for ELF_ET_DYN). */
 	void *load_base;		/**< Base address for the image. */

@@ -58,8 +58,6 @@ void libkernel_init(process_args_t *args, void *load_base) {
 		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED)
 			continue;
 
-		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
-
 		/* Do address fixups. */
 		switch(image->dyntab[i].d_tag) {
 		case ELF_DT_HASH:
@@ -68,9 +66,11 @@ void libkernel_init(process_args_t *args, void *load_base) {
 		case ELF_DT_SYMTAB:
 		case ELF_DT_JMPREL:
 		case ELF_DT_REL_TYPE:
-			image->dynamic[image->dyntab[i].d_tag] += (elf_addr_t)image->load_base;
+			image->dyntab[i].d_un.d_ptr += (elf_addr_t)image->load_base;
 			break;
 		}
+
+		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
 	}
 
 	/* Get the architecture to relocate us. */

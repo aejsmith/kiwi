@@ -442,12 +442,11 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 		goto fail;
 	}
 
-	/* Fill in our dynamic table. */
+	/* Fill in our dynamic table and do address fixups. We copy some of the
+	 * table entries we need into a table indexed by tag for easy access. */
 	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
 		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED)
 			continue;
-
-		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
 
 		/* Do address fixups. */
 		switch(image->dyntab[i].d_tag) {
@@ -457,9 +456,11 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 		case ELF_DT_SYMTAB:
 		case ELF_DT_JMPREL:
 		case ELF_DT_REL_TYPE:
-			image->dynamic[image->dyntab[i].d_tag] += (elf_addr_t)image->load_base;
+			image->dyntab[i].d_un.d_ptr += (elf_addr_t)image->load_base;
 			break;
 		}
+
+		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
 	}
 
 	/* Set name and loading state, and fill out hash information.
