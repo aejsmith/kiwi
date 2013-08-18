@@ -1,0 +1,99 @@
+#
+# Copyright (C) 2013 Alex Smith
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+Import('env', 'config')
+
+unwind_archs = {
+    'amd64': ('x86_64', [
+        'src/x86_64/Lget_proc_info.c',
+        'src/x86_64/Lglobal.c',
+        'src/x86_64/Linit.c',
+        'src/x86_64/Linit_local.c',
+        'src/x86_64/Los-kiwi.c',
+        'src/x86_64/Lregs.c',
+        'src/x86_64/Lresume.c',
+        'src/x86_64/Lstep.c',
+        'src/x86_64/getcontext.S',
+        'src/x86_64/is_fpreg.c',
+        'src/x86_64/regname.c',
+        'src/x86_64/setcontext.S',
+        'src/elf64.c',
+    ]),
+}
+
+unwind_arch_name = unwind_archs[config['ARCH']][0]
+unwind_arch_sources = unwind_archs[config['ARCH']][1]
+
+targets = map(
+    lambda x: env.SharedObject(x,
+        CPPPATH = [
+            Dir('.'),
+            Dir('src'),
+            Dir('include'),
+            Dir('include/tdep-%s' % (unwind_arch_name)),
+
+            # FIXME!!!
+            Dir('../../kernel/include'),
+            Dir('../../system/include'),
+            Dir('../../system/arch/%s/include' % (config['ARCH'])),
+        ],
+        CCFLAGS = env['CCFLAGS'] + ['-fexceptions'],
+        CPPDEFINES = {
+            'HAVE_CONFIG_H': None,
+            '_GNU_SOURCE': None,
+        }
+    ), unwind_arch_sources + [
+        'src/dwarf/Lexpr.c',
+        'src/dwarf/Lfde.c',
+        'src/dwarf/Lfind_proc_info-lsb.c',
+        'src/dwarf/Lparser.c',
+        'src/dwarf/Lpe.c',
+        'src/dwarf/Lstep.c',
+        'src/dwarf/global.c',
+        'src/mi/Ldyn-extract.c',
+        'src/mi/Lfind_dynamic_proc_info.c',
+        'src/mi/Lget_accessors.c',
+        'src/mi/Lget_proc_info_by_ip.c',
+        'src/mi/Lget_reg.c',
+        'src/mi/Lput_dynamic_unwind_info.c',
+        'src/mi/Lset_reg.c',
+        'src/mi/dyn-info-list.c',
+        'src/mi/flush_cache.c',
+        'src/mi/init.c',
+        'src/mi/mempool.c',
+        'src/unwind/Backtrace.c',
+        'src/unwind/DeleteException.c',
+        'src/unwind/FindEnclosingFunction.c',
+        'src/unwind/ForcedUnwind.c',
+        'src/unwind/GetBSP.c',
+        'src/unwind/GetCFA.c',
+        'src/unwind/GetDataRelBase.c',
+        'src/unwind/GetGR.c',
+        'src/unwind/GetIP.c',
+        'src/unwind/GetLanguageSpecificData.c',
+        'src/unwind/GetRegionStart.c',
+        'src/unwind/GetTextRelBase.c',
+        'src/unwind/RaiseException.c',
+        'src/unwind/Resume.c',
+        'src/unwind/Resume_or_Rethrow.c',
+        'src/unwind/SetGR.c',
+        'src/unwind/SetIP.c',
+        'src/unwind/GetIPInfo.c',
+        'src/os-kiwi.c',
+    ]
+)
+
+Return('targets')
