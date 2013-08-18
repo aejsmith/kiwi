@@ -1328,7 +1328,6 @@ static kdb_status_t kdb_cmd_backtrace(int argc, char **argv, kdb_filter_t *filte
  * @param filter	Ignored.
  * @return		KDB status code. */
 static kdb_status_t kdb_cmd_symbol(int argc, char **argv, kdb_filter_t *filter) {
-	thread_t *thread;
 	uint64_t addr;
 
 	if(kdb_help(argc, argv)) {
