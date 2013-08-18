@@ -269,9 +269,12 @@ int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_l
 		case 'l':
 			len = (uint32_t)*(fmt++);
 			if(*fmt == 'l') {
-				len |= (1<<8);
+				len = 'L';
 				fmt++;
 			}
+			break;
+		case 'L':
+			len = (uint32_t)*(fmt++);
 			break;
 		default:
 			len = 0;
@@ -357,16 +360,16 @@ int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_l
 			num = (unsigned short)va_arg(args, int);
 			if(state.flags & PRINTF_SIGNED)
 				num = (signed short)num;
-			break;			
+			break;
 		case 'l':
-			/* Bit 8 is set to mean 'll' rather than 'l'. */
-			if(len & (1<<8)) {
-				num = va_arg(args, unsigned long long);
-			} else {
-				num = va_arg(args, unsigned long);
-				if(state.flags & PRINTF_SIGNED)
-					num = (signed long)num;
-			}
+			num = va_arg(args, unsigned long);
+			if(state.flags & PRINTF_SIGNED)
+				num = (signed long)num;
+			break;
+		case 'L':
+			num = va_arg(args, unsigned long long);
+			if(state.flags & PRINTF_SIGNED)
+				num = (signed long long)num;
 			break;
 		case 'z':
 			num = va_arg(args, size_t);
