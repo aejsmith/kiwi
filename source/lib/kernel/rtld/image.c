@@ -660,6 +660,8 @@ __export int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void
 	struct dl_phdr_info info;
 	int ret;
 
+	// FIXME: lock.
+
 	LIST_FOREACH(&loaded_images, iter) {
 		image = list_entry(iter, rtld_image_t, header);
 
@@ -669,7 +671,9 @@ __export int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void
 		info.dlpi_phnum = image->num_phdrs;
 
 		ret = callback(&info, sizeof(info), data);
+		if(ret != 0)
+			return ret;
 	}
 
-	return ret;
+	return 0;
 }
