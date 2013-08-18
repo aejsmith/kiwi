@@ -245,19 +245,9 @@ void kdb_print_symbol(ptr_t addr, int delta) {
 		}
 	}
 
-	kdb_printf("[%0*p] %s", width, addr, sym.name);
-	if(ret)
-		kdb_printf("+0x%zx", off - delta);
-
-	if(sym.image) {
-		kdb_printf(" (%s", sym.image->name);
-
-		/* No need to print the image offset if found. */
-		if(!ret)
-			kdb_printf("+0x%zx", addr - sym.image->load_base);
-
-		kdb_printf(")");
-	}
+	kdb_printf("[%0*p] %s+0x%zx", width, addr, sym.name, (ret) ? off - delta : 0);
+	if(sym.image && sym.image->load_base)
+		kdb_printf(" (%s+0x%zx)", sym.image->name, addr - sym.image->load_base);
 }
 
 /** Backtrace callback.
