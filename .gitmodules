@@ -7,3 +7,6 @@
 [submodule "3rdparty/lib/libcxxrt"]
 	path = 3rdparty/lib/libcxxrt
 	url = https://github.com/pathscale/libcxxrt.git
+[submodule "3rdparty/lib/libunwind"]
+	path = 3rdparty/lib/libunwind
+	url = git://git.alex-smith.me.uk/kiwi/libunwind.git
