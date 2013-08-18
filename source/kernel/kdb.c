@@ -1322,6 +1322,33 @@ static kdb_status_t kdb_cmd_backtrace(int argc, char **argv, kdb_filter_t *filte
 	return KDB_SUCCESS;
 }
 
+/** Look up a symbol from an address.
+ * @param argc		Number of arguments.
+ * @param argv		Arguments passed to the command.
+ * @param filter	Ignored.
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_symbol(int argc, char **argv, kdb_filter_t *filter) {
+	thread_t *thread;
+	uint64_t addr;
+
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [<addr>]\n\n", argv[0]);
+
+		kdb_printf("Look up a symbol from an address and display details about it.\n");
+		return KDB_SUCCESS;
+	} else if(argc != 2) {
+		kdb_printf("Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
+		return KDB_FAILURE;
+	}
+
+	if(kdb_parse_expression(argv[1], &addr, NULL) != KDB_SUCCESS)
+		return KDB_FAILURE;
+
+	kdb_print_symbol(addr, 0);
+	kdb_printf("\n");
+	return KDB_SUCCESS;
+}
+
 /** Data for the wc command. */
 struct wc_data {
 	/** Mode that the function is running in. */
@@ -1706,6 +1733,7 @@ __init_text void kdb_init(void) {
 	kdb_register_command("examine", "Examine the contents of memory.", kdb_cmd_examine);
 	kdb_register_command("print", "Print out the value of an expression.", kdb_cmd_print);
 	kdb_register_command("backtrace", "Print out a backtrace.", kdb_cmd_backtrace);
+	kdb_register_command("symbol", "Look up a symbol from an address.", kdb_cmd_symbol);
 	kdb_register_command("wc", "Count words or lines in the output of a command.", kdb_cmd_wc);
 	kdb_register_command("grep", "Search the output of commands.", kdb_cmd_grep);
 	#if KDB_BREAKPOINT_COUNT
