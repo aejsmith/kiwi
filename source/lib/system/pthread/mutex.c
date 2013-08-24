@@ -209,9 +209,10 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex) {
 		return 0;
 	}
 
+	mutex->holder = -1;
+
 	if(__sync_fetch_and_sub(&mutex->futex, 1) != 1) {
 		/* There were waiters. Wake one up. */
-		mutex->holder = -1;
 		mutex->futex = 0;
 		kern_futex_wake((int32_t *)&mutex->futex, 1, NULL);
 	}
