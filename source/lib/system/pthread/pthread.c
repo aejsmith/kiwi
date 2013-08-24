@@ -17,6 +17,9 @@
 /**
  * @file
  * @brief		Main POSIX thread functions.
+ *
+ * @note		See TODOs scattered around for things to do when we
+ *			actually have threads implemented.
  */
 
 #include <pthread.h>

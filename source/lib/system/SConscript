@@ -70,6 +70,7 @@ sources = map(File, [
 
     'pthread/once.c',
     'pthread/pthread.c',
+    'pthread/specific.c',
 
     'signal/kill.c',
     'signal/sigaction.c',

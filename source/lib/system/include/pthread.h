@@ -134,7 +134,7 @@ extern int pthread_condattr_getpshared(const pthread_condattr_t *__restrict attr
 //int pthread_condattr_setclock(pthread_condattr_t *, clockid_t);
 extern int pthread_condattr_setpshared(pthread_condattr_t *attr, int pshared);
 
-extern int pthread_key_create(pthread_key_t *keyp, void (*destructor)(void *val));
+extern int pthread_key_create(pthread_key_t *keyp, void (*dtor)(void *val));
 extern int pthread_key_delete(pthread_key_t key);
 extern void *pthread_getspecific(pthread_key_t key);
 extern int pthread_setspecific(pthread_key_t key, const void *val);
