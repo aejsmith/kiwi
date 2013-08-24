@@ -31,6 +31,8 @@
 
 #include <system/_internal.h>
 
+#include <locale.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -49,8 +51,13 @@ typedef struct {
 
 /** Structure containing result from ldiv(). */
 typedef struct {
-	long int quot, rem;
+	long quot, rem;
 } ldiv_t;
+
+/** Structure containing result from lldiv(). */
+typedef struct {
+	long long quot, rem;
+} lldiv_t;
 
 extern void _Exit(int status) __libsystem_noreturn;
 extern void abort(void);
@@ -101,6 +108,27 @@ extern int system(const char *command);
 extern int unsetenv(const char *name);
 //extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);
 //extern int wctomb(char *s, wchar_t wc);
+
+// Needed for libcxx build.
+#ifdef __cplusplus
+
+extern float strtof(const char *__restrict s, char **__restrict endptr);
+extern long double strtold(const char *__restrict str, char **__restrict endptr);
+extern lldiv_t lldiv(long long numerator, long long denominator);
+extern int mblen(const char *s, size_t n);
+extern int mbtowc(wchar_t *__restrict pwc, const char *__restrict s, size_t n);
+extern int wctomb(char *s, wchar_t wc);
+extern size_t mbstowcs(wchar_t *__restrict dest, const char *__restrict src, size_t n);
+extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);
+extern long strtol_l(const char *__restrict, char **__restrict, int, locale_t);
+extern long long strtoll_l(const char *__restrict, char **__restrict, int, locale_t);
+extern unsigned long strtoul_l(const char *__restrict, char **__restrict, int, locale_t);
+extern unsigned long long strtoull_l(const char *__restrict, char **__restrict, int, locale_t);
+extern double strtod_l(const char *__restrict, char **__restrict, locale_t);
+extern float strtof_l(const char *__restrict, char **__restrict, locale_t);
+extern long double strtold_l(const char *__restrict, char **__restrict, locale_t);
+
+#endif
 
 #ifdef __cplusplus
 }

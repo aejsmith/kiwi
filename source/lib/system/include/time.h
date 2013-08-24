@@ -26,6 +26,8 @@
 #define __need_NULL
 #include <stddef.h>
 
+#include <locale.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -62,13 +64,20 @@ extern struct tm *localtime_r(const time_t *__restrict timep, struct tm *__restr
 extern time_t mktime(struct tm *timep);
 extern int nanosleep(const struct timespec *rqtp, struct timespec *rmtp);
 extern size_t strftime(char *__restrict buf, size_t max, const char *__restrict fmt, const struct tm *__restrict tm);
+//extern size_t strftime_l(char *__restrict, size_t, const char *__restrict,
+//	const struct tm *__restrict, locale_t);
 //extern char *strptime(const char *__restrict, const char *__restrict, struct tm *__restrict);
 extern time_t time(time_t *timep);
 
-// FIXME: Needed for libstdc++ compilation.
+// FIXME: Needed for libcxx
 #ifdef __cplusplus
+
 extern clock_t clock(void);
 extern double difftime(time_t, time_t);
+
+extern size_t strftime_l(char *__restrict, size_t, const char *__restrict,
+	const struct tm *__restrict, locale_t);
+
 #endif
 
 #ifdef __cplusplus

@@ -26,6 +26,8 @@
 #define __need_NULL
 #include <stddef.h>
 
+#include <locale.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,10 +45,12 @@ extern char *strcat(char *__restrict dest, const char *__restrict src);
 extern char *strchr(const char *t, int c);
 extern int strcmp(const char *s, const char *t);
 extern int strcoll(const char *s1, const char *s2);
+/* int strcoll_l(const char *, const char *, locale_t); */
 extern char *strcpy(char *__restrict dest, const char *__restrict src);
 extern size_t strcspn(const char *s, const char *reject);
 extern char *strdup(const char *s);
 extern char *strerror(int err);
+/* char *strerror_l(int, locale_t); */
 extern size_t strlen(const char *str);
 extern int strncasecmp(const char *s1, const char *s2, size_t n);
 extern char *strncat(char *__restrict dest, const char *__restrict src, size_t max);
@@ -63,6 +67,14 @@ extern char *strstr(const char *haystack, const char *needle);
 extern char *strtok(char *__restrict str, const char *__restrict delim);
 extern char *strtok_r(char *__restrict str, const char *__restrict delim, char **__restrict saveptr);
 extern size_t strxfrm(char *__restrict dest, const char *__restrict src, size_t count);
+/* size_t strxfrm_l(char *__restrict, const char *__restrict, size_t, locale_t); */
+
+#ifdef __cplusplus
+
+extern int strcoll_l(const char *, const char *, locale_t);
+extern size_t strxfrm_l(char *__restrict, const char *__restrict, size_t, locale_t);
+
+#endif
 
 #ifdef __cplusplus
 }

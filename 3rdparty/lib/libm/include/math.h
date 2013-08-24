@@ -280,7 +280,7 @@ extern double erfc(double);
 extern double lgamma(double);
 extern double tgamma(double);
 
-#if 0
+#ifdef __cplusplus
 double nearbyint(double);
 #endif
 extern double rint(double);
@@ -297,7 +297,7 @@ extern double remquo(double, double, int *);
 extern double copysign(double, double);
 extern double nan(const char *);
 extern double nextafter(double, double);
-#if 0
+#ifdef __cplusplus
 double nexttoward(double, long double);
 #endif
 
@@ -305,7 +305,7 @@ extern double fdim(double, double);
 extern double fmax(double, double);
 extern double fmin(double, double);
 
-#if 0
+#ifdef __cplusplus
 double fma(double, double, double);
 #endif
 
@@ -383,7 +383,7 @@ extern float tgammaf(float);
 
 extern float ceilf(float);
 extern float floorf(float);
-#if 0
+#ifdef __cplusplus
 float nearbyintf(float);
 #endif
 extern float rintf(float);
@@ -401,7 +401,7 @@ extern float remquof(float, float, int *);
 extern float copysignf(float, float);
 extern float nanf(const char *);
 extern float nextafterf(float, float);
-#if 0
+#ifdef __cplusplus
 float nexttowardf(float, long double);
 #endif
 
@@ -409,7 +409,7 @@ extern float fdimf(float, float);
 extern float fmaxf(float, float);
 extern float fminf(float, float);
 
-#if 0
+#ifdef __cplusplus
 float fmaf(float, float, float);
 #endif
 
@@ -455,7 +455,7 @@ extern long double cosl(long double);
 extern long double sinl(long double);
 extern long double tanl(long double);
 
-#if 0
+#ifdef __cplusplus
 long double acoshl(long double);
 long double asinhl(long double);
 long double atanhl(long double);
@@ -464,53 +464,53 @@ long double sinhl(long double);
 long double tanhl(long double);
 #endif
 
-#if 0
+#ifdef __cplusplus
 long double expl(long double);
 #endif
 extern long double exp2l(long double);
-#if 0
+#ifdef __cplusplus
 long double expm1l(long double);
 #endif
 extern long double frexpl(long double, int *);
 extern int ilogbl(long double);
 extern long double ldexpl(long double, int);
-#if 0
+#ifdef __cplusplus
 long double logl(long double);
 long double log10l(long double);
 long double log1pl(long double);
 long double log2l(long double);
 #endif
 extern long double logbl(long double);
-#if 0
+#ifdef __cplusplus
 long double modfl(long double, long double *);
 #endif
 extern long double scalbnl(long double, int);
 extern long double scalblnl(long double, long int);
 
-#if 0
+#ifdef __cplusplus
 long double cbrtl(long double);
 #endif
 extern long double fabsl(long double);
-#if 0
+#ifdef __cplusplus
 long double hypotl(long double, long double);
 long double powl(long double, long double);
 #endif
 extern long double sqrtl(long double);
 
-#if 0
+#ifdef __cplusplus
 long double erfl(long double);
 long double erfcl(long double);
 long double lgammal(long double);
 long double tgammal(long double);
 #endif
 
-#if 0
+#ifdef __cplusplus
 long double ceill(long double);
 long double floorl(long double);
 long double nearbyintl(long double);
 #endif
 extern long double rintl(long double);
-#if 0
+#ifdef __cplusplus
 long int lrintl(long double);
 long long int llrintl(long double);
 long double roundl(long double);
@@ -519,7 +519,7 @@ long long int llroundl(long double);
 long double truncl(long double);
 #endif
 
-#if 0
+#ifdef __cplusplus
 long double fmodl(long double, long double);
 long double remainderl(long double, long double);
 long double remquol(long double, long double, int *);
@@ -527,7 +527,7 @@ long double remquol(long double, long double, int *);
 
 extern long double copysignl(long double, long double);
 extern long double nanl(const char *);
-#if 0
+#ifdef __cplusplus
 long double nextafterl(long double, long double);
 long double nexttowardl(long double, long double);
 #endif
@@ -536,7 +536,7 @@ extern long double fdiml(long double, long double);
 extern long double fmaxl(long double, long double);
 extern long double fminl(long double, long double);
 
-#if 0
+#ifdef __cplusplus
 long double fmal(long double, long double, long double);
 #endif
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct __locale;
 
 /** Locale information structure. */
 struct lconv {
@@ -54,17 +56,44 @@ struct lconv {
 	char *thousands_sep;
 };
 
-/** Categories for setlocale(). */
-#define LC_ALL		0
-#define LC_COLLATE	1
-#define LC_CTYPE	2
-#define LC_MESSAGES	3
-#define LC_MONETARY	4
-#define LC_NUMERIC	5
-#define LC_TIME		6
+/** Type representing a locale object. */
+typedef struct __locale *locale_t;
 
+/** Categories for setlocale(). */
+#define LC_COLLATE		0
+#define LC_CTYPE		1
+#define LC_MESSAGES		2
+#define LC_MONETARY		3
+#define LC_NUMERIC		4
+#define LC_TIME			5
+#define LC_ALL			6
+
+/** Bitmasks for use in the category_mask parameter to newlocale(). */
+#define LC_COLLATE_MASK		(1 << LC_COLLATE)
+#define LC_CTYPE_MASK		(1 << LC_CTYPE)
+#define LC_MESSAGES_MASK	(1 << LC_MESSAGES)
+#define LC_MONETARY_MASK	(1 << LC_MONETARY)
+#define LC_NUMERIC_MASK		(1 << LC_NUMERIC)
+#define LC_TIME_MASK		(1 << LC_TIME)
+#define LC_ALL_MASK		(LC_COLLATE_MASK | LC_CTYPE_MASK \
+					| LC_MESSAGES_MASK | LC_MONETARY_MASK \
+					| LC_NUMERIC_MASK | LC_TIME_MASK)
+
+/* locale_t duplocale(locale_t); */
+/* void freelocale(locale_t); */
 extern struct lconv *localeconv(void);
+/* locale_t newlocale(int, const char *, locale_t); */
 extern char *setlocale(int category, const char *name);
+/* locale_t uselocale(locale_t); */
+
+// Needed for libcxx build.
+#ifdef __cplusplus
+
+extern void freelocale(locale_t);
+extern locale_t uselocale(locale_t);
+extern locale_t newlocale(int, const char *, locale_t);
+
+#endif
 
 #ifdef __cplusplus
 }

@@ -54,6 +54,7 @@ targets = map(
         CPPDEFINES = {
             'HAVE_CONFIG_H': None,
             '_GNU_SOURCE': None,
+            '__DUMMY_PTHREADS': None,
         }
     ), unwind_arch_sources + [
         'src/dwarf/Lexpr.c',

@@ -16,29 +16,20 @@
 
 /**
  * @file
- * @brief		POSIX threads.
+ * @brief		Locale functions/definitions.
  */
 
-#ifndef __PTHREAD_H
-#define __PTHREAD_H
-
-#include <sys/types.h>
+#ifndef __LANGINFO_H
+#define __LANGINFO_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef int32_t pthread_mutex_t;
-typedef int32_t pthread_mutexattr_t;
 
-#define PTHREAD_MUTEX_INITIALIZER 0
-
-extern int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr);
-extern int pthread_mutex_lock(pthread_mutex_t *);
-extern int pthread_mutex_unlock(pthread_mutex_t *);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __PTHREAD_H */
+#endif /* __LANGINFO_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,8 @@
 
 #ifndef __CTYPE_H
 #define __CTYPE_H
+
+#include <locale.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +47,26 @@ extern int toupper(int ch);
 
 #define _tolower(ch)	((ch) | 0x20)
 #define _toupper(ch)	((ch) & ~0x20)
+
+// Needed for libcxx build.
+#ifdef __cplusplus
+
+extern int isalnum_l(int, locale_t);
+extern int isalpha_l(int, locale_t);
+extern int isblank_l(int, locale_t);
+extern int iscntrl_l(int, locale_t);
+extern int isdigit_l(int, locale_t);
+extern int isgraph_l(int, locale_t);
+extern int islower_l(int, locale_t);
+extern int isprint_l(int, locale_t);
+extern int ispunct_l(int, locale_t);
+extern int isspace_l(int, locale_t);
+extern int isupper_l(int, locale_t);
+extern int isxdigit_l(int, locale_t);
+extern int tolower_l(int, locale_t);
+extern int toupper_l(int, locale_t);
+
+#endif
 
 #ifdef __cplusplus
 }
