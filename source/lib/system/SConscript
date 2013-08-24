@@ -68,6 +68,7 @@ sources = map(File, [
     'posix/wait.c',
     'posix/write.c',
 
+    'pthread/once.c',
     'pthread/pthread.c',
 
     'signal/kill.c',
