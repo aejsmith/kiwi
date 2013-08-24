@@ -24,7 +24,7 @@
 #ifndef __SYSTEM__PTHREAD_H
 #define __SYSTEM__PTHREAD_H
 
-#include <stdint.h>
+#include <kernel/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,7 +46,9 @@ typedef struct {
 
 /** Structure containing a mutex. */
 typedef struct {
-	int32_t futex;			/**< Futex implementing the lock. */
+	volatile int32_t futex;		/**< Futex implementing the lock. */
+	thread_id_t holder;		/**< ID of holding thread. */
+	unsigned recursion;		/**< Recursion count. */
 	pthread_mutexattr_t attr;	/**< Attributes for the mutex. */
 } pthread_mutex_t;
 
@@ -57,7 +59,7 @@ typedef struct {
 
 /** Structure containing a condition variable. */
 typedef struct {
-	int32_t futex;			/**< Futex implementing the condition variable. */
+	volatile int32_t futex;		/**< Futex implementing the condition variable. */
 	pthread_condattr_t attr;	/**< Attributes for the condition variable. */
 } pthread_cond_t;
 

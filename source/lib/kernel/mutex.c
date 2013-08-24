@@ -29,6 +29,7 @@
  *    http://dept-info.labri.fr/~denis/Enseignement/2008-IR/Articles/01-futex.pdf
  *
  * @todo		Make this fair.
+ * @fixme		Timeout is not handled correctly in the loop.
  */
 
 #include <kernel/futex.h>

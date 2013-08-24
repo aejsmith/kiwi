@@ -59,14 +59,14 @@ enum {
 
 /** Default initializer for pthread_mutex_t. */
 #define PTHREAD_MUTEX_INITIALIZER	\
-	{ 0, { PTHREAD_MUTEX_DEFAULT, PTHREAD_PROCESS_PRIVATE } }
+	{ 0, -1, 0, { PTHREAD_MUTEX_DEFAULT, PTHREAD_PROCESS_PRIVATE } }
 
 /** Default initializer for pthread_cond_t. */
 #define PTHREAD_COND_INITIALIZER	\
 	{ 0, { PTHREAD_PROCESS_PRIVATE } }
 
-extern int pthread_atfork(void (*prepare)(void), void (*parent)(void),
-	void (*child)(void));
+//extern int pthread_atfork(void (*prepare)(void), void (*parent)(void),
+//	void (*child)(void));
 //int pthread_cancel(pthread_t);
 //void pthread_cleanup_pop(int);
 //void pthread_cleanup_push(void (*)(void*), void *);
@@ -146,8 +146,8 @@ extern int pthread_mutex_destroy(pthread_mutex_t *mutex);
 //int pthread_mutex_consistent(pthread_mutex_t *);
 extern int pthread_mutex_lock(pthread_mutex_t *mutex);
 //int pthread_mutex_setprioceiling(pthread_mutex_t *__restrict, int, int *__restrict);
-extern int pthread_mutex_timedlock(pthread_mutex_t *__restrict mutex,
-	const struct timespec *__restrict abstime);
+//extern int pthread_mutex_timedlock(pthread_mutex_t *__restrict mutex,
+//	const struct timespec *__restrict abstime);
 extern int pthread_mutex_trylock(pthread_mutex_t *mutex);
 extern int pthread_mutex_unlock(pthread_mutex_t *mutex);
 extern int pthread_mutexattr_init(pthread_mutexattr_t *attr);
