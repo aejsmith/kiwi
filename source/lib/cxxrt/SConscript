@@ -43,7 +43,6 @@ env.KiwiLibrary('cxxrt',
         'CPPPATH': [Dir('.')],
         'CPPDEFINES': {
             'LIBCXXRT_WEAK_LOCKS': None,
-            '__DUMMY_PTHREADS': None,
         },
     },
 )

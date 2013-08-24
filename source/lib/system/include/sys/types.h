@@ -24,6 +24,8 @@
 
 #include <kernel/types.h>
 
+#include <system/_pthread.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -55,7 +57,6 @@ typedef unsigned long u_long;
 /* [XSI] fsfilcnt_t */
 /* id_t */
 /* [XSI] key_t */
-/* pthread*_t */
 /* timer_t */
 
 #ifdef __cplusplus

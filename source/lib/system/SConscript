@@ -68,6 +68,8 @@ sources = map(File, [
     'posix/wait.c',
     'posix/write.c',
 
+    'pthread/pthread.c',
+
     'signal/kill.c',
     'signal/sigaction.c',
     'signal/sigaltstack.c',
@@ -149,6 +151,7 @@ sources = map(File, [
     'error_list.c',
     'fatal.c',
     'init.c',
+    'sched.c',
 ])
 
 # Generate the error string list.
