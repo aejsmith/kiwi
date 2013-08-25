@@ -19,83 +19,89 @@
  * @brief		Thread functions.
  */
 
+#include <kernel/futex.h>
+#include <kernel/mutex.h>
 #include <kernel/object.h>
 #include <kernel/private/thread.h>
 
 #include "libkernel.h"
 
+/** Thread creation lock. */
+static int32_t thread_create_lock = MUTEX_INITIALIZER;
+
 /** Saved ID for the current thread. */
 __thread thread_id_t curr_thread_id = -1;
 
-#if 0
 /** Information used by thread_create(). */
-typedef struct thread_create_info {
-	handle_t sem;			/**< Semaphore for communication between entry and create. */
+typedef struct thread_create {
 	status_t ret;			/**< Initialisation status. */
-	void (*func)(void *);		/**< Real entry function. */
-	void *arg;			/**< Argument to entry function. */
-} thread_create_info_t;
+	thread_entry_t *entry;		/**< Real entry structure. */
+} thread_create_t;
 
 /** Thread entry wrapper.
  * @param arg		Pointer to information structure. */
 static void thread_entry_wrapper(void *arg) {
-	thread_create_info_t *info = arg;
-	void (*func)(void *);
+	thread_create_t *create = arg;
+	thread_entry_t *entry = create->entry;
 
 	/* Attempt to initialise our TLS block. */
-	info->ret = tls_init();
-	if(info->ret != STATUS_SUCCESS) {
+	create->ret = tls_init();
+	kern_mutex_unlock(&thread_create_lock);
+	if(create->ret != STATUS_SUCCESS)
 		_kern_thread_exit(-1);
-	}
 
-	func = info->func;
-	arg = info->arg;
-	kern_semaphore_up(info->sem, 1);
+	/* Save our ID. */
+	curr_thread_id = _kern_thread_id(THREAD_SELF);
 
-	func(arg);
+	entry->func(entry->arg);
 	kern_thread_exit(0);
 }
 
 /** Create a new thread.
  * @param name		Name of the thread to create.
- * @param stack		Pointer to base of stack to use for thread. If NULL,
- *			then a new stack will be allocated.
- * @param stacksz	Size of stack. If a stack is provided, then this should
- *			be the size of that stack. Otherwise, it is used as the
- *			size of the stack to create - if it is zero then a
- *			stack of the default size will be allocated.
- * @param func		Function to execute.
- * @param arg		Argument to pass to thread.
+ * @param entry		Details of the entry point and stack for the new thread.
+ *			See the documentation for thread_entry_t for details of
+ *			the purpose of each member.
+ * @param flags		Creation behaviour flags.
  * @param handlep	Where to store handle to the thread (can be NULL).
  * @return		Status code describing result of the operation. */
-__export status_t kern_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
-                                     void *arg, const object_security_t *security, object_rights_t rights,
-                                     handle_t *handlep) {
-	thread_create_info_t info;
+__export status_t kern_thread_create(const char *name, thread_entry_t *entry,
+	uint32_t flags, handle_t *handlep)
+{
+	thread_create_t create;
+	thread_entry_t wrapper;
 	status_t ret;
 
-	/* Create the semaphore that we use to wait for the thread to signal
-	 * that its initialisation has completed. */
-	ret = kern_semaphore_create("thread_create_sem", 0, NULL, SEMAPHORE_RIGHT_USAGE, &info.sem);
+	if(!entry)
+		return STATUS_INVALID_ARG;
+
+	/* We need to call the above wrapper function to initialize the TLS
+	 * block for the thread. */
+	create.ret = STATUS_SUCCESS;
+	create.entry = entry;
+	wrapper.func = thread_entry_wrapper;
+	wrapper.arg = &create;
+	wrapper.stack = entry->stack;
+	wrapper.stack_size = entry->stack_size;
+
+	kern_mutex_lock(&thread_create_lock, -1);
+
+	/* Create the thread. */
+	ret = _kern_thread_create(name, &wrapper, flags, handlep);
 	if(ret != STATUS_SUCCESS) {
+		kern_mutex_unlock(&thread_create_lock);
 		return ret;
 	}
-	info.ret = STATUS_SUCCESS;
-	info.func = func;
-	info.arg = arg;
 
-	ret = _kern_thread_create(name, stack, stacksz, thread_entry_wrapper, &info, security, rights, handlep);
-	if(ret != STATUS_SUCCESS) {
-		kern_handle_close(info.sem);
-		return ret;
-	}
-
-	/* Wait for the thread to signal that it is initialised. */
-	kern_semaphore_down(info.sem, -1);
-	kern_handle_close(info.sem);
-	return info.ret;
+	/* Our mutex implementation is a simple one which does not take thread
+	 * ownership into account. Therefore, to wait for the thread to signal
+	 * that it's initialised, we just attempt to lock the mutex again, which
+	 * will cause us to block. The new thread unlocks it once it is ready
+	 * (see above), which will unblock us. */
+	kern_mutex_lock(&thread_create_lock, -1);
+	kern_mutex_unlock(&thread_create_lock);
+	return create.ret;
 }
-#endif
 
 /** Get the ID of a thread.
  * @param handle	Handle for thread to get ID of, or THREAD_SELF to get
