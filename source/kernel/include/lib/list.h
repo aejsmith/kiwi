@@ -174,4 +174,34 @@ static inline void list_remove(list_t *entry) {
 	list_init(entry);
 }
 
+/** Splice the contents of one list onto another.
+ * @param position	Entry to insert before.
+ * @param list		Head of list to insert. Will become empty after the
+ *			operation. */
+static inline void list_splice_before(list_t *position, list_t *list) {
+	if(!list_empty(list)) {
+		list->next->prev = position->prev;
+		position->prev->next = list->next;
+		position->prev = list->prev;
+		list->prev->next = position;
+
+		list_init(list);
+	}
+}
+
+/** Splice the contents of one list onto another.
+ * @param position	Entry to insert after.
+ * @param list		Head of list to insert. Will become empty after the
+ *			operation. */
+static inline void list_splice_after(list_t *position, list_t *list) {
+	if(!list_empty(list)) {
+		list->prev->next = position->next;
+		position->next->prev = list->prev;
+		position->next = list->next;
+		list->next->prev = position;
+
+		list_init(list);
+	}
+}
+
 #endif /* __LIB_LIST_H */
