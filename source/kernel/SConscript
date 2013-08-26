@@ -104,6 +104,9 @@ env = manager.Create('kernel', {
         '-fno-optimize-sibling-calls', '-fno-stack-protector',
         '-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
     ],
+    'CFLAGS': [
+        '-std=gnu11',
+    ],
     'CXXFLAGS': [
         '-fno-exceptions', '-fno-rtti',
     ],
