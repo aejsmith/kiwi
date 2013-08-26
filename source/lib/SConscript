@@ -22,6 +22,7 @@ dirs = [
     'system',
     'libm',
     'cxxrt',
+    'cxx',
 ]
 
 SConscript(dirs = dirs, exports = ['env'])

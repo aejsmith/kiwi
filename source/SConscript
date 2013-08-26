@@ -110,8 +110,17 @@ env = manager.Create('uspace', {
     '_LIBINFO': {}
 })
 
+# Check if a source list uses C++.
+def is_cxx(sources):
+    suffixes = ['.cpp', '.cc', '.cxx', '.c++', '.C++', '.mm']
+    for s in sources:
+        ext = os.path.splitext(str(s))[1]
+        if ext in suffixes:
+            return 1
+    return 0
+
 # Process library dependencies, and set LIBS and CPPPATH in flags.
-def process_library_deps(env, flags, libraries, build_libraries):
+def process_library_deps(env, sources, flags, libraries, build_libraries):
     if not 'LIBS' in flags:
         flags['LIBS'] = []
     if not 'LINKFLAGS' in flags:
@@ -125,7 +134,7 @@ def process_library_deps(env, flags, libraries, build_libraries):
             flags['LIBS'].append(lib)
         if env['_LIBINFO'].has_key(lib):
             info = env['_LIBINFO'][lib]
-            process_library_deps(env, flags, [], info['build_libraries'])
+            process_library_deps(env, [], flags, [], info['build_libraries'])
             flags['CPPPATH'] += info['include_paths']
     for lib in libraries:
         add_library(lib, True)
@@ -136,6 +145,8 @@ def process_library_deps(env, flags, libraries, build_libraries):
     if not ('-nostdlib' in flags['LINKFLAGS'] or '-nodefaultlibs' in flags['LINKFLAGS']):
         flags['CPPPATH'] += env['_LIBINFO']['kernel']['include_paths']
         flags['CPPPATH'] += env['_LIBINFO']['system']['include_paths']
+        if is_cxx(sources):
+            flags['CPPPATH'] += env['_LIBINFO']['c++']['include_paths']
 
 # Custom method to build a Kiwi application.
 def kiwi_application_method(env, target, sources, **kwargs):
@@ -144,7 +155,7 @@ def kiwi_application_method(env, target, sources, **kwargs):
     flags = kwargs['flags'] if 'flags' in kwargs else {}
 
     # Set up the include path and get the libraries to link to.
-    process_library_deps(env, flags, libraries, build_libraries)
+    process_library_deps(env, sources, flags, libraries, build_libraries)
 
     # Add the application to the distribution environment.
     dist['BINARIES'].append(File(target))
@@ -166,7 +177,7 @@ def kiwi_library_method(env, target, sources, **kwargs):
         flags['CPPPATH'] += include_paths
 
     # Set up the include path and get the libraries to link to.
-    process_library_deps(env, flags, libraries, build_libraries)
+    process_library_deps(env, sources, flags, libraries, build_libraries)
 
     # Store our dependency/include path information.
     env['_LIBINFO'][target] = {
@@ -200,8 +211,8 @@ def program_emitter(target, source, env):
         Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
     if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
         Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
-        #if env['SMARTLINK'](source, target, env, None) == '$CXX':
-        #    Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
+        if env['SMARTLINK'](source, target, env, None) == '$CXX':
+            Depends(target[0], env['LIBOUTDIR'].File('libc++.so'))
     return target, source
 env.Append(PROGEMITTER = [program_emitter])
 

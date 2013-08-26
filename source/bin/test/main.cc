@@ -31,6 +31,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <stdexcept>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#if 0
 #define NUM_THREADS	8
 
 static pthread_mutex_t test_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -59,8 +65,27 @@ static void thread_func(void *id) {
 
 	pthread_mutex_unlock (&test_lock);
 }
+#endif
 
 int main(int argc, char **argv) {
+	std::cout << "Hello, World! My arguments are:" << std::endl;
+
+	std::vector<std::string> args;
+	args.assign(argv, argv + argc);
+
+	int i = 0;
+	for(const std::string &arg : args)
+		std::cout << " args[" << i++ << "] = '" << arg << "'" << std::endl;
+
+	try {
+		throw std::runtime_error("Test exception");
+	} catch(std::exception &e) {
+		std::cout << "Caught exception '" << e.what() << "'" << std::endl;
+		std::cout << typeid(e).name() << std::endl;
+	}
+
+	return 0;
+#if 0
 	int i;
 	thread_entry_t entry;
 	object_event_t events[NUM_THREADS];
@@ -111,4 +136,5 @@ int main(int argc, char **argv) {
 
 	printf("All threads exited\n");
 	return 0;
+#endif
 }
