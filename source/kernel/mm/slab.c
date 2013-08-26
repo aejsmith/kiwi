@@ -824,21 +824,21 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
 __init_text void slab_init(void) {
 	/* Intialise the cache for cache structures. */
 	slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t),
-		__alignof(slab_cache_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
+		alignof(slab_cache_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
 		0, MM_BOOT);
 
 	/* Initialize the magazine cache. This cannot have the magazine layer
 	 * enabled, for pretty obvious reasons. */
 	slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t),
-		__alignof(slab_magazine_t), NULL, NULL, NULL, SLAB_MAG_PRIORITY,
+		alignof(slab_magazine_t), NULL, NULL, NULL, SLAB_MAG_PRIORITY,
 		SLAB_CACHE_NOMAG, MM_BOOT);
 
 	/* Create other internal caches. */
 	slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t),
-		__alignof(slab_bufctl_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
+		alignof(slab_bufctl_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
 		0, MM_BOOT);
 	slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t),
-		__alignof(slab_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0,
+		alignof(slab_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0,
 		MM_BOOT);
 
 	/* Register the KDB command. */
@@ -854,7 +854,7 @@ __init_text void slab_late_init(void) {
 	size = sizeof(slab_percpu_t) * (highest_cpu_id + 1);
 	slab_percpu_cache = slab_cache_alloc(&slab_cache_cache, MM_BOOT);
 	slab_cache_init(slab_percpu_cache, "slab_percpu_cache", size,
-		__alignof(slab_percpu_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
+		alignof(slab_percpu_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
 		SLAB_CACHE_NOMAG, MM_BOOT);
 
 	mutex_lock(&slab_caches_lock);

@@ -115,7 +115,7 @@ extern void slab_cache_destroy(slab_cache_t *cache);
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to cache on success, NULL on failure. */
 #define object_cache_create(name, type, ctor, dtor, data, flags, mmflag) \
-	slab_cache_create(name, sizeof(type), __alignof(type), ctor, dtor, data, \
+	slab_cache_create(name, sizeof(type), alignof(type), ctor, dtor, data, \
 		flags, mmflag)
 
 extern void slab_init(void);
