@@ -69,6 +69,9 @@ typedef struct {
 /** Type of a POSIX thread handle. */
 typedef struct __pthread *pthread_t;
 
+/** Type of a thread attributes object (TODO). */
+typedef int32_t pthread_attr_t;
+
 #ifdef __cplusplus
 }
 #endif

@@ -187,6 +187,15 @@ extern int pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type);
 //int pthread_spin_unlock(pthread_spinlock_t *);
 
 #ifdef __cplusplus
+
+extern int pthread_create(pthread_t *__restrict, const pthread_attr_t *__restrict,
+	void *(*)(void*), void *__restrict);
+extern int pthread_detach(pthread_t);
+extern int pthread_join(pthread_t, void **);
+
+#endif
+
+#ifdef __cplusplus
 }
 #endif
 
