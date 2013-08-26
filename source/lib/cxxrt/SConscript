@@ -38,11 +38,5 @@ env.KiwiLibrary('cxxrt',
             '-Wno-missing-field-initializers', '-Wno-sometimes-uninitialized'
         ],
         'LINKFLAGS': ['-nodefaultlibs'],
-
-        # FIXME: Remove when pthreads implemented.
-        'CPPPATH': [Dir('.')],
-        'CPPDEFINES': {
-            'LIBCXXRT_WEAK_LOCKS': None,
-        },
     },
 )
