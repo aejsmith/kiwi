@@ -123,7 +123,7 @@ static status_t futex_lookup(int32_t *addr, futex_t **futexp) {
 	/* Check if the address is 4 byte aligned. This will ensure that the
 	 * address does not cross a page boundary because page sizes are
 	 * powers of 2. */
-	if((ptr_t)addr % sizeof(int32_t))
+	if(!addr || (ptr_t)addr % sizeof(int32_t))
 		return STATUS_INVALID_ARG;
 
 	/* Get the page containing the address and the offset within it. */
@@ -188,7 +188,7 @@ static void futex_finish(int32_t *addr) {
 /** Wait for a futex.
  * @param addr		Pointer to futex.
  * @param val		Value of the futex prior to the call. This is needed to
- *			prevent a race condition if another thread ups the
+ *			prevent a race condition if another thread modifies the
  *			futex before this thread has gone to sleep. If the
  *			value has changed just before sleeping, the function
  *			will return STATUS_TRY_AGAIN.
@@ -244,10 +244,7 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 	spinlock_lock(&futex->lock);
 
 	/* Wake the threads. */
-	while(count--) {
-		if(list_empty(&futex->threads))
-			break;
-
+	while(count-- && !list_empty(&futex->threads)) {
 		thread = list_first(&futex->threads, thread_t, wait_link);
 		thread_wake(thread);
 		woken++;
@@ -260,6 +257,107 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 	return (wokenp)
 		? memcpy_to_user(wokenp, &woken, sizeof(*wokenp))
 		: STATUS_SUCCESS;
+}
+
+/**
+ * Wake up or requeue threads waiting on a futex.
+ *
+ * Wakes up the specified number of threads from the source futex, and moves
+ * all the remaining waiting threads to the wait queue of the destination
+ * futex.
+ *
+ * @param addr1		Pointer to source futex.
+ * @param val		Value of the source futex prior to the call. This is
+ *			needed to prevent a race condition if another thread
+ *			modifies the futex prior to waking. If the value has
+ *			changed, the function will return STATUS_TRY_AGAIN.
+ * @param count		Number of threads to wake.
+ * @param addr2		Pointer to destination futex.
+ * @param wokenp	Where to store number of woken threads.
+ *
+ * @return		Status code describing the result of the operation.
+ */
+status_t kern_futex_requeue(int32_t *addr1, int32_t val, size_t count,
+	int32_t *addr2, size_t *wokenp)
+{
+	futex_t *source, *dest;
+	size_t woken = 0;
+	thread_t *thread;
+	status_t ret;
+
+	if(!count)
+		return STATUS_INVALID_ARG;
+
+	/* Find the futexes. */
+	ret = futex_lookup(addr1, &source);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	ret = futex_lookup(addr2, &dest);
+	if(ret != STATUS_SUCCESS) {
+		futex_finish(addr1);
+		return ret;
+	}
+
+	/* Another thread could potentially be performing a requeue with source
+	 * and dest swapped. Avoid deadlock by locking the futex with the
+	 * lowest address first. */
+	if(source <= dest) {
+		spinlock_lock(&source->lock);
+		if(source != dest)
+			spinlock_lock(&dest->lock);
+	} else {
+		spinlock_lock(&dest->lock);
+		spinlock_lock(&source->lock);
+	}
+
+	/* Now check the value to see if it has changed (see parameter
+	 * description above). The page is locked meaning it is safe to access
+	 * it directly. */
+	if(*addr1 != val) {
+		ret = STATUS_TRY_AGAIN;
+		goto out;
+	}
+
+	/* Wake the specified number of threads. */
+	while(count-- && !list_empty(&source->threads)) {
+		thread = list_first(&source->threads, thread_t, wait_link);
+		thread_wake(thread);
+		woken++;
+	}
+
+	if(source != dest) {
+		/* Now move the remaining threads onto the destination list. */
+		LIST_FOREACH_SAFE(&source->threads, iter) {
+			thread = list_entry(iter, thread_t, wait_link);
+
+			/* We don't need to lock the thread here. The members
+			 * we are changing are only touched when interrupting
+			 * threads under protection of wait_lock (which is the
+			 * source lock). If the thread is currently being
+			 * interrupted by another CPU, it may be waiting to get
+			 * the wait lock. There is a special handling in
+			 * thread.c to handle the wait lock having changed once
+			 * it manages to acquire it. */
+			assert(thread->wait_lock == &source->lock);
+			thread->wait_lock = &dest->lock;
+			list_append(&dest->threads, &thread->wait_link);
+		}
+	}
+
+out:
+	spinlock_unlock(&source->lock);
+	if(source != dest)
+		spinlock_unlock(&dest->lock);
+
+	futex_finish(addr2);
+	futex_finish(addr1);
+
+	/* Store the number of woken threads if requested. */
+	if(ret == STATUS_SUCCESS && wokenp)
+		ret = memcpy_to_user(wokenp, &woken, sizeof(*wokenp));
+
+	return ret;
 }
 
 /** Initialize the futex cache. */

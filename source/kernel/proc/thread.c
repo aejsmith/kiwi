@@ -337,6 +337,32 @@ static void thread_wake_unsafe(thread_t *thread) {
 	sched_insert_thread(thread);
 }
 
+/** Acquire a thread's wait lock.
+ * @param thread	Thread to lock for.
+ * @return		Lock that was acquired. */
+static inline spinlock_t *acquire_wait_lock(thread_t *thread) {
+	spinlock_t *lock;
+
+	/* This is necessary because of kern_futex_requeue(). While we are
+	 * waiting to acquire the wait lock, it could be changed underneath
+	 * us. Therefore, we must check whether the lock has changed after
+	 * acquiring it. */
+	while(true) {
+		lock = thread->wait_lock;
+		if(!lock)
+			break;
+
+		spinlock_lock(lock);
+		if(likely(thread->wait_lock == lock))
+			break;
+
+		spinlock_unlock(lock);
+		continue;
+	}
+
+	return lock;
+}
+
 /** Sleep timeout handler.
  * @param _thread	Pointer to thread to wake.
  * @return		Whether to preempt. */
@@ -346,9 +372,7 @@ static bool thread_timeout(void *_thread) {
 
 	/* To maintain the correct locking order and prevent deadlock, we must
 	 * take the wait lock before the thread lock. */
-	lock = thread->wait_lock;
-	if(lock)
-		spinlock_lock(lock);
+	lock = acquire_wait_lock(thread);
 
 	spinlock_lock(&thread->lock);
 
@@ -393,9 +417,7 @@ static bool thread_interrupt_internal(thread_t *thread, unsigned flags) {
 	bool ret = false;
 
 	/* Correct locking order, see thread_timeout(). */
-	lock = thread->wait_lock;
-	if(lock)
-		spinlock_lock(lock);
+	lock = acquire_wait_lock(thread);
 
 	spinlock_lock(&thread->lock);
 	thread->flags |= flags;
