@@ -19,11 +19,8 @@
  * @brief		Test application.
  */
 
-#include <kernel/mutex.h>
-#include <kernel/process.h>
 #include <kernel/status.h>
 #include <kernel/thread.h>
-#include <kernel/vm.h>
 
 #include <inttypes.h>
 #include <pthread.h>
@@ -31,43 +28,43 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <condition_variable>
+#include <mutex>
 #include <stdexcept>
 #include <iostream>
 #include <string>
 #include <vector>
 
-#if 0
 #define NUM_THREADS	8
 
-static pthread_mutex_t test_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t test_cond = PTHREAD_COND_INITIALIZER;
+static std::mutex test_lock;
+static std::condition_variable test_cond;
 static bool exiting = false;
 
 static void thread_func(void *id) {
-	pthread_mutex_lock(&test_lock);
+	std::unique_lock<std::mutex> lock(test_lock);
 
 	if((unsigned long)id == 0) {
 		while(!exiting) {
-			pthread_mutex_unlock(&test_lock);
+			lock.unlock();
 			sleep(1);
-			pthread_mutex_lock(&test_lock);
+			lock.lock();
 
 			printf("Broadcasting\n");
-			pthread_cond_broadcast(&test_cond);
+			test_cond.notify_all();
 		}
 	} else {
 		while(!exiting) {
 			printf("Thread %u waiting\n", (unsigned long)id);
-			pthread_cond_wait(&test_cond, &test_lock);
+			test_cond.wait(lock);
 			printf("Thread %u woken\n", (unsigned long)id);
 		}
 	}
-
-	pthread_mutex_unlock (&test_lock);
 }
-#endif
 
 int main(int argc, char **argv) {
+	status_t ret;
+
 	std::cout << "Hello, World! My arguments are:" << std::endl;
 
 	std::vector<std::string> args;
@@ -77,30 +74,15 @@ int main(int argc, char **argv) {
 	for(const std::string &arg : args)
 		std::cout << " args[" << i++ << "] = '" << arg << "'" << std::endl;
 
-	try {
-		throw std::runtime_error("Test exception");
-	} catch(std::exception &e) {
-		std::cout << "Caught exception '" << e.what() << "'" << std::endl;
-		std::cout << typeid(e).name() << std::endl;
-	}
-
-	return 0;
-#if 0
-	int i;
-	thread_entry_t entry;
-	object_event_t events[NUM_THREADS];
-	status_t ret;
-
-	printf("Hello, World! My arguments are:\n");
-	for(i = 0; i < argc; i++)
-		printf(" argv[%d] = '%s'\n", i, argv[i]);
-
 	printf("Acquiring lock...\n");
-	pthread_mutex_lock(&test_lock);
+	test_lock.lock();
 
 	printf("Creating threads...\n");
 
+	object_event_t events[NUM_THREADS];
 	for(i = 0; i < NUM_THREADS; i++) {
+		thread_entry_t entry;
+
 		entry.func = thread_func;
 		entry.arg = (void *)(unsigned long)i;
 		entry.stack = NULL;
@@ -119,14 +101,14 @@ int main(int argc, char **argv) {
 	}
 
 	printf("Unlocking...\n");
-	pthread_mutex_unlock(&test_lock);
+	test_lock.unlock();
 
 	sleep(20);
 
-	pthread_mutex_lock(&test_lock);
+	test_lock.lock();
 	printf("Exiting...\n");
 	exiting = true;
-	pthread_mutex_unlock(&test_lock);
+	test_lock.unlock();
 
 	ret = kern_object_wait(events, NUM_THREADS, OBJECT_WAIT_ALL, -1);
 	if(ret != STATUS_SUCCESS) {
@@ -136,5 +118,4 @@ int main(int argc, char **argv) {
 
 	printf("All threads exited\n");
 	return 0;
-#endif
 }

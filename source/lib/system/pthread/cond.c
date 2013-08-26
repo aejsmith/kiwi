@@ -64,7 +64,7 @@ int pthread_cond_init(pthread_cond_t *__restrict cond,
  *			in undefined behaviour.
  * @return		Always returns 0. */
 int pthread_cond_destroy(pthread_cond_t *cond) {
-	if(cond->futex != 0)
+	if(cond->waiters != 0)
 		libsystem_fatal("destroying condition variable %p with waiters", cond);
 
 	return 0;
@@ -130,8 +130,9 @@ int pthread_cond_wait(pthread_cond_t *__restrict cond, pthread_mutex_t *__restri
 		}
 
 		cond->mutex = mutex;
-		cond->waiters++;
 	}
+
+	cond->waiters++;
 
 	/* Drop the mutex. */
 	pthread_mutex_unlock(mutex);
@@ -152,8 +153,8 @@ int pthread_cond_wait(pthread_cond_t *__restrict cond, pthread_mutex_t *__restri
 	kern_mutex_lock(&cond->lock, -1);
 
 	/* If there are no more waiters, set mutex to NULL. */
-	if(cond->attr.pshared != PTHREAD_PROCESS_SHARED) {
-		if(--cond->waiters == 0)
+	if(--cond->waiters == 0) {
+		if(cond->attr.pshared != PTHREAD_PROCESS_SHARED)
 			cond->mutex = NULL;
 	}
 
