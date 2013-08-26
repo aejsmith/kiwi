@@ -80,18 +80,21 @@
 		b = __tmp; \
 	}
 
-/** Get log base 2 (high bit) of a value.
- * @param val		Value to get high bit from.
- * @return		High bit + 1. */
-static inline int highbit(uint64_t val) {
-	if(!val) {
+/** Implementation for native-sized values. */
+static inline int highbit_native(unsigned long val) {
+	if(!val)
 		return 0;
-	}
 
-#if CONFIG_ARCH_64BIT
 	return fls(val) + 1;
-#elif CONFIG_ARCH_32BIT
+}
+
+#if CONFIG_ARCH_32BIT
+/** Implementation for long long values on 32-bit systems. */
+static inline int highbit_ll(unsigned long long val) {
 	unsigned long high, low;
+
+	if(!val)
+		return 0;
 
 	high = (unsigned long)((val >> 32) & 0xffffffff);
 	low = (unsigned long)(val & 0xffffffff);
@@ -100,10 +103,20 @@ static inline int highbit(uint64_t val) {
 	} else {
 		return fls(low) + 1;
 	}
-#else
-# error "Implement this."
-#endif
 }
+#endif
+
+/** Get log base 2 (high bit) of a value.
+ * @param val		Value to get high bit from.
+ * @return		High bit + 1. */
+#if CONFIG_ARCH_32BIT
+# define highbit(val)	_Generic((val), \
+	unsigned long long: highbit_ll, \
+	long long: highbit_ll, \
+	default: highbit_native)(val)
+#else
+# define highbit(val)	highbit_native(val)
+#endif
 
 /** Checksum a memory range.
  * @param start		Start of range to check.
