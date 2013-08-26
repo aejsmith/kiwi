@@ -3,7 +3,7 @@
 	url = git://git.alex-smith.me.uk/kiwi/kboot.git
 [submodule "3rdparty/lib/libcxx"]
 	path = 3rdparty/lib/libcxx
-	url = http://llvm.org/git/libcxx.git
+	url = git://git.alex-smith.me.uk/kiwi/libcxx.git
 [submodule "3rdparty/lib/libcxxrt"]
 	path = 3rdparty/lib/libcxxrt
 	url = https://github.com/pathscale/libcxxrt.git
