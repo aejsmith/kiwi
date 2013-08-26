@@ -1,3 +1,0 @@
-The autoconf patch is the result of running autoconf in the libstdc++-v3 directory.
-This is done because we patch some autoconf stuff, and GCC requires a specific
-autoconf version so we can't just reautoconf in the build.
