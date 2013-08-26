@@ -368,8 +368,8 @@ status_t kern_area_resize(handle_t handle, size_t size) {
 /** Initialize the memory area system. */
 static __init_text void area_init(void) {
 	id_allocator_init(&area_id_allocator, 65535, MM_BOOT);
-	area_cache = slab_cache_create("area_cache", sizeof(area_t), 0, area_ctor,
-		NULL, NULL, 0, MM_BOOT);
+	area_cache = object_cache_create("area_cache", area_t, area_ctor, NULL,
+		NULL, 0, MM_BOOT);
 }
 
 INITCALL(area_init);

@@ -144,9 +144,8 @@ void entry_cache_remove(entry_cache_t *cache, const char *name) {
 
 /** Initialize the entry cache slab cache. */
 static __init_text void entry_cache_init(void) {
-	entry_cache_cache = slab_cache_create("entry_cache_cache",
-		sizeof(entry_cache_t), 0, entry_cache_ctor, NULL,
-		NULL, 0, MM_BOOT);
+	entry_cache_cache = object_cache_create("entry_cache_cache", entry_cache_t,
+		entry_cache_ctor, NULL, NULL, 0, MM_BOOT);
 }
 
 INITCALL(entry_cache_init);

@@ -573,11 +573,10 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 
 /** Initialize the handle caches. */
 __init_text void handle_init(void) {
-	object_handle_cache = slab_cache_create("object_handle_cache",
-		sizeof(object_handle_t), 0, NULL, NULL, NULL, 0,
-		MM_BOOT);
-	handle_table_cache = slab_cache_create("handle_table_cache",
-		sizeof(handle_table_t), 0, handle_table_ctor, NULL, NULL, 0,
+	object_handle_cache = object_cache_create("object_handle_cache",
+		object_handle_t, NULL, NULL, NULL, 0, MM_BOOT);
+	handle_table_cache = object_cache_create("handle_table_cache",
+		handle_table_t, handle_table_ctor, NULL, NULL, 0,
 		MM_BOOT);
 
 	/* Register the KDB commands. */

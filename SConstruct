@@ -48,7 +48,7 @@ host_flags = {
 # Variables to set in target environments.
 target_flags = {
     'CCFLAGS': cc_warning_flags + ['-gdwarf-2', '-pipe', '-fno-omit-frame-pointer'],
-    'CFLAGS': ['-std=gnu99'],
+    'CFLAGS': ['-std=gnu11'],
     'CXXFLAGS': cxx_warning_flags,
 
     # Clang's integrated assembler doesn't support 16-bit code.

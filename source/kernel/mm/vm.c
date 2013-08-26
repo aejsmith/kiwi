@@ -1988,12 +1988,12 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
 /** Initialize the VM system. */
 __init_text void vm_init(void) {
 	/* Create the VM slab caches. */
-	vm_aspace_cache = slab_cache_create("vm_aspace_cache", sizeof(vm_aspace_t),
-		0, vm_aspace_ctor, NULL, NULL, 0, MM_BOOT);
-	vm_region_cache = slab_cache_create("vm_region_cache", sizeof(vm_region_t),
-		0, vm_region_ctor, NULL, NULL, 0, MM_BOOT);
-	vm_amap_cache = slab_cache_create("vm_amap_cache", sizeof(vm_amap_t),
-		0, vm_amap_ctor, NULL, NULL, 0, MM_BOOT);
+	vm_aspace_cache = object_cache_create("vm_aspace_cache", vm_aspace_t,
+		vm_aspace_ctor, NULL, NULL, 0, MM_BOOT);
+	vm_region_cache = object_cache_create("vm_region_cache", vm_region_t,
+		vm_region_ctor, NULL, NULL, 0, MM_BOOT);
+	vm_amap_cache = object_cache_create("vm_amap_cache", vm_amap_t,
+		vm_amap_ctor, NULL, NULL, 0, MM_BOOT);
 
 	/* Bring up the page daemons. */
 	page_daemon_init();

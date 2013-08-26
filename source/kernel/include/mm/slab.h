@@ -100,13 +100,23 @@ typedef struct slab_cache {
 extern void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag);
 extern void slab_cache_free(slab_cache_t *cache, void *obj);
 
-/** Expands to size and align argument for slab_cache_create(). */
-#define SLAB_SIZE_ALIGN(t)	sizeof(t), __alignof__(t)
-
 extern slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
-                                       slab_ctor_t ctor, slab_dtor_t dtor,
-                                       void *data, int flags, unsigned mmflag);
+	slab_ctor_t ctor, slab_dtor_t dtor, void *data, int flags,
+	unsigned mmflag);
 extern void slab_cache_destroy(slab_cache_t *cache);
+
+/** Create a slab cache for allocation of objects of a certain type.
+ * @param name		Name of cache (for debugging purposes).
+ * @param type		Type of object to allocate.
+ * @param ctor		Constructor callback (optional).
+ * @param dtor		Destructor callback (optional).
+ * @param data		Data to pass as second parameter to callback functions.
+ * @param flags		Flags to modify the behaviour of the cache.
+ * @param mmflag	Allocation behaviour flags.
+ * @return		Pointer to cache on success, NULL on failure. */
+#define object_cache_create(name, type, ctor, dtor, data, flags, mmflag) \
+	slab_cache_create(name, sizeof(type), __alignof(type), ctor, dtor, data, \
+		flags, mmflag)
 
 extern void slab_init(void);
 extern void slab_late_init(void);

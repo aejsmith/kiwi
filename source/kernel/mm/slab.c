@@ -51,7 +51,10 @@
 #include <kernel.h>
 #include <status.h>
 
-#if CONFIG_SLAB_DEBUG
+/** Define to enable (very) verbose debug output. */
+//#define DEBUG_SLAB
+
+#ifdef DEBUG_SLAB
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
 #else
 # define dprintf(fmt...)	
@@ -719,10 +722,8 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
  * @param name		Name of cache (for debugging purposes).
  * @param size		Size of each object.
  * @param align		Alignment of each object. Must be a power of two.
- * @param ctor		Constructor callback - performs one-time initialization
- *			of an object (optional).
- * @param dtor		Destructor callback - undoes anything done by the
- *			constructor, if applicable (optional).
+ * @param ctor		Constructor callback (optional).
+ * @param dtor		Destructor callback (optional).
  * @param data		Data to pass as second parameter to callback functions.
  * @param flags		Flags to modify the behaviour of the cache.
  * @param mmflag	Allocation behaviour flags.
@@ -822,23 +823,23 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
 /** Initialize the slab allocator. */
 __init_text void slab_init(void) {
 	/* Intialise the cache for cache structures. */
-	slab_cache_init(&slab_cache_cache, "slab_cache_cache",
-		SLAB_SIZE_ALIGN(slab_cache_t), NULL, NULL, NULL,
-		SLAB_METADATA_PRIORITY, 0, MM_BOOT);
+	slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t),
+		__alignof(slab_cache_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
+		0, MM_BOOT);
 
 	/* Initialize the magazine cache. This cannot have the magazine layer
 	 * enabled, for pretty obvious reasons. */
-	slab_cache_init(&slab_mag_cache, "slab_mag_cache",
-		SLAB_SIZE_ALIGN(slab_magazine_t), NULL, NULL, NULL,
-		SLAB_MAG_PRIORITY, SLAB_CACHE_NOMAG, MM_BOOT);
+	slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t),
+		__alignof(slab_magazine_t), NULL, NULL, NULL, SLAB_MAG_PRIORITY,
+		SLAB_CACHE_NOMAG, MM_BOOT);
 
 	/* Create other internal caches. */
-	slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache",
-		SLAB_SIZE_ALIGN(slab_bufctl_t), NULL, NULL, NULL,
-		SLAB_METADATA_PRIORITY, 0, MM_BOOT);
-	slab_cache_init(&slab_slab_cache, "slab_slab_cache",
-		SLAB_SIZE_ALIGN(slab_t), NULL, NULL, NULL,
-		SLAB_METADATA_PRIORITY, 0, MM_BOOT);
+	slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t),
+		__alignof(slab_bufctl_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
+		0, MM_BOOT);
+	slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t),
+		__alignof(slab_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0,
+		MM_BOOT);
 
 	/* Register the KDB command. */
 	kdb_register_command("slab", "Display slab cache statistics.", kdb_cmd_slab);
@@ -853,8 +854,8 @@ __init_text void slab_late_init(void) {
 	size = sizeof(slab_percpu_t) * (highest_cpu_id + 1);
 	slab_percpu_cache = slab_cache_alloc(&slab_cache_cache, MM_BOOT);
 	slab_cache_init(slab_percpu_cache, "slab_percpu_cache", size,
-		__alignof(slab_percpu_t), NULL, NULL, NULL,
-		SLAB_METADATA_PRIORITY, SLAB_CACHE_NOMAG, MM_BOOT);
+		__alignof(slab_percpu_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
+		SLAB_CACHE_NOMAG, MM_BOOT);
 
 	mutex_lock(&slab_caches_lock);
 

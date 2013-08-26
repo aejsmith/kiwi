@@ -623,8 +623,8 @@ static kdb_status_t kdb_cmd_cache(int argc, char **argv, kdb_filter_t *filter) {
 
 /** Create the VM cache structure slab cache. */
 __init_text void vm_cache_init(void) {
-	vm_cache_cache = slab_cache_create("vm_cache_cache", sizeof(vm_cache_t),
-		0, vm_cache_ctor, NULL, NULL, 0, MM_BOOT);
+	vm_cache_cache = object_cache_create("vm_cache_cache", vm_cache_t,
+		vm_cache_ctor, NULL, NULL, 0, MM_BOOT);
 
 	kdb_register_command("cache", "Print information about a page cache.",
 		kdb_cmd_cache);

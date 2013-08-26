@@ -1960,8 +1960,8 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 
 /** Initialize the filesystem layer. */
 __init_text void fs_init(void) {
-	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t),
-		0, NULL, NULL, NULL, 0, MM_BOOT);
+	fs_node_cache = object_cache_create("fs_node_cache", fs_node_t, NULL,
+		NULL, NULL, 0, MM_BOOT);
 
 	/* Register the KDB commands. */
 	kdb_register_command("mount", "Print a list of mounted filesystems.",

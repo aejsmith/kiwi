@@ -362,8 +362,8 @@ out:
 
 /** Initialize the futex cache. */
 static __init_text void futex_init(void) {
-	futex_cache = slab_cache_create("futex_cache", sizeof(futex_t), 0,
-		futex_ctor, NULL, NULL, 0, MM_BOOT);
+	futex_cache = object_cache_create("futex_cache", futex_t, futex_ctor,
+		NULL, NULL, 0, MM_BOOT);
 }
 
 INITCALL(futex_init);

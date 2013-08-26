@@ -702,8 +702,8 @@ __init_text void process_init(void) {
 	id_allocator_reserve(&process_id_allocator, 0);
 
 	/* Create the process slab cache. */
-	process_cache = slab_cache_create("process_cache", SLAB_SIZE_ALIGN(process_t),
-		process_ctor, NULL, NULL, 0, MM_BOOT);
+	process_cache = object_cache_create("process_cache", process_t, process_ctor,
+		NULL, NULL, 0, MM_BOOT);
 
 	/* Register the KDB command. */
 	kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);

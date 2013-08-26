@@ -1002,8 +1002,8 @@ __init_text void thread_init(void) {
 	id_allocator_init(&thread_id_allocator, 65535, MM_BOOT);
 
 	/* Create the thread slab cache. */
-	thread_cache = slab_cache_create("thread_cache", SLAB_SIZE_ALIGN(thread_t),
-		thread_ctor, NULL, NULL, 0, MM_BOOT);
+	thread_cache = object_cache_create("thread_cache", thread_t, thread_ctor,
+		NULL, NULL, 0, MM_BOOT);
 
 	/* Register our KDB commands. */
 	kdb_register_command("thread", "Print information about threads.", kdb_cmd_thread);

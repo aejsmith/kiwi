@@ -67,12 +67,6 @@ config KMEM_DEBUG
 	help
 	  Enable extra debug output from the kernel virtual memory allocator.
 
-config SLAB_DEBUG
-	bool "Slab allocator debug output"
-	default n
-	help
-	  Enable extra debug output from the slab allocator.
-
 config CACHE_DEBUG
 	bool "Page cache debug output"
 	default n
