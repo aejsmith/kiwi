@@ -40,27 +40,30 @@ typedef int32_t pthread_key_t;
 
 /** Structure containing mutex attributes. */
 typedef struct {
-	int type;			/**< Type of the mutex. */
-	int pshared;			/**< Process sharing attribute. */
+	int type;				/**< Type of the mutex. */
+	int pshared;				/**< Process sharing attribute. */
 } pthread_mutexattr_t;
 
 /** Structure containing a mutex. */
 typedef struct {
-	volatile int32_t futex;		/**< Futex implementing the lock. */
-	thread_id_t holder;		/**< ID of holding thread. */
-	unsigned recursion;		/**< Recursion count. */
-	pthread_mutexattr_t attr;	/**< Attributes for the mutex. */
+	volatile int32_t futex;			/**< Futex implementing the lock. */
+	thread_id_t holder;			/**< ID of holding thread. */
+	unsigned recursion;			/**< Recursion count. */
+	pthread_mutexattr_t attr;		/**< Attributes for the mutex. */
 } pthread_mutex_t;
 
 /** Structure containing condition variable attributes. */
 typedef struct {
-	int pshared;			/**< Process sharing attribute. */
+	int pshared;				/**< Process sharing attribute. */
 } pthread_condattr_t;
 
 /** Structure containing a condition variable. */
 typedef struct {
-	volatile int32_t futex;		/**< Futex implementing the condition variable. */
-	pthread_condattr_t attr;	/**< Attributes for the condition variable. */
+	int32_t lock;				/**< Internal structure lock. */
+	uint32_t futex;				/**< Futex to wait on. */
+	uint32_t waiters;			/**< Number of waiters. */
+	pthread_mutex_t *mutex;			/**< Mutex being used with the condition. */
+	pthread_condattr_t attr;		/**< Attributes for the condition variable. */
 } pthread_cond_t;
 
 /** Type of a POSIX thread handle. */

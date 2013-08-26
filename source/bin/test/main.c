@@ -22,59 +22,93 @@
 #include <kernel/mutex.h>
 #include <kernel/process.h>
 #include <kernel/status.h>
+#include <kernel/thread.h>
 #include <kernel/vm.h>
 
+#include <inttypes.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
+#define NUM_THREADS	8
+
+static pthread_mutex_t test_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t test_cond = PTHREAD_COND_INITIALIZER;
+static bool exiting = false;
+
+static void thread_func(void *id) {
+	pthread_mutex_lock(&test_lock);
+
+	if((unsigned long)id == 0) {
+		while(!exiting) {
+			pthread_mutex_unlock(&test_lock);
+			sleep(1);
+			pthread_mutex_lock(&test_lock);
+
+			printf("Broadcasting\n");
+			pthread_cond_broadcast(&test_cond);
+		}
+	} else {
+		while(!exiting) {
+			printf("Thread %u waiting\n", (unsigned long)id);
+			pthread_cond_wait(&test_cond, &test_lock);
+			printf("Thread %u woken\n", (unsigned long)id);
+		}
+	}
+
+	pthread_mutex_unlock (&test_lock);
+}
+
 int main(int argc, char **argv) {
-	int i, status;
-	int32_t *addr;
+	int i;
+	thread_entry_t entry;
+	object_event_t events[NUM_THREADS];
 	status_t ret;
-	pid_t pid;
 
 	printf("Hello, World! My arguments are:\n");
 	for(i = 0; i < argc; i++)
 		printf(" argv[%d] = '%s'\n", i, argv[i]);
 
-	ret = kern_vm_map((void **)&addr, 0x1000, VM_ADDRESS_ANY,
-		VM_PROT_READ | VM_PROT_WRITE, 0, INVALID_HANDLE,
-		0, NULL);
-	if(ret != STATUS_SUCCESS) {
-		printf("Failed to create mapping: %d\n", ret);
-		return EXIT_FAILURE;
-	}
+	printf("Acquiring lock...\n");
+	pthread_mutex_lock(&test_lock);
 
-	pid = fork();
-	if(pid == 0) {
-		kern_mutex_lock(addr, -1);
-		printf("Child process is process %d, sleeping\n", getpid());
-		kern_mutex_unlock(addr);
+	printf("Creating threads...\n");
 
-		sleep(5);
-		addr[1] = 0xDEADBEEF;
+	for(i = 0; i < NUM_THREADS; i++) {
+		entry.func = thread_func;
+		entry.arg = (void *)(unsigned long)i;
+		entry.stack = NULL;
+		entry.stack_size = 0;
 
-		kern_mutex_lock(addr, -1);
-		printf("Child process finishing\n");
-		kern_mutex_unlock(addr);
-
-		return 123;
-	} else if(pid > 0) {
-		kern_mutex_lock(addr, -1);
-		printf("Parent process %d got child %d, waiting\n", getpid(), pid);
-		kern_mutex_unlock(addr);
-
-		pid = wait(&status);
-		if(pid < 0) {
-			perror("wait");
+		ret = kern_thread_create("test", &entry, 0, &events[i].handle);
+		if(ret != STATUS_SUCCESS) {
+			fprintf(stderr, "Failed to create thread: %d\n", ret);
 			return EXIT_FAILURE;
 		}
 
-		printf("Process %d finished (status: 0x%x/%d)\n", pid, status, WEXITSTATUS(status));
-		return EXIT_SUCCESS;
-	} else {
-		perror("fork");
+		events[i].event = THREAD_EVENT_DEATH;
+
+		printf("Created thread %" PRId32 ", handle %" PRId32 "\n",
+			kern_thread_id(events[i].handle), events[i].handle);
+	}
+
+	printf("Unlocking...\n");
+	pthread_mutex_unlock(&test_lock);
+
+	sleep(20);
+
+	pthread_mutex_lock(&test_lock);
+	printf("Exiting...\n");
+	exiting = true;
+	pthread_mutex_unlock(&test_lock);
+
+	ret = kern_object_wait(events, NUM_THREADS, OBJECT_WAIT_ALL, -1);
+	if(ret != STATUS_SUCCESS) {
+		fprintf(stderr, "Failed to wait for thread: %d\n", ret);
 		return EXIT_FAILURE;
 	}
+
+	printf("All threads exited\n");
+	return 0;
 }

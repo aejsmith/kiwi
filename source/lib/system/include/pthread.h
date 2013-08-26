@@ -63,7 +63,7 @@ enum {
 
 /** Default initializer for pthread_cond_t. */
 #define PTHREAD_COND_INITIALIZER	\
-	{ 0, { PTHREAD_PROCESS_PRIVATE } }
+	{ 0, 0, 0, NULL, { PTHREAD_PROCESS_PRIVATE } }
 
 //extern int pthread_atfork(void (*prepare)(void), void (*parent)(void),
 //	void (*child)(void));
@@ -120,13 +120,14 @@ extern pthread_t pthread_self(void);
 extern int pthread_cond_init(pthread_cond_t *__restrict cond,
 	const pthread_condattr_t *__restrict attr);
 extern int pthread_cond_destroy(pthread_cond_t *cond);
-extern int pthread_cond_broadcast(pthread_cond_t *cond);
-extern int pthread_cond_signal(pthread_cond_t *cond);
+extern int pthread_cond_wait(pthread_cond_t *__restrict cond,
+	pthread_mutex_t *__restrict mutex);
 extern int pthread_cond_timedwait(pthread_cond_t *__restrict cond,
 	pthread_mutex_t *__restrict mutex,
 	const struct timespec *__restrict abstime);
-extern int pthread_cond_wait(pthread_cond_t *__restrict cond,
-	pthread_mutex_t *__restrict mutex);
+extern int pthread_cond_broadcast(pthread_cond_t *cond);
+extern int pthread_cond_signal(pthread_cond_t *cond);
+extern int pthread_condattr_init(pthread_condattr_t *attr);
 extern int pthread_condattr_destroy(pthread_condattr_t *attr);
 //int pthread_condattr_getclock(const pthread_condattr_t *__restrict, clockid_t *__restrict);
 extern int pthread_condattr_getpshared(const pthread_condattr_t *__restrict attr,

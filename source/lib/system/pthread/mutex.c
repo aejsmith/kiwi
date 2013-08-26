@@ -27,6 +27,13 @@
  * Reference:
  *  - Futexes are Tricky
  *    http://dept-info.labri.fr/~denis/Enseignement/2008-IR/Articles/01-futex.pdf
+ *
+ * @note		If changing the internal implementation, be sure to
+ *			change the condition variable implementation as well,
+ *			as that prods about at the internals of a mutex.
+ * @todo		Transfer lock ownership to a woken thread? At the moment
+ *			if a thread unlocks and then immediately locks again
+ *			we can starve other threads.
  */
 
 #include <kernel/futex.h>
@@ -35,6 +42,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <pthread.h>
 
 #include "libsystem.h"
@@ -201,7 +209,12 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex) {
 		}
 
 		/* Undefined behaviour -> error. */
-		libsystem_fatal("releasing unheld mutex %p", mutex);
+		if(mutex->holder == -1) {
+			libsystem_fatal("releasing unheld mutex %p", mutex);
+		} else {
+			libsystem_fatal("releasing mutex %p held by %" PRId32,
+				mutex, mutex->holder);
+		}
 	}
 
 	if(--mutex->recursion > 0) {
