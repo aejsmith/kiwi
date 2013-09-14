@@ -378,16 +378,16 @@ __init_text void smp_boot(void) {
 	bool state;
 
 	state = local_irq_disable();
-	arch_smp_boot_prepare();
+	platform_smp_boot_prepare();
 
 	for(i = 0; i <= highest_cpu_id; i++) {
 		if(cpus[i] && cpus[i]->state == CPU_OFFLINE) {
 			smp_boot_status = SMP_BOOT_INIT;
-			arch_smp_boot(cpus[i]);
+			platform_smp_boot(cpus[i]);
 		}
 	}
 
-	arch_smp_boot_cleanup();
+	platform_smp_boot_cleanup();
 
 	/* Indicate to the newly-booted CPUs that all CPUs are up and they
 	 * can start scheduling threads (see kmain_ap()). */

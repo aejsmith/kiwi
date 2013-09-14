@@ -20,6 +20,7 @@
  */
 
 #include <x86/lapic.h>
+#include <x86/smp.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -65,4 +66,20 @@ void platform_smp_detect(void) {
 	}
 	
 	return;
+}
+
+/** Prepare the SMP boot process. */
+__init_text void platform_smp_boot_prepare(void) {
+	x86_smp_boot_prepare();
+}
+
+/** Boot a secondary CPU.
+ * @param cpu		CPU to boot. */
+__init_text void platform_smp_boot(cpu_t *cpu) {
+	x86_smp_boot(cpu);
+}
+
+/** Clean up after secondary CPUs have been booted. */
+__init_text void platform_smp_boot_cleanup(void) {
+	x86_smp_boot_cleanup();
 }

@@ -54,7 +54,7 @@ void arch_smp_ipi(cpu_id_t dest) {
 }
 
 /** Prepare the SMP boot process. */
-__init_text void arch_smp_boot_prepare(void) {
+__init_text void x86_smp_boot_prepare(void) {
 	void *mapping;
 
 	/* Allocate a low memory page for the trampoline code. */
@@ -114,7 +114,7 @@ static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
 
 /** Boot a secondary CPU.
  * @param cpu		CPU to boot. */
-__init_text void arch_smp_boot(cpu_t *cpu) {
+__init_text void x86_smp_boot(cpu_t *cpu) {
 	void *mapping;
 
 	kprintf(LOG_DEBUG, "cpu: booting CPU %" PRIu32 "...\n", cpu->id);
@@ -147,7 +147,7 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
 }
 
 /** Clean up after secondary CPUs have been booted. */
-__init_text void arch_smp_boot_cleanup(void) {
+__init_text void x86_smp_boot_cleanup(void) {
 	/* Destroy the temporary MMU context. */
 	mmu_context_destroy(ap_mmu_context);
 

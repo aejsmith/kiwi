@@ -22,8 +22,14 @@
 #ifndef __X86_SMP_H
 #define __X86_SMP_H
 
+struct cpu;
+
 /** x86-specific SMP boot status values. */
 #define SMP_BOOT_TSC_SYNC1	4	/**< Stage 1 of TSC synchronization. */
 #define SMP_BOOT_TSC_SYNC2	5	/**< Stage 2 of TSC synchronization. */
+
+extern void x86_smp_boot_prepare(void);
+extern void x86_smp_boot(struct cpu *cpu);
+extern void x86_smp_boot_cleanup(void);
 
 #endif /* __X86_SMP_H */
