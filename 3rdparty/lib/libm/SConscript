@@ -17,6 +17,8 @@
 Import('manager', 'config')
 
 env = manager.Create(flags = {
+    'CPPPATH': [Dir('include')],
+
     # Silence some warnings because I can't be bothered to fix them.
     'CCFLAGS': [
         '-Wno-strict-aliasing',

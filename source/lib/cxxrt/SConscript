@@ -17,9 +17,8 @@
 Import('manager', 'config')
 
 env = manager.Create(libraries = ['system'], flags = {
-    'CCFLAGS': [
-        '-Wno-missing-field-initializers', '-Wno-sometimes-uninitialized'
-    ],
+    'CPPPATH': [Dir('include')],
+    'CCFLAGS': ['-Wno-missing-field-initializers', '-Wno-sometimes-uninitialized'],
 
     # We must use -nodefaultlibs as by default the build system would try
     # to make us link to ourself.

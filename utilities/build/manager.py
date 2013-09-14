@@ -161,12 +161,14 @@ class BuildManager:
             'LIBS': libraries,
         })
 
+        # Add in specified flags.
+        self.merge_flags(env, flags)
+
         # Add paths for dependencies.
         def add_library(lib):
             if lib in self.libraries:
-                self.merge_flags(env, {
-                    'CPPPATH': self.libraries[lib]['include_paths'],
-                })
+                paths = [d[0] if type(d) == tuple else d for d in self.libraries[lib]['include_paths']]
+                self.merge_flags(env, {'CPPPATH': paths})
                 for dep in self.libraries[lib]['build_libraries']:
                     add_library(dep)
         for lib in libraries:
@@ -194,9 +196,6 @@ class BuildManager:
         # Add the application/library builders.
         env.AddMethod(builders.kiwi_application_method, 'KiwiApplication')
         env.AddMethod(builders.kiwi_library_method, 'KiwiLibrary')
-
-        # Add in specified flags.
-        self.merge_flags(env, flags)
 
         self.envs.append((name, env))
         return env

@@ -18,7 +18,11 @@ Import('manager', 'config')
 
 env = manager.Create(libraries = ['kernel'], flags = {
     'LINKFLAGS': ['-nodefaultlibs'],
-    'CPPPATH': [Dir('.')],
+    'CPPPATH': [
+        Dir('.'),
+        Dir('include'),
+        Dir('arch/%s/include' % (config['ARCH'])),
+    ],
 })
 
 sources = map(File, [
@@ -179,6 +183,6 @@ env.KiwiLibrary('system',
     build_libraries = ['kernel'],
     include_paths = [
         Dir('include'),
-        Dir('arch/%s/include' % (config['ARCH']))
+        Dir('arch/%s/include' % (config['ARCH'])),
     ],
 )

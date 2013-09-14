@@ -161,34 +161,34 @@ target_env['CFLAGS'] += config['EXTRA_CFLAGS'].split()
 target_env['CXXFLAGS'] += config['EXTRA_CXXFLAGS'].split()
 
 # Set paths to toolchain components.
-def tool_path(name):
-    return os.path.join(config['TOOLCHAIN_DIR'], config['TOOLCHAIN_TARGET'],
-        'bin', config['TOOLCHAIN_TARGET'] + "-" + name)
 if os.environ.has_key('CC') and os.path.basename(os.environ['CC']) == 'ccc-analyzer':
     target_env['CC'] = os.environ['CC']
-    target_env['ENV']['CCC_CC'] = tool_path('clang')
+    target_env['ENV']['CCC_CC'] = toolchain.tool_path('clang')
 
     # Force a rebuild when doing static analysis.
     def decide_if_changed(dependency, target, prev_ni):
         return True
     target_env.Decider(decide_if_changed)
 else:
-    target_env['CC'] = tool_path('clang')
+    target_env['CC'] = toolchain.tool_path('clang')
 if os.environ.has_key('CXX') and os.path.basename(os.environ['CXX']) == 'c++-analyzer':
     target_env['CXX'] = os.environ['CXX']
-    target_env['ENV']['CCC_CXX'] = tool_path('clang++')
+    target_env['ENV']['CCC_CXX'] = toolchain.tool_path('clang++')
 else:
-    target_env['CXX'] = tool_path('clang++')
-target_env['AS']      = tool_path('as')
-target_env['OBJDUMP'] = tool_path('objdump')
-target_env['READELF'] = tool_path('readelf')
-target_env['NM']      = tool_path('nm')
-target_env['STRIP']   = tool_path('strip')
-target_env['AR']      = tool_path('ar')
-target_env['RANLIB']  = tool_path('ranlib')
-target_env['OBJCOPY'] = tool_path('objcopy')
-target_env['LD']      = tool_path('ld')
+    target_env['CXX'] = toolchain.tool_path('clang++')
+target_env['AS']      = toolchain.tool_path('as')
+target_env['OBJDUMP'] = toolchain.tool_path('objdump')
+target_env['READELF'] = toolchain.tool_path('readelf')
+target_env['NM']      = toolchain.tool_path('nm')
+target_env['STRIP']   = toolchain.tool_path('strip')
+target_env['AR']      = toolchain.tool_path('ar')
+target_env['RANLIB']  = toolchain.tool_path('ranlib')
+target_env['OBJCOPY'] = toolchain.tool_path('objcopy')
+target_env['LD']      = toolchain.tool_path('ld')
 
 # Build the target system.
 SConscript('source/SConscript', variant_dir = os.path.join('build',
     '%s-%s' % (config['ARCH'], config['PLATFORM'])))
+
+# Now that we have information of all libraries, update the toolchain sysroot.
+toolchain.update_sysroot(manager)

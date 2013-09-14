@@ -19,6 +19,7 @@ Import('manager', 'config')
 env = manager.Create(
     libraries = ['system', 'cxxrt', 'm'],
     flags = {
+        'CPPPATH': [Dir('include')],
         'CPPDEFINES': {
             'LIBCXXRT': None,
             'cxx_EXPORTS': None,
@@ -59,6 +60,6 @@ env.KiwiLibrary('c++',
         'stubs.c',
     ],
     include_paths = [
-        Dir('include')
+        (Dir('include'), 'c++/v1'),
     ],
 )

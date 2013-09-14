@@ -204,37 +204,6 @@ class ToolchainManager:
     def msg(self, msg):
         print '\033[0;32m>>>\033[0;1m %s\033[0m' % (msg)
 
-    # Repairs any links within the toolchain directory.
-    def repair(self):
-        # Create clang wrapper scripts. The wrapper script is needed to pass
-        # the correct sysroot path for the target. The exec sets the executable
-        # name for clang to the wrapper script path - this allows clang to
-        # determine the target and the tool directory properly.
-        for name in ['clang', 'clang++']:
-            path = os.path.join(self.genericdir, 'bin', name)
-            wrapper = os.path.join(self.targetdir, 'bin', '%s-%s' % (self.target, name))
-            f = open(wrapper, 'w')
-            f.write('#!/bin/sh\n\n')
-            f.write('exec -a $0 %s --sysroot=%s/sysroot $*\n' % (path, self.targetdir))
-            f.close()
-            os.chmod(wrapper, 0755)
-        try:
-            os.symlink('%s-clang' % (self.target),
-                os.path.join(self.targetdir, 'bin', '%s-cc' % (self.target)))
-            os.symlink('%s-clang++' % (self.target),
-                os.path.join(self.targetdir, 'bin', '%s-c++' % (self.target)))
-        except:
-            pass
-        
-        # Set up the sysroot to link to the source tree.
-        self.remove(os.path.join(self.targetdir, 'sysroot', 'include'))
-        self.remove(os.path.join(self.targetdir, 'sysroot', 'lib'))
-        #os.symlink(os.path.join(os.getcwd(), 'source', 'include'),
-        #    os.path.join(self.targetdir, 'sysroot', 'include'))
-        os.symlink(os.path.join(os.getcwd(), 'build',
-                '%s-%s' % (self.config['ARCH'], self.config['PLATFORM']), 'lib'),
-            os.path.join(self.targetdir, 'sysroot', 'lib'))
-
     # Remove a file, symbolic link or directory tree.
     def remove(self, path):
         if not os.path.lexists(path):
@@ -256,12 +225,70 @@ class ToolchainManager:
         except:
             pass
 
-    # Get the path to a toolchain utility.
-    def tool_path(self, name):
-        return os.path.join(self.targetdir, 'bin', self.target + '-' + name)
+    # Create the clang wrappers.
+    def create_wrappers(self):
+        # Create clang wrapper scripts. The wrapper script is needed to pass
+        # the correct sysroot path for the target. The exec sets the executable
+        # name for clang to the wrapper script path - this allows clang to
+        # determine the target and the tool directory properly.
+        for name in ['clang', 'clang++']:
+            path = os.path.join(self.genericdir, 'bin', name)
+            wrapper = os.path.join(self.targetdir, 'bin', '%s-%s' % (self.target, name))
+            f = open(wrapper, 'w')
+            f.write('#!/bin/sh\n\n')
+            f.write('exec -a $0 %s --sysroot=%s/sysroot $*\n' % (path, self.targetdir))
+            f.close()
+            os.chmod(wrapper, 0755)
+        try:
+            os.symlink('%s-clang' % (self.target),
+                os.path.join(self.targetdir, 'bin', '%s-cc' % (self.target)))
+            os.symlink('%s-clang++' % (self.target),
+                os.path.join(self.targetdir, 'bin', '%s-c++' % (self.target)))
+        except:
+            pass
+
+    # Set up the toolchain sysroot.
+    def update_sysroot(self, manager):
+        sysrootdir = os.path.join(self.targetdir, 'sysroot')
+        libdir = os.path.join(sysrootdir, 'lib')
+        includedir = os.path.join(sysrootdir, 'include')
+        builddir = os.path.join(os.getcwd(), 'build',
+            '%s-%s' % (self.config['ARCH'], self.config['PLATFORM']))
+
+        # Remove any existing sysroot.
+        self.remove(sysrootdir)
+        self.makedirs(sysrootdir)
+
+        # All libraries get placed into a single directory, just link to it.
+        os.symlink(os.path.join(builddir, 'lib'), libdir)
+
+        # Now create the include directory. We create symbolic links back to
+        # the source tree for the contents of all libraries' header paths.
+        self.makedirs(os.path.join(self.targetdir, 'sysroot', 'include'))
+        for (name, lib) in manager.libraries.items():
+            for dir in lib['include_paths']:
+                def link_tree(targetdir, dir):
+                    self.makedirs(dir)
+                    for entry in os.listdir(targetdir):
+                        target = os.path.join(targetdir, entry)
+                        path = os.path.join(dir, entry)
+                        if os.path.isdir(target):
+                            link_tree(target, path)
+                        else:
+                            os.symlink(target, path)
+                if type(dir) == tuple:
+                    # Link the directory to a specific location.
+                    target = os.path.join(os.getcwd(), str(dir[0].srcnode()))
+                    path = os.path.join(includedir, dir[1])
+                    link_tree(target, path)
+                else:
+                    # Link everything in the root of the directory into the
+                    # root of the sysroot.
+                    target = os.path.join(os.getcwd(), str(dir.srcnode()))
+                    link_tree(target, includedir)
 
     # Build a component.
-    def build(self, c):
+    def build_component(self, c):
         # Create the target directory and change into it.
         os.makedirs(self.builddir)
         olddir = os.getcwd()
@@ -275,15 +302,16 @@ class ToolchainManager:
             os.chdir(olddir)
             self.remove(self.builddir)
 
+    # Get the path to a toolchain utility.
+    def tool_path(self, name):
+        return os.path.join(self.targetdir, 'bin', self.target + '-' + name)
+
     # Check if an update is required.
     def check(self):
         for c in self.components:
             if c.check():
                 return True
 
-        # Nothing needs to be built, just ensure that everything's set up
-        # correctly and clean up.
-        self.repair()
         self.remove(self.builddir)
         return False
 
@@ -304,16 +332,15 @@ class ToolchainManager:
         self.makedirs(self.genericdir)
         self.makedirs(self.targetdir)
         self.makedirs(os.path.join(self.targetdir, 'bin'))
-        self.makedirs(os.path.join(self.targetdir, 'sysroot'))
 
         # Need to do this first as compiler-rt build requires wrapper in place.
-        self.repair()
+        self.create_wrappers()
 
         # Build necessary components.
         try:
             for c in self.components:
                 if c.check():
-                    self.build(c)
+                    self.build_component(c)
         except Exception, e:
             self.msg('Exception during toolchain build: \033[0;0m%s' % (str(e)))
             return 1

@@ -27,6 +27,7 @@ env = manager.Create(flags = {
     'CPPPATH': [
         Dir('.'),
         Dir('arch/%s' % (config['ARCH'])),
+        Dir('include'),
         Dir('../system/include'),
         Dir('../system/arch/%s/include' % (config['ARCH'])),
     ],

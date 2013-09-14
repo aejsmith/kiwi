@@ -43,11 +43,6 @@ def kiwi_library_method(env, name, sources, **kwargs):
     include_paths = kwargs['include_paths'] if 'include_paths' in kwargs else []
     flags = kwargs['flags'] if 'flags' in kwargs else {}
 
-    if include_paths:
-        if not flags.has_key('CPPPATH'):
-            flags['CPPPATH'] = [] + env['CPPPATH']
-        flags['CPPPATH'] += include_paths
-
     # Register this library with the build manager.
     manager.AddLibrary(name, build_libraries, include_paths)
 
