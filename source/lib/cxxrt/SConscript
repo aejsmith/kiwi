@@ -14,7 +14,17 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'config')
+Import('manager', 'config')
+
+env = manager.Create(libraries = ['system'], flags = {
+    'CCFLAGS': [
+        '-Wno-missing-field-initializers', '-Wno-sometimes-uninitialized'
+    ],
+
+    # We must use -nodefaultlibs as by default the build system would try
+    # to make us link to ourself.
+    'LINKFLAGS': ['-nodefaultlibs'],
+})
 
 libunwind_objects = SConscript(dirs = ['unwind'], exports = ['env'])
 
@@ -29,14 +39,7 @@ env.KiwiLibrary('cxxrt',
         'src/auxhelper.cc',
         'src/libelftc_dem_gnu3.c',
     ],
-    libraries = ['system'],
     include_paths = [
         Dir('include'),
     ],
-    flags = {
-        'CCFLAGS': env['CCFLAGS'] + [
-            '-Wno-missing-field-initializers', '-Wno-sometimes-uninitialized'
-        ],
-        'LINKFLAGS': ['-nodefaultlibs'],
-    },
 )

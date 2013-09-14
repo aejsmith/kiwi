@@ -14,7 +14,12 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'config')
+Import('manager', 'config')
+
+env = manager.Create(libraries = ['kernel'], flags = {
+    'LINKFLAGS': ['-nodefaultlibs'],
+    'CPPPATH': [Dir('.')],
+})
 
 sources = map(File, [
     'dirent/alphasort.c',
@@ -171,14 +176,9 @@ arch_sources = SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])
 # Build the library from this.
 env.KiwiLibrary('system',
     sources = arch_sources + sources,
-    libraries = ['kernel'],
     build_libraries = ['kernel'],
     include_paths = [
         Dir('include'),
         Dir('arch/%s/include' % (config['ARCH']))
     ],
-    flags = {
-        'LINKFLAGS': ['-nodefaultlibs'],
-        'CPPPATH': [Dir('.')],
-    },
 )

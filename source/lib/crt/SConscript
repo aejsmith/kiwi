@@ -14,6 +14,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'config')
+Import('manager', 'config')
 
+env = manager.Create()
 SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])

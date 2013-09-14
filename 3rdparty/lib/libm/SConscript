@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2011 Alex Smith
+# Copyright (C) 2009-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,17 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'config')
+Import('manager', 'config')
+
+env = manager.Create(flags = {
+    # Silence some warnings because I can't be bothered to fix them.
+    'CCFLAGS': [
+        '-Wno-strict-aliasing',
+        '-Wno-sign-compare',
+        '-Wno-parentheses',
+        '-Wno-uninitialized',
+    ],
+})
 
 # Nice little trick to make sure that architecture-specific versions of
 # functions will get used in preference to the generic versions.
@@ -37,16 +47,5 @@ SConscript(dirs = ['arch/%s' % (config['ARCH']), 'generic', 'support'], exports 
 # Build the library.
 env.KiwiLibrary('m',
 	sources = sources.files(),
-    include_paths = [
-        Dir('include'),
-    ],
-	flags = {
-		# Silence some warnings because I can't be bothered to fix them.
-		'CCFLAGS': env['CCFLAGS'] + [
-			'-Wno-strict-aliasing',
-			'-Wno-sign-compare',
-			'-Wno-parentheses',
-			'-Wno-uninitialized',
-		],
-	},
+    include_paths = [Dir('include')],
 )

@@ -14,10 +14,8 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env')
-
 dirs = [
     'test',
 ]
 
-SConscript(dirs = dirs, exports = ['env'])
+SConscript(dirs = dirs)

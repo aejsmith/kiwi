@@ -16,13 +16,12 @@
 
 Import('env')
 
-# Build rule to create required CRT files.
-env.Object('%s/crt1.o' % (str(env['LIBOUTDIR'])), ['crt1.S'])
-env.Object('%s/crti.o' % (str(env['LIBOUTDIR'])), ['crti.S'])
-env.Object('%s/crtn.o' % (str(env['LIBOUTDIR'])), ['crtn.S'])
-env.Object('%s/crtbegin.o' % (str(env['LIBOUTDIR'])), ['crtbegin.S'])
-env.Object('%s/crtend.o' % (str(env['LIBOUTDIR'])), ['crtend.S'])
-env.Object('%s/crtbeginS.o' % (str(env['LIBOUTDIR'])), ['crtbegin.S'],
+env.Object('%s/crt1.o' % (str(env['_LIBOUTDIR'])), ['crt1.S'])
+env.Object('%s/crti.o' % (str(env['_LIBOUTDIR'])), ['crti.S'])
+env.Object('%s/crtn.o' % (str(env['_LIBOUTDIR'])), ['crtn.S'])
+env.Object('%s/crtbegin.o' % (str(env['_LIBOUTDIR'])), ['crtbegin.S'])
+env.Object('%s/crtend.o' % (str(env['_LIBOUTDIR'])), ['crtend.S'])
+env.Object('%s/crtbeginS.o' % (str(env['_LIBOUTDIR'])), ['crtbegin.S'],
     CPPDEFINES = {'PIC': None, 'SHARED': None })
-env.Object('%s/crtendS.o' % (str(env['LIBOUTDIR'])), ['crtend.S'],
+env.Object('%s/crtendS.o' % (str(env['_LIBOUTDIR'])), ['crtend.S'],
     CPPDEFINES = {'PIC': None, 'SHARED': None })

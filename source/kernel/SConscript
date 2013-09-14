@@ -92,7 +92,7 @@ sources = FeatureSources(config, [
 ############################
 
 # Create the kernel environment.
-env = manager.Create('kernel', {
+env = manager.CreateBare(name = 'kernel', flags = {
     'LIBS': [],
     'CPPPATH': [
         Dir('include'),

@@ -14,7 +14,23 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'manager', 'config')
+Import('manager', 'config')
+
+env = manager.Create(flags = {
+    'LINKFLAGS': ['-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
+
+    # The default visibility is set to hidden, as the majority of functions in
+    # this library should not be exported.
+    'CCFLAGS': ['-ffreestanding', '-fvisibility=hidden', '-nostdinc'],
+
+    'CPPDEFINES': ['LIBKERNEL'],
+    'CPPPATH': [
+        Dir('.'),
+        Dir('arch/%s' % (config['ARCH'])),
+        Dir('../system/include'),
+        Dir('../system/arch/%s/include' % (config['ARCH'])),
+    ],
+})
 
 sources = map(File, [
     'rtld/image.c',
@@ -46,20 +62,7 @@ env.Command(
 # Get a list of architecture-specific source files.
 arch_sources = SConscript(dirs = ['arch/%s' % (config['ARCH'])], exports = ['env'])
 
-# Build the library. The default visibility is set to hidden, as the majority
-# of functions in this library should not be exported.
 env.KiwiLibrary('kernel',
     sources = arch_sources + sources,
     include_paths = [Dir('include')],
-    flags = {
-        'LINKFLAGS': ['-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
-        'CCFLAGS': env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden'],
-        'CPPDEFINES': ['LIBKERNEL'],
-        'CPPPATH': [
-            Dir('.'),
-            Dir('arch/%s' % (config['ARCH'])),
-            Dir('../system/include'),
-            Dir('../system/arch/%s/include' % (config['ARCH'])),
-        ],
-    },
 )

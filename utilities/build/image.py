@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2011-2013 Alex Smith
+# Copyright (C) 2009-2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -15,16 +15,72 @@
 #
 
 from SCons.Script import *
+import tarfile, glob, os, tempfile, shutil, time
+
+# Create a TAR archive containing the filesystem tree.
+def fs_image_func(target, source, env):
+    config = env['_CONFIG']
+
+    # Create the TAR file.
+    tar = tarfile.open(str(target[0]), 'w')
+
+    def make_dir(name):
+        if len(name) == 0:
+            return
+        try:
+            tar.getmember(name)
+        except KeyError:
+            make_dir(os.path.dirname(name))
+            tarinfo = tarfile.TarInfo(name)
+            tarinfo.type = tarfile.DIRTYPE
+            tarinfo.mtime = int(time.time())
+            tar.addfile(tarinfo)
+
+    # Copy everything into it.
+    for (path, target) in env['FILES']:
+        while path[0] == '/':
+            path = path[1:]
+        make_dir(os.path.dirname(path))
+        tarinfo = tar.gettarinfo(str(target), path)
+        tarinfo.uid = 0
+        tarinfo.gid = 0
+        tarinfo.uname = "root"
+        tarinfo.gname = "root"
+        tar.addfile(tarinfo, file(str(target)))
+    for (path, target) in env['LINKS']:
+        while path[0] == '/':
+            path = path[1:]
+        make_dir(os.path.dirname(path))
+        tarinfo = tarfile.TarInfo(path)
+        tarinfo.type = tarfile.SYMTYPE
+        tarinfo.linkname = target
+        tarinfo.mtime = int(time.time())
+        tar.addfile(tarinfo)
+
+    # Add in extra stuff from the directory specified in the configuration.
+    if len(config['EXTRA_FSIMAGE']) > 0:
+        cwd = os.getcwd()
+        os.chdir(config['EXTRA_FSIMAGE'])
+        for f in glob.glob('*'):
+            tar.add(f)
+        os.chdir(cwd)
+
+    tar.close()
+    return 0
+def fs_image_emitter(target, source, env):
+    # We must depend on every file that goes into the image.
+    deps = [f for (p, f) in env['FILES']]
+    return (target, source + deps)
+fs_image_builder = Builder(action = Action(fs_image_func, '$GENCOMSTR'), emitter = fs_image_emitter)
 
 # Function to generate an ISO image.
 def iso_image_func(target, source, env):
-    import os, sys, tempfile, shutil
-    config = env['CONFIG']
+    config = env['_CONFIG']
 
+    fsimage = str(source[-1])
     cdboot = str(env['CDBOOT'])
     loader = str(env['LOADER'])
     kernel = str(env['KERNEL'])
-    fsimage = str(env['FSIMAGE'])
 
     # Create the work directory.
     tmpdir = tempfile.mkdtemp('.kiwiiso')
@@ -67,5 +123,6 @@ def iso_image_func(target, source, env):
     shutil.rmtree(tmpdir)
     return 0
 def iso_image_emitter(target, source, env):
-    return (target, source + [env['KERNEL'], env['LOADER'], env['CDBOOT'], env['FSIMAGE']] + env['MODULES'])
-ISOBuilder = Builder(action = Action(iso_image_func, '$GENCOMSTR'), emitter = iso_image_emitter)
+    assert len(source) == 1
+    return (target, [env['KERNEL'], env['LOADER'], env['CDBOOT']] + env['MODULES'] + source)
+iso_image_builder = Builder(action = Action(iso_image_func, '$GENCOMSTR'), emitter = iso_image_emitter)

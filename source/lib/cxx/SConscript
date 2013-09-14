@@ -14,7 +14,21 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'config')
+Import('manager', 'config')
+
+env = manager.Create(
+    libraries = ['system', 'cxxrt', 'm'],
+    flags = {
+        'CPPDEFINES': {
+            'LIBCXXRT': None,
+            'cxx_EXPORTS': None,
+        },
+
+        # We must use -nodefaultlibs as by default the build system would try
+        # to make us link to ourself.
+        'LINKFLAGS': ['-nodefaultlibs'],
+    },
+)
 
 env.KiwiLibrary('c++',
     sources = [
@@ -44,15 +58,7 @@ env.KiwiLibrary('c++',
         'src/valarray.cpp',
         'stubs.c',
     ],
-    libraries = ['system', 'cxxrt', 'm'],
     include_paths = [
-        Dir('include'),
+        Dir('include')
     ],
-    flags = {
-        'LINKFLAGS': ['-nodefaultlibs'],
-        'CPPDEFINES': {
-            'LIBCXXRT': None,
-            'cxx_EXPORTS': None,
-        },
-    },
 )

@@ -23,10 +23,13 @@ subdirs = ['platform', 'tty']
 Import('config', 'manager')
 
 # Create the module environment.
-env = manager.Clone('module', 'kernel', {
+env = manager.Clone(manager['kernel'], name = 'module', flags = {
     # Modules default to not exporting symbols.
     'CCFLAGS': ['-fno-common', '-fvisibility=hidden'],
 })
+
+dist = manager['dist']
+dist['MODULES'] = []
 
 # Add a builder to create kernel modules. The emitter adds all modules to the
 # distribution environment's module list.

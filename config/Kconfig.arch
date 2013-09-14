@@ -29,11 +29,6 @@ config ARCH
         string
         default "amd64" if ARCH_AMD64
 
-config SRCARCH
-	string
-	default "x86" if ARCH_AMD64
-	default ARCH
-
 config BOOTARCH
         string
         default "x86" if ARCH_AMD64
@@ -50,9 +45,6 @@ config TOOLCHAIN_TARGET
 	default "x86_64-kiwi"
 
 config ARCH_X86
-	def_bool y
-
-config ARCH_LITTLE_ENDIAN
 	def_bool y
 
 config ARCH_64BIT

@@ -14,7 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env')
+Import('manager')
+
+# Set the library output directory.
+manager.AddVariable('_LIBOUTDIR', Dir('.'))
 
 dirs = [
     'crt',
@@ -25,4 +28,4 @@ dirs = [
     'cxx',
 ]
 
-SConscript(dirs = dirs, exports = ['env'])
+SConscript(dirs = dirs)
