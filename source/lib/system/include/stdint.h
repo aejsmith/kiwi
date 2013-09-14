@@ -154,7 +154,11 @@ typedef uint64_t uintmax_t;
 #define INT_FAST64_MAX		INT64_MAX
 #define UINT_FAST64_MAX		UINT64_MIN
 
-#define SIZE_MAX		ULONG_MAX
+#if __WORDSIZE == 64
+# define SIZE_MAX		UINT64_MAX
+#else
+# define SIZE_MAX		UINT32_MAX
+#endif
 
 #endif
 
