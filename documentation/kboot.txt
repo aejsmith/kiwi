@@ -1,5 +1,0 @@
-TODO: Write a proper specification.
-
-Remember to include:
- - Machine state upon kernel entry.
- - All tags of a certain type will be consecutive in the tag list.
