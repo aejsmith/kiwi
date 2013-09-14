@@ -242,8 +242,12 @@ class ToolchainManager:
         try:
             os.symlink('%s-clang' % (self.target),
                 os.path.join(self.targetdir, 'bin', '%s-cc' % (self.target)))
+            os.symlink('%s-clang' % (self.target),
+                os.path.join(self.targetdir, 'bin', '%s-gcc' % (self.target)))
             os.symlink('%s-clang++' % (self.target),
                 os.path.join(self.targetdir, 'bin', '%s-c++' % (self.target)))
+            os.symlink('%s-clang++' % (self.target),
+                os.path.join(self.targetdir, 'bin', '%s-g++' % (self.target)))
         except:
             pass
 
