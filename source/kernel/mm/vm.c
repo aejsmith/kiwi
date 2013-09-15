@@ -2053,8 +2053,8 @@ __init_text void vm_init(void) {
  * @param spec		Address specification (VM_ADDRESS_*).
  * @param protection	Memory protection flags (VM_PROT_*).
  * @param flags		Mapping behaviour flags (VM_MAP_*).
- * @param handle	Handle to object to map in. If NULL, then the region
- *			will be an anonymous memory mapping.
+ * @param handle	Handle to object to map in. If INVALID_HANDLE, then
+ *			the region will be an anonymous memory mapping.
  * @param offset	Offset into object to map from (multiple of page size).
  * @param name		Name of the memory mapping, for informational purposes.
  *			Can be NULL.
@@ -2082,7 +2082,7 @@ status_t kern_vm_map(void **addrp, size_t size, unsigned spec, uint32_t protecti
 			return ret;
 	}
 
-	if(handle >= 0) {
+	if(handle != INVALID_HANDLE) {
 		ret = object_handle_lookup(handle, -1, 0, &khandle);
 		if(ret != STATUS_SUCCESS) {
 			kfree(kname);
