@@ -17,6 +17,10 @@
 /**
  * @file
  * @brief		Process management functions.
+ *
+ * @todo		Finer grained locking on processes? For example, we
+ *			could probably have a separate lock for security
+ *			information.
  */
 
 #include <arch/frame.h>
@@ -168,6 +172,7 @@ void process_release(process_t *process) {
 	avl_tree_remove(&process_tree, &process->tree_link);
 	rwlock_unlock(&process_tree_lock);
 
+	token_release(process->token);
 	object_destroy(&process->obj);
 	id_allocator_free(&process_id_allocator, process->id);
 
@@ -374,6 +379,7 @@ process_t *process_lookup(process_id_t id) {
  * @param name		Name to give the process.
  * @param id		If negative, allocate an ID, else the exact ID to use.
  * @param priority	Priority class to give the process.
+ * @param token		Security token for the process (should be referenced).
  * @param aspace	Address space for the process.
  * @param handles	Handle table for the process.
  * @param parent	Parent to inherit information from.
@@ -382,8 +388,8 @@ process_t *process_lookup(process_id_t id) {
  * @return		STATUS_SUCCESS if successful, STATUS_PROCESS_LIMIT if
  *			unable to allocate an ID. */
 static status_t process_alloc(const char *name, process_id_t id, int priority,
-	vm_aspace_t *aspace, handle_table_t *handles, process_t *parent,
-	process_t **procp)
+	token_t *token, vm_aspace_t *aspace, handle_table_t *handles,
+	process_t *parent, process_t **procp)
 {
 	process_t *process;
 
@@ -400,6 +406,7 @@ static status_t process_alloc(const char *name, process_id_t id, int priority,
 	memset(process->signal_act, 0, sizeof(process->signal_act));
 	process->flags = 0;
 	process->priority = priority;
+	process->token = token;
 	process->aspace = aspace;
 	process->handles = handles;
 	process->next_image_id = 0;
@@ -583,7 +590,8 @@ static void process_entry_thread(void *arg1, void *arg2) {
  *
  * Creates a new process and runs a program within it. The path to the program
  * should be the first entry in the argument array. The new process will
- * inherit no information from the calling process.
+ * inherit no information from the calling process. This process will be
+ * created with the system token.
  *
  * @param args		Arguments to pass to process (NULL-terminated array).
  * @param env		Environment to pass to process (NULL-terminated array).
@@ -621,8 +629,11 @@ status_t process_create(const char *const args[], const char *const env[],
 	/* Create a new handle table. Can't fail as it's not duplicating. */
 	handle_table_create(NULL, NULL, 0, &handles);
 
+	token_retain(system_token);
+
 	/* Create the new process. */
-	ret = process_alloc(args[0], -1, priority, load.aspace, handles, NULL, &process);
+	ret = process_alloc(args[0], -1, priority, system_token, load.aspace,
+		handles, NULL, &process);
 	if(ret != STATUS_SUCCESS) {
 		vm_aspace_destroy(load.aspace);
 		handle_table_destroy(handles);
@@ -709,7 +720,9 @@ __init_text void process_init(void) {
 	kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);
 
 	/* Create the kernel process and register the kernel image to it. */
-	process_alloc("[kernel]", 0, PRIORITY_CLASS_SYSTEM, NULL, NULL, NULL, &kernel_proc);
+	token_retain(system_token);
+	process_alloc("[kernel]", 0, PRIORITY_CLASS_SYSTEM, system_token, NULL,
+		NULL, NULL, &kernel_proc);
 	kernel_proc->flags |= PROCESS_CRITICAL;
 	kernel_proc->next_image_id = 1;
 	list_append(&kernel_proc->images, &kernel_module.image.header);
@@ -846,14 +859,26 @@ static status_t copy_process_args(const char *path, const char *const args[],
 /**
  * Create a new process.
  *
- * Creates a new process and executes a program within it. If the count
- * argument is negative, then all handle table entries with the
- * HANDLE_INHERITABLE flag in the calling process will be duplicated into the
- * child process with the same IDs. If it is 0, no handles will be duplicated
- * to the child process. Otherwise, handles will be duplicated according to the
- * given array. Furthermore, the new process' address space will inherit all
- * mappings in the calling process' address space with the VM_MAP_INHERIT flag
- * set.
+ * Creates a new process and executes a program within it, and returns a handle
+ * to it. The handle can be used to query information about the new process,
+ * and wait for it to terminate. It should be closed as soon as the process is
+ * no longer needed so that the process can be freed once it has exited.
+ *
+ * If a handle to a security token is given, the security context for the new
+ * process will be set to the context contained in that token. Otherwise, the
+ * new process will have the same identity as the calling process, and both its
+ * effective and inheritable privilege set will be set to the calling process'
+ * inheritable privilege set.
+ *
+ * The new process' address space will inherit all mappings in the calling
+ * process' address space with the VM_MAP_INHERIT flag set.
+ *
+ * If the count argument is negative, then all inheritable handle table entries
+ * in the calling process will be duplicated into the child process with the
+ * same IDs. If it is 0, no handles will be duplicated to the child process.
+ * Otherwise, handles will be duplicated according to the given array,
+ * regardless of whether the handles are marked as inheritable. Note that
+ * handles to objects of types which are non-transferrable cannot be duplicated.
  *
  * @param path		Path to binary to load.
  * @param args		Array of arguments to pass to the program
@@ -861,6 +886,9 @@ static status_t copy_process_args(const char *path, const char *const args[],
  * @param env		Array of environment variables for the program
  *			(NULL-terminated).
  * @param flags		Flags modifying creation behaviour.
+ * @param token		Handle to token containing the security context for the
+ *			new process, or INVALID_HANDLE to inherit from the
+ *			calling process.
  * @param map		Array containing handle mappings (can be NULL if count
  *			is less than or equal to 0). The first ID of each entry
  *			specifies the handle in the caller, and the second
@@ -872,13 +900,14 @@ static status_t copy_process_args(const char *path, const char *const args[],
  * @return		Status code describing result of the operation.
  */
 status_t kern_process_create(const char *path, const char *const args[],
-	const char *const env[], uint32_t flags, handle_t map[][2],
-	ssize_t count, handle_t *handlep)
+	const char *const env[], uint32_t flags, handle_t token,
+	handle_t map[][2], ssize_t count, handle_t *handlep)
 {
 	process_load_t load;
-	handle_table_t *handles;
-	process_t *process;
 	object_handle_t *khandle;
+	token_t *new_token;
+	handle_table_t *new_handles;
+	process_t *process;
 	handle_t uhandle;
 	thread_t *thread;
 	status_t ret;
@@ -887,25 +916,40 @@ status_t kern_process_create(const char *path, const char *const args[],
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
+	/* Get the security token to use for the new process. */
+	if(token != INVALID_HANDLE) {
+		ret = object_handle_lookup(token, OBJECT_TYPE_TOKEN, 0, &khandle);
+		if(ret != STATUS_SUCCESS)
+			goto out;
+
+		new_token = (token_t *)khandle->object;
+		token_retain(new_token);
+		object_handle_release(khandle);
+	} else {
+		new_token = token_inherit(curr_proc->token);
+	}
+
 	/* Create the address space for the process. */
 	ret = process_load(&load, curr_proc);
 	if(ret != STATUS_SUCCESS) {
-		free_process_args(&load);
-		return ret;
+		token_release(new_token);
+		goto out;
 	}
 
-	ret = handle_table_create(curr_proc->handles, load.map, count, &handles);
+	ret = handle_table_create(curr_proc->handles, load.map, count, &new_handles);
 	if(ret != STATUS_SUCCESS) {
 		vm_aspace_destroy(load.aspace);
+		token_release(new_token);
 		goto out;
 	}
 
 	/* Create the new process. */
-	ret = process_alloc(args[0], -1, PRIORITY_CLASS_NORMAL, load.aspace,
-		handles, NULL, &process);
+	ret = process_alloc(args[0], -1, PRIORITY_CLASS_NORMAL, new_token,
+		load.aspace, new_handles, NULL, &process);
 	if(ret != STATUS_SUCCESS) {
+		handle_table_destroy(new_handles);
 		vm_aspace_destroy(load.aspace);
-		handle_table_destroy(handles);
+		token_release(new_token);
 		goto out;
 	}
 
@@ -958,19 +1002,32 @@ out:
  * Replace the current process with a new program.
  *
  * Replaces the current process with a new program. All threads in the process
- * other than the calling thread will be terminated. If the count argument is
- * negative, then all handle table entries with the HANDLE_INHERITABLE flag in
- * the process will remain open. If it is 0, all of the process' handles will
- * be closed. Otherwise, handles will be made available in the new program
- * according to the given array. Furthermore, the new program's address space
- * will inherit all mappings in the original address space with the
- * VM_MAP_INHERIT flag set.
+ * other than the calling thread will be terminated.
+ *
+ * If a handle to a security token is given, the security context for the
+ * process will be set to the context contained in that token. Otherwise, the
+ * process will keep the same identity, and its effective privilege set will be
+ * set to its inheritable privilege set.
+ *
+ * The new program's address space will keep all mappings in the original
+ * address space with the VM_MAP_INHERIT flag set.
+ *
+ * If the count argument is negative, then all inheritable handle table entries
+ * in the process will remain open with the same IDs. If it is 0, all of the
+ * process' handles will be closed. Otherwise, handles will be made available
+ * in the new program according to the given array, regardless of whether the
+ * handles are marked as inheritable. Note that handles to objects of types
+ * which are non-transferrable cannot be duplicated.
  *
  * @param path		Path to binary to load.
  * @param args		Array of arguments to pass to the program
  *			(NULL-terminated).
  * @param env		Array of environment variables for the program
  *			(NULL-terminated).
+ * @param flags		Flags modifying creation behaviour.
+ * @param token		Handle to token containing the security context for the
+ *			new program, or INVALID_HANDLE to inherit from the
+ *			original process.
  * @param map		Array containing handle mappings (can be NULL if count
  *			is less than or equal to 0). The first ID of each entry
  *			specifies the handle in the caller, and the second
@@ -982,11 +1039,13 @@ out:
  *			failure.
  */
 status_t kern_process_exec(const char *path, const char *const args[],
-	const char *const env[], uint32_t flags, handle_t map[][2],
-	ssize_t count)
+	const char *const env[], uint32_t flags, handle_t token,
+	handle_t map[][2], ssize_t count)
 {
 	process_load_t load;
-	handle_table_t *handles, *prev_handles;
+	object_handle_t *khandle;
+	token_t *new_token, *prev_token;
+	handle_table_t *new_handles, *prev_handles;
 	thread_t *thread = NULL;
 	vm_aspace_t *prev_aspace;
 	char *prev_name;
@@ -1001,16 +1060,33 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
+	/* Get the security token to use for the new process. */
+	if(token != INVALID_HANDLE) {
+		ret = object_handle_lookup(token, OBJECT_TYPE_TOKEN, 0, &khandle);
+		if(ret != STATUS_SUCCESS) {
+			free_process_args(&load);
+			return ret;
+		}
+
+		new_token = (token_t *)khandle->object;
+		token_retain(new_token);
+		object_handle_release(khandle);
+	} else {
+		new_token = token_inherit(curr_proc->token);
+	}
+
 	/* Create the new address space for the process. */
 	ret = process_load(&load, curr_proc);
 	if(ret != STATUS_SUCCESS) {
+		token_release(new_token);
 		free_process_args(&load);
 		return ret;
 	}
 
-	ret = handle_table_create(curr_proc->handles, load.map, count, &handles);
+	ret = handle_table_create(curr_proc->handles, load.map, count, &new_handles);
 	if(ret != STATUS_SUCCESS) {
 		vm_aspace_destroy(load.aspace);
+		token_release(new_token);
 		free_process_args(&load);
 		return ret;
 	}
@@ -1019,22 +1095,30 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	ret = thread_create("main", curr_proc, 0, process_entry_thread, &load,
 		NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
-		handle_table_destroy(handles);
+		handle_table_destroy(new_handles);
 		vm_aspace_destroy(load.aspace);
+		token_release(new_token);
 		free_process_args(&load);
 		return ret;
 	}
 
 	mutex_lock(&curr_proc->lock);
 
-	/* Switch over to the new address space and handle table. */
+	// TODO: Privilege check (at start of func).
+	if(flags & PROCESS_CREATE_CRITICAL)
+		curr_proc->flags |= PROCESS_CRITICAL;
+
+	/* Switch over to the new address space. */
 	thread_disable_preempt();
 	vm_aspace_switch(load.aspace);
 	prev_aspace = curr_proc->aspace;
 	curr_proc->aspace = load.aspace;
 	thread_enable_preempt();
+
+	prev_token = curr_proc->token;
+	curr_proc->token = new_token;
 	prev_handles = curr_proc->handles;
-	curr_proc->handles = handles;
+	curr_proc->handles = new_handles;
 	prev_name = curr_proc->name;
 	curr_proc->name = (char *)load.path;
 	load.path = NULL;
@@ -1054,6 +1138,7 @@ status_t kern_process_exec(const char *path, const char *const args[],
 
 	/* Free up old data. */
 	vm_aspace_destroy(prev_aspace);
+	token_release(prev_token);
 	handle_table_destroy(prev_handles);
 	kfree(prev_name);
 
@@ -1093,10 +1178,11 @@ static void process_clone_thread(void *arg1, void *arg2) {
  * the original process' address space. Data in private mappings will be copied
  * when either the parent or the child writes to the pages. Non-private mappings
  * will be shared between the processes: any modifications made be either
- * process will be visible to the other. The new process will inherit all
- * handles from the parent, including non-inheritable ones (non-inheritable
- * handles are only closed when a new program is executed with
- * kern_process_exec() or kern_process_create()).
+ * process will be visible to the other. The new process' security context will
+ * be identical to the parent's. The new process will inherit all handles to
+ * transferrable objects from the parent, including ones not marked as
+ * inheritable (non-inheritable handles are only closed when a new program is
+ * executed with kern_process_exec() or kern_process_create()).
  *
  * Threads other than the calling thread are NOT cloned. The new process will
  * have a single thread which will resume execution after the call to
@@ -1109,6 +1195,7 @@ static void process_clone_thread(void *arg1, void *arg2) {
  * @return		Status code describing result of the operation.
  */
 status_t kern_process_clone(handle_t *handlep) {
+	token_t *token;
 	vm_aspace_t *as;
 	handle_table_t *handles;
 	process_t *process;
@@ -1121,15 +1208,17 @@ status_t kern_process_clone(handle_t *handlep) {
 	if(!handlep)
 		return STATUS_INVALID_ARG;
 
-	/* Create a clone of the process' address space and handle table. */
+	token = curr_proc->token;
+	token_retain(token);
 	as = vm_aspace_clone(curr_proc->aspace);
 	handles = handle_table_clone(curr_proc->handles);
 
-	ret = process_alloc(curr_proc->name, -1, curr_proc->priority, as, handles,
-		curr_proc, &process);
+	ret = process_alloc(curr_proc->name, -1, curr_proc->priority, token, as,
+		handles, curr_proc, &process);
 	if(ret != STATUS_SUCCESS) {
 		handle_table_destroy(handles);
 		vm_aspace_destroy(as);
+		token_release(token);
 		return ret;
 	}
 
@@ -1221,33 +1310,42 @@ process_id_t kern_process_id(handle_t handle) {
 	return id;
 }
 
-/** Perform operations on the current process (for internal use by libkernel).
- * @param action	Action to perform.
- * @param in		Pointer to input buffer.
- * @param out		Pointer to output buffer.
- * @return		Status code describing result of the operation. */
-status_t kern_process_control(unsigned action, const void *in, void *out) {
+/**
+ * Get a process' security context.
+ *
+ * Gets the given process' security context. This is only useful to query a
+ * process' current identity, as it returns only the context content, rather
+ * than a token object containing it. No special privilege is required to get
+ * a process' security context.
+ *
+ * @param handle	Handle to process.
+ * @param ctx		Where to store security context of the process.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t kern_process_security(handle_t handle, security_context_t *ctx) {
+	object_handle_t *khandle;
+	process_t *process;
+	token_t *token;
 	status_t ret;
 
-	switch(action) {
-	case PROCESS_LOADED:
-		mutex_lock(&curr_proc->lock);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
 
-		if(curr_proc->load) {
-			curr_proc->load->status = STATUS_SUCCESS;
-			semaphore_up(&curr_proc->load->sem, 1);
-			curr_proc->load = NULL;
-		}
+	process = (process_t *)khandle->object;
 
-		mutex_unlock(&curr_proc->lock);
+	mutex_lock(&process->lock);
 
-		ret = STATUS_SUCCESS;
-		break;
-	default:
-		ret = STATUS_INVALID_ARG;
-		break;
-	}
+	token = process->token;
+	token_retain(token);
 
+	mutex_unlock(&process->lock);
+
+	ret = memcpy_to_user(ctx, &token->ctx, sizeof(token->ctx));
+
+	token_release(token);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -1282,6 +1380,64 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 	return ret;
 }
 
+/** Get the calling process' security token.
+ * @param handlep	Where to store handle to token.
+ * @return		Status code describing the result of the operation. */
+status_t kern_process_token(handle_t *handlep) {
+	token_t *token;
+	object_handle_t *handle;
+	status_t ret;
+
+	if(!handlep)
+		return STATUS_INVALID_ARG;
+
+	mutex_lock(&curr_proc->lock);
+	token = curr_proc->token;
+	token_retain(token);
+	mutex_unlock(&curr_proc->lock);
+
+	handle = object_handle_create(&token->obj, NULL, 0);
+	ret = object_handle_attach(handle, NULL, handlep);
+	object_handle_release(handle);
+
+	return ret;
+}
+
+/**
+ * Set the calling process' security token.
+ *
+ * Sets the calling process' security token to the given token object. The
+ * process will take on the identity given by the security context held in the
+ * token, and the context will be used for any future security checks in the
+ * process. If any threads currently have an overridden token set, they will
+ * continue to use that until it is unset, at which point they will start using
+ * the new token set by this function.
+ *
+ * @param handle	Handle to token.
+ *
+ * @return		Status code describing the result of the operation.
+ */
+status_t kern_process_set_token(handle_t handle) {
+	object_handle_t *khandle;
+	token_t *token;
+	status_t ret;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	token = (token_t *)khandle->object;
+	token_retain(token);
+	object_handle_release(khandle);
+
+	mutex_lock(&curr_proc->lock);
+	token_release(curr_proc->token);
+	curr_proc->token = token;
+	mutex_unlock(&curr_proc->lock);
+
+	return STATUS_SUCCESS;
+}
+
 /**
  * Terminate the calling process.
  *
@@ -1293,4 +1449,34 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
  */
 void kern_process_exit(int status) {
 	process_exit(status, EXIT_REASON_NORMAL);
+}
+
+/** Perform operations on the current process (for internal use by libkernel).
+ * @param action	Action to perform.
+ * @param in		Pointer to input buffer.
+ * @param out		Pointer to output buffer.
+ * @return		Status code describing result of the operation. */
+status_t kern_process_control(unsigned action, const void *in, void *out) {
+	status_t ret;
+
+	switch(action) {
+	case PROCESS_LOADED:
+		mutex_lock(&curr_proc->lock);
+
+		if(curr_proc->load) {
+			curr_proc->load->status = STATUS_SUCCESS;
+			semaphore_up(&curr_proc->load->sem, 1);
+			curr_proc->load = NULL;
+		}
+
+		mutex_unlock(&curr_proc->lock);
+
+		ret = STATUS_SUCCESS;
+		break;
+	default:
+		ret = STATUS_INVALID_ARG;
+		break;
+	}
+
+	return ret;
 }

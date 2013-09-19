@@ -22,6 +22,7 @@
 #ifndef __KERNEL_PROCESS_H
 #define __KERNEL_PROCESS_H
 
+#include <kernel/security.h>
 #include <kernel/thread.h>
 
 #ifdef __cplusplus
@@ -47,15 +48,19 @@ extern "C" {
 #define PROCESS_CREATE_CRITICAL	(1<<0)	/**< Process is a critical system process. */
 
 extern status_t kern_process_create(const char *path, const char *const args[],
-	const char *const env[], uint32_t flags, handle_t map[][2],
+	const char *const env[], uint32_t flags, handle_t token, handle_t map[][2],
 	ssize_t count, handle_t *handlep);
 extern status_t kern_process_exec(const char *path, const char *const args[],
-	const char *const env[], uint32_t flags, handle_t map[][2],
+	const char *const env[], uint32_t flags, handle_t token, handle_t map[][2],
 	ssize_t count);
 extern status_t kern_process_clone(handle_t *handlep);
 extern status_t kern_process_open(process_id_t id, handle_t *handlep);
 extern process_id_t kern_process_id(handle_t handle);
+extern status_t kern_process_security(handle_t handle, security_context_t *ctx);
 extern status_t kern_process_status(handle_t handle, int *statusp, int *reasonp);
+
+extern status_t kern_process_token(handle_t *handlep);
+extern status_t kern_process_set_token(handle_t handle);
 extern void kern_process_exit(int status) __attribute__((noreturn));
 
 #ifdef __cplusplus

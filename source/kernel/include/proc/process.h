@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -72,6 +72,7 @@ typedef struct process {
 	int priority;			/**< Priority class of the process. */
 
 	/** Resource information. */
+	token_t *token;			/**< Security token for the process. */
 	struct vm_aspace *aspace;	/**< Process' address space. */
 	handle_table_t *handles;	/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */

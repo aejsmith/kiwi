@@ -66,6 +66,8 @@
 #include <proc/signal.h>
 #include <proc/thread.h>
 
+#include <security/security.h>
+
 #include <sync/mutex.h>
 #include <sync/semaphore.h>
 
@@ -838,6 +840,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->user_time = 0;
 	thread->pending_signals = 0;
 	thread->in_usermem = false;
+	thread->token = NULL;
 	thread->func = func;
 	thread->arg1 = arg1;
 	thread->arg2 = arg2;
@@ -1177,28 +1180,56 @@ thread_id_t kern_thread_id(handle_t handle) {
 	return id;
 }
 
-/** Perform operations on the current thread (for internal use by libkernel).
- * @param action	Action to perform.
- * @param in		Pointer to input buffer.
- * @param out		Pointer to output buffer.
- * @return		Status code describing result of the operation. */
-status_t kern_thread_control(unsigned action, const void *in, void *out) {
-	ptr_t addr;
+/**
+ * Get a thread's current security context.
+ *
+ * Gets the given thread's current security context. If the thread has an
+ * overridden security token, the context contained in that will be returned,
+ * otherwise the context from the process-wide token will be returned. The
+ * calling thread must have privileged access to the process owning the thread,
+ * i.e. the user IDs must match, or it must have the PRIV_PROCESS_ADMIN
+ * privilege. This is only useful to query a thread's current identity, as it
+ * returns only the context content, rather than a token object containing it.
+ *
+ * @param handle	Handle to thread.
+ * @param ctx		Where to store context of the thread.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
+	object_handle_t *khandle;
+	thread_t *thread;
+	token_t *token, *current;
 	status_t ret;
 
-	switch(action) {
-	case THREAD_GET_TLS_ADDR:
-		addr = arch_thread_tls_addr(curr_thread);
-		ret = memcpy_to_user(out, &addr, sizeof(addr));
-		break;
-	case THREAD_SET_TLS_ADDR:
-		ret = arch_thread_set_tls_addr(curr_thread, (ptr_t)in);
-		break;
-	default:
-		ret = STATUS_INVALID_ARG;
-		break;
+	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, 0, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	thread = (thread_t *)khandle->object;
+
+	current = security_current_token();
+
+	mutex_lock(&thread->owner->lock);
+
+	if(!security_context_has_priv(&current->ctx, PRIV_PROCESS_ADMIN)) {
+		if(current->ctx.uid != thread->owner->token->ctx.uid) {
+			mutex_unlock(&thread->owner->lock);
+			object_handle_release(khandle);
+			return ret;
+		}
 	}
 
+	token = (thread->token) ? thread->token : thread->owner->token;
+	token_retain(token);
+
+	mutex_unlock(&thread->owner->lock);
+
+	ret = memcpy_to_user(ctx, &token->ctx, sizeof(token->ctx));
+
+	token_release(token);
+	token_release(current);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -1227,11 +1258,88 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 	return ret;
 }
 
-/** Terminate the calling thread.
- * @param status	Exit status code. */
-void kern_thread_exit(int status) {
-	curr_thread->status = status;
-	thread_exit();
+/**
+ * Get the calling thread's overridden security token.
+ *
+ * Gets a handle to the calling thread's current overridden security token.
+ * If the thread does not have an overridden token, the function will return
+ * STATUS_SUCCESS, but the location referred to by handlep will be set to
+ * INVALID_HANDLE.
+ *
+ * @param handlep	Where to store handle to token.
+ *
+ * @return		Status code describing the result of the operation.
+ */
+status_t kern_thread_token(handle_t *handlep) {
+	token_t *token;
+	object_handle_t *handle;
+	handle_t uhandle;
+	status_t ret;
+
+	if(!handlep)
+		return STATUS_INVALID_ARG;
+
+	mutex_lock(&curr_proc->lock);
+
+	token = curr_thread->token;
+	if(token)
+		token_retain(token);
+
+	mutex_unlock(&curr_proc->lock);
+
+	if(token) {
+		handle = object_handle_create(&token->obj, NULL, 0);
+		ret = object_handle_attach(handle, NULL, handlep);
+		object_handle_release(handle);
+	} else {
+		/* FIXME: user_write* functions */
+		uhandle = INVALID_HANDLE;
+		ret = memcpy_to_user(handlep, &uhandle, sizeof(uhandle));
+	}
+
+	return ret;
+}
+
+/**
+ * Set the calling thread's overridden security token.
+ *
+ * Sets the overridden security token of the calling thread to the given token
+ * object. The overridden security token can be used by a thread to temporarily
+ * change its security context to that contained in another token and take on
+ * the privileges it grants. When set, it is used instead of the process-wide
+ * security token for security checks. If called with INVALID_HANDLE, the thread
+ * will revert to the process-wide security token.
+ *
+ * @param handle	Handle to token, INVALID_HANDLE to revert to process-
+ *			wide security token.
+ *
+ * @return		Status code describing the result of the operation.
+ */
+status_t kern_thread_set_token(handle_t handle) {
+	object_handle_t *khandle;
+	token_t *token = NULL;
+	status_t ret;
+
+	if(handle != INVALID_HANDLE) {
+		ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, 0, &khandle);
+		if(ret != STATUS_SUCCESS)
+			return ret;
+
+		token = (token_t *)khandle->object;
+		token_retain(token);
+		object_handle_release(khandle);
+	}
+
+	mutex_lock(&curr_proc->lock);
+
+	if(curr_thread->token)
+		token_release(curr_thread->token);
+
+	curr_thread->token = token;
+
+	mutex_unlock(&curr_proc->lock);
+
+	return STATUS_SUCCESS;
 }
 
 /** Sleep for a certain amount of time.
@@ -1263,5 +1371,37 @@ status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp) {
 			ret = STATUS_SUCCESS;
 		}
 	}
+	return ret;
+}
+
+/** Terminate the calling thread.
+ * @param status	Exit status code. */
+void kern_thread_exit(int status) {
+	curr_thread->status = status;
+	thread_exit();
+}
+
+/** Perform operations on the current thread (for internal use by libkernel).
+ * @param action	Action to perform.
+ * @param in		Pointer to input buffer.
+ * @param out		Pointer to output buffer.
+ * @return		Status code describing result of the operation. */
+status_t kern_thread_control(unsigned action, const void *in, void *out) {
+	ptr_t addr;
+	status_t ret;
+
+	switch(action) {
+	case THREAD_GET_TLS_ADDR:
+		addr = arch_thread_tls_addr(curr_thread);
+		ret = memcpy_to_user(out, &addr, sizeof(addr));
+		break;
+	case THREAD_SET_TLS_ADDR:
+		ret = arch_thread_set_tls_addr(curr_thread, (ptr_t)in);
+		break;
+	default:
+		ret = STATUS_INVALID_ARG;
+		break;
+	}
+
 	return ret;
 }

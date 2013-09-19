@@ -33,6 +33,8 @@
 #include <lib/notifier.h>
 #include <lib/refcount.h>
 
+#include <security/token.h>
+
 #include <sync/spinlock.h>
 
 #include <cpu.h>
@@ -115,6 +117,9 @@ typedef struct thread {
 	sigset_t pending_signals;	/**< Bitmap of pending signals. */
 	siginfo_t signal_info[NSIG];	/**< Information associated with pending signals. */
 	stack_t signal_stack;		/**< Alternate signal stack. */
+
+	/** Overridden security token for the thread (if any). */
+	token_t *token;
 
 	/** Thread entry function. */
 	thread_func_t func;		/**< Entry function for the thread. */

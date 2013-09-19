@@ -74,7 +74,8 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	close(fd);
 
 	ret = kern_process_exec(path, (const char *const *)argv,
-		(const char *const *)envp, 0, NULL, -1);
+		(const char *const *)envp, 0, INVALID_HANDLE,
+		NULL, -1);
 	libsystem_status_to_errno(ret);
 	return -1;
 }

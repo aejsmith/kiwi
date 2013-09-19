@@ -64,6 +64,9 @@ sources = FeatureSources(config, [
     'proc/signal.c',
     'proc/thread.c',
 
+    'security/security.c',
+    'security/token.c',
+
     'sync/condvar.c',
     'sync/futex.c',
     'sync/mutex.c',

@@ -24,6 +24,7 @@
 
 #include <kernel/limits.h>
 #include <kernel/object.h>
+#include <kernel/security.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,9 +71,13 @@ extern status_t kern_thread_create(const char *name, thread_entry_t *entry,
 	uint32_t flags, handle_t *handlep);
 extern status_t kern_thread_open(thread_id_t id, handle_t *handlep);
 extern thread_id_t kern_thread_id(handle_t handle);
+extern status_t kern_thread_security(handle_t handle, security_context_t *ctx);
 extern status_t kern_thread_status(handle_t handle, int *statusp);
-extern void kern_thread_exit(int status) __attribute__((noreturn));
+
+extern status_t kern_thread_token(handle_t *handlep);
+extern status_t kern_thread_set_token(handle_t handle);
 extern status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp);
+extern void kern_thread_exit(int status) __attribute__((noreturn));
 
 #ifdef __cplusplus
 }

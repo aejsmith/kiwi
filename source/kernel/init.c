@@ -39,6 +39,8 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
+#include <security/token.h>
+
 #include <assert.h>
 #include <console.h>
 #include <cpu.h>
@@ -124,6 +126,7 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	#endif
 
 	/* Perform other initialization tasks. */
+	token_init();
 	handle_init();
 	process_init();
 	thread_init();
