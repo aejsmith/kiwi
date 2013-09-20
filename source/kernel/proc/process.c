@@ -41,6 +41,8 @@
 #include <proc/process.h>
 #include <proc/thread.h>
 
+#include <security/security.h>
+
 #include <sync/futex.h>
 #include <sync/rwlock.h>
 #include <sync/semaphore.h>
@@ -912,6 +914,13 @@ status_t kern_process_create(const char *path, const char *const args[],
 	thread_t *thread;
 	status_t ret;
 
+	/* Marking a process as critical causes a fatal error if it exits, so
+	 * require PRIV_FATAL. */
+	if(flags & PROCESS_CREATE_CRITICAL) {
+		if(!security_check_priv(PRIV_FATAL))
+			return STATUS_PERM_DENIED;
+	}
+
 	ret = copy_process_args(path, args, env, map, count, &load);
 	if(ret != STATUS_SUCCESS)
 		return ret;
@@ -953,7 +962,6 @@ status_t kern_process_create(const char *path, const char *const args[],
 		goto out;
 	}
 
-	// TODO: Privilege check (at start of func).
 	if(flags & PROCESS_CREATE_CRITICAL)
 		process->flags |= PROCESS_CRITICAL;
 
@@ -1051,6 +1059,11 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	char *prev_name;
 	status_t ret;
 
+	if(flags & PROCESS_CREATE_CRITICAL) {
+		if(!security_check_priv(PRIV_FATAL))
+			return STATUS_PERM_DENIED;
+	}
+
 	if(curr_proc->threads.next->next != &curr_proc->threads) {
 		kprintf(LOG_WARN, "kern_process_exec: TODO: Terminate other threads\n");
 		return STATUS_NOT_IMPLEMENTED;
@@ -1104,7 +1117,6 @@ status_t kern_process_exec(const char *path, const char *const args[],
 
 	mutex_lock(&curr_proc->lock);
 
-	// TODO: Privilege check (at start of func).
 	if(flags & PROCESS_CREATE_CRITICAL)
 		curr_proc->flags |= PROCESS_CRITICAL;
 
