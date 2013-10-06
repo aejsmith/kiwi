@@ -1,6 +1,6 @@
 diff -urN binutils-2.23.1.orig/bfd/config.bfd binutils-2.23.1/bfd/config.bfd
---- binutils-2.23.1.orig/bfd/config.bfd	2013-01-12 13:22:39.000000000 +0000
-+++ binutils-2.23.1/bfd/config.bfd	2013-01-12 13:23:03.000000000 +0000
+--- binutils-2.23.1.orig/bfd/config.bfd	2013-10-05 15:58:49.000000000 +0100
++++ binutils-2.23.1/bfd/config.bfd	2013-10-06 16:36:19.000000000 +0100
 @@ -315,7 +315,7 @@
      ;;
    arm-*-elf | arm-*-freebsd* | arm*-*-linux-* | arm*-*-conix* | \
@@ -33,9 +33,23 @@ diff -urN binutils-2.23.1.orig/bfd/config.bfd binutils-2.23.1/bfd/config.bfd
  
    i860-*-mach3* | i860-*-osf1* | i860-*-coff*)
      targ_defvec=i860coff_vec
+@@ -988,11 +997,11 @@
+     targ_selvecs="bfd_elf32_tradlittlemips_vec bfd_elf32_ntradbigmips_vec bfd_elf32_ntradlittlemips_vec bfd_elf64_tradbigmips_vec bfd_elf64_tradlittlemips_vec"
+     want64=true
+     ;;
+-  mips*el-*-elf* | mips*el-*-vxworks* | mips*-*-chorus*)
++  mips*el-*-elf* | mips*el-*-vxworks* | mips*-*-chorus* | mips*el-*-kiwi*)
+     targ_defvec=bfd_elf32_littlemips_vec
+     targ_selvecs="bfd_elf32_bigmips_vec bfd_elf64_bigmips_vec bfd_elf64_littlemips_vec"
+     ;;
+-  mips*-*-elf* | mips*-*-rtems* | mips*-*-vxworks | mips*-*-windiss)
++  mips*-*-elf* | mips*-*-rtems* | mips*-*-vxworks | mips*-*-windiss | mips*-*-kiwi*)
+     targ_defvec=bfd_elf32_bigmips_vec
+     targ_selvecs="bfd_elf32_littlemips_vec bfd_elf64_bigmips_vec bfd_elf64_littlemips_vec"
+     ;;
 diff -urN binutils-2.23.1.orig/config.sub binutils-2.23.1/config.sub
---- binutils-2.23.1.orig/config.sub	2013-01-12 13:22:40.000000000 +0000
-+++ binutils-2.23.1/config.sub	2013-01-12 13:23:03.000000000 +0000
+--- binutils-2.23.1.orig/config.sub	2013-10-05 15:58:49.000000000 +0100
++++ binutils-2.23.1/config.sub	2013-10-06 16:33:53.000000000 +0100
 @@ -1368,7 +1368,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
@@ -46,8 +60,8 @@ diff -urN binutils-2.23.1.orig/config.sub binutils-2.23.1/config.sub
  		;;
  	-qnx*)
 diff -urN binutils-2.23.1.orig/configure binutils-2.23.1/configure
---- binutils-2.23.1.orig/configure	2013-01-12 13:22:40.000000000 +0000
-+++ binutils-2.23.1/configure	2013-01-12 13:24:09.000000000 +0000
+--- binutils-2.23.1.orig/configure	2013-10-05 15:58:49.000000000 +0100
++++ binutils-2.23.1/configure	2013-10-06 16:33:53.000000000 +0100
 @@ -2869,7 +2869,7 @@
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
        | *-*-linux* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
@@ -58,8 +72,8 @@ diff -urN binutils-2.23.1.orig/configure binutils-2.23.1/configure
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;
 diff -urN binutils-2.23.1.orig/configure.ac binutils-2.23.1/configure.ac
---- binutils-2.23.1.orig/configure.ac	2013-01-12 13:22:40.000000000 +0000
-+++ binutils-2.23.1/configure.ac	2013-01-12 13:24:04.000000000 +0000
+--- binutils-2.23.1.orig/configure.ac	2013-10-05 15:58:49.000000000 +0100
++++ binutils-2.23.1/configure.ac	2013-10-06 16:33:53.000000000 +0100
 @@ -313,7 +313,7 @@
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
        | *-*-linux* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
@@ -70,8 +84,8 @@ diff -urN binutils-2.23.1.orig/configure.ac binutils-2.23.1/configure.ac
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;
 diff -urN binutils-2.23.1.orig/gas/configure.tgt binutils-2.23.1/gas/configure.tgt
---- binutils-2.23.1.orig/gas/configure.tgt	2013-01-12 13:22:40.000000000 +0000
-+++ binutils-2.23.1/gas/configure.tgt	2013-01-12 13:23:03.000000000 +0000
+--- binutils-2.23.1.orig/gas/configure.tgt	2013-10-05 15:58:49.000000000 +0100
++++ binutils-2.23.1/gas/configure.tgt	2013-10-06 16:39:03.000000000 +0100
 @@ -117,6 +117,7 @@
    arm-*-eabi*)				fmt=elf em=armeabi ;;
    arm-*-symbianelf*)			fmt=elf em=symbian ;;
@@ -88,9 +102,19 @@ diff -urN binutils-2.23.1.orig/gas/configure.tgt binutils-2.23.1/gas/configure.t
    i386-*-bsd*)				fmt=aout em=386bsd ;;
    i386-*-nacl*)				fmt=elf em=nacl
      case ${cpu} in
+@@ -310,7 +312,8 @@
+   mips-*-sysv4*MP* | mips-*-gnu*)	fmt=elf em=tmips ;;
+   mips*-sde-elf*)			fmt=elf em=tmips ;;
+   mips-*-sysv*)				fmt=ecoff ;;
+-  mips-*-elf* | mips-*-rtems*)		fmt=elf ;;
++  mips-*-elf* | mips-*-rtems* | mips-*-kiwi*)
++					fmt=elf ;;
+   mips-*-netbsd*)			fmt=elf em=tmips ;;
+   mips-*-openbsd*)			fmt=elf em=tmips ;;
+ 
 diff -urN binutils-2.23.1.orig/ld/configure.tgt binutils-2.23.1/ld/configure.tgt
---- binutils-2.23.1.orig/ld/configure.tgt	2013-01-12 13:22:42.000000000 +0000
-+++ binutils-2.23.1/ld/configure.tgt	2013-01-12 13:23:03.000000000 +0000
+--- binutils-2.23.1.orig/ld/configure.tgt	2013-10-05 15:58:52.000000000 +0100
++++ binutils-2.23.1/ld/configure.tgt	2013-10-06 16:40:50.000000000 +0100
 @@ -78,6 +78,7 @@
  	  		targ_emul=armelf ;;
  arm*-*-symbianelf*)     targ_emul=armsymbian;;
@@ -110,3 +134,12 @@ diff -urN binutils-2.23.1.orig/ld/configure.tgt binutils-2.23.1/ld/configure.tgt
  i[3-7]86-*-freebsdaout* | i[3-7]86-*-freebsd[12].* | i[3-7]86-*-freebsd[12])
  			targ_emul=i386bsd ;;
  i[3-7]86-*-dragonfly*)	targ_emul=elf_i386
+@@ -428,6 +433,8 @@
+ 			targ_extra_emuls="elf32ltsmip elf32btsmipn32 elf64btsmip elf32ltsmipn32 elf64ltsmip" ;;
+ mips*el-*-elf*)		targ_emul=elf32elmip ;;
+ mips*-*-elf*)		targ_emul=elf32ebmip ;;
++mips*el-*-kiwi*)	targ_emul=elf32elmip ;;
++mips*-*-kiwi*)		targ_emul=elf32ebmip ;;
+ mips*-*-rtems*)		targ_emul=elf32ebmip ;;
+ mips*el-*-vxworks*)	targ_emul=elf32elmipvxworks
+ 			targ_extra_emuls="elf32ebmipvxworks" ;;
