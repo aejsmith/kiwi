@@ -14,17 +14,45 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+config ARCH_32BIT
+	bool
+
+config ARCH_64BIT
+	bool
+
+config LITTLE_ENDIAN
+	bool
+
+config BIG_ENDIAN
+	bool
+
+config TOOLCHAIN_LLVM
+	bool
+
+config TOOLCHAIN_GCC
+	bool
+
+# For KBoot compatibility.
+config ARCH_X86
+	bool
+	select LITTLE_ENDIAN
+	select TOOLCHAIN_LLVM
+
 choice
 	prompt "Architecture"
 	default ARCH_AMD64
 
 config ARCH_AMD64
 	bool "AMD64"
+	select ARCH_64BIT
+	select ARCH_X86
 	help
 	  Target the built system to 64-bit x86 processors.
 
 config ARCH_MIPS
 	bool "MIPS"
+	select ARCH_32BIT
+	select TOOLCHAIN_GCC
 	help
 	  Target the built system to MIPS processors. Endianness is determined
 	  by the platform type selected.
@@ -41,51 +69,12 @@ config BOOTARCH
 	default "x86" if ARCH_AMD64
 	default ARCH
 
-config LITTLE_ENDIAN
-	bool
-
-config BIG_ENDIAN
-	bool
-
-############################
-# x86 configuration values #
-############################
-
-if ARCH_AMD64
-
 config TOOLCHAIN_TARGET
 	string
-	default "x86_64-kiwi"
-
-config ARCH_X86
-	def_bool y
-	select LITTLE_ENDIAN
-
-config ARCH_64BIT
-	def_bool y
+	default "x86_64-kiwi" if ARCH_AMD64
+	default "mips-kiwi" if ARCH_MIPS && BIG_ENDIAN
+	default "mipsel-kiwi" if ARCH_MIPS && LITTLE_ENDIAN
 
 config ARCH_CCFLAGS
 	string
 	default ""
-
-endif
-
-#############################
-# MIPS configuration values #
-#############################
-
-if ARCH_MIPS
-
-config TOOLCHAIN_TARGET
-	string
-	default "mipsel-kiwi" if LITTLE_ENDIAN
-	default "mips-kiwi" if BIG_ENDIAN
-
-config ARCH_32BIT
-	def_bool y
-
-config ARCH_CCFLAGS
-	string
-	default ""
-
-endif

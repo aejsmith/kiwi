@@ -37,6 +37,27 @@ def which(program):
 
     return None
 
+def msg(msg):
+    print '\033[0;32m>>>\033[0;1m %s\033[0m' % (msg)
+
+def remove(path):
+    if not os.path.lexists(path):
+        return
+
+    # Handle symbolic links first as isfile() and isdir() follow links.
+    if os.path.islink(path) or os.path.isfile(path):
+        os.remove(path)
+    elif os.path.isdir(path):
+        shutil.rmtree(path)
+    else:
+        raise Exception('Unhandled type during remove (%s)' % (path))
+
+def makedirs(path):
+    try:
+        os.makedirs(path)
+    except:
+        pass
+
 # Base class of a toolchain component definition.
 class ToolchainComponent:
     def __init__(self, manager):
@@ -60,9 +81,9 @@ class ToolchainComponent:
     def download(self):
         for url in self.source:
             name = urlparse(url).path.split('/')[-1]
-            target = os.path.join(self.manager.dldir, name)
+            target = os.path.join(self.manager.destdir, name)
             if not os.path.exists(target):
-                self.manager.msg(' Downloading source file: %s' % (name))
+                msg(' Downloading source file: %s' % (name))
 
                 # Download to .part and then rename when complete so we can
                 # easily do continuing of downloads.
@@ -94,7 +115,7 @@ class ToolchainComponent:
 
     # Performs all required tasks to update this component.
     def _build(self):
-        self.manager.msg("Building toolchain component '%s'" % (self.name))
+        msg("Building toolchain component '%s'" % (self.name))
         self.download()
 
         # Measure time taken to build.
@@ -128,6 +149,7 @@ class BinutilsComponent(ToolchainComponent):
         confopts += '--target=%s ' % (self.manager.target)
         confopts += '--disable-werror '
         confopts += '--with-sysroot=%s ' % (os.path.join(self.destdir, 'sysroot'))
+        confopts += '--with-lib-path="=/system/lib:=/lib"'
 
         # gold has bugs which cause the generated kernel image to be huge.
         #confopts += '--enable-gold=default '
@@ -206,100 +228,136 @@ class CompilerRTComponent(ToolchainComponent):
                 os.path.join(self.manager.genericdir, 'lib', 'clang', self.version,
                     'libclang_rt.%s.a' % arch))
 
-# Class to manage building and updating the toolchain.
-class ToolchainManager:
-    def __init__(self, config):
-        self.config = config
-        self.srcdir = os.path.join(os.getcwd(), 'utilities', 'toolchain')
-        self.destdir = config['TOOLCHAIN_DIR']
-        self.target = config['TOOLCHAIN_TARGET']
-        self.genericdir = os.path.join(self.destdir, 'generic')
-        self.targetdir = os.path.join(self.destdir, self.target)
-        self.builddir = os.path.join(self.destdir, 'build-tmp')
-        self.dldir = self.destdir
-        self.makejobs = config['TOOLCHAIN_MAKE_JOBS']
-        self.totaltime = 0
+# Component definition for GCC.
+class GCCComponent(ToolchainComponent):
+    name = 'gcc'
+    version = '4.8.1'
+    generic = False
+    source = [
+        'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-' + version + '.tar.bz2',
+    ]
+    patches = [
+        ('gcc-' + version + '-no-fixinc.patch', 'gcc-' + version, 1),
+        ('gcc-' + version + '-kiwi.patch', 'gcc-' + version, 1),
+    ]
 
-        # Keep sorted in dependency order.
+    def build(self):
+        self.patch()
+
+        # Work out configure options to use.
+        env = ""
+        confopts  = '--prefix=%s ' % (self.destdir)
+        confopts += '--target=%s ' % (self.manager.target)
+        confopts += '--enable-languages=c,c++ '
+        confopts += '--with-sysroot=%s ' % (os.path.join(self.destdir, 'sysroot'))
+        confopts += '--with-newlib '
+        confopts += '--disable-libstdcxx-pch '
+        confopts += '--disable-shared '
+        if os.uname()[0] == 'Darwin':
+            env = "CC=clang CXX=clang++ "
+            confopts += '--with-libiconv-prefix=/opt/local --with-gmp=/opt/local --with-mpfr=/opt/local'
+
+        # Build and install it.
+        os.mkdir('gcc-build')
+        self.execute('%s../gcc-%s/configure %s' % (env, self.version, confopts), 'gcc-build')
+        self.execute('make -j%d all-gcc' % (self.manager.makejobs), 'gcc-build')
+        self.execute('make -j%d all-target-libgcc' % (self.manager.makejobs), 'gcc-build')
+        self.execute('make install-gcc install-target-libgcc', 'gcc-build')
+
+# Base class for a toolchain.
+class Toolchain:
+    def pre_update(self, manager):
+        pass
+
+    def post_update(self, manager):
+        pass
+
+# LLVM-based toolchain.
+class LLVMToolchain(Toolchain):
+    def __init__(self, manager):
         self.components = [
-            BinutilsComponent(self),
-            LLVMComponent(self),
-            CompilerRTComponent(self),
+            BinutilsComponent(manager),
+            LLVMComponent(manager),
+            CompilerRTComponent(manager),
         ]
 
-    # Write a status message.
-    def msg(self, msg):
-        print '\033[0;32m>>>\033[0;1m %s\033[0m' % (msg)
-
-    # Remove a file, symbolic link or directory tree.
-    def remove(self, path):
-        if not os.path.lexists(path):
-            return
-
-        # Handle symbolic links first as isfile() and isdir() follow links.
-        if os.path.islink(path) or os.path.isfile(path):
-            os.remove(path)
-        elif os.path.isdir(path):
-            shutil.rmtree(path)
-        else:
-            raise Exception('Unhandled type during remove (%s)' % (path))
-
-    # Make a directory and all intermediate directories, ignoring error if it
-    # already exists.
-    def makedirs(self, path):
-        try:
-            os.makedirs(path)
-        except:
-            pass
-
-    # Create the clang wrappers.
-    def create_wrappers(self):
+    def pre_update(self, manager):
         # Create clang wrapper scripts. The wrapper script is needed to pass
         # the correct sysroot path for the target. The exec sets the executable
         # name for clang to the wrapper script path - this allows clang to
-        # determine the target and the tool directory properly.
+        # determine the target and the tool directory properly. This needs to
+        # be done before building the toolchain as compiler-rt needs the wrapper
+        # in place to build.
         for name in ['clang', 'clang++']:
-            path = os.path.join(self.genericdir, 'bin', name)
-            wrapper = os.path.join(self.targetdir, 'bin', '%s-%s' % (self.target, name))
+            path = os.path.join(manager.genericdir, 'bin', name)
+            wrapper = os.path.join(manager.targetdir, 'bin', '%s-%s' % (manager.target, name))
             f = open(wrapper, 'w')
             f.write('#!/bin/sh\n\n')
-            f.write('exec -a $0 %s --sysroot=%s/sysroot $*\n' % (path, self.targetdir))
+            f.write('exec -a $0 %s --sysroot=%s/sysroot $*\n' % (path, manager.targetdir))
             f.close()
             os.chmod(wrapper, 0755)
         try:
-            os.symlink('%s-clang' % (self.target),
-                os.path.join(self.targetdir, 'bin', '%s-cc' % (self.target)))
-            os.symlink('%s-clang' % (self.target),
-                os.path.join(self.targetdir, 'bin', '%s-gcc' % (self.target)))
-            os.symlink('%s-clang++' % (self.target),
-                os.path.join(self.targetdir, 'bin', '%s-c++' % (self.target)))
-            os.symlink('%s-clang++' % (self.target),
-                os.path.join(self.targetdir, 'bin', '%s-g++' % (self.target)))
+            os.symlink('%s-clang' % (manager.target),
+                os.path.join(manager.targetdir, 'bin', '%s-cc' % (manager.target)))
+            os.symlink('%s-clang' % (manager.target),
+                os.path.join(manager.targetdir, 'bin', '%s-gcc' % (manager.target)))
+            os.symlink('%s-clang++' % (manager.target),
+                os.path.join(manager.targetdir, 'bin', '%s-c++' % (manager.target)))
+            os.symlink('%s-clang++' % (manager.target),
+                os.path.join(manager.targetdir, 'bin', '%s-g++' % (manager.target)))
         except:
             pass
+
+# GCC-based toolchain.
+class GCCToolchain(Toolchain):
+    def __init__(self, manager):
+        self.components = [
+            BinutilsComponent(manager),
+            GCCComponent(manager),
+        ]
+
+# Class to manage building and updating the toolchain.
+class ToolchainManager:
+    def __init__(self, config):
+        self.arch = config['ARCH']
+        self.platform = config['PLATFORM']
+        self.destdir = config['TOOLCHAIN_DIR']
+        self.target = config['TOOLCHAIN_TARGET']
+        self.makejobs = config['TOOLCHAIN_MAKE_JOBS']
+
+        self.srcdir = os.path.join(os.getcwd(), 'utilities', 'toolchain')
+        self.genericdir = os.path.join(self.destdir, 'generic')
+        self.targetdir = os.path.join(self.destdir, self.target)
+        self.builddir = os.path.join(self.destdir, 'build-tmp')
+
+        self.totaltime = 0
+
+        if config['TOOLCHAIN_LLVM']:
+            self.toolchain = LLVMToolchain(self)
+        else:
+            self.toolchain = GCCToolchain(self)
 
     # Set up the toolchain sysroot.
     def update_sysroot(self, manager):
         sysrootdir = os.path.join(self.targetdir, 'sysroot')
         libdir = os.path.join(sysrootdir, 'lib')
         includedir = os.path.join(sysrootdir, 'include')
-        builddir = os.path.join(os.getcwd(), 'build',
-            '%s-%s' % (self.config['ARCH'], self.config['PLATFORM']))
+        builddir = os.path.join(os.getcwd(), 'build', '%s-%s' % (self.arch, self.platform))
 
         # Remove any existing sysroot.
-        self.remove(sysrootdir)
-        self.makedirs(sysrootdir)
+        remove(sysrootdir)
+        makedirs(sysrootdir)
 
         # All libraries get placed into a single directory, just link to it.
         os.symlink(os.path.join(builddir, 'lib'), libdir)
 
         # Now create the include directory. We create symbolic links back to
         # the source tree for the contents of all libraries' header paths.
-        self.makedirs(os.path.join(self.targetdir, 'sysroot', 'include'))
+        makedirs(includedir)
         for (name, lib) in manager.libraries.items():
             for dir in lib['include_paths']:
                 def link_tree(targetdir, dir):
-                    self.makedirs(dir)
+                    makedirs(dir)
                     for entry in os.listdir(targetdir):
                         target = os.path.join(targetdir, entry)
                         path = os.path.join(dir, entry)
@@ -321,7 +379,7 @@ class ToolchainManager:
     # Build a component.
     def build_component(self, c):
         # Create the target directory and change into it.
-        os.makedirs(self.builddir)
+        makedirs(self.builddir)
         olddir = os.getcwd()
         os.chdir(self.builddir)
 
@@ -331,7 +389,7 @@ class ToolchainManager:
         finally:
             # Change to the old directory and clean up the build directory.
             os.chdir(olddir)
-            self.remove(self.builddir)
+            remove(self.builddir)
 
     # Get the path to a toolchain utility.
     def tool_path(self, name):
@@ -339,43 +397,37 @@ class ToolchainManager:
 
     # Check if an update is required.
     def check(self):
-        for c in self.components:
+        for c in self.toolchain.components:
             if c.check():
                 return True
 
-        self.remove(self.builddir)
+        remove(self.builddir)
         return False
 
     # Rebuilds the toolchain if required.
     def update(self, target, source, env):
         if not self.check():
-            self.msg('Toolchain already up-to-date, nothing to be done')
+            msg('Toolchain already up-to-date, nothing to be done')
             return 0
 
-        # Remove existing installation. Only remove generic/target directories
-        # when a generic/target component requires updating, this avoids
-        # rebuilding LLVM when we only need to rebuild Binutils and vice-versa.
-        for c in self.components:
-            if c.check():
-                self.remove(self.genericdir if c.generic else self.targetdir)
+        # Create destination directory.
+        makedirs(self.genericdir)
+        makedirs(self.targetdir)
+        makedirs(os.path.join(self.targetdir, 'bin'))
 
-        # Create new destination directory.
-        self.makedirs(self.genericdir)
-        self.makedirs(self.targetdir)
-        self.makedirs(os.path.join(self.targetdir, 'bin'))
-
-        # Need to do this first as compiler-rt build requires wrapper in place.
-        self.create_wrappers()
+        self.toolchain.pre_update(self)
 
         # Build necessary components.
         try:
-            for c in self.components:
+            for c in self.toolchain.components:
                 if c.check():
                     self.build_component(c)
         except Exception, e:
-            self.msg('Exception during toolchain build: \033[0;0m%s' % (str(e)))
+            msg('Exception during toolchain build: \033[0;0m%s' % (str(e)))
             return 1
 
-        self.remove(self.builddir)
-        self.msg('Toolchain updated in %d seconds' % (self.totaltime))
+        remove(self.builddir)
+        self.toolchain.post_update(self)
+
+        msg('Toolchain updated in %d seconds' % (self.totaltime))
         return 0
