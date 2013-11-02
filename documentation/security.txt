@@ -11,127 +11,115 @@ licenses/by-nc-sa/3.0/) license.
 Introduction
 ------------
 
-The purpose of this document is to describe the security model used by Kiwi to
-control access to objects and what processes are allowed to do.
+This document describes the security model implemented by Kiwi to control
+access to objects and what processes are allowed to do. It describes security
+contexts, system-wide privileges, and the methods used by kernel object types
+to control access to them.
 
-There are two methods of security used by the kernel:
+Security Contexts
+-----------------
 
- * **Object ACLs**
+The core part of the security model is the security context. A security context
+specifies an identity and a set of privileges (see next section). Each process
+has a security context associated with it. In addition to the process-wide
+security context, each thread can set its own security context, which overrides
+the process-wide context. This can be used to temporarily change identity, or
+drop privileges.
 
-   The Kiwi kernel is object-oriented: most resources accessible by userspace
-   are represented by kernel objects, which can be accessed through a handle.
-   The object manager maintains an access control list (ACL) for each object,
-   which controls what can access them.
+An identity is a single user ID and a set of group IDs. The only knowledge of
+users and groups that the kernel has is user and group IDs. User/group names,
+logging in, etc. are handled in userspace. User and group IDs also do not have
+any special meaning to the kernel, i.e. unlike UNIX, having user ID 0 does not
+automatically grant extra privileges. Instead, the privileges mechanism (see
+the next section) is used to grant additional privileges to processes,
+regardless of their user ID.
 
- * **Capabilities**
+A security token is a kernel object which encapsulates a security context. The
+process/thread security context is set by specifying a handle to a token object
+containing the new context. Security tokens are immutable, i.e. once created,
+the context held cannot be modified. The kernel provides APIs to create a token
+object from the current process-wide security context, the current per-thread
+context (if any), or a supplied context structure. A thread cannot create a
+token granting privileges that it does not itself have, and cannot set a
+different identity to its current identity unless it has the
+`PRIV_CHANGE_IDENTITY` privilege.
 
-   Capabilities are used to control use of kernel operations that do not
-   operate on an object, for example shutdown/reboot, loading modules, etc.
+Security tokens are transferrable objects. This means that a thread can grant
+its privileges to another process by creating a token and then sending a handle
+to it over an IPC connection.
 
-The following sections will describe in depth how each of these mechanisms
-work.
+Privileges
+----------
 
-Security Context
-----------------
+Privileges are used for system-wide access control, such as restricting the use
+of kernel operations that do not operate on an object (shutdown/reboot, loading
+modules, etc). They also influence the security rules for object access.
 
-The core part of the security model is the security context. Each process has
-a security context which contains its user ID, a set of group IDs for each
-group the process belongs to and a set of capabilities that the process has.
+A security context has two sets of privileges: effective and inheritable. The
+effective set is the one actually used for privilege checks. The inheritable
+set is a subset of the effective set, which will be set as both the effective
+and inheritable set on any created child processes.
 
-When creating a process, it can be given a new security context, or a copy of
-the parent's. However, a new security context cannot have capabilities that the
-parent does not have, and the user/group IDs cannot be changed unless the
-parent has the capability (CAP_CHANGE_IDENTITY) to do so. A process can also
-change its own security context, but the aforementioned restrictions apply.
+Object Security
+---------------
 
-Users, Groups and Sessions
---------------------------
+Some object types, for example timers, are not globally accessible, and only
+accessible by the process that creates them or any process which the creator
+passes a handle to. These local objects require no access control. Other object
+types such as processes, threads and files, however, are globally accessible.
+These implement access control based on the accessing thread's security
+context. The sections below describe the access control mechanisms implemented
+by various object types.
 
-The only knowledge of users and groups that the kernel has is user and group
-IDs. User/group names, logging in, etc are handled in userspace.
+### Files
 
-When a user logs in, the first process in the session is created with a
-security context containing the ID for their user, all of the group IDs for the
-user, and a set of capabilities allowed for their account and groups.
-
-Sessions are groups of processes that are represented by an ID allocated by the
-kernel. They are used by userspace to group processes by the login session that
-they are under in order to support multiple users being logged in at the same
-time. Sessions are created by using the `PROCESS_CREATE_SESSION` flag with
-`process_create`, and the capability to do so is kept only by the security
-server (see below).
-
-Object ACLs
------------
-
-Each object type has a set of rights that control what can be done with objects.
-For example, the file object type has Read, Write and Execute rights. The ACL
-defines which rights should be given to processes, and can contain the following
-entry types:
+Files implement the most complex access control system of any object type.
+Access to files is controlled by an access control list (ACL) which grants
+rights based on the identity of a thread. An ACL can contain entries (ACEs,
+access control entries) of the following type:
 
  * **User** - Specifies rights for a user.
  * **Group** - Specifies rights for all users in a group.
- * **Others** - Specifies rights for processes that do not match any user or
+ * **Others** - Specifies rights for threads that do not match any user or
    group entries.
- * **Session** - Specifies rights for all processes in a session.
- * **Capability** - Specifies rights for all processes with a certain
-   capability.
+ * **Privilege** - Specifies rights for threads with a certain privilege.
+ * **Everyone** - Specifies rights granted to everyone.
 
-The following determines how the set of rights a process is allowed for an
-object is determined:
+When opening a handle to a file, a set of requested rights must be specified.
+The file's ACL is checked against the thread's current security context to
+determine whether the rights are allowed to the thread. The following rules
+determine the set of rights a thread is allowed for an file based on its
+identity:
 
- * If a user entry matches the process' user ID, the rights it specifies will
+ * If a user entry matches the thread's user ID, the rights it specifies will
    be added to the set of allowed rights.
- * Otherwise, if any group entries match any of the groups the process is in,
+ * Otherwise, if any group entries match any of the groups the thread is in,
    the rights specified by each matching entry will be added to the set of
    allowed rights.
  * Otherwise, if an others entry exists, the rights it specifies will be added
    to the set of allowed rights.
- * If a session entry matches the process' session ID, the rights it specifies
-   will be added to the set of allowed rights.
- * If capability entries exist for any of the process' capabilities, the rights
+
+In addition to this:
+
+ * If privilege entries exist for any of the process' privileges, the rights
    specified by each matching entry will be added to the set of allowed rights.
+ * If an everyone entry exists, the rights it specifies will be added to the
+   set of allowed rights.
 
-When opening a handle to an object, a set of requested rights must be specified.
-If any of the requested rights are not in the set of rights allowed to the
-process, the open call is denied. Otherwise, the handle is created with the
-requested rights. This means that the ACL is only checked at open time, and
-operations on a handle only need to check if it has the necessary rights.
+If any of the requested rights are not in the calculated set of rights allowed
+to the thread, the open call is denied. Otherwise, the handle is created with
+the requested rights. This means that the ACL is only checked at open time, and
+operations on a file handle only need to check if the handle has the necessary
+rights.
 
-Security Server
----------------
+### Processes/Threads
 
-The security server is a userspace service that manages user accounts, groups
-and sessions. It exposes an RPC interface that allows clients to manage user
-accounts, create and switch sessions, and to change their security context to
-that of another user.
+Access to a process or thread object is determined by the security context of
+the thread making the access and the security context of the target _process_
+(_not_ the target thread). If accessing a thread and the thread has an
+overridden security context, this is ignored. Access is determined based on the
+process-wide context of its owning process is used.
 
-Internally, the server assigns permissions to sessions, to restrict creation
-and switching of sessions. Only processes under session 0 are allowed to
-create new sessions and switch to any session. Processes under other sessions
-can only switch to session 0. This means that processes under user sessions
-cannot switch to a different user's session without going through the login
-prompt to authenticate as that user.
+### IPC
 
-The facility to change to the security context of another user is used to
-allow a program to be run as another user (like the UNIX `su` utility):
-prompt for user and password to switch to, send these to security server,
-security server sets context of caller to that of the user if successful, and
-the new program is started. The use of this functionality can be restricted
-to certain users/groups. To allow this to work, the security server has a
-special capability (CAP_SECURITY_AUTHORITY) that allows it to modify the
-security context of any process.
-
-Notes
------
-
-Under this model it is impossible for support for the SUID/SGID bit to be
-implemented in the POSIX compatibility layer. In my opinion, that's a good
-thing.
-
-TODO
-----
-
- * Userspace privileges system for programs to define custom privileges for
-   things like adding printers, installing software, etc. (like Mac OS X's
-   Authorization Services and PolicyKit).
+See IPC documentation for more details.
