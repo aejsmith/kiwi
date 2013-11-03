@@ -18,17 +18,6 @@
  * @file
  * @brief		Kernel object manager.
  *
- * The kernel object manager manages all userspace-accessible objects. It
- * allows processes (as well as the kernel) to create handles to objects, and
- * implements a discretionary access control system that limits which processes
- * can access objects.
- *
- * It does not, however, manage how objects are referred to (i.e. there isn't
- * a single namespace for all objects - for example FS entries are referred to
- * by path strings, but ports, memory areas, etc. are referred to by global
- * IDs), or the lifetime of objects - it is up to each object type to manage
- * these.
- *
  * @todo		Make handle tables resizable, based on process limits
  *			or something (e.g. rlimit).
  */
@@ -107,15 +96,6 @@ void object_destroy(object_t *object) {
 	/* Nothing happens (yet). */
 }
 
-/** Calculate the set of rights that a process has for an object.
- * @param object	Object to check.
- * @param process	Process to check for (if NULL, uses the current process).
- * @return		Set of rights that the process has for the object. */
-object_rights_t object_rights(object_t *object, struct process *process) {
-	// TODO
-	return 0xFFFFFFFF;
-}
-
 /** Notifier function to use for object waiting.
  * @param arg1		Unused.
  * @param arg2		Unused.
@@ -149,54 +129,23 @@ void object_wait_signal(void *_wait, unsigned long data) {
 /**
  * Create a handle to an object.
  *
- * Creates a new handle to a kernel object. This function does _NOT_ perform a
- * rights check on the object, if this should be done use object_handle_open()
- * instead. The created handle will have a single reference on it. The handle
- * must be closed with object_handle_release() when it is no longer required.
+ * Creates a new handle to a kernel object. The handle will have a single
+ * reference on it. The handle must be closed with object_handle_release() when
+ * it is no longer required.
  *
  * @param object	Object to create a handle to.
  * @param data		Per-handle data pointer.
- * @param rights	Access rights for the handle.
  *
  * @return		Handle to the object.
  */
-object_handle_t *object_handle_create(object_t *object, void *data, object_rights_t rights) {
+object_handle_t *object_handle_create(object_t *object, void *data) {
 	object_handle_t *handle;
 
 	handle = slab_cache_alloc(object_handle_cache, MM_WAIT);
 	refcount_set(&handle->count, 1);
 	handle->object = object;
 	handle->data = data;
-	handle->rights = rights;
 	return handle;
-}
-
-/**
- * Open a handle to an object.
- *
- * Opens a new handle to a kernel object. This function checks whether the
- * current process has the necessary rights to access the object, and fail if
- * it does not. The created handle will have a single reference on it. The
- * handle must be closed with object_handle_release() when it is no longer
- * required.
- *
- * @param object	Object to create a handle to.
- * @param data		Per-handle data pointer.
- * @param rights	Access rights for the handle.
- * @param handlep	Where to store handle to object.
- *
- * @return		STATUS_SUCCESS if successful.
- *			STATUS_ACCESS_DENIED if the current process does not
- *			have the requested access rights for the object.
- */
-status_t object_handle_open(object_t *object, void *data, object_rights_t rights,
-	object_handle_t **handlep)
-{
-	if(rights && (object_rights(object, curr_proc) & rights) != rights)
-		return STATUS_ACCESS_DENIED;
-
-	*handlep = object_handle_create(object, data, rights);
-	return STATUS_SUCCESS;
 }
 
 /**
@@ -237,23 +186,18 @@ void object_handle_release(object_handle_t *handle) {
  * Look up a handle in a the current process' handle table.
  *
  * Looks up the handle with the given ID in the current process' handle table,
- * optionally checking that the object it refers to is a certain type and that
- * the handle has certain rights. The returned handle will have an extra
- * reference on it: when it is no longer needed, it should be released with
- * object_handle_release().
+ * optionally checking that the object it refers to is a certain type. The
+ * returned handle will be referenced: when it is no longer needed, it should
+ * be released with object_handle_release().
  *
  * @param id		Handle ID to look up.
  * @param type		Required object type ID (if negative, no type checking
  *			will be performed).
- * @param rights	If not 0, the handle will be checked for these rights
- *			and an error will be returned if it does not have them.
  * @param handlep	Where to store pointer to handle structure.
  *
  * @return		Status code describing result of the operation.
  */
-status_t object_handle_lookup(handle_t id, int type, object_rights_t rights,
-	object_handle_t **handlep)
-{
+status_t object_handle_lookup(handle_t id, int type, object_handle_t **handlep) {
 	object_handle_t *handle;
 
 	assert(handlep);
@@ -273,12 +217,6 @@ status_t object_handle_lookup(handle_t id, int type, object_rights_t rights,
 	if(type >= 0 && handle->object->type->id != type) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;
-	}
-
-	/* Check if the handle has the requested rights. */
-	if(rights && !object_handle_rights(handle, rights)) {
-		rwlock_unlock(&curr_proc->handles->lock);
-		return STATUS_ACCESS_DENIED;
 	}
 
 	object_handle_retain(handle);
@@ -592,7 +530,7 @@ int kern_object_type(handle_t handle) {
 	object_handle_t *khandle;
 	int ret;
 
-	if(object_handle_lookup(handle, -1, 0, &khandle) != STATUS_SUCCESS)
+	if(object_handle_lookup(handle, -1, &khandle) != STATUS_SUCCESS)
 		return -1;
 
 	ret = khandle->object->type->id;
@@ -669,7 +607,7 @@ status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags,
 		if(ret != STATUS_SUCCESS)
 			goto out;
 
-		ret = object_handle_lookup(waits[i].info.handle, -1, 0, &handle);
+		ret = object_handle_lookup(waits[i].info.handle, -1, &handle);
 		if(ret != STATUS_SUCCESS) {
 			goto out;
 		} else if(!handle->object->type->wait || !handle->object->type->unwait) {
@@ -799,35 +737,6 @@ status_t kern_handle_set_flags(handle_t handle, uint32_t flags) {
 	curr_proc->handles->flags[handle] = flags;
 	rwlock_unlock(&curr_proc->handles->lock);
 	return STATUS_SUCCESS;
-}
-
-/** Get the access rights for a handle.
- * @param handle	Handle to get rights for.
- * @param rightsp	Where to store handle access rights.
- * @return		STATUS_SUCCESS if successful.
- *			STATUS_INVALID_HANDLE if handle does not exist.
- *			STATUS_NOT_SUPPORTED if the handle refers to an object
- *			of a non-securable type. */
-status_t kern_handle_rights(handle_t handle, object_rights_t *rightsp) {
-	object_handle_t *khandle;
-	status_t ret;
-
-	if(handle < 0 || handle >= HANDLE_TABLE_SIZE)
-		return STATUS_INVALID_HANDLE;
-
-	rwlock_read_lock(&curr_proc->handles->lock);
-
-	khandle = curr_proc->handles->handles[handle];
-	if(!khandle) {
-		ret = STATUS_INVALID_HANDLE;
-	} else if(!(khandle->object->type->flags & OBJECT_SECURABLE)) {
-		ret = STATUS_NOT_SUPPORTED;
-	} else {
-		ret = memcpy_to_user(rightsp, &khandle->rights, sizeof(*rightsp));
-	}
-
-	rwlock_unlock(&curr_proc->handles->lock);
-	return ret;
 }
 
 /**

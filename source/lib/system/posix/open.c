@@ -34,10 +34,10 @@
  * @param krightsp	Where to store kernel rights.
  * @param kflagsp	Where to store kernel flags.
  * @param kcreatep	Where to store kernel creation flags. */
-static inline void convert_open_flags(int oflag, object_rights_t *krightsp,
+static inline void convert_open_flags(int oflag, uint32_t *krightsp,
 	uint32_t *kflagsp, unsigned *kcreatep)
 {
-	object_rights_t krights = 0;
+	uint32_t krights = 0;
 	uint32_t kflags = 0;
 
 	if(oflag & O_RDONLY)
@@ -71,7 +71,7 @@ static inline void convert_open_flags(int oflag, object_rights_t *krightsp,
 int open(const char *path, int oflag, ...) {
 	file_type_t type;
 	file_info_t info;
-	object_rights_t rights;
+	uint32_t rights;
 	uint32_t kflags;
 	unsigned kcreate;
 	handle_t handle;

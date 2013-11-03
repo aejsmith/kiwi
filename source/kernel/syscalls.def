@@ -25,7 +25,6 @@ type mount_id_t uint16_t;
 type node_id_t uint64_t;
 type nstime_t int64_t;
 type offset_t int64_t;
-type object_rights_t uint32_t;
 type user_id_t int16_t;
 type group_id_t int16_t;
 type image_id_t int16_t;
@@ -42,7 +41,6 @@ syscall kern_object_type(handle_t);
 syscall kern_object_wait(ptr_t, size_t, uint32_t, nstime_t);
 syscall kern_handle_flags(handle_t, ptr_t);
 syscall kern_handle_set_flags(handle_t, uint32_t);
-syscall kern_handle_rights(handle_t, ptr_t);
 syscall kern_handle_duplicate(handle_t, handle_t, ptr_t);
 syscall kern_handle_close(handle_t);
 
@@ -52,6 +50,7 @@ syscall kern_file_read_vecs(handle_t, ptr_t, size_t, offset_t, ptr_t);
 syscall kern_file_write_vecs(handle_t, ptr_t, size_t, offset_t, ptr_t);
 syscall kern_file_read_dir(handle_t, ptr_t, size_t);
 syscall kern_file_rewind_dir(handle_t);
+syscall kern_file_rights(handle_t, ptr_t);
 syscall kern_file_flags(handle_t, ptr_t);
 syscall kern_file_set_flags(handle_t, uint32_t);
 syscall kern_file_resize(handle_t, offset_t);
@@ -59,7 +58,7 @@ syscall kern_file_seek(handle_t, uint, offset_t, ptr_t);
 syscall kern_file_info(handle_t, ptr_t);
 syscall kern_file_sync(handle_t);
 
-syscall kern_fs_open(ptr_t, object_rights_t, uint32_t, uint, ptr_t);
+syscall kern_fs_open(ptr_t, uint32_t, uint32_t, uint, ptr_t);
 syscall kern_fs_create_dir(ptr_t);
 syscall kern_fs_create_fifo(ptr_t);
 syscall kern_fs_create_symlink(ptr_t, ptr_t);
@@ -77,7 +76,7 @@ syscall kern_fs_unlink(ptr_t);
 syscall kern_fs_rename(ptr_t, ptr_t);
 syscall kern_fs_sync();
 
-syscall kern_device_open(ptr_t, object_rights_t, uint32_t, ptr_t);
+syscall kern_device_open(ptr_t, uint32_t, uint32_t, ptr_t);
 syscall kern_device_request(handle_t, uint, ptr_t, size_t, ptr_t, size_t, ptr_t);
 
 syscall kern_vm_map(ptr_t, size_t, uint32_t, uint32_t, uint32_t, handle_t, offset_t, ptr_t);

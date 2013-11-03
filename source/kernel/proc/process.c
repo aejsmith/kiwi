@@ -927,7 +927,7 @@ status_t kern_process_create(const char *path, const char *const args[],
 
 	/* Get the security token to use for the new process. */
 	if(token != INVALID_HANDLE) {
-		ret = object_handle_lookup(token, OBJECT_TYPE_TOKEN, 0, &khandle);
+		ret = object_handle_lookup(token, OBJECT_TYPE_TOKEN, &khandle);
 		if(ret != STATUS_SUCCESS)
 			goto out;
 
@@ -969,7 +969,7 @@ status_t kern_process_create(const char *path, const char *const args[],
 	if(handlep) {
 		refcount_inc(&process->count);
 
-		khandle = object_handle_create(&process->obj, NULL, 0);
+		khandle = object_handle_create(&process->obj, NULL);
 		ret = object_handle_attach(khandle, &uhandle, handlep);
 		object_handle_release(khandle);
 		if(ret != STATUS_SUCCESS) {
@@ -1075,7 +1075,7 @@ status_t kern_process_exec(const char *path, const char *const args[],
 
 	/* Get the security token to use for the new process. */
 	if(token != INVALID_HANDLE) {
-		ret = object_handle_lookup(token, OBJECT_TYPE_TOKEN, 0, &khandle);
+		ret = object_handle_lookup(token, OBJECT_TYPE_TOKEN, &khandle);
 		if(ret != STATUS_SUCCESS) {
 			free_process_args(&load);
 			return ret;
@@ -1241,7 +1241,7 @@ status_t kern_process_clone(handle_t *handlep) {
 
 	/* Create a new handle. This takes over the initial reference added by
 	 * process_alloc(). */
-	khandle = object_handle_create(&process->obj, NULL, 0);
+	khandle = object_handle_create(&process->obj, NULL);
 	ret = object_handle_attach(khandle, &uhandle, handlep);
 	if(ret != STATUS_SUCCESS) {
 		object_handle_release(khandle);
@@ -1296,7 +1296,7 @@ status_t kern_process_open(process_id_t id, handle_t *handlep) {
 	}
 
 	/* Reference added by process_lookup() is taken over by this handle. */
-	handle = object_handle_create(&process->obj, NULL, 0);
+	handle = object_handle_create(&process->obj, NULL);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 	return ret;
@@ -1313,7 +1313,7 @@ process_id_t kern_process_id(handle_t handle) {
 
 	if(handle < 0) {
 		id = curr_proc->id;
-	} else if(object_handle_lookup(handle, OBJECT_TYPE_PROCESS, 0, &khandle) == STATUS_SUCCESS) {
+	} else if(object_handle_lookup(handle, OBJECT_TYPE_PROCESS, &khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
 		id = process->id;
 		object_handle_release(khandle);
@@ -1341,7 +1341,7 @@ status_t kern_process_security(handle_t handle, security_context_t *ctx) {
 	token_t *token;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1371,7 +1371,7 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 	process_t *process;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1408,7 +1408,7 @@ status_t kern_process_token(handle_t *handlep) {
 	token_retain(token);
 	mutex_unlock(&curr_proc->lock);
 
-	handle = object_handle_create(&token->obj, NULL, 0);
+	handle = object_handle_create(&token->obj, NULL);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 
@@ -1434,7 +1434,7 @@ status_t kern_process_set_token(handle_t handle) {
 	token_t *token;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 

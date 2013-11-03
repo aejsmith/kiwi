@@ -103,6 +103,7 @@ extern status_t kern_file_write_vecs(handle_t handle, const io_vec_t *vecs,
 extern status_t kern_file_read_dir(handle_t handle, dir_entry_t *buf, size_t size);
 extern status_t kern_file_rewind_dir(handle_t handle);
 
+extern status_t kern_file_rights(handle_t handle, uint32_t *rightsp);
 extern status_t kern_file_flags(handle_t handle, uint32_t *flagsp);
 extern status_t kern_file_set_flags(handle_t handle, uint32_t flags);
 extern status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset,

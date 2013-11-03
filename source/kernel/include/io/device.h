@@ -198,8 +198,9 @@ static inline const char *device_name(object_handle_t *handle) {
 	return device->name;
 }
 
-extern status_t device_create(const char *name, device_t *parent, device_ops_t *ops,
-	void *data, device_attr_t *attrs, size_t count, device_t **devicep);
+extern status_t device_create(const char *name, device_t *parent,
+	device_ops_t *ops, void *data, device_attr_t *attrs, size_t count,
+	device_t **devicep);
 extern status_t device_alias(const char *name, device_t *parent, device_t *dest,
 	device_t **devicep);
 extern status_t device_destroy(device_t *device);
@@ -208,13 +209,13 @@ extern void device_iterate(device_t *start, device_iterate_t func, void *data);
 extern device_attr_t *device_attr(device_t *device, const char *name, int type);
 extern char *device_path(device_t *device);
 
-extern status_t device_get(device_t *device, object_rights_t rights, uint32_t flags,
+extern status_t device_get(device_t *device, uint32_t rights, uint32_t flags,
 	object_handle_t **handlep);
-extern status_t device_open(const char *path, object_rights_t rights, uint32_t flags,
+extern status_t device_open(const char *path, uint32_t rights, uint32_t flags,
 	object_handle_t **handlep);
 
-extern status_t device_request(object_handle_t *handle, unsigned request, const void *in,
-	size_t in_size, void **outp, size_t *out_sizep);
+extern status_t device_request(object_handle_t *handle, unsigned request,
+	const void *in, size_t in_size, void **outp, size_t *out_sizep);
 
 extern void device_init(void);
 

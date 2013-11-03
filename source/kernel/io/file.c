@@ -90,7 +90,7 @@ static status_t file_object_mappable(object_handle_t *handle, uint32_t protectio
 {
 	file_t *file = (file_t *)handle->object;
 	file_handle_t *data = (file_handle_t *)handle->data;
-	object_rights_t rights = 0;
+	uint32_t rights = 0;
 	status_t ret;
 
 	/* Directories cannot be memory-mapped. */
@@ -118,7 +118,8 @@ static status_t file_object_mappable(object_handle_t *handle, uint32_t protectio
 		rights |= FILE_RIGHT_EXECUTE;
 	}
 
-	return (object_handle_rights(handle, rights)) ? STATUS_SUCCESS
+	return ((data->rights & rights) == rights)
+		? STATUS_SUCCESS
 		: STATUS_ACCESS_DENIED;
 }
 
@@ -153,7 +154,7 @@ static void file_object_release_page(object_handle_t *handle, offset_t offset,
 /** File object type definition. */
 static object_type_t file_object_type = {
 	.id = OBJECT_TYPE_FILE,
-	.flags = OBJECT_TRANSFERRABLE | OBJECT_SECURABLE,
+	.flags = OBJECT_TRANSFERRABLE,
 	.close = file_object_close,
 	.wait = file_object_wait,
 	.unwait = file_object_unwait,
@@ -179,6 +180,22 @@ void file_destroy(file_t *file) {
 }
 
 /**
+ * Check for access to a file.
+ *
+ * Checks the current thread's security context against a file's ACL to
+ * determine whether that it has the specified rights to the file.
+ *
+ * @param file		File to check.
+ * @param rights	Rights to check for.
+ *
+ * @return		Whether the thread is allowed the access.
+ */
+bool file_access(file_t *file, uint32_t rights) {
+	// TODO
+	return true;
+}
+
+/**
  * Create a new file handle.
  *
  * Creates a new file handle. Does not perform rights checks on the file, this
@@ -191,18 +208,19 @@ void file_destroy(file_t *file) {
  *
  * @return		Pointer to the created handle.
  */
-object_handle_t *file_handle_create(file_t *file, object_rights_t rights,
+object_handle_t *file_handle_create(file_t *file, uint32_t rights,
 	uint32_t flags, void *data)
 {
 	file_handle_t *handle;
 
 	handle = kmalloc(sizeof(*handle), MM_KERNEL);
 	mutex_init(&handle->lock, "file_handle_lock", 0);
-	handle->offset = 0;
-	handle->flags = flags;
 	handle->data = data;
+	handle->rights = rights;
+	handle->flags = flags;
+	handle->offset = 0;
 
-	return object_handle_create(&file->obj, handle, rights);
+	return object_handle_create(&file->obj, handle);
 }
 
 /** Close a FS handle.
@@ -298,7 +316,7 @@ static inline bool is_seekable(file_t *file) {
 static status_t file_io(object_handle_t *handle, io_request_t *request) {
 	file_t *file;
 	file_handle_t *data;
-	object_rights_t right;
+	uint32_t right;
 	bool update_offset = false;
 	file_info_t info;
 	status_t ret;
@@ -312,7 +330,7 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
 	data = (file_handle_t *)handle->data;
 
 	right = (request->op == IO_OP_WRITE) ? FILE_RIGHT_WRITE : FILE_RIGHT_READ;
-	if(!object_handle_rights(handle, right)) {
+	if(!(data->rights & right)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	}
@@ -579,7 +597,7 @@ status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size) {
 	file = (file_t *)handle->object;
 	data = (file_handle_t *)handle->data;
 
-	if(!object_handle_rights(handle, FILE_RIGHT_READ)) {
+	if(!(data->rights & FILE_RIGHT_READ)) {
 		return STATUS_ACCESS_DENIED;
 	} else if(file->type != FILE_TYPE_DIR) {
 		return STATUS_NOT_DIR;
@@ -619,7 +637,7 @@ status_t file_rewind_dir(object_handle_t *handle) {
 	file = (file_t *)handle->object;
 	data = (file_handle_t *)handle->data;
 
-	if(!object_handle_rights(handle, FILE_RIGHT_READ)) {
+	if(!(data->rights & FILE_RIGHT_READ)) {
 		return STATUS_ACCESS_DENIED;
 	} else if(file->type != FILE_TYPE_DIR) {
 		return STATUS_NOT_DIR;
@@ -630,6 +648,23 @@ status_t file_rewind_dir(object_handle_t *handle) {
 	mutex_lock(&data->lock);
 	data->offset = 0;
 	mutex_unlock(&data->lock);
+	return STATUS_SUCCESS;
+}
+
+/** Get a file handle's rights.
+ * @param handle	Handle to get flags from.
+ * @param rightsp	Where to store handle rights. */
+status_t file_rights(object_handle_t *handle, uint32_t *rightsp) {
+	file_handle_t *data;
+
+	assert(handle);
+
+	if(handle->object->type->id != OBJECT_TYPE_FILE)
+		return STATUS_INVALID_HANDLE;
+
+	data = (file_handle_t *)handle->data;
+
+	*rightsp = data->rights;
 	return STATUS_SUCCESS;
 }
 
@@ -757,7 +792,7 @@ status_t file_resize(object_handle_t *handle, offset_t size) {
 	file = (file_t *)handle->object;
 	data = (file_handle_t *)handle->data;
 
-	if(!object_handle_rights(handle, FILE_RIGHT_WRITE)) {
+	if(!(data->rights & FILE_RIGHT_WRITE)) {
 		return STATUS_ACCESS_DENIED;
 	} else if(file->type != FILE_TYPE_REGULAR) {
 		return STATUS_NOT_REGULAR;
@@ -848,7 +883,7 @@ status_t kern_file_read(handle_t handle, void *buf, size_t size, offset_t offset
 		goto out;
 	}
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		goto out;
 
@@ -912,7 +947,7 @@ status_t kern_file_write(handle_t handle, const void *buf, size_t size,
 		goto out;
 	}
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		goto out;
 
@@ -986,7 +1021,7 @@ status_t kern_file_read_vecs(handle_t handle, const io_vec_t *vecs, size_t count
 		goto out;
 	}
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kvecs);
 		goto out;
@@ -1061,7 +1096,7 @@ status_t kern_file_write_vecs(handle_t handle, const io_vec_t *vecs, size_t coun
 		goto out;
 	}
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kvecs);
 		goto out;
@@ -1116,7 +1151,7 @@ status_t kern_file_read_dir(handle_t handle, dir_entry_t *buf, size_t size) {
 	if(!buf)
 		return STATUS_INVALID_ARG;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1142,11 +1177,34 @@ status_t kern_file_rewind_dir(handle_t handle) {
 	object_handle_t *khandle;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
 	ret = file_rewind_dir(khandle);
+	object_handle_release(khandle);
+	return ret;
+}
+
+/** Get a file handle's rights.
+ * @param handle	Handle to get rights from.
+ * @param rightsp	Where to store handle rights. */
+status_t kern_file_rights(handle_t handle, uint32_t *rightsp) {
+	object_handle_t *khandle;
+	uint32_t rights;
+	status_t ret;
+
+	if(!rightsp)
+		return STATUS_INVALID_ARG;
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	ret = file_rights(khandle, &rights);
+	if(ret == STATUS_SUCCESS)
+		ret = memcpy_to_user(rightsp, &rights, sizeof(*rightsp));
+
 	object_handle_release(khandle);
 	return ret;
 }
@@ -1162,7 +1220,7 @@ status_t kern_file_flags(handle_t handle, uint32_t *flagsp) {
 	if(!flagsp)
 		return STATUS_INVALID_ARG;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1181,7 +1239,7 @@ status_t kern_file_set_flags(handle_t handle, uint32_t flags) {
 	object_handle_t *khandle;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1211,7 +1269,7 @@ status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset,
 	offset_t result;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1240,7 +1298,7 @@ status_t kern_file_resize(handle_t handle, offset_t size) {
 	object_handle_t *khandle;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1261,7 +1319,7 @@ status_t kern_file_info(handle_t handle, file_info_t *info) {
 	if(!info)
 		return STATUS_INVALID_ARG;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1280,7 +1338,7 @@ status_t kern_file_sync(handle_t handle) {
 	object_handle_t *khandle;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 

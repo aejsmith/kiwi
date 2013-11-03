@@ -45,8 +45,8 @@ typedef struct mount_info {
 /** Behaviour flags for kern_fs_mount(). */
 #define FS_MOUNT_READ_ONLY	(1<<0)	/**< Mount filesystem as read-only. */
 
-extern status_t kern_fs_open(const char *path, object_rights_t rights,
-	uint32_t flags, unsigned create, handle_t *handlep);
+extern status_t kern_fs_open(const char *path, uint32_t rights, uint32_t flags,
+	unsigned create, handle_t *handlep);
 
 extern status_t kern_fs_create_dir(const char *path);
 extern status_t kern_fs_create_fifo(const char *path);

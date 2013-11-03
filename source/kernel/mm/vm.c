@@ -2083,7 +2083,7 @@ status_t kern_vm_map(void **addrp, size_t size, unsigned spec, uint32_t protecti
 	}
 
 	if(handle != INVALID_HANDLE) {
-		ret = object_handle_lookup(handle, -1, 0, &khandle);
+		ret = object_handle_lookup(handle, -1, &khandle);
 		if(ret != STATUS_SUCCESS) {
 			kfree(kname);
 			return ret;

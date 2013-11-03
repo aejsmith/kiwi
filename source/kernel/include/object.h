@@ -89,7 +89,6 @@ typedef struct object_type {
 
 /** Properties of an object type. */
 #define OBJECT_TRANSFERRABLE	(1<<0)	/**< Objects can be inherited or transferred over IPC. */
-#define OBJECT_SECURABLE	(1<<1)	/**< Objects are secured through an ACL. */
 
 /** Structure defining a kernel object.
  * @note		This structure is intended to be embedded inside
@@ -102,7 +101,6 @@ typedef struct object {
 typedef struct object_handle {
 	object_t *object;		/**< Object that the handle refers to. */
 	void *data;			/**< Per-handle data pointer. */
-	object_rights_t rights;		/**< Access rights for the handle. */
 	refcount_t count;		/**< References to the handle. */
 } object_handle_t;
 
@@ -116,27 +114,15 @@ typedef struct handle_table {
 
 extern void object_init(object_t *object, object_type_t *type);
 extern void object_destroy(object_t *object);
-extern object_rights_t object_rights(object_t *object, struct process *process);
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_signal(void *wait, unsigned long data);
 
-extern object_handle_t *object_handle_create(object_t *object, void *data,
-	object_rights_t rights);
-extern status_t object_handle_open(object_t *object, void *data, object_rights_t rights,
-	object_handle_t **handlep);
+extern object_handle_t *object_handle_create(object_t *object, void *data);
 extern void object_handle_retain(object_handle_t *handle);
 extern void object_handle_release(object_handle_t *handle);
 
-/** Check if a handle has a set of rights.
- * @param handle	Handle to check.
- * @param rights	Rights to check for.
- * @return		Whether the handle has the rights. */
-static inline bool object_handle_rights(object_handle_t *handle, object_rights_t rights) {
-	return ((handle->rights & rights) == rights);
-}
-
-extern status_t object_handle_lookup(handle_t id, int type, object_rights_t rights,
+extern status_t object_handle_lookup(handle_t id, int type,
 	object_handle_t **handlep);
 extern status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
 	handle_t *uidp);

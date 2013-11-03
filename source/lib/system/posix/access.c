@@ -34,7 +34,7 @@
  * @return		0 if access is allowed, -1 if not with errno set
  *			accordingly. */
 int access(const char *path, int mode) {
-	object_rights_t rights = 0;
+	uint32_t rights = 0;
 	file_info_t info;
 	handle_t handle;
 	status_t ret;

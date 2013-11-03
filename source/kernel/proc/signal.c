@@ -227,7 +227,7 @@ status_t kern_signal_send(handle_t handle, int num) {
 	//info.si_uid = curr_proc->security.uid;
 
 	if(handle > 0) {
-		ret = object_handle_lookup(handle, -1, 0, &khandle);
+		ret = object_handle_lookup(handle, -1, &khandle);
 		if(ret != STATUS_SUCCESS)
 			return ret;
 

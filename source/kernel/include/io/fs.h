@@ -279,7 +279,7 @@ extern void fs_node_remove(fs_node_t *node);
  * Kernel interface.
  */
 
-extern status_t fs_open(const char *path, object_rights_t rights, uint32_t flags,
+extern status_t fs_open(const char *path, uint32_t rights, uint32_t flags,
 	unsigned create, object_handle_t **handlep);
 
 extern status_t fs_create_dir(const char *path);

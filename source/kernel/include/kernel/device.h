@@ -29,11 +29,12 @@
 extern "C" {
 #endif
 
-extern status_t kern_device_open(const char *path, object_rights_t rights,
+extern status_t kern_device_open(const char *path, uint32_t rights,
 	uint32_t flags, handle_t *handlep);
 
-extern status_t kern_device_request(handle_t handle, unsigned request, const void *in,
-	size_t in_size, void *out, size_t out_size, size_t *bytesp);
+extern status_t kern_device_request(handle_t handle, unsigned request,
+	const void *in, size_t in_size, void *out, size_t out_size,
+	size_t *bytesp);
 
 #ifdef __cplusplus
 }

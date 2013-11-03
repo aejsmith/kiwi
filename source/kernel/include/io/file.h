@@ -146,19 +146,22 @@ typedef struct file {
 /** File handle information. */
 typedef struct file_handle {
 	void *data;			/**< Implementation data pointer. */
-	uint32_t flags;			/**< Flags the file was opened with. */
+	uint32_t rights;		/**< Rights the handle was opened with. */
+	uint32_t flags;			/**< Flags modifying handle behaviour. */
 	mutex_t lock;			/**< Lock to protect offset. */
 	offset_t offset;		/**< Current file offset. */
 } file_handle_t;
 
 /**
- * File object implementation functions.
+ * Implementation functions.
  */
 
 extern void file_init(file_t *file, file_ops_t *ops, file_type_t type);
 extern void file_destroy(file_t *file);
 
-extern object_handle_t *file_handle_create(file_t *file, object_rights_t rights,
+extern bool file_access(file_t *file, uint32_t rights);
+
+extern object_handle_t *file_handle_create(file_t *file, uint32_t rights,
 	uint32_t flags, void *data);
 extern object_handle_t *file_from_memory(const void *buf, size_t size);
 
@@ -179,9 +182,13 @@ extern status_t file_write_vecs(object_handle_t *handle, const io_vec_t *vecs,
 extern status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size);
 extern status_t file_rewind_dir(object_handle_t *handle);
 
+extern status_t file_rights(object_handle_t *handle, uint32_t *rightsp);
+extern status_t file_flags(object_handle_t *handle, uint32_t *flagsp);
+extern status_t file_set_flags(object_handle_t *handle, uint32_t flags);
+extern status_t file_seek(object_handle_t *handle, unsigned action,
+	offset_t offset, offset_t *resultp);
+
 extern status_t file_resize(object_handle_t *handle, offset_t size);
-extern status_t file_seek(object_handle_t *handle, unsigned action, offset_t offset,
-	offset_t *resultp);
 extern status_t file_info(object_handle_t *handle, file_info_t *info);
 extern status_t file_sync(object_handle_t *handle);
 

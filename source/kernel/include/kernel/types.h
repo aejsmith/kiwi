@@ -38,9 +38,6 @@ typedef int32_t status_t;
 /** Type used to store a kernel object handle. */
 typedef int32_t handle_t;
 
-/** Type used to store a set of object rights. */
-typedef uint32_t object_rights_t;
-
 /** Other integer types used throughout the kernel. */
 typedef long ssize_t;			/**< Signed version of size_t. */
 typedef int64_t nstime_t;		/**< Type used to store a time value in nanoseconds. */

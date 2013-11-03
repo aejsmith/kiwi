@@ -1089,7 +1089,7 @@ status_t kern_thread_create(const char *name, thread_entry_t *entry,
 	if(handlep) {
 		refcount_inc(&thread->count);
 
-		khandle = object_handle_create(&thread->obj, NULL, 0);
+		khandle = object_handle_create(&thread->obj, NULL);
 		ret = object_handle_attach(khandle, &uhandle, handlep);
 		object_handle_release(khandle);
 		if(ret != STATUS_SUCCESS)
@@ -1154,7 +1154,7 @@ status_t kern_thread_open(thread_id_t id, handle_t *handlep) {
 		return STATUS_NOT_FOUND;
 
 	/* Reference added by thread_lookup() is taken over by this handle. */
-	handle = object_handle_create(&thread->obj, NULL, 0);
+	handle = object_handle_create(&thread->obj, NULL);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 	return ret;
@@ -1171,7 +1171,7 @@ thread_id_t kern_thread_id(handle_t handle) {
 
 	if(handle < 0) {
 		id = curr_thread->id;
-	} else if(object_handle_lookup(handle, OBJECT_TYPE_THREAD, 0, &khandle) == STATUS_SUCCESS) {
+	} else if(object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle) == STATUS_SUCCESS) {
 		thread = (thread_t *)khandle->object;
 		id = thread->id;
 		object_handle_release(khandle);
@@ -1202,7 +1202,7 @@ status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
 	token_t *token, *current;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1242,7 +1242,7 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 	thread_t *thread;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1288,7 +1288,7 @@ status_t kern_thread_token(handle_t *handlep) {
 	mutex_unlock(&curr_proc->lock);
 
 	if(token) {
-		handle = object_handle_create(&token->obj, NULL, 0);
+		handle = object_handle_create(&token->obj, NULL);
 		ret = object_handle_attach(handle, NULL, handlep);
 		object_handle_release(handle);
 	} else {
@@ -1321,7 +1321,7 @@ status_t kern_thread_set_token(handle_t handle) {
 	status_t ret;
 
 	if(handle != INVALID_HANDLE) {
-		ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, 0, &khandle);
+		ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, &khandle);
 		if(ret != STATUS_SUCCESS)
 			return ret;
 

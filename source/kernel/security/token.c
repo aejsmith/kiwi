@@ -220,7 +220,7 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 		}
 	}
 
-	khandle = object_handle_create(&token->obj, NULL, 0);
+	khandle = object_handle_create(&token->obj, NULL);
 	ret = object_handle_attach(khandle, NULL, handlep);
 	object_handle_release(khandle);
 	return ret;
@@ -238,7 +238,7 @@ status_t kern_token_query(handle_t handle, security_context_t *ctx) {
 	token_t *token;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 

@@ -478,7 +478,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 
 		/* We're trying to descend into the directory, check for
 		 * execute permission. */
-		if(!(object_rights(&node->file.obj, NULL) & FILE_RIGHT_EXECUTE)) {
+		if(!file_access(&node->file, FILE_RIGHT_EXECUTE)) {
 			fs_node_release(node);
 			return STATUS_ACCESS_DENIED;
 		}
@@ -789,7 +789,7 @@ static status_t fs_node_create(const char *path, file_type_t type, const char *t
 	if(FS_NODE_IS_READ_ONLY(parent)) {
 		ret = STATUS_READ_ONLY;
 		goto out;
-	} else if(!(object_rights(&parent->file.obj, NULL) & FILE_RIGHT_WRITE)) {
+	} else if(!file_access(&parent->file, FILE_RIGHT_WRITE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	} else if(!parent->ops->create) {
@@ -1173,7 +1173,7 @@ static file_ops_t fs_file_ops = {
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_open(const char *path, object_rights_t rights, uint32_t flags,
+status_t fs_open(const char *path, uint32_t rights, uint32_t flags,
 	unsigned create, object_handle_t **handlep)
 {
 	fs_node_t *node;
@@ -1215,7 +1215,7 @@ status_t fs_open(const char *path, object_rights_t rights, uint32_t flags,
 		 * regardless of the ACL upon first creation. TODO: The read-
 		 * only FS check should be moved to the access() hook when ACLs
 		 * are implemented. */
-		if(rights && (object_rights(&node->file.obj, NULL) & rights) != rights) {
+		if(rights && !file_access(&node->file, rights)) {
 			fs_node_release(node);
 			return STATUS_ACCESS_DENIED;
 		} else if(rights & FILE_RIGHT_WRITE && FS_NODE_IS_READ_ONLY(node)) {
@@ -1775,7 +1775,7 @@ status_t fs_unlink(const char *path) {
 		goto out;
 
 	/* Check whether the node can be unlinked. */
-	if(!(object_rights(&parent->file.obj, NULL) & FILE_RIGHT_WRITE)) {
+	if(!file_access(&parent->file, FILE_RIGHT_WRITE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	} else if(FS_NODE_IS_READ_ONLY(node)) {
@@ -2020,7 +2020,7 @@ void fs_shutdown(void) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_fs_open(const char *path, object_rights_t rights, uint32_t flags,
+status_t kern_fs_open(const char *path, uint32_t rights, uint32_t flags,
 	unsigned create, handle_t *handlep)
 {
 	object_handle_t *handle;
@@ -2379,7 +2379,7 @@ status_t kern_fs_set_curr_dir(const char *path) {
 	}
 
 	/* Must have execute permission to use as working directory. */
-	if(!(object_rights(&node->file.obj, NULL) & FILE_RIGHT_EXECUTE)) {
+	if(!file_access(&node->file, FILE_RIGHT_EXECUTE)) {
 		fs_node_release(node);
 		kfree(kpath);
 		return STATUS_ACCESS_DENIED;
@@ -2426,7 +2426,7 @@ status_t kern_fs_set_root_dir(const char *path) {
 	}
 
 	/* Must have execute permission to use as working directory. */
-	if(!(object_rights(&node->file.obj, NULL) & FILE_RIGHT_EXECUTE)) {
+	if(!file_access(&node->file, FILE_RIGHT_EXECUTE)) {
 		fs_node_release(node);
 		kfree(kpath);
 		return STATUS_ACCESS_DENIED;

@@ -555,7 +555,7 @@ status_t kern_timer_create(uint32_t flags, handle_t *handlep) {
 	timer->fired = false;
 	timer->thread = curr_thread;
 
-	handle = object_handle_create(&timer->obj, NULL, 0);
+	handle = object_handle_create(&timer->obj, NULL);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 	return ret;
@@ -577,7 +577,7 @@ status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode) {
 	if(interval <= 0 || (mode != TIMER_ONESHOT && mode != TIMER_PERIODIC))
 		return STATUS_INVALID_ARG;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -598,7 +598,7 @@ status_t kern_timer_stop(handle_t handle, nstime_t *remp) {
 	nstime_t rem;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, &khandle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 

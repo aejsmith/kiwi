@@ -542,7 +542,7 @@ char *device_path(device_t *device) {
  * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store handle to device.
  * @return		Status code describing result of the operation. */
-status_t device_get(device_t *device, object_rights_t rights, uint32_t flags,
+status_t device_get(device_t *device, uint32_t rights, uint32_t flags,
 	object_handle_t **handlep)
 {
 	void *data = NULL;
@@ -553,7 +553,7 @@ status_t device_get(device_t *device, object_rights_t rights, uint32_t flags,
 
 	mutex_lock(&device->lock);
 
-	if(rights && (object_rights(&device->file.obj, NULL) & rights) != rights) {
+	if(rights && !file_access(&device->file, rights)) {
 		mutex_unlock(&device->lock);
 		return STATUS_ACCESS_DENIED;
 	}
@@ -578,7 +578,7 @@ status_t device_get(device_t *device, object_rights_t rights, uint32_t flags,
  * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store pointer to handle structure.
  * @return		Status code describing result of the operation. */
-status_t device_open(const char *path, object_rights_t rights, uint32_t flags,
+status_t device_open(const char *path, uint32_t rights, uint32_t flags,
 	object_handle_t **handlep)
 {
 	void *data = NULL;
@@ -594,7 +594,7 @@ status_t device_open(const char *path, object_rights_t rights, uint32_t flags,
 
 	mutex_lock(&device->lock);
 
-	if(rights && (object_rights(&device->file.obj, NULL) & rights) != rights) {
+	if(rights && !file_access(&device->file, rights)) {
 		refcount_dec(&device->count);
 		mutex_unlock(&device->lock);
 		return STATUS_ACCESS_DENIED;
@@ -771,7 +771,7 @@ __init_text void device_init(void) {
  * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store handle to the device.
  * @return		Status code describing result of the operation. */
-status_t kern_device_open(const char *path, object_rights_t rights, uint32_t flags,
+status_t kern_device_open(const char *path, uint32_t rights, uint32_t flags,
 	handle_t *handlep)
 {
 	object_handle_t *handle;
@@ -820,7 +820,7 @@ status_t kern_device_request(handle_t handle, unsigned request, const void *in,
 	if(out_size && !out)
 		return STATUS_INVALID_ARG;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
 	if(ret != STATUS_SUCCESS)
 		goto out;
 
