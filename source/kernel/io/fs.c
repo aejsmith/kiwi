@@ -731,7 +731,7 @@ void fs_node_release(fs_node_t *node) {
  * @param node		Node to mark as removed.
  */
 void fs_node_remove(fs_node_t *node) {
-	node->flags &= FS_NODE_REMOVED;
+	node->flags |= FS_NODE_REMOVED;
 }
 
 /** Common node creation code.
