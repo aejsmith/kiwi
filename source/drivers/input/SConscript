@@ -17,7 +17,7 @@
 Import('env', 'config')
 
 # Build the input device manager.
-env.Module('input', ['input.c'])
+env.Module('input', ['input.c', 'keytable.c'])
 
 # Work out the drivers to build.
 dirs = [

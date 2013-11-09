@@ -86,7 +86,7 @@ static const uint16_t kbd_layout_extended[128] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	CONSOLE_KEY_HOME, CONSOLE_KEY_UP, CONSOLE_KEY_PGUP, 0,
 	CONSOLE_KEY_LEFT, 0, CONSOLE_KEY_RIGHT, 0, CONSOLE_KEY_END,
-	CONSOLE_KEY_DOWN, CONSOLE_KEY_PGDN, 0, CONSOLE_KEY_DELETE
+	CONSOLE_KEY_DOWN, CONSOLE_KEY_PGDN, 0, 0x7F
 };
 
 /** Read a character from the i8042 keyboard.

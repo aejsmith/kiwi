@@ -58,7 +58,7 @@ uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch) {
 			}
 		} else if(parser->length == 3) {
 			if(strncmp(parser->buffer, "[3~", 3) == 0) {
-				ret = CONSOLE_KEY_DELETE;
+				ret = 0x7F;
 			} else if(strncmp(parser->buffer, "[5~", 3) == 0) {
 				ret = CONSOLE_KEY_PGUP;
 			} else if(strncmp(parser->buffer, "[6~", 3) == 0) {

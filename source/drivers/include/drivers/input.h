@@ -191,6 +191,15 @@ typedef struct keyboard_ops {
 	status_t (*request)(struct input_device *device, unsigned request,
 		const void *in, size_t in_size, void **outp,
 		size_t *out_sizep);
+
+	/** Poll for input.
+	 * @note		This function is only used for kernel debugger
+	 *			input and therefore must be safe to call from
+	 *			interrupt context.
+	 * @param device	Device to poll.
+	 * @param event		Event structure to fill in.
+	 * @return		Whether an event was received. */
+	bool (*poll)(struct input_device *device, input_event_t *event);
 } keyboard_ops_t;
 
 /** Mouse device operations structure. */

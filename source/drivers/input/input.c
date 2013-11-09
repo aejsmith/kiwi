@@ -25,12 +25,14 @@
 #include <io/request.h>
 
 #include <lib/atomic.h>
+#include <lib/ctype.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
 
 #include <assert.h>
+#include <console.h>
 #include <module.h>
 #include <status.h>
 #include <time.h>
@@ -40,6 +42,21 @@ static device_t *input_device_dir;
 
 /** Next device ID. */
 static atomic_t next_input_id = 0;
+
+/** Device used for kernel console input. */
+static input_device_t *console_input_device = NULL;
+
+/** Kernel console input modifiers. */
+#define INPUT_MODIFIER_CTRL	(1<<0)
+#define INPUT_MODIFIER_SHIFT	(1<<1)
+#define INPUT_MODIFIER_CAPS	(1<<2)
+
+/* Currently selected modifiers. */
+static uint32_t console_input_modifiers = 0;
+
+extern uint16_t key_table[];
+extern uint16_t key_table_shift[];
+extern uint16_t key_table_ctrl[];
 
 /** Destroy an input device.
  * @param _device	Device to destroy. */
@@ -236,6 +253,111 @@ static device_ops_t mouse_device_ops = {
 	.request = mouse_device_request,
 };
 
+/** Translate an input event for the kernel console.
+ * @param event		Event to translate.
+ * @return		Character read, 0 if not an actual character. */
+static uint16_t translate_console_event(input_event_t *event) {
+	uint16_t *table;
+
+	if(event->type == INPUT_EVENT_KEY_DOWN) {
+		switch(event->value) {
+		case INPUT_KEY_LCTRL:
+		case INPUT_KEY_RCTRL:
+			console_input_modifiers |= INPUT_MODIFIER_CTRL;
+			return 0;
+		case INPUT_KEY_LSHIFT:
+		case INPUT_KEY_RSHIFT:
+			console_input_modifiers |= INPUT_MODIFIER_SHIFT;
+			return 0;
+		}
+	} else if(event->type == INPUT_EVENT_KEY_UP) {
+		switch(event->value) {
+		case INPUT_KEY_LCTRL:
+		case INPUT_KEY_RCTRL:
+			console_input_modifiers &= ~INPUT_MODIFIER_CTRL;
+			return 0;
+		case INPUT_KEY_LSHIFT:
+		case INPUT_KEY_RSHIFT:
+			console_input_modifiers &= ~INPUT_MODIFIER_SHIFT;
+			return 0;
+		case INPUT_KEY_CAPSLOCK:
+			console_input_modifiers ^= INPUT_MODIFIER_CAPS;
+			return 0;
+		}
+
+		table = (console_input_modifiers & INPUT_MODIFIER_SHIFT)
+			? key_table_shift
+			: key_table;
+
+		if(console_input_modifiers & INPUT_MODIFIER_CTRL && key_table_ctrl[event->value]) {
+		        return key_table_ctrl[event->value];
+		} else if(table[event->value]) {
+		        if(console_input_modifiers & INPUT_MODIFIER_CAPS && isalpha(table[event->value])) {
+		                return toupper(table[event->value]);
+		        } else {
+		                return table[event->value];
+		        }
+		}
+	}
+
+	return 0;
+}
+
+/** Check for a character from the console.
+ * @return		Character read, or 0 if none available. */
+static uint16_t input_console_poll(void) {
+	input_device_t *device;
+	input_event_t event;
+
+	device = console_input_device;
+	if(!device || !device->kops->poll || !device->kops->poll(device, &event))
+		return 0;
+
+	return translate_console_event(&event);
+}
+
+/** Read a character from the console, blocking until it can do so.
+ * @param chp		Where to store character read.
+ * @return		Status code describing the result of the operation. */
+static status_t input_console_getc(uint16_t *chp) {
+	input_device_t *device;
+	uint16_t ch;
+	status_t ret;
+
+	assert(console_input_device);
+	device = console_input_device;
+
+	/* Don't let things read from the kernel console if something else
+	 * has the device open. */
+	if(atomic_get(&device->open))
+		return STATUS_IN_USE;
+
+	do {
+		ret = semaphore_down_etc(&device->sem, -1, SLEEP_INTERRUPTIBLE);
+		if(ret != STATUS_SUCCESS)
+			return ret;
+
+		spinlock_lock(&device->lock);
+
+		ch = translate_console_event(&device->buffer[device->start]);
+
+		device->size--;
+		if(++device->start == INPUT_BUFFER_SIZE)
+			device->start = 0;
+
+		spinlock_unlock(&device->lock);
+	} while(!ch);
+
+	*chp = ch;
+	return STATUS_SUCCESS;
+}
+
+/** Input device console operations. */
+static console_in_ops_t input_console_in_ops = {
+	.poll = input_console_poll,
+	.getc = input_console_getc,
+};
+
 /**
  * Add an event to an input device's buffer.
  *
@@ -253,7 +375,7 @@ __export void input_device_event(device_t *_device, uint8_t type, int32_t value)
 	spinlock_lock(&device->lock);
 
 	/* Drop the input if full or device is not open. */
-	if(!atomic_get(&device->open) || device->size == INPUT_BUFFER_SIZE) {
+	if((!device->open && device != console_input_device) || device->size == INPUT_BUFFER_SIZE) {
 		spinlock_unlock(&device->lock);
 		return;
 	}
@@ -326,6 +448,12 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 			kfree(device);
 			return ret;
 		}
+	}
+
+	/* Take over the console input. */
+	if(type == INPUT_TYPE_KEYBOARD && !console_input_device) {
+		console_input_device = device;
+		main_console.in = &input_console_in_ops;
 	}
 
 	return STATUS_SUCCESS;

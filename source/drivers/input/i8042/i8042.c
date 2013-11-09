@@ -139,9 +139,9 @@ static irq_status_t i8042_keyboard_irq(unsigned num, void *_device) {
 
 	/* If extended, set that we've seen an extended and return. */
 	if(code >= 0xe0) {
-		if(code == 0xe0) {
+		if(code == 0xe0)
 			keyboard_seen_extended = true;
-		}
+
 		return IRQ_HANDLED;
 	}
 
@@ -162,6 +162,40 @@ static irq_status_t i8042_keyboard_irq(unsigned num, void *_device) {
 	return IRQ_HANDLED;
 }
 
+/** Poll for input.
+ * @param device	Device to poll.
+ * @param event		Event structure to fill in.
+ * @return		Whether an event was received. */
+static bool i8042_keyboard_poll(input_device_t *device, input_event_t *event) {
+	uint8_t code;
+
+	if(!(in8(0x64) & (1<<0)) || in8(0x64) & (1<<5))
+		return false;
+
+	code = in8(0x60);
+
+	/* If extended, set that we've seen an extended and return. */
+	if(code >= 0xe0) {
+		if(code == 0xe0)
+			keyboard_seen_extended = true;
+
+		return false;
+	}
+
+	/* Convert key releases into the right event type. */
+	if(code & 0x80) {
+		code &= 0x7F;
+		event->type = INPUT_EVENT_KEY_UP;
+	} else {
+		event->type = INPUT_EVENT_KEY_DOWN;
+	}
+
+	/* Translate the code into an input layer code. */
+	event->value = i8042_keycode_table[code][keyboard_seen_extended];
+	keyboard_seen_extended = false;
+	return event->value;
+}
+
 /** Destroy an i8042 keyboard device.
  * @param device	Device to destroy. */
 static void i8042_keyboard_destroy(input_device_t *device) {
@@ -170,6 +204,7 @@ static void i8042_keyboard_destroy(input_device_t *device) {
 
 /** i8042 keyboard device operations structure. */
 static keyboard_ops_t i8042_keyboard_ops = {
+	.poll = i8042_keyboard_poll,
 	.destroy = i8042_keyboard_destroy,
 };
 

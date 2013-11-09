@@ -54,8 +54,10 @@ typedef struct console_in_ops {
 	uint16_t (*poll)(void);
 
 	/** Read a character from the console, blocking until it can do so.
-	 * @return		Character read. */
-	uint16_t (*getc)(void);
+	 * @param ch		Where to store character read.
+	 * @return		Status code describing the result of the
+	 *			operation. */
+	status_t (*getc)(uint16_t *chp);
 } console_in_ops_t;
 
 /** Special console key definitions. */
@@ -67,7 +69,6 @@ typedef struct console_in_ops {
 #define CONSOLE_KEY_END		0x105
 #define CONSOLE_KEY_PGUP	0x106
 #define CONSOLE_KEY_PGDN	0x107
-#define CONSOLE_KEY_DELETE	0x108
 
 /**
  * Kernel console structure.

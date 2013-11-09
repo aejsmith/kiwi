@@ -642,7 +642,7 @@ static char *kdb_read_line(int count) {
 			}
 		} else if(ch == '\b') {
 			kdb_line_erase(&state, false);
-		} else if(ch == CONSOLE_KEY_DELETE) {
+		} else if(ch == 0x7F) {
 			kdb_line_erase(&state, true);
 		} else if(ch == CONSOLE_KEY_LEFT) {
 			if(state.position) {

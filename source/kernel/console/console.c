@@ -104,7 +104,9 @@ static status_t kconsole_device_io(device_t *device, file_handle_t *handle,
 		for(i = 0; i < request->total; i++) {
 			/* TODO: Escape sequences for special keys, nonblock. */
 			do {
-				ch = main_console.in->getc();
+				ret = main_console.in->getc(&ch);
+				if(ret != STATUS_SUCCESS)
+					goto out;
 			} while(ch > 0xFF);
 
 			buf[i] = ch;
