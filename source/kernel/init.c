@@ -173,7 +173,7 @@ __init_text void kmain_ap(cpu_t *cpu) {
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void init_thread(void *arg1, void *arg2) {
-	const char *pargs[] = { "/system/bin/test", NULL }, *penv[] = { NULL };
+	const char *pargs[] = { "/system/bin/shell", NULL }, *penv[] = { NULL };
 	initcall_t *initcall;
 	size_t count = 0;
 	const char *name;
