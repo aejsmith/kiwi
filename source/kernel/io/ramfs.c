@@ -131,9 +131,27 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name,
  * @param node		Node structure describing the node being created.
  * @return		Status code describing result of the operation. */
 static status_t ramfs_node_unlink(fs_node_t *parent, const char *name, fs_node_t *node) {
+	ramfs_node_t *data = node->data;
 	ramfs_node_t *pdata = parent->data;
+	dir_entry_t *entry;
 
 	assert(parent->file.type == FILE_TYPE_DIR);
+
+	if(node->file.type == FILE_TYPE_DIR) {
+		mutex_lock(&data->entries->lock);
+
+		/* Ensure the directory is empty. */
+		RADIX_TREE_FOREACH(&data->entries->entries, iter) {
+			entry = radix_tree_entry(iter, dir_entry_t);
+
+			if(strcmp(entry->name, ".") && strcmp(entry->name, "..")) {
+				mutex_unlock(&data->entries->lock);
+				return STATUS_DIR_NOT_EMPTY;
+			}
+		}
+
+		mutex_unlock(&data->entries->lock);
+	}
 
 	entry_cache_remove(pdata->entries, name);
 	fs_node_remove(node);
