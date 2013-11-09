@@ -1122,9 +1122,17 @@ status_t kern_process_exec(const char *path, const char *const args[],
 
 	/* Switch over to the new address space. */
 	thread_disable_preempt();
+
 	vm_aspace_switch(load.aspace);
 	prev_aspace = curr_proc->aspace;
 	curr_proc->aspace = load.aspace;
+
+	/* Mark our own stack as NULL so that the thread cleanup code will not
+	 * try to unmap it, which would end up unmapping something in the new
+	 * address space. */
+	curr_thread->ustack = 0;
+	curr_thread->ustack_size = 0;
+
 	thread_enable_preempt();
 
 	prev_token = curr_proc->token;
