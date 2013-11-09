@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2010 Alex Smith
+# Copyright (C) 2013 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -48,20 +48,6 @@ config PC_SERIAL_PORT
 	default 2 if PC_SERIAL_PORT_COM2
 	default 3 if PC_SERIAL_PORT_COM3
 	default 4 if PC_SERIAL_PORT_COM4
-
-choice
-	prompt "Debugger keyboard layout"
-	default PC_KBD_LAYOUT_UK
-	help
-	  Keyboard layout to use for the debugger console.
-
-config PC_KBD_LAYOUT_UK
-	bool "United Kingdom"
-
-config PC_KBD_LAYOUT_US
-	bool "United States"
-
-endchoice
 
 #######
 endmenu

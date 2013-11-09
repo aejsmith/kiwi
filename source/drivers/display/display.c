@@ -145,7 +145,7 @@ static status_t display_device_open(device_t *_device, uint32_t flags, void **da
 
 	/* If this is the kernel console device, register the redraw notifier. */
 	if(device == display_console_device) {
-		fb_console_control(FB_CONSOLE_ACQUIRE, NULL);
+		fb_console_acquire();
 		notifier_register(&kdb_exit_notifier, display_console_redraw, device);
 	}
 
@@ -165,7 +165,7 @@ static void display_device_close(device_t *_device, file_handle_t *handle) {
 
 	if(device == display_console_device) {
 		notifier_unregister(&kdb_exit_notifier, display_console_redraw, device);
-		fb_console_control(FB_CONSOLE_RELEASE, NULL);
+		fb_console_release();
 	}
 }
 
@@ -317,7 +317,7 @@ static status_t display_device_request(device_t *_device, file_handle_t *handle,
 		/* For now just return whatever mode the kernel console is
 		 * using, and fallback on 1024x768, then 800x600 if the mode
 		 * is unavailable. */
-		fb_console_control(FB_CONSOLE_INFO, &info);
+		fb_console_info(&info);
 		mode = display_mode_find(device, info.width, info.height, info.depth);
 		if(!mode) {
 			mode = display_mode_find(device, 1024, 768, 0);
@@ -353,7 +353,7 @@ static status_t display_device_request(device_t *_device, file_handle_t *handle,
 			if(device == display_console_device) {
 				notifier_unregister(&kdb_exit_notifier,
 					display_console_redraw, device);
-				fb_console_control(FB_CONSOLE_RELEASE, NULL);
+				fb_console_release();
 				display_console_device = NULL;
 			}
 
@@ -382,7 +382,7 @@ static status_t display_device_request(device_t *_device, file_handle_t *handle,
 				 * after KDB has run, and acquire the console
 				 * to prevent kernel output. */
 				if(!display_console_device) {
-					fb_console_control(FB_CONSOLE_ACQUIRE, NULL);
+					fb_console_acquire();
 					notifier_register(&kdb_exit_notifier,
 						display_console_redraw, device);
 				}
@@ -391,7 +391,7 @@ static status_t display_device_request(device_t *_device, file_handle_t *handle,
 
 				/* Point the framebuffer console at the device. */
 				display_mode_to_fb_info(device, mode, &info);
-				fb_console_control(FB_CONSOLE_CONFIGURE, &info);
+				fb_console_configure(&info, MM_KERNEL);
 			}
 		}
 

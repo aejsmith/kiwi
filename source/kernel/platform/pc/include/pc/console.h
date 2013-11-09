@@ -54,6 +54,14 @@
 #define VGA_NUM_GC_REGS		9
 #define VGA_NUM_AC_REGS		21
 #define VGA_NUM_REGS		(1 + VGA_NUM_SEQ_REGS + VGA_NUM_CRTC_REGS \
-	+ VGA_NUM_GC_REGS + VGA_NUM_AC_REGS)
+					+ VGA_NUM_GC_REGS + VGA_NUM_AC_REGS)
+
+/** Keyboard code definitions */
+#define LEFT_CTRL		0x1D
+#define RIGHT_CTRL		0x1D
+#define LEFT_ALT		0x38
+#define RIGHT_ALT		0x38
+#define LEFT_SHIFT		0x2A
+#define RIGHT_SHIFT		0x36
 
 #endif /* __PC_CONSOLE_H */

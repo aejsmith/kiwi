@@ -19,43 +19,25 @@
  * @brief		Kernel console functions.
  */
 
+#include <io/device.h>
+#include <io/request.h>
+
 #include <lib/string.h>
+
+#include <mm/malloc.h>
 
 #include <sync/spinlock.h>
 
 #include <console.h>
 #include <kboot.h>
 #include <kernel.h>
+#include <status.h>
 
-/** Lock protecting the console input list. */
-static SPINLOCK_DECLARE(console_lock);
+/** Main console. */
+console_t main_console;
 
-/** Debug console operations. */
-console_out_ops_t *debug_console_ops = NULL;
-
-/** Main console operations. */
-console_out_ops_t *main_console_ops = NULL;
-
-/** List of kernel console input operations. */
-LIST_DECLARE(console_in_ops);
-
-/** Register console input operations.
- * @param ops		Operations to register. */
-void console_register_in_ops(console_in_ops_t *ops) {
-	list_init(&ops->header);
-
-	spinlock_lock(&console_lock);
-	list_append(&console_in_ops, &ops->header);
-	spinlock_unlock(&console_lock);
-}
-
-/** Unregister console input operations.
- * @param ops		Operations to unregister. */
-void console_unregister_in_ops(console_in_ops_t *ops) {
-	spinlock_lock(&console_lock);
-	list_remove(&ops->header);
-	spinlock_unlock(&console_lock);
-}
+/** Debug console. */
+console_t debug_console;
 
 /** Initialize the debug console. */
 __init_text void console_early_init(void) {
@@ -63,7 +45,7 @@ __init_text void console_early_init(void) {
 
 	platform_console_early_init(video);
 
-	if(!main_console_ops) {
+	if(!main_console.out) {
 		/* Look for a framebuffer console. */
 		if(video && video->type == KBOOT_VIDEO_LFB)
 			fb_console_early_init(video);
@@ -74,63 +56,82 @@ __init_text void console_early_init(void) {
 __init_text void console_init(void) {
 	kboot_tag_video_t *video = kboot_tag_iterate(KBOOT_TAG_VIDEO, NULL);
 
-	if(debug_console_ops && debug_console_ops->init)
-		debug_console_ops->init(video);
-	if(main_console_ops && main_console_ops->init)
-		main_console_ops->init(video);
+	if(debug_console.out && debug_console.out->init)
+		debug_console.out->init(video);
+	if(main_console.out && main_console.out->init)
+		main_console.out->init(video);
 }
 
-/** Handle an input character.
- * @param parser	Parser data to use.
- * @param ch		Character received.
- * @return		Value to return, 0 if no character to return yet. */
-uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch) {
-	uint16_t ret = 0;
+/*
+ * Kernel console device functions.
+ */
 
-	if(parser->length < 0) {
-		if(ch == 0x1B) {
-			parser->length = 0;
-			return 0;
-		} else {
-			return (uint16_t)ch;
+/** Perform I/O on the kernel console device.
+ * @param device	Device to perform I/O on.
+ * @param handle	File handle structure.
+ * @param request	I/O request.
+ * @return		Status code describing result of the operation. */
+static status_t kconsole_device_io(device_t *device, file_handle_t *handle,
+	io_request_t *request)
+{
+	char *buf;
+	size_t i;
+	uint16_t ch;
+	status_t ret;
+
+	buf = kmalloc(request->total, MM_USER);
+	if(!buf)
+		return STATUS_NO_MEMORY;
+
+	if(request->op == IO_OP_WRITE) {
+		if(!main_console.out) {
+			ret = STATUS_NOT_SUPPORTED;
+			goto out;
 		}
+
+		ret = io_request_copy(request, buf, request->total);
+		if(ret != STATUS_SUCCESS)
+			goto out;
+
+		for(i = 0; i < request->total; i++)
+			main_console.out->putc(buf[i]);
 	} else {
-		parser->buffer[parser->length++] = ch;
-
-		/* Check for known sequences. */
-		if(parser->length == 2) {
-			if(strncmp(parser->buffer, "[A", 2) == 0) {
-				ret = CONSOLE_KEY_UP;
-			} else if(strncmp(parser->buffer, "[B", 2) == 0) {
-				ret = CONSOLE_KEY_DOWN;
-			} else if(strncmp(parser->buffer, "[D", 2) == 0) {
-				ret = CONSOLE_KEY_LEFT;
-			} else if(strncmp(parser->buffer, "[C", 2) == 0) {
-				ret = CONSOLE_KEY_RIGHT;
-			} else if(strncmp(parser->buffer, "[H", 2) == 0) {
-				ret = CONSOLE_KEY_HOME;
-			} else if(strncmp(parser->buffer, "[F", 2) == 0) {
-				ret = CONSOLE_KEY_END;
-			}
-		} else if(parser->length == 3) {
-			if(strncmp(parser->buffer, "[3~", 3) == 0) {
-				ret = CONSOLE_KEY_DELETE;
-			} else if(strncmp(parser->buffer, "[5~", 3) == 0) {
-				ret = CONSOLE_KEY_PGUP;
-			} else if(strncmp(parser->buffer, "[6~", 3) == 0) {
-				ret = CONSOLE_KEY_PGDN;
-			}
+		if(!main_console.in || !main_console.in->getc) {
+			ret = STATUS_NOT_SUPPORTED;
+			goto out;
 		}
 
-		if(ret != 0 || parser->length == ANSI_PARSER_BUFFER_LEN)
-			parser->length = -1;
+		for(i = 0; i < request->total; i++) {
+			/* TODO: Escape sequences for special keys, nonblock. */
+			do {
+				ch = main_console.in->getc();
+			} while(ch > 0xFF);
 
-		return ret;
+			buf[i] = ch;
+		}
+
+		ret = io_request_copy(request, buf, request->total);
 	}
+
+out:
+	kfree(buf);
+	return ret;
 }
 
-/** Initialize an ANSI escape code parser data structure.
- * @param parser	Parser to initialize. */
-void ansi_parser_init(ansi_parser_t *parser) {
-	parser->length = -1;
+/** Kernel console device operations structure. */
+static device_ops_t kconsole_device_ops = {
+	.type = FILE_TYPE_CHAR,
+	.io = kconsole_device_io,
+};
+
+/** Register the kernel console device. */
+static __init_text void console_device_init(void) {
+	status_t ret;
+
+	ret = device_create("kconsole", device_tree_root, &kconsole_device_ops,
+		NULL, NULL, 0, NULL);
+	if(ret != STATUS_SUCCESS)
+		fatal("Failed to register kernel console device (%d)", ret);
 }
+
+INITCALL(console_device_init);

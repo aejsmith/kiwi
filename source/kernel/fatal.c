@@ -43,10 +43,10 @@ static atomic_t in_fatal = 0;
 
 /** Helper for fatal_printf(). */
 static void fatal_printf_helper(char ch, void *data, int *total) {
-	if(debug_console_ops)
-		debug_console_ops->putc(ch);
-	if(main_console_ops)
-		main_console_ops->putc(ch);
+	if(debug_console.out)
+		debug_console.out->putc(ch);
+	if(main_console.out)
+		main_console.out->putc(ch);
 
 	kboot_log_write(ch);
 

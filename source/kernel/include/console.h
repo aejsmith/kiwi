@@ -26,7 +26,15 @@
 
 struct kboot_tag_video;
 
-/** Kernel console output operations structure. */
+/**
+ * Kernel console output operations.
+ *
+ * This structure defines operations used for kernel console output. Console
+ * output should be possible under any circumstance and therefore these
+ * functions must be usable in interrupt context. While for normal kernel
+ * output they are called with the kernel log lock held, they can also be
+ * called without, so they should perform locking themselves.
+ */
 typedef struct console_out_ops {
 	/** Properly initialize the console after memory management setup.
 	 * @param video		KBoot video tag. */
@@ -39,10 +47,14 @@ typedef struct console_out_ops {
 
 /** Kernel console input operations structure. */
 typedef struct console_in_ops {
-	list_t header;			/**< Link to input operations list. */
-
 	/** Check for a character from the console.
+	 * @note		This function must be safe to use from interrupt
+	 *			context.
 	 * @return		Character read, or 0 if none available. */
+	uint16_t (*poll)(void);
+
+	/** Read a character from the console, blocking until it can do so.
+	 * @return		Character read. */
 	uint16_t (*getc)(void);
 } console_in_ops_t;
 
@@ -57,31 +69,29 @@ typedef struct console_in_ops {
 #define CONSOLE_KEY_PGDN	0x107
 #define CONSOLE_KEY_DELETE	0x108
 
-extern console_out_ops_t *debug_console_ops;
-extern console_out_ops_t *main_console_ops;
-extern list_t console_in_ops;
+/**
+ * Kernel console structure.
+ *
+ * This structure defines a kernel console. We currently have two separate
+ * consoles: the main console and the debug console. A console is made up of
+ * separate input and output operations. The separation is necessary because
+ * output and input may be handled in different places. They are probably the
+ * same for the debug console (both handled by a serial driver), but on the
+ * main console output may, for example, be handled by the framebuffer code,
+ * while input is handled by the input driver.
+ */
+typedef struct console {
+	console_out_ops_t *out;		/**< Output operations. */
+	console_in_ops_t *in;		/**< Input operations. */
+} console_t;
 
-extern void console_register_in_ops(console_in_ops_t *ops);
-extern void console_unregister_in_ops(console_in_ops_t *ops);
+extern console_t main_console;
+extern console_t debug_console;
 
 extern void platform_console_early_init(struct kboot_tag_video *video);
 
 extern void console_early_init(void);
 extern void console_init(void);
-
-/** Buffer length for ANSI escape code parser. */
-#define ANSI_PARSER_BUFFER_LEN	3
-
-/** ANSI escape code parser structure. */
-typedef struct ansi_parser {
-	/** Buffer containing collected sequence. */
-	char buffer[ANSI_PARSER_BUFFER_LEN];
-
-	int length;			/**< Buffer length. */
-} ansi_parser_t;
-
-extern uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch);
-extern void ansi_parser_init(ansi_parser_t *parser);
 
 /** Framebuffer information structure. */
 typedef struct fb_info {
@@ -98,13 +108,10 @@ typedef struct fb_info {
 	phys_ptr_t addr;		/**< Physical address of the framebuffer. */
 } fb_info_t;
 
-/** Framebuffer console control operations. */
-#define FB_CONSOLE_INFO		1	/**< Get information. */
-#define FB_CONSOLE_CONFIGURE	2	/**< Move to a new framebuffer. */
-#define FB_CONSOLE_ACQUIRE	3	/**< Take control of the framebuffer (prevent kernel output). */
-#define FB_CONSOLE_RELEASE	4	/**< Release control of the framebuffer. */
-
-extern void fb_console_control(unsigned op, fb_info_t *info);
+extern void fb_console_info(fb_info_t *info);
+extern status_t fb_console_configure(const fb_info_t *info, unsigned mmflag);
+extern void fb_console_acquire(void);
+extern void fb_console_release(void);
 extern void fb_console_early_init(struct kboot_tag_video *video);
 
 #endif /* __CONSOLE_H */

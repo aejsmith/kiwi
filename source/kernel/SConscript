@@ -37,6 +37,7 @@ sources = FeatureSources(config, [
     #'ipc/ipc.c',
     'ipc/pipe.c',
 
+    'lib/ansi_parser.c',
     'lib/avl_tree.c',
     'lib/bitmap.c',
     'lib/fixed_heap.c',

@@ -149,10 +149,10 @@ static kdb_command_desc_t *lookup_command(const char *name) {
 /** Print a character.
  * @param ch		Character to print. */
 static void kdb_putc(char ch) {
-	if(debug_console_ops)
-		debug_console_ops->putc(ch);
-	if(main_console_ops)
-		main_console_ops->putc(ch);
+	if(debug_console.out)
+		debug_console.out->putc(ch);
+	if(main_console.out)
+		main_console.out->putc(ch);
 	if(use_kboot_log)
 		kboot_log_write(ch);
 }
@@ -261,14 +261,16 @@ static void kdb_backtrace_cb(ptr_t addr) {
 /** Read a character from the console.
  * @return		Character/special key code read. */
 uint16_t kdb_getc(void) {
-	console_in_ops_t *ops;
 	uint16_t ch;
 
 	while(true) {
-		LIST_FOREACH(&console_in_ops, iter) {
-			ops = list_entry(iter, console_in_ops_t, header);
-
-			ch = ops->getc();
+		if(debug_console.in) {
+			ch = debug_console.in->poll();
+			if(ch)
+				return ch;
+		}
+		if(main_console.in) {
+			ch = main_console.in->poll();
 			if(ch)
 				return ch;
 		}

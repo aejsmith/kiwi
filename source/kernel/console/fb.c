@@ -27,10 +27,13 @@
 #include <mm/malloc.h>
 #include <mm/phys.h>
 
+#include <sync/spinlock.h>
+
 #include <console.h>
 #include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
+#include <status.h>
 
 #if CONFIG_DEBUG
 KBOOT_BOOLEAN_OPTION("splash_disabled", "Disable splash screen", true);
@@ -65,12 +68,13 @@ extern unsigned char logo_ppm[];
 /** Get the byte offset of a pixel. */
 #define OFFSET(x, y)		(((y * fb_info.width) + x) * fb_info.bytes_per_pixel)
 
-static void fb_console_configure(const fb_info_t *info, unsigned mmflag);
+/** Lock for the framebuffer console. */
+static SPINLOCK_DECLARE(fb_lock);
 
 /** Framebuffer information. */
 static fb_info_t fb_info;
-static char *fb_mapping = NULL;
-static char *fb_backbuffer = NULL;
+static uint8_t *fb_mapping = NULL;
+static uint8_t *fb_backbuffer = NULL;
 
 /** Framebuffer console information. */
 static unsigned char *fb_console_glyphs = NULL;
@@ -85,6 +89,10 @@ static bool fb_was_acquired = false;
 static bool splash_enabled = false;
 static uint16_t splash_progress_x;
 static uint16_t splash_progress_y;
+
+/**
+ * Framebuffer drawing functions.
+ */
 
 /** Put a pixel on the framebuffer.
  * @param x		X position.
@@ -201,11 +209,9 @@ static void fb_copyrect(uint16_t dest_x, uint16_t dest_y, uint16_t src_x,
 	}
 }
 
-/** Properly initialize the framebuffer console.
- * @param video		KBoot video tag. */
-static void fb_console_init(kboot_tag_video_t *video) {
-	fb_console_configure(&fb_info, MM_BOOT);
-}
+/**
+ * Framebuffer console functions.
+ */
 
 /** Draw a glyph at the specified position the console.
  * @param ch		Character to draw.
@@ -257,6 +263,8 @@ static void fb_console_disable_cursor(void) {
 static void fb_console_putc(char ch) {
 	if(fb_console_acquired)
 		return;
+
+	spinlock_lock(&fb_lock);
 
 	fb_console_disable_cursor();
 
@@ -323,6 +331,13 @@ static void fb_console_putc(char ch) {
 	}
 
 	fb_console_enable_cursor();
+	spinlock_unlock(&fb_lock);
+}
+
+/** Properly initialize the framebuffer console.
+ * @param video		KBoot video tag. */
+static void fb_console_init(kboot_tag_video_t *video) {
+	fb_console_configure(&fb_info, MM_BOOT);
 }
 
 /** Kernel console output operations structure. */
@@ -345,7 +360,7 @@ static void fb_console_reset(void) {
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
 static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
-	if(main_console_ops == &fb_console_out_ops) {
+	if(main_console.out == &fb_console_out_ops) {
 		fb_was_acquired = fb_console_acquired;
 		if(fb_was_acquired) {
 			fb_console_acquired = false;
@@ -359,30 +374,94 @@ static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
 static void fb_console_disable(void *arg1, void *arg2, void *arg3) {
-	if(main_console_ops == &fb_console_out_ops)
+	if(main_console.out == &fb_console_out_ops)
 		fb_console_acquired = fb_was_acquired;
 }
 
+/**
+ * Public functions.
+ */
+
+/** Get framebuffer console information.
+ * @param info		Where to store console information. */
+void fb_console_info(fb_info_t *info) {
+	spinlock_lock(&fb_lock);
+	memcpy(info, &fb_info, sizeof(*info));
+	spinlock_unlock(&fb_lock);
+}
+
 /** Reconfigure the framebuffer console.
- * @param info		Information structure for new framebuffer.
- * @param mmflag	Allocation behaviour flags (MM_KERNEL or MM_BOOT). */
-static void fb_console_configure(const fb_info_t *info, unsigned mmflag) {
-	bool was_boot;
+ * @param info		Information for the new framebuffer.
+ * @param mmflag	Allocation behaviour flags.
+ * @return		Status code describing the result of the operation. */
+status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
 	size_t size;
+	uint16_t cols, rows;
+	uint8_t *mapping;
+	uint8_t *backbuffer;
+	unsigned char *glyphs;
+	bool was_boot, have_prev;
+
+	/* Map in the framebuffer and allocate a backbuffer. */
+	size = info->width * info->height * info->bytes_per_pixel;
+	size = ROUND_UP(size, PAGE_SIZE);
+	mapping = phys_map(fb_info.addr, size, mmflag);
+	if(!mapping)
+		return STATUS_NO_MEMORY;
+
+	backbuffer = kmem_alloc(size, mmflag);
+	if(!backbuffer) {
+		phys_unmap(fb_mapping, size, true);
+		return STATUS_NO_MEMORY;
+	}
+
+	cols = info->width / FONT_WIDTH;
+	rows = info->height / FONT_HEIGHT;
+	glyphs = kmalloc(cols * rows, mmflag);
+	if(!glyphs) {
+		kmem_free(backbuffer, size);
+		phys_unmap(fb_mapping, size, true);
+		return STATUS_NO_MEMORY;
+	}
+
+	spinlock_lock(&fb_lock);
 
 	was_boot = fb_backbuffer == fb_mapping;
+	have_prev = main_console.out == &fb_console_out_ops && !was_boot;
+	size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
+	size = ROUND_UP(size, PAGE_SIZE);
 
-	if(main_console_ops == &fb_console_out_ops && !was_boot) {
-		/* Framebuffer console is already in use. Temporarily disable
-		 * it to ensure nothing prints to it while we're making
-		 * changes. */
-		main_console_ops = NULL;
+	/* Swap out the old framebuffer for the new one. */
+	memcpy(&fb_info, info, sizeof(fb_info));
+	SWAP(fb_mapping, mapping);
+	SWAP(fb_backbuffer, backbuffer);
+	SWAP(fb_console_glyphs, glyphs);
+	fb_console_cols = cols;
+	fb_console_rows = rows;
 
+	memset(fb_console_glyphs, ' ', fb_console_cols * fb_console_rows);
+
+	/* If this was the KBoot framebuffer we should copy the current content
+	 * of that to the backbuffer. */
+	if(was_boot) {
+		memcpy(fb_backbuffer, fb_mapping, size);
+	} else if(!fb_console_acquired) {
+		fb_console_x = fb_console_y = 0;
+
+		/* Clear to the font background colour. */
+		fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
+		fb_console_enable_cursor();
+	}
+
+	main_console.out = &fb_console_out_ops;
+
+	spinlock_unlock(&fb_lock);
+
+	if(have_prev) {
 		/* Free old mappings. */
-		size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
-		phys_unmap(fb_mapping, size, true);
-		kmem_free(fb_backbuffer, ROUND_UP(size, PAGE_SIZE));
-		kfree(fb_console_glyphs);
+		kfree(glyphs);
+		kmem_free(backbuffer, size);
+		phys_unmap(mapping, size, true);
 	} else {
 		/* First time the framebuffer console has been enabled.
 		 * Register callbacks to reset the framebuffer console upon
@@ -392,70 +471,49 @@ static void fb_console_configure(const fb_info_t *info, unsigned mmflag) {
 		notifier_register(&kdb_exit_notifier, fb_console_disable, NULL);
 	}
 
-	memcpy(&fb_info, info, sizeof(fb_info));
-
-	/* Map in the framebuffer and allocate a backbuffer. */
-	size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
-	fb_mapping = phys_map(fb_info.addr, size, mmflag);
-	fb_backbuffer = kmem_alloc(ROUND_UP(size, PAGE_SIZE), mmflag | MM_ZERO);
-
-	/* If this was the KBoot framebuffer we should copy the current content
-	 * of that to the backbuffer. */
-	if(was_boot) {
-		memcpy(fb_backbuffer, fb_mapping,
-			fb_info.height * fb_info.width * fb_info.bytes_per_pixel);
-	}
-
-	/* Configure the console and create a backbuffer for it, initially
-	 * filled with spaces. */
-	fb_console_cols = fb_info.width / FONT_WIDTH;
-	fb_console_rows = fb_info.height / FONT_HEIGHT;
-	fb_console_glyphs = kmalloc(fb_console_cols * fb_console_rows, mmflag);
-	memset(fb_console_glyphs, ' ', fb_console_cols * fb_console_rows);
-
-	if(!fb_console_acquired) {
-		/* Clear to the font background colour. */
-		if(!was_boot)
-			fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
-		fb_console_enable_cursor();
-	}
-
-	main_console_ops = &fb_console_out_ops;
+	return STATUS_SUCCESS;
 }
 
-/** Control the framebuffer console.
- * @param op		Operation to perform.
- * @param info		For FB_CONSOLE_INFO and FB_CONSOLE_CONFIGURE, FB info
- *			structure to use. */
-void fb_console_control(unsigned op, fb_info_t *info) {
-	switch(op) {
-	case FB_CONSOLE_INFO:
-		/* Get information on the current mode. */
-		memcpy(info, &fb_info, sizeof(*info));
-		break;
-	case FB_CONSOLE_CONFIGURE:
-		/* Reconfigure to use a new framebuffer. */
-		fb_console_configure(info, MM_KERNEL);
-		break;
-	case FB_CONSOLE_ACQUIRE:
-		/* Acquire the framebuffer for exclusive use. */
-		if(fb_console_acquired && !splash_enabled)
-			fatal("Framebuffer console already acquired");
+/**
+ * Acquire the framebuffer for exclusive use.
+ *
+ * Acquires the framebuffer for exclusive use. This disables the splash screen
+ * and prevents kernel output to the framebuffer. It can be used if KDB is
+ * entered or a fatal error occurs.
+ */
+void fb_console_acquire(void) {
+	spinlock_lock(&fb_lock);
 
-		/* Prevent output to the console. */
-		fb_console_acquired = true;
-		splash_enabled = false;
-		break;
-	case FB_CONSOLE_RELEASE:
-		/* Release the framebuffer. */
-		if(!fb_console_acquired)
-			fatal("Framebuffer console not acquired");
+	if(fb_console_acquired && !splash_enabled)
+		fatal("Framebuffer console already acquired");
 
-		fb_console_acquired = false;
-		fb_console_reset();
-		break;
-	}
+	fb_console_acquired = true;
+	splash_enabled = false;
+
+	spinlock_unlock(&fb_lock);
 }
+
+/**
+ * Release the framebuffer.
+ *
+ * Releases the framebuffer after it has been acquired with fb_console_acquire()
+ * and re-enables kernel output to it.
+ */
+void fb_console_release(void) {
+	spinlock_lock(&fb_lock);
+
+	if(!fb_console_acquired)
+		fatal("Framebuffer console not acquired");
+
+	fb_console_acquired = false;
+	fb_console_reset();
+
+	spinlock_unlock(&fb_lock);
+}
+
+/**
+ * Splash screen functions.
+ */
 
 /* Skip over whitespace and comments in a PPM file.
  * @param buf		Pointer to data buffer.
@@ -535,6 +593,23 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
 	}
 }
 
+/** Update the progress on the boot splash.
+ * @param percent	Boot progress percentage. */
+void update_boot_progress(int percent) {
+	if(splash_enabled) {
+		fb_fillrect(splash_progress_x, splash_progress_y,
+			SPLASH_PROGRESS_WIDTH, SPLASH_PROGRESS_HEIGHT,
+			SPLASH_PROGRESS_BG);
+		fb_fillrect(splash_progress_x, splash_progress_y,
+			(SPLASH_PROGRESS_WIDTH * percent) / 100,
+			SPLASH_PROGRESS_HEIGHT, SPLASH_PROGRESS_FG);
+	}
+}
+
+/**
+ * Initialization functions.
+ */
+
 /** Initialize the framebuffer console.
  * @param video		KBoot video tag. */
 __init_text void fb_console_early_init(kboot_tag_video_t *video) {
@@ -556,7 +631,7 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
 	/* Get the mapping created by KBoot. Can't create a backbuffer yet so
 	 * set the backbuffer pointer to be the same - this will cause updates
 	 * from the backbuffer to not be done. */
-	fb_mapping = (char *)((ptr_t)video->lfb.fb_virt);
+	fb_mapping = (uint8_t *)((ptr_t)video->lfb.fb_virt);
 	fb_backbuffer = fb_mapping;
 
 	/* Clear the framebuffer. */
@@ -567,7 +642,7 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
 	fb_console_cols = fb_info.width / FONT_WIDTH;
 	fb_console_rows = fb_info.height / FONT_HEIGHT;
 
-	main_console_ops = &fb_console_out_ops;
+	main_console.out = &fb_console_out_ops;
 
 	/* If the splash is enabled, acquire the console so output is ignored. */
 	if(!kboot_boolean_option("splash_disabled")) {
@@ -587,18 +662,5 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
 
 		/* Draw initial progress bar. */
 		update_boot_progress(0);
-	}
-}
-
-/** Update the progress on the boot splash.
- * @param percent	Boot progress percentage. */
-void update_boot_progress(int percent) {
-	if(splash_enabled) {
-		fb_fillrect(splash_progress_x, splash_progress_y,
-			SPLASH_PROGRESS_WIDTH, SPLASH_PROGRESS_HEIGHT,
-			SPLASH_PROGRESS_BG);
-		fb_fillrect(splash_progress_x, splash_progress_y,
-			(SPLASH_PROGRESS_WIDTH * percent) / 100,
-			SPLASH_PROGRESS_HEIGHT, SPLASH_PROGRESS_FG);
 	}
 }
