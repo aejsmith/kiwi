@@ -58,10 +58,8 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	char buf[2];
 	int fd;
 
-	if(access(path, X_OK) != 0) {
-		errno = EACCES;
+	if(access(path, X_OK) != 0)
 		return -1;
-	}
 
 	/* Open the file and check if it is an interpreter. */
 	fd = open(path, O_RDONLY);
