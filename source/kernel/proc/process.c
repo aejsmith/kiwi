@@ -1132,8 +1132,7 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	prev_handles = curr_proc->handles;
 	curr_proc->handles = new_handles;
 	prev_name = curr_proc->name;
-	curr_proc->name = (char *)load.path;
-	load.path = NULL;
+	curr_proc->name = kstrdup(load.path, MM_KERNEL);
 
 	/* Reset signal handling state. */
 	memset(curr_proc->signal_act, 0, sizeof(curr_proc->signal_act));
