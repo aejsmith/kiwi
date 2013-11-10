@@ -28,7 +28,7 @@ typedef struct notifier_func {
 	list_t header;			/**< Link to notifier. */
 
 	notifier_cb_t func;		/**< Function to call. */
-	void *data;			/**< Third data argument for function. */
+	void *data;			/**< Second data argument for function. */
 } notifier_func_t;
 
 /** Initialize a notifier.
@@ -67,7 +67,7 @@ void notifier_clear(notifier_t *notif) {
  * the lock.
  *
  * @param notif		Notifier to run.
- * @param data		Pointer to pass as second argument to functions.
+ * @param data		Pointer to pass as third argument to functions.
  * @param destroy	Whether to remove functions after calling them.
  *
  * @return		Whther any handlers were called.
@@ -78,7 +78,7 @@ bool notifier_run_unlocked(notifier_t *notif, void *data, bool destroy) {
 
 	LIST_FOREACH_SAFE(&notif->functions, iter) {
 		nf = list_entry(iter, notifier_func_t, header);
-		nf->func(notif->data, data, nf->data);
+		nf->func(notif->data, nf->data, data);
 		if(destroy) {
 			list_remove(&nf->header);
 			kfree(nf);
@@ -92,7 +92,7 @@ bool notifier_run_unlocked(notifier_t *notif, void *data, bool destroy) {
 
 /** Runs all functions on a notifier.
  * @param notif		Notifier to run.
- * @param data		Pointer to pass as second argument to functions.
+ * @param data		Pointer to pass as third argument to functions.
  * @param destroy	Whether to remove functions after calling them.
  * @return		Whther any handlers were called. */
 bool notifier_run(notifier_t *notif, void *data, bool destroy) {
@@ -108,7 +108,7 @@ bool notifier_run(notifier_t *notif, void *data, bool destroy) {
 /** Add a function to a notifier.
  * @param notif		Notifier to add to.
  * @param func		Function to add.
- * @param data		Pointer to pass as third argument to function. */
+ * @param data		Pointer to pass as second argument to function. */
 void notifier_register(notifier_t *notif, notifier_cb_t func, void *data) {
 	notifier_func_t *nf = kmalloc(sizeof(notifier_func_t), MM_KERNEL);
 

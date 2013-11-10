@@ -50,8 +50,11 @@ static inline bool notifier_empty(notifier_t *notif) {
 	return list_empty(&notif->functions);
 }
 
-/** Notifier callback function type. */
-typedef void (*notifier_cb_t)(void *, void *, void *);
+/** Notifier callback function type.
+ * @param arg1		Data argument associated with the notifier.
+ * @param arg2		Data argument registered with the function.
+ * @param arg3		Data argument passed to notifier_run(). */
+typedef void (*notifier_cb_t)(void *arg1, void *arg2, void *arg3);
 
 extern void notifier_init(notifier_t *notif, void *data);
 extern void notifier_clear(notifier_t *notif);

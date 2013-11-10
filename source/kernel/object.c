@@ -98,11 +98,10 @@ void object_destroy(object_t *object) {
 
 /** Notifier function to use for object waiting.
  * @param arg1		Unused.
- * @param arg2		Unused.
- * @param arg3		Wait structure pointer. */
+ * @param arg2		Wait structure pointer.
+ * @param arg3		Data for the event (unsigned long cast to void *). */
 void object_wait_notifier(void *arg1, void *arg2, void *arg3) {
-	// FIXME: How do we pass data here? Use one of the other args?
-	object_wait_signal(arg3, 0);
+	object_wait_signal(arg2, (unsigned long)arg3);
 }
 
 /** Signal that an event being waited for has occurred.
