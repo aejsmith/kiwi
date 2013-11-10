@@ -31,6 +31,7 @@
 
 struct object_handle;
 struct process;
+struct vm_region;
 
 /** Kernel object type structure. */
 typedef struct object_type {
@@ -58,33 +59,22 @@ typedef struct object_type {
 	 * @param wait		Internal data pointer. */
 	void (*unwait)(struct object_handle *handle, unsigned event, void *wait);
 
-	/** Check if an object can be memory-mapped.
-	 * @note		If this function is implemented, the get_page
-	 *			operation MUST be implemented. If it is not,
-	 *			then the object will be classed as mappable if
-	 *			get_page is implemented.
+	/**
+	 * Map an object into memory.
+	 *
+	 * This function is called when an object is to be mapped into memory.
+	 * It should check whether the current thread has permission to perform
+	 * the mapping with the protection flags set in the region. It should
+	 * then either map the entire region up front, or set the region's
+	 * operations structure pointer to allow the region content to be
+	 * demand paged.
+	 *
 	 * @param handle	Handle to object.
-	 * @param protection	Protection flags (VM_PROT_*).
-	 * @param flags		Mapping flags (VM_MAP_*).
-	 * @return		STATUS_SUCCESS if can be mapped, status code
-	 *			explaining why if not. */
-	status_t (*mappable)(struct object_handle *handle, uint32_t protection,
-		uint32_t flags);
-
-	/** Get a page from the object.
-	 * @param handle	Handle to object to get page from.
-	 * @param offset	Offset into object to get page from.
-	 * @param physp		Where to store physical address of page.
-	 * @return		Status code describing result of the operation. */
-	status_t (*get_page)(struct object_handle *handle, offset_t offset,
-		phys_ptr_t *physp);
-
-	/** Release a page from the object.
-	 * @param handle	Handle to object to release page in.
-	 * @param offset	Offset of page in object.
-	 * @param phys		Physical address of page that was unmapped. */
-	void (*release_page)(struct object_handle *handle, offset_t offset,
-		phys_ptr_t phys);
+	 * @param region	Region being mapped.
+	 *
+	 * @return		Status code describing result of the operation.
+	 */
+	status_t (*map)(struct object_handle *handle, struct vm_region *region);
 } object_type_t;
 
 /** Properties of an object type. */

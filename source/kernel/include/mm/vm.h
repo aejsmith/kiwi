@@ -40,12 +40,32 @@
 struct intr_frame;
 struct mmu_context;
 struct vm_aspace;
+struct vm_region;
 
 /** Number of free lists to use. */
 #define VM_FREELISTS		(((unsigned)BITS(ptr_t)) - PAGE_WIDTH)
 
 /** Maximum length of a region name. */
 #define REGION_NAME_MAX		32
+
+/**
+ * Interface provided by an object to access its pages.
+ *
+ * This structure contains operations used by the VM to access an object's
+ * pages. When an object is mapped through a handle, the VM calls the object
+ * type's map() method. That method is expected to check that the requested
+ * access is allowed, and then either map the entire region up front, or set
+ * the region's "ops" and "private" pointers. The private pointer will be passed
+ * to all of these functions.
+ */
+typedef struct vm_region_ops {
+	/** Get a page for the region.
+	 * @param region	Region to get page for.
+	 * @param offset	Offset into object to get page from.
+	 * @param pagep		Where to store pointer to page structure.
+	 * @return		Status code describing result of the operation. */
+	status_t (*get_page)(struct vm_region *region, offset_t offset, page_t **pagep);
+} vm_region_ops_t;
 
 /** Structure containing an anonymous memory map. */
 typedef struct vm_amap {
@@ -81,6 +101,8 @@ typedef struct vm_region {
 	offset_t obj_offset;		/**< Offset into the object. */
 	vm_amap_t *amap;		/**< Anonymous map. */
 	offset_t amap_offset;		/**< Offset into the anonymous map. */
+	vm_region_ops_t *ops;		/**< Operations provided by the object. */
+	void *private;			/**< Private data for the object type. */
 
 	/** Kernel locking state. */
 	size_t locked;			/**< Number of calls to vm_lock_page() on the region. */

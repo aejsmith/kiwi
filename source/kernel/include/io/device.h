@@ -84,28 +84,15 @@ typedef struct device_ops {
 	status_t (*io)(struct device *device, file_handle_t *handle,
 		struct io_request *request);
 
-	/** Check if a device can be memory-mapped.
-	 * @note		If this function is implemented, the get_page
-	 *			operation MUST be implemented. If it is not,
-	 *			then the device will be classed as mappable if
-	 *			get_page is implemented.
-	 * @param device	Device being mapped.
+	/** Map a device into memory.
+	 * @note		See object_type_t::map() for more details on the
+	 *			behaviour of this function.
+	 * @param device	Device to map.
 	 * @param handle	File handle structure.
-	 * @param protection	Protection flags (VM_PROT_*).
-	 * @param flags		Mapping flags (VM_MAP_*).
-	 * @return		STATUS_SUCCESS if can be mapped, status code
-	 *			explaining why if not. */
-	status_t (*mappable)(struct device *device, file_handle_t *handle,
-		uint32_t protection, uint32_t flags);
-
-	/** Get a page from the device.
-	 * @param device	Device to get page from.
-	 * @param handle	File handle structure.
-	 * @param offset	Offset into device to get page from.
-	 * @param physp		Where to store physical address of page.
+	 * @param region	Region being mapped.
 	 * @return		Status code describing result of the operation. */
-	status_t (*get_page)(struct device *device, file_handle_t *handle,
-		offset_t offset, phys_ptr_t *physp);
+	status_t (*map)(struct device *device, struct file_handle *handle,
+		struct vm_region *region);
 
 	/** Handler for device-specific requests.
 	 * @param device	Device request is being made on.

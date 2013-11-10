@@ -82,7 +82,6 @@
 #include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/phys.h>
-#include <mm/vm_cache.h>
 
 #include <proc/thread.h>
 
@@ -189,9 +188,12 @@ static void page_writer(void *arg1, void *arg2) {
 			spinlock_unlock(&queue->lock);
 
 			/* Write out the page. */
-			if(vm_cache_flush_page(page)) {
-				dprintf("page: page writer wrote page 0x%" PRIxPHYS "\n", page->addr);
-				written++;
+			if(page->ops && page->ops->flush_page) {
+				if(page->ops->flush_page(page) == STATUS_SUCCESS) {
+					dprintf("page: page writer wrote page 0x%"
+						PRIxPHYS "\n", page->addr);
+					written++;
+				}
 			}
 
 			spinlock_lock(&queue->lock);
@@ -202,41 +204,6 @@ static void page_writer(void *arg1, void *arg2) {
 		spinlock_unlock(&queue->lock);
 	}
 }
-
-#if 0
-/** Reclaim cached pages.
- * @param level		Resource level. */
-static void vm_cache_reclaim(int level) {
-	page_queue_t *queue = &page_queues[PAGE_QUEUE_CACHED];
-	vm_page_t *page;
-	size_t count = 0;
-
-	spinlock_lock(&queue->lock);
-
-	/* Work out how many pages to free. */
-	switch(level) {
-	case RESOURCE_LEVEL_ADVISORY:
-		count = queue->count / 8;
-		break;
-	case RESOURCE_LEVEL_LOW:
-		count = queue->count / 4;
-		break;
-	case RESOURCE_LEVEL_CRITICAL:
-		count = queue->count;
-		break;
-	}
-
-	/* Reclaim the pages. */
-	while(count--) {
-		page = list_first(&queue->pages, vm_page_t, header);
-		spinlock_unlock(&queue->lock);
-		vm_cache_evict_page(page);
-		spinlock_lock(&queue->lock);
-	}
-
-	spinlock_unlock(&queue->lock);
-}
-#endif
 
 /** Append page onto the end of a page queue.
  * @param index		Queue index to append to.
@@ -376,7 +343,8 @@ static void page_free_internal(page_t *page) {
 	/* Reset the page structure to a clear state. */
 	page->state = PAGE_STATE_FREE;
 	page->modified = false;
-	page->cache = NULL;
+	page->ops = NULL;
+	page->private = NULL;
 
 	/* Push it onto the appropriate list. */
 	list_prepend(&free_page_lists[memory_ranges[page->range].freelist].pages, &page->header);
@@ -726,13 +694,15 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
 			return KDB_FAILURE;
 		}
 
-		kdb_printf("Page 0x%" PRIxPHYS " (%p) (Range: %u)\n", page->addr, page, page->range);
+		kdb_printf("Page 0x%" PRIxPHYS " (%p) (Range: %u)\n", page->addr,
+			page, page->range);
 		kdb_printf("=================================================\n");
 		kdb_printf("state:    %d\n", page->state);
 		kdb_printf("modified: %d\n", page->modified);
-		kdb_printf("count:    %d\n", page->count);
-		kdb_printf("cache:    %p\n", page->cache);
+		kdb_printf("ops:      %ps\n", page->ops);
+		kdb_printf("private:  %p\n", page->private);
 		kdb_printf("offset:   %" PRIu64 "\n", page->offset);
+		kdb_printf("count:    %d\n", page->count);
 	} else {
 		kdb_printf("Start              End                Freelist Pages\n");
 		kdb_printf("=====              ===                ======== =====\n");

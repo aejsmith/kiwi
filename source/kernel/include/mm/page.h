@@ -34,18 +34,20 @@
 
 #include <sync/spinlock.h>
 
-struct page_queue;
-struct vm_amap;
-struct vm_cache;
+struct page;
 
-/** Structure containing physical memory usage statistics. */
-typedef struct page_stats {
-	uint64_t total;			/**< Total available memory. */
-	uint64_t allocated;		/**< Amount of memory in-use. */
-	uint64_t modified;		/**< Amount of memory containing modified data. */
-	uint64_t cached;		/**< Amount of memory being used by caches. */
-	uint64_t free;			/**< Amount of free memory. */
-} page_stats_t;
+/** Interface from the memory manager to a page's owner. */
+typedef struct page_ops {
+	/** Write back a dirty page.
+	 * @param page		Page to write back.
+	 * @return		Status code describing result of the operation. */
+	status_t (*flush_page)(struct page *page);
+
+	/** Release a page.
+	 * @param page		Page to release.
+	 * @param phys		Physical address of page that was unmapped. */
+	void (*release_page)(struct page *page);
+} page_ops_t;
 
 /** Structure describing a page in memory. */
 typedef struct page {
@@ -58,11 +60,11 @@ typedef struct page {
 	bool modified : 1;		/**< Whether the page has been modified. */
 	uint8_t unused: 7;
 
-	/** Information about how the page is being used.
-	 * @note		Use of count and avl_link is up to the owner. */
-	refcount_t count;		/**< Reference count of the page (use is up to page user). */
-	struct vm_cache *cache;		/**< Cache that the page belongs to. */
+	/** Information about how the page is being used. */
+	page_ops_t *ops;		/**< Operations for the page. */
+	void *private;			/**< Private data pointer for the owner. */
 	offset_t offset;		/**< Offset into the owner of the page. */
+	refcount_t count;		/**< Reference count for use by owner. */
 	avl_tree_node_t avl_link;	/**< Link to AVL tree for use by owner. */
 } page_t;
 
@@ -71,6 +73,15 @@ typedef struct page {
 #define PAGE_STATE_MODIFIED	1	/**< Modified. */
 #define PAGE_STATE_CACHED	2	/**< Cached. */
 #define PAGE_STATE_FREE		3	/**< Free. */
+
+/** Structure containing physical memory usage statistics. */
+typedef struct page_stats {
+	uint64_t total;			/**< Total available memory. */
+	uint64_t allocated;		/**< Amount of memory in-use. */
+	uint64_t modified;		/**< Amount of memory containing modified data. */
+	uint64_t cached;		/**< Amount of memory being used by caches. */
+	uint64_t free;			/**< Amount of free memory. */
+} page_stats_t;
 
 extern bool page_init_done;
 

@@ -255,7 +255,7 @@ static kmem_range_t *kmem_hash_find(ptr_t addr, size_t size) {
  * @param shared	Whether the mapping was shared with other CPUs. */
 static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, bool shared) {
 	kmem_range_t *range, *exist;
-	phys_ptr_t page;
+	page_t *page;
 	size_t i;
 
 	mutex_lock(&kmem_lock);
@@ -283,7 +283,7 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
 				fatal("Address %p was not mapped while freeing", addr + i);
 
 			if(free)
-				phys_free(page, PAGE_SIZE);
+				page_free(page);
 
 			dprintf("kmem: unmapped page 0x%" PRIxPHYS " from %p\n", page, addr + i);
 		}
@@ -410,10 +410,10 @@ void kmem_raw_free(ptr_t addr, size_t size) {
  * @return		Address of allocation on success, 0 on failure.
  */
 void *kmem_alloc(size_t size, unsigned mmflag) {
-	phys_ptr_t paddr;
 	page_t *page;
 	ptr_t addr;
 	size_t i;
+	status_t ret;
 
 	/* Allocate a range to map into. */
 	addr = kmem_raw_alloc(size, mmflag);
@@ -426,22 +426,24 @@ void *kmem_alloc(size_t size, unsigned mmflag) {
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		page = page_alloc(mmflag & MM_FLAG_MASK);
 		if(unlikely(!page)) {
-			kprintf(LOG_DEBUG, "kmem: unable to allocate pages to back allocation\n");
+			kprintf(LOG_DEBUG, "kmem: unable to allocate pages to "
+				"back allocation\n");
 			goto fail;
 		}
 
 		/* Map the page into the kernel address space. */
-		if(mmu_context_map(&kernel_mmu_context, addr + i, page->addr,
+		ret = mmu_context_map(&kernel_mmu_context, addr + i, page->addr,
 			VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE,
-			mmflag & MM_FLAG_MASK) != STATUS_SUCCESS)
-		{
-			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n",
-				page->addr, addr + i);
+			mmflag & MM_FLAG_MASK);
+		if(ret != STATUS_SUCCESS) {
+			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%"
+				PRIxPHYS " to %p\n", page->addr, addr + i);
 			page_free(page);
 			goto fail;
 		}
 
-		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", page->addr, addr + i);
+		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", page->addr,
+			addr + i);
 	}
 
 	/* Zero the range if requested. */
@@ -453,8 +455,9 @@ void *kmem_alloc(size_t size, unsigned mmflag) {
 fail:
 	/* Go back and reverse what we have done. */
 	for(; i; i -= PAGE_SIZE) {
-		mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), true, &paddr);
-		phys_free(paddr, PAGE_SIZE);
+		mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE),
+			true, &page);
+		page_free(page);
 	}
 	mmu_context_unlock(&kernel_mmu_context);
 	kmem_raw_free(addr, size);
@@ -492,6 +495,7 @@ void kmem_free(void *addr, size_t size) {
 void *kmem_map(phys_ptr_t base, size_t size, unsigned mmflag) {
 	ptr_t addr;
 	size_t i;
+	status_t ret;
 
 	assert(!(base % PAGE_SIZE));
 
@@ -503,24 +507,27 @@ void *kmem_map(phys_ptr_t base, size_t size, unsigned mmflag) {
 
 	/* Back the allocation with the required page range. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
-		if(mmu_context_map(&kernel_mmu_context, addr + i, base + i,
+		ret = mmu_context_map(&kernel_mmu_context, addr + i, base + i,
 			VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE,
-			mmflag & MM_FLAG_MASK) != STATUS_SUCCESS)
-		{
-			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n",
-				base + i, addr + i);
+			mmflag & MM_FLAG_MASK);
+		if(ret != STATUS_SUCCESS) {
+			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%"
+				PRIxPHYS " to %p\n", base + i, addr + i);
 			goto fail;
 		}
 
-		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", base + i, addr + i);
+		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", base + i,
+			addr + i);
 	}
 
 	mmu_context_unlock(&kernel_mmu_context);
 	return (void *)addr;
 fail:
 	/* Go back and reverse what we have done. */
-	for(; i; i -= PAGE_SIZE)
-		mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), true, NULL);
+	for(; i; i -= PAGE_SIZE) {
+		mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE),
+			true, NULL);
+	}
 
 	mmu_context_unlock(&kernel_mmu_context);
 	kmem_raw_free(addr, size);

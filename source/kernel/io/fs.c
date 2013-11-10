@@ -993,50 +993,20 @@ static status_t fs_file_io(file_t *file, file_handle_t *handle, io_request_t *re
 		: STATUS_NOT_SUPPORTED;
 }
 
-/** Check if a file can be memory-mapped.
- * @param file		File being mapped.
+/** Map a file into memory.
+ * @param file		File to map.
  * @param handle	File handle structure.
- * @param protection	Protection flags (VM_PROT_*).
- * @param flags		Mapping flags (VM_MAP_*).
- * @return		STATUS_SUCCESS if can be mapped, status code explaining
- *			why if not. */
-static status_t fs_file_mappable(file_t *file, file_handle_t *handle, uint32_t protection,
-	uint32_t flags)
-{
-	fs_node_t *node = (fs_node_t *)file;
-
-	return (node->ops->get_cache) ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;
-}
-
-/** Get a page from the file.
- * @param file		File to get page from.
- * @param handle	File handle structure.
- * @param offset	Offset into file to get page from.
- * @param physp		Where to store physical address of page.
+ * @param region	Region being mapped.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_get_page(file_t *file, file_handle_t *handle, offset_t offset,
-	phys_ptr_t *physp)
-{
+static status_t fs_file_map(file_t *file, file_handle_t *handle, vm_region_t *region) {
 	fs_node_t *node = (fs_node_t *)file;
-	vm_cache_t *cache;
 
-	cache = node->ops->get_cache(node, handle);
-	return vm_cache_get_page(cache, offset, physp);
-}
+	if(!node->ops->get_cache)
+		return STATUS_NOT_SUPPORTED;
 
-/** Release a page from the object.
- * @param file		File to release page in.
- * @param handle	File handle structure.
- * @param offset	Offset of page in file.
- * @param phys		Physical address of page that was unmapped. */
-static void fs_file_release_page(file_t *file, file_handle_t *handle, offset_t offset,
-	phys_ptr_t phys)
-{
-	fs_node_t *node = (fs_node_t *)file;
-	vm_cache_t *cache;
-
-	cache = node->ops->get_cache(node, handle);
-	vm_cache_release_page(cache, offset, phys);
+	region->private = node->ops->get_cache(node, handle);
+	region->ops = &vm_cache_region_ops;
+	return STATUS_SUCCESS;
 }
 
 /** Read the next directory entry.
@@ -1141,9 +1111,7 @@ static file_ops_t fs_file_ops = {
 	.wait = fs_file_wait,
 	.unwait = fs_file_unwait,
 	.io = fs_file_io,
-	.mappable = fs_file_mappable,
-	.get_page = fs_file_get_page,
-	.release_page = fs_file_release_page,
+	.map = fs_file_map,
 	.read_dir = fs_file_read_dir,
 	.resize = fs_file_resize,
 	.info = fs_file_info,

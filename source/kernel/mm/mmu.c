@@ -132,9 +132,11 @@ void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t p
  * @param shared	Whether the mapping was shared across multiple CPUs.
  *			Used as an optimisation to not perform remote TLB
  *			invalidations if not necessary.
- * @param physp		Where to store physical address of mapping.
+ * @param pagep		Where to pointer to page that was unmapped. May be set
+ *			to NULL if the address was mapped to memory that doesn't
+ *			have a page_t (e.g. device memory).
  * @return		Whether a page was mapped at the virtual address. */
-bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_ptr_t *physp) {
+bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **pagep) {
 	assert(mutex_held(&ctx->lock));
 	assert(!(virt % PAGE_SIZE));
 
@@ -146,7 +148,7 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_ptr_t *
 
 	dprintf("mmu: mmu_context_unmap(%p, %p, %d)\n", ctx, virt, shared);
 
-	return mmu_ops->unmap(ctx, virt, shared, physp);
+	return mmu_ops->unmap(ctx, virt, shared, pagep);
 }
 
 /** Query details about a mapping.

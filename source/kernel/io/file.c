@@ -72,76 +72,33 @@ static void file_object_unwait(object_handle_t *handle, unsigned event, void *wa
 	return file->ops->unwait(file, data, event, wait);
 }
 
-/** Check if an object can be memory-mapped.
+/** Map a file object into memory.
  * @param handle	Handle to object.
- * @param protection	Protection flags (VM_PROT_*).
- * @param flags		Mapping flags (VM_MAP_*).
- * @return		STATUS_SUCCESS if can be mapped, status code explaining
- *			why if not. */
-static status_t file_object_mappable(object_handle_t *handle, uint32_t protection,
-	uint32_t flags)
-{
+ * @param region	Region being mapped.
+ * @return		Status code describing result of the operation. */
+static status_t file_object_map(object_handle_t *handle, vm_region_t *region) {
 	file_t *file = (file_t *)handle->object;
 	file_handle_t *data = (file_handle_t *)handle->data;
 	uint32_t rights = 0;
-	status_t ret;
 
 	/* Directories cannot be memory-mapped. */
-	if(file->type == FILE_TYPE_DIR)
+	if(file->type == FILE_TYPE_DIR || !file->ops->map)
 		return STATUS_NOT_SUPPORTED;
-
-	if(file->ops->mappable) {
-		assert(file->ops->get_page);
-
-		ret = file->ops->mappable(file, data, protection, flags);
-		if(ret != STATUS_SUCCESS)
-			return ret;
-	} else {
-		if(!file->ops->get_page)
-			return STATUS_NOT_SUPPORTED;
-	}
 
 	/* Check for the necessary access rights. Don't need write permission
 	 * for private mappings, changes won't be written back to the file. */
-	if(protection & VM_PROT_READ) {
+	if(region->protection & VM_PROT_READ) {
 		rights |= FILE_RIGHT_READ;
-	} else if(protection & VM_PROT_WRITE && !(flags & VM_MAP_PRIVATE)) {
+	} else if(region->protection & VM_PROT_WRITE && !(region->flags & VM_MAP_PRIVATE)) {
 		rights |= FILE_RIGHT_WRITE;
-	} else if(protection & VM_PROT_EXECUTE) {
+	} else if(region->protection & VM_PROT_EXECUTE) {
 		rights |= FILE_RIGHT_EXECUTE;
 	}
 
-	return ((data->rights & rights) == rights)
-		? STATUS_SUCCESS
-		: STATUS_ACCESS_DENIED;
-}
+	if((data->rights & rights) != rights)
+		return STATUS_ACCESS_DENIED;
 
-/** Get a page from the object.
- * @param handle	Handle to object to get page from.
- * @param offset	Offset into object to get page from.
- * @param physp		Where to store physical address of page.
- * @return		Status code describing result of the operation. */
-static status_t file_object_get_page(object_handle_t *handle, offset_t offset,
-	phys_ptr_t *physp)
-{
-	file_t *file = (file_t *)handle->object;
-	file_handle_t *data = (file_handle_t *)handle->data;
-
-	return file->ops->get_page(file, data, offset, physp);
-}
-
-/** Release a page from the object.
- * @param handle	Handle to object to release page in.
- * @param offset	Offset of page in object.
- * @param phys		Physical address of page that was unmapped. */
-static void file_object_release_page(object_handle_t *handle, offset_t offset,
-	phys_ptr_t phys)
-{
-	file_t *file = (file_t *)handle->object;
-	file_handle_t *data = (file_handle_t *)handle->data;
-
-	if(file->ops->release_page)
-		file->ops->release_page(file, data, offset, phys);
+	return file->ops->map(file, data, region);
 }
 
 /** File object type definition. */
@@ -151,9 +108,7 @@ static object_type_t file_object_type = {
 	.close = file_object_close,
 	.wait = file_object_wait,
 	.unwait = file_object_unwait,
-	.mappable = file_object_mappable,
-	.get_page = file_object_get_page,
-	.release_page = file_object_release_page,
+	.map = file_object_map,
 };
 
 /** Initialize a file object.

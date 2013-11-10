@@ -70,15 +70,6 @@
  *			that MM_USER will at some point use interruptible sleep
  *			so interrupting a process waiting for memory leaves us
  *			no choice but to crash the thread.
- * @todo		When cloning, duplicate all mappings from the previous
- *			address space after cloning regions, to remove overhead
- *			of faulting in the new process? This may not be the best
- *			thing to do as cloning is mainly used to implement the
- *			POSIX fork() system call, which is most often followed
- *			with an exec(). In this case, the majority of the
- *			duplicated mappings would in fact not be required, and
- *			copying mappings would be more overhead. Could possibly
- *			just map a working set.
  */
 
 #include <arch/frame.h>
@@ -406,14 +397,13 @@ static void vm_amap_unmap(vm_amap_t *map, offset_t offset, size_t size) {
  * @param physp		Where to store physical address of page.
  * @return		Status code describing the result of the operation. */
 static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, phys_ptr_t *physp) {
-	object_handle_t *handle = region->handle;
 	vm_amap_t *amap = region->amap;
 	phys_ptr_t phys;
 	uint32_t protect;
 	bool exist;
 	offset_t offset;
 	size_t idx;
-	page_t *page;
+	page_t *page, *prev;
 	status_t ret;
 
 	/* Check if the page is already mapped. If it is and the protection
@@ -439,7 +429,7 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 
 	assert(idx < amap->max_size);
 
-	if(!amap->pages[idx] && !handle) {
+	if(!amap->pages[idx] && !region->handle) {
 		/* No page existing and no source. Allocate a zeroed page. */
 		dprintf("vm:  anon fault: no existing page and no source, allocating new\n");
 		amap->pages[idx] = page_alloc(MM_KERNEL | MM_ZERO);
@@ -477,30 +467,39 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 			phys = amap->pages[idx]->addr;
 		} else {
 			assert(region->flags & VM_MAP_PRIVATE);
-			assert(handle);
+			assert(region->handle);
 
 			/* Find the page to copy. If there was an existing
 			 * mapping, we already have its address in phys so we
 			 * don't need to bother getting a page from the object
 			 * again. */
 			if(!exist) {
-				assert(handle->object->type->get_page);
+				assert(region->ops && region->ops->get_page);
 
-				ret = handle->object->type->get_page(handle,
-					offset + region->obj_offset, &phys);
+				ret = region->ops->get_page(region,
+					offset + region->obj_offset, &prev);
 				if(ret != STATUS_SUCCESS) {
 					dprintf("vm: failed to get page at offset 0x%"
 						PRIx64 " from %p (object: %p): %d\n",
 						offset + region->obj_offset,
-						handle, handle->object, ret);
+						region->handle,
+						region->handle->object, ret);
 					mutex_unlock(&amap->lock);
 					return ret;
 				}
+
+				phys = prev->addr;
+			} else {
+				/* We do need to lookup the existing page in
+				 * order to release it, however. Page may not
+				 * necessarily exist here if something has a
+				 * private mapping over device memory. */
+				prev = page_lookup(phys);
 			}
 
 			dprintf("vm:  anon write fault: copying page 0x%" PRIxPHYS
-				" from %p (object: %p)\n", phys, handle,
-				handle->object);
+				" from %p (object: %p)\n", phys, region->handle,
+				region->handle->object);
 
 			page = page_alloc(MM_KERNEL);
 			phys_copy(page->addr, phys, MM_KERNEL);
@@ -508,10 +507,8 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 			/* Add the page and release the old one. */
 			refcount_inc(&page->count);
 			amap->pages[idx] = page;
-			if(handle->object->type->release_page) {
-				handle->object->type->release_page(handle,
-					offset + region->obj_offset, phys);
-			}
+			if(prev && prev->ops && prev->ops->release_page)
+				prev->ops->release_page(prev);
 
 			amap->curr_size++;
 			phys = page->addr;
@@ -531,25 +528,27 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 			phys = amap->pages[idx]->addr;
 		} else {
 			assert(region->flags & VM_MAP_PRIVATE);
-			assert(handle);
-			assert(handle->object->type->get_page);
+			assert(region->handle);
+			assert(region->ops && region->ops->get_page);
 
 			/* Get the page from the source, and map read-only. */
-			ret = handle->object->type->get_page(handle,
-				offset + region->obj_offset, &phys);
+			ret = region->ops->get_page(region,
+				offset + region->obj_offset, &page);
 			if(ret != STATUS_SUCCESS) {
 				dprintf("vm: failed to get page at offset 0x%"
 					PRIx64 " from %p (object: %p): %d\n",
 					offset + region->obj_offset,
-					handle, handle->object, ret);
+					region->handle, region->handle->object,
+					ret);
 				mutex_unlock(&amap->lock);
 				return ret;
 			}
 
 			dprintf("vm:  anon read fault: mapping page 0x%" PRIxPHYS
 				" from %p (object: %p) as read-only\n", phys,
-				handle, handle->object);
+				region->handle, region->handle->object);
 
+			phys = page->addr;
 			protect &= ~VM_PROT_WRITE;
 		}
 	}
@@ -583,10 +582,10 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *phy
 	offset_t offset;
 	phys_ptr_t phys;
 	uint32_t protect;
+	page_t *page;
 	status_t ret;
 
 	assert(region->handle);
-	assert(region->handle->object->type->get_page);
 
 	/* Check if the page is already mapped. */
 	if(mmu_context_query(region->as->mmu, addr, &phys, &protect)) {
@@ -599,9 +598,12 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *phy
 		return STATUS_SUCCESS;
 	}
 
+	assert(region->ops);
+	assert(region->ops->get_page);
+
 	/* Get a page from the object. */
 	offset = (offset_t)(addr - region->start) + region->obj_offset;
-	ret = region->handle->object->type->get_page(region->handle, offset, &phys);
+	ret = region->ops->get_page(region, offset, &page);
 	if(ret != STATUS_SUCCESS) {
 		dprintf("vm: failed to get page at offset 0x%" PRIx64 " from %p "
 			"(object: %p): %d\n", offset, region->handle,
@@ -614,13 +616,14 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *phy
 	 * before locking the address space, as if pages need to be reclaimed
 	 * we could run into issues because we're holding the address space and
 	 * context locks. */
-	mmu_context_map(region->as->mmu, addr, phys, region->protection, MM_KERNEL);
+	mmu_context_map(region->as->mmu, addr, page->addr, region->protection,
+		MM_KERNEL);
 
 	if(physp)
-		*physp = phys;
+		*physp = page->addr;
 
 	dprintf("vm: mapped 0x%" PRIxPHYS " at %p (as: %p, protect: 0x%x)\n",
-		phys, addr, region->as, region->protection);
+		page->addr, addr, region->as, region->protection);
 	return STATUS_SUCCESS;
 }
 
@@ -646,14 +649,14 @@ static status_t map_page(vm_region_t *region, ptr_t addr, uint32_t access, phys_
  * @return		Whether the page was mapped. */
 static bool unmap_page(vm_region_t *region, ptr_t addr) {
 	offset_t offset;
-	phys_ptr_t phys;
+	page_t *page;
 	size_t idx;
 
 	assert(vm_region_contains(region, addr));
 
 	offset = addr - region->start;
 
-	if(!mmu_context_unmap(region->as->mmu, addr, true, &phys))
+	if(!mmu_context_unmap(region->as->mmu, addr, true, &page))
 		return false;
 
 	/* Release the page from the source. */
@@ -665,18 +668,16 @@ static bool unmap_page(vm_region_t *region, ptr_t addr) {
 
 		/* If page is in the object, then do nothing. */
 		if(region->amap->pages[idx]) {
-			assert(region->amap->pages[idx]->addr == phys);
+			assert(region->amap->pages[idx] == page);
 			return true;
 		}
 
 		assert(region->handle);
-		assert(region->handle->object->type->release_page);
 	}
 
-	if(region->handle->object->type->release_page) {
+	if(page && page->ops && page->ops->release_page) {
 		offset += region->obj_offset;
-		region->handle->object->type->release_page(region->handle,
-			offset, phys);
+		page->ops->release_page(page);
 	}
 
 	return true;
@@ -716,6 +717,8 @@ static vm_region_t *vm_region_create(vm_aspace_t *as, ptr_t start, size_t size,
 	region->obj_offset = 0;
 	region->amap = NULL;
 	region->amap_offset = 0;
+	region->ops = NULL;
+	region->private = NULL;
 	region->name = (name) ? kstrdup(name, MM_KERNEL) : NULL;
 	return region;
 }
@@ -731,6 +734,9 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 		src->flags, src->state, src->name);
 	if(src->state != VM_REGION_ALLOCATED)
 		return dest;
+
+	dest->ops = src->ops;
+	dest->private = src->private;
 
 	/* Copy the object handle. */
 	if(src->handle) {
@@ -1013,7 +1019,8 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 	 * is only held within the functions in this file, and they should not
 	 * incur a page fault (if they do there's something wrong!). */
 	if(unlikely(mutex_held(&as->lock) && as->lock.holder == curr_thread)) {
-		kprintf(LOG_WARN, "vm: recursive locking on %p, fault in VM operation?\n");
+		kprintf(LOG_WARN, "vm: fault on %p with lock held at %pS\n", as,
+			frame->ip);
 		return STATUS_INVALID_ADDR;
 	}
 
@@ -1186,6 +1193,8 @@ static vm_region_t *trim_regions(vm_aspace_t *as, ptr_t start, size_t size) {
 
 			if(split->state == VM_REGION_ALLOCATED) {
 				/* Copy object details into the split. */
+				split->ops = region->ops;
+				split->private = region->private;
 				if((split->handle = region->handle))
 					object_handle_retain(split->handle);
 
@@ -1436,19 +1445,13 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 	}
 
 	if(handle) {
-		if(offset % PAGE_SIZE || (offset_t)(offset + size) < offset)
+		if(offset % PAGE_SIZE || (offset_t)(offset + size) < offset) {
 			return STATUS_INVALID_ARG;
-
-		/* Check if the object can be mapped with the requested access. */
-		if(handle->object->type->mappable) {
-			assert(handle->object->type->get_page);
-			ret = handle->object->type->mappable(handle, protection, flags);
-			if(ret != STATUS_SUCCESS)
-				return ret;
-		} else if(!handle->object->type->get_page) {
+		} else if(!handle->object->type->map) {
 			return STATUS_NOT_SUPPORTED;
 		}
 	}
+
 
 	/* Cannot have a guard page on a 1-page stack. */
 	if(flags & VM_MAP_STACK && size == PAGE_SIZE)
@@ -1484,6 +1487,16 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 		region->handle = handle;
 		object_handle_retain(region->handle);
 		region->obj_offset = offset;
+
+		ret = handle->object->type->map(handle, region);
+		if(ret != STATUS_SUCCESS) {
+			/* Free up the region again. */
+			region = vm_region_create(as, region->start,
+				region->size, 0, 0, VM_REGION_FREE, NULL);
+			insert_region(as, region);
+			mutex_unlock(&as->lock);
+			return ret;
+		}
 	}
 
 	/* For private or anonymous mappings we must create an anonymous map. */

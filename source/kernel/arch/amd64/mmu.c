@@ -434,9 +434,9 @@ static void amd64_mmu_protect(mmu_context_t *ctx, ptr_t virt, size_t size, uint3
  * @param shared	Whether the mapping was shared across multiple CPUs.
  *			Used as an optimisation to not perform remote TLB
  *			invalidations if not necessary.
- * @param physp		Where to store physical address the page was mapped to.
+ * @param pagep		Where to pointer to page that was unmapped.
  * @return		Whether a page was mapped at the virtual address. */
-static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_ptr_t *physp) {
+static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **pagep) {
 	uint64_t *ptbl, entry;
 	unsigned pte;
 	page_t *page;
@@ -454,12 +454,11 @@ static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_pt
 	/* Clear the entry. */
 	entry = clear_pte(&ptbl[pte]);
 
+	page = page_lookup(entry & PHYS_PAGE_MASK);
+
 	/* If the entry is dirty, set the modified flag on the page. */
-	if(entry & X86_PTE_DIRTY) {
-		page = page_lookup(entry & PHYS_PAGE_MASK);
-		if(page)
-			page->modified = true;
-	}
+	if(page && entry & X86_PTE_DIRTY)
+		page->modified = true;
 
 	/* If the entry has been accessed, need to flush TLB entries. A
 	 * processor will not cache a translation without setting the accessed
@@ -467,8 +466,8 @@ static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_pt
 	if(entry & X86_PTE_ACCESSED)
 		invalidate_page(ctx, virt, shared);
 
-	if(physp)
-		*physp = entry & PHYS_PAGE_MASK;
+	if(pagep)
+		*pagep = page;
 
 	return true;
 }

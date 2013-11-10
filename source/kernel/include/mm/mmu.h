@@ -37,7 +37,7 @@
 
 #include <kernel/vm.h>
 
-#include <mm/mm.h>
+#include <mm/page.h>
 
 #include <sync/mutex.h>
 
@@ -79,11 +79,13 @@ typedef struct mmu_ops {
 	 * @param shared	Whether the mapping was shared across multiple
 	 *			CPUs. Used as an optimisation to not perform
 	 *			remote TLB invalidations if not necessary.
-	 * @param physp		Where to store physical address the page was
-	 *			mapped to.
+	 * @param pagep		Where to pointer to page that was unmapped. May
+	 *			be set to NULL if the address was mapped to
+	 *			memory that doesn't have a page_t (e.g. device
+	 *			memory).
 	 * @return		Whether a page was mapped at the virtual address. */
 	bool (*unmap)(struct mmu_context *ctx, ptr_t virt, bool shared,
-		phys_ptr_t *physp);
+		page_t **pagep);
 
 	/** Query details about a mapping.
 	 * @param ctx		Context to query.
@@ -125,7 +127,7 @@ extern status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
 extern void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size,
 	uint32_t protect);
 extern bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared,
-	phys_ptr_t *physp);
+	page_t **pagep);
 extern bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp,
 	uint32_t *protectp);
 

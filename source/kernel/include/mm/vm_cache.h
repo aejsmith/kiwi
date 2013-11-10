@@ -23,7 +23,10 @@
 #define __MM_VM_CACHE_H
 
 #include <lib/avl_tree.h>
+
 #include <mm/page.h>
+#include <mm/vm.h>
+
 #include <sync/mutex.h>
 
 struct io_request;
@@ -68,16 +71,14 @@ typedef struct vm_cache {
 	bool deleted;			/**< Whether the cache is destroyed. */
 } vm_cache_t;
 
-extern vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data);
+extern vm_region_ops_t vm_cache_region_ops;
+
 extern status_t vm_cache_io(vm_cache_t *cache, struct io_request *request);
-extern status_t vm_cache_get_page(vm_cache_t *cache, offset_t offset, phys_ptr_t *physp);
-extern void vm_cache_release_page(vm_cache_t *cache, offset_t offset, phys_ptr_t phys);
 extern void vm_cache_resize(vm_cache_t *cache, offset_t size);
 extern status_t vm_cache_flush(vm_cache_t *cache);
-extern status_t vm_cache_destroy(vm_cache_t *cache, bool discard);
 
-extern bool vm_cache_flush_page(page_t *page);
-extern void vm_cache_evict_page(page_t *page);
+extern vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data);
+extern status_t vm_cache_destroy(vm_cache_t *cache, bool discard);
 
 extern void vm_cache_init(void);
 

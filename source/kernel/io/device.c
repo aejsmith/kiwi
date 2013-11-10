@@ -91,44 +91,19 @@ static status_t device_file_io(file_t *file, file_handle_t *handle, io_request_t
 		: STATUS_NOT_SUPPORTED;
 }
 
-/** Check if a device can be memory-mapped.
- * @param file		Device being mapped.
+/** Map a device into memory.
+ * @param file		File to map.
  * @param handle	File handle structure.
- * @param protection	Protection flags (VM_PROT_*).
- * @param flags		Mapping flags (VM_MAP_*).
- * @return		STATUS_SUCCESS if can be mapped, status code explaining
- *			why if not. */
-static status_t device_file_mappable(file_t *file, file_handle_t *handle,
-	uint32_t protection, uint32_t flags)
-{
+ * @param region	Region being mapped.
+ * @return		Status code describing result of the operation. */
+static status_t device_file_map(file_t *file, file_handle_t *handle, vm_region_t *region) {
 	device_t *device = (device_t *)file;
 
 	/* Cannot create private mappings to devices. */
-	if(!device->ops || flags & VM_MAP_PRIVATE)
+	if(!device->ops || !device->ops->map || region->flags & VM_MAP_PRIVATE)
 		return STATUS_NOT_SUPPORTED;
 
-	if(device->ops->mappable) {
-		assert(device->ops->get_page);
-		return device->ops->mappable(device, handle, protection, flags);
-	} else {
-		return (device->ops->get_page) ? STATUS_SUCCESS
-			: STATUS_NOT_SUPPORTED;
-	}
-}
-
-/** Get a page from a device.
- * @param file		Device to get page from.
- * @param handle	File handle structure.
- * @param offset	Offset into device to get page from.
- * @param physp		Where to store physical address of page.
- * @return		Status code describing result of the operation. */
-static status_t device_file_get_page(file_t *file, file_handle_t *handle,
-	offset_t offset, phys_ptr_t *physp)
-{
-	device_t *device = (device_t *)file;
-
-	assert(device->ops && device->ops->get_page);
-	return device->ops->get_page(device, handle, offset, physp);
+	return device->ops->map(device, handle, region);
 }
 
 /** Get information about a device.
@@ -151,8 +126,7 @@ static file_ops_t device_file_ops = {
 	.wait = device_file_wait,
 	.unwait = device_file_unwait,
 	.io = device_file_io,
-	.mappable = device_file_mappable,
-	.get_page = device_file_get_page,
+	.map = device_file_map,
 	.info = device_file_info,
 };
 

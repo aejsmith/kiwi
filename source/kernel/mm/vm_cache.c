@@ -43,6 +43,8 @@
 # define dprintf(fmt...)	
 #endif
 
+static page_ops_t vm_cache_page_ops;
+
 /** Slab cache for allocating VM cache structures. */
 static slab_cache_t *vm_cache_cache;
 
@@ -54,22 +56,6 @@ static void vm_cache_ctor(void *obj, void *data) {
 
 	mutex_init(&cache->lock, "vm_cache_lock", 0);
 	avl_tree_init(&cache->pages);
-}
-
-/** Allocate a new VM cache.
- * @param size		Size of the cache.
- * @param ops		Pointer to operations structure (optional).
- * @param data		Implementation-specific data pointer.
- * @return		Pointer to cache structure. */
-vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data) {
-	vm_cache_t *cache;
-
-	cache = slab_cache_alloc(vm_cache_cache, MM_KERNEL);
-	cache->size = size;
-	cache->ops = ops;
-	cache->data = data;
-	cache->deleted = false;
-	return cache;
 }
 
 /** Get a page from a cache.
@@ -166,7 +152,8 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset,
 
 	/* Cache the page and unlock. */
 	refcount_inc(&page->count);
-	page->cache = cache;
+	page->ops = &vm_cache_page_ops;
+	page->private = cache;
 	page->offset = offset;
 	avl_tree_insert(&cache->pages, offset, &page->avl_link);
 	mutex_unlock(&cache->lock);
@@ -200,20 +187,10 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset,
 }
 
 /** Release a page from a cache.
- * @param cache		Cache that the page belongs to.
- * @param offset	Offset of page to release.
+ * @param cache		Cache that the page belongs to. Must be locked.
+ * @param page		Page to release.
  * @param dirty		Whether the page has been dirtied. */
-static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, bool dirty) {
-	page_t *page;
-
-	mutex_lock(&cache->lock);
-
-	assert(!cache->deleted);
-
-	page = avl_tree_lookup(&cache->pages, offset, page_t, avl_link);
-	if(unlikely(!page))
-		fatal("Tried to release page that isn't cached");
-
+static void vm_cache_release_page_internal(vm_cache_t *cache, page_t *page, bool dirty) {
 	dprintf("cache: released page 0x%" PRIxPHYS " at offset 0x%" PRIx64 " "
 		"in %p\n", page->addr, offset, cache);
 
@@ -226,7 +203,7 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
 		/* If the page is outside of the cache's size (i.e. cache has
 		 * been resized with pages in use, discard it). Otherwise,
 		 * move the page to the appropriate queue. */
-		if(offset >= cache->size) {
+		if(page->offset >= cache->size) {
 			avl_tree_remove(&cache->pages, &page->avl_link);
 			page_free(page);
 		} else if(page->modified && cache->ops && cache->ops->write_page) {
@@ -236,8 +213,41 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
 			page_set_state(page, PAGE_STATE_CACHED);
 		}
 	}
+}
 
-	mutex_unlock(&cache->lock);
+/** Flush changes to a cache page.
+ * @param cache		Cache page belongs to.
+ * @param page		Page to flush.
+ * @return		Status code describing result of the operation. */
+static status_t vm_cache_flush_page_internal(vm_cache_t *cache, page_t *page) {
+	void *mapping;
+	status_t ret;
+
+	/* If the page is outside of the cache, it may be there because the
+	 * cache was shrunk but with the page in use. Ignore this. Also ignore
+	 * pages that aren't modified. */
+	if(page->offset >= cache->size || !page->modified)
+		return STATUS_SUCCESS;
+
+	/* Should only end up here if the page is writable - when releasing
+	 * pages the modified flag is cleared if there is no write operation. */
+	assert(cache->ops && cache->ops->write_page);
+
+	mapping = phys_map(page->addr, PAGE_SIZE, MM_KERNEL);
+
+	ret = cache->ops->write_page(cache, mapping, page->offset);
+	if(ret == STATUS_SUCCESS) {
+		/* Clear modified flag only if the page reference count is
+		 * zero. This is because the page may be mapped into an address
+		 * space as read-write. */
+		if(refcount_get(&page->count) == 0) {
+			page->modified = false;
+			page_set_state(page, PAGE_STATE_CACHED); 
+		}
+	}
+
+	phys_unmap(mapping, PAGE_SIZE, true);
+	return ret;
 }
 
 /** Get and map a page from a cache.
@@ -268,12 +278,82 @@ static status_t vm_cache_map_page(vm_cache_t *cache, offset_t offset, bool overw
 static void vm_cache_unmap_page(vm_cache_t *cache, void *mapping, offset_t offset,
 	bool dirty, bool shared)
 {
+	page_t *page;
+
 	phys_unmap(mapping, PAGE_SIZE, shared);
 	if(!shared)
 		thread_unwire(curr_thread);
 
-	vm_cache_release_page_internal(cache, offset, dirty);
+	mutex_lock(&cache->lock);
+
+	page = avl_tree_lookup(&cache->pages, offset, page_t, avl_link);
+	if(unlikely(!page))
+		fatal("Tried to release page that isn't cached");
+
+	vm_cache_release_page_internal(cache, page, dirty);
+
+	mutex_unlock(&cache->lock);
 }
+
+/** Flush changes to a page from a cache.
+ * @param page		Page to flush.
+ * @return		Status code describing the result of the operation. */
+static status_t vm_cache_flush_page(page_t *page) {
+	vm_cache_t *cache;
+	status_t ret;
+
+	/* Must be careful - another thread could be destroying the cache.
+	 * FIXME: wut? */
+	if(!(cache = page->private))
+		return STATUS_SUCCESS;
+
+	mutex_lock(&cache->lock);
+
+	if(cache->deleted) {
+		mutex_unlock(&cache->lock);
+		return true;
+	}
+
+	ret = vm_cache_flush_page_internal(cache, page);
+	mutex_unlock(&cache->lock);
+	return (ret == STATUS_SUCCESS);
+}
+
+/** Release a page in a cache.
+ * @param cache		Cache to release from.
+ * @param offset	Offset into cache page was from.
+ * @param phys		Physical address of page. */
+static void vm_cache_release_page(page_t *page) {
+	vm_cache_t *cache = page->private;
+
+	mutex_lock(&cache->lock);
+
+	/* The VM system will have flagged the page as modified if necessary. */
+	vm_cache_release_page_internal(cache, page, false);
+
+	mutex_unlock(&cache->lock);
+}
+
+/** VM cache page operations. */
+static page_ops_t vm_cache_page_ops = {
+	.flush_page = vm_cache_flush_page,
+	.release_page = vm_cache_release_page,
+};
+
+/** Get a page from a cache.
+ * @param region	Region to get page for.
+ * @param offset	Offset into object to get page from.
+ * @param pagep		Where to store pointer to page structure.
+ * @return		Status code describing result of the operation. */
+static status_t vm_cache_get_page(vm_region_t *region, offset_t offset, page_t **pagep) {
+	return vm_cache_get_page_internal(region->private, offset, false, pagep,
+		NULL, NULL);
+}
+
+/** VM region operations for mapping a VM cache. */
+vm_region_ops_t vm_cache_region_ops = {
+	.get_page = vm_cache_get_page,
+};
 
 /** Perform I/O on a cache.
  * @param cache		Cache to read from.
@@ -356,38 +436,6 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
 	return STATUS_SUCCESS;
 }
 
-/**
- * Get a page from a cache.
- *
- * Gets a page from a cache. This is a helper function to allow the cache to
- * be memory-mapped.
- *
- * @param cache		Cache to get page from.
- * @param offset	Offset into cache to get page from.
- * @param physp		Where to store physical address of page.
- *
- * @return		Status code describing result of the operation.
- */
-status_t vm_cache_get_page(vm_cache_t *cache, offset_t offset, phys_ptr_t *physp) {
-	status_t ret;
-	page_t *page;
-
-	ret = vm_cache_get_page_internal(cache, offset, false, &page, NULL, NULL);
-	if(ret == STATUS_SUCCESS)
-		*physp = page->addr;
-
-	return ret;
-}
-
-/** Release a page in a cache.
- * @param cache		Cache to release from.
- * @param offset	Offset into cache page was from.
- * @param phys		Physical address of page. */
-void vm_cache_release_page(vm_cache_t *cache, offset_t offset, phys_ptr_t phys) {
-	/* The VM system will have flagged the page as modified if necessary. */
-	vm_cache_release_page_internal(cache, offset, false);
-}
-
 /** Resize a cache.
  * @param cache		Cache to resize.
  * @param size		New size of the cache. */
@@ -414,41 +462,6 @@ void vm_cache_resize(vm_cache_t *cache, offset_t size) {
 	mutex_unlock(&cache->lock);
 }
 
-/** Flush changes to a cache page.
- * @param cache		Cache page belongs to.
- * @param page		Page to flush.
- * @return		Status code describing result of the operation. */
-static status_t vm_cache_flush_page_internal(vm_cache_t *cache, page_t *page) {
-	void *mapping;
-	status_t ret;
-
-	/* If the page is outside of the cache, it may be there because the
-	 * cache was shrunk but with the page in use. Ignore this. Also ignore
-	 * pages that aren't modified. */
-	if(page->offset >= cache->size || !page->modified)
-		return STATUS_SUCCESS;
-
-	/* Should only end up here if the page is writable - when releasing
-	 * pages the modified flag is cleared if there is no write operation. */
-	assert(cache->ops && cache->ops->write_page);
-
-	mapping = phys_map(page->addr, PAGE_SIZE, MM_KERNEL);
-
-	ret = cache->ops->write_page(cache, mapping, page->offset);
-	if(ret == STATUS_SUCCESS) {
-		/* Clear modified flag only if the page reference count is
-		 * zero. This is because the page may be mapped into an address
-		 * space as read-write. */
-		if(refcount_get(&page->count) == 0) {
-			page->modified = false;
-			page_set_state(page, PAGE_STATE_CACHED); 
-		}
-	}
-
-	phys_unmap(mapping, PAGE_SIZE, true);
-	return ret;
-}
-
 /** Flush modifications to a cache.
  * @param cache		Cache to flush.
  * @return		Status code describing result of the operation. If a
@@ -472,6 +485,22 @@ status_t vm_cache_flush(vm_cache_t *cache) {
 
 	mutex_unlock(&cache->lock);
 	return ret;
+}
+
+/** Allocate a new VM cache.
+ * @param size		Size of the cache.
+ * @param ops		Pointer to operations structure (optional).
+ * @param data		Implementation-specific data pointer.
+ * @return		Pointer to cache structure. */
+vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data) {
+	vm_cache_t *cache;
+
+	cache = slab_cache_alloc(vm_cache_cache, MM_KERNEL);
+	cache->size = size;
+	cache->ops = ops;
+	cache->data = data;
+	cache->deleted = false;
+	return cache;
 }
 
 /** Destroy a cache.
@@ -513,65 +542,6 @@ status_t vm_cache_destroy(vm_cache_t *cache, bool discard) {
 
 	slab_cache_free(vm_cache_cache, cache);
 	return STATUS_SUCCESS;
-}
-
-/**
- * Flush changes to a page from a cache.
- *
- * Flushes changes to a modified page belonging to a cache. This is a helper
- * function for use by the page daemon, and should not be used by anything
- * else.
- *
- * @param page		Page to flush.
- *
- * @return		Whether the page was removed from the queue.
- */
-bool vm_cache_flush_page(page_t *page) {
-	vm_cache_t *cache;
-	status_t ret;
-
-	/* Must be careful - another thread could be destroying the cache. */
-	if(!(cache = page->cache))
-		return true;
-
-	mutex_lock(&cache->lock);
-
-	if(cache->deleted) {
-		mutex_unlock(&cache->lock);
-		return true;
-	}
-
-	ret = vm_cache_flush_page_internal(cache, page);
-	mutex_unlock(&cache->lock);
-	return (ret == STATUS_SUCCESS);
-}
-
-/**
- * Evict a page in a cache from memory.
- *
- * Attempts to evict a page belonging to a cache from memory. This is a helper
- * function for use by the page daemon, and should not be used by anything
- * else.
- *
- * @param page		Page to evict.
- */
-void vm_cache_evict_page(page_t *page) {
-	vm_cache_t *cache;
-
-	/* Must be careful - another thread could be destroying the cache. */
-	if(!(cache = page->cache))
-		return;
-
-	mutex_lock(&cache->lock);
-
-	if(cache->deleted) {
-		mutex_unlock(&cache->lock);
-		return;
-	}
-
-	avl_tree_remove(&cache->pages, &page->avl_link);
-	page_free(page);
-	mutex_unlock(&cache->lock);
 }
 
 /** Print information about a cache.
