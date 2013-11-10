@@ -22,6 +22,7 @@
 #include <arch/memory.h>
 
 #include <io/fs.h>
+#include <io/memory_file.h>
 
 #include <lib/utility.h>
 
@@ -484,7 +485,7 @@ __init_text void module_init(void) {
 	KBOOT_ITERATE(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
 		name = kboot_tag_data(tag, 0);
 		mapping = phys_map(tag->addr, tag->size, MM_BOOT);
-		handle = file_from_memory(mapping, tag->size);
+		handle = memory_file_create(mapping, tag->size);
 
 		module = kmalloc(sizeof(module_t), MM_BOOT);
 		list_init(&module->header);

@@ -23,6 +23,7 @@
 
 #include <io/device.h>
 #include <io/fs.h>
+#include <io/memory_file.h>
 
 #include <lib/string.h>
 #include <lib/tar.h>
@@ -216,7 +217,7 @@ static void init_thread(void *arg1, void *arg2) {
 		KBOOT_ITERATE(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
 			name = kboot_tag_data(tag, 0);
 			mapping = phys_map(tag->addr, tag->size, MM_BOOT);
-			handle = file_from_memory(mapping, tag->size);
+			handle = memory_file_create(mapping, tag->size);
 
 			ret = tar_extract(handle, "/");
 			object_handle_release(handle);

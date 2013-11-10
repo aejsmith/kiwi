@@ -163,7 +163,6 @@ extern bool file_access(file_t *file, uint32_t rights);
 
 extern object_handle_t *file_handle_create(file_t *file, uint32_t rights,
 	uint32_t flags, void *data);
-extern object_handle_t *file_from_memory(const void *buf, size_t size);
 
 /**
  * Public kernel interface.
