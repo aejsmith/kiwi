@@ -26,6 +26,7 @@
 #include <x86/lapic.h>
 
 #include <pc/acpi.h>
+#include <pc/console.h>
 #include <pc/pic.h>
 #include <pc/pit.h>
 
@@ -41,6 +42,8 @@ __init_text void platform_init(void) {
 	/* If the LAPIC is not available, we must use the PIT as the timer. */
 	if(!lapic_enabled())
 		pit_init();
+
+	i8042_init();
 }
 
 /** Reboot the system. */

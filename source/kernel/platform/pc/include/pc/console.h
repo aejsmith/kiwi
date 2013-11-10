@@ -64,4 +64,6 @@
 #define LEFT_SHIFT		0x2A
 #define RIGHT_SHIFT		0x36
 
+extern void i8042_init(void);
+
 #endif /* __PC_CONSOLE_H */

@@ -108,7 +108,3 @@ endmenu
 menu "Kernel configuration"
 source "source/kernel/Kconfig"
 endmenu
-
-menu "Driver configuration"
-source "source/drivers/Kconfig"
-endmenu

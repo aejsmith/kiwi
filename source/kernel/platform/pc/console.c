@@ -17,9 +17,16 @@
 /**
  * @file
  * @brief		PC console code.
+ *
+ * @todo		Move i8042 stuff out to a driver. A simple polling
+ *			implementation will be left here though for early use,
+ *			so that KDB can be used before the proper driver is
+ *			loaded.
  */
 
 #include <arch/io.h>
+
+#include <device/irq.h>
 
 #include <lib/ansi_parser.h>
 #include <lib/string.h>
@@ -28,11 +35,17 @@
 
 #include <pc/console.h>
 
+#include <proc/thread.h>
+
+#include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
 #include <console.h>
+#include <dpc.h>
 #include <kboot.h>
+#include <kdb.h>
 #include <kernel.h>
+#include <status.h>
 
 /** VGA character attributes to use. */
 #define VGA_ATTRIB	0x0F00
@@ -49,6 +62,16 @@ static uint16_t vga_cols;		/**< Number of columns. */
 static uint16_t vga_lines;		/**< Number of lines. */
 static uint16_t vga_cursor_x;		/**< X position of the cursor. */
 static uint16_t vga_cursor_y;		/**< Y position of the cursor. */
+
+/** Size of the keyboard input buffer. */
+#define I8042_BUFFER_SIZE	16
+
+/** Keyboard implementation details. */
+static SEMAPHORE_DECLARE(i8042_sem, 0);
+static SPINLOCK_DECLARE(i8042_lock);
+static uint16_t i8042_buffer[I8042_BUFFER_SIZE];
+static size_t i8042_buffer_start = 0;
+static size_t i8042_buffer_size = 0;
 
 #ifdef SERIAL_PORT
 /** Serial port ANSI escape parser. */
@@ -89,22 +112,72 @@ static const uint16_t kbd_layout_extended[128] = {
 	CONSOLE_KEY_DOWN, CONSOLE_KEY_PGDN, 0, 0x7F
 };
 
-/** Read a character from the i8042 keyboard.
- * @return		Character read, or 0 if none available. */
-static uint16_t i8042_console_poll(void) {
+/** Translate a keycode read from the i8042 keyboard.
+ * @param code		Keycode read.
+ * @return		Translated character, or 0 if none available. */
+static uint16_t i8042_console_translate(uint8_t code) {
 	static bool shift = false;
 	static bool ctrl = false;
 	static bool alt = false;
 	static bool extended = false;
 
-	unsigned char code;
+	uint16_t ret;
+
+	/* Check for an extended code. */
+	if(code >= 0xe0) {
+		if(code == 0xe0)
+			extended = true;
+
+		return 0;
+	}
+
+	/* Handle key releases. */
+	if(code & 0x80) {
+		code &= 0x7F;
+
+		if(code == LEFT_SHIFT || code == RIGHT_SHIFT) {
+			shift = false;
+		} else if(code == LEFT_CTRL || code == RIGHT_CTRL) {
+			ctrl = false;
+		} else if(code == LEFT_ALT || code == RIGHT_ALT) {
+			alt = false;
+		}
+
+		extended = false;
+		return 0;
+	}
+
+	if(!extended) {
+		if(code == LEFT_SHIFT || code == RIGHT_SHIFT) {
+			shift = true;
+			return 0;
+		} else if(code == LEFT_CTRL || code == RIGHT_CTRL) {
+			ctrl = true;
+			return 0;
+		} else if(code == LEFT_ALT || code == RIGHT_ALT) {
+			alt = true;
+			return 0;
+		}
+	}
+
+	ret = (extended)
+		? kbd_layout_extended[code]
+		: ((shift) ? kbd_layout_shift[code] : kbd_layout[code]);
+	extended = false;
+	return ret;
+}
+
+/** Read a character from the i8042 keyboard.
+ * @return		Character read, or 0 if none available. */
+static uint16_t i8042_console_poll(void) {
+	uint8_t status;
 	uint16_t ret;
 
 	while(true) {
 		/* Check for keyboard data. */
-		code = in8(0x64);
-		if(code & (1<<0)) {
-			if(code & (1<<5)) {
+		status = in8(0x64);
+		if(status & (1<<0)) {
+			if(status & (1<<5)) {
 				/* Mouse data, discard. */
 				in8(0x60);
 				continue;
@@ -114,49 +187,7 @@ static uint16_t i8042_console_poll(void) {
 		}
 
 		/* Read the code. */
-		code = in8(0x60);
-
-		/* Check for an extended code. */
-		if(code >= 0xe0) {
-			if(code == 0xe0)
-				extended = true;
-
-			continue;
-		}
-
-		/* Handle key releases. */
-		if(code & 0x80) {
-			code &= 0x7F;
-
-			if(code == LEFT_SHIFT || code == RIGHT_SHIFT) {
-				shift = false;
-			} else if(code == LEFT_CTRL || code == RIGHT_CTRL) {
-				ctrl = false;
-			} else if(code == LEFT_ALT || code == RIGHT_ALT) {
-				alt = false;
-			}
-
-			extended = false;
-			continue;
-		}
-
-		if(!extended) {
-			if(code == LEFT_SHIFT || code == RIGHT_SHIFT) {
-				shift = true;
-				continue;
-			} else if(code == LEFT_CTRL || code == RIGHT_CTRL) {
-				ctrl = true;
-				continue;
-			} else if(code == LEFT_ALT || code == RIGHT_ALT) {
-				alt = true;
-				continue;
-			}
-		}
-
-		/* Work out the return code. */
-		ret = (extended)
-			? kbd_layout_extended[code]
-			: ((shift) ? kbd_layout_shift[code] : kbd_layout[code]);
+		ret = i8042_console_translate(in8(0x60));
 
 		/* Little hack so that pressing Enter won't result in an extra
 		 * newline being sent. */
@@ -165,16 +196,91 @@ static uint16_t i8042_console_poll(void) {
 			in8(0x60);
 		}
 
-		extended = false;
-		if(ret != 0)
-			return ret;
+		return ret;
 	}
+}
+
+/** Read a character from the keyboard, blocking until it can do so.
+ * @param ch		Where to store character read.
+ * @return		Status code describing the result of the operation. */
+static status_t i8042_console_getc(uint16_t *chp) {
+	status_t ret;
+
+	ret = semaphore_down_etc(&i8042_sem, -1, SLEEP_INTERRUPTIBLE);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	spinlock_lock(&i8042_lock);
+
+	*chp = i8042_buffer[i8042_buffer_start];
+	i8042_buffer_size--;
+	if(++i8042_buffer_start == I8042_BUFFER_SIZE)
+		i8042_buffer_start = 0;
+
+	spinlock_unlock(&i8042_lock);
+	return STATUS_SUCCESS;
 }
 
 /** i8042 early console input operations. */
 static console_in_ops_t i8042_console_in_ops = {
 	.poll = i8042_console_poll,
+	.getc = i8042_console_getc,
 };
+
+/** IRQ handler for i8042 keyboard.
+ * @param num		IRQ number.
+ * @return		IRQ status code. */
+static irq_status_t i8042_irq(unsigned num, void *data) {
+	uint8_t code;
+	uint16_t ch;
+
+	if(!(in8(0x64) & (1<<0)) || in8(0x64) & (1<<5))
+		return IRQ_UNHANDLED;
+
+	/* Read the code. */
+	code = in8(0x60);
+
+	/* Some debugging hooks to go into KDB, etc. */
+	switch(code) {
+	case 59:
+		/* F1 - Enter KDB. */
+		kdb_enter(KDB_REASON_USER, NULL);
+		break;
+	case 60:
+		/* F2 - Call fatal(). */
+		fatal("User requested fatal error");
+		break;
+	case 61:
+		/* F3 - Reboot. */
+		dpc_request((dpc_function_t)system_shutdown, (void *)((ptr_t)SHUTDOWN_REBOOT));
+		break;
+	case 62:
+		/* F4 - Shutdown. */
+		dpc_request((dpc_function_t)system_shutdown, (void *)((ptr_t)SHUTDOWN_POWEROFF));
+		break;
+	}
+
+	spinlock_lock(&i8042_lock);
+
+	ch = i8042_console_translate(code);
+
+	if(ch && i8042_buffer_size < I8042_BUFFER_SIZE) {
+		i8042_buffer[(i8042_buffer_start + i8042_buffer_size++) % I8042_BUFFER_SIZE] = ch;
+		semaphore_up(&i8042_sem, 1);
+	}
+
+	spinlock_unlock(&i8042_lock);
+	return IRQ_HANDLED;
+}
+
+/** Initialize keyboard input. */
+__init_text void i8042_init(void) {
+	/* Empty i8042 buffer. */
+	while(in8(0x64) & 1)
+		in8(0x60);
+
+	irq_register(1, i8042_irq, NULL, NULL);
+}
 
 /**
  * VGA console operations.

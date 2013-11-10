@@ -28,7 +28,7 @@
  * @param num		IRQ number.
  * @param data		Data associated with IRQ (unused).
  * @return		IRQ status code. */
-static irq_status_t pit_handler(unsigned num, void *data) {
+static irq_status_t pit_irq(unsigned num, void *data) {
 	return (timer_tick()) ? IRQ_PREEMPT : IRQ_HANDLED;
 }
 
@@ -64,5 +64,5 @@ static timer_device_t pit_timer_device = {
 __init_text void pit_init(void) {
 	timer_device_set(&pit_timer_device);
 	pit_disable();
-	irq_register(0, pit_handler, NULL, NULL);
+	irq_register(0, pit_irq, NULL, NULL);
 }
