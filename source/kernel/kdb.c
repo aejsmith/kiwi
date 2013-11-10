@@ -900,7 +900,14 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 
 		kdb_printf("Backtrace:\n");
 		kdb_backtrace_cb(frame->ip);
-		arch_kdb_backtrace(NULL, kdb_backtrace_cb);
+
+		atomic_set(&kdb_running, 2);
+		if(setjmp(kdb_fault_context)) {
+			/* Backtrace faulted, just ignore. */
+		} else {
+			arch_kdb_backtrace(NULL, kdb_backtrace_cb);
+		}
+		atomic_set(&kdb_running, 1);
 
 		/* Flush and disable writing the KBoot log. */
 		kboot_log_flush();
@@ -929,9 +936,10 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 
 			/* Call the command to set up the filter. */
 			filter = kdb_malloc(sizeof(kdb_filter_t));
-			if(perform_call(list_first(&data.filters, kdb_args_t, header),
-				NULL, filter) != KDB_SUCCESS)
-			{
+			ret = perform_call(
+				list_first(&data.filters, kdb_args_t, header),
+				NULL, filter);
+			if(ret != KDB_SUCCESS) {
 				kdb_free(filter);
 				continue;
 			}
