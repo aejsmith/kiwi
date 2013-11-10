@@ -161,14 +161,6 @@ static int mount_command(std::vector<std::string> args) {
 	return 0;
 }
 
-static int test_command(std::vector<std::string> args) {
-	printf("Called test_command with %zu arguments:\n", args.size());
-	for(size_t i = 0; i < args.size(); i++)
-		printf(" args[%zu] = '%s'\n", i, args[i].c_str());
-
-	return 0;
-}
-
 static int unlink_command(std::vector<std::string> args) {
 	if(args.size() != 2) {
 		printf("Error: invalid arguments\n");
@@ -206,7 +198,6 @@ int main(int argc, char **argv) {
 	shell_commands.insert(std::make_pair("ls", ls_command));
 	shell_commands.insert(std::make_pair("mkdir", mkdir_command));
 	shell_commands.insert(std::make_pair("mount", mount_command));
-	shell_commands.insert(std::make_pair("test", test_command));
 	shell_commands.insert(std::make_pair("unlink", unlink_command));
 
 	printf("\nWelcome to Kiwi!\n\n");
