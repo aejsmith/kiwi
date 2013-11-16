@@ -30,12 +30,11 @@
 #include <sync/rwlock.h>
 
 struct object_handle;
-struct process;
 struct vm_region;
 
 /** Kernel object type structure. */
 typedef struct object_type {
-	int id;				/**< ID number for the type. */
+	unsigned id;			/**< ID number for the type. */
 	unsigned flags;			/**< Flags for objects of this type. */
 
 	/** Close a handle to an object.
@@ -80,17 +79,10 @@ typedef struct object_type {
 /** Properties of an object type. */
 #define OBJECT_TRANSFERRABLE	(1<<0)	/**< Objects can be inherited or transferred over IPC. */
 
-/** Structure defining a kernel object.
- * @note		This structure is intended to be embedded inside
- *			another structure for the object. */
-typedef struct object {
-	object_type_t *type;		/**< Type of the object. */
-} object_t;
-
-/** Structure containing a handle to a kernel object. */
+/** Structure containing a kernel object handle. */
 typedef struct object_handle {
-	object_t *object;		/**< Object that the handle refers to. */
-	void *data;			/**< Per-handle data pointer. */
+	object_type_t *type;		/**< Type of the object. */
+	void *private;			/**< Per-handle data pointer. */
 	refcount_t count;		/**< References to the handle. */
 } object_handle_t;
 
@@ -102,13 +94,10 @@ typedef struct handle_table {
 	unsigned long *bitmap;		/**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
 
-extern void object_init(object_t *object, object_type_t *type);
-extern void object_destroy(object_t *object);
-
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_signal(void *wait, unsigned long data);
 
-extern object_handle_t *object_handle_create(object_t *object, void *data);
+extern object_handle_t *object_handle_create(object_type_t *type, void *private);
 extern void object_handle_retain(object_handle_t *handle);
 extern void object_handle_release(object_handle_t *handle);
 
@@ -120,9 +109,9 @@ extern status_t object_handle_detach(handle_t id);
 
 extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2],
 	ssize_t count, handle_table_t **tablep);
-extern handle_table_t *handle_table_clone(handle_table_t *src);
+extern handle_table_t *handle_table_clone(handle_table_t *parent);
 extern void handle_table_destroy(handle_table_t *table);
 
-extern void handle_init(void);
+extern void object_init(void);
 
 #endif /* __OBJECT_H */

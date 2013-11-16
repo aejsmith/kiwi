@@ -180,8 +180,10 @@ extern device_t *device_bus_dir;
 /** Get the name of a device from a handle.
  * @param handle	Handle to get name from.
  * @return		Name of the device. */
-static inline const char *device_name(object_handle_t *handle) {
-	device_t *device = (device_t *)handle->object;
+static inline const char *device_name(object_handle_t *_handle) {
+	file_handle_t *handle = _handle->private;
+	device_t *device = (device_t *)handle->file;
+
 	return device->name;
 }
 

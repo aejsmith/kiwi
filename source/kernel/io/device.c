@@ -41,10 +41,9 @@ device_t *device_tree_root;
 device_t *device_bus_dir;
 
 /** Close a device.
- * @param file		Device being closed.
  * @param handle	File handle structure. */
-static void device_file_close(file_t *file, file_handle_t *handle) {
-	device_t *device = (device_t *)file;
+static void device_file_close(file_handle_t *handle) {
+	device_t *device = (device_t *)handle->file;
 
 	if(device->ops && device->ops->close)
 		device->ops->close(device, handle);
@@ -53,13 +52,12 @@ static void device_file_close(file_t *file, file_handle_t *handle) {
 }
 
 /** Signal that a device event is being waited for.
- * @param file		Device being waited on.
  * @param handle	File handle structure.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t device_file_wait(file_t *file, file_handle_t *handle, unsigned event, void *wait) {
-	device_t *device = (device_t *)file;
+static status_t device_file_wait(file_handle_t *handle, unsigned event, void *wait) {
+	device_t *device = (device_t *)handle->file;
 
 	return (device->ops && device->ops->wait && device->ops->unwait)
 		? device->ops->wait(device, handle, event, wait)
@@ -67,24 +65,22 @@ static status_t device_file_wait(file_t *file, file_handle_t *handle, unsigned e
 }
 
 /** Stop waiting for a device event.
- * @param file		Device being waited on.
  * @param handle	File handle structure.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer. */
-static void device_file_unwait(file_t *file, file_handle_t *handle, unsigned event, void *wait) {
-	device_t *device = (device_t *)file;
+static void device_file_unwait(file_handle_t *handle, unsigned event, void *wait) {
+	device_t *device = (device_t *)handle->file;
 
 	assert(device->ops);
 	return device->ops->unwait(device, handle, event, wait);
 }
 
 /** Perform I/O on a device.
- * @param file		Device to perform I/O on.
  * @param handle	File handle structure.
  * @param request	I/O request.
  * @return		Status code describing result of the operation. */
-static status_t device_file_io(file_t *file, file_handle_t *handle, io_request_t *request) {
-	device_t *device = (device_t *)file;
+static status_t device_file_io(file_handle_t *handle, io_request_t *request) {
+	device_t *device = (device_t *)handle->file;
 
 	return (device->ops && device->ops->io)
 		? device->ops->io(device, handle, request)
@@ -92,12 +88,11 @@ static status_t device_file_io(file_t *file, file_handle_t *handle, io_request_t
 }
 
 /** Map a device into memory.
- * @param file		File to map.
  * @param handle	File handle structure.
  * @param region	Region being mapped.
  * @return		Status code describing result of the operation. */
-static status_t device_file_map(file_t *file, file_handle_t *handle, vm_region_t *region) {
-	device_t *device = (device_t *)file;
+static status_t device_file_map(file_handle_t *handle, vm_region_t *region) {
+	device_t *device = (device_t *)handle->file;
 
 	/* Cannot create private mappings to devices. */
 	if(!device->ops || !device->ops->map || region->flags & VM_MAP_PRIVATE)
@@ -107,13 +102,12 @@ static status_t device_file_map(file_t *file, file_handle_t *handle, vm_region_t
 }
 
 /** Get information about a device.
- * @param file		Device to get information on.
  * @param handle	File handle structure.
  * @param info		Information structure to fill in. */
-static void device_file_info(file_t *file, file_handle_t *handle, file_info_t *info) {
+static void device_file_info(file_handle_t *handle, file_info_t *info) {
 	info->id = 0;
 	info->mount = 0;
-	info->type = file->type;
+	info->type = handle->file->type;
 	info->block_size = 0;
 	info->size = 0;
 	info->links = 1;
@@ -601,16 +595,16 @@ status_t device_open(const char *path, uint32_t rights, uint32_t flags,
 status_t device_request(object_handle_t *handle, unsigned request, const void *in,
 	size_t in_size, void **outp, size_t *out_sizep)
 {
-	device_t *device;
 	file_handle_t *data;
+	device_t *device;
 
 	assert(handle);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	device = (device_t *)handle->object;
-	data = (file_handle_t *)handle->data;
+	data = (file_handle_t *)handle->private;
+	device = (device_t *)data->file;
 
 	if(device->file.ops != &device_file_ops) {
 		return STATUS_INVALID_HANDLE;

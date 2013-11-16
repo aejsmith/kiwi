@@ -175,7 +175,6 @@ void process_release(process_t *process) {
 	rwlock_unlock(&process_tree_lock);
 
 	token_release(process->token);
-	object_destroy(&process->obj);
 	id_allocator_free(&process_id_allocator, process->id);
 
 	dprintf("process: destroyed process %" PRId32 " (%s) (process: %p, status: %d)\n",
@@ -259,7 +258,7 @@ void process_detach_thread(thread_t *thread) {
 /** Closes a handle to a process.
  * @param handle	Handle to close. */
 static void process_object_close(object_handle_t *handle) {
-	process_release((process_t *)handle->object);
+	process_release(handle->private);
 }
 
 /** Signal that a process is being waited for.
@@ -268,7 +267,7 @@ static void process_object_close(object_handle_t *handle) {
  * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
 static status_t process_object_wait(object_handle_t *handle, unsigned event, void *wait) {
-	process_t *process = (process_t *)handle->object;
+	process_t *process = handle->private;
 
 	switch(event) {
 	case PROCESS_EVENT_DEATH:
@@ -289,7 +288,7 @@ static status_t process_object_wait(object_handle_t *handle, unsigned event, voi
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer. */
 static void process_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
-	process_t *process = (process_t *)handle->object;
+	process_t *process = handle->private;
 
 	switch(event) {
 	case PROCESS_EVENT_DEATH:
@@ -402,7 +401,6 @@ static status_t process_alloc(const char *name, process_id_t id, int priority,
 	}
 
 	process = slab_cache_alloc(process_cache, MM_KERNEL);
-	object_init(&process->obj, &process_object_type);
 	refcount_set(&process->count, 1);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
 	memset(process->signal_act, 0, sizeof(process->signal_act));
@@ -931,7 +929,7 @@ status_t kern_process_create(const char *path, const char *const args[],
 		if(ret != STATUS_SUCCESS)
 			goto out;
 
-		new_token = (token_t *)khandle->object;
+		new_token = khandle->private;
 		token_retain(new_token);
 		object_handle_release(khandle);
 	} else {
@@ -969,7 +967,7 @@ status_t kern_process_create(const char *path, const char *const args[],
 	if(handlep) {
 		refcount_inc(&process->count);
 
-		khandle = object_handle_create(&process->obj, NULL);
+		khandle = object_handle_create(&process_object_type, process);
 		ret = object_handle_attach(khandle, &uhandle, handlep);
 		object_handle_release(khandle);
 		if(ret != STATUS_SUCCESS) {
@@ -1081,7 +1079,7 @@ status_t kern_process_exec(const char *path, const char *const args[],
 			return ret;
 		}
 
-		new_token = (token_t *)khandle->object;
+		new_token = khandle->private;
 		token_retain(new_token);
 		object_handle_release(khandle);
 	} else {
@@ -1248,7 +1246,7 @@ status_t kern_process_clone(handle_t *handlep) {
 
 	/* Create a new handle. This takes over the initial reference added by
 	 * process_alloc(). */
-	khandle = object_handle_create(&process->obj, NULL);
+	khandle = object_handle_create(&process_object_type, process);
 	ret = object_handle_attach(khandle, &uhandle, handlep);
 	if(ret != STATUS_SUCCESS) {
 		object_handle_release(khandle);
@@ -1303,7 +1301,7 @@ status_t kern_process_open(process_id_t id, handle_t *handlep) {
 	}
 
 	/* Reference added by process_lookup() is taken over by this handle. */
-	handle = object_handle_create(&process->obj, NULL);
+	handle = object_handle_create(&process_object_type, process);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 	return ret;
@@ -1317,13 +1315,17 @@ process_id_t kern_process_id(handle_t handle) {
 	object_handle_t *khandle;
 	process_id_t id = -1;
 	process_t *process;
+	status_t ret;
 
 	if(handle < 0) {
 		id = curr_proc->id;
-	} else if(object_handle_lookup(handle, OBJECT_TYPE_PROCESS, &khandle) == STATUS_SUCCESS) {
-		process = (process_t *)khandle->object;
-		id = process->id;
-		object_handle_release(khandle);
+	} else {
+		ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, &khandle);
+		if(ret == STATUS_SUCCESS) {
+			process = khandle->private;
+			id = process->id;
+			object_handle_release(khandle);
+		}
 	}
 
 	return id;
@@ -1352,8 +1354,7 @@ status_t kern_process_security(handle_t handle, security_context_t *ctx) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	process = (process_t *)khandle->object;
-
+	process = khandle->private;
 	mutex_lock(&process->lock);
 
 	token = process->token;
@@ -1382,7 +1383,7 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	process = (process_t *)khandle->object;
+	process = khandle->private;
 
 	if(process->state != PROCESS_DEAD) {
 		object_handle_release(khandle);
@@ -1415,7 +1416,7 @@ status_t kern_process_token(handle_t *handlep) {
 	token_retain(token);
 	mutex_unlock(&curr_proc->lock);
 
-	handle = object_handle_create(&token->obj, NULL);
+	handle = object_handle_create(&token_object_type, token);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 
@@ -1445,7 +1446,7 @@ status_t kern_process_set_token(handle_t handle) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	token = (token_t *)khandle->object;
+	token = khandle->private;
 	token_retain(token);
 	object_handle_release(khandle);
 

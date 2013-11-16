@@ -35,15 +35,12 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#include <object.h>
-
-struct vm_aspace;
+struct handle_table;
 struct process_create;
+struct vm_aspace;
 
 /** Structure containing details about a process. */
 typedef struct process {
-	object_t obj;			/**< Kernel object header. */
-
 	/** Lock to protect the process data. */
 	mutex_t lock;
 
@@ -74,7 +71,7 @@ typedef struct process {
 	/** Resource information. */
 	token_t *token;			/**< Security token for the process. */
 	struct vm_aspace *aspace;	/**< Process' address space. */
-	handle_table_t *handles;	/**< Table of open handles. */
+	struct handle_table *handles;	/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
 	list_t threads;			/**< List of threads. */
 	avl_tree_t futexes;		/**< Tree of futexes that the process has accessed. */

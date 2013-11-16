@@ -182,8 +182,6 @@ void thread_release(thread_t *thread) {
 	rwlock_unlock(&thread_tree_lock);
 
 	process_detach_thread(thread);
-
-	object_destroy(&thread->obj);
 	id_allocator_free(&thread_id_allocator, thread->id);
 
 	dprintf("thread: destroyed thread %" PRId32 " (%s) (thread: %p)\n", thread->id,
@@ -228,7 +226,7 @@ static void reaper_thread(void *arg1, void *arg2) {
 /** Closes a handle to a thread.
  * @param handle	Handle being closed. */
 static void thread_object_close(object_handle_t *handle) {
-	thread_release((thread_t *)handle->object);
+	thread_release(handle->private);
 }
 
 /** Signal that a thread is being waited for.
@@ -237,7 +235,7 @@ static void thread_object_close(object_handle_t *handle) {
  * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
 static status_t thread_object_wait(object_handle_t *handle, unsigned event, void *wait) {
-	thread_t *thread = (thread_t *)handle->object;
+	thread_t *thread = handle->private;
 
 	switch(event) {
 	case THREAD_EVENT_DEATH:
@@ -258,7 +256,7 @@ static status_t thread_object_wait(object_handle_t *handle, unsigned event, void
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer. */
 static void thread_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
-	thread_t *thread = (thread_t *)handle->object;
+	thread_t *thread = handle->private;
 
 	switch(event) {
 	case THREAD_EVENT_DEATH:
@@ -825,7 +823,6 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags,
 	if(threadp)
 		refcount_inc(&thread->count);
 
-	object_init(&thread->obj, &thread_object_type);
 	thread->state = THREAD_CREATED;
 	thread->flags = flags;
 	thread->priority = THREAD_PRIORITY_NORMAL;
@@ -1089,7 +1086,7 @@ status_t kern_thread_create(const char *name, thread_entry_t *entry,
 	if(handlep) {
 		refcount_inc(&thread->count);
 
-		khandle = object_handle_create(&thread->obj, NULL);
+		khandle = object_handle_create(&thread_object_type, thread);
 		ret = object_handle_attach(khandle, &uhandle, handlep);
 		object_handle_release(khandle);
 		if(ret != STATUS_SUCCESS)
@@ -1154,7 +1151,7 @@ status_t kern_thread_open(thread_id_t id, handle_t *handlep) {
 		return STATUS_NOT_FOUND;
 
 	/* Reference added by thread_lookup() is taken over by this handle. */
-	handle = object_handle_create(&thread->obj, NULL);
+	handle = object_handle_create(&thread_object_type, thread);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 	return ret;
@@ -1168,13 +1165,17 @@ thread_id_t kern_thread_id(handle_t handle) {
 	object_handle_t *khandle;
 	thread_id_t id = -1;
 	thread_t *thread;
+	status_t ret;
 
 	if(handle < 0) {
 		id = curr_thread->id;
-	} else if(object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle) == STATUS_SUCCESS) {
-		thread = (thread_t *)khandle->object;
-		id = thread->id;
-		object_handle_release(khandle);
+	} else {
+		ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle);
+		if(ret == STATUS_SUCCESS) {
+			thread = khandle->private;
+			id = thread->id;
+			object_handle_release(khandle);
+		}
 	}
 
 	return id;
@@ -1206,8 +1207,7 @@ status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	thread = (thread_t *)khandle->object;
-
+	thread = khandle->private;
 	current = security_current_token();
 
 	mutex_lock(&thread->owner->lock);
@@ -1246,7 +1246,7 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	thread = (thread_t *)khandle->object;
+	thread = khandle->private;
 
 	if(thread->state != THREAD_DEAD) {
 		object_handle_release(khandle);
@@ -1288,7 +1288,7 @@ status_t kern_thread_token(handle_t *handlep) {
 	mutex_unlock(&curr_proc->lock);
 
 	if(token) {
-		handle = object_handle_create(&token->obj, NULL);
+		handle = object_handle_create(&token_object_type, token);
 		ret = object_handle_attach(handle, NULL, handlep);
 		object_handle_release(handle);
 	} else {
@@ -1325,7 +1325,7 @@ status_t kern_thread_set_token(handle_t handle) {
 		if(ret != STATUS_SUCCESS)
 			return ret;
 
-		token = (token_t *)khandle->object;
+		token = khandle->private;
 		token_retain(token);
 		object_handle_release(khandle);
 	}

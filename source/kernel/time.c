@@ -46,8 +46,6 @@
 
 /** Userspace timer structure. */
 typedef struct user_timer {
-	object_t obj;			/**< Object header. */
-
 	uint32_t flags;			/**< Flags for the timer. */
 	timer_t timer;			/**< Kernel timer. */
 	notifier_t notifier;		/**< Notifier for the timer event. */
@@ -465,10 +463,9 @@ __init_text void time_init(void) {
 /** Closes a handle to a timer.
  * @param handle	Handle being closed. */
 static void timer_object_close(object_handle_t *handle) {
-	user_timer_t *timer = (user_timer_t *)handle->object;
+	user_timer_t *timer = handle->private;
 
 	notifier_clear(&timer->notifier);
-	object_destroy(&timer->obj);
 	kfree(timer);
 }
 
@@ -478,7 +475,7 @@ static void timer_object_close(object_handle_t *handle) {
  * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
 static status_t timer_object_wait(object_handle_t *handle, unsigned event, void *wait) {
-	user_timer_t *timer = (user_timer_t *)handle->object;
+	user_timer_t *timer = handle->private;
 
 	switch(event) {
 	case TIMER_EVENT_FIRED:
@@ -500,7 +497,7 @@ static status_t timer_object_wait(object_handle_t *handle, unsigned event, void 
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer. */
 static void timer_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
-	user_timer_t *timer = (user_timer_t *)handle->object;
+	user_timer_t *timer = handle->private;
 
 	switch(event) {
 	case TIMER_EVENT_FIRED:
@@ -548,14 +545,13 @@ status_t kern_timer_create(uint32_t flags, handle_t *handlep) {
 		return STATUS_INVALID_ARG;
 
 	timer = kmalloc(sizeof(*timer), MM_KERNEL);
-	object_init(&timer->obj, &timer_object_type);
 	timer_init(&timer->timer, "timer_object", user_timer_func, timer, TIMER_THREAD);
 	notifier_init(&timer->notifier, timer);
 	timer->flags = flags;
 	timer->fired = false;
 	timer->thread = curr_thread;
 
-	handle = object_handle_create(&timer->obj, NULL);
+	handle = object_handle_create(&timer_object_type, timer);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
 	return ret;
@@ -581,7 +577,8 @@ status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	timer = (user_timer_t *)khandle->object;
+	timer = khandle->private;
+
 	timer_stop(&timer->timer);
 	timer_start(&timer->timer, interval, mode);
 	object_handle_release(khandle);
@@ -602,7 +599,8 @@ status_t kern_timer_stop(handle_t handle, nstime_t *remp) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	timer = (user_timer_t *)khandle->object;
+	timer = khandle->private;
+
 	if(!list_empty(&timer->timer.header)) {
 		timer_stop(&timer->timer);
 		if(remp) {

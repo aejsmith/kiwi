@@ -480,10 +480,9 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 					offset + region->obj_offset, &prev);
 				if(ret != STATUS_SUCCESS) {
 					dprintf("vm: failed to get page at offset 0x%"
-						PRIx64 " from %p (object: %p): %d\n",
+						PRIx64 " from %p: %d\n",
 						offset + region->obj_offset,
-						region->handle,
-						region->handle->object, ret);
+						region->handle, ret);
 					mutex_unlock(&amap->lock);
 					return ret;
 				}
@@ -498,8 +497,7 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 			}
 
 			dprintf("vm:  anon write fault: copying page 0x%" PRIxPHYS
-				" from %p (object: %p)\n", phys, region->handle,
-				region->handle->object);
+				" from %p\n", phys, region->handle);
 
 			page = page_alloc(MM_KERNEL);
 			phys_copy(page->addr, phys, MM_KERNEL);
@@ -536,17 +534,16 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 				offset + region->obj_offset, &page);
 			if(ret != STATUS_SUCCESS) {
 				dprintf("vm: failed to get page at offset 0x%"
-					PRIx64 " from %p (object: %p): %d\n",
+					PRIx64 " from %p: %d\n",
 					offset + region->obj_offset,
-					region->handle, region->handle->object,
-					ret);
+					region->handle, ret);
 				mutex_unlock(&amap->lock);
 				return ret;
 			}
 
-			dprintf("vm:  anon read fault: mapping page 0x%" PRIxPHYS
-				" from %p (object: %p) as read-only\n", phys,
-				region->handle, region->handle->object);
+			dprintf("vm:  anon read fault: mapping page 0x%"
+				PRIxPHYS " from %p as read-only\n", phys,
+				region->handle);
 
 			phys = page->addr;
 			protect &= ~VM_PROT_WRITE;
@@ -605,9 +602,8 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *phy
 	offset = (offset_t)(addr - region->start) + region->obj_offset;
 	ret = region->ops->get_page(region, offset, &page);
 	if(ret != STATUS_SUCCESS) {
-		dprintf("vm: failed to get page at offset 0x%" PRIx64 " from %p "
-			"(object: %p): %d\n", offset, region->handle,
-			region->handle->object, ret);
+		dprintf("vm: failed to get page at offset 0x%" PRIx64 " from "
+			"%p: %d\n", offset, region->handle, ret);
 		return ret;
 	}
 
@@ -634,7 +630,9 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *phy
  * @param access	Required access for the page.
  * @param physp		Where to store physical address of page.
  * @return		Status code describing the result of the operation. */
-static status_t map_page(vm_region_t *region, ptr_t addr, uint32_t access, phys_ptr_t *physp) {
+static status_t map_page(vm_region_t *region, ptr_t addr, uint32_t access,
+	phys_ptr_t *physp)
+{
 	assert(vm_region_contains(region, addr));
 
 	return (region->amap)
@@ -1447,7 +1445,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 	if(handle) {
 		if(offset % PAGE_SIZE || (offset_t)(offset + size) < offset) {
 			return STATUS_INVALID_ARG;
-		} else if(!handle->object->type->map) {
+		} else if(!handle->type->map) {
 			return STATUS_NOT_SUPPORTED;
 		}
 	}
@@ -1488,7 +1486,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 		object_handle_retain(region->handle);
 		region->obj_offset = offset;
 
-		ret = handle->object->type->map(handle, region);
+		ret = handle->type->map(handle, region);
 		if(ret != STATUS_SUCCESS) {
 			/* Free up the region again. */
 			region = vm_region_create(as, region->start,

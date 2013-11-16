@@ -28,56 +28,46 @@
 
 #include <object.h>
 
-struct file;
 struct file_handle;
 struct io_request;
 
 /** Operations for a file. */
 typedef struct file_ops {
 	/** Close a file.
-	 * @param file		File being closed.
 	 * @param handle	File handle structure. All data allocated for
 	 *			the handle should be freed. */
-	void (*close)(struct file *file, struct file_handle *handle);
+	void (*close)(struct file_handle *handle);
 
 	/** Signal that a file event is being waited for.
 	 * @note		If the event being waited for has occurred
 	 *			already, this function should call the callback
 	 *			function and return success.
-	 * @param file		File being waited on.
 	 * @param handle	File handle structure.
 	 * @param event		Event that is being waited for.
 	 * @param wait		Internal data pointer to be passed to
 	 *			object_wait_signal() or object_wait_notifier().
 	 * @return		Status code describing result of the operation. */
-	status_t (*wait)(struct file *file, struct file_handle *handle, unsigned event,
-		void *wait);
+	status_t (*wait)(struct file_handle *handle, unsigned event, void *wait);
 
 	/** Stop waiting for a file event.
-	 * @param file		File being waited on.
 	 * @param handle	File handle structure.
 	 * @param event		Event that is being waited for.
 	 * @param wait		Internal data pointer. */
-	void (*unwait)(struct file *file, struct file_handle *handle, unsigned event,
-		void *wait);
+	void (*unwait)(struct file_handle *handle, unsigned event, void *wait);
 
 	/** Perform I/O on a file.
-	 * @param file		File to perform I/O on.
 	 * @param handle	File handle structure.
 	 * @param request	I/O request.
 	 * @return		Status code describing result of the operation. */
-	status_t (*io)(struct file *file, struct file_handle *handle,
-		struct io_request *request);
+	status_t (*io)(struct file_handle *handle, struct io_request *request);
 
 	/** Map a file into memory.
 	 * @note		See object_type_t::map() for more details on the
 	 *			behaviour of this function.
-	 * @param file		File to map.
 	 * @param handle	File handle structure.
 	 * @param region	Region being mapped.
 	 * @return		Status code describing result of the operation. */
-	status_t (*map)(struct file *file, struct file_handle *handle,
-		struct vm_region *region);
+	status_t (*map)(struct file_handle *handle, struct vm_region *region);
 
 	/** Read the next directory entry.
 	 * @note		The implementation can make use of the offset
@@ -85,45 +75,39 @@ typedef struct file_ops {
 	 *			to implement this function. It will be set to
 	 *			0 when the handle is initially opened, and
 	 *			when rewind_dir() is called on the handle.
-	 * @param file		File to read from.
 	 * @param handle	File handle structure.
 	 * @param entryp	Where to store pointer to directory entry
 	 *			structure (must be allocated using a
 	 *			kmalloc()-based function).
 	 * @return		Status code describing result of the operation. */
-	status_t (*read_dir)(struct file *file, struct file_handle *handle,
-		dir_entry_t **entryp);
+	status_t (*read_dir)(struct file_handle *handle, dir_entry_t **entryp);
 
 	/** Modify the size of a file.
-	 * @param file		File to resize.
 	 * @param handle	File handle structure.
 	 * @param size		New size of the file.
 	 * @return		Status code describing result of the operation. */
-	status_t (*resize)(struct file *file, struct file_handle *handle, offset_t size);
+	status_t (*resize)(struct file_handle *handle, offset_t size);
 
 	/** Get information about a file.
-	 * @param file		File to get information on.
 	 * @param handle	File handle structure.
 	 * @param info		Information structure to fill in. */
-	void (*info)(struct file *file, struct file_handle *handle, file_info_t *info);
+	void (*info)(struct file_handle *handle, file_info_t *info);
 
 	/** Flush changes to a file.
-	 * @param file		File to flush.
 	 * @param handle	File handle structure.
 	 * @return		Status code describing result of the operation. */
-	status_t (*sync)(struct file *file, struct file_handle *handle);
+	status_t (*sync)(struct file_handle *handle);
 } file_ops_t;
 
 /** Header for a file object. */
 typedef struct file {
-	object_t obj;			/**< Kernel object header. */
-
 	file_ops_t *ops;		/**< File operations structure. */
 	file_type_t type;		/**< Type of the file. */
 } file_t;
 
 /** File handle information. */
 typedef struct file_handle {
+	file_t *file;			/**< File object. */
 	void *data;			/**< Implementation data pointer. */
 	uint32_t rights;		/**< Rights the handle was opened with. */
 	uint32_t flags;			/**< Flags modifying handle behaviour. */

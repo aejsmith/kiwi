@@ -38,7 +38,6 @@
 #include <sync/spinlock.h>
 
 #include <cpu.h>
-#include <object.h>
 #include <time.h>
 
 struct intr_frame;
@@ -49,8 +48,6 @@ typedef void (*thread_func_t)(void *, void *);
 
 /** Definition of a thread. */
 typedef struct thread {
-	object_t obj;			/**< Object header. */
-
 	/** Architecture thread implementation. */
 	arch_thread_t arch;
 

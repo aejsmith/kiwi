@@ -231,9 +231,9 @@ status_t kern_signal_send(handle_t handle, int num) {
 		if(ret != STATUS_SUCCESS)
 			return ret;
 
-		switch(khandle->object->type->id) {
+		switch(khandle->type->id) {
 		case OBJECT_TYPE_PROCESS:
-			process = (process_t *)khandle->object;
+			process = khandle->private;
 
 			mutex_lock(&process->lock);
 
@@ -262,7 +262,7 @@ status_t kern_signal_send(handle_t handle, int num) {
 			mutex_unlock(&process->lock);
 			break;
 		case OBJECT_TYPE_THREAD:
-			thread = (thread_t *)khandle->object;
+			thread = khandle->private;
 			break;
 		default:
 			object_handle_release(khandle);

@@ -43,11 +43,11 @@ token_t *system_token = NULL;
 /** Closes a handle to a token.
  * @param handle	Handle being closed. */
 static void token_object_close(object_handle_t *handle) {
-	token_release((token_t *)handle->object);
+	token_release(handle->private);
 }
 
 /** Token object type. */
-static object_type_t token_object_type = {
+object_type_t token_object_type = {
 	.id = OBJECT_TYPE_TOKEN,
 	.flags = OBJECT_TRANSFERRABLE,
 	.close = token_object_close,
@@ -82,8 +82,6 @@ token_t *token_inherit(token_t *source) {
 
 	if(source->copy_on_inherit) {
 		token = slab_cache_alloc(token_cache, MM_KERNEL);
-
-		object_init(&token->obj, &token_object_type);
 		refcount_set(&token->count, 1);
 
 		token->ctx.uid = source->ctx.uid;
@@ -111,7 +109,6 @@ __init_text void token_init(void) {
 
 	/* Create the system token. It is granted all privileges. */
 	system_token = slab_cache_alloc(token_cache, MM_BOOT);
-	object_init(&system_token->obj, &token_object_type);
 	refcount_set(&system_token->count, 1);
 	system_token->ctx.uid = 0;
 	system_token->ctx.gid = 0;
@@ -161,7 +158,6 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 	creator = security_current_token();
 
 	token = slab_cache_alloc(token_cache, MM_KERNEL);
-	object_init(&token->obj, &token_object_type);
 	refcount_set(&token->count, 1);
 	token->copy_on_inherit = false;
 
@@ -220,7 +216,7 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 		}
 	}
 
-	khandle = object_handle_create(&token->obj, NULL);
+	khandle = object_handle_create(&token_object_type, token);
 	ret = object_handle_attach(khandle, NULL, handlep);
 	object_handle_release(khandle);
 	return ret;
@@ -242,7 +238,7 @@ status_t kern_token_query(handle_t handle, security_context_t *ctx) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	token = (token_t *)khandle->object;
+	token = khandle->private;
 
 	ret = memcpy_to_user(ctx, &token->ctx, sizeof(token->ctx));
 	object_handle_release(khandle);

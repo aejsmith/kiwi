@@ -28,8 +28,6 @@
 
 /** Structure of a security token. */
 typedef struct token {
-	object_t obj;			/**< Object header. */
-
 	security_context_t ctx;		/**< Context that the token holds. */
 	refcount_t count;		/**< Reference count for the token. */
 
@@ -44,6 +42,7 @@ typedef struct token {
 } token_t;
 
 extern token_t *system_token;
+extern object_type_t token_object_type;
 
 extern void token_retain(token_t *token);
 extern void token_release(token_t *token);

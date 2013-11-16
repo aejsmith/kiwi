@@ -70,6 +70,20 @@ static slab_cache_t *object_handle_cache;
 /** Cache for handle table structures. */
 static slab_cache_t *handle_table_cache;
 
+/** Object type names. */
+static const char *object_type_names[] = {
+	[OBJECT_TYPE_PROCESS] = "OBJECT_TYPE_PROCESS",
+	[OBJECT_TYPE_THREAD] = "OBJECT_TYPE_THREAD",
+	[OBJECT_TYPE_TOKEN] = "OBJECT_TYPE_TOKEN",
+	[OBJECT_TYPE_TIMER] = "OBJECT_TYPE_TIMER",
+	[OBJECT_TYPE_WATCHER] = "OBJECT_TYPE_WATCHER",
+	[OBJECT_TYPE_AREA] = "OBJECT_TYPE_AREA",
+	[OBJECT_TYPE_FILE] = "OBJECT_TYPE_FILE",
+	[OBJECT_TYPE_PORT] = "OBJECT_TYPE_PORT",
+	[OBJECT_TYPE_CONNECTION] = "OBJECT_TYPE_CONNECTION",
+	[OBJECT_TYPE_SEMAPHORE] = "OBJECT_TYPE_SEMAPHORE",
+};
+
 /** Constructor for handle table objects.
  * @param obj		Object to construct.
  * @param data		Cache data pointer. */
@@ -77,23 +91,6 @@ static void handle_table_ctor(void *obj, void *data) {
 	handle_table_t *table = obj;
 
 	rwlock_init(&table->lock, "handle_table_lock");
-}
-
-/** Initialize an object structure.
- * @param obj		Object to initialize.
- * @param type		Pointer to type structure for object type. Can be NULL,
- *			in which case the object will be a 'NULL object', and
- *			handles will never be created to it. */
-void object_init(object_t *object, object_type_t *type) {
-	assert(object);
-
-	object->type = type;
-}
-
-/** Destroy an object structure.
- * @param obj		Object to destroy. */
-void object_destroy(object_t *object) {
-	/* Nothing happens (yet). */
 }
 
 /** Notifier function to use for object waiting.
@@ -132,18 +129,21 @@ void object_wait_signal(void *_wait, unsigned long data) {
  * reference on it. The handle must be closed with object_handle_release() when
  * it is no longer required.
  *
- * @param object	Object to create a handle to.
- * @param data		Per-handle data pointer.
+ * @param type		Type of the object.
+ * @param private	Per-handle data pointer. This can be a pointer to the
+ *			object, or for object types that need per-handle state,
+ *			a pointer to a structure containing the object pointer
+ *			plus the required state.
  *
  * @return		Handle to the object.
  */
-object_handle_t *object_handle_create(object_t *object, void *data) {
+object_handle_t *object_handle_create(object_type_t *type, void *private) {
 	object_handle_t *handle;
 
 	handle = slab_cache_alloc(object_handle_cache, MM_WAIT);
 	refcount_set(&handle->count, 1);
-	handle->object = object;
-	handle->data = data;
+	handle->type = type;
+	handle->private = private;
 	return handle;
 }
 
@@ -174,8 +174,8 @@ void object_handle_release(object_handle_t *handle) {
 
 	/* If there are no more references we can close it. */
 	if(refcount_dec(&handle->count) == 0) {
-		if(handle->object->type->close)
-			handle->object->type->close(handle);
+		if(handle->type->close)
+			handle->type->close(handle);
 
 		slab_cache_free(object_handle_cache, handle);
 	}
@@ -213,7 +213,7 @@ status_t object_handle_lookup(handle_t id, int type, object_handle_t **handlep) 
 	}
 
 	/* Check if the type is the type the caller wants. */
-	if(type >= 0 && handle->object->type->id != type) {
+	if(type >= 0 && handle->type->id != (unsigned)type) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;
 	}
@@ -272,8 +272,8 @@ status_t object_handle_attach(object_handle_t *handle, handle_t *idp, handle_t *
 	rwlock_unlock(&curr_proc->handles->lock);
 
 	dprintf("object: allocated handle %" PRId32 " in process %" PRId32 " ("
-		"object: %p, data: %p)\n", id, curr_proc->id, handle->object,
-		handle->data);
+		"type: %u, private: %p)\n", id, curr_proc->id, handle->type->id,
+		handle->private);
 	return STATUS_SUCCESS;
 }
 
@@ -313,6 +313,37 @@ status_t object_handle_detach(handle_t id) {
 	return ret;
 }
 
+/** Inherit a handle from one table to another.
+ * @param parent	Parent table.
+ * @param source	Source handle ID.
+ * @param table		Table to duplicate to.
+ * @param dest		Destination handle ID.
+ * @return		Status code describing result of the operation. */
+static status_t inherit_handle(handle_table_t *parent, handle_t source,
+	handle_table_t *table, handle_t dest)
+{
+	if(source < 0 || source >= HANDLE_TABLE_SIZE) {
+		return STATUS_INVALID_HANDLE;
+	} else if(dest < 0 || dest >= HANDLE_TABLE_SIZE) {
+		return STATUS_INVALID_HANDLE;
+	} else if(!parent->handles[source]) {
+		return STATUS_INVALID_HANDLE;
+	} else if(table->handles[dest]) {
+		return STATUS_ALREADY_EXISTS;
+	}
+
+	/* When using a map, the inheritable flag is ignored so we must check
+	 * whether transferring handles is allowed. */
+	if(!(parent->handles[source]->type->flags & OBJECT_TRANSFERRABLE))
+		return STATUS_NOT_SUPPORTED;
+
+	object_handle_retain(parent->handles[source]);
+	table->handles[dest] = parent->handles[source];
+	table->flags[dest] = parent->flags[source];
+	bitmap_set(table->bitmap, dest);
+	return STATUS_SUCCESS;
+}
+
 /**
  * Create a new handle table.
  *
@@ -332,20 +363,24 @@ status_t object_handle_detach(handle_t id) {
  *			duplicated.
  * @param tablep	Where to store pointer to table structure.
  *
- * @return		Status code describing result of the operation. Failure
- *			can only occur when handle mappings are specified.
+ * @return		STATUS_SUCCESS on success (always the case with no map).
+ *			STATUS_INVALID_HANDLE if the given map specifies a
+ *			non-existant handle in the parent.
+ *			STATUS_ALREADY_EXISTS if the given map maps multiple
+ *			handles from the parent to the same ID in the new table.
  */
 status_t handle_table_create(handle_table_t *parent, handle_t map[][2],
 	ssize_t count, handle_table_t **tablep)
 {
 	handle_table_t *table;
-	object_handle_t *handle;
 	status_t ret;
 	int i;
 
 	table = slab_cache_alloc(handle_table_cache, MM_KERNEL);
-	table->handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->handles[0]), MM_KERNEL);
-	table->flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->flags[0]), MM_KERNEL);
+	table->handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->handles[0]),
+		MM_KERNEL);
+	table->flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->flags[0]),
+		MM_KERNEL);
 	table->bitmap = bitmap_alloc(HANDLE_TABLE_SIZE, MM_KERNEL);
 
 	*tablep = table;
@@ -360,44 +395,16 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2],
 		assert(map);
 
 		for(i = 0; i < count; i++) {
-			if(map[i][0] < 0 || map[i][0] >= HANDLE_TABLE_SIZE
-				|| map[i][1] < 0 || map[i][1] >= HANDLE_TABLE_SIZE
-				|| !parent->handles[map[i][0]])
-			{
-				ret = STATUS_INVALID_HANDLE;
+			ret = inherit_handle(parent, map[i][0], table, map[i][1]);
+			if(ret != STATUS_SUCCESS)
 				goto fail;
-			}
-
-			if(table->handles[map[i][1]]) {
-				ret = STATUS_ALREADY_EXISTS;
-				goto fail;
-			}
-
-			handle = parent->handles[map[i][0]];
-
-			/* When using a map, the inheritable flag is ignored so
-			 * we must check whether transferring handles is
-			 * allowed. */
-			if(!(handle->object->type->flags & OBJECT_TRANSFERRABLE)) {
-				ret = STATUS_NOT_SUPPORTED;
-				goto fail;
-			}
-
-			object_handle_retain(handle);
-			table->handles[map[i][1]] = handle;
-			table->flags[map[i][1]] = parent->flags[map[i][0]];
-			bitmap_set(table->bitmap, map[i][1]);
 		}
 	} else {
 		for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
 			/* Flag can only be set if handle is not NULL and the
 			 * type allows transferring. */
-			if(parent->flags[i] & HANDLE_INHERITABLE) {
-				object_handle_retain(parent->handles[i]);
-				table->handles[i] = parent->handles[i];
-				table->flags[i] = parent->flags[i];
-				bitmap_set(table->bitmap, i);
-			}
+			if(parent->flags[i] & HANDLE_INHERITABLE)
+				inherit_handle(parent, i, table, i);
 		}
 	}
 
@@ -412,37 +419,36 @@ fail:
 /**
  * Clone a handle table.
  *
- * Creates a clone of a handle table. All handles, even non-inheritable ones,
- * will be copied into the new table. The table entries will all refer to the
- * same underlying handle as the old table.
+ * Creates a clone of a handle table. All handles, including non-inheritable
+ * ones (unless they are of a non-transferrable type), will be copied into the
+ * new table. The table entries will all refer to the same underlying handle as
+ * the old table.
  *
- * @param src		Source table.
+ * @param parent		Source table.
  *
  * @return		Pointer to cloned table.
  */
-handle_table_t *handle_table_clone(handle_table_t *src) {
+handle_table_t *handle_table_clone(handle_table_t *parent) {
 	handle_table_t *table;
 	size_t i;
 
 	table = slab_cache_alloc(handle_table_cache, MM_KERNEL);
-	table->handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->handles[0]), MM_KERNEL);
-	table->flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->flags[0]), MM_KERNEL);
+	table->handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->handles[0]),
+		MM_KERNEL);
+	table->flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->flags[0]),
+		MM_KERNEL);
 	table->bitmap = bitmap_alloc(HANDLE_TABLE_SIZE, MM_KERNEL);
 
-	rwlock_read_lock(&src->lock);
+	rwlock_read_lock(&parent->lock);
 
 	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
-		/* Flag can only be set if handle is not NULL and the type
-		 * allows transferring. */
-		if(src->flags[i] & HANDLE_INHERITABLE) {
-			object_handle_retain(src->handles[i]);
-			table->handles[i] = src->handles[i];
-			table->flags[i] = src->flags[i];
-			bitmap_set(table->bitmap, i);
+		if(parent->handles[i]) {
+			if(parent->handles[i]->type->flags & OBJECT_TRANSFERRABLE)
+				inherit_handle(parent, i, table, i);
 		}
 	}
 
-	rwlock_unlock(&src->lock);
+	rwlock_unlock(&parent->lock);
 	return table;
 }
 
@@ -491,25 +497,27 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 		return KDB_FAILURE;
 	}
 
-	kdb_printf("ID   Flags  Object             Type                    Count Data\n");
-	kdb_printf("==   =====  ======             ====                    ===== ====\n");
+	kdb_printf("ID   Flags  Type                        Count Private\n");
+	kdb_printf("==   =====  ====                        ===== =======\n");
 
 	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
 		handle = process->handles->handles[i];
 		if(!handle)
 			continue;
 
-		kdb_printf("%-4zu 0x%-4" PRIx32 " %-18p %-2u (%-18p) %-5" PRId32 " %p\n",
-			i, process->handles->flags[i], handle->object,
-			handle->object->type->id, handle->object->type,
-			refcount_get(&handle->count), handle->data);
+		kdb_printf("%-4zu 0x%-4" PRIx32 " %-2u (%-22s) %-5" PRId32 " %p\n",
+			i, process->handles->flags[i], handle->type->id,
+			(handle->type->id < ARRAY_SIZE(object_type_names))
+				? object_type_names[handle->type->id]
+				: "Unknown",
+			refcount_get(&handle->count), handle->private);
 	}
 
 	return KDB_SUCCESS;
 }
 
 /** Initialize the handle caches. */
-__init_text void handle_init(void) {
+__init_text void object_init(void) {
 	object_handle_cache = object_cache_create("object_handle_cache",
 		object_handle_t, NULL, NULL, NULL, 0, MM_BOOT);
 	handle_table_cache = object_cache_create("handle_table_cache",
@@ -532,7 +540,7 @@ int kern_object_type(handle_t handle) {
 	if(object_handle_lookup(handle, -1, &khandle) != STATUS_SUCCESS)
 		return -1;
 
-	ret = khandle->object->type->id;
+	ret = khandle->type->id;
 	object_handle_release(khandle);
 	return ret;
 }
@@ -609,7 +617,7 @@ status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags,
 		ret = object_handle_lookup(waits[i].info.handle, -1, &handle);
 		if(ret != STATUS_SUCCESS) {
 			goto out;
-		} else if(!handle->object->type->wait || !handle->object->type->unwait) {
+		} else if(!handle->type->wait || !handle->type->unwait) {
 			ret = STATUS_INVALID_EVENT;
 			object_handle_release(handle);
 			goto out;
@@ -619,7 +627,7 @@ status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags,
 		waits[i].handle = handle;
 		waits[i].info.signalled = false;
 
-		ret = handle->object->type->wait(handle, waits[i].info.event, &waits[i]);
+		ret = handle->type->wait(handle, waits[i].info.event, &waits[i]);
 		if(ret != STATUS_SUCCESS) {
 			object_handle_release(handle);
 			goto out;
@@ -642,7 +650,7 @@ out:
 	/* Cancel all waits which have been set up. */
 	while(i--) {
 		handle = waits[i].handle;
-		handle->object->type->unwait(handle, waits[i].info.event, &waits[i]);
+		handle->type->unwait(handle, waits[i].info.event, &waits[i]);
 		object_handle_release(handle);
 
 		/* If we're waiting with OBJECT_WAIT_ALL and we've timed out or
@@ -683,7 +691,8 @@ status_t kern_handle_flags(handle_t handle, uint32_t *flagsp) {
 		return STATUS_INVALID_HANDLE;
 	}
 
-	ret = memcpy_to_user(flagsp, &curr_proc->handles->flags[handle], sizeof(*flagsp));
+	ret = memcpy_to_user(flagsp, &curr_proc->handles->flags[handle],
+		sizeof(*flagsp));
 	rwlock_unlock(&curr_proc->handles->lock);
 	return ret;
 }
@@ -727,7 +736,7 @@ status_t kern_handle_set_flags(handle_t handle, uint32_t flags) {
 
 	/* To set the inheritable flag, the object type must be transferrable. */
 	if(flags & HANDLE_INHERITABLE) {
-		if(!(khandle->object->type->flags & OBJECT_TRANSFERRABLE)) {
+		if(!(khandle->type->flags & OBJECT_TRANSFERRABLE)) {
 			rwlock_unlock(&curr_proc->handles->lock);
 			return STATUS_NOT_SUPPORTED;
 		}
@@ -808,8 +817,8 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *newp) {
 	bitmap_set(curr_proc->handles->bitmap, dest);
 
 	dprintf("object: duplicated handle %" PRId32 " to %" PRId32 " in process %"
-		PRId32 " (object: %p, data: %p)\n", handle, dest, curr_proc->id,
-		khandle->object, khandle->data);
+		PRId32 " (type: %u, private: %p)\n", handle, dest, curr_proc->id,
+		khandle->type->id, khandle->private);
 	rwlock_unlock(&curr_proc->handles->lock);
 	return STATUS_SUCCESS;
 }

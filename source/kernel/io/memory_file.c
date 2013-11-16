@@ -37,43 +37,41 @@ typedef struct memory_file {
 /** Close a handle to a memory file.
  * @param file		File being closed.
  * @param handle	File handle structure. */
-static void memory_file_close(file_t *file, file_handle_t *handle) {
-	kfree(file);
+static void memory_file_close(file_handle_t *handle) {
+	kfree(handle->file);
 }
 
 /** Perform I/O on a memory file.
- * @param file		File to perform I/O on.
  * @param handle	File handle structure.
  * @param request	I/O request.
  * @return		Status code describing result of the operation. */
-static status_t memory_file_io(file_t *file, file_handle_t *handle, io_request_t *request) {
-	memory_file_t *data = (memory_file_t *)file;
+static status_t memory_file_io(file_handle_t *handle, io_request_t *request) {
+	memory_file_t *file = (memory_file_t *)handle->file;
 	size_t size;
 
 	assert(request->op == IO_OP_READ);
 
-	if(request->offset >= (offset_t)data->size)
+	if(request->offset >= (offset_t)file->size)
 		return STATUS_SUCCESS;
 
-	size = ((request->offset + request->total) > data->size)
-		? data->size - request->offset
+	size = ((request->offset + request->total) > file->size)
+		? file->size - request->offset
 		: request->total;
 
-	return io_request_copy(request, (void *)data->data + request->offset, size);
+	return io_request_copy(request, (void *)file->data + request->offset, size);
 }
 
 /** Get information about a memory file.
- * @param file		File to get information on.
  * @param handle	File handle structure.
  * @param info		Information structure to fill in. */
-static void memory_file_info(file_t *file, file_handle_t *handle, file_info_t *info) {
-	memory_file_t *data = (memory_file_t *)file;
+static void memory_file_info(file_handle_t *handle, file_info_t *info) {
+	memory_file_t *file = (memory_file_t *)handle->file;
 
 	info->id = 0;
 	info->mount = 0;
-	info->type = file->type;
+	info->type = file->file.type;
 	info->block_size = 1;
-	info->size = data->size;
+	info->size = file->size;
 	info->links = 1;
 	info->created = info->accessed = info->modified = unix_time();
 }

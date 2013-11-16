@@ -127,8 +127,8 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	#endif
 
 	/* Perform other initialization tasks. */
+	object_init();
 	token_init();
-	handle_init();
 	process_init();
 	thread_init();
 	dpc_init();

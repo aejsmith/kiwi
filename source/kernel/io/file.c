@@ -34,42 +34,39 @@
 #include <status.h>
 
 /** Close a handle to an file.
- * @param handle	Handle to the object. */
+ * @param handle	Handle to the file. */
 static void file_object_close(object_handle_t *handle) {
-	file_t *file = (file_t *)handle->object;
-	file_handle_t *data = (file_handle_t *)handle->data;
+	file_handle_t *fhandle = handle->private;
 
-	if(file->ops->close)
-		file->ops->close(file, data);
+	if(fhandle->file->ops->close)
+		fhandle->file->ops->close(fhandle);
 
-	kfree(data);
+	kfree(fhandle);
 }
 
 /** Signal that an object event is being waited for.
- * @param handle	Handle to object.
+ * @param handle	Handle to the file.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
 static status_t file_object_wait(object_handle_t *handle, unsigned event, void *wait) {
-	file_t *file = (file_t *)handle->object;
-	file_handle_t *data = (file_handle_t *)handle->data;
+	file_handle_t *fhandle = handle->private;
 
-	if(!file->ops->wait)
+	if(!fhandle->file->ops->wait)
 		return STATUS_NOT_SUPPORTED;
 
-	return file->ops->wait(file, data, event, wait);
+	return fhandle->file->ops->wait(fhandle, event, wait);
 }
 
 /** Stop waiting for an object.
- * @param handle	Handle to object.
+ * @param handle	Handle to the file.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer. */
 static void file_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
-	file_t *file = (file_t *)handle->object;
-	file_handle_t *data = (file_handle_t *)handle->data;
+	file_handle_t *fhandle = handle->private;
 
-	assert(file->ops->unwait);
-	return file->ops->unwait(file, data, event, wait);
+	assert(fhandle->file->ops->unwait);
+	return fhandle->file->ops->unwait(fhandle, event, wait);
 }
 
 /** Map a file object into memory.
@@ -77,12 +74,11 @@ static void file_object_unwait(object_handle_t *handle, unsigned event, void *wa
  * @param region	Region being mapped.
  * @return		Status code describing result of the operation. */
 static status_t file_object_map(object_handle_t *handle, vm_region_t *region) {
-	file_t *file = (file_t *)handle->object;
-	file_handle_t *data = (file_handle_t *)handle->data;
+	file_handle_t *fhandle = handle->private;
 	uint32_t rights = 0;
 
 	/* Directories cannot be memory-mapped. */
-	if(file->type == FILE_TYPE_DIR || !file->ops->map)
+	if(fhandle->file->type == FILE_TYPE_DIR || !fhandle->file->ops->map)
 		return STATUS_NOT_SUPPORTED;
 
 	/* Check for the necessary access rights. Don't need write permission
@@ -95,10 +91,10 @@ static status_t file_object_map(object_handle_t *handle, vm_region_t *region) {
 		rights |= FILE_RIGHT_EXECUTE;
 	}
 
-	if((data->rights & rights) != rights)
+	if((fhandle->rights & rights) != rights)
 		return STATUS_ACCESS_DENIED;
 
-	return file->ops->map(file, data, region);
+	return fhandle->file->ops->map(fhandle, region);
 }
 
 /** File object type definition. */
@@ -116,7 +112,6 @@ static object_type_t file_object_type = {
  * @param ops		File operations structure.
  * @param type		Type of the file. */
 void file_init(file_t *file, file_ops_t *ops, file_type_t type) {
-	object_init(&file->obj, &file_object_type);
 	file->ops = ops;
 	file->type = type;
 }
@@ -124,7 +119,7 @@ void file_init(file_t *file, file_ops_t *ops, file_type_t type) {
 /** Destroy a file object.
  * @param file		Object to destroy. */
 void file_destroy(file_t *file) {
-	object_destroy(&file->obj);
+	/* Nothing happens. */
 }
 
 /**
@@ -159,16 +154,17 @@ bool file_access(file_t *file, uint32_t rights) {
 object_handle_t *file_handle_create(file_t *file, uint32_t rights,
 	uint32_t flags, void *data)
 {
-	file_handle_t *handle;
+	file_handle_t *fhandle;
 
-	handle = kmalloc(sizeof(*handle), MM_KERNEL);
-	mutex_init(&handle->lock, "file_handle_lock", 0);
-	handle->data = data;
-	handle->rights = rights;
-	handle->flags = flags;
-	handle->offset = 0;
+	fhandle = kmalloc(sizeof(*fhandle), MM_KERNEL);
+	mutex_init(&fhandle->lock, "file_handle_lock", 0);
+	fhandle->file = file;
+	fhandle->data = data;
+	fhandle->rights = rights;
+	fhandle->flags = flags;
+	fhandle->offset = 0;
 
-	return object_handle_create(&file->obj, handle);
+	return object_handle_create(&file_object_type, fhandle);
 }
 
 /** Determine whether a file is seekable.
@@ -183,28 +179,26 @@ static inline bool is_seekable(file_t *file) {
  * @param request	I/O request to perform.
  * @return		Status code describing result of the operation. */
 static status_t file_io(object_handle_t *handle, io_request_t *request) {
-	file_t *file;
-	file_handle_t *data;
+	file_handle_t *fhandle;
 	uint32_t right;
 	bool update_offset = false;
 	file_info_t info;
 	status_t ret;
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE) {
+	if(handle->type->id != OBJECT_TYPE_FILE) {
 		ret = STATUS_INVALID_HANDLE;
 		goto out;
 	}
 
-	file = (file_t *)handle->object;
-	data = (file_handle_t *)handle->data;
+	fhandle = handle->private;
 
 	right = (request->op == IO_OP_WRITE) ? FILE_RIGHT_WRITE : FILE_RIGHT_READ;
-	if(!(data->rights & right)) {
+	if(!(fhandle->rights & right)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	}
 
-	if(file->type == FILE_TYPE_DIR || !file->ops->io) {
+	if(fhandle->file->type == FILE_TYPE_DIR || !fhandle->file->ops->io) {
 		ret = STATUS_NOT_SUPPORTED;
 		goto out;
 	}
@@ -219,15 +213,15 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
 	 * flag. TODO: We don't handle atomicity at all here. For regular files,
 	 * should we lock the handle across the operation so that nothing else
 	 * can do I/O while this is in progress? */
-	if(is_seekable(file)) {
+	if(is_seekable(fhandle->file)) {
 		if(request->offset < 0) {
-			if(request->op == IO_OP_WRITE && data->flags & FILE_APPEND) {
-				mutex_lock(&data->lock);
-				file->ops->info(file, data, &info);
-				data->offset = request->offset = info.size;
-				mutex_unlock(&data->lock);
+			if(request->op == IO_OP_WRITE && fhandle->flags & FILE_APPEND) {
+				mutex_lock(&fhandle->lock);
+				fhandle->file->ops->info(fhandle, &info);
+				fhandle->offset = request->offset = info.size;
+				mutex_unlock(&fhandle->lock);
 			} else {
-				request->offset = data->offset;
+				request->offset = fhandle->offset;
 			}
 
 			update_offset = true;
@@ -239,13 +233,13 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
 		}
 	}
 
-	ret = file->ops->io(file, data, request);
+	ret = fhandle->file->ops->io(fhandle, request);
 out:
 	/* Update the file handle offset. */
 	if(request->transferred && update_offset) {
-		mutex_lock(&data->lock);
-		data->offset += request->transferred;
-		mutex_unlock(&data->lock);
+		mutex_lock(&fhandle->lock);
+		fhandle->offset += request->transferred;
+		mutex_unlock(&fhandle->lock);
 	}
 
 	return ret;
@@ -273,8 +267,8 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t file_read(object_handle_t *handle, void *buf, size_t size, offset_t offset,
-	size_t *bytesp)
+status_t file_read(object_handle_t *handle, void *buf, size_t size,
+	offset_t offset, size_t *bytesp)
 {
 	io_vec_t vec;
 	io_request_t request;
@@ -286,7 +280,8 @@ status_t file_read(object_handle_t *handle, void *buf, size_t size, offset_t off
 	vec.buffer = buf;
 	vec.size = size;
 
-	ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ, IO_TARGET_KERNEL);
+	ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ,
+		IO_TARGET_KERNEL);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -334,7 +329,8 @@ status_t file_write(object_handle_t *handle, const void *buf, size_t size,
 	vec.buffer = (void *)buf;
 	vec.size = size;
 
-	ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
+	ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE,
+		IO_TARGET_KERNEL);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -367,8 +363,8 @@ status_t file_write(object_handle_t *handle, const void *buf, size_t size,
  *
  * @return		Status code describing result of the operation.
  */
-status_t file_read_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t count,
-	offset_t offset, size_t *bytesp)
+status_t file_read_vecs(object_handle_t *handle, const io_vec_t *vecs,
+	size_t count, offset_t offset, size_t *bytesp)
 {
 	io_request_t request;
 	status_t ret;
@@ -410,8 +406,8 @@ status_t file_read_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t co
  *
  * @return		Status code describing result of the operation.
  */
-status_t file_write_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t count,
-	offset_t offset, size_t *bytesp)
+status_t file_write_vecs(object_handle_t *handle, const io_vec_t *vecs,
+	size_t count, offset_t offset, size_t *bytesp)
 {
 	io_request_t request;
 	status_t ret;
@@ -453,32 +449,30 @@ status_t file_write_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t c
  *			entry.
  */
 status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size) {
-	file_t *file;
-	file_handle_t *data;
+	file_handle_t *fhandle;
 	dir_entry_t *entry;
 	status_t ret;
 
 	assert(handle);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	file = (file_t *)handle->object;
-	data = (file_handle_t *)handle->data;
+	fhandle = handle->private;
 
-	if(!(data->rights & FILE_RIGHT_READ)) {
+	if(!(fhandle->rights & FILE_RIGHT_READ)) {
 		return STATUS_ACCESS_DENIED;
-	} else if(file->type != FILE_TYPE_DIR) {
+	} else if(fhandle->file->type != FILE_TYPE_DIR) {
 		return STATUS_NOT_DIR;
-	} else if(!file->ops->read_dir) {
+	} else if(!fhandle->file->ops->read_dir) {
 		return STATUS_NOT_SUPPORTED;
 	}
 
 	/* Lock the handle around the call, the implementation is allowed to
 	 * modify the offset. */
-	mutex_lock(&data->lock);
-	ret = file->ops->read_dir(file, data, &entry);
-	mutex_unlock(&data->lock);
+	mutex_lock(&fhandle->lock);
+	ret = fhandle->file->ops->read_dir(fhandle, &entry);
+	mutex_unlock(&fhandle->lock);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(entry->length > size) {
@@ -495,28 +489,26 @@ status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size) {
  * @param handle	Handle to directory to rewind.
  * @return		Status code describing result of the operation. */
 status_t file_rewind_dir(object_handle_t *handle) {
-	file_t *file;
-	file_handle_t *data;
+	file_handle_t *fhandle;
 
 	assert(handle);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	file = (file_t *)handle->object;
-	data = (file_handle_t *)handle->data;
+	fhandle = handle->private;
 
-	if(!(data->rights & FILE_RIGHT_READ)) {
+	if(!(fhandle->rights & FILE_RIGHT_READ)) {
 		return STATUS_ACCESS_DENIED;
-	} else if(file->type != FILE_TYPE_DIR) {
+	} else if(fhandle->file->type != FILE_TYPE_DIR) {
 		return STATUS_NOT_DIR;
-	} else if(!file->ops->read_dir) {
+	} else if(!fhandle->file->ops->read_dir) {
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	mutex_lock(&data->lock);
-	data->offset = 0;
-	mutex_unlock(&data->lock);
+	mutex_lock(&fhandle->lock);
+	fhandle->offset = 0;
+	mutex_unlock(&fhandle->lock);
 	return STATUS_SUCCESS;
 }
 
@@ -524,16 +516,15 @@ status_t file_rewind_dir(object_handle_t *handle) {
  * @param handle	Handle to get flags from.
  * @param rightsp	Where to store handle rights. */
 status_t file_rights(object_handle_t *handle, uint32_t *rightsp) {
-	file_handle_t *data;
+	file_handle_t *fhandle;
 
 	assert(handle);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	data = (file_handle_t *)handle->data;
-
-	*rightsp = data->rights;
+	fhandle = handle->private;
+	*rightsp = fhandle->rights;
 	return STATUS_SUCCESS;
 }
 
@@ -541,16 +532,15 @@ status_t file_rights(object_handle_t *handle, uint32_t *rightsp) {
  * @param handle	Handle to get flags from.
  * @param flagsp	Where to store handle flags. */
 status_t file_flags(object_handle_t *handle, uint32_t *flagsp) {
-	file_handle_t *data;
+	file_handle_t *fhandle;
 
 	assert(handle);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	data = (file_handle_t *)handle->data;
-
-	*flagsp = data->flags;
+	fhandle = handle->private;
+	*flagsp = fhandle->flags;
 	return STATUS_SUCCESS;
 }
 
@@ -558,16 +548,15 @@ status_t file_flags(object_handle_t *handle, uint32_t *flagsp) {
  * @param handle	Handle to set flags for.
  * @param flags		New flags to set. */
 status_t file_set_flags(object_handle_t *handle, uint32_t flags) {
-	file_handle_t *data;
+	file_handle_t *fhandle;
 
 	assert(handle);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	data = (file_handle_t *)handle->data;
-
-	data->flags = flags;
+	fhandle = handle->private;
+	fhandle->flags = flags;
 	return STATUS_SUCCESS;
 }
 
@@ -588,47 +577,45 @@ status_t file_set_flags(object_handle_t *handle, uint32_t flags) {
 status_t file_seek(object_handle_t *handle, unsigned action, offset_t offset,
 	offset_t *resultp)
 {
-	file_t *file;
-	file_handle_t *data;
+	file_handle_t *fhandle;
 	offset_t result;
 	file_info_t info;
 
 	assert(handle);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	file = (file_t *)handle->object;
-	data = (file_handle_t *)handle->data;
+	fhandle = handle->private;
 
-	if(!is_seekable(file))
+	if(!is_seekable(fhandle->file))
 		return STATUS_NOT_SUPPORTED;
 
-	mutex_lock(&data->lock);
+	mutex_lock(&fhandle->lock);
 
 	switch(action) {
 	case FILE_SEEK_SET:
 		result = offset;
 		break;
 	case FILE_SEEK_ADD:
-		result = data->offset + offset;
+		result = fhandle->offset + offset;
 		break;
 	case FILE_SEEK_END:
-		file->ops->info(file, data, &info);
+		fhandle->file->ops->info(fhandle, &info);
 		result = info.size + offset;
 		break;
 	default:
-		mutex_unlock(&data->lock);
+		mutex_unlock(&fhandle->lock);
 		return STATUS_INVALID_ARG;
 	}
 
 	if(result < 0) {
-		mutex_unlock(&data->lock);
+		mutex_unlock(&fhandle->lock);
 		return STATUS_INVALID_ARG;
 	}
 
-	data->offset = result;
-	mutex_unlock(&data->lock);
+	fhandle->offset = result;
+	mutex_unlock(&fhandle->lock);
 
 	if(resultp)
 		*resultp = result;
@@ -650,26 +637,24 @@ status_t file_seek(object_handle_t *handle, unsigned action, offset_t offset,
  * @return		Status code describing result of the operation.
  */
 status_t file_resize(object_handle_t *handle, offset_t size) {
-	file_t *file;
-	file_handle_t *data;
+	file_handle_t *fhandle;
 
 	assert(handle);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	file = (file_t *)handle->object;
-	data = (file_handle_t *)handle->data;
+	fhandle = handle->private;
 
-	if(!(data->rights & FILE_RIGHT_WRITE)) {
+	if(!(fhandle->rights & FILE_RIGHT_WRITE)) {
 		return STATUS_ACCESS_DENIED;
-	} else if(file->type != FILE_TYPE_REGULAR) {
+	} else if(fhandle->file->type != FILE_TYPE_REGULAR) {
 		return STATUS_NOT_REGULAR;
-	} else if(!file->ops->resize) {
+	} else if(!fhandle->file->ops->resize) {
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	return file->ops->resize(file, data, size);
+	return fhandle->file->ops->resize(fhandle, size);
 }
 
 /** Get information about a file or directory.
@@ -677,19 +662,17 @@ status_t file_resize(object_handle_t *handle, offset_t size) {
  * @param info		Information structure to fill in.
  * @return		Status code describing result of the operation. */
 status_t file_info(object_handle_t *handle, file_info_t *info) {
-	file_t *file;
-	file_handle_t *data;
+	file_handle_t *fhandle;
 
 	assert(handle);
 	assert(info);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	file = (file_t *)handle->object;
-	data = (file_handle_t *)handle->data;
+	fhandle = handle->private;
 
-	file->ops->info(file, data, info);
+	fhandle->file->ops->info(fhandle, info);
 	return STATUS_SUCCESS;
 }
 
@@ -697,22 +680,20 @@ status_t file_info(object_handle_t *handle, file_info_t *info) {
  * @param handle	Handle to file to flush.
  * @return		Status code describing result of the operation. */
 status_t file_sync(object_handle_t *handle) {
-	file_t *file;
-	file_handle_t *data;
+	file_handle_t *fhandle;
 
 	assert(handle);
 
-	if(handle->object->type->id != OBJECT_TYPE_FILE)
+	if(handle->type->id != OBJECT_TYPE_FILE)
 		return STATUS_INVALID_HANDLE;
 
-	file = (file_t *)handle->object;
-	data = (file_handle_t *)handle->data;
+	fhandle = handle->private;
 
 	/* If it's not implemented, assume there is nothing to sync. */
-	if(!file->ops->sync)
+	if(!fhandle->file->ops->sync)
 		return STATUS_SUCCESS;
 
-	return file->ops->sync(file, data);
+	return fhandle->file->ops->sync(fhandle);
 }
 
 /**

@@ -950,10 +950,9 @@ fail:
  */
 
 /** Close a FS handle.
- * @param file		File being closed.
  * @param handle	File handle structure. */
-static void fs_file_close(file_t *file, file_handle_t *handle) {
-	fs_node_t *node = (fs_node_t *)file;
+static void fs_file_close(file_handle_t *handle) {
+	fs_node_t *node = (fs_node_t *)handle->file;
 
 	if(node->ops->close)
 		node->ops->close(node, handle);
@@ -962,44 +961,40 @@ static void fs_file_close(file_t *file, file_handle_t *handle) {
 }
 
 /** Signal that a file event is being waited for.
- * @param file		File being waited on.
  * @param handle	File handle structure.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_wait(file_t *file, file_handle_t *handle, unsigned event, void *wait) {
+static status_t fs_file_wait(file_handle_t *handle, unsigned event, void *wait) {
 	/* TODO. */
 	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Stop waiting for a file.
- * @param file		File being waited on.
  * @param handle	File handle structure.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer. */
-static void fs_file_unwait(file_t *file, file_handle_t *handle, unsigned event, void *wait) {
+static void fs_file_unwait(file_handle_t *handle, unsigned event, void *wait) {
 	/* TODO. */
 }
 
 /** Perform I/O on a file.
- * @param file		File to perform I/O on.
  * @param handle	File handle structure.
  * @param request	I/O request.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_io(file_t *file, file_handle_t *handle, io_request_t *request) {
-	fs_node_t *node = (fs_node_t *)file;
+static status_t fs_file_io(file_handle_t *handle, io_request_t *request) {
+	fs_node_t *node = (fs_node_t *)handle->file;
 
 	return (node->ops->io) ? node->ops->io(node, handle, request)
 		: STATUS_NOT_SUPPORTED;
 }
 
 /** Map a file into memory.
- * @param file		File to map.
  * @param handle	File handle structure.
  * @param region	Region being mapped.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_map(file_t *file, file_handle_t *handle, vm_region_t *region) {
-	fs_node_t *node = (fs_node_t *)file;
+static status_t fs_file_map(file_handle_t *handle, vm_region_t *region) {
+	fs_node_t *node = (fs_node_t *)handle->file;
 
 	if(!node->ops->get_cache)
 		return STATUS_NOT_SUPPORTED;
@@ -1010,16 +1005,15 @@ static status_t fs_file_map(file_t *file, file_handle_t *handle, vm_region_t *re
 }
 
 /** Read the next directory entry.
- * @param file		File to read from.
  * @param handle	File handle structure.
  * @param entryp	Where to store pointer to directory entry structure.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_read_dir(file_t *file, file_handle_t *handle, dir_entry_t **entryp) {
+static status_t fs_file_read_dir(file_handle_t *handle, dir_entry_t **entryp) {
 	fs_node_t *node, *child;
 	dir_entry_t *entry;
 	status_t ret;
 
-	node = (fs_node_t *)file;
+	node = (fs_node_t *)handle->file;
 
 	if(!node->ops->read_dir)
 		return STATUS_NOT_SUPPORTED;
@@ -1068,12 +1062,11 @@ static status_t fs_file_read_dir(file_t *file, file_handle_t *handle, dir_entry_
 }
 
 /** Modify the size of a file.
- * @param file		File to resize.
  * @param handle	File handle structure.
  * @param size		New size of the file.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_resize(file_t *file, file_handle_t *handle, offset_t size) {
-	fs_node_t *node = (fs_node_t *)file;
+static status_t fs_file_resize(file_handle_t *handle, offset_t size) {
+	fs_node_t *node = (fs_node_t *)handle->file;
 
 	if(!node->ops->resize)
 		return STATUS_NOT_SUPPORTED;
@@ -1082,21 +1075,19 @@ static status_t fs_file_resize(file_t *file, file_handle_t *handle, offset_t siz
 }
 
 /** Get information about a file.
- * @param file		File to get information on.
  * @param handle	File handle structure.
  * @param info		Information structure to fill in. */
-static void fs_file_info(file_t *file, file_handle_t *handle, file_info_t *info) {
-	fs_node_t *node = (fs_node_t *)file;
+static void fs_file_info(file_handle_t *handle, file_info_t *info) {
+	fs_node_t *node = (fs_node_t *)handle->file;
 
 	fs_node_info(node, info);
 }
 
 /** Flush changes to a file.
- * @param file		File to flush.
  * @param handle	File handle structure.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_sync(file_t *file, file_handle_t *handle) {
-	fs_node_t *node = (fs_node_t *)file;
+static status_t fs_file_sync(file_handle_t *handle) {
+	fs_node_t *node = (fs_node_t *)handle->file;
 
 	if(!FS_NODE_IS_READ_ONLY(node) && node->ops->flush) {
 		return node->ops->flush(node);
