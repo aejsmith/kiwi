@@ -27,7 +27,6 @@ sources = FeatureSources(config, [
 
     'io/context.c',
     'io/device.c',
-    'io/entry_cache.c',
     'io/file.c',
     'io/fs.c',
     'io/memory_file.c',
