@@ -619,9 +619,9 @@ static status_t slab_percpu_init(slab_cache_t *cache, unsigned mmflag) {
  * @param flags		Flags to modify the behaviour of the cache.
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing result of the operation. */
-static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t size,
-	size_t align, slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
-	int flags, unsigned mmflag)
+static status_t slab_cache_init(slab_cache_t *cache, const char *name,
+	size_t size, size_t align, slab_ctor_t ctor, slab_dtor_t dtor,
+	void *data, int priority, unsigned flags, unsigned mmflag)
 {
 	slab_cache_t *exist;
 	status_t ret;
@@ -729,18 +729,19 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to cache on success, NULL on failure. */
 slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
-	slab_ctor_t ctor, slab_dtor_t dtor, void *data, int flags,
+	slab_ctor_t ctor, slab_dtor_t dtor, void *data, unsigned flags,
 	unsigned mmflag)
 {
 	slab_cache_t *cache;
+	status_t ret;
 
 	cache = slab_cache_alloc(&slab_cache_cache, mmflag);
 	if(!cache)
 		return NULL;
 
-	if(slab_cache_init(cache, name, size, align, ctor, dtor, data,
-		SLAB_DEFAULT_PRIORITY, flags, mmflag) != STATUS_SUCCESS)
-	{
+	ret = slab_cache_init(cache, name, size, align, ctor, dtor, data,
+		SLAB_DEFAULT_PRIORITY, flags, mmflag);
+	if(ret != STATUS_SUCCESS) {
 		slab_cache_free(&slab_cache_cache, cache);
 		return NULL;
 	}

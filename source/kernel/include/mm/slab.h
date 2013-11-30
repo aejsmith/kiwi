@@ -75,7 +75,7 @@ typedef struct slab_cache {
 	struct slab_bufctl *bufctl_hash[SLAB_HASH_SIZE];
 
 	/** Cache settings. */
-	int flags;				/**< Cache behaviour flags. */
+	unsigned flags;				/**< Cache behaviour flags. */
 	size_t slab_size;			/**< Size of a slab. */
 	size_t obj_size;			/**< Size of an object. */
 	size_t obj_count;			/**< Number of objects per slab. */
@@ -100,9 +100,9 @@ typedef struct slab_cache {
 extern void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag);
 extern void slab_cache_free(slab_cache_t *cache, void *obj);
 
-extern slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
-	slab_ctor_t ctor, slab_dtor_t dtor, void *data, int flags,
-	unsigned mmflag);
+extern slab_cache_t *slab_cache_create(const char *name, size_t size,
+	size_t align, slab_ctor_t ctor, slab_dtor_t dtor, void *data,
+	unsigned flags, unsigned mmflag);
 extern void slab_cache_destroy(slab_cache_t *cache);
 
 /** Create a slab cache for allocation of objects of a certain type.
