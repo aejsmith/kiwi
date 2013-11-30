@@ -43,12 +43,10 @@ device_t *device_bus_dir;
 /** Close a device.
  * @param handle	File handle structure. */
 static void device_file_close(file_handle_t *handle) {
-	device_t *device = (device_t *)handle->file;
+	if(handle->device->ops && handle->device->ops->close)
+		handle->device->ops->close(handle->device, handle);
 
-	if(device->ops && device->ops->close)
-		device->ops->close(device, handle);
-
-	refcount_dec(&device->count);
+	refcount_dec(&handle->device->count);
 }
 
 /** Signal that a device event is being waited for.
@@ -57,7 +55,7 @@ static void device_file_close(file_handle_t *handle) {
  * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
 static status_t device_file_wait(file_handle_t *handle, unsigned event, void *wait) {
-	device_t *device = (device_t *)handle->file;
+	device_t *device = handle->device;
 
 	return (device->ops && device->ops->wait && device->ops->unwait)
 		? device->ops->wait(device, handle, event, wait)
@@ -69,10 +67,8 @@ static status_t device_file_wait(file_handle_t *handle, unsigned event, void *wa
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer. */
 static void device_file_unwait(file_handle_t *handle, unsigned event, void *wait) {
-	device_t *device = (device_t *)handle->file;
-
-	assert(device->ops);
-	return device->ops->unwait(device, handle, event, wait);
+	assert(handle->device->ops);
+	return handle->device->ops->unwait(handle->device, handle, event, wait);
 }
 
 /** Perform I/O on a device.
@@ -80,10 +76,8 @@ static void device_file_unwait(file_handle_t *handle, unsigned event, void *wait
  * @param request	I/O request.
  * @return		Status code describing result of the operation. */
 static status_t device_file_io(file_handle_t *handle, io_request_t *request) {
-	device_t *device = (device_t *)handle->file;
-
-	return (device->ops && device->ops->io)
-		? device->ops->io(device, handle, request)
+	return (handle->device->ops && handle->device->ops->io)
+		? handle->device->ops->io(handle->device, handle, request)
 		: STATUS_NOT_SUPPORTED;
 }
 
@@ -92,7 +86,7 @@ static status_t device_file_io(file_handle_t *handle, io_request_t *request) {
  * @param region	Region being mapped.
  * @return		Status code describing result of the operation. */
 static status_t device_file_map(file_handle_t *handle, vm_region_t *region) {
-	device_t *device = (device_t *)handle->file;
+	device_t *device = handle->device;
 
 	/* Cannot create private mappings to devices. */
 	if(!device->ops || !device->ops->map || region->flags & VM_MAP_PRIVATE)
@@ -165,7 +159,8 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops,
 	}
 
 	device = kmalloc(sizeof(device_t), MM_KERNEL);
-	file_init(&device->file, &device_file_ops, (ops) ? ops->type : FILE_TYPE_CHAR);
+	device->file.ops = &device_file_ops;
+	device->file.type = (ops) ? ops->type : FILE_TYPE_CHAR;
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -262,8 +257,8 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 	}
 
 	device = kmalloc(sizeof(device_t), MM_KERNEL);
-	file_init(&device->file, &device_file_ops, (dest->ops) ? dest->ops->type
-		: FILE_TYPE_CHAR);
+	device->file.ops = &device_file_ops;
+	device->file.type = (dest->ops) ? dest->ops->type : FILE_TYPE_CHAR;
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -353,7 +348,6 @@ status_t device_destroy(device_t *device) {
 
 	kprintf(LOG_DEBUG, "device: destroyed device %s\n", device->name);
 
-	file_destroy(&device->file);
 	kfree(device->name);
 	kfree(device);
 	return STATUS_SUCCESS;
@@ -513,7 +507,7 @@ char *device_path(device_t *device) {
 status_t device_get(device_t *device, uint32_t rights, uint32_t flags,
 	object_handle_t **handlep)
 {
-	void *data = NULL;
+	file_handle_t *handle;
 	status_t ret;
 
 	assert(device);
@@ -526,16 +520,19 @@ status_t device_get(device_t *device, uint32_t rights, uint32_t flags,
 		return STATUS_ACCESS_DENIED;
 	}
 
+	handle = file_handle_alloc(&device->file, rights, flags);
+
 	if(device->ops && device->ops->open) {
-		ret = device->ops->open(device, flags, &data);
+		ret = device->ops->open(device, flags, &handle->private);
 		if(ret != STATUS_SUCCESS) {
+			file_handle_free(handle);
 			mutex_unlock(&device->lock);
 			return ret;
 		}
 	}
 
 	refcount_inc(&device->count);
-	*handlep = file_handle_create(&device->file, rights, flags, data);
+	*handlep = file_handle_create(handle);
 	mutex_unlock(&device->lock);
 	return STATUS_SUCCESS;
 }
@@ -549,8 +546,8 @@ status_t device_get(device_t *device, uint32_t rights, uint32_t flags,
 status_t device_open(const char *path, uint32_t rights, uint32_t flags,
 	object_handle_t **handlep)
 {
-	void *data = NULL;
 	device_t *device;
+	file_handle_t *handle;
 	status_t ret;
 
 	assert(path);
@@ -568,16 +565,19 @@ status_t device_open(const char *path, uint32_t rights, uint32_t flags,
 		return STATUS_ACCESS_DENIED;
 	}
 
+	handle = file_handle_alloc(&device->file, rights, flags);
+
 	if(device->ops && device->ops->open) {
-		ret = device->ops->open(device, flags, &data);
+		ret = device->ops->open(device, flags, &handle->private);
 		if(ret != STATUS_SUCCESS) {
+			file_handle_free(handle);
 			refcount_dec(&device->count);
 			mutex_unlock(&device->lock);
 			return ret;
 		}
 	}
 
-	*handlep = file_handle_create(&device->file, rights, flags, data);
+	*handlep = file_handle_create(handle);
 	mutex_unlock(&device->lock);
 	return STATUS_SUCCESS;
 }

@@ -102,11 +102,14 @@ static file_ops_t memory_file_ops = {
  */
 object_handle_t *memory_file_create(const void *buf, size_t size) {
 	memory_file_t *file;
+	file_handle_t *handle;
 
 	file = kmalloc(sizeof(*file), MM_BOOT);
-	file_init(&file->file, &memory_file_ops, FILE_TYPE_REGULAR);
+	file->file.ops = &memory_file_ops;
+	file->file.type = FILE_TYPE_REGULAR;
 	file->data = buf;
 	file->size = size;
 
-	return file_handle_create(&file->file, FILE_RIGHT_READ, 0, NULL);
+	handle = file_handle_alloc(&file->file, FILE_RIGHT_READ, 0);
+	return file_handle_create(handle);
 }

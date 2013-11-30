@@ -41,7 +41,7 @@ static void file_object_close(object_handle_t *handle) {
 	if(fhandle->file->ops->close)
 		fhandle->file->ops->close(fhandle);
 
-	kfree(fhandle);
+	file_handle_free(fhandle);
 }
 
 /** Signal that an object event is being waited for.
@@ -107,21 +107,6 @@ static object_type_t file_object_type = {
 	.map = file_object_map,
 };
 
-/** Initialize a file object.
- * @param file		Object to initialize.
- * @param ops		File operations structure.
- * @param type		Type of the file. */
-void file_init(file_t *file, file_ops_t *ops, file_type_t type) {
-	file->ops = ops;
-	file->type = type;
-}
-
-/** Destroy a file object.
- * @param file		Object to destroy. */
-void file_destroy(file_t *file) {
-	/* Nothing happens. */
-}
-
 /**
  * Check for access to a file.
  *
@@ -138,32 +123,34 @@ bool file_access(file_t *file, uint32_t rights) {
 	return true;
 }
 
-/**
- * Create a new file handle.
- *
- * Creates a new file handle. Does not perform rights checks on the file, this
- * must be done manually before calling this function.
- *
- * @param file		File to create handle to.
- * @param rights	Access rights for the handle.
+/** Allocate a new file handle structure.
+ * @param file		File that handle is to.
+ * @param rights	Rights for the handle.
  * @param flags		Flags for the handle.
- * @param data		Data pointer for the handle.
- *
- * @return		Pointer to the created handle.
- */
-object_handle_t *file_handle_create(file_t *file, uint32_t rights,
-	uint32_t flags, void *data)
-{
+ * @return		Pointer to allocated structure. */
+file_handle_t *file_handle_alloc(file_t *file, uint32_t rights, uint32_t flags) {
 	file_handle_t *fhandle;
 
 	fhandle = kmalloc(sizeof(*fhandle), MM_KERNEL);
 	mutex_init(&fhandle->lock, "file_handle_lock", 0);
 	fhandle->file = file;
-	fhandle->data = data;
 	fhandle->rights = rights;
 	fhandle->flags = flags;
+	fhandle->private = NULL;
 	fhandle->offset = 0;
+	return fhandle;
+}
 
+/** Free a file handle structure.
+ * @param fhandle	Handle to free. */
+void file_handle_free(file_handle_t *fhandle) {
+	kfree(fhandle);
+}
+
+/** Create an object handle from a file handle structure.
+ * @param fhandle	Filled in file handle structure.
+ * @return		Created object handle. */
+object_handle_t *file_handle_create(file_handle_t *fhandle) {
 	return object_handle_create(&file_object_type, fhandle);
 }
 

@@ -26,8 +26,6 @@
 #include <assert.h>
 #include <status.h>
 
-extern fs_mount_t *root_mount;
-
 /**
  * Initialize an I/O context.
  *
@@ -41,8 +39,6 @@ extern fs_mount_t *root_mount;
  */
 void io_context_init(io_context_t *context, io_context_t *parent) {
 	rwlock_init(&context->lock, "io_context_lock");
-	context->curr_dir = NULL;
-	context->root_dir = NULL;
 
 	/* Inherit parent's current/root directories if possible. */
 	if(parent) {
@@ -51,81 +47,81 @@ void io_context_init(io_context_t *context, io_context_t *parent) {
 		assert(parent->root_dir);
 		assert(parent->curr_dir);
 
-		fs_node_retain(parent->root_dir);
+		fs_dentry_retain(parent->root_dir);
 		context->root_dir = parent->root_dir;
-		fs_node_retain(parent->curr_dir);
+		fs_dentry_retain(parent->curr_dir);
 		context->curr_dir = parent->curr_dir;
 
 		rwlock_unlock(&parent->lock);
 	} else if(root_mount) {
-		fs_node_retain(root_mount->root);
+		fs_dentry_retain(root_mount->root);
 		context->root_dir = root_mount->root;
-		fs_node_retain(root_mount->root);
+		fs_dentry_retain(root_mount->root);
 		context->curr_dir = root_mount->root;
 	} else {
 		/* This should only be the case when the kernel process is
-		 * being created. */
+		 * being created. They will be set when the FS is
+		 * initialized. */
 		assert(!kernel_proc);
+
+		context->curr_dir = NULL;
+		context->root_dir = NULL;
 	}
 }
 
 /** Destroy an I/O context.
  * @param context	Context to destroy. */
 void io_context_destroy(io_context_t *context) {
-	fs_node_release(context->curr_dir);
-	fs_node_release(context->root_dir);
+	fs_dentry_release(context->curr_dir);
+	fs_dentry_release(context->root_dir);
 }
 
 /**
  * Set the working directory of an I/O context.
  *
- * Sets the working directory of an I/O context to the specified filesystem
- * node. The previous working directory node will be released, and the supplied
- * node will be referenced.
+ * Sets the working directory of an I/O context to the specified directory
+ * entry. The previous working directory will be released, and the supplied
+ * entry will be referenced.
  *
  * @param context	Context to set directory of.
- * @param node		Node to set to.
+ * @param entry		Entry to set to.
  */
-void io_context_set_curr_dir(io_context_t *context, fs_node_t *node) {
-	fs_node_t *old;
+void io_context_set_curr_dir(io_context_t *context, fs_dentry_t *entry) {
+	fs_dentry_t *prev;
 
-	assert(node->file.type == FILE_TYPE_DIR);
-
-	fs_node_retain(node);
+	fs_dentry_retain(entry);
 
 	rwlock_write_lock(&context->lock);
-	old = context->curr_dir;
-	context->curr_dir = node;
+	prev = context->curr_dir;
+	context->curr_dir = entry;
 	rwlock_unlock(&context->lock);
 
-	fs_node_release(old);
+	fs_dentry_release(prev);
 }
 
 /**
  * Set the root directory of an I/O context.
  *
  * Sets both the root directory and working directory of an I/O context to
- * the specified directory.
+ * the specified directory entry.
  *
  * @param context	Context to set in.
- * @param node		Node to set to.
+ * @param entry		Entry to set to.
  */
-void io_context_set_root_dir(io_context_t *context, fs_node_t *node) {
-	fs_node_t *old_root, *old_work;
+void io_context_set_root_dir(io_context_t *context, fs_dentry_t *entry) {
+	fs_dentry_t *prev_curr, *prev_root;
 
-	assert(node->file.type == FILE_TYPE_DIR);
-
-	/* Get twice: one for root, one for working. */
-	fs_node_retain(node);
-	fs_node_retain(node);
+	/* Reference twice: one for root, one for working. */
+	fs_dentry_retain(entry);
+	fs_dentry_retain(entry);
 
 	rwlock_write_lock(&context->lock);
-	old_work = context->curr_dir;
-	context->curr_dir = node;
-	old_root = context->root_dir;
-	context->root_dir = node;
+	prev_curr = context->curr_dir;
+	context->curr_dir = entry;
+	prev_root = context->root_dir;
+	context->root_dir = entry;
 	rwlock_unlock(&context->lock);
 
-	fs_node_release(old_work);
-	fs_node_release(old_root);
+	fs_dentry_release(prev_curr);
+	fs_dentry_release(prev_root);
 }

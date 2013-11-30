@@ -28,7 +28,9 @@
 
 #include <object.h>
 
+struct device;
 struct file_handle;
+struct fs_node;
 struct io_request;
 
 /** Operations for a file. */
@@ -107,25 +109,30 @@ typedef struct file {
 
 /** File handle information. */
 typedef struct file_handle {
-	file_t *file;			/**< File object. */
-	void *data;			/**< Implementation data pointer. */
+	union {
+		file_t *file;		/**< File object. */
+		struct fs_node *node;	/**< Filesystem node. */
+		struct device *device;	/**< Device node. */
+	};
+
 	uint32_t rights;		/**< Rights the handle was opened with. */
 	uint32_t flags;			/**< Flags modifying handle behaviour. */
+	void *private;			/**< Implementation data pointer. */
 	mutex_t lock;			/**< Lock to protect offset. */
 	offset_t offset;		/**< Current file offset. */
+	struct fs_dentry *entry;	/**< Directory entry used to open the node. */
 } file_handle_t;
 
 /**
  * Implementation functions.
  */
 
-extern void file_init(file_t *file, file_ops_t *ops, file_type_t type);
-extern void file_destroy(file_t *file);
-
 extern bool file_access(file_t *file, uint32_t rights);
 
-extern object_handle_t *file_handle_create(file_t *file, uint32_t rights,
-	uint32_t flags, void *data);
+extern file_handle_t *file_handle_alloc(file_t *file, uint32_t rights,
+	uint32_t flags);
+extern void file_handle_free(file_handle_t *fhandle);
+extern object_handle_t *file_handle_create(file_handle_t *fhandle);
 
 /**
  * Public kernel interface.
@@ -133,15 +140,16 @@ extern object_handle_t *file_handle_create(file_t *file, uint32_t rights,
 
 extern status_t file_read(object_handle_t *handle, void *buf, size_t size,
 	offset_t offset, size_t *bytesp);
-extern status_t file_write(object_handle_t *handle, const void *buf, size_t size,
-	offset_t offset, size_t *bytesp);
+extern status_t file_write(object_handle_t *handle, const void *buf,
+	size_t size, offset_t offset, size_t *bytesp);
 
 extern status_t file_read_vecs(object_handle_t *handle, const io_vec_t *vecs,
 	size_t count, offset_t offset, size_t *bytesp);
 extern status_t file_write_vecs(object_handle_t *handle, const io_vec_t *vecs,
 	size_t count, offset_t offset, size_t *bytesp);
 
-extern status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size);
+extern status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf,
+	size_t size);
 extern status_t file_rewind_dir(object_handle_t *handle);
 
 extern status_t file_rights(object_handle_t *handle, uint32_t *rightsp);

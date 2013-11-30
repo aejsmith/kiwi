@@ -80,6 +80,7 @@ typedef struct io_vec {
 /** Behaviour flags for file handles. */
 #define FILE_NONBLOCK		(1<<0)	/**< I/O operations on the handle should not block. */
 #define FILE_APPEND		(1<<1)	/**< Before each write, offset is set to the end of the file. */
+#define FILE_DIRECT		(1<<2)	/**< I/O operations bypass cache and directly access device. */
 
 /** Operations for kern_file_seek(). */
 #define FILE_SEEK_SET		1	/**< Set to the exact position specified. */
@@ -100,14 +101,15 @@ extern status_t kern_file_read_vecs(handle_t handle, const io_vec_t *vecs,
 extern status_t kern_file_write_vecs(handle_t handle, const io_vec_t *vecs,
 	size_t count, offset_t offset, size_t *bytesp);
 
-extern status_t kern_file_read_dir(handle_t handle, dir_entry_t *buf, size_t size);
+extern status_t kern_file_read_dir(handle_t handle, dir_entry_t *buf,
+	size_t size);
 extern status_t kern_file_rewind_dir(handle_t handle);
 
 extern status_t kern_file_rights(handle_t handle, uint32_t *rightsp);
 extern status_t kern_file_flags(handle_t handle, uint32_t *flagsp);
 extern status_t kern_file_set_flags(handle_t handle, uint32_t flags);
-extern status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset,
-	offset_t *resultp);
+extern status_t kern_file_seek(handle_t handle, unsigned action,
+	offset_t offset, offset_t *resultp);
 
 extern status_t kern_file_resize(handle_t handle, offset_t size);
 extern status_t kern_file_info(handle_t handle, file_info_t *info);

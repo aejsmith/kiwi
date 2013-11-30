@@ -51,10 +51,10 @@
 #define STATUS_NOT_SYMLINK		25	/**< Path does not refer to a symbolic link. */
 #define STATUS_NOT_MOUNT		26	/**< Path does not refer to root of a mount. */
 #define STATUS_NOT_FOUND		27	/**< Requested object could not be found. */
-#define STATUS_ALREADY_EXISTS		28	/**< Object already exists. */
-#define STATUS_TOO_SMALL		29	/**< Provided buffer is too small. */
-#define STATUS_TOO_LONG			30	/**< Provided string is too long. */
-#define STATUS_DIR_NOT_EMPTY		31	/**< Directory is not empty. */
+#define STATUS_NOT_EMPTY		28	/**< Directory is not empty. */
+#define STATUS_ALREADY_EXISTS		29	/**< Object already exists. */
+#define STATUS_TOO_SMALL		30	/**< Provided buffer is too small. */
+#define STATUS_TOO_LONG			31	/**< Provided string is too long. */
 #define STATUS_DIR_FULL			32	/**< Directory is full. */
 #define STATUS_UNKNOWN_FS		33	/**< Filesystem has an unrecognised format. */
 #define STATUS_CORRUPT_FS		34	/**< Corruption detected on the filesystem. */

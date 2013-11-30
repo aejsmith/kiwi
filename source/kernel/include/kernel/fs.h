@@ -54,12 +54,12 @@ extern status_t kern_fs_create_symlink(const char *path, const char *target);
 
 extern status_t kern_fs_read_symlink(const char *path, char *buf, size_t size);
 
-extern status_t kern_fs_mount(const char *device, const char *path, const char *type,
-	uint32_t flags, const char *opts);
+extern status_t kern_fs_mount(const char *device, const char *path,
+	const char *type, uint32_t flags, const char *opts);
 extern status_t kern_fs_mount_info(mount_info_t *infos, size_t *countp);
 extern status_t kern_fs_unmount(const char *path);
 
-extern status_t kern_fs_path(const char *path, handle_t from, char *buf, size_t size);
+extern status_t kern_fs_path(handle_t handle, char *buf, size_t size);
 extern status_t kern_fs_curr_dir(char *buf, size_t size);
 extern status_t kern_fs_set_curr_dir(const char *path);
 extern status_t kern_fs_set_root_dir(const char *path);

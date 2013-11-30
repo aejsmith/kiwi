@@ -24,18 +24,20 @@
 
 #include <sync/rwlock.h>
 
-struct fs_node;
+struct fs_dentry;
 
 /** Structure containing an I/O context. */
 typedef struct io_context {
 	rwlock_t lock;			/**< Lock to protect context. */
-	struct fs_node *root_dir;	/**< Root directory. */
-	struct fs_node *curr_dir;	/**< Current working directory. */
+	struct fs_dentry *root_dir;	/**< Root directory. */
+	struct fs_dentry *curr_dir;	/**< Current working directory. */
 } io_context_t;
 
 extern void io_context_init(io_context_t *context, io_context_t *parent);
 extern void io_context_destroy(io_context_t *context);
-extern void io_context_set_curr_dir(io_context_t *context, struct fs_node *node);
-extern void io_context_set_root_dir(io_context_t *context, struct fs_node *node);
+extern void io_context_set_curr_dir(io_context_t *context,
+	struct fs_dentry *entry);
+extern void io_context_set_root_dir(io_context_t *context,
+	struct fs_dentry *entry);
 
 #endif /* __IO_CONTEXT_H */
