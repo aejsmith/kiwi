@@ -38,6 +38,36 @@ static inline int32_t atomic_dec(atomic_t *var) {
 	return atomic_sub(var, 1);
 }
 
+/** Atomically OR a value with an atomic variable.
+ * @param var		Pointer to atomic variable.
+ * @param val		Value to OR.
+ * @return		Previous value of variable. */
+static inline int32_t atomic_or(atomic_t *var, int32_t val) {
+	int32_t old, new;
+
+	do {
+		old = atomic_get(var);
+		new = old | val;
+	} while(atomic_cas(var, old, new) != old);
+
+	return old;
+}
+
+/** Atomically AND a value with an atomic variable.
+ * @param var		Pointer to atomic variable.
+ * @param val		Value to AND.
+ * @return		Previous value of variable. */
+static inline int32_t atomic_and(atomic_t *var, int32_t val) {
+	int32_t old, new;
+
+	do {
+		old = atomic_get(var);
+		new = old & val;
+	} while(atomic_cas(var, old, new) != old);
+
+	return old;
+}
+
 #if CONFIG_ARCH_64BIT
 
 /** Atomically increment an atomic variable (64-bit).

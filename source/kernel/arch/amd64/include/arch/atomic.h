@@ -47,7 +47,7 @@ static inline void atomic_set(atomic_t *var, int32_t val) {
  * @return		Previous value of variable. */
 static inline int32_t atomic_add(atomic_t *var, int32_t val) {
 	__asm__ volatile(
-		"lock xaddl %0, %1"
+		"lock xaddl	%0, %1"
 		: "+r"(val), "+m"(*var)
 		:: "memory");
 	return val;
@@ -67,7 +67,7 @@ static inline int32_t atomic_sub(atomic_t *var, int32_t val) {
  * @return		Previous value of the variable. */
 static inline int32_t atomic_swap(atomic_t *var, int32_t val) {
 	__asm__ volatile(
-		"lock xchgl %0, %1"
+		"lock xchgl	%0, %1"
 		: "+r"(val), "+m"(*var)
 		:: "memory");
 	return val;
@@ -90,8 +90,7 @@ static inline int32_t atomic_cas(atomic_t *var, int32_t cmp, int32_t val) {
 	int32_t r;
 
 	__asm__ volatile(
-		"lock\n\t"
-		"cmpxchgl	%3, %1\n\t"
+		"lock cmpxchgl	%3, %1\n\t"
 		: "=a"(r), "+m"(*var)
 		: "0"(cmp), "r"(val));
 	return r;
