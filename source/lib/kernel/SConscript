@@ -41,6 +41,7 @@ sources = map(File, [
     'support/printf.c',
     'support/string.c',
 
+    'fs.c',
     'init.c',
     'mutex.c',
     'process.c',
