@@ -46,7 +46,8 @@ static int cd_command(std::vector<std::string> args) {
 
 	status_t ret = kern_fs_set_curr_dir(args[1].c_str());
 	if(ret != STATUS_SUCCESS) {
-		printf("Failed to change directory: %d\n", ret);
+		printf("Failed to change directory: %d (%s)\n", ret,
+			__kernel_status_strings[ret]);
 		return 1;
 	}
 
@@ -62,7 +63,8 @@ static int ls_command(std::vector<std::string> args) {
 	handle_t handle;
 	ret = kern_fs_open(dir.c_str(), FILE_RIGHT_READ, 0, FS_OPEN, &handle);
 	if(ret != STATUS_SUCCESS) {
-		printf("Failed to open directory '%s': %d\n", dir.c_str(), ret);
+		printf("Failed to open directory '%s': %d (%s)\n", dir.c_str(),
+			ret, __kernel_status_strings[ret]);
 		return 1;
 	}
 
@@ -76,7 +78,8 @@ static int ls_command(std::vector<std::string> args) {
 			free(entry);
 			kern_handle_close(handle);
 			if(ret != STATUS_NOT_FOUND) {
-				printf("Failed to read directory: %d\n", ret);
+				printf("Failed to read directory: %d (%s)\n",
+					ret, __kernel_status_strings[ret]);
 				return 1;
 			}
 
@@ -89,7 +92,8 @@ static int ls_command(std::vector<std::string> args) {
 		file_info_t info;
 		ret = kern_fs_info(path.c_str(), false, &info);
 		if(ret != STATUS_SUCCESS) {
-			printf("Failed to get entry information: %d\n", ret);
+			printf("Failed to get entry information: %d (%s)\n",
+				ret, __kernel_status_strings[ret]);
 			free(entry);
 			kern_handle_close(handle);
 			return ret;
@@ -114,7 +118,8 @@ static int mkdir_command(std::vector<std::string> args) {
 
 	status_t ret = kern_fs_create_dir(args[1].c_str());
 	if(ret != STATUS_SUCCESS) {
-		printf("Failed to create directory: %d\n", ret);
+		printf("Failed to create directory: %d (%s)\n", ret,
+			__kernel_status_strings[ret]);
 		return 1;
 	}
 
@@ -154,7 +159,8 @@ static int mount_command(std::vector<std::string> args) {
 		args[idx + 2].c_str(), flags,
 		((args.size() - idx) == 4) ? args[idx + 3].c_str() : NULL);
 	if(ret != STATUS_SUCCESS) {
-		printf("Failed to mount filesystem: %d\n", ret);
+		printf("Failed to mount filesystem: %d (%s)\n", ret,
+			__kernel_status_strings[ret]);
 		return 1;
 	}
 
@@ -169,7 +175,8 @@ static int unlink_command(std::vector<std::string> args) {
 
 	status_t ret = kern_fs_unlink(args[1].c_str());
 	if(ret != STATUS_SUCCESS) {
-		printf("Failed to unlink: %d\n", ret);
+		printf("Failed to unlink: %d (%s)\n", ret,
+			__kernel_status_strings[ret]);
 		return 1;
 	}
 
