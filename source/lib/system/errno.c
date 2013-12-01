@@ -77,6 +77,8 @@ static int status_to_errno_table[] = {
 	[STATUS_MISSING_SYMBOL] =	ENOEXEC,
 	[STATUS_DEST_UNREACHABLE] =	EHOSTUNREACH,
 	[STATUS_TRY_AGAIN] =		EAGAIN,
+	[STATUS_DIFFERENT_FS] =		EXDEV,
+	[STATUS_IS_DIR] =		EISDIR,
 };
 
 /** Real location of errno. */

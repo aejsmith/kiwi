@@ -69,6 +69,8 @@
 #define STATUS_MISSING_SYMBOL		43	/**< Referenced symbol not found. */
 #define STATUS_DEST_UNREACHABLE		44	/**< Cannot reach destination. */
 #define STATUS_TRY_AGAIN		45	/**< Attempt the operation again. */
+#define STATUS_DIFFERENT_FS		46	/**< Link source and destination on different FS. */
+#define STATUS_IS_DIR			47	/**< Not a directory. */
 
 #if !defined(KERNEL) && !defined(__ASM__)
 #include <kernel/types.h>

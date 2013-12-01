@@ -124,8 +124,24 @@ static status_t ramfs_node_create(fs_node_t *_parent, fs_dentry_t *entry,
 	return STATUS_SUCCESS;
 }
 
+/** Create a hard link.
+ * @param _parent	Directory to create link in.
+ * @param entry		Entry structure for the new entry.
+ * @param _node		Existing node to link to.
+ * @return		Status code describing result of the operation. */
+static status_t ramfs_node_link(fs_node_t *_parent, fs_dentry_t *entry,
+	fs_node_t *_node)
+{
+	ramfs_node_t *node = _node->private;
+
+	if(atomic_inc(&node->links) == 0)
+		fs_node_clear_flag(_node, FS_NODE_REMOVED);
+
+	return STATUS_SUCCESS;
+}
+
 /** Unlink a ramfs node.
- * @param parent	Directory containing the entry to remove.
+ * @param _parent	Directory containing the entry to remove.
  * @param entry		Entry in the directory being removed.
  * @param _node		Node that the entry refers to.
  * @return		Status code describing result of the operation. */
@@ -308,6 +324,7 @@ static status_t ramfs_node_read_dir(file_handle_t *handle, dir_entry_t **entryp)
 static fs_node_ops_t ramfs_node_ops = {
 	.free = ramfs_node_free,
 	.create = ramfs_node_create,
+	.link = ramfs_node_link,
 	.unlink = ramfs_node_unlink,
 	.info = ramfs_node_info,
 	.resize = ramfs_node_resize,

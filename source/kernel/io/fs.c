@@ -317,9 +317,6 @@ static fs_dentry_t *fs_dentry_alloc(const char *name, fs_mount_t *mount,
 /** Free a directory entry structure.
  * @param entry		Entry to free. */
 static void fs_dentry_free(fs_dentry_t *entry) {
-	dprintf("fs: freed entry '%s' (%p) on mount %" PRIu16 "\n", entry->name,
-		entry, entry->mount->id);
-
 	kfree(entry->name);
 	slab_cache_free(fs_dentry_cache, entry);
 }
@@ -356,8 +353,11 @@ static void fs_dentry_release_locked(fs_dentry_t *entry) {
 
 	/* If the parent is NULL, that means we have been unlinked, therefore
 	 * we should free the entry immediately. */
-	if(removed)
+	if(removed) {
+		dprintf("fs: freed entry '%s' (%p) on mount %" PRIu16 "\n",
+			entry->name, entry, entry->mount->id);
 		fs_dentry_free(entry);
+	}
 
 	/* TODO: Move node and entry to unused lists. Don't if they have the
 	 * keep flag set. Though, we do need used and unused lists per mount
@@ -454,7 +454,7 @@ static status_t fs_dentry_lookup(fs_dentry_t *parent, const char *name,
 
 		ret = parent->node->ops->lookup(parent->node, entry);
 		if(ret != STATUS_SUCCESS) {
-			slab_cache_free(fs_dentry_cache, entry);
+			fs_dentry_free(entry);
 			return ret;
 		}
 
@@ -704,18 +704,16 @@ static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **entryp
  * Internal implementation functions.
  */
 
-/** Common creation code.
+/** Prepare to create a filesystem entry.
  * @param path		Path to node to create.
- * @param type		Type to give the new node.
- * @param target	For symbolic links, the target of the link.
- * @param entryp	Where to store pointer to created entry (can be NULL).
+ * @param entryp	Where to store pointer to created directory entry
+ *			structure. This can then be used to create the entry on
+ *			the filesystem. Its parent will be instantiated and
+ *			locked.
  * @return		Status code describing result of the operation. */
-static status_t fs_create(const char *path, file_type_t type,
-	const char *target, fs_dentry_t **entryp)
-{
+static status_t fs_create_prepare(const char *path, fs_dentry_t **entryp) {
 	char *dir, *name;
 	fs_dentry_t *parent, *entry;
-	fs_node_t *node;
 	status_t ret;
 
 	/* Split path into directory/name. */
@@ -761,43 +759,84 @@ static status_t fs_create(const char *path, file_type_t type,
 		goto out_release_parent;
 	}
 
-	/* Check that we are on a writable filesystem, that we have write
-	 * permission to the directory, and that the FS supports node
-	 * creation. */
+	/* Check that we are on a writable filesystem and that we have write
+	 * permission to the directory. */
 	if(fs_node_is_read_only(parent->node)) {
 		ret = STATUS_READ_ONLY;
 		goto out_release_parent;
 	} else if(!file_access(&parent->node->file, FILE_RIGHT_WRITE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out_release_parent;
-	} else if(!parent->node->ops->create) {
-		ret = STATUS_NOT_SUPPORTED;
-		goto out_release_parent;
 	}
 
-	entry = fs_dentry_alloc(name, parent->mount, parent);
+	*entryp = fs_dentry_alloc(name, parent->mount, parent);
+	ret = STATUS_SUCCESS;
+	goto out_free_name;
+out_release_parent:
+	fs_dentry_release_locked(parent);
+out_free_name:
+	kfree(dir);
+	kfree(name);
+	return ret;
+}
+
+/** Publish a newly created entry.
+ * @param entry		Directory entry. Parent entry will be unlocked and
+ *			released by this function. Entry itself will _not_ be
+ *			released.
+ * @param node		Node to attach to the entry. Reference count will not
+ *			be changed. */
+static void fs_create_finish(fs_dentry_t *entry, fs_node_t *node) {
+	fs_dentry_t *parent = entry->parent;
+
+	/* Instantiate the directory entry and attach to the parent. */
+	refcount_set(&entry->count, 1);
+	entry->node = node;
+	radix_tree_insert(&parent->entries, entry->name, entry);
+
+	fs_dentry_release_locked(parent);
+}
+
+/** Common creation code.
+ * @param path		Path to node to create.
+ * @param type		Type to give the new node.
+ * @param target	For symbolic links, the target of the link.
+ * @param entryp	Where to store pointer to created entry (can be NULL).
+ * @return		Status code describing result of the operation. */
+static status_t fs_create(const char *path, file_type_t type,
+	const char *target, fs_dentry_t **entryp)
+{
+	fs_dentry_t *parent, *entry;
+	fs_node_t *node;
+	status_t ret;
+
+	ret = fs_create_prepare(path, &entry);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	parent = entry->parent;
+	if(!parent->node->ops->create) {
+		ret = STATUS_NOT_SUPPORTED;
+		goto err_free_entry;
+	}
+
 	node = fs_node_alloc(parent->mount);
 	node->file.type = type;
 
 	ret = parent->node->ops->create(parent->node, entry, node, target);
 	if(ret != STATUS_SUCCESS)
-		goto out_free_child;
+		goto err_free_node;
+
+	dprintf("fs: created '%s': node %" PRIu64 " (%p) in %" PRIu64 " (%p) "
+		"on %" PRIu16 " (%p)\n", path, node->id, node, parent->node->id,
+		parent->node, parent->mount->id, parent->mount);
 
 	/* Attach the node to the mount. */
 	mutex_lock(&parent->mount->lock);
 	avl_tree_insert(&parent->mount->nodes, node->id, &node->tree_link);
 	mutex_unlock(&parent->mount->lock);
 
-	/* Instantiate the directory entry and attach to the parent. */
-	refcount_set(&entry->count, 1);
-	entry->node = node;
-	radix_tree_insert(&parent->entries, name, entry);
-
-	dprintf("fs: created '%s': node %" PRIu64 " (%p) in %" PRIu64 " (%p) "
-		"on %" PRIu16 " (%p)\n", path, node->id, node, parent->node->id,
-		parent->node, parent->mount->id);
-
-	fs_dentry_release_locked(parent);
+	fs_create_finish(entry, node);
 
 	if(entryp) {
 		*entryp = entry;
@@ -805,17 +844,12 @@ static status_t fs_create(const char *path, file_type_t type,
 		fs_dentry_release(entry);
 	}
 
-	ret = STATUS_SUCCESS;
-	goto out_free_name;
-
-out_free_child:
+	return STATUS_SUCCESS;
+err_free_node:
 	slab_cache_free(fs_node_cache, node);
-	slab_cache_free(fs_dentry_cache, entry);
-out_release_parent:
+err_free_entry:
+	fs_dentry_free(entry);
 	fs_dentry_release_locked(parent);
-out_free_name:
-	kfree(dir);
-	kfree(name);
 	return ret;
 }
 
@@ -1348,7 +1382,7 @@ err_unmount:
 	if(mount->ops->unmount)
 		mount->ops->unmount(mount);
 err_free_root:
-	slab_cache_free(fs_dentry_cache, mount->root);
+	fs_dentry_free(mount->root);
 err_free_mount:
 	kfree(mount);
 err_release_mp:
@@ -1405,13 +1439,64 @@ status_t fs_info(const char *path, bool follow, file_info_t *info) {
  * source path refers to a symbolic link, the new link will refer to the node
  * pointed to by the symbolic link, not the symbolic link itself.
  *
- * @param source	Path to source.
- * @param dest		Path to new link.
+ * @param path		Path to new link.
+ * @param source	Path to source node for the link.
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_link(const char *source, const char *dest) {
-	return STATUS_NOT_IMPLEMENTED;
+status_t fs_link(const char *path, const char *source) {
+	fs_dentry_t *parent, *entry;
+	fs_node_t *node;
+	status_t ret;
+
+	ret = fs_lookup(source, FS_LOOKUP_FOLLOW, &entry);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	/* We just need the node, we don't care about the source dentry. */
+	node = entry->node;
+	refcount_inc(&node->count);
+	fs_dentry_release(entry);
+
+	/* Can't hard link to directories. */
+	if(node->file.type == FILE_TYPE_DIR) {
+		ret = STATUS_IS_DIR;
+		goto err_release_node;
+	}
+
+	ret = fs_create_prepare(path, &entry);
+	if(ret != STATUS_SUCCESS)
+		goto err_release_node;
+
+	parent = entry->parent;
+	if(parent->mount != node->mount) {
+		ret = STATUS_DIFFERENT_FS;
+		goto err_free_entry;
+	} else if(!parent->node->ops->link) {
+		ret = STATUS_NOT_SUPPORTED;
+		goto err_free_entry;
+	}
+
+	entry->id = node->id;
+
+	ret = parent->node->ops->link(parent->node, entry, node);
+	if(ret != STATUS_SUCCESS)
+		goto err_free_entry;
+
+	dprintf("fs: linked '%s': node %" PRIu64 " (%p) in %" PRIu64 " (%p) "
+		"on %" PRIu16 " (%p)\n", path, node->id, node, parent->node->id,
+		parent->node, parent->mount->id, parent->mount);
+
+	/* The node reference is taken over by fs_create_finish(). */
+	fs_create_finish(entry, node);
+	fs_dentry_release(entry);
+	return STATUS_SUCCESS;
+err_free_entry:
+	fs_dentry_free(entry);
+	fs_dentry_release_locked(parent);
+err_release_node:
+	fs_node_release(node);
+	return ret;
 }
 
 /**
@@ -2343,31 +2428,31 @@ status_t kern_fs_info(const char *path, bool follow, file_info_t *info) {
  * source path refers to a symbolic link, the new link will refer to the node
  * pointed to by the symbolic link, not the symbolic link itself.
  *
- * @param source	Path to source.
- * @param dest		Path to new link.
+ * @param path		Path to new link.
+ * @param source	Path to source node for the link.
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_fs_link(const char *source, const char *dest) {
-	char *ksource, *kdest;
+status_t kern_fs_link(const char *path, const char *source) {
+	char *kpath, *ksource;
 	status_t ret;
 
-	if(!source || !dest)
+	if(!path || !source)
 		return STATUS_INVALID_ARG;
 
-	ret = strndup_from_user(source, FS_PATH_MAX, &ksource);
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = strndup_from_user(dest, FS_PATH_MAX, &kdest);
+	ret = strndup_from_user(source, FS_PATH_MAX, &ksource);
 	if(ret != STATUS_SUCCESS) {
-		kfree(ksource);
+		kfree(kpath);
 		return ret;
 	}
 
-	ret = fs_link(ksource, kdest);
-	kfree(kdest);
+	ret = fs_link(kpath, ksource);
 	kfree(ksource);
+	kfree(kpath);
 	return ret;
 }
 

@@ -165,7 +165,7 @@ typedef struct fs_node_ops {
 	 * Creates a new node as a child of an existing directory. The supplied
 	 * entry structure contains the name of the entry to create, and the
 	 * supplied node structure contains the attributes for the new node
-	 * (type, security attributes, etc). The filesystem should fill in the
+	 * (type, security attributes, etc). This function should fill in the
 	 * remainder of both of these structures as though lookup() and
 	 * read_node() had been called on each of them.
 	 *
@@ -178,6 +178,25 @@ typedef struct fs_node_ops {
 	 */
 	status_t (*create)(struct fs_node *parent, struct fs_dentry *entry,
 		struct fs_node *node, const char *target);
+
+	/**
+	 * Create a hard link.
+	 *
+	 * Creates a hard link in a directory to an existing node. This function
+	 * should fill in any flags it wishes on the directory entry, as with
+	 * create(). Note that it may be possible that an unlink takes place
+	 * at the same time as a link on the same node, so when incrementing
+	 * the node link count this function should check whether it was 0
+	 * and clear the FS_NODE_REMOVE flag if it was.
+	 *
+	 * @param parent	Directory to create link in.
+	 * @param entry		Entry structure for the new entry.
+	 * @param node		Existing node to link to.
+	 *
+	 * @return		Status code describing result of the operation.
+	 */
+	status_t (*link)(struct fs_node *parent, struct fs_dentry *entry,
+		struct fs_node *node);
 
 	/**
 	 * Remove an entry from a directory.
@@ -369,7 +388,7 @@ extern status_t fs_mount(const char *device, const char *path, const char *type,
 extern status_t fs_unmount(const char *path);
 
 extern status_t fs_info(const char *path, bool follow, file_info_t *info);
-extern status_t fs_link(const char *source, const char *dest);
+extern status_t fs_link(const char *path, const char *source);
 extern status_t fs_unlink(const char *path);
 extern status_t fs_rename(const char *source, const char *dest);
 extern status_t fs_sync(void);

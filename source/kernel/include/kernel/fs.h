@@ -64,7 +64,7 @@ extern status_t kern_fs_curr_dir(char *buf, size_t size);
 extern status_t kern_fs_set_curr_dir(const char *path);
 extern status_t kern_fs_set_root_dir(const char *path);
 extern status_t kern_fs_info(const char *path, bool follow, file_info_t *info);
-extern status_t kern_fs_link(const char *source, const char *dest);
+extern status_t kern_fs_link(const char *path, const char *source);
 extern status_t kern_fs_unlink(const char *path);
 extern status_t kern_fs_rename(const char *source, const char *dest);
 extern status_t kern_fs_sync(void);
