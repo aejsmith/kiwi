@@ -54,6 +54,37 @@ static int cd_command(std::vector<std::string> args) {
 	return 0;
 }
 
+static int ln_command(std::vector<std::string> args) {
+	if(args.size() != ((args.size() > 1 && args[1][0] == '-') ? 4 : 3)) {
+		printf("Error: invalid arguments\n");
+		return 1;
+	}
+
+	bool symlink = false;
+	unsigned idx = 1;
+	if(args[1][0] == '-') {
+		if(args[1].compare("-s") == 0) {
+			symlink = true;
+		} else {
+			printf("Error: unknown option '%s'\n", args[1].c_str());
+		}
+
+		idx++;
+	}
+
+	status_t ret = (symlink)
+		? kern_fs_create_symlink(args[idx + 1].c_str(), args[idx].c_str())
+		: kern_fs_link(args[idx + 1].c_str(), args[idx].c_str());
+	if(ret != STATUS_SUCCESS) {
+		printf("Failed to create %slink: %d (%s)\n",
+			(symlink) ? "sym" : "", ret,
+			__kernel_status_strings[ret]);
+		return 1;
+	}
+
+	return 0;
+}
+
 static int ls_command(std::vector<std::string> args) {
 	static char buf[FS_PATH_MAX];
 	status_t ret;
@@ -202,6 +233,7 @@ static void split(const std::string &line, std::vector<std::string> &args) {
 
 int main(int argc, char **argv) {
 	shell_commands.insert(std::make_pair("cd", cd_command));
+	shell_commands.insert(std::make_pair("ln", ln_command));
 	shell_commands.insert(std::make_pair("ls", ls_command));
 	shell_commands.insert(std::make_pair("mkdir", mkdir_command));
 	shell_commands.insert(std::make_pair("mount", mount_command));
