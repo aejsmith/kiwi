@@ -40,7 +40,7 @@ typedef struct ramfs_node {
 		char *target;		/**< Symbolic link destination. */
 	};
 
-	size_t links;			/**< Link count. */
+	atomic_t links;			/**< Link count. */
 	nstime_t created;		/**< Time of creation. */
 	nstime_t accessed;		/**< Time of last access. */
 	nstime_t modified;		/**< Time last modified. */
@@ -90,7 +90,7 @@ static status_t ramfs_node_create(fs_node_t *_parent, fs_dentry_t *entry,
 	assert(_parent->file.type == FILE_TYPE_DIR);
 
 	node = kmalloc(sizeof(*node), MM_KERNEL);
-	node->links = 1;
+	atomic_set(&node->links, 1);
 	node->created = node->accessed = node->modified = unix_time();
 
 	/* Allocate a unique ID for the node. */
@@ -108,8 +108,8 @@ static status_t ramfs_node_create(fs_node_t *_parent, fs_dentry_t *entry,
 	case FILE_TYPE_DIR:
 		/* Our link count should include the '.' entry to ourself, and
 		 * the parent's should include one for our '..' entry. */
-		node->links++;
-		parent->links++;
+		atomic_inc(&node->links);
+		atomic_inc(&parent->links);
 		break;
 	default:
 		kfree(node);
@@ -134,21 +134,22 @@ static status_t ramfs_node_unlink(fs_node_t *_parent, fs_dentry_t *entry,
 {
 	ramfs_node_t *parent = _parent->private;
 	ramfs_node_t *node = _node->private;
+	int32_t val;
 
 	/* For directories, the FS layer checks whether its cache is empty
 	 * before calling into this function to save a call out to the FS
 	 * when it already knows that the directory is not empty. Therefore,
 	 * we don't need to do a check here. */
-	node->links--;
+	val = atomic_dec(&node->links);
 
 	if(_node->file.type == FILE_TYPE_DIR) {
 		/* Drop an extra link on ourself for the '.' entry, and one on
 		 * the parent for the '..' entry. */
-		parent->links--;
-		node->links--;
+		atomic_dec(&parent->links);
+		val = atomic_dec(&node->links);
 	}
 
-	if(node->links == 0)
+	if(val == 1)
 		fs_node_set_flag(_node, FS_NODE_REMOVED);
 
 	return STATUS_SUCCESS;
@@ -160,7 +161,7 @@ static status_t ramfs_node_unlink(fs_node_t *_parent, fs_dentry_t *entry,
 static void ramfs_node_info(fs_node_t *_node, file_info_t *info) {
 	ramfs_node_t *node = _node->private;
 
-	info->links = node->links;
+	info->links = atomic_get(&node->links);
 	info->block_size = PAGE_SIZE;
 	info->created = node->created;
 	info->accessed = node->accessed;

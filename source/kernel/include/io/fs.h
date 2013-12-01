@@ -310,9 +310,6 @@ static inline bool fs_node_is_read_only(fs_node_t *node) {
 	return (node->mount && node->mount->flags & FS_MOUNT_READ_ONLY);
 }
 
-extern void fs_node_retain(fs_node_t *node);
-extern void fs_node_release(fs_node_t *node);
-
 /** Structure containing a directory entry. */
 typedef struct fs_dentry {
 	mutex_t lock;			/**< Lock to protect the entry. */

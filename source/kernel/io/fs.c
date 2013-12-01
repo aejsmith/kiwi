@@ -75,6 +75,10 @@
 # define dprintf(fmt...)
 #endif
 
+/** Filesystem lookup behaviour flags. */
+#define FS_LOOKUP_FOLLOW	(1<<0)	/**< If final path component is a symlink, follow it. */
+#define FS_LOOKUP_LOCK		(1<<1)	/**< Return a locked entry. */
+
 static file_ops_t fs_file_ops;
 
 /** List of registered FS types (protected by fs_mount_lock). */
@@ -192,8 +196,71 @@ static fs_node_t *fs_node_alloc(fs_mount_t *mount) {
 	node->file.ops = &fs_file_ops;
 	node->flags = 0;
 	node->mount = mount;
-
 	return node;
+}
+
+/**
+ * Free an unused node.
+ *
+ * Free an unused node structure. The node's mount must be locked. If the node
+ * is not marked as removed, the node's flush operation will be called, and the
+ * node will not be freed if this fails. Removed nodes will always be freed
+ * without error.
+ *
+ * @param node		Node to free.
+ *
+ * @return		Status code describing result of the operation. Cannot
+ *			fail if node has FS_NODE_REMOVED set.
+ */
+static status_t fs_node_free(fs_node_t *node) {
+	fs_mount_t *mount = node->mount;
+	status_t ret;
+
+	assert(refcount_get(&node->count) == 0);
+	assert(mutex_held(&mount->lock));
+
+	if(!fs_node_is_read_only(node) && !(node->flags & FS_NODE_REMOVED)) {
+		if(node->ops->flush) {
+			ret = node->ops->flush(node);
+			if(ret != STATUS_SUCCESS)
+				return ret;
+		}
+	}
+
+	if(node->ops->free)
+		node->ops->free(node);
+
+	avl_tree_remove(&mount->nodes, &node->tree_link);
+
+	dprintf("fs: freed node %" PRIu16 ":%" PRIu64 " (%p)\n", mount->id,
+		node->id, node);
+
+	slab_cache_free(fs_node_cache, node);
+	return STATUS_SUCCESS;
+}
+
+/** Release a node.
+ * @param node		Node to release. */
+static void fs_node_release(fs_node_t *node) {
+	fs_mount_t *mount = node->mount;
+
+	if(refcount_dec(&node->count) > 0)
+		return;
+
+	/* Recheck after locking in case somebody has taken the node. */
+	mutex_lock(&mount->lock);
+	if(refcount_get(&node->count) > 0) {
+		mutex_unlock(&mount->lock);
+		return;
+	}
+
+	/* Free the node straight away if it is removed. */
+	if(node->flags & FS_NODE_REMOVED)
+		fs_node_free(node);
+
+	/* TODO: Unused list. */
+
+	mutex_unlock(&mount->lock);
 }
 
 /** Get information about a node.
@@ -247,6 +314,16 @@ static fs_dentry_t *fs_dentry_alloc(const char *name, fs_mount_t *mount,
 	return entry;
 }
 
+/** Free a directory entry structure.
+ * @param entry		Entry to free. */
+static void fs_dentry_free(fs_dentry_t *entry) {
+	dprintf("fs: freed entry '%s' (%p) on mount %" PRIu16 "\n", entry->name,
+		entry, entry->mount->id);
+
+	kfree(entry->name);
+	slab_cache_free(fs_dentry_cache, entry);
+}
+
 /** Increase the reference count of a directory entry.
  * @note		Should not be used on unused entries.
  * @param entry		Entry to increase reference count of. */
@@ -257,10 +334,11 @@ void fs_dentry_retain(fs_dentry_t *entry) {
 	}
 }
 
-/** Decrease the reference count of a directory entry.
- * @param entry		Entry to decrease reference count of. */
-void fs_dentry_release(fs_dentry_t *entry) {
-	mutex_lock(&entry->lock);
+/** Decrease the reference count of a locked directory entry.
+ * @param entry		Entry to decrease reference count of. Will be unlocked
+ *			upon return. */
+static void fs_dentry_release_locked(fs_dentry_t *entry) {
+	bool removed;
 
 	if(refcount_dec(&entry->count) > 0) {
 		mutex_unlock(&entry->lock);
@@ -268,14 +346,29 @@ void fs_dentry_release(fs_dentry_t *entry) {
 	}
 
 	assert(entry->node);
-	refcount_dec(&entry->node->count);
+	assert(!entry->mounted);
+
+	fs_node_release(entry->node);
 	entry->node = NULL;
+
+	removed = !entry->parent;
+	mutex_unlock(&entry->lock);
+
+	/* If the parent is NULL, that means we have been unlinked, therefore
+	 * we should free the entry immediately. */
+	if(removed)
+		fs_dentry_free(entry);
 
 	/* TODO: Move node and entry to unused lists. Don't if they have the
 	 * keep flag set. Though, we do need used and unused lists per mount
 	 * to aid in clean up when unmounting. */
+}
 
-	mutex_unlock(&entry->lock);
+/** Decrease the reference count of a directory entry.
+ * @param entry		Entry to decrease reference count of. */
+void fs_dentry_release(fs_dentry_t *entry) {
+	mutex_lock(&entry->lock);
+	fs_dentry_release_locked(entry);
 }
 
 /** Instantiate a directory entry.
@@ -373,21 +466,21 @@ static status_t fs_dentry_lookup(fs_dentry_t *parent, const char *name,
 }
 
 /** Look up an entry in the filesystem.
- * @param path		Path string to look up (duplicated string).
+ * @param path		Path string to look up (will be modified).
  * @param entry		Instantiated entry to begin lookup at (NULL for current
  *			working directory). Will be released upon return.
- * @param follow	Whether to follow last path component if it is a
- *			symbolic link.
+ * @param flags		Lookup behaviour flags.
  * @param nest		Symbolic link nesting count.
  * @param entryp	Where to store pointer to entry found (referenced,
  *			and locked).
  * @return		Status code describing result of the operation. */
-static status_t fs_lookup_internal(char *path, fs_dentry_t *entry, bool follow,
-	unsigned nest, fs_dentry_t **entryp)
+static status_t fs_lookup_internal(char *path, fs_dentry_t *entry,
+	unsigned flags, unsigned nest, fs_dentry_t **entryp)
 {
 	fs_dentry_t *prev;
 	fs_node_t *node;
 	char *tok, *link;
+	bool follow;
 	status_t ret;
 
 	if(path[0] == '/') {
@@ -403,7 +496,9 @@ static status_t fs_lookup_internal(char *path, fs_dentry_t *entry, bool follow,
 		assert(curr_proc->ioctx.root_dir);
 		entry = curr_proc->ioctx.root_dir;
 		fs_dentry_retain(entry);
-		mutex_lock(&entry->lock);
+
+		if(path[0] || flags & FS_LOOKUP_LOCK)
+			mutex_lock(&entry->lock);
 
 		/* Return the root if we've reached the end of the path. */
 		if(!path[0]) {
@@ -432,7 +527,8 @@ static status_t fs_lookup_internal(char *path, fs_dentry_t *entry, bool follow,
 		/* If the current entry is a symlink and this is not the last
 		 * element of the path, or the caller wishes to follow the link,
 		 * follow it. */
-		if(node->file.type == FILE_TYPE_SYMLINK && (tok || follow)) {
+		follow = tok || flags & FS_LOOKUP_FOLLOW;
+		if(node->file.type == FILE_TYPE_SYMLINK && follow) {
 			/* The previous entry should be the link's parent. */
 			assert(prev);
 			assert(prev == entry->parent);
@@ -456,14 +552,15 @@ static status_t fs_lookup_internal(char *path, fs_dentry_t *entry, bool follow,
 			/* Don't need this entry any more. The previous
 			 * iteration of the loop left a reference on the
 			 * previous entry. */
-			mutex_unlock(&entry->lock);
-			fs_dentry_release(entry);
+			fs_dentry_release_locked(entry);
 
 			/* Recurse to find the link destination. The check
 			 * above ensures we do not infinitely recurse. TODO:
 			 * although we have a limit on this, perhaps it would
 			 * be better to avoid recursion altogether. */
-			ret = fs_lookup_internal(link, prev, true, nest, &entry);
+			ret = fs_lookup_internal(link, prev,
+				FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK,
+				nest, &entry);
 			if(ret != STATUS_SUCCESS) {
 				kfree(link);
 				return ret;
@@ -486,6 +583,8 @@ static status_t fs_lookup_internal(char *path, fs_dentry_t *entry, bool follow,
 		if(!tok) {
 			/* The last token was the last element of the path
 			 * string, return the entry we're currently on. */
+			if(!(flags & FS_LOOKUP_LOCK))
+				mutex_unlock(&entry->lock);
 			*entryp = entry;
 			return STATUS_SUCCESS;
 		} else if(node->file.type != FILE_TYPE_DIR) {
@@ -537,8 +636,8 @@ static status_t fs_lookup_internal(char *path, fs_dentry_t *entry, bool follow,
 
 		/* TODO: If unused, should pull off unused list before
 		 * unlocking parent so that it can't get freed between the
-		 * unlock and relock in instantiate. Possibly do this in
-		 * fs_dentry_lookup(). */
+		 * unlock and relock in instantiate. Not in fs_dentry_lookup(),
+		 * not right for unlink. */
 		mutex_unlock(&prev->lock);
 
 		ret = fs_dentry_instantiate(entry);
@@ -557,8 +656,7 @@ static status_t fs_lookup_internal(char *path, fs_dentry_t *entry, bool follow,
 err_release_prev:
 	fs_dentry_release(prev);
 err_release:
-	mutex_unlock(&entry->lock);
-	fs_dentry_release(entry);
+	fs_dentry_release_locked(entry);
 	return ret;
 }
 
@@ -572,17 +670,13 @@ err_release:
  * looked up relative to the current I/O context's root.
  *
  * @param path		Path string to look up.
- * @param follow	If the last path component refers to a symbolic link,
- *			specified whether to follow the link or return the
- *			entry of the link itself.
- * @param entryp	Where to store pointer to entry found (referenced,
- *			unlocked).
+ * @param flags		Lookup behaviour flags.
+ * @param entryp	Where to store pointer to entry found (instantiated).
  *
  * @return		Status code describing result of the operation.
  */
-static status_t fs_lookup(const char *path, bool follow, fs_dentry_t **entryp) {
+static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **entryp) {
 	char *dup;
-	fs_dentry_t *entry;
 	status_t ret;
 
 	assert(path);
@@ -600,14 +694,7 @@ static status_t fs_lookup(const char *path, bool follow, fs_dentry_t **entryp) {
 	dup = kstrdup(path, MM_KERNEL);
 
 	/* Look up the path string. */
-	ret = fs_lookup_internal(dup, NULL, follow, 0, &entry);
-
-	if(ret == STATUS_SUCCESS) {
-		/* The above function returns a locked entry, we don't. */
-		mutex_unlock(&entry->lock);
-		*entryp = entry;
-	}
-
+	ret = fs_lookup_internal(dup, NULL, flags, 0, entryp);
 	kfree(dup);
 	rwlock_unlock(&curr_proc->ioctx.lock);
 	return ret;
@@ -652,11 +739,9 @@ static status_t fs_create(const char *path, file_type_t type,
 	}
 
 	/* Look up the parent entry. */
-	ret = fs_lookup(dir, true, &parent);
+	ret = fs_lookup(dir, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, &parent);
 	if(ret != STATUS_SUCCESS)
 		goto out_free_name;
-
-	mutex_lock(&parent->lock);
 
 	if(parent->node->file.type != FILE_TYPE_DIR) {
 		ret = STATUS_NOT_DIR;
@@ -712,8 +797,7 @@ static status_t fs_create(const char *path, file_type_t type,
 		"on %" PRIu16 " (%p)\n", path, node->id, node, parent->node->id,
 		parent->node, parent->mount->id);
 
-	mutex_unlock(&parent->lock);
-	fs_dentry_release(parent);
+	fs_dentry_release_locked(parent);
 
 	if(entryp) {
 		*entryp = entry;
@@ -728,8 +812,7 @@ out_free_child:
 	slab_cache_free(fs_node_cache, node);
 	slab_cache_free(fs_dentry_cache, entry);
 out_release_parent:
-	mutex_unlock(&parent->lock);
-	fs_dentry_release(parent);
+	fs_dentry_release_locked(parent);
 out_free_name:
 	kfree(dir);
 	kfree(name);
@@ -923,7 +1006,7 @@ status_t fs_open(const char *path, uint32_t rights, uint32_t flags,
 		return STATUS_INVALID_ARG;
 
 	/* Look up the filesystem entry. */
-	ret = fs_lookup(path, true, &entry);
+	ret = fs_lookup(path, FS_LOOKUP_FOLLOW, &entry);
 	if(ret != STATUS_SUCCESS) {
 		if(ret != STATUS_NOT_FOUND || create == FS_OPEN)
 			return ret;
@@ -1052,7 +1135,7 @@ status_t fs_read_symlink(const char *path, char **targetp) {
 	assert(targetp);
 
 	/* Find the link node. */
-	ret = fs_lookup(path, false, &entry);
+	ret = fs_lookup(path, 0, &entry);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1173,7 +1256,7 @@ status_t fs_mount(const char *device, const char *path, const char *type,
 		mountpoint = NULL;
 	} else {
 		/* Look up the destination mountpoint. */
-		ret = fs_lookup(path, true, &mountpoint);
+		ret = fs_lookup(path, 0, &mountpoint);
 		if(ret != STATUS_SUCCESS)
 			goto err_unlock;
 
@@ -1305,7 +1388,7 @@ status_t fs_info(const char *path, bool follow, file_info_t *info) {
 	assert(path);
 	assert(info);
 
-	ret = fs_lookup(path, follow, &entry);
+	ret = fs_lookup(path, (follow) ? FS_LOOKUP_FOLLOW : 0, &entry);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -1344,7 +1427,95 @@ status_t fs_link(const char *source, const char *dest) {
  * @return		Status code describing result of the operation.
  */
 status_t fs_unlink(const char *path) {
-	return STATUS_NOT_IMPLEMENTED;
+	char *dir, *name;
+	fs_dentry_t *parent, *entry;
+	status_t ret;
+
+	/* Split path into directory/name. */
+	dir = kdirname(path, MM_KERNEL);
+	name = kbasename(path, MM_KERNEL);
+
+	/* It is possible for kbasename() to return a string with a '/'
+	 * character if the path refers to the root of the FS. */
+	if(strchr(name, '/')) {
+		ret = STATUS_IN_USE;
+		goto out_free_name;
+	}
+
+	dprintf("fs: unlink '%s': dirname = '%s', basename = '%s'\n",
+		path, dir, name);
+
+	if(strcmp(name, ".") == 0) {
+		/* Trying to unlink '.' is invalid, it means "remove the '.'
+		 * entry from the directory", rather than "remove the entry
+		 * referring to the directory in the parent". */
+		ret = STATUS_INVALID_ARG;
+		goto out_free_name;
+	} else if(strcmp(name, "..") == 0) {
+		ret = STATUS_NOT_EMPTY;
+		goto out_free_name;
+	}
+
+	/* Look up the parent entry. */
+	ret = fs_lookup(dir, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, &parent);
+	if(ret != STATUS_SUCCESS)
+		goto out_free_name;
+
+	if(parent->node->file.type != FILE_TYPE_DIR) {
+		ret = STATUS_NOT_DIR;
+		goto out_release_parent;
+	}
+
+	/* Look up the child entry. */
+	ret = fs_dentry_lookup(parent, name, &entry);
+	if(ret != STATUS_SUCCESS)
+		goto out_release_parent;
+	ret = fs_dentry_instantiate(entry);
+	if(ret != STATUS_SUCCESS) {
+		/* TODO: Move to unused list. */
+		goto out_release_parent;
+	}
+
+	/* Check whether we can unlink the entry. */
+	if(entry->mounted) {
+		ret = STATUS_IN_USE;
+		goto out_release_entry;
+	} else if(fs_node_is_read_only(parent->node)) {
+		ret = STATUS_READ_ONLY;
+		goto out_release_entry;
+	} else if(!file_access(&parent->node->file, FILE_RIGHT_WRITE)) {
+		ret = STATUS_ACCESS_DENIED;
+		goto out_release_entry;
+	} else if(!parent->node->ops->unlink) {
+		ret = STATUS_NOT_SUPPORTED;
+		goto out_release_entry;
+	}
+
+	/* If the node being unlinked is a directory, check whether we have
+	 * anything in the cache for it. While this is not a sufficient
+	 * emptiness check (there may be entries we haven't got cached), it
+	 * avoids a call out to the FS if we know that it is not empty already.
+	 * Also, ramfs relies on this check being here, as it exists entirely
+	 * in the cache. */
+	if(!radix_tree_empty(&entry->entries)) {
+		ret = STATUS_NOT_EMPTY;
+		goto out_release_entry;
+	}
+
+	ret = parent->node->ops->unlink(parent->node, entry, entry->node);
+	if(ret != STATUS_SUCCESS)
+		goto out_release_entry;
+
+	radix_tree_remove(&parent->entries, entry->name, NULL);
+	entry->parent = NULL;
+out_release_entry:
+	fs_dentry_release_locked(entry);
+out_release_parent:
+	fs_dentry_release_locked(parent);
+out_free_name:
+	kfree(dir);
+	kfree(name);
+	return ret;
 }
 
 /**
@@ -2062,7 +2233,7 @@ status_t kern_fs_set_curr_dir(const char *path) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = fs_lookup(kpath, true, &entry);
+	ret = fs_lookup(kpath, FS_LOOKUP_FOLLOW, &entry);
 	if(ret != STATUS_SUCCESS) {
 		goto out_free;
 	} else if(entry->node->file.type != FILE_TYPE_DIR) {
@@ -2115,7 +2286,7 @@ status_t kern_fs_set_root_dir(const char *path) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = fs_lookup(kpath, true, &entry);
+	ret = fs_lookup(kpath, FS_LOOKUP_FOLLOW, &entry);
 	if(ret != STATUS_SUCCESS) {
 		goto out_free;
 	} else if(entry->node->file.type != FILE_TYPE_DIR) {
