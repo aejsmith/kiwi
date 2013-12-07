@@ -198,6 +198,41 @@ static int mount_command(std::vector<std::string> args) {
 	return 0;
 }
 
+
+static int unmount_command(std::vector<std::string> args) {
+	size_t idx = 1;
+	uint32_t flags = 0;
+
+	if(args.size() > 1 && args[1][0] == '-') {
+		for(size_t i = 1; i < args[1].size(); i++) {
+			switch(args[1][i]) {
+			case 'f':
+				flags |= FS_UNMOUNT_FORCE;
+				break;
+			default:
+				printf("Error: invalid arguments\n");
+				return 1;
+			}
+		}
+
+		idx++;
+	}
+
+	if((args.size() - idx) != 1) {
+		printf("Error: invalid arguments\n");
+		return 1;
+	}
+
+	status_t ret = kern_fs_unmount(args[idx].c_str(), flags);
+	if(ret != STATUS_SUCCESS) {
+		printf("Failed to unmount filesystem: %d (%s)\n", ret,
+			__kernel_status_strings[ret]);
+		return 1;
+	}
+
+	return 0;
+}
+
 static int unlink_command(std::vector<std::string> args) {
 	if(args.size() != 2) {
 		printf("Error: invalid arguments\n");
@@ -238,6 +273,7 @@ int main(int argc, char **argv) {
 	shell_commands.insert(std::make_pair("mkdir", mkdir_command));
 	shell_commands.insert(std::make_pair("mount", mount_command));
 	shell_commands.insert(std::make_pair("unlink", unlink_command));
+	shell_commands.insert(std::make_pair("unmount", unmount_command));
 
 	printf("\nWelcome to Kiwi!\n\n");
 
