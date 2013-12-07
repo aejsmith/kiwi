@@ -132,6 +132,8 @@ typedef struct fs_mount {
 	avl_tree_t nodes;		/**< Tree mapping node IDs to node structures. */
 	struct fs_dentry *root;		/**< Root directory entry. */
 	struct fs_dentry *mountpoint;	/**< Directory that this mount is mounted on. */
+	list_t used_entries;		/**< List of all used entries. */
+	list_t unused_entries;		/**< List of all unused entries. */
 
 	mount_id_t id;			/**< Mount ID. */
 	fs_type_t *type;		/**< Filesystem type. */
@@ -302,6 +304,7 @@ typedef struct fs_node {
 	fs_mount_t *mount;		/**< Mount that the node resides on. */
 
 	avl_tree_node_t tree_link;	/**< Link to node tree. */
+	list_t unused_link;		/**< Link to global unused node list. */
 } fs_node_t;
 
 /** Flags for a filesystem node. */
@@ -361,7 +364,8 @@ typedef struct fs_dentry {
 	struct fs_dentry *parent;	/**< Parent entry. */
 	radix_tree_t entries;		/**< Tree of name to entry mappings. */
 	fs_mount_t *mounted;		/**< Filesystem mounted on this entry. */
-	list_t unused_link;		/**< Link to unused directory entry list. */
+	list_t mount_link;		/**< Link to mount unused entry list. */
+	list_t unused_link;		/**< Link to global unused entry list. */
 } fs_dentry_t;
 
 /** Flags for a directory entry. */

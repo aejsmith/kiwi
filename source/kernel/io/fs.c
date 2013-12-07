@@ -89,9 +89,19 @@ static mount_id_t next_mount_id = 1;
 static LIST_DECLARE(fs_mount_list);
 static MUTEX_DECLARE(fs_mount_lock, 0);
 
-/** Cache of filesystem node structures. */
+/** Caches of filesystem structures. */
 static slab_cache_t *fs_node_cache;
 static slab_cache_t *fs_dentry_cache;
+
+/** Unused directory entries. */
+static LIST_DECLARE(unused_entries);
+static SPINLOCK_DECLARE(unused_entries_lock);
+static size_t unused_entry_count = 0;
+
+/** Unused nodes. */
+static LIST_DECLARE(unused_nodes);
+static SPINLOCK_DECLARE(unused_nodes_lock);
+static size_t unused_node_count = 0;
 
 /** Mount at the root of the filesystem. */
 fs_mount_t *root_mount = NULL;
@@ -193,6 +203,7 @@ static fs_node_t *fs_node_alloc(fs_mount_t *mount) {
 
 	node = slab_cache_alloc(fs_node_cache, MM_KERNEL);
 	refcount_set(&node->count, 1);
+	list_init(&node->unused_link);
 	node->file.ops = &fs_file_ops;
 	node->flags = 0;
 	node->mount = mount;
@@ -217,6 +228,7 @@ static status_t fs_node_free(fs_node_t *node) {
 	status_t ret;
 
 	assert(refcount_get(&node->count) == 0);
+	assert(list_empty(&node->unused_link));
 	assert(mutex_held(&mount->lock));
 
 	if(!fs_node_is_read_only(node) && !(node->flags & FS_NODE_REMOVED)) {
@@ -254,11 +266,20 @@ static void fs_node_release(fs_node_t *node) {
 		return;
 	}
 
-	/* Free the node straight away if it is removed. */
-	if(node->flags & FS_NODE_REMOVED)
+	if(node->flags & FS_NODE_REMOVED) {
+		/* Free the node straight away if it is removed. */
 		fs_node_free(node);
+	} else if(!(node->flags & FS_NODE_KEEP)) {
+		/* Move to the unused list so that it can be reclaimed. */
+		spinlock_lock(&unused_nodes_lock);
+		assert(list_empty(&node->unused_link));
+		unused_node_count++;
+		list_append(&unused_nodes, &node->unused_link);
+		spinlock_unlock(&unused_nodes_lock);
 
-	/* TODO: Unused list. */
+		dprintf("fs: transferred node %" PRIu16 ":%" PRIu64 " (%p) to "
+			"unused list\n", mount->id, node->id, node);
+	}
 
 	mutex_unlock(&mount->lock);
 }
@@ -289,6 +310,7 @@ static void fs_dentry_ctor(void *obj, void *data) {
 
 	mutex_init(&entry->lock, "fs_dentry_lock", 0);
 	radix_tree_init(&entry->entries);
+	list_init(&entry->mount_link);
 	list_init(&entry->unused_link);
 }
 
@@ -335,8 +357,6 @@ void fs_dentry_retain(fs_dentry_t *entry) {
  * @param entry		Entry to decrease reference count of. Will be unlocked
  *			upon return. */
 static void fs_dentry_release_locked(fs_dentry_t *entry) {
-	bool removed;
-
 	if(refcount_dec(&entry->count) > 0) {
 		mutex_unlock(&entry->lock);
 		return;
@@ -348,20 +368,34 @@ static void fs_dentry_release_locked(fs_dentry_t *entry) {
 	fs_node_release(entry->node);
 	entry->node = NULL;
 
-	removed = !entry->parent;
-	mutex_unlock(&entry->lock);
-
-	/* If the parent is NULL, that means we have been unlinked, therefore
-	 * we should free the entry immediately. */
-	if(removed) {
+	/* If the parent is NULL, that means the entry has been unlinked,
+	 * therefore we should free it immediately. */
+	if(!entry->parent) {
 		dprintf("fs: freed entry '%s' (%p) on mount %" PRIu16 "\n",
 			entry->name, entry, entry->mount->id);
+
+		mutex_unlock(&entry->lock);
 		fs_dentry_free(entry);
+		return;
 	}
 
-	/* TODO: Move node and entry to unused lists. Don't if they have the
-	 * keep flag set. Though, we do need used and unused lists per mount
-	 * to aid in clean up when unmounting. */
+	/* Add to the mount unused list. This is done regardless of the keep
+	 * flag as the purpose this list serves is to aid in cleanup when
+	 * unmounting, and when doing so we want to free all entries. */
+	mutex_lock(&entry->mount->lock);
+	list_append(&entry->mount->unused_entries, &entry->mount_link);
+	mutex_unlock(&entry->mount->lock);
+
+	if(!(entry->flags & FS_DENTRY_KEEP)) {
+		/* Move to the global unused list so it can be reclaimed. */
+		spinlock_lock(&unused_entries_lock);
+		assert(list_empty(&entry->unused_link));
+		unused_entry_count++;
+		list_append(&unused_entries, &entry->unused_link);
+		spinlock_unlock(&unused_entries_lock);
+	}
+
+	mutex_unlock(&entry->lock);
 }
 
 /** Decrease the reference count of a directory entry.
@@ -393,7 +427,15 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
 	/* Check if the node is cached in the mount. */
 	node = avl_tree_lookup(&mount->nodes, entry->id, fs_node_t, tree_link);
 	if(node) {
-		refcount_inc(&node->count);
+		if(refcount_inc(&node->count) == 1) {
+			if(!(node->flags & FS_NODE_KEEP)) {
+				spinlock_lock(&unused_nodes_lock);
+				assert(!list_empty(&node->unused_link));
+				unused_node_count--;
+				list_remove(&node->unused_link);
+				spinlock_unlock(&unused_nodes_lock);
+			}
+		}
 	} else {
 		/* Node is not cached, we must read it from the filesystem. */
 		assert(mount->ops->read_node);
@@ -405,6 +447,24 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
 		if(ret != STATUS_SUCCESS) {
 			slab_cache_free(fs_node_cache, node);
 			refcount_dec(&entry->count);
+
+			/* This may have been a newly created entry from
+			 * fs_dentry_lookup(). In this case we must put the
+			 * entry onto the unused list as it will not have been
+			 * put there to begin with. */
+			list_append(&mount->unused_entries, &entry->mount_link);
+			if(!(entry->flags & FS_DENTRY_KEEP)) {
+				spinlock_lock(&unused_entries_lock);
+
+				if(list_empty(&entry->unused_link))
+					unused_entry_count++;
+
+				list_append(&unused_entries,
+					&entry->unused_link);
+
+				spinlock_unlock(&unused_entries_lock);
+			}
+
 			mutex_unlock(&mount->lock);
 			mutex_unlock(&entry->lock);
 			return ret;
@@ -412,6 +472,16 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
 
 		/* Attach the node to the node tree. */
 		avl_tree_insert(&mount->nodes, node->id, &node->tree_link);
+	}
+
+	list_append(&mount->used_entries, &entry->mount_link);
+
+	if(!(entry->flags & FS_DENTRY_KEEP)) {
+		spinlock_lock(&unused_entries_lock);
+		assert(!list_empty(&entry->unused_link));
+		unused_entry_count--;
+		list_remove(&entry->unused_link);
+		spinlock_unlock(&unused_entries_lock);
 	}
 
 	mutex_unlock(&mount->lock);
@@ -635,15 +705,10 @@ static status_t fs_lookup_internal(char *path, fs_dentry_t *entry,
 				entry = entry->mounted->root;
 		}
 
-		/* TODO: If unused, should pull off unused list before
-		 * unlocking parent so that it can't get freed between the
-		 * unlock and relock in instantiate. Not in fs_dentry_lookup(),
-		 * not right for unlink. */
 		mutex_unlock(&prev->lock);
 
 		ret = fs_dentry_instantiate(entry);
 		if(ret != STATUS_SUCCESS) {
-			/* TODO: Then should move to unused list here. */
 			fs_dentry_release(prev);
 			return ret;
 		}
@@ -750,12 +815,8 @@ static status_t fs_create_prepare(const char *path, fs_dentry_t **entryp) {
 	/* Check if the name we're creating already exists. */
 	ret = fs_dentry_lookup(parent, name, &entry);
 	if(ret != STATUS_NOT_FOUND) {
-		if(ret == STATUS_SUCCESS) {
-			/* FIXME: Need to move back to unused list here as is
-			 * not instantiated. Or perhaps not pull it off in
-			 * fs_dentry_lookup() and do it in instantiate()? */
+		if(ret == STATUS_SUCCESS)
 			ret = STATUS_ALREADY_EXISTS;
-		}
 
 		goto out_release_parent;
 	}
@@ -1306,6 +1367,8 @@ status_t fs_mount(const char *device, const char *path, const char *type,
 	mount = kmalloc(sizeof(*mount), MM_KERNEL | MM_ZERO);
 	mutex_init(&mount->lock, "fs_mount_lock", 0);
 	avl_tree_init(&mount->nodes);
+	list_init(&mount->used_entries);
+	list_init(&mount->unused_entries);
 	list_init(&mount->header);
 	mount->flags = flags;
 	mount->mountpoint = mountpoint;
@@ -1557,10 +1620,8 @@ status_t fs_unlink(const char *path) {
 	if(ret != STATUS_SUCCESS)
 		goto out_release_parent;
 	ret = fs_dentry_instantiate(entry);
-	if(ret != STATUS_SUCCESS) {
-		/* TODO: Move to unused list. */
+	if(ret != STATUS_SUCCESS)
 		goto out_release_parent;
-	}
 
 	/* Check whether we can unlink the entry. */
 	if(entry->mounted) {
