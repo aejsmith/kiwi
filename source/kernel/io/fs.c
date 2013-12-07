@@ -404,6 +404,7 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
 		ret = mount->ops->read_node(mount, node);
 		if(ret != STATUS_SUCCESS) {
 			slab_cache_free(fs_node_cache, node);
+			refcount_dec(&entry->count);
 			mutex_unlock(&mount->lock);
 			mutex_unlock(&entry->lock);
 			return ret;
