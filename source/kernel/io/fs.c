@@ -778,6 +778,60 @@ static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **entryp
 	return ret;
 }
 
+/** Get the path to a directory entry.
+ * @param entry		Entry to get path to.
+ * @param pathp		Where to store pointer to path string.
+ * @return		Status code describing result of the operation. */
+static status_t fs_dentry_path(fs_dentry_t *entry, char **pathp) {
+	char *buf = NULL, *tmp;
+	size_t total = 0, len;
+
+	rwlock_read_lock(&curr_proc->ioctx.lock);
+
+	/* Loop through until we reach the root. */
+	while(entry != curr_proc->ioctx.root_dir && entry != root_mount->root) {
+		if(entry == entry->mount->root)
+			entry = entry->mount->mountpoint;
+
+		len = strlen(entry->name);
+		total += (buf) ? len + 1 : len;
+
+		tmp = kmalloc(total + 1, MM_KERNEL);
+		memcpy(tmp, entry->name, len + 1);
+		if(buf) {
+			tmp[len] = '/';
+			strcpy(&tmp[len + 1], buf);
+			kfree(buf);
+		}
+		buf = tmp;
+
+		/* It is safe for us to go through the tree without locking or
+		 * referencing. Because we have a reference to the starting
+		 * entry, none of the parent entries will be freed. */
+		entry = entry->parent;
+		if(!entry) {
+			/* Unlinked entry. */
+			rwlock_unlock(&curr_proc->ioctx.lock);
+			return STATUS_NOT_FOUND;
+		}
+	}
+
+	rwlock_unlock(&curr_proc->ioctx.lock);
+
+	/* Prepend a '/'. */
+	tmp = kmalloc((++total) + 1, MM_KERNEL);
+	tmp[0] = '/';
+	if(buf) {
+		memcpy(&tmp[1], buf, total);
+		kfree(buf);
+	} else {
+		tmp[1] = 0;
+	}
+
+	*pathp = tmp;
+	return STATUS_SUCCESS;
+}
+
 /**
  * Internal implementation functions.
  */
@@ -1609,6 +1663,42 @@ err_release_root:
 	fs_dentry_release(root);
 err_unlock:
 	mutex_unlock(&fs_mount_lock);
+	return ret;
+}
+
+/**
+ * Get the path to a file or directory.
+ *
+ * Given a handle to a file or directory, this function will return the
+ * absolute path that was used to open the handle. If the handle specified is
+ * NULL, the path to the current directory will be returned.
+ *
+ * @param handle	Handle to get path from.
+ * @param pathp		Where to store pointer to path string.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t fs_path(object_handle_t *handle, char **pathp) {
+	file_handle_t *fhandle;
+	fs_dentry_t *entry;
+	status_t ret;
+
+	if(handle) {
+		fhandle = handle->private;
+
+		if(fhandle->file->ops != &fs_file_ops)
+			return STATUS_NOT_SUPPORTED;
+
+		entry = fhandle->entry;
+	} else {
+		rwlock_read_lock(&curr_proc->ioctx.lock);
+		entry = curr_proc->ioctx.curr_dir;
+	}
+
+	ret = fs_dentry_path(entry, pathp);
+	if(!handle)
+		rwlock_unlock(&curr_proc->ioctx.lock);
+
 	return ret;
 }
 
@@ -2478,8 +2568,33 @@ status_t kern_fs_unmount(const char *path, unsigned flags) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_fs_path(handle_t from, char *buf, size_t size) {
-	return STATUS_NOT_IMPLEMENTED;
+status_t kern_fs_path(handle_t handle, char *buf, size_t size) {
+	object_handle_t *khandle = NULL;
+	char *path;
+	size_t len;
+	status_t ret;
+
+	if(handle >= 0) {
+		ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+		if(ret != STATUS_SUCCESS)
+			return ret;
+	}
+
+	ret = fs_path(khandle, &path);
+	if(khandle)
+		object_handle_release(khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	len = strlen(path);
+	if(len < size) {
+		ret = memcpy_to_user(buf, path, len + 1);
+	} else {
+		ret = STATUS_TOO_SMALL;
+	}
+
+	kfree(path);
+	return ret;
 }
 
 /** Set the current working directory.

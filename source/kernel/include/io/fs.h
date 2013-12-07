@@ -394,6 +394,7 @@ extern status_t fs_mount(const char *device, const char *path, const char *type,
 	uint32_t flags, const char *opts);
 extern status_t fs_unmount(const char *path, unsigned flags);
 
+extern status_t fs_path(object_handle_t *handle, char **pathp);
 extern status_t fs_info(const char *path, bool follow, file_info_t *info);
 extern status_t fs_link(const char *path, const char *source);
 extern status_t fs_unlink(const char *path);
