@@ -42,6 +42,10 @@
  * Locking order:
  *  - Lock down the directory entry tree (i.e. parent before child).
  *  - Directory entry before mount.
+ *
+ * @todo		Locking could possibly be improved. There may end up
+ *			being quite a bit of contention on various locks.
+ *			Might be able to convert dentry locks to rwlocks.
  */
 
 #include <io/device.h>
@@ -228,7 +232,6 @@ static status_t fs_node_free(fs_node_t *node) {
 	status_t ret;
 
 	assert(refcount_get(&node->count) == 0);
-	assert(list_empty(&node->unused_link));
 	assert(mutex_held(&mount->lock));
 
 	if(!fs_node_is_read_only(node) && !(node->flags & FS_NODE_REMOVED)) {
@@ -237,6 +240,14 @@ static status_t fs_node_free(fs_node_t *node) {
 			if(ret != STATUS_SUCCESS)
 				return ret;
 		}
+	}
+
+	/* May still be on the unused list if freeing via fs_unmount(). */
+	if(!list_empty(&node->unused_link)) {
+		spinlock_lock(&unused_nodes_lock);
+		unused_node_count--;
+		list_remove(&node->unused_link);
+		spinlock_unlock(&unused_nodes_lock);
 	}
 
 	if(node->ops->free)
@@ -339,6 +350,7 @@ static fs_dentry_t *fs_dentry_alloc(const char *name, fs_mount_t *mount,
 /** Free a directory entry structure.
  * @param entry		Entry to free. */
 static void fs_dentry_free(fs_dentry_t *entry) {
+	radix_tree_clear(&entry->entries, NULL);
 	kfree(entry->name);
 	slab_cache_free(fs_dentry_cache, entry);
 }
@@ -1461,16 +1473,143 @@ err_unlock:
 /**
  * Unmount a filesystem.
  *
- * Flushes all modifications to a filesystem if it is not read-only and
- * unmounts it. If any nodes in the filesystem are busy, then the operation
+ * Flushes all modifications to a filesystem (if it is not read-only) and
+ * unmounts it. If any entries in the filesystem are in use, then the operation
  * will fail.
  *
  * @param path		Path to mount point of filesystem.
+ * @param flags		Behaviour flags.
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_unmount(const char *path) {
-	return STATUS_NOT_IMPLEMENTED;
+status_t fs_unmount(const char *path, unsigned flags) {
+	fs_dentry_t *root, *parent, *entry;
+	fs_mount_t *mount;
+	fs_node_t *node;
+	status_t ret;
+
+	if(!security_check_priv(PRIV_FS_MOUNT))
+		return STATUS_PERM_DENIED;
+
+	mutex_lock(&fs_mount_lock);
+
+	ret = fs_lookup(path, 0, &root);
+	if(ret != STATUS_SUCCESS)
+		goto err_unlock;
+
+	mount = root->mount;
+
+	if(root->node->file.type != FILE_TYPE_DIR) {
+		ret = STATUS_NOT_DIR;
+		goto err_release_root;
+	} else if(root != mount->root) {
+		ret = STATUS_NOT_MOUNT;
+		goto err_release_root;
+	} else if(!mount->mountpoint) {
+		/* Can't unmount the root filesystem. */
+		ret = STATUS_IN_USE;
+		goto err_release_root;
+	}
+
+	/* Lock the entry containing the mountpoint. Once we have determined
+	 * that no entries on the mount are in use, this will ensure that no
+	 * lookups will descend into the mount. */
+	parent = mount->mountpoint->parent;
+	mutex_lock(&parent->lock);
+	mutex_lock(&mount->lock);
+
+	/* Check that we are the only user of the root, and whether any entries
+	 * other than the root are in use. Drop the reference we just got to
+	 * the root, and check that the count is now 1 for the reference added
+	 * by fs_mount(). */
+	if(refcount_dec(&root->count) != 1) {
+		assert(refcount_get(&root->count));
+		ret = STATUS_IN_USE;
+		goto err_unlock_mount;
+	} else if(!list_is_singular(&mount->used_entries)) {
+		ret = STATUS_IN_USE;
+		goto err_unlock_mount;
+	}
+
+	/* Free all unused directory entries. */
+	LIST_FOREACH_SAFE(&mount->unused_entries, iter) {
+		entry = list_entry(iter, fs_dentry_t, mount_link);
+
+		assert(refcount_get(&entry->count) == 0);
+		assert(!entry->node);
+
+		if(!(entry->flags & FS_DENTRY_KEEP)) {
+			spinlock_lock(&unused_entries_lock);
+			assert(!list_empty(&entry->unused_link));
+			unused_entry_count--;
+			list_remove(&entry->unused_link);
+			spinlock_unlock(&unused_entries_lock);
+		}
+
+		list_remove(&entry->mount_link);
+		fs_dentry_free(entry);
+	}
+
+	/* Free all nodes other than the root node. We have to free the root
+	 * node and directory entry last as we still want to leave the mount in
+	 * the correct state if we fail to flush some nodes. */
+	AVL_TREE_FOREACH_SAFE(&mount->nodes, iter) {
+		node = avl_tree_entry(iter, fs_node_t, tree_link);
+
+		if(node == root->node)
+			continue;
+
+		assert(refcount_get(&node->count) == 0);
+
+		/* Forcibly free the node ignoring I/O errors if requested. */
+		if(flags & FS_UNMOUNT_FORCE)
+			node->flags |= FS_NODE_REMOVED;
+		ret = fs_node_free(node);
+		if(ret != STATUS_SUCCESS)
+			goto err_unlock_mount;
+	}
+
+	/* Free the root node itself. Drop reference to satisfy assertion in
+	 * fs_node_free(). */
+	refcount_dec(&root->node->count);
+	if(flags & FS_UNMOUNT_FORCE)
+		root->node->flags |= FS_NODE_REMOVED;
+	ret = fs_node_free(root->node);
+	if(ret != STATUS_SUCCESS) {
+		refcount_inc(&root->node->count);
+		goto err_unlock_mount;
+	}
+
+	list_remove(&root->mount_link);
+	fs_dentry_free(root);
+
+	/* Detach from the mountpoint. */
+	mount->mountpoint->mounted = NULL;
+	mutex_unlock(&parent->lock);
+	fs_dentry_release(mount->mountpoint);
+
+	if(mount->ops->unmount)
+		mount->ops->unmount(mount);
+
+	if(mount->device)
+		object_handle_release(mount->device);
+
+	refcount_dec(&mount->type->count);
+
+	list_remove(&mount->header);
+	mutex_unlock(&mount->lock);
+	kfree(mount);
+	mutex_unlock(&fs_mount_lock);
+	return STATUS_SUCCESS;
+err_unlock_mount:
+	mutex_unlock(&mount->lock);
+	mutex_unlock(&parent->lock);
+	goto err_unlock;
+err_release_root:
+	fs_dentry_release(root);
+err_unlock:
+	mutex_unlock(&fs_mount_lock);
+	return ret;
 }
 
 /** Get information about a filesystem entry.
@@ -2036,36 +2175,12 @@ __init_text void fs_init(void) {
 
 /** Shut down the filesystem layer. */
 void fs_shutdown(void) {
-#if 0
-	fs_mount_t *mount;
-	status_t ret;
-
-	/* Drop references to the kernel process' root and current directories. */
-	fs_node_release(curr_proc->ioctx.root_dir);
-	curr_proc->ioctx.root_dir = NULL;
-	fs_node_release(curr_proc->ioctx.curr_dir);
-	curr_proc->ioctx.curr_dir = NULL;
-
-	/* We must unmount all filesystems in the correct order, so that a FS
-	 * will be unmounted before the FS that it is mounted on. This is
-	 * actually easy to do: when a filesystem is mounted, it is appended to
-	 * the mounts list. This means that the FS it is mounted on will always
-	 * be before it in the list. So, we just need to iterate over the list
-	 * in reverse. */
-	LIST_FOREACH_REVERSE_SAFE(&mount_list, iter) {
-		mount = list_entry(iter, fs_mount_t, header);
-
-		ret = fs_unmount_internal(mount, NULL);
-		if(ret != STATUS_SUCCESS) {
-			if(ret == STATUS_IN_USE) {
-				fatal("Mount %p in use during shutdown", mount);
-			} else {
-				fatal("Failed to unmount %p (%d)", mount, ret);
-			}
-		}
-	}
-#endif
+	/* TODO */
 }
+
+/**
+ * System calls.
+ */
 
 /**
  * Open a handle to a filesystem entry.
@@ -2321,17 +2436,19 @@ status_t kern_fs_mount_info(mount_info_t *infos, size_t *countp) {
 }
 
 /**
- * Unmounts a filesystem.
+ * Unmount a filesystem.
  *
- * Flushes all modifications to a filesystem if it is not read-only and
- * unmounts it. If any nodes in the filesystem are busy, then the operation
+ * Flushes all modifications to a filesystem (if it is not read-only) and
+ * unmounts it. If any entries in the filesystem are in use, then the operation
  * will fail.
  *
  * @param path		Path to mount point of filesystem.
+ * @param flags		Behaviour flags.
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_fs_unmount(const char *path) {
+
+status_t kern_fs_unmount(const char *path, unsigned flags) {
 	char *kpath;
 	status_t ret;
 
@@ -2342,7 +2459,7 @@ status_t kern_fs_unmount(const char *path) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = fs_unmount(kpath);
+	ret = fs_unmount(kpath, flags);
 	kfree(kpath);
 	return ret;
 }

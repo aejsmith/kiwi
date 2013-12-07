@@ -150,7 +150,10 @@ typedef struct fs_node_ops {
 	 * This function is called when the node is being freed and should free
 	 * any data allocated for it by the filesystem type. If the node's link
 	 * count has reached 0, this function should remove it from the
-	 * filesystem.
+	 * filesystem. Note that you should not check the FS_NODE_REMOVED flag
+	 * to see if the node should be removed, instead check the filesystem's
+	 * own link count, as this flag can be used internally by the FS layer
+	 * when the node has not actually been removed from the FS.
 	 *
 	 * @param node		Node to free.
 	 */
@@ -189,7 +192,7 @@ typedef struct fs_node_ops {
 	 * create(). Note that it may be possible that an unlink takes place
 	 * at the same time as a link on the same node, so when incrementing
 	 * the node link count this function should check whether it was 0
-	 * and clear the FS_NODE_REMOVE flag if it was.
+	 * and clear the FS_NODE_REMOVED flag if it was.
 	 *
 	 * @param parent	Directory to create link in.
 	 * @param entry		Entry structure for the new entry.
@@ -389,7 +392,7 @@ extern status_t fs_read_symlink(const char *path, char **targetp);
 
 extern status_t fs_mount(const char *device, const char *path, const char *type,
 	uint32_t flags, const char *opts);
-extern status_t fs_unmount(const char *path);
+extern status_t fs_unmount(const char *path, unsigned flags);
 
 extern status_t fs_info(const char *path, bool follow, file_info_t *info);
 extern status_t fs_link(const char *path, const char *source);

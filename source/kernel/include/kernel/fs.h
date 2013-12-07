@@ -45,6 +45,9 @@ typedef struct mount_info {
 /** Behaviour flags for kern_fs_mount(). */
 #define FS_MOUNT_READ_ONLY	(1<<0)	/**< Mount filesystem as read-only. */
 
+/** Behaviour flags for kern_fs_unmount(). */
+#define FS_UNMOUNT_FORCE	(1<<0)	/**< Force unmounting even if unable to flush data. */
+
 extern status_t kern_fs_open(const char *path, uint32_t rights, uint32_t flags,
 	unsigned create, handle_t *handlep);
 
@@ -57,7 +60,7 @@ extern status_t kern_fs_read_symlink(const char *path, char *buf, size_t size);
 extern status_t kern_fs_mount(const char *device, const char *path,
 	const char *type, uint32_t flags, const char *opts);
 extern status_t kern_fs_mount_info(mount_info_t *infos, size_t *countp);
-extern status_t kern_fs_unmount(const char *path);
+extern status_t kern_fs_unmount(const char *path, unsigned flags);
 
 extern status_t kern_fs_path(handle_t handle, char *buf, size_t size);
 extern status_t kern_fs_curr_dir(char *buf, size_t size);
