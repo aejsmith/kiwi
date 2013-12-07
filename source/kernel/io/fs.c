@@ -1794,7 +1794,7 @@ static void dump_children(fs_dentry_t *entry, bool descend) {
 				child->flags, (child->mount) ? child->mount->id : -1,
 				child->id, depth * 2, "", child->name);
 
-			if(!descend || radix_tree_empty(&child->entries)) {
+			if(!descend) {
 				child = NULL;
 				continue;
 			}
@@ -1804,7 +1804,7 @@ static void dump_children(fs_dentry_t *entry, bool descend) {
 				child = NULL;
 				continue;
 			} else if(child->mounted) {
-				if(child->mounted->mountpoint != entry) {
+				if(child->mounted->mountpoint != child) {
 					kdb_printf("-- Incorrect mountpoint %p\n",
 						child->mounted->mountpoint);
 					child = NULL;
@@ -1821,7 +1821,7 @@ static void dump_children(fs_dentry_t *entry, bool descend) {
 			/* Go to child. */
 			depth++;
 			entry = child;
-			prev = NULL;
+			prev = child = NULL;
 		} else {
 			/* Go back to parent. */
 			if(depth == 0)
