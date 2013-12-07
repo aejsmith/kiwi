@@ -114,8 +114,15 @@ typedef struct list {
 
 /** Checks whether the given list is empty.
  * @param list		List to check. */
-#define list_empty(list)			\
-	(((list)->prev == (list)) && ((list)->next) == (list))
+static inline bool list_empty(const list_t *list) {
+	return (list->prev == list && list->next == list);
+}
+
+/** Check if a list has only a single entry.
+ * @param list		List to check. */
+static inline bool list_is_singular(const list_t *list) {
+	return (!list_empty(list) && list->next == list->prev);
+}
 
 /** Internal part of list_remove(). */
 static inline void list_real_remove(list_t *entry) {
