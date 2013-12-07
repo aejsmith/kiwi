@@ -278,7 +278,15 @@ int main(int argc, char **argv) {
 	printf("\nWelcome to Kiwi!\n\n");
 
 	while(true) {
-		printf("Kiwi> ");
+		char buf[FS_PATH_MAX];
+		status_t ret;
+
+		ret = kern_fs_curr_dir(buf, FS_PATH_MAX);
+		if(ret == STATUS_SUCCESS) {
+			printf("Kiwi:%s> ", buf);
+		} else {
+			printf("Kiwi> ");
+		}
 
 		std::string line;
 		while(true) {
@@ -311,8 +319,8 @@ int main(int argc, char **argv) {
 			continue;
 		}
 
-		pid_t ret = fork();
-		if(ret == 0) {
+		pid_t pid = fork();
+		if(pid == 0) {
 			char **argv = new char *[args.size() + 1];
 			for(size_t i = 0; i < args.size(); i++)
 				argv[i] = strdup(args[i].c_str());
@@ -321,7 +329,7 @@ int main(int argc, char **argv) {
 			execvp(argv[0], argv);
 			printf("Error: failed to execute '%s': %s\n", argv[0], strerror(errno));
 			exit(EXIT_FAILURE);
-		} else if(ret > 0) {
+		} else if(pid > 0) {
 			wait(NULL);
 		} else {
 			perror("fork");
