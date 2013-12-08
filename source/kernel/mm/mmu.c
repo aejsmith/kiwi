@@ -62,8 +62,8 @@ mmu_ops_t *mmu_ops = NULL;
  * @param ctx		Context to lock.
  */
 void mmu_context_lock(mmu_context_t *ctx) {
-	thread_wire(curr_thread);
 	mutex_lock(&ctx->lock);
+	preempt_disable();
 }
 
 /** Unlock an MMU context.
@@ -74,8 +74,8 @@ void mmu_context_unlock(mmu_context_t *ctx) {
 	if(mutex_recursion(&ctx->lock) == 1)
 		mmu_ops->flush(ctx);
 
+	preempt_enable();
 	mutex_unlock(&ctx->lock);
-	thread_unwire(curr_thread);
 }
 
 /** Create a mapping in an MMU context.

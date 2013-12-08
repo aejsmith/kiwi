@@ -280,9 +280,7 @@ page_t *page_alloc(unsigned mmflag) {
 
 	assert((mmflag & (MM_WAIT | MM_ATOMIC)) != (MM_WAIT | MM_ATOMIC));
 
-	/* Acquire the lock and wire the current thread to this CPU so that the
-	 * entire operation is performed on this CPU. */
-	thread_wire(curr_thread);
+	preempt_disable();
 	mutex_lock(&free_page_lock);
 
 	/* Attempt to allocate from each of the lists. */
@@ -308,7 +306,7 @@ page_t *page_alloc(unsigned mmflag) {
 			mapping = phys_map(page->addr, PAGE_SIZE, mmflag & MM_FLAG_MASK);
 			if(unlikely(!mapping)) {
 				page_free(page);
-				thread_unwire(curr_thread);
+				preempt_enable();
 				return NULL;
 			}
 
@@ -316,7 +314,7 @@ page_t *page_alloc(unsigned mmflag) {
 			phys_unmap(mapping, PAGE_SIZE, false);
 		}
 
-		thread_unwire(curr_thread);
+		preempt_enable();
 
 		dprintf("page: allocated page 0x%" PRIxPHYS " (list: %u)\n", page->addr, i);
 		return page;
@@ -331,7 +329,7 @@ page_t *page_alloc(unsigned mmflag) {
 	}
 
 	mutex_unlock(&free_page_lock);
-	thread_unwire(curr_thread);
+	preempt_enable();
 	return NULL;
 }
 
@@ -550,9 +548,7 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 	/* Work out how many pages we need to allocate. */
 	count = size / PAGE_SIZE;
 
-	/* Acquire the lock and wire the current thread to this CPU so that the
-	 * entire operation is performed on this CPU. */
-	thread_wire(curr_thread);
+	preempt_disable();
 	mutex_lock(&free_page_lock);
 
 	/* Single-page allocations with no constraints or only minaddr/maxaddr
@@ -568,7 +564,7 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 		}
 
 		mutex_unlock(&free_page_lock);
-		thread_unwire(curr_thread);
+		preempt_enable();
 		return STATUS_NO_MEMORY;
 	}
 
@@ -591,7 +587,7 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 		mapping = phys_map(pages->addr, size, mmflag & MM_FLAG_MASK);
 		if(unlikely(!mapping)) {
 			phys_free(pages->addr, size);
-			thread_unwire(curr_thread);
+			preempt_enable();
 			return STATUS_NO_MEMORY;
 		}
 
@@ -599,7 +595,7 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 		phys_unmap(mapping, size, false);
 	}
 
-	thread_unwire(curr_thread);
+	preempt_enable();
 
 	dprintf("page: allocated page range [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
 		pages->addr, pages->addr + size);

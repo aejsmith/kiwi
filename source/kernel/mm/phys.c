@@ -29,8 +29,6 @@
 #include <mm/page.h>
 #include <mm/phys.h>
 
-#include <proc/thread.h>
-
 #include <sync/spinlock.h>
 
 #include <assert.h>
@@ -110,25 +108,25 @@ bool phys_copy(phys_ptr_t dest, phys_ptr_t source, unsigned mmflag) {
 	assert(!(dest % PAGE_SIZE));
 	assert(!(source % PAGE_SIZE));
 
-	thread_wire(curr_thread);
+	preempt_disable();
 
 	mdest = phys_map(dest, PAGE_SIZE, mmflag);
 	if(unlikely(!mdest)) {
-		thread_unwire(curr_thread);
+		preempt_enable();
 		return false;
 	}
 
 	msrc = phys_map(source, PAGE_SIZE, mmflag);
 	if(unlikely(!msrc)) {
 		phys_unmap(mdest, PAGE_SIZE, false);
-		thread_unwire(curr_thread);
+		preempt_enable();
 		return false;
 	}
 
 	memcpy(mdest, msrc, PAGE_SIZE);
 	phys_unmap(msrc, PAGE_SIZE, false);
 	phys_unmap(mdest, PAGE_SIZE, false);
-	thread_unwire(curr_thread);
+	preempt_enable();
 	return true;
 }
 
