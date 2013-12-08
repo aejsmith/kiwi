@@ -75,7 +75,7 @@ typedef struct thread {
 	unsigned flags;			/**< Flags for the thread. */
 	int priority;			/**< Priority of the thread. */
 	size_t wired;			/**< How many calls to thread_wire() have been made. */
-	size_t preempt_disabled;	/**< Whether preemption is disabled. */
+	size_t preempt_count;		/**< Whether preemption is disabled. */
 
 	/** Scheduling information. */
 	list_t runq_link;		/**< Link to run queues. */
@@ -169,9 +169,6 @@ extern bool thread_interrupt(thread_t *thread);
 extern void thread_kill(thread_t *thread);
 extern void thread_rename(thread_t *thread, const char *name);
 
-extern void thread_preempt(void);
-extern void thread_disable_preempt(void);
-extern void thread_enable_preempt(void);
 extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name,
 	unsigned flags);
 extern void thread_yield(void);

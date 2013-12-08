@@ -71,4 +71,7 @@ extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);
 
 extern void log_early_init(void);
 
+extern void preempt_disable(void);
+extern void preempt_enable(void);
+
 #endif /* __KERNEL_H */

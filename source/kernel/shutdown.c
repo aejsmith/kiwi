@@ -50,8 +50,7 @@ static status_t shutdown_call_func(void *data) {
 static void shutdown_thread_entry(void *_action, void *arg2) {
 	int action = (int)((ptr_t)_action);
 
-	thread_wire(curr_thread);
-	thread_disable_preempt();
+	preempt_disable();
 
 	kprintf(LOG_NOTICE, "system: terminating all processes...\n");
 	process_shutdown();
@@ -84,7 +83,7 @@ void system_shutdown(int action) {
 
 	if(!shutdown_in_progress) {
 		shutdown_in_progress = true;
-		thread_disable_preempt();
+		preempt_disable();
 
 		/* Perform the shutdown in a thread under the kernel process,
 		 * as all other processes will be terminated. Don't use a DPC,

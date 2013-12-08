@@ -34,8 +34,8 @@
 #include <mm/vm.h>
 
 #include <proc/process.h>
+#include <proc/sched.h>
 #include <proc/signal.h>
-#include <proc/thread.h>
 
 #include <kdb.h>
 #include <kernel.h>
@@ -303,7 +303,7 @@ void intr_handler(intr_frame_t *frame) {
 		/* Preempt if required. When returning to userspace, this is
 		 * done by thread_at_kernel_exit(). */
 		if(curr_cpu->should_preempt)
-			thread_preempt();
+			sched_preempt();
 	}
 }
 

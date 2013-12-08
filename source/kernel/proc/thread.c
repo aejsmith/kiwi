@@ -45,6 +45,14 @@
  * Threads are killed by setting the THREAD_KILLED flag and interrupting the
  * thread. The THREAD_KILLED flag is checked upon exit from the kernel, and
  * upon entry for a system call. If it is set, the thread will exit.
+ *
+ * @todo		A thread can be prevented from moving CPUs both by
+ *			disabling preemption and being wired. The former is
+ *			the preferred way for a thread to stop itself being
+ *			moved. The latter is mainly used at the moment to keep
+ *			the idle threads on their CPUs. Once thread affinity
+ *			is implemented, get rid of thread_{,un}wire() as that
+ *			can be used for keeping the idle threads from moving.
  */
 
 #include <arch/frame.h>
@@ -493,57 +501,6 @@ void thread_rename(thread_t *thread, const char *name) {
 	spinlock_unlock(&thread->lock);
 }
 
-/** Preempt the current thread. */
-void thread_preempt(void) {
-	bool state = local_irq_disable();
-
-	curr_cpu->should_preempt = false;
-
-	spinlock_lock_noirq(&curr_thread->lock);
-	if(curr_thread->preempt_disabled > 0) {
-		curr_thread->flags |= THREAD_PREEMPTED;
-		spinlock_unlock_noirq(&curr_thread->lock);
-		local_irq_restore(state);
-	} else {
-		sched_reschedule(state);
-	}
-}
-
-/**
- * Disable preemption for the current thread.
- *
- * Prevents the current thread from being preempted. If a preemption is missed
- * due to being disabled, the thread will be preempted as soon as preemption is
- * enabled again. In order for preemption to be enabled again, there must be
- * an equal number of calls to thread_enable_preempt() as there have been to
- * thread_disable_preempt().
- */
-void thread_disable_preempt(void) {
-	curr_thread->preempt_disabled++;
-}
-
-/** Re-enable preemption for the current thread.
- * @see			thread_disable_preempt(). */
-void thread_enable_preempt(void) {
-	bool state = local_irq_disable();
-
-	spinlock_lock_noirq(&curr_thread->lock);
-
-	assert(curr_thread->preempt_disabled > 0);
-
-	if(--curr_thread->preempt_disabled == 0) {
-		/* If a preemption was missed then preempt immediately. */
-		if(curr_thread->flags & THREAD_PREEMPTED) {
-			curr_thread->flags &= ~THREAD_PREEMPTED;
-			sched_reschedule(state);
-			return;
-		}
-	}
-
-	spinlock_unlock_noirq(&curr_thread->lock);
-	local_irq_restore(state);
-}
-
 /**
  * Send the current thread to sleep.
  *
@@ -670,7 +627,7 @@ void thread_at_kernel_exit(void) {
 
 	/* Preempt if required. */
 	if(curr_cpu->should_preempt)
-		thread_preempt();
+		sched_preempt();
 }
 
 /** Terminate the current thread.
@@ -827,7 +784,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->flags = flags;
 	thread->priority = THREAD_PRIORITY_NORMAL;
 	thread->wired = 0;
-	thread->preempt_disabled = 0;
+	thread->preempt_count = 0;
 	thread->max_prio = -1;
 	thread->curr_prio = -1;
 	thread->timeslice = 0;

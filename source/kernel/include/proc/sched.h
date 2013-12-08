@@ -26,6 +26,7 @@
 
 extern void sched_reschedule(bool state);
 extern void sched_post_switch(bool state);
+extern void sched_preempt(void);
 extern void sched_insert_thread(thread_t *thread);
 
 extern void sched_init(void);

@@ -338,7 +338,65 @@ void sched_post_switch(bool state) {
 	local_irq_restore(state);
 }
 
+/** Preempt the current thread. */
+void sched_preempt(void) {
+	bool state = local_irq_disable();
+
+	curr_cpu->should_preempt = false;
+
+	spinlock_lock_noirq(&curr_thread->lock);
+	if(curr_thread->preempt_count > 0) {
+		curr_thread->flags |= THREAD_PREEMPTED;
+		spinlock_unlock_noirq(&curr_thread->lock);
+		local_irq_restore(state);
+	} else {
+		sched_reschedule(state);
+	}
+}
+
+/**
+ * Disable preemption for the current thread.
+ *
+ * Prevents the current thread from being preempted. This also prevents the
+ * thread from being moved to a different CPU. This function can be nested,
+ * i.e. in order for preemption to be enabled again, there must be an equal
+ * number of calls to preempt_enable() as there have been to preempt_disable().
+ */
+void preempt_disable(void) {
+	curr_thread->preempt_count++;
+}
+
+/**
+ * Re-enable preemption for the current thread.
+ *
+ * Decrements the preemption disable count. If it reaches 0, preemption will
+ * be re-enabled for the current thread. If a preemption was missed due to
+ * being disabled, the thread will be preempted immediately unless interrupts
+ * are currently disabled.
+ */
+void preempt_enable(void) {
+	bool state = local_irq_disable();
+
+	assert(curr_thread->preempt_count > 0);
+
+	if(--curr_thread->preempt_count == 0 && state) {
+		spinlock_lock_noirq(&curr_thread->lock);
+
+		/* If a preemption was missed then preempt immediately. */
+		if(curr_thread->flags & THREAD_PREEMPTED) {
+			curr_thread->flags &= ~THREAD_PREEMPTED;
+			sched_reschedule(state);
+			return;
+		}
+
+		spinlock_unlock_noirq(&curr_thread->lock);
+	}
+
+	local_irq_restore(state);
+}
+
 #if CONFIG_SMP
+
 /** Allocate a CPU for a thread to run on.
  * @param thread	Thread to allocate for. */
 static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
@@ -386,7 +444,8 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 
 	return cpu;
 }
-#endif
+
+#endif /* CONFIG_SMP */
 
 /** Insert a thread into the scheduler.
  * @param thread	Thread to insert (should be locked and in the Ready
@@ -403,7 +462,7 @@ void sched_insert_thread(thread_t *thread) {
 	}
 
 	#if CONFIG_SMP
-	if(!thread->wired) {
+	if(!thread->wired && !thread->preempt_count) {
 		/* Pick a new CPU for the thread to run on. */
 		thread->cpu = sched_allocate_cpu(thread);
 	}
