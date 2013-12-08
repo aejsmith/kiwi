@@ -996,6 +996,17 @@ static void fs_file_close(file_handle_t *handle) {
 	fs_dentry_release(handle->entry);
 }
 
+/** Get the name of a FS object.
+ * @param handle	File handle structure.
+ * @return		Pointer to allocated name string. */
+static char *fs_file_name(file_handle_t *handle) {
+	char *path;
+	status_t ret;
+
+	ret = fs_dentry_path(handle->entry, &path);
+	return (ret == STATUS_SUCCESS) ? path : NULL;
+}
+
 /** Signal that a file event is being waited for.
  * @param handle	File handle structure.
  * @param event		Event that is being waited for.
@@ -1120,6 +1131,7 @@ static status_t fs_file_sync(file_handle_t *handle) {
 /** FS file object operations. */
 static file_ops_t fs_file_ops = {
 	.close = fs_file_close,
+	.name = fs_file_name,
 	.wait = fs_file_wait,
 	.unwait = fs_file_unwait,
 	.io = fs_file_io,

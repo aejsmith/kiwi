@@ -40,6 +40,11 @@ typedef struct file_ops {
 	 *			the handle should be freed. */
 	void (*close)(struct file_handle *handle);
 
+	/** Get the name of a file.
+	 * @param handle	File handle structure.
+	 * @return		Pointer to allocated name string. */
+	char *(*name)(struct file_handle *handle);
+
 	/** Signal that a file event is being waited for.
 	 * @note		If the event being waited for has occurred
 	 *			already, this function should call the callback

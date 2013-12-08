@@ -33,7 +33,7 @@
 #include <object.h>
 #include <status.h>
 
-/** Close a handle to an file.
+/** Close a handle to a file.
  * @param handle	Handle to the file. */
 static void file_object_close(object_handle_t *handle) {
 	file_handle_t *fhandle = handle->private;
@@ -44,7 +44,19 @@ static void file_object_close(object_handle_t *handle) {
 	file_handle_free(fhandle);
 }
 
-/** Signal that an object event is being waited for.
+/** Get the name of a file object.
+ * @param handle	Handle to the file.
+ * @return		Pointer to allocated name string. */
+static char *file_object_name(object_handle_t *handle) {
+	file_handle_t *fhandle = handle->private;
+
+	if(!fhandle->file->ops->name)
+		return NULL;
+
+	return fhandle->file->ops->name(fhandle);
+}
+
+/** Signal that a file event is being waited for.
  * @param handle	Handle to the file.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer.
@@ -58,7 +70,7 @@ static status_t file_object_wait(object_handle_t *handle, unsigned event, void *
 	return fhandle->file->ops->wait(fhandle, event, wait);
 }
 
-/** Stop waiting for an object.
+/** Stop waiting for a file event.
  * @param handle	Handle to the file.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer. */
@@ -102,6 +114,7 @@ static object_type_t file_object_type = {
 	.id = OBJECT_TYPE_FILE,
 	.flags = OBJECT_TRANSFERRABLE,
 	.close = file_object_close,
+	.name = file_object_name,
 	.wait = file_object_wait,
 	.unwait = file_object_unwait,
 	.map = file_object_map,

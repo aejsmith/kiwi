@@ -41,6 +41,11 @@ typedef struct object_type {
 	 * @param handle	Handle to the object. */
 	void (*close)(struct object_handle *handle);
 
+	/** Get the name of an object.
+	 * @param handle	Handle to the object.
+	 * @return		Pointer to allocated name string. */
+	char *(*name)(struct object_handle *handle);
+
 	/** Signal that an object event is being waited for.
 	 * @note		If the event being waited for has occurred
 	 *			already, this function should call the callback
