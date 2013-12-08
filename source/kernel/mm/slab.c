@@ -49,16 +49,8 @@
 #include <cpu.h>
 #include <kdb.h>
 #include <kernel.h>
+#include <module.h>
 #include <status.h>
-
-/** Define to enable (very) verbose debug output. */
-//#define DEBUG_SLAB
-
-#ifdef DEBUG_SLAB
-# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
-#else
-# define dprintf(fmt...)	
-#endif
 
 struct slab;
 
@@ -530,6 +522,51 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 	return true;
 }
 
+#if CONFIG_SLAB_TRACING
+
+/** Function names to skip over in trace_return_address(). */
+static const char *trace_skip_names[] = {
+	"kmalloc", "krealloc", "kcalloc", "kfree", "kstrdup", "kstrndup",
+	"kmemdup", "kbasename", "kdirname",
+};
+
+/** Get the address for allocation tracing output.
+ * @param cache		Cache being allocated from. */
+static __always_inline void *trace_return_address(slab_cache_t *cache) {
+	symbol_t sym;
+	void *addr;
+	size_t i, j;
+
+	addr = __builtin_return_address(0);
+	if(!symbol_from_addr((ptr_t)addr - 1, &sym, NULL))
+		return addr;
+
+	/* If we're called through another allocation function, we want the
+	 * address printed to be the caller of that. This can be multiple
+	 * levels deep, e.g. kstrdup -> kmalloc -> slab_cache_alloc. We have to
+	 * pass a constant integer to __builtin_return_address, so hardcode
+	 * this for 2 levels deep. Yeah, this is terribly inefficient, but this
+	 * is only enabled for debugging. */
+	for(i = 0; i < ARRAY_SIZE(trace_skip_names); i++) {
+		if(strcmp(trace_skip_names[i], sym.name) == 0) {
+			addr = __builtin_return_address(1);
+			if(!symbol_from_addr((ptr_t)addr - 1, &sym, NULL))
+				return addr;
+
+			for(j = 0; j < ARRAY_SIZE(trace_skip_names); j++) {
+				if(strcmp(trace_skip_names[j], sym.name) == 0)
+					return __builtin_return_address(2);
+			}
+
+			return addr;
+		}
+	}
+
+	return addr;
+}
+
+#endif /* CONFIG_SLAB_TRACING */
+
 /** Allocate a constructed object from a slab cache.
  * @param cache		Cache to allocate from.
  * @param mmflag	Allocation behaviour flags.
@@ -547,7 +584,10 @@ void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
 			atomic_inc(&cache->alloc_total);
 			atomic_inc(&cache->alloc_current);
 			#endif
-			dprintf("slab: allocated %p from cache %s (%p) (magazine)\n", ret, cache->name, cache);
+			#if CONFIG_SLAB_TRACING
+			kprintf(LOG_DEBUG, "slab: allocated %p from %s at %pB\n",
+				ret, cache->name, trace_return_address(cache));
+			#endif
 			return ret;
 		}
 	}
@@ -559,7 +599,10 @@ void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
 		atomic_inc(&cache->alloc_total);
 		atomic_inc(&cache->alloc_current);
 		#endif
-		dprintf("slab: allocated %p from cache %s (%p) (slab)\n", ret, cache->name, cache);
+		#if CONFIG_SLAB_TRACING
+		kprintf(LOG_DEBUG, "slab: allocated %p from %s at %pB\n",
+			ret, cache->name, trace_return_address(cache));
+		#endif
 	}
 
 	return ret;
@@ -576,7 +619,10 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 			#if CONFIG_SLAB_STATS
 			atomic_dec(&cache->alloc_current);
 			#endif
-			dprintf("slab: freed %p to cache %s (%p) (magazine)\n", obj, cache->name, cache);
+			#if CONFIG_SLAB_TRACING
+			kprintf(LOG_DEBUG, "slab: freed %p to %s at %pB\n",
+				obj, cache->name, trace_return_address(cache));
+			#endif
 			return;
 		}
 	}
@@ -586,7 +632,10 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 	#if CONFIG_SLAB_STATS
 	atomic_dec(&cache->alloc_current);
 	#endif
-	dprintf("slab: freed %p to cache %s (%p) (slab)\n", obj, cache->name, cache);
+	#if CONFIG_SLAB_TRACING
+	kprintf(LOG_DEBUG, "slab: freed %p to %s at %pB\n", obj, cache->name,
+		trace_return_address(cache));
+	#endif
 }
 
 /** Create the per-CPU data for a slab cache.
@@ -659,24 +708,27 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name,
 	cache->align = MAX(SLAB_ALIGN_MIN, align);
 
 	/* Make sure the object size is aligned. */
-	cache->obj_size = ROUND_UP(size, cache->align);
+	size = ROUND_UP(size, cache->align);
+	cache->obj_size = size;
 
 	/* If the cache contains large objects, set the large flag which causes
 	 * to not store metadata within allocated space. */
-	if(cache->obj_size >= (PAGE_SIZE / SLAB_LARGE_FRACTION)) {
+	if(size >= (PAGE_SIZE / SLAB_LARGE_FRACTION)) {
 		cache->flags |= SLAB_CACHE_LARGE;
 
 		/* Compute the appropriate slab size. */
-		cache->slab_size = ROUND_UP(cache->obj_size, PAGE_SIZE);
-		while((cache->slab_size % cache->obj_size) > (cache->slab_size / SLAB_WASTE_FRACTION))
+		cache->slab_size = ROUND_UP(size, PAGE_SIZE);
+		while((cache->slab_size % size) > (cache->slab_size / SLAB_WASTE_FRACTION))
 			cache->slab_size += PAGE_SIZE;
 
-		cache->obj_count = cache->slab_size / cache->obj_size;
-		cache->colour_max = cache->slab_size - (cache->obj_count * cache->obj_size);
+		cache->obj_count = cache->slab_size / size;
+		cache->colour_max = cache->slab_size - (cache->obj_count * size);
 	} else {
 		cache->slab_size = PAGE_SIZE;
-		cache->obj_count = (cache->slab_size - sizeof(slab_t)) / cache->obj_size;
-		cache->colour_max = (cache->slab_size - (cache->obj_count * cache->obj_size)) - sizeof(slab_t);
+		cache->obj_count = (cache->slab_size - sizeof(slab_t))
+			/ size;
+		cache->colour_max = (cache->slab_size -
+			(cache->obj_count * size)) - sizeof(slab_t);
 	}
 
 	/* If we want the magazine layer to be enabled but the CPU count is
@@ -713,8 +765,9 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name,
 
 	mutex_unlock(&slab_caches_lock);
 
-	dprintf("slab: created cache %s (%p) (obj_size: %u, slab_size: %u, align: %u)\n",
-		cache->name, cache, cache->obj_size, cache->slab_size, cache->align);
+	kprintf(LOG_DEBUG, "slab: created cache %s (obj_size: %u, slab_size: %u"
+		", align: %u)\n", cache->name, cache->obj_size, cache->slab_size,
+		cache->align);
 	return STATUS_SUCCESS;
 }
 

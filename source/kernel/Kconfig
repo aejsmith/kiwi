@@ -42,8 +42,15 @@ config SLAB_STATS
 	default n
 	help
 	  Enable extra statistics in the slab allocator. This is not enabled by
-	  default as it causes a slight performance hit - the statistics are
-	  modified using atomic operations which are serialising instructions.
+	  default as it causes a slight performance hit.
+
+config SLAB_TRACING
+	bool "Slab allocation tracing output"
+	default n
+	help
+	  Enable output on the debug console on every slab allocation/free,
+	  useful to run through the allocation statistics script in the
+	  utilities directory.
 
 config DEBUGGER_DELAY
 	int "Time to wait for debugger connection"
