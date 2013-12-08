@@ -426,7 +426,7 @@ static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *m
  * @param cache		Cache to allocate from.
  * @return		Pointer to object on success, NULL on failure. */
 static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
-	slab_percpu_t *cc = &cache->cpu_caches[curr_cpu->id];
+	slab_percpu_t *cc;
 	slab_magazine_t *mag;
 	bool state;
 	void *ret;
@@ -435,6 +435,8 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 	 * by any other CPUs. We do however need to disable interrupts to
 	 * prevent a thread switch from occurring mid-operation. */
 	state = local_irq_disable();
+
+	cc = &cache->cpu_caches[curr_cpu->id];
 
 	/* Check if we have a magazine to allocate from. */
 	if(likely(cc->loaded)) {
@@ -478,11 +480,13 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
  * @param obj		Object to free.
  * @return		True if succeeded, false if not. */
 static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
-	slab_percpu_t *cc = &cache->cpu_caches[curr_cpu->id];
+	slab_percpu_t *cc;
 	slab_magazine_t *mag;
 	bool state;
 
 	state = local_irq_disable();
+
+	cc = &cache->cpu_caches[curr_cpu->id];
 
 	/* If the loaded magazine has spare slots, just put the object there
 	 * and return. */
