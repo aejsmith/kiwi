@@ -28,6 +28,7 @@
 
 struct cpu;
 struct intr_frame;
+struct thread;
 
 /** x86-specific thread structure.
  * @note		The GS register is pointed to the copy of this structure
@@ -36,7 +37,8 @@ struct intr_frame;
  *			assembly code. If changing the layout of this structure,
  *			be sure to updated the offset definitions below. */
 typedef struct __packed arch_thread {
-	struct cpu *cpu;			/** Current CPU pointer, used by curr_cpu. */
+	struct cpu *cpu;			/**< Current CPU pointer, for curr_cpu. */
+	struct thread *parent;			/**< Pointer to containing thread, for curr_thread. */
 
 	/** SYSCALL/SYSRET data. */
 	ptr_t kernel_rsp;			/**< RSP for kernel entry via SYSCALL. */
@@ -56,6 +58,14 @@ typedef struct __packed arch_thread {
 	char fpu[512] __aligned(16);
 } arch_thread_t;
 
+/** Get the current thread structure pointer.
+ * @return		Pointer to current thread structure. */
+static inline struct thread *arch_curr_thread(void) {
+	struct thread *addr;
+	__asm__("mov %%gs:8, %0" : "=r"(addr));
+	return addr;
+}
+
 #endif /* __ASM__ */
 
 /** Flags for arch_thread_t. */
@@ -64,9 +74,9 @@ typedef struct __packed arch_thread {
 #define ARCH_THREAD_FREQUENT_FPU	(1<<2)	/**< FPU is frequently used by the thread. */
 
 /** Offsets in arch_thread_t. */
-#define ARCH_THREAD_OFF_KERNEL_RSP	0x8
-#define ARCH_THREAD_OFF_USER_RSP	0x10
-#define ARCH_THREAD_OFF_USER_IFRAME	0x20
-#define ARCH_THREAD_OFF_FLAGS		0x28
+#define ARCH_THREAD_OFF_KERNEL_RSP	0x10
+#define ARCH_THREAD_OFF_USER_RSP	0x18
+#define ARCH_THREAD_OFF_USER_IFRAME	0x28
+#define ARCH_THREAD_OFF_FLAGS		0x30
 
 #endif /* __ARCH_THREAD_H */

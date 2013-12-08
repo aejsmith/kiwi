@@ -27,13 +27,16 @@
 #include <types.h>
 
 struct cpu;
+struct thread;
 
 /** Type used to store a CPU ID. */
 typedef uint32_t cpu_id_t;
 
 /** Architecture-specific CPU structure. */
 typedef struct arch_cpu {
-	struct cpu *parent;			/**< Pointer back to CPU. */
+	/** Temporary per-CPU data used during initialization. */
+	struct cpu *parent;			/**< Current CPU pointer. */
+	struct thread *thread;			/**< Current thread pointer. */
 
 	/** Time conversion factors. */
 	uint64_t cycles_per_us;			/**< CPU cycles per µs. */
@@ -59,10 +62,10 @@ typedef struct arch_cpu {
 
 /** Get the current CPU structure pointer.
  * @return		Pointer to current CPU structure. */
-static inline struct cpu *arch_cpu_pointer(void) {
-	ptr_t addr;
+static inline struct cpu *arch_curr_cpu(void) {
+	struct cpu *addr;
 	__asm__("mov %%gs:0, %0" : "=r"(addr));
-	return (struct cpu *)addr;
+	return addr;
 }
 
 /** Halt the current CPU. */

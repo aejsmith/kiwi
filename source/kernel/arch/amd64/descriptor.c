@@ -149,6 +149,7 @@ static __init_text void gdt_init(cpu_t *cpu) {
 	 * CPU data has a pointer at the start which we can use, so point the
 	 * GS base at that to begin with. */
 	cpu->arch.parent = cpu;
+	cpu->arch.thread = NULL;
 	x86_write_msr(X86_MSR_GS_BASE, (ptr_t)&cpu->arch);
 	x86_write_msr(X86_MSR_KERNEL_GS_BASE, 0);
 }

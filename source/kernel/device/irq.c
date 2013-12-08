@@ -33,6 +33,7 @@
 #include <sync/spinlock.h>
 
 #include <assert.h>
+#include <cpu.h>
 #include <kernel.h>
 #include <status.h>
 

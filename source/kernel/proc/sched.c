@@ -151,8 +151,10 @@ static inline void sched_calculate_priority(thread_t *thread) {
 	priority = 5 + (thread->owner->priority * 8);
 	priority += (thread->priority - 1) * 2;
 
-	dprintf("sched: setting priority for thread %" PRId32 " to %d (proc: %d, thread: %d)\n",
-		thread->id, priority, thread->owner->priority, thread->priority);
+	dprintf("sched: setting priority for thread %" PRId32 " to %d (proc: "
+		"%d, thread: %d)\n", thread->id, priority,
+		thread->owner->priority, thread->priority);
+
 	thread->max_prio = thread->curr_prio = priority;
 }
 
@@ -165,16 +167,20 @@ static inline void sched_tweak_priority(sched_cpu_t *cpu, thread_t *thread) {
 		 * already at the maximum priority. */
 		if(thread->curr_prio < thread->max_prio) {
 			thread->curr_prio++;
-			dprintf("sched: thread %" PRId32 " (%" PRId32 ") bonus (new: %d, max: %d)\n",
-				thread->id, thread->owner->id, thread->curr_prio, thread->max_prio);
+			dprintf("sched: thread %" PRId32 " (%" PRId32 ") bonus "
+				"(new: %d, max: %d)\n", thread->id,
+				thread->owner->id, thread->curr_prio,
+				thread->max_prio);
 		}
 	} else {
 		/* The timeslice was used up, penalise the thread if we've not
 		 * already given it the maximum penalty. */
 		if(thread->curr_prio && (thread->max_prio - thread->curr_prio) < MAX_PENALTY) {
 			thread->curr_prio--;
-			dprintf("sched: thread %" PRId32 " (%" PRId32 ") penalty (new: %d, max: %d)\n",
-				thread->id, thread->owner->id, thread->curr_prio, thread->max_prio);
+			dprintf("sched: thread %" PRId32 " (%" PRId32 ") penalty "
+				"(new: %d, max: %d)\n", thread->id,
+				thread->owner->id, thread->curr_prio,
+				thread->max_prio);
 		}
 	}
 }
@@ -271,8 +277,8 @@ void sched_reschedule(bool state) {
 		next = cpu->idle_thread;
 		if(next != curr_thread) {
 			spinlock_lock_noirq(&next->lock);
-			dprintf("sched: cpu %" PRIu32 " has no runnable threads remaining, idling\n",
-				curr_cpu->id);
+			dprintf("sched: cpu %" PRIu32 " has no runnable threads "
+				"remaining, idling\n", curr_cpu->id);
 		}
 
 		/* The idle thread runs indefinitely until an interrupt causes
@@ -283,33 +289,34 @@ void sched_reschedule(bool state) {
 
 	assert(next->cpu == curr_cpu);
 
-	/* Move the thread to the Running state and set it as the current. */
+	/* Move the thread to the running state. */
 	cpu->prev_thread = curr_thread;
 	next->state = THREAD_RUNNING;
-	curr_thread = next;
+	curr_cpu->thread = next;
 
 	/* Finished with the scheduler queues, unlock. */
 	spinlock_unlock_noirq(&cpu->lock);
 
 	/* Set off the timer if necessary. */
-	if(curr_thread->timeslice > 0)
-		timer_start(&cpu->timer, curr_thread->timeslice, TIMER_ONESHOT);
+	if(next->timeslice > 0)
+		timer_start(&cpu->timer, next->timeslice, TIMER_ONESHOT);
 
 	/* Only need to continue if the new thread is different. */
-	if(curr_thread != cpu->prev_thread) {
+	if(next != cpu->prev_thread) {
 		/* Switch the address space. This function handles the case
 		 * where the new process' aspace pointer is NULL. */
-		vm_aspace_switch(curr_proc->aspace);
+		vm_aspace_switch(next->owner->aspace);
 
-		/* Perform the thread switch. */
-		arch_thread_switch(curr_thread, cpu->prev_thread);
+		/* Perform the thread switch. This should change over the
+		 * curr_thread pointer to the new thread. */
+		arch_thread_switch(next, cpu->prev_thread);
 
 		/* The switch may return to thread_trampoline(), so put
 		 * anything to do after a switch in sched_post_switch()
 		 * below. */
 		sched_post_switch(state);
 	} else {
-		spinlock_unlock_noirq(&curr_thread->lock);
+		spinlock_unlock_noirq(&next->lock);
 		local_irq_restore(state);
 	}
 }
@@ -369,7 +376,8 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 
 		load = other->sched->total;
 		if(load < average) {
-			dprintf("sched: CPU %" PRIu32 " load %zu less than average %zu, giving it thread %" PRId32 "\n",
+			dprintf("sched: CPU %" PRIu32 " load %zu less than "
+				"average %zu, giving it thread %" PRId32 "\n",
 				other->id, load, average, thread->id);
 			cpu = other;
 			break;
@@ -466,8 +474,10 @@ __init_text void sched_init_percpu(void) {
 	sprintf(name, "idle-%" PRIu32, curr_cpu->id);
 	ret = thread_create(name, NULL, 0, sched_idle_thread, NULL, NULL,
 		&curr_cpu->sched->idle_thread);
-	if(ret != STATUS_SUCCESS)
-		fatal("Could not create idle thread for %" PRIu32 " (%d)", curr_cpu->id, ret);
+	if(ret != STATUS_SUCCESS) {
+		fatal("Could not create idle thread for %" PRIu32 " (%d)",
+			curr_cpu->id, ret);
+	}
 	thread_wire(curr_cpu->sched->idle_thread);
 
 	/* Set the idle thread as the current thread. */
@@ -479,7 +489,8 @@ __init_text void sched_init_percpu(void) {
 	curr_cpu->idle = true;
 
 	/* Create the preemption timer. */
-	timer_init(&curr_cpu->sched->timer, "sched_timer", sched_timer_handler, NULL, 0);
+	timer_init(&curr_cpu->sched->timer, "sched_timer", sched_timer_handler,
+		NULL, 0);
 
 	/* Initialize queues. */
 	for(i = 0; i < 2; i++) {
@@ -492,9 +503,9 @@ __init_text void sched_init_percpu(void) {
 /** Begin executing other threads. */
 __init_text void sched_enter(void) {
 	/* Lock the idle thread - sched_post_switch() expects it to be locked. */
-	spinlock_lock_noirq(&curr_thread->lock);
+	spinlock_lock_noirq(&curr_cpu->thread->lock);
 
 	/* Switch to the idle thread. */
-	arch_thread_switch(curr_thread, NULL);
+	arch_thread_switch(curr_cpu->thread, NULL);
 	fatal("Should not get here");
 }

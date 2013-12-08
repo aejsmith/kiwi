@@ -44,6 +44,7 @@ extern void amd64_context_restore(ptr_t new_rsp);
 void arch_thread_init(thread_t *thread, void *stack, void (*entry)(void)) {
 	unsigned long *sp;
 
+	thread->arch.parent = thread;
 	thread->arch.flags = 0;
 	thread->arch.tls_base = 0;
 	thread->arch.fpu_count = 0;
@@ -185,8 +186,8 @@ void arch_thread_clone(thread_t *thread, thread_t *parent, intr_frame_t *frame) 
  * @param stack		Stack pointer.
  * @param arg1		First argument to function.
  * @param arg2		Second argument to function. */
-void arch_thread_prepare_userspace(intr_frame_t *frame, ptr_t entry, ptr_t stack,
-	ptr_t arg1, ptr_t arg2)
+void arch_thread_prepare_userspace(intr_frame_t *frame, ptr_t entry,
+	ptr_t stack, ptr_t arg1, ptr_t arg2)
 {
 	/* Correctly align the stack pointer for ABI requirements. */
 	stack -= sizeof(unsigned long);

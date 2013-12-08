@@ -32,6 +32,7 @@
 
 #include <proc/thread.h>
 
+#include <cpu.h>
 #include <kdb.h>
 
 /** Structure containing a stack frame. */

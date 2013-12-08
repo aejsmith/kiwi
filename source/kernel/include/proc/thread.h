@@ -37,9 +37,9 @@
 
 #include <sync/spinlock.h>
 
-#include <cpu.h>
 #include <time.h>
 
+struct cpu;
 struct intr_frame;
 struct process;
 
@@ -81,7 +81,7 @@ typedef struct thread {
 	list_t runq_link;		/**< Link to run queues. */
 	int max_prio;			/**< Maximum scheduling priority. */
 	int curr_prio;			/**< Current scheduling priority. */
-	cpu_t *cpu;			/**< CPU that the thread runs on. */
+	struct cpu *cpu;		/**< CPU that the thread runs on. */
 	nstime_t timeslice;		/**< Current timeslice. */
 
 	/** Sleeping information. */
@@ -147,7 +147,7 @@ typedef struct thread {
 #define SLEEP_ABSOLUTE		(1<<1)	/**< Specified timeout is absolute, not relative to current time. */
 
 /** Macro that expands to a pointer to the current thread. */
-#define curr_thread		(curr_cpu->thread)
+#define curr_thread		(arch_curr_thread())
 
 extern void arch_thread_init(thread_t *thread, void *stack, void (*entry)(void));
 extern void arch_thread_destroy(thread_t *thread);
