@@ -897,6 +897,7 @@ static void vm_region_destroy(vm_region_t *region) {
 		region->as->find_cache = NULL;
 
 	assert(list_empty(&region->free_link));
+	kfree(region->name);
 	slab_cache_free(vm_region_cache, region);
 }
 
