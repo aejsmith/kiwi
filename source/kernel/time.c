@@ -221,6 +221,7 @@ bool timer_tick(void) {
 	timer_t *timer;
 
 	assert(timer_device);
+	assert(!local_irq_state());
 
 	if(!curr_cpu->timer_enabled)
 		return false;
@@ -292,14 +293,19 @@ void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data,
  *			the function will do nothing.
  * @param mode		Mode for the timer. */
 void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
+	bool state;
+
 	if(length <= 0)
 		return;
+
+	/* Prevent curr_cpu from changing underneath us. */
+	state = local_irq_disable();
 
 	timer->cpu = curr_cpu;
 	timer->mode = mode;
 	timer->initial = length;
 
-	spinlock_lock(&curr_cpu->timer_lock);
+	spinlock_lock_noirq(&curr_cpu->timer_lock);
 
 	/* Add the timer to the list. */
 	timer_start_unsafe(timer);
@@ -319,7 +325,8 @@ void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
 		break;
 	}
 
-	spinlock_unlock(&curr_cpu->timer_lock);
+	spinlock_unlock_noirq(&curr_cpu->timer_lock);
+	local_irq_restore(state);
 }
 
 /** Cancel a running timer.
