@@ -65,10 +65,14 @@ typedef struct cpu {
 	#endif
 } cpu_t;
 
-/** Expands to a pointer to the CPU structure of the current CPU.
- * @note		We don't define this to &boot_cpu when compiling
- *			without SMP support to ensure that a module will work
- *			properly in any kernel when compiled without SMP. */
+/**
+ * Pointer to the CPU structure of the current CPU.
+ *
+ * This definition expands to a pointer to the CPU structure of the current
+ * CPU. It should only be accessed in situations where the current thread
+ * cannot be migrated to a different CPU, i.e. preemption or interrupts
+ * disabled.
+ */
 #define curr_cpu	(arch_curr_cpu())
 
 extern cpu_t boot_cpu;
