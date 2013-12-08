@@ -363,7 +363,8 @@ void sched_preempt(void) {
  * number of calls to preempt_enable() as there have been to preempt_disable().
  */
 void preempt_disable(void) {
-	curr_thread->preempt_count++;
+	if(curr_thread)
+		curr_thread->preempt_count++;
 }
 
 /**
@@ -375,7 +376,12 @@ void preempt_disable(void) {
  * are currently disabled.
  */
 void preempt_enable(void) {
-	bool state = local_irq_disable();
+	bool state;
+
+	if(!curr_thread)
+		return;
+
+	state = local_irq_disable();
 
 	assert(curr_thread->preempt_count > 0);
 
