@@ -82,7 +82,8 @@ static inline bool is_kernel_context(mmu_context_t *ctx) {
 
 /** Check if a context is the current context. */
 static inline bool is_current_context(mmu_context_t *ctx) {
-	return (is_kernel_context(ctx) || (curr_aspace && ctx == curr_aspace->mmu));
+	return (is_kernel_context(ctx)
+		|| (curr_cpu->aspace && ctx == curr_cpu->aspace->mmu));
 }
 
 /** Get the flags to map a PDP/page directory/page table with.

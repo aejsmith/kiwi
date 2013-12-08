@@ -233,7 +233,7 @@ void kdb_print_symbol(ptr_t addr, int delta) {
 
 	ret = symbol_from_addr(addr + delta, &sym, &off);
 	if(!ret && !sym.image) {
-		if(is_user_address((void *)addr) && curr_thread && curr_aspace) {
+		if(is_user_address((void *)addr) && curr_thread && curr_cpu->aspace) {
 			/* Look up in loaded userspace images. */
 			LIST_FOREACH(&curr_proc->images, iter) {
 				image = list_entry(iter, elf_image_t, header);

@@ -972,7 +972,7 @@ void vm_unlock_page(vm_aspace_t *as, ptr_t addr) {
  * @return		STATUS_SUCCESS if the fault has been handled in some
  *			way, other status code if not. */
 status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) {
-	vm_aspace_t *as = curr_aspace;
+	vm_aspace_t *as = curr_cpu->aspace;
 	ptr_t base;
 	vm_region_t *region;
 	siginfo_t info;
@@ -1622,33 +1622,29 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 }
 
 /** Switch to another address space.
- * @note		Does not take address space lock because this function
- *			is used during rescheduling.
  * @param as		Address space to switch to. */
 void vm_aspace_switch(vm_aspace_t *as) {
-	bool state;
+	bool state = local_irq_disable();
 
 	/* The kernel process does not have an address space. When switching
 	 * to one of its threads, it is not necessary to switch to the kernel
 	 * MMU context, as all mappings in the kernel context are visible in
 	 * all address spaces. Kernel threads should never touch the userspace
 	 * portion of the address space. */
-	if(as && as != curr_aspace) {
-		state = local_irq_disable();
-
+	if(as && as != curr_cpu->aspace) {
 		/* Decrease old address space's reference count, if there is one. */
-		if(curr_aspace) {
-			mmu_context_unload(curr_aspace->mmu);
-			refcount_dec(&curr_aspace->count);
+		if(curr_cpu->aspace) {
+			mmu_context_unload(curr_cpu->aspace->mmu);
+			refcount_dec(&curr_cpu->aspace->count);
 		}
 
 		/* Switch to the new address space. */
 		refcount_inc(&as->count);
 		mmu_context_load(as->mmu);
-		curr_aspace = as;
-
-		local_irq_restore(state);
+		curr_cpu->aspace = as;
 	}
+
+	local_irq_restore(state);
 }
 
 /** Create a new address space.
@@ -1758,22 +1754,18 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *parent) {
  * @param as		Address space being switched from. */
 static status_t switch_to_kernel(void *_as) {
 	vm_aspace_t *as = _as;
-	bool state;
-
-	state = local_irq_disable();
 
 	/* We may have switched address space between the check below and
 	 * receiving the interrupt. Avoid an unnecessary switch in this
 	 * case. */
-	if(as == curr_aspace) {
+	if(as == curr_cpu->aspace) {
 		mmu_context_unload(as->mmu);
 		refcount_dec(&as->count);
 
 		mmu_context_load(&kernel_mmu_context);
-		curr_aspace = NULL;
+		curr_cpu->aspace = NULL;
 	}
 
-	local_irq_restore(state);
 	return STATUS_SUCCESS;
 }
 
@@ -1790,6 +1782,7 @@ static status_t switch_to_kernel(void *_as) {
 void vm_aspace_destroy(vm_aspace_t *as) {
 	#if CONFIG_SMP
 	cpu_t *cpu;
+	bool state;
 	#endif
 
 	assert(as);
@@ -1800,6 +1793,8 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	 * and prod any CPUs that are using it. */
 	if(refcount_get(&as->count) > 0) {
 		#if CONFIG_SMP
+		state = local_irq_disable();
+
 		LIST_FOREACH(&running_cpus, iter) {
 			cpu = list_entry(iter, cpu_t, header);
 			if(cpu->aspace == as) {
@@ -1810,6 +1805,8 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 				}
 			}
 		}
+
+		local_irq_restore(state);
 		#else
 		switch_to_kernel(as);
 		#endif

@@ -536,8 +536,6 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	process_args_t *uargs;
 	intr_frame_t frame;
 
-	assert(curr_aspace == load->aspace);
-
 	/* Copy stack details to the thread so that it'll get unmapped if this
 	 * thread exits. */
 	curr_thread->ustack = load->stack;

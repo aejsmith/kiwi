@@ -131,9 +131,6 @@ typedef struct vm_aspace {
 	list_t regions;
 } vm_aspace_t;
 
-/** Macro that expands to a pointer to the current address space. */
-#define curr_aspace		(curr_cpu->aspace)
-
 /** Page fault reason codes. */
 enum {
 	VM_FAULT_NOT_PRESENT,		/**< Fault caused by a not present page. */
