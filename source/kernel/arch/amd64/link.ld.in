@@ -42,8 +42,6 @@ SECTIONS {
 
 	. = KERNEL_VIRT_BASE + SIZEOF_HEADERS;
 
-	. = KERNEL_VIRT_BASE + SIZEOF_HEADERS;
-
 	.text : {
 		__text_seg_start = .;
 		__text_start = .;
