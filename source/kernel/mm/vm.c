@@ -686,41 +686,6 @@ static bool unmap_page(vm_region_t *region, ptr_t addr) {
  * Region functions.
  */
 
-/** Allocate a new region structure. Caller must attach object to it.
- * @param as		Address space of the region.
- * @param start		Start address of the region.
- * @param size		Size of the region.
- * @param protection	Protection flags for the region.
- * @param flags		Flags for the region.
- * @param state		Allocation state of the region.
- * @param name		Name of the region (will be copied).
- * @return		Pointer to region structure. */
-static vm_region_t *vm_region_create(vm_aspace_t *as, ptr_t start, size_t size,
-	uint32_t protection, uint32_t flags, int state, const char *name)
-{
-	vm_region_t *region;
-
-	assert(!(start % PAGE_SIZE));
-	assert(!(size % PAGE_SIZE));
-	assert(state == VM_REGION_ALLOCATED || !name);
-
-	region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
-	region->as = as;
-	region->start = start;
-	region->size = size;
-	region->protection = protection;
-	region->flags = flags;
-	region->state = state;
-	region->handle = NULL;
-	region->obj_offset = 0;
-	region->amap = NULL;
-	region->amap_offset = 0;
-	region->ops = NULL;
-	region->private = NULL;
-	region->name = (name) ? kstrdup(name, MM_KERNEL) : NULL;
-	return region;
-}
-
 /** Clone a region.
  * @param src		Region to clone.
  * @param as		Address space for new region.
@@ -728,46 +693,57 @@ static vm_region_t *vm_region_create(vm_aspace_t *as, ptr_t start, size_t size,
 static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	vm_region_t *dest;
 
-	dest = vm_region_create(as, src->start, src->size, src->protection,
-		src->flags, src->state, src->name);
-	if(src->state != VM_REGION_ALLOCATED)
-		return dest;
-
+	dest = slab_cache_alloc(vm_region_cache, MM_KERNEL);
+	dest->name = (src->name) ? kstrdup(src->name, MM_KERNEL) : NULL;
+	dest->as = as;
+	dest->start = src->start;
+	dest->size = src->size;
+	dest->protection = src->protection;
+	dest->flags = src->flags;
+	dest->state = src->state;
 	dest->ops = src->ops;
 	dest->private = src->private;
 
-	/* Copy the object handle. */
-	if(src->handle) {
-		object_handle_retain(src->handle);
-		dest->handle = src->handle;
-		dest->obj_offset = src->obj_offset;
-	}
-
-	/* If this is not a private mapping, just point the new region at the
-	 * old anonymous map and return. */
-	if(!(src->flags & VM_MAP_PRIVATE)) {
-		if(src->amap) {
-			refcount_inc(&src->amap->count);
-			vm_amap_map(src->amap, src->amap_offset, src->size);
-			dest->amap = src->amap;
-			dest->amap_offset = src->amap_offset;
-		}
-
+	if(src->state != VM_REGION_ALLOCATED) {
+		dest->handle = NULL;
+		dest->obj_offset = 0;
+		dest->amap = NULL;
+		dest->amap_offset = 0;
 		return dest;
 	}
 
-	/* This is a private region. Write-protect all mappings on the source
-	 * region and then clone the anonymous map. */
-	mmu_context_lock(src->as->mmu);
-	mmu_context_protect(src->as->mmu, src->start, src->size,
-		src->protection & ~VM_PROT_WRITE);
-	mmu_context_unlock(src->as->mmu);
+	/* Copy the object handle. */
+	dest->handle = src->handle;
+	dest->obj_offset = src->obj_offset;
+	if(dest->handle)
+		object_handle_retain(dest->handle);
 
-	assert(src->amap);
-	dest->amap = vm_amap_clone(src->amap, src->amap_offset, src->size);
+	if(src->flags & VM_MAP_PRIVATE) {
+		/* This is a private region. Write-protect all mappings on the
+		 * source region and then clone the anonymous map. */
+		mmu_context_lock(src->as->mmu);
+		mmu_context_protect(src->as->mmu, src->start, src->size,
+			src->protection & ~VM_PROT_WRITE);
+		mmu_context_unlock(src->as->mmu);
 
-	dprintf("vm: copied private region %p (map: %p) to %p (map: %p)\n",
-		src, src->amap, dest, dest->amap);
+		assert(src->amap);
+		dest->amap = vm_amap_clone(src->amap, src->amap_offset,
+			src->size);
+		dest->amap_offset = 0;
+
+		dprintf("vm: copied private region %p (map: %p) to %p (map: %p)\n",
+			src, src->amap, dest, dest->amap);
+	} else {
+		/* This is not a private mapping, just point the new region at
+		 * the old anonymous map. */
+		dest->amap = src->amap;
+		dest->amap_offset = src->amap_offset;
+		if(dest->amap) {
+			refcount_inc(&dest->amap->count);
+			vm_amap_map(dest->amap, dest->amap_offset, dest->size);
+		}
+	}
+
 	return dest;
 }
 
@@ -1186,29 +1162,38 @@ static vm_region_t *trim_regions(vm_aspace_t *as, ptr_t start, size_t size) {
 			new_start = region->start;
 			new_size = match_start - region->start;
 
-			split = vm_region_create(as, match_end + 1,
-				region_end - match_end, region->protection,
-				region->flags, region->state, region->name);
+			split = slab_cache_alloc(vm_region_cache, MM_KERNEL);
+			split->name = (region->name)
+				? kstrdup(region->name, MM_KERNEL) : NULL;
+			split->as = as;
+			split->start = match_end + 1;
+			split->size = region_end - match_end;
+			split->protection = region->protection;
+			split->flags = region->flags;
+			split->state = region->state;
+			split->ops = region->ops;
+			split->private = region->private;
+			split->handle = region->handle;
+			split->obj_offset = region->obj_offset;
+			split->amap = region->amap;
+			split->amap_offset = region->amap_offset;
 
 			if(split->state == VM_REGION_ALLOCATED) {
-				/* Copy object details into the split. */
-				split->ops = region->ops;
-				split->private = region->private;
-				if((split->handle = region->handle))
+				if(split->handle)
 					object_handle_retain(split->handle);
 
-				if((split->amap = region->amap)) {
+				if(split->amap) {
 					refcount_inc(&split->amap->count);
-					split->obj_offset = region->obj_offset;
-					split->amap_offset = region->amap_offset
-						+ (split->start - region->start);
+					split->amap_offset += split->start
+						- region->start;
 				} else {
-					split->obj_offset = region->obj_offset
-						+ (split->start - region->start);
+					split->obj_offset += split->start
+						- region->start;
 				}
 
 				/* Insert the split region to the tree. */
-				avl_tree_insert(&as->tree, split->start, &split->tree_link);
+				avl_tree_insert(&as->tree, split->start,
+					&split->tree_link);
 			} else if(split->state == VM_REGION_FREE) {
 				/* Insert the split region to the free list. */
 				vm_freelist_insert(split, split->size);
@@ -1297,10 +1282,10 @@ static void insert_region(vm_aspace_t *as, vm_region_t *region) {
  * @param size		Size of space required.
  * @param protection	Protection flags for the region.
  * @param flags		Flags for the region.
- * @param name		Name of the region.
+ * @param name		Name of the region (will not be copied).
  * @return		Pointer to region if allocated, NULL if not. */
-static vm_region_t *alloc_region(vm_aspace_t *as, size_t size, uint32_t protection,
-	uint32_t flags, const char *name)
+static vm_region_t *alloc_region(vm_aspace_t *as, size_t size,
+	uint32_t protection, uint32_t flags, char *name)
 {
 	vm_region_t *region, *split;
 	unsigned list, i;
@@ -1335,9 +1320,21 @@ static vm_region_t *alloc_region(vm_aspace_t *as, size_t size, uint32_t protecti
 			 * is simple: the region is free, so we don't need to
 			 * deal with copying object details. */
 			if(region->size > size) {
-				split = vm_region_create(as, region->start + size,
-					region->size - size, 0, 0, VM_REGION_FREE,
-					NULL);
+				split = slab_cache_alloc(vm_region_cache,
+					MM_KERNEL);
+				split->name = NULL;
+				split->as = as;
+				split->start = region->start + size;
+				split->size = region->size - size;
+				split->protection = 0;
+				split->flags = 0;
+				split->state = VM_REGION_FREE;
+				split->handle = NULL;
+				split->obj_offset = 0;
+				split->amap = NULL;
+				split->amap_offset = 0;
+				split->ops = NULL;
+				split->private = NULL;
 
 				/* Add the split to the lists. */
 				vm_freelist_insert(split, split->size);
@@ -1351,7 +1348,7 @@ static vm_region_t *alloc_region(vm_aspace_t *as, size_t size, uint32_t protecti
 			region->protection = protection;
 			region->flags = flags;
 			region->state = VM_REGION_ALLOCATED;
-			region->name = (name) ? kstrdup(name, MM_KERNEL) : NULL;
+			region->name = name;
 			avl_tree_insert(&as->tree, region->start, &region->tree_link);
 
 			dprintf("vm: allocated region [%p,%p) from list %u in %p\n",
@@ -1362,6 +1359,32 @@ static vm_region_t *alloc_region(vm_aspace_t *as, size_t size, uint32_t protecti
 	}
 
 	return NULL;
+}
+
+/** Mark a region as free.
+ * @param as		Address space to free in.
+ * @param start		Start of region to free.
+ * @param size		Size of region to free.
+ * @param state		State for the region (free or reserved). */
+static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
+	vm_region_t *region;
+
+	region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
+	region->as = as;
+	region->start = start;
+	region->size = size;
+	region->protection = 0;
+	region->flags = 0;
+	region->state = state;
+	region->handle = NULL;
+	region->obj_offset = 0;
+	region->amap = NULL;
+	region->amap_offset = 0;
+	region->ops = NULL;
+	region->private = NULL;
+	region->name = NULL;
+
+	insert_region(as, region);
 }
 
 /**
@@ -1420,6 +1443,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 {
 	vm_region_t *region = NULL;
 	ptr_t addr;
+	char *dup = NULL;
 	status_t ret;
 
 	assert(addrp);
@@ -1451,6 +1475,12 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 		}
 	}
 
+	/* Get the name to use. Get from object type if no name supplied. */
+	if(name) {
+		dup = kstrdup(name, MM_KERNEL);
+	} else if(handle && handle->type->name) {
+		dup = handle->type->name(handle);
+	}
 
 	/* Cannot have a guard page on a 1-page stack. */
 	if(flags & VM_MAP_STACK && size == PAGE_SIZE)
@@ -1462,9 +1492,10 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 	switch(spec) {
 	case VM_ADDRESS_ANY:
 		/* Allocate some space. */
-		region = alloc_region(as, size, protection, flags, name);
+		region = alloc_region(as, size, protection, flags, dup);
 		if(!region) {
 			mutex_unlock(&as->lock);
+			kfree(dup);
 			return STATUS_NO_MEMORY;
 		}
 
@@ -1472,11 +1503,19 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 	case VM_ADDRESS_EXACT:
 		if(!vm_aspace_fits(as, addr, size)) {
 			mutex_unlock(&as->lock);
+			kfree(dup);
 			return STATUS_NO_MEMORY;
 		}
 
-		region = vm_region_create(as, addr, size, protection, flags,
-			VM_REGION_ALLOCATED, name);
+		region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
+		region->as = as;
+		region->start = addr;
+		region->size = size;
+		region->protection = protection;
+		region->flags = flags;
+		region->state = VM_REGION_ALLOCATED;
+		region->name = dup;
+
 		insert_region(as, region);
 		break;
 	}
@@ -1490,18 +1529,25 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 		ret = handle->type->map(handle, region);
 		if(ret != STATUS_SUCCESS) {
 			/* Free up the region again. */
-			region = vm_region_create(as, region->start,
-				region->size, 0, 0, VM_REGION_FREE, NULL);
-			insert_region(as, region);
+			free_region(as, region->start, region->size,
+				VM_REGION_FREE);
 			mutex_unlock(&as->lock);
 			return ret;
 		}
+	} else {
+		region->handle = NULL;
+		region->obj_offset = 0;
+		region->ops = NULL;
+		region->private = NULL;
 	}
 
 	/* For private or anonymous mappings we must create an anonymous map. */
+	region->amap_offset = 0;
 	if(!handle || flags & VM_MAP_PRIVATE) {
 		region->amap = vm_amap_create(size);
 		vm_amap_map(region->amap, 0, size);
+	} else {
+		region->amap = NULL;
 	}
 
 	dprintf("vm: mapped region [%p,%p) in %p (spec: %u, protection: 0x%"
@@ -1527,8 +1573,6 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
  * @return		Status code describing result of the operation.
  */
 status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
-	vm_region_t *region;
-
 	if(!size || start % PAGE_SIZE || size % PAGE_SIZE)
 		return STATUS_INVALID_ARG;
 
@@ -1539,8 +1583,7 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 		return STATUS_NO_MEMORY;
 	}
 
-	region = vm_region_create(as, start, size, 0, 0, VM_REGION_FREE, NULL);
-	insert_region(as, region);
+	free_region(as, start, size, VM_REGION_FREE);
 
 	dprintf("vm: unmapped region [%p,%p) in %p\n", start, start + size, as);
 	mutex_unlock(&as->lock);
@@ -1561,8 +1604,6 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
  * @return		Status code describing result of the operation.
  */
 status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
-	vm_region_t *region;
-
 	if(!size || start % PAGE_SIZE || size % PAGE_SIZE)
 		return STATUS_INVALID_ARG;
 
@@ -1573,8 +1614,7 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 		return STATUS_NO_MEMORY;
 	}
 
-	region = vm_region_create(as, start, size, 0, 0, VM_REGION_RESERVED, NULL);
-	insert_region(as, region);
+	free_region(as, start, size, VM_REGION_RESERVED);
 
 	dprintf("vm: reserved region [%p,%p) in %p\n", start, start + size, as);
 	mutex_unlock(&as->lock);
@@ -1626,7 +1666,20 @@ vm_aspace_t *vm_aspace_create(vm_aspace_t *parent) {
 	as->free_map = 0;
 
 	/* Insert the initial free region. */
-	region = vm_region_create(as, USER_BASE, USER_SIZE, 0, 0, VM_REGION_FREE, NULL);
+	region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
+	region->as = as;
+	region->start = USER_BASE;
+	region->size = USER_SIZE;
+	region->protection = 0;
+	region->flags = 0;
+	region->state = VM_REGION_FREE;
+	region->handle = NULL;
+	region->obj_offset = 0;
+	region->amap = NULL;
+	region->amap_offset = 0;
+	region->ops = NULL;
+	region->private = NULL;
+	region->name = NULL;
 	list_append(&as->regions, &region->header);
 	vm_freelist_insert(region, USER_SIZE);
 
