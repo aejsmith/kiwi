@@ -46,16 +46,54 @@ static volatile nstime_t system_time_sync __init_data;
 /** Get the system time (number of nanoseconds since boot).
  * @return		Number of nanoseconds since system was booted. */
 nstime_t system_time(void) {
-	return USECS2NSECS((x86_rdtsc() - curr_cpu->arch.system_time_offset)
-		/ curr_cpu->arch.cycles_per_us);
+	uint64_t usecs;
+
+	preempt_disable();
+
+	usecs = (x86_rdtsc() - curr_cpu->arch.system_time_offset)
+		/ curr_cpu->arch.cycles_per_us;
+
+	preempt_enable();
+	return USECS2NSECS(usecs);
 }
 
 /** Spin for a certain amount of time.
  * @param nsecs		Nanoseconds to spin for. */
 void spin(nstime_t nsecs) {
-	uint64_t target = x86_rdtsc() + (NSECS2USECS(nsecs) * curr_cpu->arch.cycles_per_us);
-	while(x86_rdtsc() < target)
-		arch_cpu_spin_hint();
+	uint64_t usecs, start, target, current, cycles_per_us;
+	cpu_id_t id;
+
+	usecs = NSECS2USECS(nsecs);
+
+	preempt_disable();
+
+	while(true) {
+		id = curr_cpu->id;
+		cycles_per_us = curr_cpu->arch.cycles_per_us;
+		start = x86_rdtsc();
+		target = start + (usecs * cycles_per_us);
+
+		while(true) {
+			current = x86_rdtsc();
+			if(current >= target) {
+				preempt_enable();
+				return;
+			}
+
+			preempt_enable();
+			arch_cpu_spin_hint();
+			preempt_disable();
+
+			/* We may have been migrated to a different CPU.
+			 * Recalculate the target. This can lose accuracy, but
+			 * we can only end up waiting too long rather than not
+			 * long enough. This is acceptable. */
+			if(id != curr_cpu->id) {
+				usecs -= (current - start) / cycles_per_us;
+				break;
+			}
+		}
+	}
 }
 
 /** Set up the boot time offset. */
