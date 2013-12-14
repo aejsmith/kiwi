@@ -34,15 +34,11 @@
 /** Whether a system shutdown is in progress. */
 bool shutdown_in_progress = false;
 
-#if CONFIG_SMP
-
 /** SMP call handler to halt a CPU. */
 static status_t shutdown_call_func(void *data) {
 	smp_call_acknowledge(STATUS_SUCCESS);
 	arch_cpu_halt();
 }
-
-#endif
 
 /** System shutdown thread.
  * @param _action	Action to perform once the system has been shut down.
@@ -56,10 +52,9 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 	process_shutdown();
 	kprintf(LOG_NOTICE, "system: unmounting filesystems...\n");
 	fs_shutdown();
-	#if CONFIG_SMP
-	kprintf(LOG_NOTICE, "system: shutting down other CPUs...\n");
+
+	/* Halt all remote CPUs. */
 	smp_call_broadcast(shutdown_call_func, NULL, 0);
-	#endif
 
 	switch(action) {
 	case SHUTDOWN_REBOOT:

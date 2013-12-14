@@ -451,6 +451,12 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 	return cpu;
 }
 
+#else /* CONFIG_SMP */
+
+static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
+	return curr_cpu;
+}
+
 #endif /* CONFIG_SMP */
 
 /** Insert a thread into the scheduler.
@@ -467,14 +473,9 @@ void sched_insert_thread(thread_t *thread) {
 		sched_calculate_priority(thread);
 	}
 
-	#if CONFIG_SMP
-	if(!thread->wired && !thread->preempt_count) {
-		/* Pick a new CPU for the thread to run on. */
+	/* Pick a new CPU for the thread to run on. */
+	if(!thread->wired && !thread->preempt_count)
 		thread->cpu = sched_allocate_cpu(thread);
-	}
-	#else
-	thread->cpu = curr_cpu;
-	#endif
 
 	sched = thread->cpu->sched;
 	spinlock_lock(&sched->lock);

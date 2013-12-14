@@ -441,11 +441,9 @@ static bool thread_interrupt_internal(thread_t *thread, unsigned flags) {
 		 * is cleared at kernel entry and exit). */
 		thread->flags |= THREAD_INTERRUPTED;
 
-		#if CONFIG_SMP
 		/* If the thread is running on a different CPU, interrupt it. */
-		if(thread->state == THREAD_RUNNING && thread->cpu != curr_cpu)
+		if(thread->cpu->id != curr_cpu->id && thread->state == THREAD_RUNNING)
 			smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
-		#endif
 	}
 
 	spinlock_unlock(&thread->lock);

@@ -177,15 +177,17 @@ static void smp_call_queue(smp_call_t *call, cpu_t *cpu) {
 }
 
 /**
- * Call a function on a single remote CPU.
+ * Call a function on a single CPU.
  *
- * Interrupts a single remote CPU and causes the specified function to be
- * called on it. If the SMP_CALL_ASYNC flag is specified, this function will
- * return immediately after queueing the call. Otherwise, it will not return
- * until the called function returns, or it calls smp_call_acknowledge().
+ * Interrupts a single CPU and causes the specified function to be called on it.
+ * If the SMP_CALL_ASYNC flag is specified, this function will return
+ * immediately after queueing the call. Otherwise, it will not return until the
+ * called function returns, or it calls smp_call_acknowledge(). The function
+ * pointer can be specified as NULL, which has the effect of prodding the CPU
+ * to reschedule if it is idle.
  *
- * The function pointer can be specified as NULL, which has the effect of
- * prodding the CPU to reschedule if it is idle.
+ * If the CPU specified is the current CPU, the function will be called
+ * directly, and this function will not return until it has completed.
  *
  * @param dest		Destination CPU ID (must exist).
  * @param func		Function to call (can be NULL, as explained above).
@@ -205,18 +207,22 @@ status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigne
 
 	state = local_irq_disable();
 
-	/* Don't do anything if the call system isn't enabled. */
+	if(dest == curr_cpu->id) {
+		ret = func(arg);
+		local_irq_restore(state);
+		return ret;
+	}
+
+	/* Don't do anything more if the call system isn't enabled, other CPUs
+	 * won't be up. */
 	if(!smp_call_enabled) {
 		local_irq_restore(state);
 		return STATUS_SUCCESS;
 	}
 
-	/* Destination must exist, and must not be ourself. */
-	if(dest > highest_cpu_id || !cpus[dest]) {
+	/* Destination must exist. */
+	if(dest > highest_cpu_id || !cpus[dest])
 		fatal("Attempting to call on non-existant CPU");
-	} else if(dest == curr_cpu->id) {
-		fatal("Should not be calling current CPU");
-	}
 
 	call = smp_call_get();
 	call->func = func;

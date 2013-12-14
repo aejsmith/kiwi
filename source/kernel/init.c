@@ -58,14 +58,6 @@
 KBOOT_IMAGE(KBOOT_IMAGE_LOG | KBOOT_IMAGE_SECTIONS);
 KBOOT_BOOLEAN_OPTION("early_kdb", "Enter KDB during initialization", false);
 
-extern void kmain_bsp(uint32_t magic, kboot_tag_t *tags);
-#if CONFIG_SMP
-extern void kmain_ap(cpu_t *cpu);
-#endif
-
-extern initcall_t __initcall_start[], __initcall_end[];
-extern fs_mount_t *root_mount;
-
 static void init_thread(void *arg1, void *arg2);
 
 /** Address of the KBoot tag list. */
@@ -119,9 +111,7 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	cpu_init();
 	platform_init();
 	time_init();
-	#if CONFIG_SMP
 	smp_init();
-	#endif
 	slab_late_init();
 
 	/* Perform other initialization tasks. */
@@ -144,6 +134,7 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 }
 
 #if CONFIG_SMP
+
 /** Kernel entry point for a secondary CPU.
  * @param cpu		Pointer to CPU structure for the CPU. */
 __init_text void kmain_ap(cpu_t *cpu) {
@@ -166,7 +157,8 @@ __init_text void kmain_ap(cpu_t *cpu) {
 	/* Begin scheduling threads. */
 	sched_enter();
 }
-#endif
+
+#endif /* CONFIG_SMP */
 
 /** Second-stage intialization thread.
  * @param arg1		Unused.
@@ -181,9 +173,7 @@ static void init_thread(void *arg1, void *arg2) {
 	status_t ret;
 
 	/* Bring up all detected secondary CPUs. */
-	#if CONFIG_SMP
 	smp_boot();
-	#endif
 
 	kprintf(LOG_NOTICE, "cpu: detected %zu CPU(s):\n", cpu_count);
 	LIST_FOREACH(&running_cpus, iter)

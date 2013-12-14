@@ -1780,10 +1780,8 @@ static status_t switch_to_kernel(void *_as) {
  * @param as		Address space to destroy.
  */
 void vm_aspace_destroy(vm_aspace_t *as) {
-	#if CONFIG_SMP
 	cpu_t *cpu;
 	bool state;
-	#endif
 
 	assert(as);
 
@@ -1792,24 +1790,16 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	 * (see the comment in vm_aspace_switch()). We need to go through
 	 * and prod any CPUs that are using it. */
 	if(refcount_get(&as->count) > 0) {
-		#if CONFIG_SMP
 		state = local_irq_disable();
 
 		LIST_FOREACH(&running_cpus, iter) {
 			cpu = list_entry(iter, cpu_t, header);
-			if(cpu->aspace == as) {
-				if(cpu == curr_cpu) {
-					switch_to_kernel(as);
-				} else {
-					smp_call_single(cpu->id, switch_to_kernel, as, 0);
-				}
-			}
+
+			if(cpu->aspace == as)
+				smp_call_single(cpu->id, switch_to_kernel, as, 0);
 		}
 
 		local_irq_restore(state);
-		#else
-		switch_to_kernel(as);
-		#endif
 
 		/* The address space should no longer be in use. */
 		assert(refcount_get(&as->count) == 0);

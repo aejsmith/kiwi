@@ -861,10 +861,8 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 		}
 	}
 
-	#if CONFIG_SMP
 	/* Ask all other CPUs to pause execution. */
 	arch_kdb_trap_cpus();
-	#endif
 
 	curr_kdb_frame = frame;
 

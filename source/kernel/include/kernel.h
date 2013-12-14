@@ -31,6 +31,7 @@
 
 struct cpu;
 struct intr_frame;
+struct kboot_tag;
 
 extern notifier_t fatal_notifier;
 extern bool shutdown_in_progress;
@@ -50,6 +51,8 @@ typedef void (*initcall_t)(void);
  *			the order that they are in the initcall section. */
 #define INITCALL(func)	\
 	static ptr_t __initcall_##func __section(".init.initcalls") __used = (ptr_t)func
+
+extern initcall_t __initcall_start[], __initcall_end[];
 
 extern void platform_init(void);
 extern void platform_reboot(void);
@@ -73,5 +76,10 @@ extern void log_early_init(void);
 
 extern void preempt_disable(void);
 extern void preempt_enable(void);
+
+extern void kmain_bsp(uint32_t magic, struct kboot_tag *tags);
+#if CONFIG_SMP
+extern void kmain_ap(struct cpu *cpu);
+#endif
 
 #endif /* __KERNEL_H */

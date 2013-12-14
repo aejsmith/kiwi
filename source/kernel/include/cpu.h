@@ -84,6 +84,7 @@ extern cpu_t **cpus;
 #if CONFIG_SMP
 extern cpu_t *cpu_register(cpu_id_t id, int state);
 #endif
+
 extern cpu_id_t cpu_id(void);
 extern void cpu_dump(cpu_t *cpu);
 
