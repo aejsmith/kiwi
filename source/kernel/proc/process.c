@@ -1169,13 +1169,11 @@ status_t kern_process_exec(const char *path, const char *const args[],
  * @param arg2		User-specified handle location. */
 static void process_clone_thread(void *arg1, void *arg2) {
 	intr_frame_t frame;
-	handle_t handle;
 
 	/* Set the user's handle to INVALID_HANDLE for it to determine that it
 	 * is the child process. This should succeed as in the parent process
 	 * we wrote the address successfully. */
-	handle = INVALID_HANDLE;
-	memcpy_to_user(arg2, &handle, sizeof(handle));
+	write_user((handle_t *)arg2, INVALID_HANDLE);
 
 	/* Copy the allocated frame onto the kernel stack and free it. */
 	memcpy(&frame, arg1, sizeof(frame));
@@ -1387,10 +1385,10 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 	}
 
 	if(statusp)
-		ret = memcpy_to_user(statusp, &process->status, sizeof(*statusp));
+		ret = write_user(statusp, process->status);
 
 	if(reasonp)
-		ret = memcpy_to_user(reasonp, &process->reason, sizeof(*reasonp));
+		ret = write_user(reasonp, process->reason);
 
 	object_handle_release(khandle);
 	return ret;

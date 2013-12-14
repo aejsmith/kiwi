@@ -403,7 +403,7 @@ status_t kern_signal_stack(const stack_t *newp, stack_t *oldp) {
 			return STATUS_INVALID_ARG;
 
 		/* Check whether the provided stack range is valid. */
-		if(!validate_user_range(kstack.ss_sp, kstack.ss_size))
+		if(!is_user_range(kstack.ss_sp, kstack.ss_size))
 			return STATUS_INVALID_ADDR;
 
 		memcpy(&curr_thread->signal_stack, &kstack, sizeof(kstack));

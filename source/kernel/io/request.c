@@ -73,7 +73,7 @@ status_t io_request_init(io_request_t *request, const io_vec_t *vecs, size_t cou
 
 		/* Validate addresses on user address spaces. */
 		if(target == IO_TARGET_USER) {
-			if(!validate_user_range(vecs[i].buffer, vecs[i].size)) {
+			if(!is_user_range(vecs[i].buffer, vecs[i].size)) {
 				kfree(request->vecs);
 				return STATUS_INVALID_ADDR;
 			}

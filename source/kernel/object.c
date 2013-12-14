@@ -257,7 +257,7 @@ status_t object_handle_attach(object_handle_t *handle, handle_t *idp, handle_t *
 		*idp = id;
 
 	if(uidp) {
-		ret = memcpy_to_user(uidp, &id, sizeof(*uidp));
+		ret = write_user(uidp, id);
 		if(ret != STATUS_SUCCESS) {
 			rwlock_unlock(&curr_proc->handles->lock);
 			return ret;
@@ -691,8 +691,7 @@ status_t kern_handle_flags(handle_t handle, uint32_t *flagsp) {
 		return STATUS_INVALID_HANDLE;
 	}
 
-	ret = memcpy_to_user(flagsp, &curr_proc->handles->flags[handle],
-		sizeof(*flagsp));
+	ret = write_user(flagsp, curr_proc->handles->flags[handle]);
 	rwlock_unlock(&curr_proc->handles->lock);
 	return ret;
 }
@@ -804,7 +803,7 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *newp) {
 		}
 	}
 
-	ret = memcpy_to_user(newp, &dest, sizeof(*newp));
+	ret = write_user(newp, dest);
 	if(ret != STATUS_SUCCESS) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return ret;

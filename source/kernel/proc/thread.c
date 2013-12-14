@@ -1016,7 +1016,7 @@ status_t kern_thread_create(const char *name, thread_entry_t *entry,
 		if(!kentry.stack_size)
 			return STATUS_INVALID_ARG;
 
-		if(!validate_user_range(kentry.stack, kentry.stack_size))
+		if(!is_user_range(kentry.stack, kentry.stack_size))
 			return STATUS_INVALID_ADDR;
 	}
 
@@ -1208,7 +1208,7 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 		return STATUS_STILL_RUNNING;
 	}
 
-	ret = memcpy_to_user(statusp, &thread->status, sizeof(int));
+	ret = write_user(statusp, thread->status);
 	object_handle_release(khandle);
 	return ret;
 }
@@ -1228,7 +1228,6 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 status_t kern_thread_token(handle_t *handlep) {
 	token_t *token;
 	object_handle_t *handle;
-	handle_t uhandle;
 	status_t ret;
 
 	if(!handlep)
@@ -1247,9 +1246,7 @@ status_t kern_thread_token(handle_t *handlep) {
 		ret = object_handle_attach(handle, NULL, handlep);
 		object_handle_release(handle);
 	} else {
-		/* FIXME: user_write* functions */
-		uhandle = INVALID_HANDLE;
-		ret = memcpy_to_user(handlep, &uhandle, sizeof(uhandle));
+		ret = write_user(handlep, INVALID_HANDLE);
 	}
 
 	return ret;
@@ -1304,7 +1301,7 @@ status_t kern_thread_set_token(handle_t handle) {
  *			be stored here if the wait is interrupted.
  * @return		Status code describing result of the operation. */
 status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp) {
-	nstime_t begin, elapsed, rem;
+	nstime_t begin, elapsed;
 	status_t ret;
 
 	if(nsecs < 0)
@@ -1320,12 +1317,12 @@ status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp) {
 	if(ret == STATUS_INTERRUPTED && remp) {
 		elapsed = system_time() - begin;
 		if(elapsed < nsecs) {
-			rem = nsecs - elapsed;
-			memcpy_to_user(remp, &rem, sizeof(rem));
+			write_user(remp, nsecs - elapsed);
 		} else {
 			ret = STATUS_SUCCESS;
 		}
 	}
+
 	return ret;
 }
 
@@ -1342,13 +1339,11 @@ void kern_thread_exit(int status) {
  * @param out		Pointer to output buffer.
  * @return		Status code describing result of the operation. */
 status_t kern_thread_control(unsigned action, const void *in, void *out) {
-	ptr_t addr;
 	status_t ret;
 
 	switch(action) {
 	case THREAD_GET_TLS_ADDR:
-		addr = arch_thread_tls_addr(curr_thread);
-		ret = memcpy_to_user(out, &addr, sizeof(addr));
+		ret = write_user((ptr_t *)out, arch_thread_tls_addr(curr_thread));
 		break;
 	case THREAD_SET_TLS_ADDR:
 		ret = arch_thread_set_tls_addr(curr_thread, (ptr_t)in);

@@ -612,7 +612,7 @@ status_t kern_timer_stop(handle_t handle, nstime_t *remp) {
 		timer_stop(&timer->timer);
 		if(remp) {
 			rem = system_time() - timer->timer.target;
-			ret = memcpy_to_user(remp, &rem, sizeof(*remp));
+			ret = write_user(remp, rem);
 		}
 	} else if(remp) {
 		ret = memset_user(remp, 0, sizeof(*remp));
@@ -626,14 +626,12 @@ status_t kern_timer_stop(handle_t handle, nstime_t *remp) {
  * @param timep		Where to store number of nanoseconds since boot.
  * @return		Status code describing result of the operation. */
 status_t kern_system_time(nstime_t *timep) {
-	nstime_t ret = system_time();
-	return memcpy_to_user(timep, &ret, sizeof(ret));
+	return write_user(timep, system_time());
 }
 
 /** Get the time since the UNIX epoch.
  * @param timep		Where to store number of nanoseconds since the epoch.
  * @return		Status code describing result of the operation. */
 status_t kern_unix_time(nstime_t *timep) {
-	nstime_t ret = unix_time();
-	return memcpy_to_user(timep, &ret, sizeof(ret));
+	return write_user(timep, unix_time());
 }

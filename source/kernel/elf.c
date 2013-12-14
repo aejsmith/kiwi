@@ -1050,9 +1050,9 @@ status_t kern_image_register(image_info_t *info, image_id_t *idp) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	if(kinfo.load_base && !validate_user_range(kinfo.load_base, kinfo.load_size)) {
+	if(kinfo.load_base && !is_user_range(kinfo.load_base, kinfo.load_size)) {
 		return STATUS_INVALID_ADDR;
-	} else if(kinfo.symtab && !validate_user_range(kinfo.symtab, kinfo.sym_size)) {
+	} else if(kinfo.symtab && !is_user_range(kinfo.symtab, kinfo.sym_size)) {
 		return STATUS_INVALID_ADDR;
 	} else if(kinfo.strtab && !is_user_address(kinfo.strtab)) {
 		return STATUS_INVALID_ADDR;
@@ -1078,7 +1078,7 @@ status_t kern_image_register(image_info_t *info, image_id_t *idp) {
 
 	mutex_lock(&curr_proc->lock);
 
-	ret = memcpy_to_user(idp, &curr_proc->next_image_id, sizeof(*idp));
+	ret = write_user(idp, curr_proc->next_image_id);
 	if(ret != STATUS_SUCCESS) {
 		mutex_unlock(&curr_proc->lock);
 		kfree(image->name);

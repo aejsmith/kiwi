@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,50 +31,27 @@
 #include <setjmp.h>
 #include <status.h>
 
-/** Check if an address is valid. */
-#if USER_BASE == 0
-# define VALID(addr, count)		\
-	(((addr) + (count)) <= USER_SIZE && ((addr) + (count)) >= (addr))
-#else
-# define VALID(addr, count)			\
-	((addr) >= USER_BASE && ((addr) + (count)) <= (USER_BASE + USER_SIZE) && ((addr) + (count)) >= (addr))
-#endif
-
 /** Common entry code for userspace memory functions. */
-#define USERMEM_ENTER()			\
-	if(setjmp(curr_thread->usermem_context) != 0) { \
+#define usermem_enter() \
+	if(setjmp(curr_thread->usermem_context) != 0) \
 		return STATUS_INVALID_ADDR; \
-	} \
-	curr_thread->in_usermem = true
+	\
+	curr_thread->in_usermem = true; \
+	compiler_barrier()
 
 /** Common exit code for userspace memory functions. */
-#define USERMEM_EXIT(status)		\
-	curr_thread->in_usermem = false; \
-	return (status)
-
-/** Return success from a userspace memory function. */
-#define USERMEM_SUCCESS()		USERMEM_EXIT(STATUS_SUCCESS)
-
-/** Return failure from a userspace memory function. */
-#define USERMEM_FAIL()			USERMEM_EXIT(STATUS_INVALID_ADDR)
+#define usermem_exit() \
+	compiler_barrier(); \
+	curr_thread->in_usermem = false
 
 /** Code to check parameters execute a statement. */
-#define USERMEM_WRAP(addr, count, stmt)	\
-	if(!VALID((ptr_t)addr, count)) { \
+#define usermem_wrap(addr, count, stmt)	\
+	if(!is_user_range(addr, count)) \
 		return STATUS_INVALID_ADDR; \
-	} \
-	USERMEM_ENTER(); \
+	usermem_enter(); \
 	stmt; \
-	USERMEM_SUCCESS()
-
-/** Check if an address range is within userspace memory.
- * @note		Does not check if the memory is actually accessible!
- * @param dest		Base address.
- * @param size		Size of range.
- * @return		Whether the address range is valid. */
-bool validate_user_range(void *dest, size_t size) {
-	return VALID((ptr_t)dest, size);
-}
+	usermem_exit(); \
+	return STATUS_SUCCESS
 
 /** Copy data from user memory.
  * @param dest		The kernel memory area to copy to.
@@ -83,7 +60,7 @@ bool validate_user_range(void *dest, size_t size) {
  * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
  *			failure. */
 status_t memcpy_from_user(void *dest, const void *src, size_t count) {
-	USERMEM_WRAP(src, count, memcpy(dest, src, count));
+	usermem_wrap(src, count, memcpy(dest, src, count));
 }
 
 /** Copy data to user memory.
@@ -93,7 +70,7 @@ status_t memcpy_from_user(void *dest, const void *src, size_t count) {
  * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
  *			failure. */
 status_t memcpy_to_user(void *dest, const void *src, size_t count) {
-	USERMEM_WRAP(dest, count, memcpy(dest, src, count));
+	usermem_wrap(dest, count, memcpy(dest, src, count));
 }
 
 /** Fill a user memory area.
@@ -103,7 +80,7 @@ status_t memcpy_to_user(void *dest, const void *src, size_t count) {
  * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
  *			failure. */
 status_t memset_user(void *dest, int val, size_t count) {
-	USERMEM_WRAP(dest, count, memset(dest, val, count));
+	usermem_wrap(dest, count, memset(dest, val, count));
 }
 
 /** Get the length of a user string.
@@ -114,12 +91,12 @@ status_t memset_user(void *dest, int val, size_t count) {
 status_t strlen_user(const char *str, size_t *lenp) {
 	size_t retval = 0;
 
-	USERMEM_ENTER();
+	usermem_enter();
 
-	/* Yeah... this is horrible. */
 	while(true) {
-		if(!VALID((ptr_t)str, retval + 1)) {
-			USERMEM_FAIL();
+		if(!is_user_range(str, retval + 1)) {
+			usermem_exit();
+			return STATUS_INVALID_ADDR;
 		} else if(str[retval] == 0) {
 			break;
 		}
@@ -128,7 +105,8 @@ status_t strlen_user(const char *str, size_t *lenp) {
 	}
 
 	*lenp = retval;
-	USERMEM_SUCCESS();
+	usermem_exit();
+	return STATUS_SUCCESS;
 }
 
 /**
@@ -271,3 +249,27 @@ fail:
 
 	return ret;
 }
+
+#define BUILD_READ(width) \
+	status_t __read_user##width(const void *_ptr, void *_dest) { \
+		const uint##width##_t *ptr = _ptr; \
+		uint##width##_t *dest = _dest; \
+		usermem_wrap(ptr, 4, *dest = *ptr); \
+	}
+
+BUILD_READ(64);
+BUILD_READ(32);
+BUILD_READ(16);
+BUILD_READ(8);
+
+#define BUILD_WRITE(width) \
+	status_t __write_user##width(void *_ptr, const void *_src) { \
+		uint##width##_t *ptr = _ptr; \
+		const uint##width##_t *src = _src; \
+		usermem_wrap(ptr, 4, *ptr = *src); \
+	}
+
+BUILD_WRITE(64);
+BUILD_WRITE(32);
+BUILD_WRITE(16);
+BUILD_WRITE(8);

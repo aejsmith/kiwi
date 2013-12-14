@@ -255,9 +255,7 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 	futex_finish(addr);
 
 	/* Store the number of woken threads if requested. */
-	return (wokenp)
-		? memcpy_to_user(wokenp, &woken, sizeof(*wokenp))
-		: STATUS_SUCCESS;
+	return (wokenp) ? write_user(wokenp, woken) : STATUS_SUCCESS;
 }
 
 /**
@@ -356,7 +354,7 @@ out:
 
 	/* Store the number of woken threads if requested. */
 	if(ret == STATUS_SUCCESS && wokenp)
-		ret = memcpy_to_user(wokenp, &woken, sizeof(*wokenp));
+		ret = write_user(wokenp, woken);
 
 	return ret;
 }

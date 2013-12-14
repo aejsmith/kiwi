@@ -820,7 +820,7 @@ status_t kern_device_request(handle_t handle, unsigned request, const void *in,
 		}
 
 		if(bytesp) {
-			err = memcpy_to_user(bytesp, &koutsz, sizeof(*bytesp));
+			err = write_user(bytesp, koutsz);
 			if(err != STATUS_SUCCESS)
 				ret = err;
 		}

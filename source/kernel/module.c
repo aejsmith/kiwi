@@ -582,7 +582,7 @@ status_t kern_module_info(module_info_t *infop, size_t *countp) {
 	status_t ret;
 
 	if(infop) {
-		ret = memcpy_from_user(&count, countp, sizeof(count));
+		ret = read_user(countp, &count);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		} else if(!count) {
@@ -615,6 +615,6 @@ status_t kern_module_info(module_info_t *infop, size_t *countp) {
 	}
 
 	mutex_unlock(&module_lock);
-	return memcpy_to_user(countp, &i, sizeof(i));
+	return write_user(countp, i);
 }
 #endif

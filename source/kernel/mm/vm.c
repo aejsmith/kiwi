@@ -91,6 +91,7 @@
 
 #include <assert.h>
 #include <kdb.h>
+#include <setjmp.h>
 #include <smp.h>
 #include <status.h>
 
@@ -977,6 +978,7 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 	vm_region_t *region;
 	siginfo_t info;
 	status_t ret;
+	bool in_usermem;
 
 	assert(!local_irq_state());
 
@@ -998,6 +1000,9 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 			frame->ip);
 		return STATUS_INVALID_ADDR;
 	}
+
+	in_usermem = curr_thread->in_usermem;
+	curr_thread->in_usermem = false;
 
 	mutex_lock(&as->lock);
 
@@ -1069,8 +1074,12 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 	}
 out:
 	mutex_unlock(&as->lock);
+	curr_thread->in_usermem = in_usermem;
 
-	if(ret != STATUS_SUCCESS && intr_frame_from_user(frame)) {
+	if(ret == STATUS_SUCCESS)
+		return ret;
+
+	if(intr_frame_from_user(frame)) {
 		kdb_enter(KDB_REASON_USER, frame);
 
 		/* Send a signal to the thread. */
@@ -1093,6 +1102,12 @@ out:
 
 		signal_send(curr_thread, info.si_signo, &info, true);
 		ret = STATUS_SUCCESS;
+	} else if(curr_thread->in_usermem && is_user_address((void *)addr)) {
+		/* Handle faults in safe user memory access functions. */
+		kprintf(LOG_DEBUG, "vm: thread %" PRId32 " (%s) faulted in "
+			"user memory access at %p (ip: %p)\n", curr_thread->id,
+			curr_thread->name, addr, frame->ip);
+		longjmp(curr_thread->usermem_context, 1);
 	}
 
 	return ret;
@@ -2124,7 +2139,7 @@ status_t kern_vm_map(void **addrp, size_t size, unsigned spec, uint32_t protecti
 	if(!addrp)
 		return STATUS_INVALID_ARG;
 
-	ret = memcpy_from_user(&addr, addrp, sizeof(addr));
+	ret = read_user((ptr_t *)addrp, &addr);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -2146,7 +2161,7 @@ status_t kern_vm_map(void **addrp, size_t size, unsigned spec, uint32_t protecti
 		khandle, offset, kname);
 
 	if(ret == STATUS_SUCCESS) {
-		ret = memcpy_to_user(addrp, &addr, sizeof(addr));
+		ret = write_user((ptr_t *)addrp, addr);
 		if(ret != STATUS_SUCCESS)
 			vm_unmap(curr_proc->aspace, addr, size);
 	}

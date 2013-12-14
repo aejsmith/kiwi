@@ -230,16 +230,8 @@ static void page_fault(intr_frame_t *frame) {
 
 	ret = vm_fault(frame, addr, reason, access);
 	if(ret != STATUS_SUCCESS) {
-		/* Handle faults in safe user memory access functions. */
-		if(curr_thread && curr_thread->in_usermem && is_user_address((void *)addr)) {
-			kprintf(LOG_DEBUG, "arch: thread %" PRId32 " (%s) faulted "
-				"in usermem at %p (ip: %p)\n", curr_thread->id,
-				curr_thread->name, addr, frame->ip);
-			kdb_enter(KDB_REASON_USER, frame);
-			longjmp(curr_thread->usermem_context, 1);
-		}
-
-		fatal_etc(frame, "Unhandled %s-mode page fault exception at %p (%d)",
+		fatal_etc(frame,
+			"Unhandled %s-mode page fault exception at %p (%d)",
 			(frame->cs & 3) ? "user" : "kernel", addr, ret);
 	}
 }
@@ -312,7 +304,7 @@ __init_text void intr_init(void) {
 	size_t i;
 
 	/* Install default handlers. 0-31 are exceptions, 32-47 are IRQs, the
-	 * rest should be pointed to the unhandled interrupt function */
+	 * rest should be pointed to the unhandled interrupt function. */
 	for(i = 0; i < 32; i++)
 		intr_table[i] = except_handler;
 	for(i = 32; i < 48; i++)

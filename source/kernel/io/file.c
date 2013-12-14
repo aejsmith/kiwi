@@ -751,7 +751,7 @@ status_t kern_file_read(handle_t handle, void *buf, size_t size, offset_t offset
 	object_handle_release(khandle);
 out:
 	if(bytesp) {
-		err = memcpy_to_user(bytesp, &request.transferred, sizeof(*bytesp));
+		err = write_user(bytesp, request.transferred);
 		if(err != STATUS_SUCCESS)
 			ret = err;
 	}
@@ -815,7 +815,7 @@ status_t kern_file_write(handle_t handle, const void *buf, size_t size,
 	object_handle_release(khandle);
 out:
 	if(bytesp) {
-		err = memcpy_to_user(bytesp, &request.transferred, sizeof(*bytesp));
+		err = write_user(bytesp, request.transferred);
 		if(err != STATUS_SUCCESS)
 			ret = err;
 	}
@@ -889,7 +889,7 @@ status_t kern_file_read_vecs(handle_t handle, const io_vec_t *vecs, size_t count
 	object_handle_release(khandle);
 out:
 	if(bytesp) {
-		err = memcpy_to_user(bytesp, &request.transferred, sizeof(*bytesp));
+		err = write_user(bytesp, request.transferred);
 		if(err != STATUS_SUCCESS)
 			ret = err;
 	}
@@ -964,7 +964,7 @@ status_t kern_file_write_vecs(handle_t handle, const io_vec_t *vecs, size_t coun
 	object_handle_release(khandle);
 out:
 	if(bytesp) {
-		err = memcpy_to_user(bytesp, &request.transferred, sizeof(*bytesp));
+		err = write_user(bytesp, request.transferred);
 		if(err != STATUS_SUCCESS)
 			ret = err;
 	}
@@ -1053,7 +1053,7 @@ status_t kern_file_rights(handle_t handle, uint32_t *rightsp) {
 
 	ret = file_rights(khandle, &rights);
 	if(ret == STATUS_SUCCESS)
-		ret = memcpy_to_user(rightsp, &rights, sizeof(*rightsp));
+		ret = write_user(rightsp, rights);
 
 	object_handle_release(khandle);
 	return ret;
@@ -1076,7 +1076,7 @@ status_t kern_file_flags(handle_t handle, uint32_t *flagsp) {
 
 	ret = file_flags(khandle, &flags);
 	if(ret == STATUS_SUCCESS)
-		ret = memcpy_to_user(flagsp, &flags, sizeof(*flagsp));
+		ret = write_user(flagsp, flags);
 
 	object_handle_release(khandle);
 	return ret;
@@ -1125,7 +1125,7 @@ status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset,
 
 	ret = file_seek(khandle, action, offset, &result);
 	if(ret == STATUS_SUCCESS && resultp)
-		ret = memcpy_to_user(resultp, &result, sizeof(*resultp));
+		ret = write_user(resultp, result);
 
 	object_handle_release(khandle);
 	return ret;
