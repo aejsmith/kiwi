@@ -28,12 +28,17 @@
 
 /** Raise a fatal error if the given condition is not met.
  * @param cond		Condition to test. */
-#define assert(cond)	if(unlikely(!(cond))) { __assert_fail(#cond, __FILE__, __LINE__); }
+#define assert(cond)	\
+	if(unlikely(!(cond))) { __assert_fail(#cond, __FILE__, __LINE__); }
 
 #else
 #define assert(cond)	((void)0)
 #endif
 
 extern void __assert_fail(const char *cond, const char *file, int line) __noreturn;
+
+#ifndef __cplusplus
+#define static_assert(cond)	_Static_assert(cond)
+#endif
 
 #endif /* __ASSERT_H */
