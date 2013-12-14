@@ -52,14 +52,6 @@ config SLAB_TRACING
 	  useful to run through the allocation statistics script in the
 	  utilities directory.
 
-config DEBUGGER_DELAY
-	int "Time to wait for debugger connection"
-	default 0
-	help
-	  If not 0, this option adds a delay in the kernel initialisation
-	  process which allows time, for example, for GDB to be connected to
-	  QEMU.
-
 config PAGE_DEBUG
 	bool "Physical memory debug output"
 	default n

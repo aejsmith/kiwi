@@ -56,6 +56,7 @@
 #include <time.h>
 
 KBOOT_IMAGE(KBOOT_IMAGE_LOG | KBOOT_IMAGE_SECTIONS);
+KBOOT_BOOLEAN_OPTION("early_kdb", "Enter KDB during initialization", false);
 
 extern void kmain_bsp(uint32_t magic, kboot_tag_t *tags);
 #if CONFIG_SMP
@@ -111,6 +112,9 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	/* Properly set up the console. */
 	console_init();
 
+	if(kboot_boolean_option("early_kdb"))
+		kdb_enter(KDB_REASON_USER, NULL);
+
 	/* Finish initializing the CPU subsystem and set up the platform. */
 	cpu_init();
 	platform_init();
@@ -119,12 +123,6 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	smp_init();
 	#endif
 	slab_late_init();
-
-	#if CONFIG_DEBUGGER_DELAY > 0
-	/* Delay to allow GDB to be connected. */
-	kprintf(LOG_NOTICE, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
-	spin(SECS2NSECS(CONFIG_DEBUGGER_DELAY));
-	#endif
 
 	/* Perform other initialization tasks. */
 	object_init();
