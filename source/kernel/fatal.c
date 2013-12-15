@@ -27,6 +27,8 @@
 
 #include <mm/safe.h>
 
+#include <security/security.h>
+
 #include <assert.h>
 #include <console.h>
 #include <cpu.h>
@@ -97,12 +99,15 @@ void __assert_fail(const char *cond, const char *file, int line) {
  * Print a fatal error message and halt the system.
  *
  * Prints a fatal error message and halts the system. The calling process must
- * have the CAP_FATAL capability.
+ * have the PRIV_FATAL privilege.
  *
  * @param message	Message to print.
  */
 void kern_fatal(const char *message) {
 	char *kmessage;
+
+	if(!security_check_priv(PRIV_FATAL))
+		return;
 
 	if(strdup_from_user(message, &kmessage) != STATUS_SUCCESS)
 		return;
