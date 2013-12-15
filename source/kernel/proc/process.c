@@ -69,14 +69,18 @@
 
 /** Structure containing process loading information. */
 typedef struct process_load {
-	const char *path;		/**< Path to program. */
-	const char *const *args;	/**< Argument array. */
+	char *path;			/**< Path to program. */
+	char **args;			/**< Argument array. */
 	size_t arg_count;		/**< Argument count. */
-	const char *const *env;		/**< Environment array. */
+	char **env;			/**< Environment array. */
 	size_t env_count;		/**< Environment variable count. */
 	handle_t (*map)[2];		/**< Handle mapping array. */
+	ssize_t map_count;		/**< Size of mapping array. */
 
-	struct vm_aspace *aspace;	/**< Address space for the process. */
+	token_t *token;			/**< Token for the process. */
+	vm_aspace_t *aspace;		/**< Address space for the process. */
+	handle_table_t *handles;	/**< Handle table. */
+
 	elf_image_t *image;		/**< ELF loader data. */
 	ptr_t arg_block;		/**< Address of argument block mapping. */
 	ptr_t stack;			/**< Address of stack mapping. */
@@ -177,8 +181,9 @@ void process_release(process_t *process) {
 	token_release(process->token);
 	id_allocator_free(&process_id_allocator, process->id);
 
-	dprintf("process: destroyed process %" PRId32 " (%s) (process: %p, status: %d)\n",
-		process->id, process->name, process, process->status);
+	dprintf("process: destroyed process %" PRId32 " (%s) (process: %p, "
+		"status: %d)\n", process->id, process->name, process,
+		process->status);
 
 	kfree(process->name);
 	slab_cache_free(process_cache, process);
@@ -232,7 +237,7 @@ void process_thread_exited(thread_t *thread) {
 		process_cleanup(process);
 
 		/* If the create info pointer is not NULL, a process_create()
-		 * call is waiting. Make it return with the process' exit code. */
+		 * call is waiting. Make it return with the exit code. */
 		if(process->load) {
 			process->load->status = process->status;
 			semaphore_up(&process->load->sem, 1);
@@ -266,7 +271,8 @@ static void process_object_close(object_handle_t *handle) {
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t process_object_wait(object_handle_t *handle, unsigned event, void *wait) {
+static status_t
+process_object_wait(object_handle_t *handle, unsigned event, void *wait) {
 	process_t *process = handle->private;
 
 	switch(event) {
@@ -274,7 +280,8 @@ static status_t process_object_wait(object_handle_t *handle, unsigned event, voi
 		if(process->state == PROCESS_DEAD) {
 			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&process->death_notifier, object_wait_notifier, wait);
+			notifier_register(&process->death_notifier,
+				object_wait_notifier, wait);
 		}
 
 		return STATUS_SUCCESS;
@@ -287,12 +294,14 @@ static status_t process_object_wait(object_handle_t *handle, unsigned event, voi
  * @param handle	Handle to process.
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer. */
-static void process_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
+static void
+process_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
 	process_t *process = handle->private;
 
 	switch(event) {
 	case PROCESS_EVENT_DEATH:
-		notifier_unregister(&process->death_notifier, object_wait_notifier, wait);
+		notifier_unregister(&process->death_notifier,
+			object_wait_notifier, wait);
 		break;
 	}
 }
@@ -388,9 +397,10 @@ process_t *process_lookup(process_id_t id) {
  *			Reference count will be set to 1.
  * @return		STATUS_SUCCESS if successful, STATUS_PROCESS_LIMIT if
  *			unable to allocate an ID. */
-static status_t process_alloc(const char *name, process_id_t id, int priority,
-	token_t *token, vm_aspace_t *aspace, handle_table_t *handles,
-	process_t *parent, process_t **procp)
+static status_t
+process_alloc(const char *name, process_id_t id, int priority, token_t *token,
+	vm_aspace_t *aspace, handle_table_t *handles, process_t *parent,
+	process_t **procp)
 {
 	process_t *process;
 
@@ -423,8 +433,9 @@ static status_t process_alloc(const char *name, process_id_t id, int priority,
 	avl_tree_insert(&process_tree, process->id, &process->tree_link);
 	rwlock_unlock(&process_tree_lock);
 
-	dprintf("process: created process %" PRId32 " (%s) (process: %p, parent: %p)\n",
-		process->id, process->name, process, parent);
+	dprintf("process: created process %" PRId32 " (%s) (process: %p, "
+		"parent: %p)\n", process->id, process->name, process,
+		parent);
 
 	*procp = process;
 	return STATUS_SUCCESS;
@@ -447,7 +458,8 @@ static status_t process_load(process_load_t *load, process_t *parent) {
 	 * we must reserve space to ensure that the mappings we create below
 	 * for the arguments/stack don't end up placed where the binary wants
 	 * to be. */
-	ret = fs_open(load->path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0, &handle);
+	ret = fs_open(load->path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE,
+		0, 0, &handle);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -462,8 +474,9 @@ static status_t process_load(process_load_t *load, process_t *parent) {
 	 * rebooted. This avoids problems if a new kernel is not ABI-compatible
 	 * with the previous kernel. */
 	if(!kernel_library) {
-		ret = fs_open(LIBKERNEL_PATH, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE,
-			0, 0, &kernel_library);
+		ret = fs_open(LIBKERNEL_PATH,
+			FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0,
+			&kernel_library);
 		if(ret != STATUS_SUCCESS)
 			fatal("Could not open kernel library (%d)", ret);
 	}
@@ -512,9 +525,8 @@ fail:
  * @param source	Array to copy data of.
  * @param count		Number of array entries.
  * @param base		Pointer to address to copy to, updated after copying. */
-static void copy_argument_strings(char **dest, const char *const source[],
-	size_t count, ptr_t *base)
-{
+static void
+copy_argument_strings(char **dest, char **source, size_t count, ptr_t *base) {
 	size_t i, len;
 
 	for(i = 0; i < count; i++) {
@@ -601,7 +613,8 @@ static void process_entry_thread(void *arg1, void *arg2) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t process_create(const char *const args[], const char *const env[],
+status_t
+process_create(const char *const args[], const char *const env[],
 	uint32_t flags, int priority, process_t **procp)
 {
 	process_load_t load;
@@ -615,9 +628,9 @@ status_t process_create(const char *const args[], const char *const env[],
 	assert(env);
 	assert(priority >= 0 && priority <= PRIORITY_CLASS_MAX);
 
-	load.path = args[0];
-	load.args = args;
-	load.env = env;
+	load.path = (char *)args[0];
+	load.args = (char **)args;
+	load.env = (char **)env;
 
 	/* Create the address space for the process. */
 	ret = process_load(&load, NULL);
@@ -642,7 +655,8 @@ status_t process_create(const char *const args[], const char *const env[],
 		process->flags |= PROCESS_CRITICAL;
 
 	/* Create and run the entry thread. */
-	ret = thread_create("main", process, 0, process_entry_thread, &load, NULL, &thread);
+	ret = thread_create("main", process, 0, process_entry_thread, &load,
+		NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
 		process_release(process);
 		return ret;
@@ -688,10 +702,18 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 			(process == curr_proc) ? "*" : " ");
 
 		switch(process->state) {
-		case PROCESS_CREATED:	kdb_printf("Created "); break;
-		case PROCESS_RUNNING:	kdb_printf("Running "); break;
-		case PROCESS_DEAD:	kdb_printf("Dead    "); break;
-		default:		kdb_printf("Bad     "); break;
+		case PROCESS_CREATED:
+			kdb_printf("Created ");
+			break;
+		case PROCESS_RUNNING:
+			kdb_printf("Running ");
+			break;
+		case PROCESS_DEAD:
+			kdb_printf("Dead    ");
+			break;
+		default:
+			kdb_printf("Bad     ");
+			break;
 		}
 
 		kdb_printf("%-8d %-5d %-5d %-7d %-18p %s\n", process->priority,
@@ -711,11 +733,12 @@ __init_text void process_init(void) {
 	id_allocator_reserve(&process_id_allocator, 0);
 
 	/* Create the process slab cache. */
-	process_cache = object_cache_create("process_cache", process_t, process_ctor,
-		NULL, NULL, 0, MM_BOOT);
+	process_cache = object_cache_create("process_cache", process_t,
+		process_ctor, NULL, NULL, 0, MM_BOOT);
 
 	/* Register the KDB command. */
-	kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);
+	kdb_register_command("process", "Print a list of running processes.",
+		kdb_cmd_process);
 
 	/* Create the kernel process and register the kernel image to it. */
 	token_retain(system_token);
@@ -754,16 +777,21 @@ void process_shutdown(void) {
 
 		count = 0;
 		rwlock_read_lock(&process_tree_lock);
+
 		AVL_TREE_FOREACH_SAFE(&process_tree, iter) {
 			process = avl_tree_entry(iter, process_t, tree_link);
-			if(process != kernel_proc) {
-				count++;
-				if(!(interval % SECS2NSECS(2)) && process->state == PROCESS_RUNNING) {
-					kprintf(LOG_NOTICE, "system: still waiting for %u(%s)...\n",
-						process->id, process->name);
-				}
+			if(process == kernel_proc)
+				continue;
+
+			count++;
+
+			if(!(interval % SECS2NSECS(2)) && process->state == PROCESS_RUNNING) {
+				kprintf(LOG_NOTICE, "system: still waiting for "
+					"%u (%s)...\n", process->id,
+					process->name);
 			}
 		}
+
 		rwlock_unlock(&process_tree_lock);
 	} while(count);
 
@@ -774,84 +802,115 @@ void process_shutdown(void) {
 /** Helper to free information copied from userspace.
  * @param load		Structure containing copied information. */
 static void free_process_args(process_load_t *load) {
-	int i;
+	size_t i;
 
-	if(load->path)
-		kfree((void *)load->path);
+	if(load->handles)
+		handle_table_destroy(load->handles);
 
-	if(load->args) {
-		for(i = 0; load->args[i]; i++)
-			kfree((void *)load->args[i]);
+	if(load->aspace)
+		vm_aspace_destroy(load->aspace);
 
-		kfree((void *)load->args);
-	}
+	if(load->token)
+		token_release(load->token);
+
+	kfree(load->map);
 
 	if(load->env) {
 		for(i = 0; load->env[i]; i++)
-			kfree((void *)load->env[i]);
+			kfree(load->env[i]);
 
-		kfree((void *)load->env);
+		kfree(load->env);
 	}
 
-	if(load->map)
-		kfree(load->map);
+	if(load->args) {
+		for(i = 0; load->args[i]; i++)
+			kfree(load->args[i]);
+
+		kfree(load->args);
+	}
+
+	kfree(load->path);
 }
 
 /** Helper to copy process creation information from userspace.
  * @param path		Path to copy.
  * @param args		Argument array to copy.
  * @param env		Environment array to copy.
- * @param map		Handle array to copy.
- * @param count		Size of handle array.
+ * @param attrib	Attributes structure.
  * @param load		Pointer to information structure to fill in.
  * @return		Status code describing result of the operation. */
-static status_t copy_process_args(const char *path, const char *const args[],
-	const char *const env[], handle_t map[][2],
-	int count, process_load_t *load)
+static status_t
+copy_process_args(const char *path, const char *const args[],
+	const char *const env[], const process_attrib_t *attrib,
+	process_load_t *load)
 {
-	status_t ret;
+	process_attrib_t kattrib;
+	object_handle_t *handle;
 	size_t size;
+	status_t ret;
 
-	if(!path || !args || !env || (count > 0 && !map))
+	if(!path || !args || !env)
 		return STATUS_INVALID_ARG;
 
-	load->path = NULL;
-	load->args = NULL;
-	load->env = NULL;
-	load->map = NULL;
+	memset(load, 0, sizeof(*load));
 
-	ret = strndup_from_user(path, FS_PATH_MAX, (char **)&load->path);
+	ret = strndup_from_user(path, FS_PATH_MAX, &load->path);
 	if(ret != STATUS_SUCCESS)
-		return ret;
+		goto err_free;
 
-	ret = arrcpy_from_user(args, (char ***)&load->args);
-	if(ret != STATUS_SUCCESS) {
-		free_process_args(load);
-		return ret;
-	}
+	ret = arrcpy_from_user(args, &load->args);
+	if(ret != STATUS_SUCCESS)
+		goto err_free;
 
-	ret = arrcpy_from_user(env, (char ***)&load->env);
-	if(ret != STATUS_SUCCESS) {
-		free_process_args(load);
-		return ret;
-	}
+	ret = arrcpy_from_user(env, &load->env);
+	if(ret != STATUS_SUCCESS)
+		goto err_free;
 
-	if(count > 0) {
-		size = sizeof(handle_t) * 2 * count;
-		load->map = kmalloc(size, MM_USER);
-		if(!load->map) {
-			free_process_args(load);
-			return STATUS_NO_MEMORY;
+	if(attrib) {
+		ret = memcpy_from_user(&kattrib, attrib, sizeof(kattrib));
+		if(ret != STATUS_SUCCESS)
+			goto err_free;
+
+		if(kattrib.count > 0 && !kattrib.map) {
+			ret = STATUS_INVALID_ARG;
+			goto err_free;
 		}
 
-		ret = memcpy_from_user(load->map, map, size);
-		if(ret != STATUS_SUCCESS) {
-			free_process_args(load);
-			return ret;
+		load->map_count = kattrib.count;
+		if(load->map_count > 0) {
+			size = sizeof(handle_t) * 2 * load->map_count;
+			load->map = kmalloc(size, MM_USER);
+			if(!load->map) {
+				ret = STATUS_NO_MEMORY;
+				goto err_free;
+			}
+
+			ret = memcpy_from_user(load->map, kattrib.map, size);
+			if(ret != STATUS_SUCCESS)
+				goto err_free;
 		}
+
+		if(kattrib.token != INVALID_HANDLE) {
+			ret = object_handle_lookup(kattrib.token,
+				OBJECT_TYPE_TOKEN, &handle);
+			if(ret != STATUS_SUCCESS)
+				goto err_free;
+
+			load->token = handle->private;
+			token_retain(load->token);
+			object_handle_release(handle);
+		}
+	} else {
+		load->map_count = -1;
 	}
+
+	if(!load->token)
+		load->token = token_inherit(curr_proc->token);
 
 	return STATUS_SUCCESS;
+err_free:
+	free_process_args(load);
+	return ret;
 }
 
 /**
@@ -859,8 +918,11 @@ static status_t copy_process_args(const char *path, const char *const args[],
  *
  * Creates a new process and executes a program within it, and returns a handle
  * to it. The handle can be used to query information about the new process,
- * and wait for it to terminate. It should be closed as soon as the process is
- * no longer needed so that the process can be freed once it has exited.
+ * and wait for it to terminate. It should be closed as soon as it is no longer
+ * needed so that the process can be freed once it has exited. An optional
+ * attributes structure can be provided which specifies additional attributes
+ * for the new process. See the documentation for process_attrib_t for the
+ * default behaviour when this structure is not provided.
  *
  * If a handle to a security token is given, the security context for the new
  * process will be set to the context contained in that token. Otherwise, the
@@ -871,40 +933,28 @@ static status_t copy_process_args(const char *path, const char *const args[],
  * The new process' address space will inherit all mappings in the calling
  * process' address space with the VM_MAP_INHERIT flag set.
  *
- * If the count argument is negative, then all inheritable handle table entries
- * in the calling process will be duplicated into the child process with the
- * same IDs. If it is 0, no handles will be duplicated to the child process.
- * Otherwise, handles will be duplicated according to the given array,
- * regardless of whether the handles are marked as inheritable. Note that
- * handles to objects of types which are non-transferrable cannot be duplicated.
+ * If no handle map is specified in the attributes structure, then all
+ * inheritable handle table entries in the calling process will be duplicated
+ * into the child process with the same IDs. Otherwise, handles will be
+ * duplicated according to the map, see the documentation for process_attrib_t
+ * for details.
  *
  * @param path		Path to binary to load.
- * @param args		Array of arguments to pass to the program
- *			(NULL-terminated).
- * @param env		Array of environment variables for the program
- *			(NULL-terminated).
+ * @param args		NULL-terminated array of arguments to the program.
+ * @param env		NULL-terminated array of environment variables.
  * @param flags		Flags modifying creation behaviour.
- * @param token		Handle to token containing the security context for the
- *			new process, or INVALID_HANDLE to inherit from the
- *			calling process.
- * @param map		Array containing handle mappings (can be NULL if count
- *			is less than or equal to 0). The first ID of each entry
- *			specifies the handle in the caller, and the second
- *			specifies the ID to give it in the child.
- * @param count		Number of entries in handle mapping array, or -1 if
- *			array should not be used.
+ * @param attrib	Optional attributes structure.
  * @param handlep	Where to store handle to process (can be NULL).
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_process_create(const char *path, const char *const args[],
-	const char *const env[], uint32_t flags, handle_t token,
-	handle_t map[][2], ssize_t count, handle_t *handlep)
+status_t
+kern_process_create(const char *path, const char *const args[],
+	const char *const env[], uint32_t flags,
+	const process_attrib_t *attrib, handle_t *handlep)
 {
 	process_load_t load;
 	object_handle_t *khandle;
-	token_t *new_token;
-	handle_table_t *new_handles;
 	process_t *process;
 	handle_t uhandle;
 	thread_t *thread;
@@ -917,46 +967,30 @@ status_t kern_process_create(const char *path, const char *const args[],
 			return STATUS_PERM_DENIED;
 	}
 
-	ret = copy_process_args(path, args, env, map, count, &load);
+	ret = copy_process_args(path, args, env, attrib, &load);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	/* Get the security token to use for the new process. */
-	if(token != INVALID_HANDLE) {
-		ret = object_handle_lookup(token, OBJECT_TYPE_TOKEN, &khandle);
-		if(ret != STATUS_SUCCESS)
-			goto out;
-
-		new_token = khandle->private;
-		token_retain(new_token);
-		object_handle_release(khandle);
-	} else {
-		new_token = token_inherit(curr_proc->token);
-	}
-
 	/* Create the address space for the process. */
 	ret = process_load(&load, curr_proc);
-	if(ret != STATUS_SUCCESS) {
-		token_release(new_token);
+	if(ret != STATUS_SUCCESS)
 		goto out;
-	}
 
-	ret = handle_table_create(curr_proc->handles, load.map, count, &new_handles);
-	if(ret != STATUS_SUCCESS) {
-		vm_aspace_destroy(load.aspace);
-		token_release(new_token);
+	ret = handle_table_create(curr_proc->handles, load.map, load.map_count,
+		&load.handles);
+	if(ret != STATUS_SUCCESS)
 		goto out;
-	}
 
 	/* Create the new process. */
-	ret = process_alloc(args[0], -1, PRIORITY_CLASS_NORMAL, new_token,
-		load.aspace, new_handles, NULL, &process);
-	if(ret != STATUS_SUCCESS) {
-		handle_table_destroy(new_handles);
-		vm_aspace_destroy(load.aspace);
-		token_release(new_token);
+	ret = process_alloc(args[0], -1, PRIORITY_CLASS_NORMAL, load.token,
+		load.aspace, load.handles, NULL, &process);
+	if(ret != STATUS_SUCCESS)
 		goto out;
-	}
+
+	/* These will now be freed when destroying the process. */
+	load.token = NULL;
+	load.aspace = NULL;
+	load.handles = NULL;
 
 	if(flags & PROCESS_CREATE_CRITICAL)
 		process->flags |= PROCESS_CRITICAL;
@@ -1006,7 +1040,10 @@ out:
  * Replace the current process with a new program.
  *
  * Replaces the current process with a new program. All threads in the process
- * other than the calling thread will be terminated.
+ * other than the calling thread will be terminated. Upon successful completion,
+ * the process will be in the same state as a new process would be after a
+ * call to kern_process_create() with the same arguments, except it retains the
+ * same process ID and all handles open to the process remain valid.
  *
  * If a handle to a security token is given, the security context for the
  * process will be set to the context contained in that token. Otherwise, the
@@ -1016,43 +1053,28 @@ out:
  * The new program's address space will keep all mappings in the original
  * address space with the VM_MAP_INHERIT flag set.
  *
- * If the count argument is negative, then all inheritable handle table entries
- * in the process will remain open with the same IDs. If it is 0, all of the
- * process' handles will be closed. Otherwise, handles will be made available
- * in the new program according to the given array, regardless of whether the
- * handles are marked as inheritable. Note that handles to objects of types
- * which are non-transferrable cannot be duplicated.
+ * If no handle map is specified in the attributes structure, then all
+ * inheritable handle table entries in the process will remain open with the
+ * same IDs. Otherwise, handles will be made available in the new program
+ * according to the map, see the documentation for process_attrib_t for details.
  *
  * @param path		Path to binary to load.
- * @param args		Array of arguments to pass to the program
- *			(NULL-terminated).
- * @param env		Array of environment variables for the program
- *			(NULL-terminated).
+ * @param args		NULL-terminated array of arguments to the program.
+ * @param env		NULL-terminated array of environment variables.
  * @param flags		Flags modifying creation behaviour.
- * @param token		Handle to token containing the security context for the
- *			new program, or INVALID_HANDLE to inherit from the
- *			original process.
- * @param map		Array containing handle mappings (can be NULL if count
- *			is less than or equal to 0). The first ID of each entry
- *			specifies the handle in the caller, and the second
- *			specifies the ID to move it to.
- * @param count		Number of entries in handle mapping array, or -1 if
- *			array should not be used.
+ * @param attrib	Optional attributes structure.
  *
  * @return		Does not return on success, returns status code on
  *			failure.
  */
-status_t kern_process_exec(const char *path, const char *const args[],
-	const char *const env[], uint32_t flags, handle_t token,
-	handle_t map[][2], ssize_t count)
+status_t
+kern_process_exec(const char *path, const char *const args[],
+	const char *const env[], uint32_t flags,
+	const process_attrib_t *attrib)
 {
 	process_load_t load;
-	object_handle_t *khandle;
-	token_t *new_token, *prev_token;
-	handle_table_t *new_handles, *prev_handles;
 	thread_t *thread = NULL;
-	vm_aspace_t *prev_aspace;
-	char *prev_name;
+	char *name;
 	status_t ret;
 
 	if(flags & PROCESS_CREATE_CRITICAL) {
@@ -1061,41 +1083,25 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	}
 
 	if(curr_proc->threads.next->next != &curr_proc->threads) {
-		kprintf(LOG_WARN, "kern_process_exec: TODO: Terminate other threads\n");
+		kprintf(LOG_WARN, "kern_process_exec: TODO: Terminate other "
+			"threads\n");
 		return STATUS_NOT_IMPLEMENTED;
 	}
 
-	ret = copy_process_args(path, args, env, map, count, &load);
+	ret = copy_process_args(path, args, env, attrib, &load);
 	if(ret != STATUS_SUCCESS)
 		return ret;
-
-	/* Get the security token to use for the new process. */
-	if(token != INVALID_HANDLE) {
-		ret = object_handle_lookup(token, OBJECT_TYPE_TOKEN, &khandle);
-		if(ret != STATUS_SUCCESS) {
-			free_process_args(&load);
-			return ret;
-		}
-
-		new_token = khandle->private;
-		token_retain(new_token);
-		object_handle_release(khandle);
-	} else {
-		new_token = token_inherit(curr_proc->token);
-	}
 
 	/* Create the new address space for the process. */
 	ret = process_load(&load, curr_proc);
 	if(ret != STATUS_SUCCESS) {
-		token_release(new_token);
 		free_process_args(&load);
 		return ret;
 	}
 
-	ret = handle_table_create(curr_proc->handles, load.map, count, &new_handles);
+	ret = handle_table_create(curr_proc->handles, load.map, load.map_count,
+		&load.handles);
 	if(ret != STATUS_SUCCESS) {
-		vm_aspace_destroy(load.aspace);
-		token_release(new_token);
 		free_process_args(&load);
 		return ret;
 	}
@@ -1104,37 +1110,34 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	ret = thread_create("main", curr_proc, 0, process_entry_thread, &load,
 		NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
-		handle_table_destroy(new_handles);
-		vm_aspace_destroy(load.aspace);
-		token_release(new_token);
 		free_process_args(&load);
 		return ret;
 	}
 
 	mutex_lock(&curr_proc->lock);
 
-	if(flags & PROCESS_CREATE_CRITICAL)
+	if(flags & PROCESS_CREATE_CRITICAL) {
 		curr_proc->flags |= PROCESS_CRITICAL;
+	} else {
+		curr_proc->flags &= ~PROCESS_CRITICAL;
+	}
+
+	/* Mark our own stack as NULL so that the thread cleanup code will not
+	 * try to unmap it when we exit. Doing so would end up unmapping
+	 * something in the new address space. */
+	curr_thread->ustack = 0;
+	curr_thread->ustack_size = 0;
 
 	/* Switch over to the new address space. */
 	preempt_disable();
 	vm_aspace_switch(load.aspace);
-	prev_aspace = curr_proc->aspace;
-	curr_proc->aspace = load.aspace;
+	SWAP(curr_proc->aspace, load.aspace);
 	preempt_enable();
 
-	/* Mark our own stack as NULL so that the thread cleanup code will not
-	 * try to unmap it, which would end up unmapping something in the new
-	 * address space. */
-	curr_thread->ustack = 0;
-	curr_thread->ustack_size = 0;
-
-	prev_token = curr_proc->token;
-	curr_proc->token = new_token;
-	prev_handles = curr_proc->handles;
-	curr_proc->handles = new_handles;
-	prev_name = curr_proc->name;
-	curr_proc->name = kstrdup(load.path, MM_KERNEL);
+	SWAP(curr_proc->token, load.token);
+	SWAP(curr_proc->handles, load.handles);
+	name = curr_proc->name;
+	curr_proc->name = load.path;
 
 	/* Reset signal handling state. */
 	memset(curr_proc->signal_act, 0, sizeof(curr_proc->signal_act));
@@ -1149,17 +1152,17 @@ status_t kern_process_exec(const char *path, const char *const args[],
 
 	mutex_unlock(&curr_proc->lock);
 
-	/* Free up old data. */
-	vm_aspace_destroy(prev_aspace);
-	token_release(prev_token);
-	handle_table_destroy(prev_handles);
-	kfree(prev_name);
-
-	/* Run the thread and wait for it to complete, then free up data and
-	 * exit this thread. */
+	/* Run the thread and wait for it to complete. */
 	thread_run(thread);
 	thread_release(thread);
 	semaphore_down(&load.sem);
+
+	/* Free up old data. We swapped the address space, handle table and
+	 * token pointers into the structure, so they will get freed by
+	 * free_process_args(). Don't free the path string, as that string is
+	 * now the process' name. */
+	kfree(name);
+	load.path = NULL;
 	free_process_args(&load);
 	thread_exit();
 }
@@ -1234,7 +1237,8 @@ status_t kern_process_clone(handle_t *handlep) {
 	}
 
 	/* Clone other per-process information. */
-	memcpy(process->signal_act, curr_proc->signal_act, sizeof(process->signal_act));
+	memcpy(process->signal_act, curr_proc->signal_act,
+		sizeof(process->signal_act));
 	process->signal_mask = curr_proc->signal_mask;
 	elf_clone(process, curr_proc);
 
@@ -1264,7 +1268,8 @@ status_t kern_process_clone(handle_t *handlep) {
 	spinlock_unlock(&curr_thread->lock);
 
 	/* Inherit other per-thread attributes from the calling thread. */
-	memcpy(&thread->signal_stack, &curr_thread->signal_stack, sizeof(thread->signal_stack));
+	memcpy(&thread->signal_stack, &curr_thread->signal_stack,
+		sizeof(thread->signal_stack));
 	thread->ustack = curr_thread->ustack;
 	thread->ustack_size = curr_thread->ustack_size;
 
@@ -1413,7 +1418,6 @@ status_t kern_process_token(handle_t *handlep) {
 	handle = object_handle_create(&token_object_type, token);
 	ret = object_handle_attach(handle, NULL, handlep);
 	object_handle_release(handle);
-
 	return ret;
 }
 
@@ -1448,7 +1452,6 @@ status_t kern_process_set_token(handle_t handle) {
 	token_release(curr_proc->token);
 	curr_proc->token = token;
 	mutex_unlock(&curr_proc->lock);
-
 	return STATUS_SUCCESS;
 }
 

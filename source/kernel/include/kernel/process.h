@@ -29,6 +29,41 @@
 extern "C" {
 #endif
 
+/** Extended attributes for process creation. */
+typedef struct process_attrib {
+	/**
+	 * Security token for new process.
+	 *
+	 * Token containing the security context for the new process. If set
+	 * to INVALID_HANDLE, or no attributes structure is given, the new
+	 * process will inherit the security context of the calling process.
+	 */
+	handle_t token;
+
+	/**
+	 * Handle map.
+	 *
+	 * Array containing a mapping of handles to duplicate into the new
+	 * process from the calling process. Handles specified by this array
+	 * are duplicated regardless of the inheritable flag on the handle.
+	 * Handles to objects of types which are non-transferrable cannot be
+	 * duplicated and specifying one in this array will result in an error.
+	 * If the count field is less than or equal to 0, this field can be
+	 * NULL.
+	 */
+	handle_t (*map)[2];
+
+	/**
+	 * Size of handle map.
+	 *
+	 * Number of entries in the handle map. If 0, no handles will be
+	 * duplicated to the child process. If negative, or no attributes
+	 * structure is given, handles will be duplicated into the new process
+	 * according to the inheritable flag on each handle table entry.
+	 */
+	ssize_t count;
+} process_attrib_t;
+
 /** Handle value used to refer to the current process. */
 #define PROCESS_SELF		INVALID_HANDLE
 
@@ -48,12 +83,13 @@ extern "C" {
 #define PROCESS_CREATE_CRITICAL	(1<<0)	/**< Process is a critical system process. */
 
 extern status_t kern_process_create(const char *path, const char *const args[],
-	const char *const env[], uint32_t flags, handle_t token, handle_t map[][2],
-	ssize_t count, handle_t *handlep);
+	const char *const env[], uint32_t flags,
+	const process_attrib_t *attrib, handle_t *handlep);
 extern status_t kern_process_exec(const char *path, const char *const args[],
-	const char *const env[], uint32_t flags, handle_t token, handle_t map[][2],
-	ssize_t count);
+	const char *const env[], uint32_t flags,
+	const process_attrib_t *attrib);
 extern status_t kern_process_clone(handle_t *handlep);
+
 extern status_t kern_process_open(process_id_t id, handle_t *handlep);
 extern process_id_t kern_process_id(handle_t handle);
 extern status_t kern_process_security(handle_t handle, security_context_t *ctx);
