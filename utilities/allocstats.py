@@ -17,12 +17,26 @@
 
 import sys
 
-if len(sys.argv) != 2:
-    sys.stderr.write('Usage: %s <log file>\n' % (sys.argv[0]))
+def usage():
+    sys.stderr.write('Usage: %s [--include-slab] <log file>\n' % (sys.argv[0]))
     sys.exit(1)
 
+i = 1
+include_slab = False
+if len(sys.argv) == 2:
+    if sys.argv[1][0:2] == '--':
+        usage()
+elif len(sys.argv) == 3:
+    if sys.argv[1] == '--include-slab':
+        include_slab = True
+    else:
+        usage()
+    i = 2
+else:
+    usage()
+
 allocations = {}
-f = open(sys.argv[1], 'r')
+f = open(sys.argv[i], 'r')
 for line in f.readlines():
     line = line.strip().split(' ', 6)
     if len(line) != 7 or line[0] != 'slab:':
@@ -46,4 +60,6 @@ print "%s %s Caller" % ("Address".ljust(addr_width), "Cache".ljust(name_width))
 print "%s %s ======" % ("=======".ljust(addr_width), "=====".ljust(name_width))
 
 for (k, v) in allocations.items():
-    print "%s %s %s" % (k.ljust(addr_width), v[0].ljust(name_width), v[1])
+    slab_caches = ['slab_bufctl_cache', 'slab_mag_cache', 'slab_slab_cache']
+    if include_slab or v[0] not in slab_caches:
+        print "%s %s %s" % (k.ljust(addr_width), v[0].ljust(name_width), v[1])
