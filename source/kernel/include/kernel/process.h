@@ -41,6 +41,15 @@ typedef struct process_attrib {
 	handle_t token;
 
 	/**
+	 * Root port for the new process.
+	 *
+	 * Handle to root port for the new process. If set to INVALID_HANDLE,
+	 * or no attributes structure is given, the new process will inherit
+	 * the calling process' root port.
+	 */
+	handle_t root;
+
+	/**
 	 * Handle map.
 	 *
 	 * Array containing a mapping of handles to duplicate into the new
@@ -94,6 +103,8 @@ extern status_t kern_process_open(process_id_t id, handle_t *handlep);
 extern process_id_t kern_process_id(handle_t handle);
 extern status_t kern_process_security(handle_t handle, security_context_t *ctx);
 extern status_t kern_process_status(handle_t handle, int *statusp, int *reasonp);
+extern status_t kern_process_port(handle_t handle, int32_t port,
+	handle_t *handlep);
 
 extern status_t kern_process_token(handle_t *handlep);
 extern status_t kern_process_set_token(handle_t handle);
