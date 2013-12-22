@@ -26,13 +26,13 @@
  *			to investigate this at some point...
  */
 
-#include <arch/memory.h>
 #include <arch/page.h>
 
 #include <lib/fnv.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/aspace.h>
 #include <mm/kmem.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
@@ -574,7 +574,7 @@ __init_text void kmem_init(void) {
 		end = range->start + range->size;
 
 		/* Only want to include ranges in kmem space. */
-		if(start < KERNEL_KMEM_BASE || end > KERNEL_KMEM_BASE + KERNEL_KMEM_SIZE)
+		if(start < KERNEL_KMEM_BASE || end - 1 > KERNEL_KMEM_END)
 			continue;
 
 		if(start != boot_end)
@@ -616,7 +616,7 @@ __init_text void kmem_late_init(void) {
 		end = range->start + range->size;
 
 		/* Only want to include ranges in kmem space. */
-		if(start < KERNEL_KMEM_BASE || end > KERNEL_KMEM_BASE + KERNEL_KMEM_SIZE)
+		if(start < KERNEL_KMEM_BASE || end - 1 > KERNEL_KMEM_END)
 			continue;
 
 		boot_end = end;
@@ -625,6 +625,7 @@ __init_text void kmem_late_init(void) {
 	if(boot_end != KERNEL_KMEM_BASE) {
 		/* The pages have already been freed, so we don't want to free
 		 * them again, but do need to unmap them. */
-		kmem_unmap((void *)KERNEL_KMEM_BASE, boot_end - KERNEL_KMEM_BASE, true);
+		kmem_unmap((void *)KERNEL_KMEM_BASE,
+			boot_end - KERNEL_KMEM_BASE, true);
 	}
 }

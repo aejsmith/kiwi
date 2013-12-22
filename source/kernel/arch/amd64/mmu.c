@@ -24,7 +24,6 @@
  */
 
 #include <arch/barrier.h>
-#include <arch/memory.h>
 
 #include <x86/cpu.h>
 #include <x86/mmu.h>
@@ -33,6 +32,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/aspace.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/page.h>

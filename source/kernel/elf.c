@@ -19,8 +19,6 @@
  * @brief		ELF loader.
  */
 
-#include <arch/memory.h>
-
 #include <io/fs.h>
 
 #include <kernel/private/image.h>
@@ -28,6 +26,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/aspace.h>
 #include <mm/malloc.h>
 #include <mm/phys.h>
 #include <mm/safe.h>

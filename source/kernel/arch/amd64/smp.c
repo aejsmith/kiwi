@@ -20,7 +20,7 @@
  */
 
 #include <arch/barrier.h>
-#include <arch/memory.h>
+#include <arch/stack.h>
 
 #include <x86/lapic.h>
 #include <x86/mmu.h>
@@ -28,6 +28,7 @@
 
 #include <lib/string.h>
 
+#include <mm/aspace.h>
 #include <mm/kmem.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
@@ -37,9 +38,6 @@
 #include <kernel.h>
 #include <smp.h>
 #include <time.h>
-
-extern char __ap_trampoline_start[], __ap_trampoline_end[];
-extern void kmain_ap(cpu_t *cpu);
 
 /** MMU context used by APs while booting. */
 static mmu_context_t *ap_mmu_context;

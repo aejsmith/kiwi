@@ -19,7 +19,7 @@
  * @brief		AMD64 kernel linker script.
  */
 
-#include <arch/memory.h>
+#include <arch/aspace.h>
 #include <arch/page.h>
 
 ENTRY(kmain_bsp)

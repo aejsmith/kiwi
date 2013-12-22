@@ -19,7 +19,7 @@
  * @brief		AMD64 descriptor table functions.
  */
 
-#include <arch/memory.h>
+#include <arch/stack.h>
 
 #include <x86/cpu.h>
 #include <x86/descriptor.h>

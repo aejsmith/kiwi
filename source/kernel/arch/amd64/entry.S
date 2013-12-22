@@ -20,7 +20,6 @@
  */
 
 #include <arch/frame.h>
-#include <arch/memory.h>
 #include <arch/thread.h>
 
 #include <x86/asm.h>

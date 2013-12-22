@@ -19,10 +19,9 @@
  * @brief		Safe user memory access functions.
  */
 
-#include <arch/memory.h>
-
 #include <lib/string.h>
 
+#include <mm/aspace.h>
 #include <mm/malloc.h>
 #include <mm/safe.h>
 

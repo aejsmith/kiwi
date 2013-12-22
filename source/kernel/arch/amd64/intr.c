@@ -19,8 +19,6 @@
  * @brief		AMD64 interrupt handling functions.
  */
 
-#include <arch/memory.h>
-
 #include <x86/cpu.h>
 #include <x86/fpu.h>
 #include <x86/intr.h>

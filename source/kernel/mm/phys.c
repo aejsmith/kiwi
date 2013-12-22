@@ -19,11 +19,10 @@
  * @brief		Physical memory handling functions.
  */
 
-#include <arch/memory.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/aspace.h>
 #include <mm/kmem.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
@@ -88,7 +87,7 @@ void phys_unmap(void *addr, size_t size, bool shared) {
 
 	/* If the range lies within the physical map area, don't need to do
 	 * anything. Otherwise, unmap and free from kernel memory. */
-	if((ptr_t)addr < KERNEL_PMAP_BASE || (ptr_t)addr >= (KERNEL_PMAP_BASE + KERNEL_PMAP_SIZE)) {
+	if((ptr_t)addr < KERNEL_PMAP_BASE || (ptr_t)addr > KERNEL_PMAP_END) {
 		base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
 		end = ROUND_UP((ptr_t)addr + size, PAGE_SIZE);
 		

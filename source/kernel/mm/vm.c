@@ -73,10 +73,10 @@
  */
 
 #include <arch/frame.h>
-#include <arch/memory.h>
 
 #include <lib/string.h>
 
+#include <mm/aspace.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/phys.h>

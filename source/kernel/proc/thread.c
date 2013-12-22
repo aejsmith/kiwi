@@ -56,7 +56,7 @@
  */
 
 #include <arch/frame.h>
-#include <arch/memory.h>
+#include <arch/stack.h>
 
 #include <kernel/private/thread.h>
 

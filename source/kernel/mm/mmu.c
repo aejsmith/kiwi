@@ -23,8 +23,7 @@
  *			invalidation.
  */
 
-#include <arch/memory.h>
-
+#include <mm/aspace.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/vm.h>
@@ -109,7 +108,9 @@ status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
  * @param virt		Start of range to update.
  * @param size		Size of range to update.
  * @param protect	New protection flags. */
-void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t protect) {
+void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size,
+	uint32_t protect)
+{
 	assert(mutex_held(&ctx->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(!(size % PAGE_SIZE));
@@ -136,7 +137,9 @@ void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t p
  *			to NULL if the address was mapped to memory that doesn't
  *			have a page_t (e.g. device memory).
  * @return		Whether a page was mapped at the virtual address. */
-bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **pagep) {
+bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared,
+	page_t **pagep)
+{
 	assert(mutex_held(&ctx->lock));
 	assert(!(virt % PAGE_SIZE));
 
@@ -157,7 +160,9 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **pag
  * @param physp		Where to store physical address the page is mapped to.
  * @param protectp	Where to store protection flags for the mapping.
  * @return		Whether a page is mapped at the virtual address. */
-bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, uint32_t *protectp) {
+bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp,
+	uint32_t *protectp)
+{
 	bool ret;
 
 	assert(mutex_held(&ctx->lock));
@@ -242,11 +247,11 @@ __init_text void mmu_init(void) {
 
 	/* Duplicate all virtual memory mappings created by KBoot. */
 	KBOOT_ITERATE(KBOOT_TAG_VMEM, kboot_tag_vmem_t, range) {
-		end = range->start + range->size;
+		end = range->start + range->size - 1;
 
 		/* Only want to map ranges in kmem space, and non-special
 		 * mappings. */
-		if(range->start < KERNEL_KMEM_BASE || end > KERNEL_KMEM_BASE + KERNEL_KMEM_SIZE) {
+		if(range->start < KERNEL_KMEM_BASE || end > KERNEL_KMEM_END) {
 			continue;
 		} else if(range->phys == ~((uint64_t)0)) {
 			continue;

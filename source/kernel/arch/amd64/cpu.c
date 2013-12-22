@@ -20,8 +20,8 @@
  */
 
 #include <arch/io.h>
-#include <arch/memory.h>
 #include <arch/page.h>
+#include <arch/stack.h>
 
 #include <x86/cpu.h>
 #include <x86/descriptor.h>

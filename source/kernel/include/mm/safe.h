@@ -22,8 +22,7 @@
 #ifndef __MM_SAFE_H
 #define __MM_SAFE_H
 
-#include <arch/memory.h>
-
+#include <mm/aspace.h>
 #include <mm/mm.h>
 
 #include <types.h>
@@ -33,7 +32,7 @@
  * @return		Whether the address is a user address. */
 static inline bool is_user_address(const void *addr) {
 	#if USER_BASE > 0
-	return ((ptr_t)addr >= USER_BASE && (ptr_t)addr < USER_BASE + USER_SIZE);
+	return ((ptr_t)addr >= USER_BASE && (ptr_t)addr <= USER_END);
 	#else
 	return ((ptr_t)addr < USER_SIZE);
 	#endif 
@@ -48,11 +47,11 @@ static inline bool is_user_range(const void *addr, size_t size) {
 
 	#if USER_BASE > 0
 	return ((ptr_t)addr >= USER_BASE
-		&& (ptr_t)addr + size <= USER_BASE + USER_SIZE
-		&& (ptr_t)addr + size >= (ptr_t)addr);
+		&& (ptr_t)addr + size - 1 <= USER_END
+		&& (ptr_t)addr + size - 1 >= (ptr_t)addr);
 	#else
-	return ((ptr_t)addr + size <= USER_BASE + USER_SIZE
-		&& (ptr_t)addr + size >= (ptr_t)addr);
+	return ((ptr_t)addr + size - 1 <= USER_END
+		&& (ptr_t)addr + size -1 >= (ptr_t)addr);
 	#endif
 }
 

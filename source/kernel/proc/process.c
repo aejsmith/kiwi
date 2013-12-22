@@ -24,7 +24,7 @@
  */
 
 #include <arch/frame.h>
-#include <arch/memory.h>
+#include <arch/stack.h>
 
 #include <lib/id_allocator.h>
 #include <lib/string.h>
@@ -33,6 +33,7 @@
 
 #include <kernel/private/process.h>
 
+#include <mm/aspace.h>
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
@@ -271,8 +272,9 @@ static void process_object_close(object_handle_t *handle) {
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t
-process_object_wait(object_handle_t *handle, unsigned event, void *wait) {
+static status_t process_object_wait(object_handle_t *handle, unsigned event,
+	void *wait)
+{
 	process_t *process = handle->private;
 
 	switch(event) {
@@ -294,8 +296,9 @@ process_object_wait(object_handle_t *handle, unsigned event, void *wait) {
  * @param handle	Handle to process.
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer. */
-static void
-process_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
+static void process_object_unwait(object_handle_t *handle, unsigned event,
+	void *wait)
+{
 	process_t *process = handle->private;
 
 	switch(event) {
@@ -397,10 +400,9 @@ process_t *process_lookup(process_id_t id) {
  *			Reference count will be set to 1.
  * @return		STATUS_SUCCESS if successful, STATUS_PROCESS_LIMIT if
  *			unable to allocate an ID. */
-static status_t
-process_alloc(const char *name, process_id_t id, int priority, token_t *token,
-	vm_aspace_t *aspace, handle_table_t *handles, process_t *parent,
-	process_t **procp)
+static status_t process_alloc(const char *name, process_id_t id, int priority,
+	token_t *token, vm_aspace_t *aspace, handle_table_t *handles,
+	process_t *parent, process_t **procp)
 {
 	process_t *process;
 
@@ -525,8 +527,9 @@ fail:
  * @param source	Array to copy data of.
  * @param count		Number of array entries.
  * @param base		Pointer to address to copy to, updated after copying. */
-static void
-copy_argument_strings(char **dest, char **source, size_t count, ptr_t *base) {
+static void copy_argument_strings(char **dest, char **source, size_t count,
+	ptr_t *base)
+{
 	size_t i, len;
 
 	for(i = 0; i < count; i++) {
@@ -613,8 +616,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t
-process_create(const char *const args[], const char *const env[],
+status_t process_create(const char *const args[], const char *const env[],
 	uint32_t flags, int priority, process_t **procp)
 {
 	process_load_t load;
@@ -839,8 +841,7 @@ static void free_process_args(process_load_t *load) {
  * @param attrib	Attributes structure.
  * @param load		Pointer to information structure to fill in.
  * @return		Status code describing result of the operation. */
-static status_t
-copy_process_args(const char *path, const char *const args[],
+static status_t copy_process_args(const char *path, const char *const args[],
 	const char *const env[], const process_attrib_t *attrib,
 	process_load_t *load)
 {
@@ -948,8 +949,7 @@ err_free:
  *
  * @return		Status code describing result of the operation.
  */
-status_t
-kern_process_create(const char *path, const char *const args[],
+status_t kern_process_create(const char *path, const char *const args[],
 	const char *const env[], uint32_t flags,
 	const process_attrib_t *attrib, handle_t *handlep)
 {
@@ -1067,8 +1067,7 @@ out:
  * @return		Does not return on success, returns status code on
  *			failure.
  */
-status_t
-kern_process_exec(const char *path, const char *const args[],
+status_t kern_process_exec(const char *path, const char *const args[],
 	const char *const env[], uint32_t flags,
 	const process_attrib_t *attrib)
 {

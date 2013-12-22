@@ -16,10 +16,10 @@
 
 /**
  * @file
- * @brief		AMD64 memory layout definitions.
+ * @brief		AMD64 address space layout definitions.
  *
- * This file contains definitions for the virtual memory layout. The virtual
- * memory layout is as follows:
+ * This file contains definitions for the virtual address space layout. The
+ * layout on AMD64 is as follows:
  *  0x0000000000000000-0x00007FFFFFFFFFFF - 128TB - User address space.
  *   ... non-canonical address space ...
  *  0xFFFF800000000000-0xFFFFFEFFFFFFFFFF - 127TB - Physical map area.
@@ -28,8 +28,8 @@
  *  0xFFFFFFFF80000000-0xFFFFFFFFFFFFFFFF - 2GB   - Kernel image/modules.
  */
 
-#ifndef __ARCH_MEMORY_H
-#define __ARCH_MEMORY_H
+#ifndef __ARCH_ASPACE_H
+#define __ARCH_ASPACE_H
 
 /** Memory layout definitions. */
 #define USER_BASE		0x0000000000000000	/**< User address space base. */
@@ -49,18 +49,11 @@
 #define KERNEL_MODULE_BASE	0xFFFFFFFFC0000000	/**< Module area base. */
 #define KERNEL_MODULE_SIZE	0x0000000040000000	/**< Module area size (1GB). */
 
-/** Stack size definitions. */
-#define KSTACK_SIZE		0x2000			/**< Kernel stack size (8KB). */
-#define USTACK_SIZE		0x200000		/**< User stack size (2MB). */
-
-/** Stack direction definition. */
-#define STACK_GROWS_DOWN	1
-
 #ifndef __ASM__
 extern char __text_seg_start[], __text_seg_end[];
 extern char __data_seg_start[], __data_seg_end[];
 extern char __init_seg_start[], __init_seg_end[];
-extern char __end[];
+extern char __ap_trampoline_start[], __ap_trampoline_end[];
 #endif
 
-#endif /* __ARCH_MEMORY_H */
+#endif /* __ARCH_ASPACE_H */

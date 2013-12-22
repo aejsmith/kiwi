@@ -20,13 +20,15 @@
  */
 
 #include <arch/frame.h>
-#include <arch/memory.h>
+#include <arch/stack.h>
 
 #include <x86/cpu.h>
 #include <x86/descriptor.h>
 #include <x86/fpu.h>
 
 #include <lib/string.h>
+
+#include <mm/aspace.h>
 
 #include <proc/sched.h>
 #include <proc/thread.h>
@@ -142,7 +144,7 @@ ptr_t arch_thread_tls_addr(thread_t *thread) {
  * @param addr		TLS address.
  * @return		Status code describing result of the operation. */
 status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr) {
-	if(addr >= (USER_BASE + USER_SIZE))
+	if(addr > USER_END)
 		return STATUS_INVALID_ADDR;
 
 	/* The AMD64 ABI uses the FS segment register to access the TLS data.

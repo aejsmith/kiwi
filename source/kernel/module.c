@@ -19,13 +19,12 @@
  * @brief		Kernel module loader.
  */
 
-#include <arch/memory.h>
-
 #include <io/fs.h>
 #include <io/memory_file.h>
 
 #include <lib/utility.h>
 
+#include <mm/aspace.h>
 #include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>

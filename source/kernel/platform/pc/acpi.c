@@ -19,8 +19,6 @@
  * @brief		PC ACPI functions.
  */
 
-#include <arch/memory.h>
-
 #include <pc/acpi.h>
 
 #include <lib/string.h>

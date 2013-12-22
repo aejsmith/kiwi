@@ -73,11 +73,10 @@
  *			allocation will not overcommit memory.
  */
 
-#include <arch/memory.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/aspace.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
