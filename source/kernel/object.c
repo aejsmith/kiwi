@@ -67,9 +67,6 @@ typedef struct object_wait {
 /** Cache for handle structures. */
 static slab_cache_t *object_handle_cache;
 
-/** Cache for handle table structures. */
-static slab_cache_t *handle_table_cache;
-
 /** Object type names. */
 static const char *object_type_names[] = {
 	[OBJECT_TYPE_PROCESS] = "OBJECT_TYPE_PROCESS",
@@ -83,15 +80,6 @@ static const char *object_type_names[] = {
 	[OBJECT_TYPE_CONNECTION] = "OBJECT_TYPE_CONNECTION",
 	[OBJECT_TYPE_SEMAPHORE] = "OBJECT_TYPE_SEMAPHORE",
 };
-
-/** Constructor for handle table objects.
- * @param obj		Object to construct.
- * @param data		Cache data pointer. */
-static void handle_table_ctor(void *obj, void *data) {
-	handle_table_t *table = obj;
-
-	rwlock_init(&table->lock, "handle_table_lock");
-}
 
 /** Notifier function to use for object waiting.
  * @param arg1		Unused.
@@ -197,6 +185,7 @@ void object_handle_release(object_handle_t *handle) {
  * @return		Status code describing result of the operation.
  */
 status_t object_handle_lookup(handle_t id, int type, object_handle_t **handlep) {
+	handle_table_t *table = &curr_proc->handles;
 	object_handle_t *handle;
 
 	assert(handlep);
@@ -204,22 +193,22 @@ status_t object_handle_lookup(handle_t id, int type, object_handle_t **handlep) 
 	if(id < 0 || id >= HANDLE_TABLE_SIZE)
 		return STATUS_INVALID_HANDLE;
 
-	rwlock_read_lock(&curr_proc->handles->lock);
+	rwlock_read_lock(&table->lock);
 
-	handle = curr_proc->handles->handles[id];
+	handle = table->handles[id];
 	if(!handle) {
-		rwlock_unlock(&curr_proc->handles->lock);
+		rwlock_unlock(&table->lock);
 		return STATUS_INVALID_HANDLE;
 	}
 
 	/* Check if the type is the type the caller wants. */
 	if(type >= 0 && handle->type->id != (unsigned)type) {
-		rwlock_unlock(&curr_proc->handles->lock);
+		rwlock_unlock(&table->lock);
 		return STATUS_INVALID_HANDLE;
 	}
 
 	object_handle_retain(handle);
-	rwlock_unlock(&curr_proc->handles->lock);
+	rwlock_unlock(&table->lock);
 
 	*handlep = handle;
 	return STATUS_SUCCESS;
@@ -237,19 +226,22 @@ status_t object_handle_lookup(handle_t id, int type, object_handle_t **handlep) 
  *
  * @return		Status code describing result of the operation.
  */
-status_t object_handle_attach(object_handle_t *handle, handle_t *idp, handle_t *uidp) {
-	status_t ret;
+status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
+	handle_t *uidp)
+{
+	handle_table_t *table = &curr_proc->handles;
 	handle_t id;
+	status_t ret;
 
 	assert(handle);
 	assert(idp || uidp);
 
-	rwlock_write_lock(&curr_proc->handles->lock);
+	rwlock_write_lock(&table->lock);
 
 	/* Find a handle ID in the table. */
-	id = bitmap_ffz(curr_proc->handles->bitmap, HANDLE_TABLE_SIZE);
+	id = bitmap_ffz(table->bitmap, HANDLE_TABLE_SIZE);
 	if(id < 0) {
-		rwlock_unlock(&curr_proc->handles->lock);
+		rwlock_unlock(&table->lock);
 		return STATUS_NO_HANDLES;
 	}
 
@@ -259,17 +251,20 @@ status_t object_handle_attach(object_handle_t *handle, handle_t *idp, handle_t *
 	if(uidp) {
 		ret = write_user(uidp, id);
 		if(ret != STATUS_SUCCESS) {
-			rwlock_unlock(&curr_proc->handles->lock);
+			rwlock_unlock(&table->lock);
 			return ret;
 		}
 	}
 
-	object_handle_retain(handle);
-	curr_proc->handles->handles[id] = handle;
-	curr_proc->handles->flags[id] = 0;
-	bitmap_set(curr_proc->handles->bitmap, id);
+	if(handle->type->attach)
+		handle->type->attach(handle, curr_proc);
 
-	rwlock_unlock(&curr_proc->handles->lock);
+	object_handle_retain(handle);
+	table->handles[id] = handle;
+	table->flags[id] = 0;
+	bitmap_set(table->bitmap, id);
+
+	rwlock_unlock(&table->lock);
 
 	dprintf("object: allocated handle %" PRId32 " in process %" PRId32 " ("
 		"type: %u, private: %p)\n", id, curr_proc->id, handle->type->id,
@@ -281,13 +276,21 @@ status_t object_handle_attach(object_handle_t *handle, handle_t *idp, handle_t *
  * @param id		ID of handle to detach.
  * @return		Status code describing result of the operation. */
 static status_t object_handle_detach_unsafe(handle_t id) {
-	if(id < 0 || id >= HANDLE_TABLE_SIZE || !curr_proc->handles->handles[id])
+	handle_table_t *table = &curr_proc->handles;
+	object_handle_t *handle;
+
+	if(id < 0 || id >= HANDLE_TABLE_SIZE || !table->handles[id])
 		return STATUS_INVALID_HANDLE;
 
-	object_handle_release(curr_proc->handles->handles[id]);
-	curr_proc->handles->handles[id] = NULL;
-	curr_proc->handles->flags[id] = 0;
-	bitmap_clear(curr_proc->handles->bitmap, id);
+	handle = table->handles[id];
+
+	if(handle->type->detach)
+		handle->type->detach(handle, curr_proc);
+
+	object_handle_release(handle);
+	table->handles[id] = NULL;
+	table->flags[id] = 0;
+	bitmap_clear(table->bitmap, id);
 
 	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
 		id, curr_proc->id);
@@ -307,21 +310,60 @@ static status_t object_handle_detach_unsafe(handle_t id) {
 status_t object_handle_detach(handle_t id) {
 	status_t ret;
 
-	rwlock_write_lock(&curr_proc->handles->lock);
+	rwlock_write_lock(&curr_proc->handles.lock);
 	ret = object_handle_detach_unsafe(id);
-	rwlock_unlock(&curr_proc->handles->lock);
+	rwlock_unlock(&curr_proc->handles.lock);
 	return ret;
 }
 
+/** Initialize a process' handle table.
+ * @param process	Process to initialize. */
+void object_process_init(process_t *process) {
+	handle_table_t *table = &process->handles;
+
+	rwlock_init(&table->lock, "handle_table_lock");
+
+	table->handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->handles[0]),
+		MM_KERNEL);
+	table->flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->flags[0]),
+		MM_KERNEL);
+	table->bitmap = bitmap_alloc(HANDLE_TABLE_SIZE, MM_KERNEL);
+}
+
+/** Destroy a process' handle table.
+ * @param process	Process to clean up. */
+void object_process_cleanup(process_t *process) {
+	handle_table_t *table = &process->handles;
+	size_t i;
+	object_handle_t *handle;
+
+	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
+		handle = table->handles[i];
+		if(handle) {
+			if(handle->type->detach)
+				handle->type->detach(handle, process);
+
+			object_handle_release(handle);
+		}
+	}
+
+	kfree(table->bitmap);
+	kfree(table->flags);
+	kfree(table->handles);
+}
+
 /** Inherit a handle from one table to another.
- * @param parent	Parent table.
- * @param source	Source handle ID.
  * @param table		Table to duplicate to.
  * @param dest		Destination handle ID.
+ * @param parent	Parent table.
+ * @param source	Source handle ID.
+ * @param process	Process to attach to, if any.
  * @return		Status code describing result of the operation. */
-static status_t inherit_handle(handle_table_t *parent, handle_t source,
-	handle_table_t *table, handle_t dest)
+static status_t inherit_handle(handle_table_t *table, handle_t dest,
+	handle_table_t *parent, handle_t source, process_t *process)
 {
+	object_handle_t *handle;
+
 	if(source < 0 || source >= HANDLE_TABLE_SIZE) {
 		return STATUS_INVALID_HANDLE;
 	} else if(dest < 0 || dest >= HANDLE_TABLE_SIZE) {
@@ -332,27 +374,32 @@ static status_t inherit_handle(handle_table_t *parent, handle_t source,
 		return STATUS_ALREADY_EXISTS;
 	}
 
+	handle = parent->handles[source];
+
 	/* When using a map, the inheritable flag is ignored so we must check
 	 * whether transferring handles is allowed. */
-	if(!(parent->handles[source]->type->flags & OBJECT_TRANSFERRABLE))
+	if(!(handle->type->flags & OBJECT_TRANSFERRABLE))
 		return STATUS_NOT_SUPPORTED;
 
-	object_handle_retain(parent->handles[source]);
-	table->handles[dest] = parent->handles[source];
+	object_handle_retain(handle);
+
+	if(process && handle->type->attach)
+		handle->type->attach(handle, process);
+
+	table->handles[dest] = handle;
 	table->flags[dest] = parent->flags[source];
 	bitmap_set(table->bitmap, dest);
 	return STATUS_SUCCESS;
 }
 
 /**
- * Create a new handle table.
+ * Duplicate handles to a new process.
  *
- * Creates a new handle table and duplicates handles from another handle table
- * into it, either using provided mapping information, or by looking at the
- * inheritable flag of handles.
+ * Duplicates handles from a process into a newly created process, either using
+ * provided mapping information, or based on the inheritable flag of handles.
  *
- * @param parent	Parent process' handle table (can be NULL, in which
- *			case no handles will be duplicated).
+ * @param process	Newly created process.
+ * @param parent	Parent process.
  * @param map		An array specifying handles to add to the new table.
  *			The first ID of each entry specifies the handle in the
  *			parent, and the second specifies the ID to give it in
@@ -361,7 +408,6 @@ static status_t inherit_handle(handle_table_t *parent, handle_t source,
  *			map will be ignored and all handles with the inheritable
  *			flag set will be duplicated. If 0, no handles will be
  *			duplicated.
- * @param tablep	Where to store pointer to table structure.
  *
  * @return		STATUS_SUCCESS on success (always the case with no map).
  *			STATUS_INVALID_HANDLE if the given map specifies a
@@ -369,103 +415,173 @@ static status_t inherit_handle(handle_table_t *parent, handle_t source,
  *			STATUS_ALREADY_EXISTS if the given map maps multiple
  *			handles from the parent to the same ID in the new table.
  */
-status_t handle_table_create(handle_table_t *parent, handle_t map[][2],
-	ssize_t count, handle_table_t **tablep)
+status_t object_process_create(process_t *process, process_t *parent,
+	handle_t map[][2], ssize_t count)
 {
-	handle_table_t *table;
+	ssize_t i;
 	status_t ret;
-	int i;
 
-	table = slab_cache_alloc(handle_table_cache, MM_KERNEL);
-	table->handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->handles[0]),
-		MM_KERNEL);
-	table->flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->flags[0]),
-		MM_KERNEL);
-	table->bitmap = bitmap_alloc(HANDLE_TABLE_SIZE, MM_KERNEL);
-
-	*tablep = table;
-
-	if(!parent || count == 0)
+	if(!count)
 		return STATUS_SUCCESS;
 
-	rwlock_read_lock(&parent->lock);
+	rwlock_read_lock(&parent->handles.lock);
 
-	/* Inherit all inheritable handles in the parent table. */
 	if(count > 0) {
 		assert(map);
 
 		for(i = 0; i < count; i++) {
-			ret = inherit_handle(parent, map[i][0], table, map[i][1]);
+			ret = inherit_handle(&process->handles, map[i][1],
+				&parent->handles, map[i][0], process);
 			if(ret != STATUS_SUCCESS)
-				goto fail;
+				goto out;
 		}
 	} else {
+		/* Inherit all inheritable handles in the parent table. */
 		for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
 			/* Flag can only be set if handle is not NULL and the
 			 * type allows transferring. */
-			if(parent->flags[i] & HANDLE_INHERITABLE)
-				inherit_handle(parent, i, table, i);
+			if(parent->handles.flags[i] & HANDLE_INHERITABLE) {
+				inherit_handle(&process->handles, i,
+					&parent->handles, i, process);
+			}
 		}
 	}
 
-	rwlock_unlock(&parent->lock);
-	return STATUS_SUCCESS;
-fail:
-	rwlock_unlock(&parent->lock);
-	handle_table_destroy(table);
+	ret = STATUS_SUCCESS;
+out:
+	/* We don't need to clean up on failure - this will be done when the
+	 * process gets destroyed. */
+	rwlock_unlock(&parent->handles.lock);
 	return ret;
 }
 
 /**
- * Clone a handle table.
+ * Close handles when executing a new program.
  *
- * Creates a clone of a handle table. All handles, including non-inheritable
- * ones (unless they are of a non-transferrable type), will be copied into the
- * new table. The table entries will all refer to the same underlying handle as
- * the old table.
+ * If no map is specified, closes all non-inheritable handles in the given
+ * process. If a map is specified, replaces the process' handle table with a
+ * new table containing all handles from the old table specified by the map.
  *
- * @param parent		Source table.
+ * @param process	Process that is executing a new program.
+ * @param map		An array specifying handles to add to the new table.
+ *			The first ID of each entry specifies the handle in the
+ *			parent, and the second specifies the ID to give it in
+ *			the new table. Can be NULL if count <= 0.
+ * @param count		The number of handles in the array. If negative, the
+ *			map will be ignored and all handles with the inheritable
+ *			flag set will be duplicated. If 0, no handles will be
+ *			duplicated.
  *
- * @return		Pointer to cloned table.
+ * @return		STATUS_SUCCESS on success (always the case with no map).
+ *			STATUS_INVALID_HANDLE if the given map specifies a
+ *			non-existant handle in the parent.
+ *			STATUS_ALREADY_EXISTS if the given map maps multiple
+ *			handles from the parent to the same ID in the new table.
  */
-handle_table_t *handle_table_clone(handle_table_t *parent) {
-	handle_table_t *table;
-	size_t i;
+status_t object_process_exec(process_t *process, handle_t map[][2],
+	ssize_t count)
+{
+	handle_table_t new;
+	ssize_t i;
+	object_handle_t *handle;
+	status_t ret;
 
-	table = slab_cache_alloc(handle_table_cache, MM_KERNEL);
-	table->handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->handles[0]),
+	/* The attach and detach callbacks are used by IPC code to track when
+	 * ports are no longer referenced by their owning process. When we exec
+	 * a process, that should count as giving up ownership of ports.
+	 * Therefore, this function has to do a somewhat complicated dance to
+	 * ensure that this happens: we first populate a new table without
+	 * calling attach on any handles. If that succeeds, we then call
+	 * detach on all handles in the old table, and *then* call attach on
+	 * all in the new table. This ensures that the IPC code correctly sees
+	 * that all references from the process to any ports it owns are
+	 * dropped and disowns the ports, before we re-add any references. */
+
+	new.handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(new.handles[0]),
 		MM_KERNEL);
-	table->flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->flags[0]),
+	new.flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(new.flags[0]),
 		MM_KERNEL);
-	table->bitmap = bitmap_alloc(HANDLE_TABLE_SIZE, MM_KERNEL);
+	new.bitmap = bitmap_alloc(HANDLE_TABLE_SIZE, MM_KERNEL);
 
-	rwlock_read_lock(&parent->lock);
+	if(count > 0) {
+		assert(map);
 
-	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
-		if(parent->handles[i]) {
-			if(parent->handles[i]->type->flags & OBJECT_TRANSFERRABLE)
-				inherit_handle(parent, i, table, i);
+		for(i = 0; i < count; i++) {
+			ret = inherit_handle(&new, map[i][1], &process->handles,
+				map[i][0], NULL);
+			if(ret != STATUS_SUCCESS) {
+				while(i--) {
+					handle = new.handles[map[i][1]];
+					object_handle_release(handle);
+				}
+
+				goto out;
+			}
+		}
+	} else if(count < 0) {
+		for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
+			if(process->handles.flags[i] & HANDLE_INHERITABLE) {
+				inherit_handle(&new, i, &process->handles,
+					i, NULL);
+			}
 		}
 	}
 
-	rwlock_unlock(&parent->lock);
-	return table;
-}
-
-/** Destroy a handle table.
- * @param table		Table being destroyed. */
-void handle_table_destroy(handle_table_t *table) {
-	size_t i;
-
+	/* Now we can detach and release all handles in the old table. */
 	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
-		if(table->handles[i])
-			object_handle_release(table->handles[i]);
+		handle = process->handles.handles[i];
+		if(handle) {
+			if(handle->type->detach)
+				handle->type->detach(handle, process);
+
+			object_handle_release(handle);
+		}
 	}
 
-	kfree(table->bitmap);
-	kfree(table->flags);
-	kfree(table->handles);
-	slab_cache_free(handle_table_cache, table);
+	SWAP(process->handles.handles, new.handles);
+	SWAP(process->handles.flags, new.flags);
+	SWAP(process->handles.bitmap, new.bitmap);
+
+	/* Finally, attach all handles in the new table. */
+	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
+		handle = process->handles.handles[i];
+		if(handle && handle->type->attach)
+			handle->type->attach(handle, process);
+	}
+
+	ret = STATUS_SUCCESS;
+out:
+	kfree(new.bitmap);
+	kfree(new.flags);
+	kfree(new.handles);
+	return ret;
+}
+
+/**
+ * Clone an existing process' handle table to a new process.
+ *
+ * Clones all handles, including non-inheritable ones (unless they are of a
+ * non-transferrable type), from an existing process' handle table to a new
+ * process. The table entries will all refer to the same underlying handles as
+ * the old table.
+ *
+ * @param process	New process.
+ * @param parent	Original process.
+ */
+void object_process_clone(process_t *process, process_t *parent) {
+	size_t i;
+
+	rwlock_read_lock(&parent->handles.lock);
+
+	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
+		/* inherit_handle() ignores non-transferrable handles. */
+		if(parent->handles.handles[i]) {
+			inherit_handle(&process->handles, i, &parent->handles,
+				i, process);
+		}
+	}
+
+	rwlock_unlock(&parent->handles.lock);
 }
 
 /** Print a list of a process' handles.
@@ -484,7 +600,8 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 		kdb_printf("Prints out a list of all currently open handles in a process.\n");
 		return KDB_SUCCESS;
 	} else if(argc != 2) {
-		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n",
+			argv[0]);
 		return KDB_FAILURE;
 	}
 
@@ -501,12 +618,12 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 	kdb_printf("==   =====  ====                        ===== =======\n");
 
 	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
-		handle = process->handles->handles[i];
+		handle = process->handles.handles[i];
 		if(!handle)
 			continue;
 
-		kdb_printf("%-4zu 0x%-4" PRIx32 " %-2u (%-22s) %-5" PRId32 " %p\n",
-			i, process->handles->flags[i], handle->type->id,
+		kdb_printf("%-4zu 0x%-4" PRIx32 " %-2u - %-22s %-5" PRId32
+			" %p\n", i, process->handles.flags[i], handle->type->id,
 			(handle->type->id < ARRAY_SIZE(object_type_names))
 				? object_type_names[handle->type->id]
 				: "Unknown",
@@ -520,9 +637,6 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 __init_text void object_init(void) {
 	object_handle_cache = object_cache_create("object_handle_cache",
 		object_handle_t, NULL, NULL, NULL, 0, MM_BOOT);
-	handle_table_cache = object_cache_create("handle_table_cache",
-		handle_table_t, handle_table_ctor, NULL, NULL, 0,
-		MM_BOOT);
 
 	/* Register the KDB commands. */
 	kdb_register_command("handles", "Inspect a process' handle table.",
@@ -610,7 +724,8 @@ status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags,
 		return STATUS_NO_MEMORY;
 
 	for(i = 0; i < count; i++) {
-		ret = memcpy_from_user(&waits[i].info, &events[i], sizeof(*events));
+		ret = memcpy_from_user(&waits[i].info, &events[i],
+			sizeof(*events));
 		if(ret != STATUS_SUCCESS)
 			goto out;
 
@@ -627,7 +742,8 @@ status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags,
 		waits[i].handle = handle;
 		waits[i].info.signalled = false;
 
-		ret = handle->type->wait(handle, waits[i].info.event, &waits[i]);
+		ret = handle->type->wait(handle, waits[i].info.event,
+			&waits[i]);
 		if(ret != STATUS_SUCCESS) {
 			object_handle_release(handle);
 			goto out;
@@ -661,7 +777,8 @@ out:
 		case STATUS_TIMED_OUT:
 		case STATUS_INTERRUPTED:
 		case STATUS_WOULD_BLOCK:
-			err = memcpy_to_user(&events[i], &waits[i].info, sizeof(*events));
+			err = memcpy_to_user(&events[i], &waits[i].info,
+				sizeof(*events));
 			if(err != STATUS_SUCCESS)
 				ret = err;
 
@@ -679,20 +796,21 @@ out:
  * @param flagsp	Where to store handle table entry flags.
  * @return		Status code describing result of the operation. */
 status_t kern_handle_flags(handle_t handle, uint32_t *flagsp) {
+	handle_table_t *table = &curr_proc->handles;
 	status_t ret;
 
 	if(handle < 0 || handle >= HANDLE_TABLE_SIZE)
 		return STATUS_INVALID_HANDLE;
 
-	rwlock_read_lock(&curr_proc->handles->lock);
+	rwlock_read_lock(&table->lock);
 
-	if(!curr_proc->handles->handles[handle]) {
-		rwlock_unlock(&curr_proc->handles->lock);
+	if(!table->handles[handle]) {
+		rwlock_unlock(&table->lock);
 		return STATUS_INVALID_HANDLE;
 	}
 
-	ret = write_user(flagsp, curr_proc->handles->flags[handle]);
-	rwlock_unlock(&curr_proc->handles->lock);
+	ret = write_user(flagsp, table->flags[handle]);
+	rwlock_unlock(&table->lock);
 	return ret;
 }
 
@@ -719,30 +837,31 @@ status_t kern_handle_flags(handle_t handle, uint32_t *flagsp) {
  *			object.
  */
 status_t kern_handle_set_flags(handle_t handle, uint32_t flags) {
+	handle_table_t *table = &curr_proc->handles;
 	object_handle_t *khandle;
 
 	if(handle < 0 || handle >= HANDLE_TABLE_SIZE)
 		return STATUS_INVALID_HANDLE;
 
-	/* Don't need to write lock just to set flags. */
-	rwlock_read_lock(&curr_proc->handles->lock);
+	/* Don't need to write lock just to set flags, it's atomic. */
+	rwlock_read_lock(&table->lock);
 
-	khandle = curr_proc->handles->handles[handle];
+	khandle = table->handles[handle];
 	if(!khandle) {
-		rwlock_unlock(&curr_proc->handles->lock);
+		rwlock_unlock(&table->lock);
 		return STATUS_INVALID_HANDLE;
 	}
 
 	/* To set the inheritable flag, the object type must be transferrable. */
 	if(flags & HANDLE_INHERITABLE) {
 		if(!(khandle->type->flags & OBJECT_TRANSFERRABLE)) {
-			rwlock_unlock(&curr_proc->handles->lock);
+			rwlock_unlock(&table->lock);
 			return STATUS_NOT_SUPPORTED;
 		}
 	}
 
-	curr_proc->handles->flags[handle] = flags;
-	rwlock_unlock(&curr_proc->handles->lock);
+	table->flags[handle] = flags;
+	rwlock_unlock(&table->lock);
 	return STATUS_SUCCESS;
 }
 
@@ -770,6 +889,7 @@ status_t kern_handle_set_flags(handle_t handle, uint32_t flags) {
  *			handle table is full.
  */
 status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *newp) {
+	handle_table_t *table = &curr_proc->handles;
 	object_handle_t *khandle;
 	status_t ret;
 
@@ -783,11 +903,11 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *newp) {
 		return STATUS_INVALID_ARG;
 	}
 
-	rwlock_write_lock(&curr_proc->handles->lock);
+	rwlock_write_lock(&table->lock);
 
-	khandle = curr_proc->handles->handles[handle];
+	khandle = table->handles[handle];
 	if(!khandle) {
-		rwlock_unlock(&curr_proc->handles->lock);
+		rwlock_unlock(&table->lock);
 		return STATUS_INVALID_HANDLE;
 	}
 
@@ -796,29 +916,32 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *newp) {
 		object_handle_detach_unsafe(dest);
 	} else {
 		/* Try to allocate a new ID. */
-		dest = bitmap_ffz(curr_proc->handles->bitmap, HANDLE_TABLE_SIZE);
+		dest = bitmap_ffz(table->bitmap, HANDLE_TABLE_SIZE);
 		if(dest < 0) {
-			rwlock_unlock(&curr_proc->handles->lock);
+			rwlock_unlock(&table->lock);
 			return STATUS_NO_HANDLES;
 		}
 	}
 
 	ret = write_user(newp, dest);
 	if(ret != STATUS_SUCCESS) {
-		rwlock_unlock(&curr_proc->handles->lock);
+		rwlock_unlock(&table->lock);
 		return ret;
 	}
 
+	if(khandle->type->attach)
+		khandle->type->attach(khandle, curr_proc);
+
 	/* Insert the new handle. */
 	object_handle_retain(khandle);
-	curr_proc->handles->handles[dest] = khandle;
-	curr_proc->handles->flags[dest] = 0;
-	bitmap_set(curr_proc->handles->bitmap, dest);
+	table->handles[dest] = khandle;
+	table->flags[dest] = 0;
+	bitmap_set(table->bitmap, dest);
 
-	dprintf("object: duplicated handle %" PRId32 " to %" PRId32 " in process %"
-		PRId32 " (type: %u, private: %p)\n", handle, dest, curr_proc->id,
-		khandle->type->id, khandle->private);
-	rwlock_unlock(&curr_proc->handles->lock);
+	dprintf("object: duplicated handle %" PRId32 " to %" PRId32 " in "
+		"process %" PRId32 " (type: %u, private: %p)\n", handle, dest,
+		curr_proc->id, khandle->type->id, khandle->private);
+	rwlock_unlock(&table->lock);
 	return STATUS_SUCCESS;
 }
 

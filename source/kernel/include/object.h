@@ -30,6 +30,7 @@
 #include <sync/rwlock.h>
 
 struct object_handle;
+struct process;
 struct vm_region;
 
 /** Kernel object type structure. */
@@ -45,6 +46,16 @@ typedef struct object_type {
 	 * @param handle	Handle to the object.
 	 * @return		Pointer to allocated name string. */
 	char *(*name)(struct object_handle *handle);
+
+	/** Called when a handle is attached to a process.
+	 * @param handle	Handle to the object.
+	 * @param process	Process the handle is being attached to. */
+	void (*attach)(struct object_handle *handle, struct process *process);
+
+	/** Called when a handle is detached from a process.
+	 * @param handle	Handle to the object.
+	 * @param process	Process the handle is being detached from. */
+	void (*detach)(struct object_handle *handle, struct process *process);
 
 	/** Signal that an object event is being waited for.
 	 * @note		If the event being waited for has occurred
@@ -112,10 +123,14 @@ extern status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
 	handle_t *uidp);
 extern status_t object_handle_detach(handle_t id);
 
-extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2],
-	ssize_t count, handle_table_t **tablep);
-extern handle_table_t *handle_table_clone(handle_table_t *parent);
-extern void handle_table_destroy(handle_table_t *table);
+extern void object_process_init(struct process *process);
+extern void object_process_cleanup(struct process *process);
+extern status_t object_process_create(struct process *process,
+	struct process *parent, handle_t map[][2], ssize_t count);
+extern status_t object_process_exec(struct process *process, handle_t map[][2],
+	ssize_t count);
+extern void object_process_clone(struct process *process,
+	struct process *parent);
 
 extern void object_init(void);
 

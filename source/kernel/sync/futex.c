@@ -84,7 +84,7 @@ static void futex_ctor(void *obj, void *data) {
 
 /** Clean up a process' futexes.
  * @param proc		Process to clean up. */
-void futex_cleanup(process_t *proc) {
+void futex_process_cleanup(process_t *proc) {
 	futex_link_t *link;
 	futex_t *futex;
 

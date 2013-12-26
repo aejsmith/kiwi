@@ -80,7 +80,6 @@ typedef struct process_load {
 
 	token_t *token;			/**< Token for the process. */
 	vm_aspace_t *aspace;		/**< Address space for the process. */
-	handle_table_t *handles;	/**< Handle table. */
 
 	elf_image_t *image;		/**< ELF loader data. */
 	ptr_t arg_block;		/**< Address of argument block mapping. */
@@ -136,20 +135,16 @@ void process_retain(process_t *process) {
 /** Free a process' resources after it has died.
  * @param process	Process to clean up. */
 static void process_cleanup(process_t *process) {
-	futex_cleanup(process);
-	elf_cleanup(process);
+	futex_process_cleanup(process);
+	elf_process_cleanup(process);
 
 	if(process->aspace) {
 		vm_aspace_destroy(process->aspace);
 		process->aspace = NULL;
 	}
 
-	if(process->handles) {
-		handle_table_destroy(process->handles);
-		process->handles = NULL;
-	}
-
 	io_context_destroy(&process->ioctx);
+	object_process_cleanup(process);
 	notifier_clear(&process->death_notifier);
 }
 
@@ -394,15 +389,14 @@ process_t *process_lookup(process_id_t id) {
  * @param priority	Priority class to give the process.
  * @param token		Security token for the process (should be referenced).
  * @param aspace	Address space for the process.
- * @param handles	Handle table for the process.
  * @param parent	Parent to inherit information from.
  * @param procp		Where to store pointer to created process structure.
  *			Reference count will be set to 1.
  * @return		STATUS_SUCCESS if successful, STATUS_PROCESS_LIMIT if
  *			unable to allocate an ID. */
 static status_t process_alloc(const char *name, process_id_t id, int priority,
-	token_t *token, vm_aspace_t *aspace, handle_table_t *handles,
-	process_t *parent, process_t **procp)
+	token_t *token, vm_aspace_t *aspace, process_t *parent,
+	process_t **procp)
 {
 	process_t *process;
 
@@ -415,12 +409,12 @@ static status_t process_alloc(const char *name, process_id_t id, int priority,
 	process = slab_cache_alloc(process_cache, MM_KERNEL);
 	refcount_set(&process->count, 1);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
+	object_process_init(process);
 	memset(process->signal_act, 0, sizeof(process->signal_act));
 	process->flags = 0;
 	process->priority = priority;
 	process->token = token;
 	process->aspace = aspace;
-	process->handles = handles;
 	process->next_image_id = 0;
 	process->signal_mask = 0;
 	process->state = PROCESS_CREATED;
@@ -620,7 +614,6 @@ status_t process_create(const char *const args[], const char *const env[],
 	uint32_t flags, int priority, process_t **procp)
 {
 	process_load_t load;
-	handle_table_t *handles;
 	process_t *process;
 	thread_t *thread;
 	status_t ret;
@@ -639,17 +632,13 @@ status_t process_create(const char *const args[], const char *const env[],
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	/* Create a new handle table. Can't fail as it's not duplicating. */
-	handle_table_create(NULL, NULL, 0, &handles);
-
 	token_retain(system_token);
 
 	/* Create the new process. */
 	ret = process_alloc(args[0], -1, priority, system_token, load.aspace,
-		handles, NULL, &process);
+		NULL, &process);
 	if(ret != STATUS_SUCCESS) {
 		vm_aspace_destroy(load.aspace);
-		handle_table_destroy(handles);
 		return ret;
 	}
 
@@ -745,7 +734,7 @@ __init_text void process_init(void) {
 	/* Create the kernel process and register the kernel image to it. */
 	token_retain(system_token);
 	process_alloc("[kernel]", 0, PRIORITY_CLASS_SYSTEM, system_token, NULL,
-		NULL, NULL, &kernel_proc);
+		NULL, &kernel_proc);
 	kernel_proc->flags |= PROCESS_CRITICAL;
 	kernel_proc->next_image_id = 1;
 	list_append(&kernel_proc->images, &kernel_module.image.header);
@@ -805,9 +794,6 @@ void process_shutdown(void) {
  * @param load		Structure containing copied information. */
 static void free_process_args(process_load_t *load) {
 	size_t i;
-
-	if(load->handles)
-		handle_table_destroy(load->handles);
 
 	if(load->aspace)
 		vm_aspace_destroy(load->aspace);
@@ -974,26 +960,25 @@ status_t kern_process_create(const char *path, const char *const args[],
 	/* Create the address space for the process. */
 	ret = process_load(&load, curr_proc);
 	if(ret != STATUS_SUCCESS)
-		goto out;
-
-	ret = handle_table_create(curr_proc->handles, load.map, load.map_count,
-		&load.handles);
-	if(ret != STATUS_SUCCESS)
-		goto out;
+		goto out_free_args;
 
 	/* Create the new process. */
 	ret = process_alloc(args[0], -1, PRIORITY_CLASS_NORMAL, load.token,
-		load.aspace, load.handles, NULL, &process);
+		load.aspace, NULL, &process);
 	if(ret != STATUS_SUCCESS)
-		goto out;
+		goto out_free_args;
 
 	/* These will now be freed when destroying the process. */
 	load.token = NULL;
 	load.aspace = NULL;
-	load.handles = NULL;
 
 	if(flags & PROCESS_CREATE_CRITICAL)
 		process->flags |= PROCESS_CRITICAL;
+
+	/* Duplicate handles into the new process. */
+	ret = object_process_create(process, curr_proc, load.map, load.map_count);
+	if(ret != STATUS_SUCCESS)
+		goto out_release_process;
 
 	/* Create a handle if necessary. */
 	if(handlep) {
@@ -1002,10 +987,8 @@ status_t kern_process_create(const char *path, const char *const args[],
 		khandle = object_handle_create(&process_object_type, process);
 		ret = object_handle_attach(khandle, &uhandle, handlep);
 		object_handle_release(khandle);
-		if(ret != STATUS_SUCCESS) {
-			process_release(process);
-			goto out;
-		}
+		if(ret != STATUS_SUCCESS)
+			goto out_release_process;
 	}
 
 	/* Create and run the entry thread. */
@@ -1015,8 +998,7 @@ status_t kern_process_create(const char *path, const char *const args[],
 		if(handlep)
 			object_handle_detach(uhandle);
 
-		process_release(process);
-		goto out;
+		goto out_release_process;
 	}
 
 	process->load = &load;
@@ -1030,8 +1012,9 @@ status_t kern_process_create(const char *path, const char *const args[],
 	if(ret != STATUS_SUCCESS && handlep)
 		object_handle_detach(uhandle);
 
+out_release_process:
 	process_release(process);
-out:
+out_free_args:
 	free_process_args(&load);
 	return ret;
 }
@@ -1093,25 +1076,18 @@ status_t kern_process_exec(const char *path, const char *const args[],
 
 	/* Create the new address space for the process. */
 	ret = process_load(&load, curr_proc);
-	if(ret != STATUS_SUCCESS) {
-		free_process_args(&load);
-		return ret;
-	}
-
-	ret = handle_table_create(curr_proc->handles, load.map, load.map_count,
-		&load.handles);
-	if(ret != STATUS_SUCCESS) {
-		free_process_args(&load);
-		return ret;
-	}
+	if(ret != STATUS_SUCCESS)
+		goto err_free_args;
 
 	/* Create the entry thread to finish loading the program. */
 	ret = thread_create("main", curr_proc, 0, process_entry_thread, &load,
 		NULL, &thread);
-	if(ret != STATUS_SUCCESS) {
-		free_process_args(&load);
-		return ret;
-	}
+	if(ret != STATUS_SUCCESS)
+		goto err_free_args;
+
+	ret = object_process_exec(curr_proc, load.map, load.map_count);
+	if(ret != STATUS_SUCCESS)
+		goto err_release_thread;
 
 	mutex_lock(&curr_proc->lock);
 
@@ -1134,7 +1110,6 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	preempt_enable();
 
 	SWAP(curr_proc->token, load.token);
-	SWAP(curr_proc->handles, load.handles);
 	name = curr_proc->name;
 	curr_proc->name = load.path;
 
@@ -1146,7 +1121,7 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	curr_thread->signal_stack.ss_flags = SS_DISABLE;
 
 	/* Free all currently loaded images. */
-	elf_cleanup(curr_proc);
+	elf_process_cleanup(curr_proc);
 	curr_proc->next_image_id = 0;
 
 	mutex_unlock(&curr_proc->lock);
@@ -1164,6 +1139,12 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	load.path = NULL;
 	free_process_args(&load);
 	thread_exit();
+
+err_release_thread:
+	thread_release(thread);
+err_free_args:
+	free_process_args(&load);
+	return ret;
 }
 
 /** Entry thread for a cloned process.
@@ -1210,7 +1191,6 @@ static void process_clone_thread(void *arg1, void *arg2) {
 status_t kern_process_clone(handle_t *handlep) {
 	token_t *token;
 	vm_aspace_t *as;
-	handle_table_t *handles;
 	process_t *process;
 	object_handle_t *khandle;
 	handle_t uhandle;
@@ -1221,25 +1201,25 @@ status_t kern_process_clone(handle_t *handlep) {
 	if(!handlep)
 		return STATUS_INVALID_ARG;
 
+	/* Clone the address space and security token. */
+	as = vm_aspace_clone(curr_proc->aspace);
 	token = curr_proc->token;
 	token_retain(token);
-	as = vm_aspace_clone(curr_proc->aspace);
-	handles = handle_table_clone(curr_proc->handles);
 
-	ret = process_alloc(curr_proc->name, -1, curr_proc->priority, token, as,
-		handles, curr_proc, &process);
+	ret = process_alloc(curr_proc->name, -1, curr_proc->priority, token,
+		as, curr_proc, &process);
 	if(ret != STATUS_SUCCESS) {
-		handle_table_destroy(handles);
 		vm_aspace_destroy(as);
 		token_release(token);
 		return ret;
 	}
 
-	/* Clone other per-process information. */
+	/* Clone handles and other per-process information. */
+	object_process_clone(process, curr_proc);
+	elf_process_clone(process, curr_proc);
 	memcpy(process->signal_act, curr_proc->signal_act,
 		sizeof(process->signal_act));
 	process->signal_mask = curr_proc->signal_mask;
-	elf_clone(process, curr_proc);
 
 	/* Create a new handle. This takes over the initial reference added by
 	 * process_alloc(). */

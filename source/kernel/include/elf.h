@@ -76,7 +76,7 @@ extern bool elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
 
 extern void elf_init(elf_image_t *image);
 
-extern void elf_clone(struct process *process, struct process *parent);
-extern void elf_cleanup(struct process *process);
+extern void elf_process_clone(struct process *process, struct process *parent);
+extern void elf_process_cleanup(struct process *process);
 
 #endif /* __KERNEL_ELF_H */

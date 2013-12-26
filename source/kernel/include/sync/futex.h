@@ -26,6 +26,6 @@
 
 struct process;
 
-extern void futex_cleanup(struct process *proc);
+extern void futex_process_cleanup(struct process *proc);
 
 #endif /* __SYNC_FUTEX_H */

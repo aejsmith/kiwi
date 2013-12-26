@@ -1003,7 +1003,7 @@ __init_text void elf_init(elf_image_t *image) {
 /** Clone loaded image information.
  * @param process	New process.
  * @param parent	Parent process. */
-void elf_clone(process_t *process, process_t *parent) {
+void elf_process_clone(process_t *process, process_t *parent) {
 	elf_image_t *image, *clone;
 
 	LIST_FOREACH(&parent->images, iter) {
@@ -1020,7 +1020,7 @@ void elf_clone(process_t *process, process_t *parent) {
 
 /** Clean up ELF images attached to a process.
  * @param process	Process to clean up. */
-void elf_cleanup(process_t *process) {
+void elf_process_cleanup(process_t *process) {
 	elf_image_t *image;
 
 	LIST_FOREACH_SAFE(&process->images, iter) {
