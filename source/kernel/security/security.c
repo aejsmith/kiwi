@@ -25,62 +25,44 @@
 #include <security/security.h>
 #include <security/token.h>
 
-/** Get the currently active security token.
- * @return		Currently active security token, will be referenced. */
+/**
+ * Get the currently active security token.
+ *
+ * Gets the current thread's active security token. A thread's active security
+ * token remains constant for the entire time that the thread is in the kernel,
+ * i.e. if another thread changes the process-wide security context, the change
+ * will not take effect until the current thread returns to userspace. The
+ * returned token does not have an extra reference added, it remains valid
+ * until the calling thread exits the kernel. If it needs to be kept after this,
+ * the token must be explicitly referenced.
+ *
+ * @return		Currently active security token.
+ */
 token_t *security_current_token(void) {
 	token_t *token;
 
-	mutex_lock(&curr_proc->lock);
+	if(curr_thread->active_token) {
+		token = curr_thread->active_token;
+	} else {
+		mutex_lock(&curr_proc->lock);
 
-	token = (curr_thread->token) ? curr_thread->token : curr_proc->token;
-	token_retain(token);
+		token = (curr_thread->token) ? curr_thread->token
+			: curr_proc->token;
+		token_retain(token);
 
-	mutex_unlock(&curr_proc->lock);
+		mutex_unlock(&curr_proc->lock);
+
+		/* Save the active token to be returned by subsequent calls.
+		 * An alternative to doing this would be to always save the
+		 * token in thread_at_kernel_entry(), however doing so would be
+		 * inefficient: it would require a process lock on every kernel
+		 * entry, and for a lot of kernel entries the security token
+		 * is not required. By saving the token the first time we call
+		 * this function, we still achieve the desired behaviour of not
+		 * having the thread's identity change while doing security
+		 * checks. */
+		curr_thread->active_token = token;
+	}
+
 	return token;
-}
-
-/** Get the current user ID.
- * @return		Current user ID. */
-user_id_t security_current_uid(void) {
-	token_t *token;
-	user_id_t ret;
-
-	mutex_lock(&curr_proc->lock);
-
-	token = (curr_thread->token) ? curr_thread->token : curr_proc->token;
-	ret = token->ctx.uid;
-
-	mutex_unlock(&curr_proc->lock);
-	return ret;
-}
-
-/** Get the current group ID.
- * @return		Current group ID. */
-group_id_t security_current_gid(void) {
-	token_t *token;
-	group_id_t ret;
-
-	mutex_lock(&curr_proc->lock);
-
-	token = (curr_thread->token) ? curr_thread->token : curr_proc->token;
-	ret = token->ctx.gid;
-
-	mutex_unlock(&curr_proc->lock);
-	return ret;
-}
-
-/** Check whether the current thread has a privilege.
- * @param priv		Privilege to check for.
- * @return		Whether the current thread has the privilege. */
-bool security_check_priv(unsigned priv) {
-	token_t *token;
-	bool ret;
-
-	mutex_lock(&curr_proc->lock);
-
-	token = (curr_thread->token) ? curr_thread->token : curr_proc->token;
-	ret = security_context_has_priv(&token->ctx, priv);
-
-	mutex_unlock(&curr_proc->lock);
-	return ret;
 }

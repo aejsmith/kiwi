@@ -86,12 +86,15 @@ token_t *token_inherit(token_t *source) {
 
 		token->ctx.uid = source->ctx.uid;
 		token->ctx.gid = source->ctx.gid;
-		memcpy(&token->ctx.groups, &source->ctx.groups, sizeof(token->ctx.groups));
+		memcpy(&token->ctx.groups, &source->ctx.groups,
+			sizeof(token->ctx.groups));
 
 		/* Both the effective and inheritable sets should be set to the
 		 * source's inheritable set. */
-		memcpy(&token->ctx.privs, &source->ctx.inherit, sizeof(token->ctx.privs));
-		memcpy(&token->ctx.inherit, &source->ctx.inherit, sizeof(token->ctx.inherit));
+		memcpy(&token->ctx.privs, &source->ctx.inherit,
+			sizeof(token->ctx.privs));
+		memcpy(&token->ctx.inherit, &source->ctx.inherit,
+			sizeof(token->ctx.inherit));
 
 		return token;
 	} else {
@@ -205,12 +208,11 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 
 	/* If we do not have PRIV_CHANGE_IDENTITY, we cannot change identity. */
 	if(!security_check_priv(PRIV_CHANGE_IDENTITY)) {
-		if(token->ctx.uid != creator->ctx.uid || token->ctx.gid != creator->ctx.gid) {
-			ret = STATUS_PERM_DENIED;
-			goto fail;
-		}
-
-		if(memcmp(token->ctx.groups, creator->ctx.groups, sizeof(token->ctx.groups))) {
+		if(token->ctx.uid != creator->ctx.uid
+			|| token->ctx.gid != creator->ctx.gid
+			|| memcmp(token->ctx.groups, creator->ctx.groups,
+				sizeof(token->ctx.groups)))
+		{
 			ret = STATUS_PERM_DENIED;
 			goto fail;
 		}

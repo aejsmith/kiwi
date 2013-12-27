@@ -607,6 +607,12 @@ void thread_at_kernel_entry(void) {
 void thread_at_kernel_exit(void) {
 	nstime_t now;
 
+	/* Clear active security token. */
+	if(curr_thread->active_token) {
+		token_release(curr_thread->active_token);
+		curr_thread->active_token = NULL;
+	}
+
 	/* Update accounting information. */
 	now = system_time();
 	curr_thread->kernel_time += now - curr_thread->last_time;
@@ -793,6 +799,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->pending_signals = 0;
 	thread->in_usermem = false;
 	thread->token = NULL;
+	thread->active_token = NULL;
 	thread->func = func;
 	thread->arg1 = arg1;
 	thread->arg2 = arg2;

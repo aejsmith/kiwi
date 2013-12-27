@@ -25,9 +25,30 @@
 #include <security/token.h>
 
 extern token_t *security_current_token(void);
-extern user_id_t security_current_uid(void);
-extern group_id_t security_current_gid(void);
 
-extern bool security_check_priv(unsigned priv);
+/** Get the current user ID.
+ * @return		Current user ID. */
+static inline user_id_t security_current_uid(void) {
+	token_t *token = security_current_token();
+
+	return token->ctx.uid;
+}
+
+/** Get the current group ID.
+ * @return		Current group ID. */
+static inline group_id_t security_current_gid(void) {
+	token_t *token = security_current_token();
+
+	return token->ctx.gid;
+}
+
+/** Check whether the current thread has a privilege.
+ * @param priv		Privilege to check for.
+ * @return		Whether the current thread has the privilege. */
+static inline bool security_check_priv(unsigned priv) {
+	token_t *token = security_current_token();
+
+	return security_context_has_priv(&token->ctx, priv);
+}
 
 #endif /* __SECURITY_SECURITY_H */
