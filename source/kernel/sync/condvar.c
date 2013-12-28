@@ -102,8 +102,9 @@ bool condvar_signal(condvar_t *cv) {
 
 	spinlock_lock(&cv->lock);
 
-	ret = list_empty(&cv->threads);
-	if(ret) {
+	if(!list_empty(&cv->threads)) {
+		ret = true;
+
 		thread = list_first(&cv->threads, thread_t, wait_link);
 		thread_wake(thread);
 	}
