@@ -26,6 +26,14 @@
 
 extern token_t *security_current_token(void);
 
+/** Get the current security context.
+ * @return		Pointer to current security context. */
+static inline security_context_t *security_current_context(void) {
+	token_t *token = security_current_token();
+
+	return &token->ctx;
+}
+
 /** Get the current user ID.
  * @return		Current user ID. */
 static inline user_id_t security_current_uid(void) {
