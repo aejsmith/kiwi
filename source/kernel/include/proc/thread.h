@@ -121,13 +121,12 @@ typedef struct thread {
 	/**
 	 * Active token for the thread.
 	 *
-	 * When a thread calls security_current_token(), we save the current
-	 * token here. Subsequent calls to security_current_token() return the
-	 * saved token. The saved token is cleared when the thread returns to
-	 * userspace. This behaviour means that a thread's identity effectively
-	 * remains constant for the entire time that it is in the kernel, and
-	 * won't change if another thread changes the process-wide security
-	 * token.
+	 * When a thread calls token_current(), we save the current token here.
+	 * Subsequent calls to token_current() return the saved token. The
+	 * saved token is cleared when the thread returns to userspace. This
+	 * behaviour means that a thread's identity effectively remains
+	 * constant for the entire time that it is in the kernel, and won't
+	 * change if another thread changes the process-wide security token.
 	 */
 	token_t *active_token;
 

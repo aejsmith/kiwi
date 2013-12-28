@@ -24,12 +24,10 @@
 
 #include <security/token.h>
 
-extern token_t *security_current_token(void);
-
 /** Get the current security context.
  * @return		Pointer to current security context. */
 static inline security_context_t *security_current_context(void) {
-	token_t *token = security_current_token();
+	token_t *token = token_current();
 
 	return &token->ctx;
 }
@@ -37,7 +35,7 @@ static inline security_context_t *security_current_context(void) {
 /** Get the current user ID.
  * @return		Current user ID. */
 static inline user_id_t security_current_uid(void) {
-	token_t *token = security_current_token();
+	token_t *token = token_current();
 
 	return token->ctx.uid;
 }
@@ -45,7 +43,7 @@ static inline user_id_t security_current_uid(void) {
 /** Get the current group ID.
  * @return		Current group ID. */
 static inline group_id_t security_current_gid(void) {
-	token_t *token = security_current_token();
+	token_t *token = token_current();
 
 	return token->ctx.gid;
 }
@@ -54,7 +52,7 @@ static inline group_id_t security_current_gid(void) {
  * @param priv		Privilege to check for.
  * @return		Whether the current thread has the privilege. */
 static inline bool security_check_priv(unsigned priv) {
-	token_t *token = security_current_token();
+	token_t *token = token_current();
 
 	return security_context_has_priv(&token->ctx, priv);
 }

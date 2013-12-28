@@ -103,6 +103,48 @@ token_t *token_inherit(token_t *source) {
 	}
 }
 
+/**
+ * Get the currently active security token.
+ *
+ * Gets the current thread's active security token. A thread's active security
+ * token remains constant for the entire time that the thread is in the kernel,
+ * i.e. if another thread changes the process-wide security context, the change
+ * will not take effect until the current thread returns to userspace. The
+ * returned token does not have an extra reference added, it remains valid
+ * until the calling thread exits the kernel. If it needs to be kept after this,
+ * the token must be explicitly referenced.
+ *
+ * @return		Currently active security token.
+ */
+token_t *token_current(void) {
+	token_t *token;
+
+	if(curr_thread->active_token) {
+		token = curr_thread->active_token;
+	} else {
+		mutex_lock(&curr_proc->lock);
+
+		token = (curr_thread->token) ? curr_thread->token
+			: curr_proc->token;
+		token_retain(token);
+
+		mutex_unlock(&curr_proc->lock);
+
+		/* Save the active token to be returned by subsequent calls.
+		 * An alternative to doing this would be to always save the
+		 * token in thread_at_kernel_entry(), however doing so would be
+		 * inefficient: it would require a process lock on every kernel
+		 * entry, and for a lot of kernel entries the security token
+		 * is not required. By saving the token the first time we call
+		 * this function, we still achieve the desired behaviour of not
+		 * having the thread's identity change while doing security
+		 * checks. */
+		curr_thread->active_token = token;
+	}
+
+	return token;
+}
+
 /** Initialize the security token allocator. */
 __init_text void token_init(void) {
 	size_t i;
@@ -158,7 +200,7 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 	object_handle_t *khandle;
 	status_t ret;
 
-	creator = security_current_token();
+	creator = token_current();
 
 	token = slab_cache_alloc(token_cache, MM_KERNEL);
 	refcount_set(&token->count, 1);
@@ -166,11 +208,11 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 
 	ret = memcpy_from_user(&token->ctx, ctx, sizeof(token->ctx));
 	if(ret != STATUS_SUCCESS)
-		goto fail;
+		goto err_free_token;
 
 	if(token->ctx.uid < 0 || token->ctx.gid < 0) {
 		ret = STATUS_INVALID_ARG;
-		goto fail;
+		goto err_free_token;
 	}
 
 	/* Sort the supplementary groups array into ascending order, with all
@@ -189,7 +231,7 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 		/* The inheritable set must be a subset of the effective set. */
 		if(token->ctx.inherit[i] & ~(token->ctx.privs[i])) {
 			ret = STATUS_INVALID_ARG;
-			goto fail;
+			goto err_free_token;
 		}
 
 		/* Need to copy the token when inheriting if the inherit set
@@ -202,7 +244,7 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 	for(i = 0; i < ARRAY_SIZE(token->ctx.privs); i++) {
 		if(token->ctx.privs[i] & ~(creator->ctx.privs[i])) {
 			ret = STATUS_PERM_DENIED;
-			goto fail;
+			goto err_free_token;
 		}
 	}
 
@@ -214,7 +256,7 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 				sizeof(token->ctx.groups)))
 		{
 			ret = STATUS_PERM_DENIED;
-			goto fail;
+			goto err_free_token;
 		}
 	}
 
@@ -222,8 +264,8 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *handlep) {
 	ret = object_handle_attach(khandle, NULL, handlep);
 	object_handle_release(khandle);
 	return ret;
-fail:
-	token_release(creator);
+
+err_free_token:
 	slab_cache_free(token_cache, token);
 	return ret;
 }

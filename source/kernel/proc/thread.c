@@ -1170,7 +1170,7 @@ status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
 		return ret;
 
 	thread = khandle->private;
-	current = security_current_token();
+	current = token_current();
 
 	mutex_lock(&thread->owner->lock);
 
@@ -1178,7 +1178,7 @@ status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
 		if(current->ctx.uid != thread->owner->token->ctx.uid) {
 			mutex_unlock(&thread->owner->lock);
 			object_handle_release(khandle);
-			return ret;
+			return STATUS_ACCESS_DENIED;
 		}
 	}
 
@@ -1190,7 +1190,6 @@ status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
 	ret = memcpy_to_user(ctx, &token->ctx, sizeof(token->ctx));
 
 	token_release(token);
-	token_release(current);
 	object_handle_release(khandle);
 	return ret;
 }
