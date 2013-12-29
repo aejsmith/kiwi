@@ -214,20 +214,14 @@ status_t object_handle_lookup(handle_t id, int type, object_handle_t **handlep) 
 	return STATUS_SUCCESS;
 }
 
-/**
- * Insert a handle into the current process' handle table.
- *
- * Allocates a handle ID for the current process and adds a handle to its
- * handle table. On success, the handle will have an extra reference on it.
- *
+/** Internal part of object_handle_attach().
  * @param handle	Handle to attach.
  * @param idp		If not NULL, a kernel location to store handle ID in.
  * @param uidp		If not NULL, a user location to store handle ID in.
- *
- * @return		Status code describing result of the operation.
- */
-status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
-	handle_t *uidp)
+ * @param retain	Whether to retain the handle.
+ * @return		Status code describing result of the operation. */
+static status_t object_handle_attach_internal(object_handle_t *handle,
+	handle_t *idp, handle_t *uidp, bool retain)
 {
 	handle_table_t *table = &curr_proc->handles;
 	handle_t id;
@@ -256,10 +250,12 @@ status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
 		}
 	}
 
+	if(retain)
+		object_handle_retain(handle);
+
 	if(handle->type->attach)
 		handle->type->attach(handle, curr_proc);
 
-	object_handle_retain(handle);
 	table->handles[id] = handle;
 	table->flags[id] = 0;
 	bitmap_set(table->bitmap, id);
@@ -270,6 +266,24 @@ status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
 		"type: %u, private: %p)\n", id, curr_proc->id, handle->type->id,
 		handle->private);
 	return STATUS_SUCCESS;
+}
+
+/**
+ * Insert a handle into the current process' handle table.
+ *
+ * Allocates a handle ID for the current process and adds a handle to its
+ * handle table. On success, the handle will have an extra reference on it.
+ *
+ * @param handle	Handle to attach.
+ * @param idp		If not NULL, a kernel location to store handle ID in.
+ * @param uidp		If not NULL, a user location to store handle ID in.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
+	handle_t *uidp)
+{
+	return object_handle_attach_internal(handle, idp, uidp, true);
 }
 
 /** Detach a handle from the current process' handle table.
@@ -287,13 +301,15 @@ static status_t object_handle_detach_unsafe(handle_t id) {
 	if(handle->type->detach)
 		handle->type->detach(handle, curr_proc);
 
+	dprintf("object: detached handle %" PRId32 " from process %" PRId32 " "
+		"(count: %d)\n", id, curr_proc->id,
+		refcount_get(&handle->count));
+
 	object_handle_release(handle);
 	table->handles[id] = NULL;
 	table->flags[id] = 0;
 	bitmap_clear(table->bitmap, id);
 
-	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
-		id, curr_proc->id);
 	return STATUS_SUCCESS;
 }
 
@@ -313,6 +329,43 @@ status_t object_handle_detach(handle_t id) {
 	rwlock_write_lock(&curr_proc->handles.lock);
 	ret = object_handle_detach_unsafe(id);
 	rwlock_unlock(&curr_proc->handles.lock);
+	return ret;
+}
+
+/**
+ * Create a handle in the current process' handle table.
+ *
+ * Allocates a handle ID in the current process and creates a new handle in its
+ * handle table. This is a shortcut for creating a new handle with
+ * object_handle_create() and then attaching it with object_handle_attach().
+ * The behaviour of this function also differs slightly from doing that: if
+ * attaching the handle fails, the object type's release method will not be
+ * called. Note that as soon as this function succeeds, it is possible for the
+ * process to close the handle and cause it to be released.
+ *
+ * @param type		Type of the object.
+ * @param private	Per-handle data pointer. This can be a pointer to the
+ *			object, or for object types that need per-handle state,
+ *			a pointer to a structure containing the object pointer
+ *			plus the required state.
+ * @param idp		If not NULL, a kernel location to store handle ID in.
+ * @param uidp		If not NULL, a user location to store handle ID in.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t object_handle_open(object_type_t *type, void *private, handle_t *idp,
+	handle_t *uidp)
+{
+	object_handle_t *handle;
+	status_t ret;
+
+	handle = object_handle_create(type, private);
+	ret = object_handle_attach_internal(handle, idp, uidp, false);
+	if(ret != STATUS_SUCCESS) {
+		slab_cache_free(object_handle_cache, handle);
+		return ret;
+	}
+
 	return ret;
 }
 
@@ -342,6 +395,10 @@ void object_process_cleanup(process_t *process) {
 		if(handle) {
 			if(handle->type->detach)
 				handle->type->detach(handle, process);
+
+			dprintf("object: detached handle %" PRId32 " from "
+				"process %" PRId32 " (count: %d)\n", i,
+				process->id, refcount_get(&handle->count));
 
 			object_handle_release(handle);
 		}

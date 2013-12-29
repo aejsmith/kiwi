@@ -122,6 +122,8 @@ extern status_t object_handle_lookup(handle_t id, int type,
 extern status_t object_handle_attach(object_handle_t *handle, handle_t *idp,
 	handle_t *uidp);
 extern status_t object_handle_detach(handle_t id);
+extern status_t object_handle_open(object_type_t *type, void *private,
+	handle_t *idp, handle_t *uidp);
 
 extern void object_process_init(struct process *process);
 extern void object_process_cleanup(struct process *process);
