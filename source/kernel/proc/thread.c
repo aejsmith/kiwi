@@ -1000,7 +1000,7 @@ static void thread_uspace_trampoline(void *_args, void *arg2) {
  * @param flags		Creation behaviour flags.
  * @param handlep	Where to store handle to the thread (can be NULL).
  * @return		Status code describing result of the operation. */
-status_t kern_thread_create(const char *name, thread_entry_t *entry,
+status_t kern_thread_create(const char *name, const thread_entry_t *entry,
 	uint32_t flags, handle_t *handlep)
 {
 	thread_entry_t kentry;

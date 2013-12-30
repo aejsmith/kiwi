@@ -67,8 +67,8 @@ typedef struct thread_entry {
 #define THREAD_PRIORITY_NORMAL	1	/**< Normal priority. */
 #define THREAD_PRIORITY_HIGH	2	/**< High priority. */
 
-extern status_t kern_thread_create(const char *name, thread_entry_t *entry,
-	uint32_t flags, handle_t *handlep);
+extern status_t kern_thread_create(const char *name,
+	const thread_entry_t *entry, uint32_t flags, handle_t *handlep);
 extern status_t kern_thread_open(thread_id_t id, handle_t *handlep);
 extern thread_id_t kern_thread_id(handle_t handle);
 extern status_t kern_thread_security(handle_t handle, security_context_t *ctx);
