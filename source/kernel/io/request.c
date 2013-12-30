@@ -52,8 +52,9 @@
  * @param target	Target address space. If set to IO_TARGET_USER, the
  *			target will be the current thread's address space.
  * @return		Status code describing result of the operation. */
-status_t io_request_init(io_request_t *request, const io_vec_t *vecs, size_t count,
-	offset_t offset, io_op_t op, io_target_t target)
+status_t io_request_init(io_request_t *request, const io_vec_t *vecs,
+	size_t count, offset_t offset, io_op_t op,
+	io_target_t target)
 {
 	size_t i;
 

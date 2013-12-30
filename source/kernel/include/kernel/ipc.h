@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		IPC functions.
+ * @brief		Inter-Process Communication (IPC) interface.
  */
 
 #ifndef __KERNEL_IPC_H
@@ -30,47 +30,61 @@ extern "C" {
 #endif
 
 /** Maximum length of data that can be attached to a message. */
-#define IPC_MESSAGE_MAX		16384
+#define IPC_DATA_MAX			16384
+
+/** Maximum number of messages that can be queued at a time. */
+#define IPC_QUEUE_MAX			256
 
 /** Structure describing an IPC message. */
 typedef struct ipc_message {
-	uint32_t id;			/**< Message type identifier. */
-	unsigned long args[6];		/**< Inline message arguments. */
-	uint16_t size;			/**< Size of attached data. */
-	uint16_t flags;			/**< Message flags. */
+	uint32_t id;
+	uint16_t flags;				/**< Message flags. */
+	uint16_t size;				/**< Size of attached data. */
+	unsigned long args[6];			/**< Inline message arguments. */
 } ipc_message_t;
 
 /** IPC message flags. */
-#define IPC_MESSAGE_HANDLE	(1<<0)	/**< Message has an attached handle. */
+#define IPC_MESSAGE_VALID		(1<<0)	/**< Message is valid (ignored when sending). */
+#define IPC_MESSAGE_HANDLE		(1<<1)	/**< Message has an attached handle. */
 
 /** Structure describing an IPC client. */
 typedef struct ipc_client {
-	process_id_t pid;		/**< Connecting process ID. */
-	security_context_t security;	/**< Security context at time of connection. */
+	process_id_t pid;			/**< Connecting process ID. */
+	security_context_t security;		/**< Security context at time of connection. */
 } ipc_client_t;
 
+/** IPC port event IDs. */
+#define PORT_EVENT_LISTEN		0	/**< A connection is being made to the port. */
+
+/** IPC connection event IDs. */
+#define CONNECTION_EVENT_HANGUP		0	/**< Remote end hung up or port was deleted. */
+#define CONNECTION_EVENT_RECEIVE	1	/**< A message is received. */
+
 /** Special process port IDs (negative values to distinguish from handles). */
-#define PROCESS_ROOT_PORT	(-1)
+#define PROCESS_ROOT_PORT		(-1)
 
 /** Thread special port IDs (must not conflict with process IDs). */
-#define THREAD_EXCEPTION_PORT	(-10)
+#define THREAD_EXCEPTION_PORT		(-10)
+
+/** Behaviour flags for kern_port_listen(). */
+#define PORT_LISTEN_ACCEPT		(1<<0)	/**< Immediately accept the connection. */
 
 extern status_t kern_port_create(handle_t *handlep);
-extern status_t kern_port_listen(handle_t handle, ipc_message_t *payload,
-	ipc_client_t *client, nstime_t timeout, handle_t *handlep);
-
-extern status_t kern_connection_create(handle_t handlep[2]);
-extern status_t kern_connection_open(handle_t port,
-	const ipc_message_t *payload, const void *data, nstime_t timeout,
+extern status_t kern_port_listen(handle_t handle, unsigned flags,
+	ipc_message_t *payload, ipc_client_t *client, nstime_t timeout,
 	handle_t *handlep);
+
+extern status_t kern_connection_open(handle_t port,
+	const ipc_message_t *payload, const void *data, handle_t attached,
+	nstime_t timeout, handle_t *handlep);
 
 extern status_t kern_connection_accept(handle_t handle);
 extern status_t kern_connection_reject(handle_t handle, status_t status);
 extern status_t kern_connection_forward(handle_t handle, handle_t port,
-	const ipc_message_t *payload, const void *data);
+	const ipc_message_t *payload, const void *data, handle_t attached);
 
 extern status_t kern_connection_send(handle_t handle, const ipc_message_t *msg,
-	const void *data, handle_t attached);
+	const void *data, handle_t attached, nstime_t timeout);
 extern status_t kern_connection_receive(handle_t handle, ipc_message_t *msg,
 	nstime_t timeout);
 extern status_t kern_connection_receive_data(handle_t handle, void *data);

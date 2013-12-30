@@ -33,6 +33,7 @@ sources = FeatureSources(config, [
     'io/ramfs.c',
     'io/request.c',
 
+    'ipc/ipc.c',
     'ipc/pipe.c',
 
     'lib/ansi_parser.c',

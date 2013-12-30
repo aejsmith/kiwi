@@ -107,15 +107,17 @@ syscall kern_thread_sleep(nstime_t, ptr_t);
 syscall kern_thread_exit(int) wrapped;
 syscall kern_thread_control(uint, ptr_t, ptr_t) hidden;
 
-#syscall kern_port_create(object_rights_t, ptr_t);
-#syscall kern_port_open(port_id_t, object_rights_t, ptr_t);
-#syscall kern_port_id(handle_t);
-#syscall kern_port_listen(handle_t, nstime_t, ptr_t, ptr_t);
-#syscall kern_port_loopback(handle_t, ptr_t);
-#syscall kern_connection_open(port_id_t, ptr_t);
-#syscall kern_connection_send(handle_t, uint32_t, ptr_t, size_t);
-#syscall kern_connection_peek(handle_t, nstime_t, ptr_t, ptr_t);
-#syscall kern_connection_receive(handle_t, nstime_t, ptr_t, ptr_t, size_t);
+syscall kern_port_create(ptr_t);
+syscall kern_port_listen(handle_t, uint, ptr_t, ptr_t, nstime_t, ptr_t);
+
+syscall kern_connection_open(handle_t, ptr_t, ptr_t, handle_t, nstime_t, ptr_t);
+syscall kern_connection_accept(handle_t);
+syscall kern_connection_reject(handle_t, status_t);
+syscall kern_connection_forward(handle_t, handle_t, ptr_t, ptr_t, handle_t);
+syscall kern_connection_send(handle_t, ptr_t, ptr_t, handle_t, nstime_t);
+syscall kern_connection_receive(handle_t, ptr_t, nstime_t);
+syscall kern_connection_receive_data(handle_t, ptr_t);
+syscall kern_connection_receive_handle(handle_t, ptr_t);
 
 #syscall kern_semaphore_create(ptr_t, size_t, ptr_t);
 #syscall kern_semaphore_open(semaphore_id_t, ptr_t);

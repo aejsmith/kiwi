@@ -23,6 +23,8 @@
 #include <io/fs.h>
 #include <io/memory_file.h>
 
+#include <ipc/ipc.h>
+
 #include <lib/string.h>
 #include <lib/tar.h>
 
@@ -115,6 +117,7 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 	/* Perform other initialization tasks. */
 	object_init();
 	token_init();
+	ipc_init();
 	process_init();
 	thread_init();
 	dpc_init();
