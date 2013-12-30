@@ -17,4 +17,5 @@
 Import('manager')
 
 env = manager.Create(libraries = ['kernel'])
-env.KiwiApplication('test', ['main.cc'])
+env.KiwiApplication('test-threads', ['test-threads.cc'])
+env.KiwiApplication('test-ipc', ['test-ipc.c'])
