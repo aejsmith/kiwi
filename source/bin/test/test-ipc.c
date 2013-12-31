@@ -21,13 +21,13 @@
 
 #include <kernel/ipc.h>
 #include <kernel/object.h>
+#include <kernel/process.h>
 #include <kernel/status.h>
 #include <kernel/thread.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #define TEST_MESSAGE_PAYLOAD	1
 #define TEST_MESSAGE_PING	2
@@ -36,6 +36,8 @@
 #define TEST_DATA_LEN		128
 
 #define TEST_PING_COUNT		10
+
+extern char **environ;
 
 static void dump_message(ipc_message_t *msg) {
 	int i;
@@ -49,12 +51,44 @@ static void dump_message(ipc_message_t *msg) {
 	}
 }
 
-static int test_server(handle_t port) {
+static bool spawn_client(handle_t port) {
+	const char *args[] = { "/system/bin/test-ipc", "--client", NULL };
+	handle_t map[3][2] = { { 0, 0 }, { 1, 1 }, { 2, 2 } };
+	process_attrib_t attrib;
+	status_t ret;
+
+	attrib.token = INVALID_HANDLE;
+	attrib.root_port = port;
+	attrib.map = map;
+	attrib.count = 3;
+
+	ret = kern_process_create(args[0], args, (const char *const *)environ,
+		0, &attrib, NULL);
+	if(ret != STATUS_SUCCESS) {
+		fprintf(stderr, "Failed to create process: %d\n", ret);
+		return false;
+	}
+
+	return true;
+}
+
+static int test_server(void) {
 	ipc_message_t msg;
 	ipc_client_t client;
 	char data[TEST_DATA_LEN];
-	handle_t conn;
+	handle_t port, conn;
 	status_t ret;
+
+	ret = kern_port_create(&port);
+	if(ret != STATUS_SUCCESS) {
+		fprintf(stderr, "Failed to create port: %d\n", ret);
+		return EXIT_FAILURE;
+	}
+
+	printf("Created port (handle: %d)\n", port);
+
+	if(!spawn_client(port))
+		return EXIT_FAILURE;
 
 	ret = kern_port_listen(port, 0, &msg, &client, -1, &conn);
 	if(ret != STATUS_SUCCESS) {
@@ -110,7 +144,7 @@ static int test_server(handle_t port) {
 	}
 }
 
-static int test_client(handle_t port) {
+static int test_client(void) {
 	ipc_message_t msg;
 	unsigned long count = 1;
 	char data[TEST_DATA_LEN];
@@ -126,7 +160,8 @@ static int test_client(handle_t port) {
 	msg.args[4] = 0xcafebabe;
 	msg.args[5] = 0x1337cafe;
 
-	ret = kern_connection_open(port, &msg, NULL, INVALID_HANDLE, -1, &conn);
+	ret = kern_connection_open(PROCESS_ROOT_PORT, &msg, NULL,
+		INVALID_HANDLE, -1, &conn);
 	if(ret != STATUS_SUCCESS) {
 		fprintf(stderr, "Failed to open connection: %d\n", ret);
 		return EXIT_FAILURE;
@@ -177,24 +212,9 @@ static int test_client(handle_t port) {
 }
 
 int main(int argc, char **argv) {
-	handle_t port;
-	status_t ret;
-
-	ret = kern_port_create(&port);
-	if(ret != STATUS_SUCCESS) {
-		fprintf(stderr, "Failed to create port: %d\n", ret);
-		return EXIT_FAILURE;
-	}
-
-	printf("Created port (handle: %d)\n", port);
-
-	ret = fork();
-	if(ret < 0) {
-		perror("fork");
-		return EXIT_FAILURE;
-	} else if(ret == 0) {
-		return test_client(port);
+	if(argc > 1 && strcmp(argv[1], "--client") == 0) {
+		return test_client();
 	} else {
-		return test_server(port);
+		return test_server();
 	}
 }
