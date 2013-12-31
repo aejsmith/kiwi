@@ -65,20 +65,6 @@ static void ipc_port_ctor(void *obj, void *data) {
 	notifier_init(&port->listen_notifier, port);
 }
 
-/** Release an IPC port.
- * @param port		Port to release. */
-static void ipc_port_release(ipc_port_t *port) {
-	if(refcount_dec(&port->count) > 0)
-		return;
-
-	assert(list_empty(&port->waiting));
-	assert(notifier_empty(&port->listen_notifier));
-
-	dprintf("ipc: destroying port %p\n", port);
-
-	slab_cache_free(ipc_port_cache, port);
-}
-
 /** Disown an IPC port.
  * @param port		Port to disown (must be locked). */
 static void ipc_port_disown(ipc_port_t *port) {
@@ -373,7 +359,7 @@ static status_t queue_message(ipc_connection_t *conn, ipc_endpoint_t *endpoint,
 	}
 
 	/* Queue the message. */
-	ipc_kmessage_retain(msg);
+	refcount_inc(&msg->count);
 	list_append(&endpoint->messages, &msg->header);
 	endpoint->message_count++;
 	condvar_signal(&endpoint->data_cvar);
@@ -705,8 +691,15 @@ ipc_port_t *ipc_port_create(ipc_port_ops_t *ops, void *private) {
 	return port;
 }
 
-/** Destroy an IPC port.
- * @param port		Port to destroy. */
+/**
+ * Destroy an IPC port.
+ *
+ * This function should be used to close a port that was created in the kernel
+ * with ipc_port_create(). It disowns the port and then releases it so that it
+ * can be freed once no more references to it remain.
+ *
+ * @param port		Port to destroy.
+ */
 void ipc_port_destroy(ipc_port_t *port) {
 	/* This function is used to indicate that a port created in the kernel
 	 * is no longer in use. Therefore we disown it, and then drop the
@@ -716,6 +709,26 @@ void ipc_port_destroy(ipc_port_t *port) {
 	mutex_unlock(&port->lock);
 
 	ipc_port_release(port);
+}
+
+/** Increase the reference count of a port.
+ * @param port		Port to retain. */
+void ipc_port_retain(ipc_port_t *port) {
+	refcount_inc(&port->count);
+}
+
+/** Release an IPC port.
+ * @param port		Port to release. */
+void ipc_port_release(ipc_port_t *port) {
+	if(refcount_dec(&port->count) > 0)
+		return;
+
+	assert(list_empty(&port->waiting));
+	assert(notifier_empty(&port->listen_notifier));
+
+	dprintf("ipc: destroying port %p\n", port);
+
+	slab_cache_free(ipc_port_cache, port);
 }
 
 /**
@@ -1043,7 +1056,7 @@ status_t kern_port_listen(handle_t handle, unsigned flags,
 				/* Reference the message so that it won't be
 				 * freed by kern_connection_open() if it
 				 * returns. */
-				ipc_kmessage_retain(conn->payload);
+				refcount_inc(&conn->payload->count);
 				endpoint->pending = conn->payload;
 			}
 		} else {
@@ -1142,8 +1155,18 @@ status_t kern_connection_open(handle_t _port, const ipc_message_t *payload,
 	status_t ret;
 
 	if(_port < 0) {
-		/* TODO: Special ports. */
-		return STATUS_NOT_IMPLEMENTED;
+		switch(_port) {
+		case PROCESS_ROOT_PORT:
+			port = curr_proc->root_port;
+			break;
+		default:
+			return STATUS_INVALID_ARG;
+		}
+
+		if(!port)
+			return STATUS_NOT_FOUND;
+
+		refcount_inc(&port->count);
 	} else {
 		ret = object_handle_lookup(_port, OBJECT_TYPE_PORT, &khandle);
 		if(ret != STATUS_SUCCESS)

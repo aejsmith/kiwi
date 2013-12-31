@@ -166,6 +166,8 @@ extern status_t ipc_connection_receive(ipc_endpoint_t *endpoint, unsigned flags,
 
 extern ipc_port_t *ipc_port_create(ipc_port_ops_t *ops, void *private);
 extern void ipc_port_destroy(ipc_port_t *port);
+extern void ipc_port_retain(ipc_port_t *port);
+extern void ipc_port_release(ipc_port_t *port);
 extern status_t ipc_port_publish(ipc_port_t *port, handle_t *idp,
 	handle_t *uidp);
 

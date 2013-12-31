@@ -47,18 +47,19 @@ typedef struct process_attrib {
 	 * or no attributes structure is given, the new process will inherit
 	 * the calling process' root port.
 	 */
-	handle_t root;
+	handle_t root_port;
 
 	/**
 	 * Handle map.
 	 *
 	 * Array containing a mapping of handles to duplicate into the new
-	 * process from the calling process. Handles specified by this array
-	 * are duplicated regardless of the inheritable flag on the handle.
-	 * Handles to objects of types which are non-transferrable cannot be
-	 * duplicated and specifying one in this array will result in an error.
-	 * If the count field is less than or equal to 0, this field can be
-	 * NULL.
+	 * process from the calling process. The first ID of each entry
+	 * specifies the handle in the caller, and the second specifies the ID
+	 * to give it in the child. Handles specified by this array are
+	 * duplicated regardless of the inheritable flag on the handle. Handles
+	 * to objects of types which are non-transferrable cannot be duplicated
+	 * and specifying one in this array will result in an error. If the
+	 * count field is less than or equal to 0, this field can be NULL.
 	 */
 	handle_t (*map)[2];
 
@@ -102,8 +103,9 @@ extern status_t kern_process_clone(handle_t *handlep);
 extern status_t kern_process_open(process_id_t id, handle_t *handlep);
 extern process_id_t kern_process_id(handle_t handle);
 extern status_t kern_process_security(handle_t handle, security_context_t *ctx);
-extern status_t kern_process_status(handle_t handle, int *statusp, int *reasonp);
-extern status_t kern_process_port(handle_t handle, int32_t port,
+extern status_t kern_process_status(handle_t handle, int *statusp,
+	int *reasonp);
+extern status_t kern_process_port(handle_t handle, int32_t id,
 	handle_t *handlep);
 
 extern status_t kern_process_token(handle_t *handlep);

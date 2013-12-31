@@ -58,6 +58,8 @@
 #include <arch/frame.h>
 #include <arch/stack.h>
 
+#include <ipc/ipc.h>
+
 #include <kernel/private/thread.h>
 
 #include <lib/id_allocator.h>
@@ -980,6 +982,36 @@ __init_text void thread_init(void) {
 		fatal("Could not create thread reaper (%d)", ret);
 }
 
+/**
+ * Userspace interface.
+ */
+
+/** Look up a thread given a handle.
+ * @param handle	Handle to thread, or THREAD_SELF for calling thread.
+ * @param threadp	Where to store pointer to thread (referenced).
+ * @return		Status code describing result of the operation. */
+static status_t thread_handle_lookup(handle_t handle, thread_t **threadp) {
+	object_handle_t *khandle;
+	thread_t *thread;
+	status_t ret;
+
+	if(handle == THREAD_SELF) {
+		refcount_inc(&curr_thread->count);
+		*threadp = curr_thread;
+		return STATUS_SUCCESS;
+	}
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	thread = khandle->private;
+	refcount_inc(&thread->count);
+	object_handle_release(khandle);
+	*threadp = thread;
+	return STATUS_SUCCESS;
+}
+
 /** Entry function for a userspace thread.
  * @param _args		Argument structure pointer (will be freed).
  * @param arg2		Unused. */
@@ -987,7 +1019,8 @@ static void thread_uspace_trampoline(void *_args, void *arg2) {
 	thread_uspace_args_t *args = _args;
 	intr_frame_t frame;
 
-	arch_thread_prepare_userspace(&frame, args->entry, args->sp, args->arg, 0);
+	arch_thread_prepare_userspace(&frame, args->entry, args->sp,
+		args->arg, 0);
 	kfree(args);
 	arch_thread_enter_userspace(&frame);
 }
@@ -1102,7 +1135,6 @@ fail:
  * @return		Status code describing result of the operation. */
 status_t kern_thread_open(thread_id_t id, handle_t *handlep) {
 	thread_t *thread;
-	object_handle_t *handle;
 	status_t ret;
 
 	if(!handlep)
@@ -1113,31 +1145,25 @@ status_t kern_thread_open(thread_id_t id, handle_t *handlep) {
 		return STATUS_NOT_FOUND;
 
 	/* Reference added by thread_lookup() is taken over by this handle. */
-	handle = object_handle_create(&thread_object_type, thread);
-	ret = object_handle_attach(handle, NULL, handlep);
-	object_handle_release(handle);
+	ret = object_handle_open(&thread_object_type, thread, NULL, handlep);
+	if(ret != STATUS_SUCCESS)
+		thread_release(thread);
+
 	return ret;
 }
 
 /** Get the ID of a thread.
- * @param handle	Handle for thread to get ID of, or THREAD_SELF to get
- *			ID of the calling thread.
+ * @param handle	Handle to thread, or THREAD_SELF for calling thread.
  * @return		Thread ID on success, -1 if handle is invalid. */
 thread_id_t kern_thread_id(handle_t handle) {
-	object_handle_t *khandle;
 	thread_id_t id = -1;
 	thread_t *thread;
 	status_t ret;
 
-	if(handle < 0) {
-		id = curr_thread->id;
-	} else {
-		ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle);
-		if(ret == STATUS_SUCCESS) {
-			thread = khandle->private;
-			id = thread->id;
-			object_handle_release(khandle);
-		}
+	ret = thread_handle_lookup(handle, &thread);
+	if(ret == STATUS_SUCCESS) {
+		id = thread->id;
+		thread_release(thread);
 	}
 
 	return id;
@@ -1154,32 +1180,29 @@ thread_id_t kern_thread_id(handle_t handle) {
  * privilege. This is only useful to query a thread's current identity, as it
  * returns only the context content, rather than a token object containing it.
  *
- * @param handle	Handle to thread.
+ * @param handle	Handle to thread, or THREAD_SELF for calling thread.
  * @param ctx		Where to store context of the thread.
  *
  * @return		Status code describing result of the operation.
  */
 status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
-	object_handle_t *khandle;
 	thread_t *thread;
-	token_t *token, *current;
+	token_t *token;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle);
+	if(!ctx)
+		return STATUS_INVALID_ARG;
+
+	ret = thread_handle_lookup(handle, &thread);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	thread = khandle->private;
-	current = token_current();
-
 	mutex_lock(&thread->owner->lock);
 
-	if(!security_context_has_priv(&current->ctx, PRIV_PROCESS_ADMIN)) {
-		if(current->ctx.uid != thread->owner->token->ctx.uid) {
-			mutex_unlock(&thread->owner->lock);
-			object_handle_release(khandle);
-			return STATUS_ACCESS_DENIED;
-		}
+	if(!process_access_unsafe(thread->owner)) {
+		mutex_unlock(&thread->owner->lock);
+		thread_release(thread);
+		return STATUS_ACCESS_DENIED;
 	}
 
 	token = (thread->token) ? thread->token : thread->owner->token;
@@ -1190,32 +1213,73 @@ status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
 	ret = memcpy_to_user(ctx, &token->ctx, sizeof(token->ctx));
 
 	token_release(token);
-	object_handle_release(khandle);
+	thread_release(thread);
 	return ret;
 }
 
 /** Query the exit status of a thread.
  * @param handle	Handle to thread.
- * @param statusp	Where to store exit status of thread.
+ * @param statusp	Where to store exit status of thread (can be NULL).
  * @return		Status code describing result of the operation. */
 status_t kern_thread_status(handle_t handle, int *statusp) {
-	object_handle_t *khandle;
 	thread_t *thread;
 	status_t ret;
 
-	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle);
+	/* Although getting the status of the current thread is silly (it'll
+	 * error below), support it anyway for consistency's sake. */
+	ret = thread_handle_lookup(handle, &thread);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	thread = khandle->private;
-
 	if(thread->state != THREAD_DEAD) {
-		object_handle_release(khandle);
+		thread_release(thread);
 		return STATUS_STILL_RUNNING;
 	}
 
-	ret = write_user(statusp, thread->status);
-	object_handle_release(khandle);
+	if(statusp)
+		ret = write_user(statusp, thread->status);
+
+	thread_release(thread);
+	return ret;
+}
+
+/**
+ * Get one of a thread's special ports.
+ *
+ * Gets a handle to one of a thread's special ports. The calling thread must
+ * have privileged access to the process owning the thread, i.e. the user IDs
+ * must match, or it must have the PRIV_PROCESS_ADMIN privilege.
+ *
+ * @param handle	Handle to thread, or THREAD_SELF for calling thread.
+ * @param id		Special port ID.
+ * @param handlep	Where to store handle to port.
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_HANDLE if thread handle is invalid.
+ *			STATUS_ACCESS_DENIED if calling thread does not have
+ *			sufficient privileges to access the thread's special
+ *			ports.
+ *			STATUS_INVALID_ARG if port ID is invalid.
+ *			STATUS_NOT_FOUND if port does not exist.
+ */
+status_t kern_thread_port(handle_t handle, int32_t id, handle_t *handlep) {
+	thread_t *thread;
+	status_t ret;
+
+	if(!handlep)
+		return STATUS_INVALID_ARG;
+
+	ret = thread_handle_lookup(handle, &thread);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	if(!process_access(thread->owner)) {
+		thread_release(thread);
+		return STATUS_ACCESS_DENIED;
+	}
+
+	/* TODO. */
+	thread_release(thread);
 	return ret;
 }
 

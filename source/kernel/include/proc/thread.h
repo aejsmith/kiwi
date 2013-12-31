@@ -166,7 +166,8 @@ extern void arch_thread_destroy(thread_t *thread);
 extern void arch_thread_switch(thread_t *thread, thread_t *prev);
 extern ptr_t arch_thread_tls_addr(thread_t *thread);
 extern status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr);
-extern void arch_thread_clone(thread_t *thread, thread_t *parent, struct intr_frame *frame);
+extern void arch_thread_clone(thread_t *thread, thread_t *parent,
+	struct intr_frame *frame);
 extern void arch_thread_prepare_userspace(struct intr_frame *frame, ptr_t entry,
 	ptr_t stack, ptr_t arg1, ptr_t arg2);
 extern void arch_thread_enter_userspace(struct intr_frame *frame) __noreturn;
@@ -181,8 +182,8 @@ extern bool thread_interrupt(thread_t *thread);
 extern void thread_kill(thread_t *thread);
 extern void thread_rename(thread_t *thread, const char *name);
 
-extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name,
-	unsigned flags);
+extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout,
+	const char *name, unsigned flags);
 extern void thread_yield(void);
 extern void thread_at_kernel_entry(void);
 extern void thread_at_kernel_exit(void);
@@ -191,8 +192,9 @@ extern void thread_exit(void) __noreturn;
 extern thread_t *thread_lookup_unsafe(thread_id_t id);
 extern thread_t *thread_lookup(thread_id_t id);
 
-extern status_t thread_create(const char *name, struct process *owner, unsigned flags,
-	thread_func_t func, void *arg1, void *arg2, thread_t **threadp);
+extern status_t thread_create(const char *name, struct process *owner,
+	unsigned flags, thread_func_t func, void *arg1, void *arg2,
+	thread_t **threadp);
 extern void thread_run(thread_t *thread);
 
 extern void thread_init(void);

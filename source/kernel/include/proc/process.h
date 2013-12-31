@@ -37,6 +37,7 @@
 
 #include <object.h>
 
+struct ipc_port;
 struct process_load;
 struct vm_aspace;
 
@@ -79,6 +80,9 @@ typedef struct process {
 	list_t images;			/**< List of loaded images. */
 	image_id_t next_image_id;	/**< Next image ID. */
 
+	/** Special ports. */
+	struct ipc_port *root_port;	/**< Root port. */
+
 	/** Signal information. */
 	sigset_t signal_mask;		/**< Bitmap of masked signals. */
 	sigaction_t signal_act[NSIG];	/**< Signal action structures. */
@@ -114,19 +118,22 @@ extern process_t *kernel_proc;
 
 extern void process_retain(process_t *process);
 extern void process_release(process_t *process);
-
 extern void process_attach_thread(process_t *process, thread_t *thread);
 extern void process_thread_started(thread_t *thread);
 extern void process_thread_exited(thread_t *thread);
 extern void process_detach_thread(thread_t *thread);
+
+extern bool process_access_unsafe(process_t *process);
+extern bool process_access(process_t *process);
 
 extern void process_exit(int status, int reason) __noreturn;
 
 extern process_t *process_lookup_unsafe(process_id_t id);
 extern process_t *process_lookup(process_id_t id);
 
-extern status_t process_create(const char *const args[], const char *const env[],
-	uint32_t flags, int priority, process_t **procp);
+extern status_t process_create(const char *const args[],
+	const char *const env[], uint32_t flags, int priority,
+	process_t **procp);
 
 extern void process_init(void);
 extern void process_shutdown(void);
