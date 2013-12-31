@@ -35,14 +35,14 @@ __thread thread_id_t curr_thread_id = -1;
 /** Information used by thread_create(). */
 typedef struct thread_create {
 	status_t ret;			/**< Initialisation status. */
-	thread_entry_t *entry;		/**< Real entry structure. */
+	const thread_entry_t *entry;	/**< Real entry structure. */
 } thread_create_t;
 
 /** Thread entry wrapper.
  * @param arg		Pointer to information structure. */
 static void thread_entry_wrapper(void *arg) {
 	thread_create_t *create = arg;
-	thread_entry_t *entry = create->entry;
+	const thread_entry_t *entry = create->entry;
 
 	/* Attempt to initialise our TLS block. */
 	create->ret = tls_init();
@@ -65,8 +65,8 @@ static void thread_entry_wrapper(void *arg) {
  * @param flags		Creation behaviour flags.
  * @param handlep	Where to store handle to the thread (can be NULL).
  * @return		Status code describing result of the operation. */
-__export status_t kern_thread_create(const char *name, thread_entry_t *entry,
-	uint32_t flags, handle_t *handlep)
+__export status_t kern_thread_create(const char *name,
+	const thread_entry_t *entry, uint32_t flags, handle_t *handlep)
 {
 	thread_create_t create;
 	thread_entry_t wrapper;
