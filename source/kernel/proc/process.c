@@ -352,7 +352,7 @@ bool process_access(process_t *process) {
 		mutex_unlock(&process->lock);
 	}
 
-	return true;
+	return ret;
 }
 
 /**
