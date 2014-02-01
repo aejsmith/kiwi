@@ -1,39 +1,39 @@
-diff -urN llvm-3.3.src.orig/include/llvm/ADT/Triple.h llvm-3.3.src/include/llvm/ADT/Triple.h
---- llvm-3.3.src.orig/include/llvm/ADT/Triple.h	2013-08-11 18:40:43.000000000 +0100
-+++ llvm-3.3.src/include/llvm/ADT/Triple.h	2013-08-11 21:00:17.000000000 +0100
-@@ -105,7 +105,8 @@
-     NaCl,       // Native Client
-     CNK,        // BG/P Compute-Node Kernel
+diff -urN llvm-3.4.orig/include/llvm/ADT/Triple.h llvm-3.4/include/llvm/ADT/Triple.h
+--- llvm-3.4.orig/include/llvm/ADT/Triple.h	2014-02-01 13:06:35.000000000 +0000
++++ llvm-3.4/include/llvm/ADT/Triple.h	2014-02-01 13:07:18.000000000 +0000
+@@ -111,7 +111,8 @@
      Bitrig,
--    AIX
-+    AIX,
+     AIX,
+     CUDA,       // NVIDIA CUDA
+-    NVCL        // NVIDIA OpenCL
++    NVCL,       // NVIDIA OpenCL
 +    Kiwi
    };
    enum EnvironmentType {
      UnknownEnvironment,
-diff -urN llvm-3.3.src.orig/lib/Support/Triple.cpp llvm-3.3.src/lib/Support/Triple.cpp
---- llvm-3.3.src.orig/lib/Support/Triple.cpp	2013-08-11 18:40:43.000000000 +0100
-+++ llvm-3.3.src/lib/Support/Triple.cpp	2013-08-11 21:00:17.000000000 +0100
-@@ -135,6 +135,7 @@
-   case CNK: return "cnk";
-   case Bitrig: return "bitrig";
+diff -urN llvm-3.4.orig/lib/Support/Triple.cpp llvm-3.4/lib/Support/Triple.cpp
+--- llvm-3.4.orig/lib/Support/Triple.cpp	2014-02-01 13:06:35.000000000 +0000
++++ llvm-3.4/lib/Support/Triple.cpp	2014-02-01 13:07:09.000000000 +0000
+@@ -137,6 +137,7 @@
    case AIX: return "aix";
+   case CUDA: return "cuda";
+   case NVCL: return "nvcl";
 +  case Kiwi: return "kiwi";
    }
  
    llvm_unreachable("Invalid OSType");
-@@ -287,6 +288,7 @@
-     .StartsWith("cnk", Triple::CNK)
-     .StartsWith("bitrig", Triple::Bitrig)
+@@ -292,6 +293,7 @@
      .StartsWith("aix", Triple::AIX)
+     .StartsWith("cuda", Triple::CUDA)
+     .StartsWith("nvcl", Triple::NVCL)
 +    .StartsWith("kiwi", Triple::Kiwi)
      .Default(Triple::UnknownOS);
  }
  
-diff -urN llvm-3.3.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-3.3.src/tools/clang/lib/Basic/Targets.cpp
---- llvm-3.3.src.orig/tools/clang/lib/Basic/Targets.cpp	2013-08-11 18:40:46.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Basic/Targets.cpp	2013-08-11 21:00:17.000000000 +0100
-@@ -397,6 +397,23 @@
+diff -urN llvm-3.4.orig/tools/clang/lib/Basic/Targets.cpp llvm-3.4/tools/clang/lib/Basic/Targets.cpp
+--- llvm-3.4.orig/tools/clang/lib/Basic/Targets.cpp	2014-02-01 13:06:38.000000000 +0000
++++ llvm-3.4/tools/clang/lib/Basic/Targets.cpp	2014-02-01 13:08:21.000000000 +0000
+@@ -421,6 +421,22 @@
    }
  };
  
@@ -48,46 +48,81 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-3.3.src/tools
 +    DefineStd(Builder, "unix", Opts);
 +  }
 +public:
-+  KiwiTargetInfo(const std::string &triple)
-+    : OSTargetInfo<Target>(triple) {
-+      this->UserLabelPrefix = "";
-+    }
++  KiwiTargetInfo(const llvm::Triple &Triple) : OSTargetInfo<Target>(Triple) {
++    this->UserLabelPrefix = "";
++  }
 +};
 +
  // Bitrig Target
  template<typename Target>
  class BitrigTargetInfo : public OSTargetInfo<Target> {
-@@ -5242,6 +5259,8 @@
-       return new NetBSDTargetInfo<ARMTargetInfo>(T);
+@@ -5572,6 +5588,8 @@
+       return new RTEMSTargetInfo<ARMTargetInfo>(Triple);
+     case llvm::Triple::NaCl:
+       return new NaClTargetInfo<ARMTargetInfo>(Triple);
++    case llvm::Triple::Kiwi:
++      return new KiwiTargetInfo<ARMTargetInfo>(Triple);
+     default:
+       return new ARMTargetInfo(Triple);
+     }
+@@ -5589,6 +5607,8 @@
+       return new FreeBSDTargetInfo<Mips32EBTargetInfo>(Triple);
+     case llvm::Triple::NetBSD:
+       return new NetBSDTargetInfo<Mips32EBTargetInfo>(Triple);
++    case llvm::Triple::Kiwi:
++      return new KiwiTargetInfo<Mips32EBTargetInfo>(Triple);
+     default:
+       return new Mips32EBTargetInfo(Triple);
+     }
+@@ -5605,6 +5625,8 @@
+       return new NetBSDTargetInfo<Mips32ELTargetInfo>(Triple);
+     case llvm::Triple::NaCl:
+       return new NaClTargetInfo<Mips32ELTargetInfo>(Triple);
++    case llvm::Triple::Kiwi:
++      return new KiwiTargetInfo<Mips32ELTargetInfo>(Triple);
+     default:
+       return new Mips32ELTargetInfo(Triple);
+     }
+@@ -5621,6 +5643,8 @@
+       return new NetBSDTargetInfo<Mips64EBTargetInfo>(Triple);
      case llvm::Triple::OpenBSD:
-       return new OpenBSDTargetInfo<ARMTargetInfo>(T);
+       return new OpenBSDTargetInfo<Mips64EBTargetInfo>(Triple);
 +    case llvm::Triple::Kiwi:
-+      return new KiwiTargetInfo<ARMTargetInfo>(T);
-     case llvm::Triple::Bitrig:
-       return new BitrigTargetInfo<ARMTargetInfo>(T);
-     case llvm::Triple::RTEMS:
-@@ -5436,6 +5455,8 @@
-       return new FreeBSDTargetInfo<X86_32TargetInfo>(T);
-     case llvm::Triple::Minix:
-       return new MinixTargetInfo<X86_32TargetInfo>(T);
++      return new KiwiTargetInfo<Mips64EBTargetInfo>(Triple);
+     default:
+       return new Mips64EBTargetInfo(Triple);
+     }
+@@ -5637,6 +5661,8 @@
+       return new NetBSDTargetInfo<Mips64ELTargetInfo>(Triple);
+     case llvm::Triple::OpenBSD:
+       return new OpenBSDTargetInfo<Mips64ELTargetInfo>(Triple);
 +    case llvm::Triple::Kiwi:
-+      return new KiwiTargetInfo<X86_32TargetInfo>(T);
-     case llvm::Triple::Solaris:
-       return new SolarisTargetInfo<X86_32TargetInfo>(T);
-     case llvm::Triple::Cygwin:
-@@ -5473,6 +5494,8 @@
-       return new BitrigX86_64TargetInfo(T);
-     case llvm::Triple::FreeBSD:
-       return new FreeBSDTargetInfo<X86_64TargetInfo>(T);
++      return new KiwiTargetInfo<Mips64ELTargetInfo>(Triple);
+     default:
+       return new Mips64ELTargetInfo(Triple);
+     }
+@@ -5783,6 +5809,8 @@
+       return new RTEMSX86_32TargetInfo(Triple);
+     case llvm::Triple::NaCl:
+       return new NaClTargetInfo<X86_32TargetInfo>(Triple);
 +    case llvm::Triple::Kiwi:
-+      return new KiwiTargetInfo<X86_64TargetInfo>(T);
-     case llvm::Triple::Solaris:
-       return new SolarisTargetInfo<X86_64TargetInfo>(T);
-     case llvm::Triple::MinGW32:
-diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-3.3.src/tools/clang/lib/Driver/Driver.cpp
---- llvm-3.3.src.orig/tools/clang/lib/Driver/Driver.cpp	2013-08-11 18:40:46.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/Driver.cpp	2013-08-11 21:00:17.000000000 +0100
-@@ -1747,6 +1747,9 @@
++      return new KiwiTargetInfo<X86_32TargetInfo>(Triple);
+     default:
+       return new X86_32TargetInfo(Triple);
+     }
+@@ -5816,6 +5844,8 @@
+       return new VisualStudioWindowsX86_64TargetInfo(Triple);
+     case llvm::Triple::NaCl:
+       return new NaClTargetInfo<X86_64TargetInfo>(Triple);
++    case llvm::Triple::Kiwi:
++      return new KiwiTargetInfo<X86_64TargetInfo>(Triple);
+     default:
+       return new X86_64TargetInfo(Triple);
+     }
+diff -urN llvm-3.4.orig/tools/clang/lib/Driver/Driver.cpp llvm-3.4/tools/clang/lib/Driver/Driver.cpp
+--- llvm-3.4.orig/tools/clang/lib/Driver/Driver.cpp	2014-02-01 13:06:38.000000000 +0000
++++ llvm-3.4/tools/clang/lib/Driver/Driver.cpp	2014-02-01 13:07:09.000000000 +0000
+@@ -1952,6 +1952,9 @@
      case llvm::Triple::Minix:
        TC = new toolchains::Minix(*this, Target, Args);
        break;
@@ -97,10 +132,10 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-3.3.src/tools
      case llvm::Triple::Linux:
        if (Target.getArch() == llvm::Triple::hexagon)
          TC = new toolchains::Hexagon_TC(*this, Target, Args);
-diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.cpp llvm-3.3.src/tools/clang/lib/Driver/ToolChains.cpp
---- llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.cpp	2013-08-11 18:40:46.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/ToolChains.cpp	2013-08-11 22:02:49.000000000 +0100
-@@ -1929,6 +1929,82 @@
+diff -urN llvm-3.4.orig/tools/clang/lib/Driver/ToolChains.cpp llvm-3.4/tools/clang/lib/Driver/ToolChains.cpp
+--- llvm-3.4.orig/tools/clang/lib/Driver/ToolChains.cpp	2014-02-01 13:06:38.000000000 +0000
++++ llvm-3.4/tools/clang/lib/Driver/ToolChains.cpp	2014-02-01 13:16:08.000000000 +0000
+@@ -2100,6 +2100,82 @@
    return new tools::minix::Link(*this);
  }
  
@@ -133,8 +168,8 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.cpp llvm-3.3.src/t
 +    return;
 +
 +  if (!DriverArgs.hasArg(options::OPT_nobuiltininc)) {
-+    llvm::sys::Path P(D.ResourceDir);
-+    P.appendComponent("include");
++    SmallString<128> P(D.ResourceDir);
++    llvm::sys::path::append(P, "include");
 +    addSystemInclude(DriverArgs, CC1Args, P.str());
 +  }
 +
@@ -183,26 +218,29 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.cpp llvm-3.3.src/t
  /// AuroraUX - AuroraUX tool chain which can call as(1) and ld(1) directly.
  
  AuroraUX::AuroraUX(const Driver &D, const llvm::Triple& Triple,
-diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.h llvm-3.3.src/tools/clang/lib/Driver/ToolChains.h
---- llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.h	2013-08-11 18:40:46.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/ToolChains.h	2013-08-11 21:17:22.000000000 +0100
-@@ -493,6 +493,25 @@
+diff -urN llvm-3.4.orig/tools/clang/lib/Driver/ToolChains.h llvm-3.4/tools/clang/lib/Driver/ToolChains.h
+--- llvm-3.4.orig/tools/clang/lib/Driver/ToolChains.h	2014-02-01 13:06:38.000000000 +0000
++++ llvm-3.4/tools/clang/lib/Driver/ToolChains.h	2014-02-01 13:07:09.000000000 +0000
+@@ -557,6 +557,28 @@
    virtual Tool *buildLinker() const;
  };
  
 +class LLVM_LIBRARY_VISIBILITY Kiwi : public Generic_ELF {
 +public:
-+  Kiwi(const Driver &D, const llvm::Triple& Triple, const ArgList &Args);
++  Kiwi(const Driver &D, const llvm::Triple& Triple,
++       const llvm::opt::ArgList &Args);
 +
-+  virtual void AddClangSystemIncludeArgs(const ArgList &DriverArgs,
-+                                         ArgStringList &CC1Args) const;
++  virtual void
++  AddClangSystemIncludeArgs(const llvm::opt::ArgList &DriverArgs,
++                            llvm::opt::ArgStringList &CC1Args) const;
 +
-+  virtual CXXStdlibType GetCXXStdlibType(const ArgList &Args) const;
++  virtual CXXStdlibType GetCXXStdlibType(const llvm::opt::ArgList &Args) const;
 +
-+  virtual void AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
-+                                            ArgStringList &CC1Args) const;
-+  virtual void AddCXXStdlibLibArgs(const ArgList &Args,
-+                                   ArgStringList &CmdArgs) const;
++  virtual void
++  AddClangCXXStdlibIncludeArgs(const llvm::opt::ArgList &DriverArgs,
++                               llvm::opt::ArgStringList &CC1Args) const;
++  virtual void AddCXXStdlibLibArgs(const llvm::opt::ArgList &Args,
++                                   llvm::opt::ArgStringList &CmdArgs) const;
 +
 +protected:
 +  virtual Tool *buildAssembler() const;
@@ -211,20 +249,19 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/ToolChains.h llvm-3.3.src/too
 +
  class LLVM_LIBRARY_VISIBILITY DragonFly : public Generic_ELF {
  public:
-   DragonFly(const Driver &D, const llvm::Triple& Triple, const ArgList &Args);
-diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/clang/lib/Driver/Tools.cpp
---- llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp	2013-08-11 18:40:46.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/Tools.cpp	2013-08-11 21:43:54.000000000 +0100
-@@ -1234,6 +1234,8 @@
- 
-   if (Triple.getOSName().startswith("haiku"))
+   DragonFly(const Driver &D, const llvm::Triple &Triple,
+diff -urN llvm-3.4.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.4/tools/clang/lib/Driver/Tools.cpp
+--- llvm-3.4.orig/tools/clang/lib/Driver/Tools.cpp	2014-02-01 13:06:38.000000000 +0000
++++ llvm-3.4/tools/clang/lib/Driver/Tools.cpp	2014-02-01 13:42:22.000000000 +0000
+@@ -1325,6 +1325,7 @@
+   case llvm::Triple::Haiku:
      return "i586";
-+  if (Triple.getOSName().startswith("kiwi"))
-+    return "i686";
-   if (Triple.getOSName().startswith("openbsd"))
-     return "i486";
-   if (Triple.getOSName().startswith("bitrig"))
-@@ -6239,6 +6241,248 @@
+   case llvm::Triple::Bitrig:
++  case llvm::Triple::Kiwi:
+     return "i686";
+   default:
+     // Fallback to p4.
+@@ -6712,6 +6713,299 @@
    C.addCommand(new Command(JA, *this, Exec, CmdArgs));
  }
  
@@ -249,10 +286,16 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/
 +    CmdArgs.push_back("-a64");
 +    CmdArgs.push_back("-mppc64");
 +    CmdArgs.push_back("-many");
++  } else if (getToolChain().getArch() == llvm::Triple::ppc64le) {
++    CmdArgs.push_back("-a64");
++    CmdArgs.push_back("-mppc64le");
++    CmdArgs.push_back("-many");
 +  } else if (getToolChain().getArch() == llvm::Triple::arm) {
 +    StringRef MArch = getToolChain().getArchName();
 +    if (MArch == "armv7" || MArch == "armv7a" || MArch == "armv7-a")
 +      CmdArgs.push_back("-mfpu=neon");
++    if (MArch == "armv8" || MArch == "armv8a" || MArch == "armv8-a")
++      CmdArgs.push_back("-mfpu=crypto-neon-fp-armv8");
 +
 +    StringRef ARMFloatABI = getARMFloatABI(getToolChain().getDriver(), Args,
 +                                           getToolChain().getTriple());
@@ -267,25 +310,44 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/
 +             getToolChain().getArch() == llvm::Triple::mips64el) {
 +    StringRef CPUName;
 +    StringRef ABIName;
-+    getMipsCPUAndABI(Args, getToolChain(), CPUName, ABIName);
++    getMipsCPUAndABI(Args, getToolChain().getTriple(), CPUName, ABIName);
 +
 +    CmdArgs.push_back("-march");
 +    CmdArgs.push_back(CPUName.data());
 +
-+    // Convert ABI name to the GNU tools acceptable variant.
-+    if (ABIName == "o32")
-+      ABIName = "32";
-+    else if (ABIName == "n64")
-+      ABIName = "64";
-+
 +    CmdArgs.push_back("-mabi");
-+    CmdArgs.push_back(ABIName.data());
++    CmdArgs.push_back(getGnuCompatibleMipsABIName(ABIName).data());
 +
 +    if (getToolChain().getArch() == llvm::Triple::mips ||
 +        getToolChain().getArch() == llvm::Triple::mips64)
 +      CmdArgs.push_back("-EB");
 +    else
 +      CmdArgs.push_back("-EL");
++
++    if (Arg *A = Args.getLastArg(options::OPT_mnan_EQ)) {
++      if (StringRef(A->getValue()) == "2008")
++        CmdArgs.push_back(Args.MakeArgString("-mnan=2008"));
++    }
++
++    if (Arg *A = Args.getLastArg(options::OPT_mfp32, options::OPT_mfp64)) {
++      if (A->getOption().matches(options::OPT_mfp32))
++        CmdArgs.push_back(Args.MakeArgString("-mfp32"));
++      else
++        CmdArgs.push_back(Args.MakeArgString("-mfp64"));
++    }
++
++    Args.AddLastArg(CmdArgs, options::OPT_mips16, options::OPT_mno_mips16);
++    Args.AddLastArg(CmdArgs, options::OPT_mmicromips,
++                    options::OPT_mno_micromips);
++    Args.AddLastArg(CmdArgs, options::OPT_mdsp, options::OPT_mno_dsp);
++    Args.AddLastArg(CmdArgs, options::OPT_mdspr2, options::OPT_mno_dspr2);
++
++    if (Arg *A = Args.getLastArg(options::OPT_mmsa, options::OPT_mno_msa)) {
++      // Do not use AddLastArg because not all versions of MIPS assembler
++      // support -mmsa / -mno-msa options.
++      if (A->getOption().matches(options::OPT_mmsa))
++        CmdArgs.push_back(Args.MakeArgString("-mmsa"));
++    }
 +
 +    Arg *LastPICArg = Args.getLastArg(options::OPT_fPIC, options::OPT_fno_PIC,
 +                                      options::OPT_fpic, options::OPT_fno_pic,
@@ -298,6 +360,11 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/
 +         LastPICArg->getOption().matches(options::OPT_fpie))) {
 +      CmdArgs.push_back("-KPIC");
 +    }
++  } else if (getToolChain().getArch() == llvm::Triple::systemz) {
++    // Always pass an -march option, since our default of z10 is later
++    // than the GNU assembler's default.
++    StringRef CPUName = getSystemZTargetCPU(Args);
++    CmdArgs.push_back(Args.MakeArgString("-march=" + CPUName));
 +  }
 +
 +  Args.AddAllArgValues(CmdArgs, options::OPT_Wa_COMMA,
@@ -418,37 +485,58 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/
 +  // Tell the linker to load the plugin. This has to come before AddLinkerInputs
 +  // as gold requires -plugin to come before any -plugin-opt that -Wl might
 +  // forward.
-+  if (D.IsUsingLTO(Args) || Args.hasArg(options::OPT_use_gold_plugin)) {
++  if (D.IsUsingLTO(Args)) {
 +    CmdArgs.push_back("-plugin");
 +    std::string Plugin = getToolChain().getDriver().Dir + "/../lib/LLVMgold.so";
 +    CmdArgs.push_back(Args.MakeArgString(Plugin));
++
++    // Try to pass driver level flags relevant to LTO code generation down to
++    // the plugin.
++
++    // Handle flags for selecting CPU variants.
++    std::string CPU = getCPUName(Args, getToolChain().getTriple());
++    if (!CPU.empty()) {
++      CmdArgs.push_back(
++                        Args.MakeArgString(Twine("-plugin-opt=mcpu=") +
++                                           CPU));
++    }
 +  }
 +
 +  AddLinkerInputs(getToolChain(), Inputs, Args, CmdArgs);
 +
 +  if (!Args.hasArg(options::OPT_nostdlib) &&
 +      !Args.hasArg(options::OPT_nodefaultlibs)) {
-+    if (D.CCCIsCXX) {
++    if (D.CCCIsCXX()) {
 +      getToolChain().AddCXXStdlibLibArgs(Args, CmdArgs);
 +      CmdArgs.push_back("-lm");
 +    }
 +    CmdArgs.push_back("-lsystem");
 +
 +    std::string file = "libclang_rt.";
-+    const llvm::Triple &T = getToolChain().getTriple();
-+    llvm::Triple::ArchType Arch = T.getArch();
-+    switch (Arch) {
-+      case llvm::Triple::arm:
-+        file += "arm";
-+        break;
-+      case llvm::Triple::x86:
-+        file += "i386";
-+        break;
-+      case llvm::Triple::x86_64:
-+        file += "x86_64";
-+        break;
-+      default:
-+        assert(0 && "Unsupported architecture");
++    switch (getToolChain().getTriple().getArch()) {
++    case llvm::Triple::arm:
++      file += "arm";
++      break;
++    case llvm::Triple::x86:
++      file += "i386";
++      break;
++    case llvm::Triple::x86_64:
++      file += "x86_64";
++      break;
++    case llvm::Triple::mips:
++      file += "mips";
++      break;
++    case llvm::Triple::mipsel:
++      file += "mipsel";
++      break;
++    case llvm::Triple::mips64:
++      file += "mips64";
++      break;
++    case llvm::Triple::mips64el:
++      file += "mips64el";
++      break;
++    default:
++      llvm_unreachable("Unsupported architecture");
 +    }
 +    file += ".a";
 +
@@ -473,34 +561,31 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.cpp llvm-3.3.src/tools/
  /// DragonFly Tools
  
  // For now, DragonFly Assemble does just about the same as for
-diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.h llvm-3.3.src/tools/clang/lib/Driver/Tools.h
---- llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.h	2013-08-11 18:40:46.000000000 +0100
-+++ llvm-3.3.src/tools/clang/lib/Driver/Tools.h	2013-08-11 21:00:17.000000000 +0100
-@@ -486,6 +486,39 @@
+diff -urN llvm-3.4.orig/tools/clang/lib/Driver/Tools.h llvm-3.4/tools/clang/lib/Driver/Tools.h
+--- llvm-3.4.orig/tools/clang/lib/Driver/Tools.h	2014-02-01 13:06:38.000000000 +0000
++++ llvm-3.4/tools/clang/lib/Driver/Tools.h	2014-02-01 13:07:09.000000000 +0000
+@@ -501,6 +501,36 @@
    };
  } // end namespace minix
  
 +  /// kiwi -- Directly call GNU Binutils assembler and linker
 +namespace kiwi {
 +  class LLVM_LIBRARY_VISIBILITY Assemble : public Tool  {
-+
 +  public:
-+    Assemble(const ToolChain &TC)
-+      : Tool("kiwi::Assemble", "assembler", TC) {}
++    Assemble(const ToolChain &TC) : Tool("kiwi::Assemble", "assembler",
++                                         TC) {}
 +
 +    virtual bool hasIntegratedCPP() const { return false; }
 +
 +    virtual void ConstructJob(Compilation &C, const JobAction &JA,
 +                              const InputInfo &Output,
 +                              const InputInfoList &Inputs,
-+                              const ArgList &TCArgs,
++                              const llvm::opt::ArgList &TCArgs,
 +                              const char *LinkingOutput) const;
 +  };
 +  class LLVM_LIBRARY_VISIBILITY Link : public Tool  {
-+
 +  public:
-+    Link(const ToolChain &TC)
-+      : Tool("kiwi::Link", "linker", TC) {}
++    Link(const ToolChain &TC) : Tool("kiwi::Link", "linker", TC) {}
 +
 +    virtual bool hasIntegratedCPP() const { return false; }
 +    virtual bool isLinkJob() const { return true; }
@@ -508,7 +593,7 @@ diff -urN llvm-3.3.src.orig/tools/clang/lib/Driver/Tools.h llvm-3.3.src/tools/cl
 +    virtual void ConstructJob(Compilation &C, const JobAction &JA,
 +                              const InputInfo &Output,
 +                              const InputInfoList &Inputs,
-+                              const ArgList &TCArgs,
++                              const llvm::opt::ArgList &TCArgs,
 +                              const char *LinkingOutput) const;
 +  };
 +} // end namespace kiwi

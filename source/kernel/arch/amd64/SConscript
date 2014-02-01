@@ -35,7 +35,7 @@ sources = FeatureSources(config, [
 	'time.c',
 ])
 
-# Prevent FPU code generation, warn on stack frames that are too large.
+# Prevent FPU code generation.
 env['CCFLAGS'] += ['-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
 
 # Warn on stack frames that are too large.

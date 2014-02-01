@@ -1,19 +1,19 @@
-diff -urN compiler-rt-3.3.src.orig/lib/arm/Makefile.mk compiler-rt-3.3.src/lib/arm/Makefile.mk
---- compiler-rt-3.3.src.orig/lib/arm/Makefile.mk	2013-07-16 17:01:30.000000000 +0100
-+++ compiler-rt-3.3.src/lib/arm/Makefile.mk	2013-07-16 17:02:28.000000000 +0100
+diff -urN compiler-rt-3.4.orig/lib/arm/Makefile.mk compiler-rt-3.4/lib/arm/Makefile.mk
+--- compiler-rt-3.4.orig/lib/arm/Makefile.mk	2014-02-01 12:49:17.000000000 +0000
++++ compiler-rt-3.4/lib/arm/Makefile.mk	2014-02-01 12:52:19.000000000 +0000
 @@ -9,7 +9,7 @@
  
  ModuleName := builtins
  SubDirs := 
--OnlyArchs := armv5 armv6 armv7 armv7f armv7k armv7s
-+OnlyArchs := arm armv5 armv6 armv7 armv7f armv7k armv7s
+-OnlyArchs := armv5 armv6 armv7 armv7f armv7k armv7m armv7em armv7s
++OnlyArchs := arm armv5 armv6 armv7 armv7f armv7k armv7m armv7em armv7s
  
  AsmSources := $(foreach file,$(wildcard $(Dir)/*.S),$(notdir $(file)))
  Sources := $(foreach file,$(wildcard $(Dir)/*.c),$(notdir $(file)))
-diff -urN compiler-rt-3.3.src.orig/lib/int_endianness.h compiler-rt-3.3.src/lib/int_endianness.h
---- compiler-rt-3.3.src.orig/lib/int_endianness.h	2013-07-16 17:01:30.000000000 +0100
-+++ compiler-rt-3.3.src/lib/int_endianness.h	2013-07-16 17:02:28.000000000 +0100
-@@ -93,6 +93,20 @@
+diff -urN compiler-rt-3.4.orig/lib/int_endianness.h compiler-rt-3.4/lib/int_endianness.h
+--- compiler-rt-3.4.orig/lib/int_endianness.h	2014-02-01 12:49:17.000000000 +0000
++++ compiler-rt-3.4/lib/int_endianness.h	2014-02-01 12:49:28.000000000 +0000
+@@ -95,6 +95,20 @@
  
  #endif /* GNU/Linux */
  
@@ -34,11 +34,11 @@ diff -urN compiler-rt-3.3.src.orig/lib/int_endianness.h compiler-rt-3.3.src/lib/
  #if defined(_WIN32)
  
  #define _YUGA_LITTLE_ENDIAN 1
-diff -urN compiler-rt-3.3.src.orig/make/platform/clang_kiwi.mk compiler-rt-3.3.src/make/platform/clang_kiwi.mk
---- compiler-rt-3.3.src.orig/make/platform/clang_kiwi.mk	1970-01-01 01:00:00.000000000 +0100
-+++ compiler-rt-3.3.src/make/platform/clang_kiwi.mk	2013-07-16 17:02:28.000000000 +0100
-@@ -0,0 +1,63 @@
-+Description := Static runtime libraries for clang/Linux.
+diff -urN compiler-rt-3.4.orig/make/platform/clang_kiwi.mk compiler-rt-3.4/make/platform/clang_kiwi.mk
+--- compiler-rt-3.4.orig/make/platform/clang_kiwi.mk	1970-01-01 01:00:00.000000000 +0100
++++ compiler-rt-3.4/make/platform/clang_kiwi.mk	2014-02-01 12:50:58.000000000 +0000
+@@ -0,0 +1,61 @@
++Description := Static runtime libraries for clang/Kiwi.
 +
 +###
 +
@@ -52,10 +52,8 @@ diff -urN compiler-rt-3.3.src.orig/make/platform/clang_kiwi.mk compiler-rt-3.3.s
 +# and only define configurations we know that compiler can generate.
 +CompilerTargetTriple := $(shell \
 +	$(CC) -v 2>&1 | grep 'Target:' | cut -d' ' -f2)
-+ifneq ($(DEBUGMAKE),)
 +ifeq ($(CompilerTargetTriple),)
 +$(error "unable to infer compiler target triple for $(CC)")
-+endif
 +endif
 +
 +# Only define configs if we detected a Kiwi target.

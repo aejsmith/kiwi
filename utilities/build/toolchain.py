@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2013 Alex Smith
+# Copyright (C) 2009-2014 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -132,7 +132,7 @@ class ToolchainComponent:
 # Component definition for binutils.
 class BinutilsComponent(ToolchainComponent):
     name = 'binutils'
-    version = '2.23.1'
+    version = '2.24'
     generic = False
     source = [
         'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
@@ -163,19 +163,19 @@ class BinutilsComponent(ToolchainComponent):
 # Component definition for LLVM/Clang.
 class LLVMComponent(ToolchainComponent):
     name = 'llvm'
-    version = '3.3'
+    version = '3.4'
     generic = True
     source = [
         'http://llvm.org/releases/' + version + '/llvm-' + version + '.src.tar.gz',
-        'http://llvm.org/releases/' + version + '/cfe-' + version + '.src.tar.gz',
+        'http://llvm.org/releases/' + version + '/clang-' + version + '.src.tar.gz',
     ]
     patches = [
-        ('llvm-' + version + '-kiwi.patch', 'llvm-' + version + '.src', 1),
+        ('llvm-' + version + '-kiwi.patch', 'llvm-' + version, 1),
     ]
 
     def build(self):
         # Move clang sources to the right place.
-        os.rename('cfe-%s.src' % (self.version), 'llvm-%s.src/tools/clang' % (self.version))
+        os.rename('clang-%s' % (self.version), 'llvm-%s/tools/clang' % (self.version))
 
         self.patch()
 
@@ -194,20 +194,20 @@ class LLVMComponent(ToolchainComponent):
 
         # Build and install it.
         os.mkdir('llvm-build')
-        self.execute('../llvm-%s.src/configure %s' % (self.version, confopts), 'llvm-build')
+        self.execute('../llvm-%s/configure %s' % (self.version, confopts), 'llvm-build')
         self.execute('make -j%d' % (self.manager.makejobs), 'llvm-build')
         self.execute('make install', 'llvm-build')
 
 # Component definition for Compiler-RT.
 class CompilerRTComponent(ToolchainComponent):
     name = 'compiler-rt'
-    version = '3.3'
+    version = '3.4'
     generic = False
     source = [
         'http://llvm.org/releases/' + version + '/compiler-rt-' + version + '.src.tar.gz',
     ]
     patches = [
-        ('compiler-rt-' + version + '-kiwi.patch', 'compiler-rt-' + version + '.src', 1),
+        ('compiler-rt-' + version + '-kiwi.patch', 'compiler-rt-' + version, 1),
     ]
 
     def build(self):
@@ -217,13 +217,13 @@ class CompilerRTComponent(ToolchainComponent):
         self.execute('make CC=%s AR=%s RANLIB=%s clang_kiwi' % (
             self.manager.tool_path('clang'),
             self.manager.tool_path('ar'),
-            self.manager.tool_path('ranlib')), 'compiler-rt-%s.src' % self.version)
+            self.manager.tool_path('ranlib')), 'compiler-rt-%s' % self.version)
 
         # Install it. Iterate directories because some targets build multiple
         # libraries (e.g. i386 and x86_64).
-        archs = os.listdir(os.path.join('compiler-rt-%s.src' % self.version, 'clang_kiwi'))
+        archs = os.listdir(os.path.join('compiler-rt-%s' % self.version, 'clang_kiwi'))
         for arch in archs:
-            shutil.copyfile(os.path.join('compiler-rt-%s.src' % self.version, 'clang_kiwi',
+            shutil.copyfile(os.path.join('compiler-rt-%s' % self.version, 'clang_kiwi',
                     arch, 'libcompiler_rt.a'),
                 os.path.join(self.manager.genericdir, 'lib', 'clang', self.version,
                     'libclang_rt.%s.a' % arch))
