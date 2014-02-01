@@ -15,8 +15,9 @@
 #
 
 sources = map(File, [
-    'init.c',
+    'relocate.c',
     'rtld.c',
+    'start.S',
     'tls.c',
 ])
 

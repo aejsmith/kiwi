@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,27 +16,39 @@
 
 /**
  * @file
- * @brief		AMD64 kernel library initialisation function.
+ * @brief		AMD64 kernel library relocation function.
  */
 
 #include "libkernel.h"
 
-/** Kernel library architecture initialisation function.
- * @param args		Process argument block.
- * @param image		Kernel library image structure. */
-void libkernel_arch_init(process_args_t *args, rtld_image_t *image) {
-	elf_rela_t *relocs;
+/** Relocate the library.
+ * @param dyn		Pointer to dynamic section.
+ * @param load_base	Load base address. */
+void libkernel_relocate(elf_dyn_t *dyn, ptr_t load_base) {
+	elf_rela_t *reloc;
 	elf_addr_t *addr;
-	size_t count, i;
+	size_t size, ent, i;
 
-	count = image->dynamic[ELF_DT_RELSZ_TYPE] / sizeof(elf_rela_t);
-	relocs = (elf_rela_t *)image->dynamic[ELF_DT_REL_TYPE];
-	for(i = 0; i < count; i++) {
-		addr = (elf_addr_t *)(image->load_base + relocs[i].r_offset);
+	for (i = 0; dyn[i].d_tag != ELF_DT_NULL; ++i) {
+		switch (dyn[i].d_tag) {
+		case ELF_DT_RELA:
+			reloc = (elf_rela_t *)(dyn[i].d_un.d_ptr + load_base);
+			break;
+		case ELF_DT_RELASZ:
+			size = dyn[i].d_un.d_val;
+			break;
+		case ELF_DT_RELAENT:
+			ent = dyn[i].d_un.d_val;
+			break;
+		}
+	}
 
-		switch(ELF64_R_TYPE(relocs[i].r_info)) {
+	for(i = 0; i < size / ent; i++, reloc = (elf_rela_t *)((ptr_t)reloc + ent)) {
+		addr = (elf_addr_t *)(load_base + reloc->r_offset);
+
+		switch(ELF64_R_TYPE(reloc->r_info)) {
 		case ELF_R_X86_64_RELATIVE:
-			*addr = (elf_addr_t)image->load_base + relocs[i].r_addend;
+			*addr = (elf_addr_t)load_base + reloc->r_addend;
 			break;
 		case ELF_R_X86_64_DTPMOD64:
 			*addr = LIBKERNEL_TLS_ID;

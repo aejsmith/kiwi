@@ -69,4 +69,6 @@ static inline tls_tcb_t *tls_tcb_get(void) {
 
 extern void tls_tcb_init(tls_tcb_t *tcb);
 
+extern void libkernel_relocate(elf_dyn_t *dyn, ptr_t load_base);
+
 #endif /* __LIBKERNEL_ARCH_H */

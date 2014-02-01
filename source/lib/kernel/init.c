@@ -30,33 +30,32 @@
 
 #include "libkernel.h"
 
-extern void libkernel_init_stage2(process_args_t *args, void *load_base);
-
-/**
- * Kernel library 1st stage initialisation.
- *
- * The job of this function is to relocate the the library. The kernel just
- * loads us somewhere and does not perform any relocations. We must therefore
- * relocate ourselves before we can make any calls to exported functions or
- * use global variables.
- *
+/** Kernel library main function.
  * @param args		Process argument block.
- * @param load_base	Load base address.
- */
-void libkernel_init(process_args_t *args, void *load_base) {
+ * @param load_base	Load base address. */
+void libkernel_init(process_args_t *args, ptr_t load_base) {
 	rtld_image_t *image;
-	int i;
+	elf_ehdr_t *ehdr;
+	elf_phdr_t *phdrs;
+	handle_t handle;
+	bool dry_run = false;
+	void (*entry)(process_args_t *);
+	void (*func)(void);
+	size_t i;
+	status_t ret;
 
-	/* Work out the correct location of the libkernel image structure and
-	 * fill it in with information we have. */
-	image = (rtld_image_t *)((elf_addr_t)&libkernel_image + (elf_addr_t)load_base);
-	image->load_base = load_base;
-	image->dyntab = (elf_dyn_t *)((elf_addr_t)_DYNAMIC + (elf_addr_t)load_base);
+	/* Fill in the libkernel image structure with information we have. */
+	image = &libkernel_image;
+	image->load_base = (void *)load_base;
+	image->dyntab = _DYNAMIC;
 
 	/* Populate the dynamic table and do address fixups. */
 	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED)
+		if(image->dyntab[i].d_tag >= ELF_DT_NUM) {
 			continue;
+		} else if(image->dyntab[i].d_tag == ELF_DT_NEEDED) {
+			continue;
+		}
 
 		/* Do address fixups. */
 		switch(image->dyntab[i].d_tag) {
@@ -66,37 +65,12 @@ void libkernel_init(process_args_t *args, void *load_base) {
 		case ELF_DT_SYMTAB:
 		case ELF_DT_JMPREL:
 		case ELF_DT_REL_TYPE:
-			image->dyntab[i].d_un.d_ptr += (elf_addr_t)image->load_base;
+			image->dyntab[i].d_un.d_ptr += load_base;
 			break;
 		}
 
 		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
 	}
-
-	/* Get the architecture to relocate us. */
-	libkernel_arch_init(args, image);
-
-	/* Jump to the second stage initialisation. Annoyingly, the compiler
-	 * can cache the location of libkernel_image, so if we try to get at it
-	 * from this function it will use the old address. So, we must continue
-	 * in a separate function (global, to prevent the compiler from inlining
-	 * it). */
-	libkernel_init_stage2(args, load_base);
-}
-
-/** Second stage initialisation.
- * @param args		Process argument block.
- * @param load_base	Load base address. */
-void libkernel_init_stage2(process_args_t *args, void *load_base) {
-	void (*entry)(process_args_t *);
-	bool dry_run = false;
-	rtld_image_t *image;
-	void (*func)(void);
-	elf_phdr_t *phdrs;
-	elf_ehdr_t *ehdr;
-	handle_t handle;
-	size_t i;
-	status_t ret;
 
 	/* Find out where our TLS segment is loaded to. */
 	ehdr = (elf_ehdr_t *)load_base;
@@ -106,12 +80,11 @@ void libkernel_init_stage2(process_args_t *args, void *load_base) {
 			if(!phdrs[i].p_memsz)
 				break;
 
-			libkernel_image.tls_module_id = tls_alloc_module_id();
-			libkernel_image.tls_image = (void *)((elf_addr_t)load_base
-				+ phdrs[i].p_vaddr);
-			libkernel_image.tls_filesz = phdrs[i].p_filesz;
-			libkernel_image.tls_memsz = phdrs[i].p_memsz;
-			libkernel_image.tls_align = phdrs[i].p_align;
+			image->tls_module_id = tls_alloc_module_id();
+			image->tls_image = (void *)(load_base + phdrs[i].p_vaddr);
+			image->tls_filesz = phdrs[i].p_filesz;
+			image->tls_memsz = phdrs[i].p_memsz;
+			image->tls_align = phdrs[i].p_align;
 			break;
 		}
 	}
@@ -144,8 +117,8 @@ void libkernel_init_stage2(process_args_t *args, void *load_base) {
 		kern_process_exit(STATUS_SUCCESS);
 
 	/* Set up TLS for the current thread. */
-	if(libkernel_image.tls_module_id)
-		libkernel_image.tls_offset = tls_tp_offset(&libkernel_image);
+	if(image->tls_module_id)
+		image->tls_offset = tls_tp_offset(image);
 	ret = tls_init();
 	if(ret != STATUS_SUCCESS)
 		kern_process_exit(ret);
