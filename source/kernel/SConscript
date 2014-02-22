@@ -159,7 +159,7 @@ Depends('kernel-unstripped', env['LDSCRIPT'])
 env.Command(['kernel', 'kernel.lst', 'kernel.rde', 'kernel.sym'], 'kernel-unstripped', [
     Action('$STRIP --strip-debug $SOURCE -o ${TARGETS[0]}', '$GENCOMSTR'),
     Action('$OBJDUMP -d $SOURCE > ${TARGETS[1]}', None),
-    Action('$READELF -a $SOURCE > ${TARGETS[2]}', None),
+    Action('$READELF -aW $SOURCE > ${TARGETS[2]}', None),
     Action('$NM -C $SOURCE | sort > ${TARGETS[3]}', None),
 ])
 
