@@ -108,12 +108,10 @@ void *memset(void *dest, int val, size_t count) {
 		nd = (unsigned long *)d;
 
 		/* Compute the value we will write. */
-		#if CONFIG_ARCH_64BIT
+		#if CONFIG_64BIT
 		nval = c * 0x0101010101010101ul;
-		#elif CONFIG_ARCH_32BIT
+		#elif CONFIG_32BIT
 		nval = c * 0x01010101ul;
-		#else
-		# error "Unsupported"
 		#endif
 
 		/* Unroll the loop if possible. */

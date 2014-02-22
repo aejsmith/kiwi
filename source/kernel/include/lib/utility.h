@@ -88,7 +88,8 @@ static inline int highbit_native(unsigned long val) {
 	return fls(val) + 1;
 }
 
-#if CONFIG_ARCH_32BIT
+#if CONFIG_32BIT
+
 /** Implementation for long long values on 32-bit systems. */
 static inline int highbit_ll(unsigned long long val) {
 	unsigned long high, low;
@@ -104,12 +105,13 @@ static inline int highbit_ll(unsigned long long val) {
 		return fls(low) + 1;
 	}
 }
-#endif
+
+#endif /* CONFIG_32BIT */
 
 /** Get log base 2 (high bit) of a value.
  * @param val		Value to get high bit from.
  * @return		High bit + 1. */
-#if CONFIG_ARCH_32BIT
+#if CONFIG_32BIT
 # define highbit(val)	_Generic((val), \
 	unsigned long long: highbit_ll, \
 	long long: highbit_ll, \

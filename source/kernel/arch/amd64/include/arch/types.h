@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,36 +23,8 @@
 #define __ARCH_TYPES_H
 
 /** Format character definitions for printf(). */
-#define PRIu8		"u"		/**< Format for uint8_t. */
-#define PRIu16		"u"		/**< Format for uint16_t. */
-#define PRIu32		"u"		/**< Format for uint32_t. */
-#define PRIu64		"lu"		/**< Format for uint64_t. */
-#define PRId8		"d"		/**< Format for int8_t. */
-#define PRId16		"d"		/**< Format for int16_t. */
-#define PRId32		"d"		/**< Format for int32_t. */
-#define PRId64		"ld"		/**< Format for int64_t. */
-#define PRIx8		"x"		/**< Format for (u)int8_t (hexadecimal). */
-#define PRIx16		"x"		/**< Format for (u)int16_t (hexadecimal). */
-#define PRIx32		"x"		/**< Format for (u)int32_t (hexadecimal). */
-#define PRIx64		"lx"		/**< Format for (u)int64_t (hexadecimal). */
-#define PRIo8		"o"		/**< Format for (u)int8_t (octal). */
-#define PRIo16		"o"		/**< Format for (u)int16_t (octal). */
-#define PRIo32		"o"		/**< Format for (u)int32_t (octal). */
-#define PRIo64		"llo"		/**< Format for (u)int64_t (octal). */
-#define PRIxPHYS	"lx"		/**< Format for phys_ptr_t (hexadecimal). */
-#define PRIuPHYS	"lu"		/**< Format for phys_ptr_t. */
-
-/** Unsigned data types. */
-typedef unsigned char uint8_t;		/**< Unsigned 8-bit. */
-typedef unsigned short uint16_t;	/**< Unsigned 16-bit. */
-typedef unsigned int uint32_t;		/**< Unsigned 32-bit. */
-typedef unsigned long uint64_t;		/**< Unsigned 64-bit. */
-
-/** Signed data types. */
-typedef signed char int8_t;		/**< Signed 8-bit. */
-typedef signed short int16_t;		/**< Signed 16-bit. */
-typedef signed int int32_t;		/**< Signed 32-bit. */
-typedef signed long int64_t;		/**< Signed 64-bit. */
+#define PRIxPHYS	"llx"		/**< Format for phys_ptr_t (hexadecimal). */
+#define PRIuPHYS	"llu"		/**< Format for phys_ptr_t. */
 
 /** Integer type that can represent a pointer. */
 typedef unsigned long ptr_t;

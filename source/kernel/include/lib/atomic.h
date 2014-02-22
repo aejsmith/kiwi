@@ -68,7 +68,7 @@ static inline int32_t atomic_and(atomic_t *var, int32_t val) {
 	return old;
 }
 
-#if CONFIG_ARCH_64BIT
+#if CONFIG_64BIT
 
 /** Atomically increment an atomic variable (64-bit).
  * @param var		Pointer to atomic variable.
@@ -84,6 +84,6 @@ static inline int64_t atomic_dec64(atomic64_t *var) {
 	return atomic_sub64(var, 1);
 }
 
-#endif /* CONFIG_ARCH_64BIT */
+#endif /* CONFIG_64BIT */
 
 #endif /* __LIB_ATOMIC_H */

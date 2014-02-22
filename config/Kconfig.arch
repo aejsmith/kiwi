@@ -14,10 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-config ARCH_32BIT
+config 32BIT
 	bool
 
-config ARCH_64BIT
+config 64BIT
 	bool
 
 config LITTLE_ENDIAN
@@ -44,14 +44,14 @@ choice
 
 config ARCH_AMD64
 	bool "AMD64"
-	select ARCH_64BIT
+	select 64BIT
 	select ARCH_X86
 	help
 	  Target the built system to 64-bit x86 processors.
 
 config ARCH_MIPS
 	bool "MIPS"
-	select ARCH_32BIT
+	select 32BIT
 	select TOOLCHAIN_GCC
 	help
 	  Target the built system to MIPS processors. Endianness is determined
