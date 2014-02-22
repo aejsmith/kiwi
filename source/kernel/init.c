@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -66,7 +66,7 @@ static kboot_tag_t *kboot_tag_list __init_data;
 /** Main entry point of the kernel.
  * @param magic		KBoot magic number.
  * @param tags		Tag list pointer. */
-__init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
+__init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
 	status_t ret;
 
 	/* Save the tag list address. */
@@ -138,7 +138,7 @@ __init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
 
 /** Kernel entry point for a secondary CPU.
  * @param cpu		Pointer to CPU structure for the CPU. */
-__init_text void kmain_ap(cpu_t *cpu) {
+__init_text void kmain_secondary(cpu_t *cpu) {
 	/* Indicate that we have reached the kernel. */
 	smp_boot_status = SMP_BOOT_ALIVE;
 

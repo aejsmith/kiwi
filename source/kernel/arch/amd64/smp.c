@@ -125,7 +125,7 @@ __init_text void x86_smp_boot(cpu_t *cpu) {
 
 	/* Fill in details required by the bootstrap code. */
 	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_BOOT);
-	*(uint64_t *)(mapping + 16) = (ptr_t)kmain_ap;
+	*(uint64_t *)(mapping + 16) = (ptr_t)kmain_secondary;
 	*(uint64_t *)(mapping + 24) = (ptr_t)cpu;
 	*(uint64_t *)(mapping + 32) = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;
 	*(uint32_t *)(mapping + 40) = (ptr_t)ap_mmu_context->arch.pml4;

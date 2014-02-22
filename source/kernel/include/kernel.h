@@ -77,9 +77,9 @@ extern void log_early_init(void);
 extern void preempt_disable(void);
 extern void preempt_enable(void);
 
-extern void kmain_bsp(uint32_t magic, struct kboot_tag *tags);
+extern void kmain(uint32_t magic, struct kboot_tag *tags);
 #if CONFIG_SMP
-extern void kmain_ap(struct cpu *cpu);
+extern void kmain_secondary(struct cpu *cpu);
 #endif
 
 #endif /* __KERNEL_H */

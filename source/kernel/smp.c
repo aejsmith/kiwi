@@ -396,7 +396,7 @@ __init_text void smp_boot(void) {
 	platform_smp_boot_cleanup();
 
 	/* Indicate to the newly-booted CPUs that all CPUs are up and they
-	 * can start scheduling threads (see kmain_ap()). */
+	 * can start scheduling threads (see kmain_secondary()). */
 	smp_boot_status = SMP_BOOT_COMPLETE;
 
 	local_irq_restore(state);

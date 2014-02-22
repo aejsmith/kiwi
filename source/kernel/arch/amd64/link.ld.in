@@ -22,7 +22,7 @@
 #include <arch/aspace.h>
 #include <arch/page.h>
 
-ENTRY(kmain_bsp)
+ENTRY(kmain)
 OUTPUT_ARCH("i386:x86-64")
 OUTPUT_FORMAT("elf64-x86-64")
 
