@@ -18,14 +18,14 @@ from util import FeatureSources
 Import('config')
 
 sources = FeatureSources(config, [
-	'acpi.c',
-	'console.c',
-	'page.c',
-	'pic.c',
-	'pit.c',
-	'platform.c',
-	'rtc.c',
-	('SMP', 'smp.c'),
+    'acpi.c',
+    'console.c',
+    'page.c',
+    'pic.c',
+    'pit.c',
+    'platform.c',
+    'rtc.c',
+    ('SMP', 'smp.c'),
 ])
 
 Return('sources')

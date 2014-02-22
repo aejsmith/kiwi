@@ -28,7 +28,8 @@ config PLATFORM_PC
 config PLATFORM_MALTA
 	bool "MIPS Malta"
 	depends on ARCH_MIPS
-	select LITTLE_ENDIAN
+	select SYS_SUPPORTS_BIG_ENDIAN
+	select SYS_SUPPORTS_LITTLE_ENDIAN
 	help
 	  Target the built system to the MIPS Malta evaluation board.
 

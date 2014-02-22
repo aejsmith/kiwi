@@ -14,8 +14,11 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+config SYS_SUPPORTS_SMP
+	bool
+
 config SMP
-	depends on HAVE_SMP
+	depends on SYS_SUPPORTS_SMP
 	def_bool y
 
 config KLOG_SIZE
@@ -24,13 +27,13 @@ config KLOG_SIZE
 	help
 	  Size for the kernel log buffer (in characters).
 
-if ARCH_AMD64
-source "arch/amd64/Kconfig"
-endif
+menu "Architecture configuration"
+source "arch/Kconfig"
+endmenu
 
-if PLATFORM_PC
-source "platform/pc/Kconfig"
-endif
+menu "Platform configuration"
+source "platform/Kconfig"
+endmenu
 
 ########################
 menu "Debugging options"

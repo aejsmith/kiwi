@@ -20,10 +20,10 @@ config 32BIT
 config 64BIT
 	bool
 
-config LITTLE_ENDIAN
+config SYS_SUPPORTS_LITTLE_ENDIAN
 	bool
 
-config BIG_ENDIAN
+config SYS_SUPPORTS_BIG_ENDIAN
 	bool
 
 config TOOLCHAIN_LLVM
@@ -35,7 +35,7 @@ config TOOLCHAIN_GCC
 # For KBoot compatibility.
 config ARCH_X86
 	bool
-	select LITTLE_ENDIAN
+	select SYS_SUPPORTS_LITTLE_ENDIAN
 	select TOOLCHAIN_LLVM
 
 choice
@@ -75,6 +75,24 @@ config TOOLCHAIN_TARGET
 	default "mips-kiwi" if ARCH_MIPS && BIG_ENDIAN
 	default "mipsel-kiwi" if ARCH_MIPS && LITTLE_ENDIAN
 
+config ARCH_ASFLAGS
+	string
+	default ""
+
 config ARCH_CCFLAGS
 	string
 	default ""
+
+choice
+	prompt "Endianness"
+	default LITTLE_ENDIAN
+
+config BIG_ENDIAN
+	bool "Big endian"
+	depends on SYS_SUPPORTS_BIG_ENDIAN
+
+config LITTLE_ENDIAN
+	bool "Little endian"
+	depends on SYS_SUPPORTS_LITTLE_ENDIAN
+
+endchoice

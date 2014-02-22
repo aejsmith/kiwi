@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2010 Alex Smith
+# Copyright (C) 2010-2014 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,5 +14,6 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-config HAVE_SMP
+config KERNEL_ARCH_AMD64
 	def_bool y
+	select SYS_SUPPORTS_SMP

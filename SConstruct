@@ -152,8 +152,12 @@ static_obj, shared_obj = createObjBuilders(target_env)
 shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
 
 # Add in extra compilation flags from the configuration.
+if config.has_key('ARCH_ASFLAGS'):
+    target_env['ASFLAGS'] += config['ARCH_ASFLAGS'].split()
 if config.has_key('ARCH_CCFLAGS'):
     target_env['CCFLAGS'] += config['ARCH_CCFLAGS'].split()
+if config.has_key('PLATFORM_ASFLAGS'):
+    target_env['CCFLAGS'] += config['PLATFORM_ASFLAGS'].split()
 if config.has_key('PLATFORM_CCFLAGS'):
     target_env['CCFLAGS'] += config['PLATFORM_CCFLAGS'].split()
 target_env['CCFLAGS'] += config['EXTRA_CCFLAGS'].split()
