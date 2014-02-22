@@ -182,7 +182,7 @@ static void page_writer(void *arg1, void *arg2) {
 		 * per iteration, or until we reach the end of the queue. */
 		while(written < PAGE_WRITER_MAX_PER_RUN && marker.next != &queue->pages) {
 			/* Take the page and move the marker after it. */
-			page = list_next(&marker, page_t, header);
+			page = list_entry(marker.next, page_t, header);
 			list_add_after(&page->header, &marker);
 			spinlock_unlock(&queue->lock);
 

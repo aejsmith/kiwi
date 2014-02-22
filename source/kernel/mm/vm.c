@@ -213,7 +213,7 @@ static vm_region_t *vm_region_prev(vm_region_t *region) {
 	if(region == list_first(&region->as->regions, vm_region_t, header))
 		return NULL;
 
-	return list_prev(&region->header, vm_region_t, header);
+	return list_prev(region, header);
 }
 
 /** Get the region after another region in the region list.
@@ -223,7 +223,7 @@ static vm_region_t *vm_region_next(vm_region_t *region) {
 	if(region == list_last(&region->as->regions, vm_region_t, header))
 		return NULL;
 
-	return list_next(&region->header, vm_region_t, header);
+	return list_next(region, header);
 }
 
 /** Check if a region contains an address.

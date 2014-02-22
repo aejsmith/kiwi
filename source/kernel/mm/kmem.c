@@ -298,7 +298,7 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
 
 	/* Coalesce with adjacent free ranges. */
 	if(range != list_last(&kmem_ranges, kmem_range_t, range_link)) {
-		exist = list_next(&range->range_link, kmem_range_t, range_link);
+		exist = list_next(range, range_link);
 		if(!exist->allocated) {
 			range->size += exist->size;
 			kmem_freelist_remove(exist);
@@ -307,7 +307,7 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
 		}
 	}
 	if(range != list_first(&kmem_ranges, kmem_range_t, range_link)) {
-		exist = list_prev(&range->range_link, kmem_range_t, range_link);
+		exist = list_prev(range, range_link);
 		if(!exist->allocated) {
 			range->addr = exist->addr;
 			range->size += exist->size;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,13 +33,13 @@ typedef struct list {
 /** Iterate over a list.
  * @param list		Head of list to iterate.
  * @param iter		Variable name to set to node pointer on each iteration. */
-#define LIST_FOREACH(list, iter)		\
+#define LIST_FOREACH(list, iter) \
 	for(list_t *iter = (list)->next; iter != (list); iter = iter->next)
 
 /** Iterate over a list in reverse.
  * @param list		Head of list to iterate.
  * @param iter		Variable name to set to node pointer on each iteration. */
-#define LIST_FOREACH_REVERSE(list, iter)	\
+#define LIST_FOREACH_REVERSE(list, iter) \
 	for(list_t *iter = (list)->prev; iter != (list); iter = iter->prev)
 
 /** Iterate over a list safely.
@@ -47,7 +47,7 @@ typedef struct list {
  *			the next pointer from the entry before the loop body.
  * @param list		Head of list to iterate.
  * @param iter		Variable name to set to node pointer on each iteration. */
-#define LIST_FOREACH_SAFE(list, iter)		\
+#define LIST_FOREACH_SAFE(list, iter) \
 	for(list_t *iter = (list)->next, *_##iter = iter->next; \
 		iter != (list); iter = _##iter, _##iter = _##iter->next)
 
@@ -55,19 +55,19 @@ typedef struct list {
  * @note		Safe to use when the loop may modify the list.
  * @param list		Head of list to iterate.
  * @param iter		Variable name to set to node pointer on each iteration. */
-#define LIST_FOREACH_REVERSE_SAFE(list, iter)	\
+#define LIST_FOREACH_REVERSE_SAFE(list, iter) \
 	for(list_t *iter = (list)->prev, *_##iter = iter->prev; \
 		iter != (list); iter = _##iter, _##iter = _##iter->prev)
 
 /** Initializes a statically declared linked list. */
-#define LIST_INITIALIZER(_var)			\
+#define LIST_INITIALIZER(_var) \
 	{ \
 		.prev = &_var, \
 		.next = &_var, \
 	}
 
 /** Statically declares a new linked list. */
-#define LIST_DECLARE(_var)			\
+#define LIST_DECLARE(_var) \
 	list_t _var = LIST_INITIALIZER(_var)
 
 /** Get a pointer to the structure containing a list node.
@@ -75,26 +75,24 @@ typedef struct list {
  * @param type		Type of the structure.
  * @param member	Name of the list node member in the structure.
  * @return		Pointer to the structure. */
-#define list_entry(entry, type, member)		\
-	(type *)((char *)entry - offsetof(type, member))
+#define list_entry(entry, type, member) \
+	((type *)((char *)entry - offsetof(type, member)))
 
 /** Get a pointer to the next structure in a list.
  * @note		Does not check if the next entry is the head.
  * @param entry		Current entry.
- * @param type		Type of the structure.
  * @param member	Name of the list node member in the structure.
  * @return		Pointer to the next structure. */
-#define list_next(entry, type, member)		\
-	(type *)((char *)((entry)->next) - offsetof(type, member))
+#define list_next(entry, member) \
+	(list_entry((entry)->member.next, typeof(*(entry)), member))
 
 /** Get a pointer to the previous structure in a list.
  * @note		Does not check if the previous entry is the head.
  * @param entry		Current entry.
- * @param type		Type of the structure.
  * @param member	Name of the list node member in the structure.
  * @return		Pointer to the previous structure. */
-#define list_prev(entry, type, member)		\
-	(type *)((char *)((entry)->prev) - offsetof(type, member))
+#define list_prev(entry, member) \
+	(list_entry((entry)->member.prev, typeof(*(entry)), member))
 
 /** Get a pointer to the first structure in a list.
  * @note		Does not check if the list is empty.
@@ -102,7 +100,8 @@ typedef struct list {
  * @param type		Type of the structure.
  * @param member	Name of the list node member in the structure.
  * @return		Pointer to the first structure. */
-#define list_first(list, type, member)		list_next(list, type, member)
+#define list_first(list, type, member) \
+	(list_entry((list)->next, type, member))
 
 /** Get a pointer to the last structure in a list.
  * @note		Does not check if the list is empty.
@@ -110,7 +109,8 @@ typedef struct list {
  * @param type		Type of the structure.
  * @param member	Name of the list node member in the structure.
  * @return		Pointer to the last structure. */
-#define list_last(list, type, member)		list_prev(list, type, member)
+#define list_last(list, type, member) \
+	(list_entry((list)->prev, type, member))
 
 /** Checks whether the given list is empty.
  * @param list		List to check. */
