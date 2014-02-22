@@ -346,7 +346,7 @@ static void build_conf(struct menu *menu)
 	struct symbol *sym;
 	struct property *prop;
 	struct menu *child;
-	int type, tmp, doint = 2;
+	int type, tmp, doint = 2, visible_children = 0;
 	tristate val;
 	char ch;
 	bool visible;
@@ -361,6 +361,11 @@ static void build_conf(struct menu *menu)
 	else if (!show_all_options && !visible)
 		return;
 
+	for (child = menu->list; child; child = child->next) {
+		if (menu_is_visible(child))
+			visible_children++;
+	}
+
 	sym = menu->sym;
 	prop = menu->prompt;
 	if (!sym) {
@@ -368,6 +373,8 @@ static void build_conf(struct menu *menu)
 			const char *prompt = menu_get_prompt(menu);
 			switch (prop->type) {
 			case P_MENU:
+				if(!visible_children)
+					return;
 				child_count++;
 				prompt = _(prompt);
 				if (single_menu_mode) {
@@ -407,6 +414,10 @@ static void build_conf(struct menu *menu)
 	if (sym_is_choice(sym)) {
 		struct symbol *def_sym = sym_get_choice_value(sym);
 		struct menu *def_menu = NULL;
+		int count = 0;
+
+		if(visible_children < 2)
+			return;
 
 		child_count++;
 		for (child = menu->list; child; child = child->next) {
@@ -529,6 +540,7 @@ static void conf(struct menu *menu)
 	int s_scroll = 0;
 
 	while (1) {
+		child_count = 0;
 		item_reset();
 		current_menu = menu;
 		build_conf(menu);
