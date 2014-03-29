@@ -292,7 +292,7 @@ class LLVMToolchain(Toolchain):
             path = os.path.join(manager.genericdir, 'bin', name)
             wrapper = os.path.join(manager.targetdir, 'bin', '%s-%s' % (manager.target, name))
             f = open(wrapper, 'w')
-            f.write('#!/bin/sh\n\n')
+            f.write('#!/bin/bash\n\n')
             f.write('exec -a $0 %s --sysroot=%s/sysroot $*\n' % (path, manager.targetdir))
             f.close()
             os.chmod(wrapper, 0755)
