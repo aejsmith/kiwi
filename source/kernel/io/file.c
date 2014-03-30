@@ -267,8 +267,9 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t file_read(object_handle_t *handle, void *buf, size_t size,
-	offset_t offset, size_t *bytesp)
+status_t
+file_read(object_handle_t *handle, void *buf, size_t size, offset_t offset,
+	size_t *bytesp)
 {
 	io_vec_t vec;
 	io_request_t request;
@@ -280,8 +281,7 @@ status_t file_read(object_handle_t *handle, void *buf, size_t size,
 	vec.buffer = buf;
 	vec.size = size;
 
-	ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ,
-		IO_TARGET_KERNEL);
+	ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ, IO_TARGET_KERNEL);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -316,7 +316,8 @@ status_t file_read(object_handle_t *handle, void *buf, size_t size,
  *
  * @return		Status code describing result of the operation.
  */
-status_t file_write(object_handle_t *handle, const void *buf, size_t size,
+status_t
+file_write(object_handle_t *handle, const void *buf, size_t size,
 	offset_t offset, size_t *bytesp)
 {
 	io_vec_t vec;
@@ -329,8 +330,7 @@ status_t file_write(object_handle_t *handle, const void *buf, size_t size,
 	vec.buffer = (void *)buf;
 	vec.size = size;
 
-	ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE,
-		IO_TARGET_KERNEL);
+	ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -363,16 +363,16 @@ status_t file_write(object_handle_t *handle, const void *buf, size_t size,
  *
  * @return		Status code describing result of the operation.
  */
-status_t file_read_vecs(object_handle_t *handle, const io_vec_t *vecs,
-	size_t count, offset_t offset, size_t *bytesp)
+status_t
+file_read_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t count,
+	offset_t offset, size_t *bytesp)
 {
 	io_request_t request;
 	status_t ret;
 
 	assert(handle);
 
-	ret = io_request_init(&request, vecs, count, offset, IO_OP_READ,
-		IO_TARGET_KERNEL);
+	ret = io_request_init(&request, vecs, count, offset, IO_OP_READ, IO_TARGET_KERNEL);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -406,16 +406,16 @@ status_t file_read_vecs(object_handle_t *handle, const io_vec_t *vecs,
  *
  * @return		Status code describing result of the operation.
  */
-status_t file_write_vecs(object_handle_t *handle, const io_vec_t *vecs,
-	size_t count, offset_t offset, size_t *bytesp)
+status_t
+file_write_vecs(object_handle_t *handle, const io_vec_t *vecs, size_t count,
+	offset_t offset, size_t *bytesp)
 {
 	io_request_t request;
 	status_t ret;
 
 	assert(handle);
 
-	ret = io_request_init(&request, vecs, count, offset, IO_OP_WRITE,
-		IO_TARGET_KERNEL);
+	ret = io_request_init(&request, vecs, count, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -574,7 +574,8 @@ status_t file_set_flags(object_handle_t *handle, uint32_t flags) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t file_seek(object_handle_t *handle, unsigned action, offset_t offset,
+status_t
+file_seek(object_handle_t *handle, unsigned action, offset_t offset,
 	offset_t *resultp)
 {
 	file_handle_t *fhandle;
@@ -697,6 +698,10 @@ status_t file_sync(object_handle_t *handle) {
 }
 
 /**
+ * System calls.
+ */
+
+/**
  * Read from a file.
  *
  * Reads data from a file into a buffer. If the specified offset is greater
@@ -718,7 +723,8 @@ status_t file_sync(object_handle_t *handle) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_file_read(handle_t handle, void *buf, size_t size, offset_t offset,
+status_t
+kern_file_read(handle_t handle, void *buf, size_t size, offset_t offset,
 	size_t *bytesp)
 {
 	object_handle_t *khandle;
@@ -782,8 +788,9 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_file_write(handle_t handle, const void *buf, size_t size,
-	offset_t offset, size_t *bytesp)
+status_t
+kern_file_write(handle_t handle, const void *buf, size_t size, offset_t offset,
+	size_t *bytesp)
 {
 	object_handle_t *khandle;
 	io_vec_t vec;
@@ -844,7 +851,8 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_file_read_vecs(handle_t handle, const io_vec_t *vecs, size_t count,
+status_t
+kern_file_read_vecs(handle_t handle, const io_vec_t *vecs, size_t count,
 	offset_t offset, size_t *bytesp)
 {
 	object_handle_t *khandle;
@@ -919,7 +927,8 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_file_write_vecs(handle_t handle, const io_vec_t *vecs, size_t count,
+status_t
+kern_file_write_vecs(handle_t handle, const io_vec_t *vecs, size_t count,
 	offset_t offset, size_t *bytesp)
 {
 	object_handle_t *khandle;
@@ -1112,7 +1121,8 @@ status_t kern_file_set_flags(handle_t handle, uint32_t flags) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset,
+status_t
+kern_file_seek(handle_t handle, unsigned action, offset_t offset,
 	offset_t *resultp)
 {
 	object_handle_t *khandle;

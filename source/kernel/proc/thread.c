@@ -751,7 +751,8 @@ static void thread_trampoline(void) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t thread_create(const char *name, process_t *owner, unsigned flags,
+status_t
+thread_create(const char *name, process_t *owner, unsigned flags,
 	thread_func_t func, void *arg1, void *arg2, thread_t **threadp)
 {
 	thread_t *thread;
@@ -860,9 +861,15 @@ static inline void dump_thread(thread_t *thread) {
 	kdb_printf("%-5" PRId32 "%s ", thread->id, (thread == curr_thread) ? "*" : " ");
 
 	switch(thread->state) {
-	case THREAD_CREATED:	kdb_printf("Created      "); break;
-	case THREAD_READY:	kdb_printf("Ready        "); break;
-	case THREAD_RUNNING:	kdb_printf("Running      "); break;
+	case THREAD_CREATED:
+		kdb_printf("Created      ");
+		break;
+	case THREAD_READY:
+		kdb_printf("Ready        ");
+		break;
+	case THREAD_RUNNING:
+		kdb_printf("Running      ");
+		break;
 	case THREAD_SLEEPING:
 		kdb_printf("Sleeping ");
 		if(thread->flags & THREAD_INTERRUPTIBLE) {
@@ -871,8 +878,12 @@ static inline void dump_thread(thread_t *thread) {
 			kdb_printf("    ");
 		}
 		break;
-	case THREAD_DEAD:	kdb_printf("Dead         "); break;
-	default:		kdb_printf("Bad          "); break;
+	case THREAD_DEAD:
+		kdb_printf("Dead         ");
+		break;
+	default:
+		kdb_printf("Bad          ");
+		break;
 	}
 
 	kdb_printf("%-5d %-4" PRIu32 " %-4zu %-4d %-4d 0x%-3x %-20s %-5" PRId32 " %s\n",
@@ -966,12 +977,16 @@ __init_text void thread_init(void) {
 	id_allocator_init(&thread_id_allocator, 65535, MM_BOOT);
 
 	/* Create the thread slab cache. */
-	thread_cache = object_cache_create("thread_cache", thread_t, thread_ctor,
-		NULL, NULL, 0, MM_BOOT);
+	thread_cache = object_cache_create(
+		"thread_cache", thread_t, thread_ctor, NULL, NULL, 0, MM_BOOT);
 
 	/* Register our KDB commands. */
-	kdb_register_command("thread", "Print information about threads.", kdb_cmd_thread);
-	kdb_register_command("kill", "Kill a running user thread.", kdb_cmd_kill);
+	kdb_register_command(
+		"thread", "Print information about threads.",
+		kdb_cmd_thread);
+	kdb_register_command(
+		"kill", "Kill a running user thread.",
+		kdb_cmd_kill);
 
 	/* Initialize the scheduler. */
 	sched_init();
@@ -1033,7 +1048,8 @@ static void thread_uspace_trampoline(void *_args, void *arg2) {
  * @param flags		Creation behaviour flags.
  * @param handlep	Where to store handle to the thread (can be NULL).
  * @return		Status code describing result of the operation. */
-status_t kern_thread_create(const char *name, const thread_entry_t *entry,
+status_t
+kern_thread_create(const char *name, const thread_entry_t *entry,
 	uint32_t flags, handle_t *handlep)
 {
 	thread_entry_t kentry;
@@ -1072,8 +1088,7 @@ status_t kern_thread_create(const char *name, const thread_entry_t *entry,
 	/* Create the thread, but do not run it yet. We attempt to create the
 	 * handle to the thread before running it as this allows us to
 	 * terminate it if not successful. */
-	ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args,
-		NULL, &thread);
+	ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args, NULL, &thread);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 

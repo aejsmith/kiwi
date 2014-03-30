@@ -255,9 +255,7 @@ static status_t fs_node_free(fs_node_t *node) {
 
 	avl_tree_remove(&mount->nodes, &node->tree_link);
 
-	dprintf("fs: freed node %" PRIu16 ":%" PRIu64 " (%p)\n", mount->id,
-		node->id, node);
-
+	dprintf("fs: freed node %" PRIu16 ":%" PRIu64 " (%p)\n", mount->id, node->id, node);
 	slab_cache_free(fs_node_cache, node);
 	return STATUS_SUCCESS;
 }
@@ -288,8 +286,8 @@ static void fs_node_release(fs_node_t *node) {
 		list_append(&unused_nodes, &node->unused_link);
 		spinlock_unlock(&unused_nodes_lock);
 
-		dprintf("fs: transferred node %" PRIu16 ":%" PRIu64 " (%p) to "
-			"unused list\n", mount->id, node->id, node);
+		dprintf("fs: transferred node %" PRIu16 ":%" PRIu64 " (%p) to unused list\n",
+			mount->id, node->id, node);
 	}
 
 	mutex_unlock(&mount->lock);
@@ -331,9 +329,7 @@ static void fs_dentry_ctor(void *obj, void *data) {
  * @param parent	Parent entry.
  * @return		Pointer to created entry structure. Reference count
  *			will be set to 0. */
-static fs_dentry_t *fs_dentry_alloc(const char *name, fs_mount_t *mount,
-	fs_dentry_t *parent)
-{
+static fs_dentry_t *fs_dentry_alloc(const char *name, fs_mount_t *mount, fs_dentry_t *parent) {
 	fs_dentry_t *entry;
 
 	entry = slab_cache_alloc(fs_dentry_cache, MM_KERNEL);
@@ -359,10 +355,8 @@ static void fs_dentry_free(fs_dentry_t *entry) {
  * @note		Should not be used on unused entries.
  * @param entry		Entry to increase reference count of. */
 void fs_dentry_retain(fs_dentry_t *entry) {
-	if(unlikely(refcount_inc(&entry->count) == 1)) {
-		fatal("Retaining unused directory entry %p ('%s')\n", entry,
-			entry->name);
-	}
+	if(unlikely(refcount_inc(&entry->count) == 1))
+		fatal("Retaining unused directory entry %p ('%s')\n", entry, entry->name);
 }
 
 /** Decrease the reference count of a locked directory entry.
@@ -471,8 +465,7 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
 				if(list_empty(&entry->unused_link))
 					unused_entry_count++;
 
-				list_append(&unused_entries,
-					&entry->unused_link);
+				list_append(&unused_entries, &entry->unused_link);
 
 				spinlock_unlock(&unused_entries_lock);
 			}
@@ -517,9 +510,7 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
  *
  * @return		Status code describing the result of the operation.
  */
-static status_t fs_dentry_lookup(fs_dentry_t *parent, const char *name,
-	fs_dentry_t **entryp)
-{
+static status_t fs_dentry_lookup(fs_dentry_t *parent, const char *name, fs_dentry_t **entryp) {
 	fs_dentry_t *entry;
 	status_t ret;
 
@@ -557,8 +548,9 @@ static status_t fs_dentry_lookup(fs_dentry_t *parent, const char *name,
  * @param entryp	Where to store pointer to entry found (referenced,
  *			and locked).
  * @return		Status code describing result of the operation. */
-static status_t fs_lookup_internal(char *path, fs_dentry_t *entry,
-	unsigned flags, unsigned nest, fs_dentry_t **entryp)
+static status_t
+fs_lookup_internal(char *path, fs_dentry_t *entry, unsigned flags, unsigned nest,
+	fs_dentry_t **entryp)
 {
 	fs_dentry_t *prev;
 	fs_node_t *node;
@@ -653,9 +645,8 @@ static status_t fs_lookup_internal(char *path, fs_dentry_t *entry,
 			assert(entry->node);
 			node = entry->node;
 
-			dprintf("fs: followed '%s' to '%s' (%" PRIu16 ":%"
-				PRIu64 ")\n", link, entry->name,
-				entry->mount->id, node->id);
+			dprintf("fs: followed '%s' to '%s' (%" PRIu16 ":%" PRIu64 ")\n",
+				link, entry->name, entry->mount->id, node->id);
 
 			kfree(link);
 		} else if(node->file.type == FILE_TYPE_SYMLINK) {
@@ -931,8 +922,9 @@ static void fs_create_finish(fs_dentry_t *entry, fs_node_t *node) {
  * @param target	For symbolic links, the target of the link.
  * @param entryp	Where to store pointer to created entry (can be NULL).
  * @return		Status code describing result of the operation. */
-static status_t fs_create(const char *path, file_type_t type,
-	const char *target, fs_dentry_t **entryp)
+static status_t
+fs_create(const char *path, file_type_t type, const char *target,
+	fs_dentry_t **entryp)
 {
 	fs_dentry_t *parent, *entry;
 	fs_node_t *node;
@@ -1165,8 +1157,9 @@ static file_ops_t fs_file_ops = {
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_open(const char *path, uint32_t rights, uint32_t flags,
-	unsigned create, object_handle_t **handlep)
+status_t
+fs_open(const char *path, uint32_t rights, uint32_t flags, unsigned create,
+	object_handle_t **handlep)
 {
 	fs_dentry_t *entry;
 	fs_node_t *node;
@@ -1330,9 +1323,7 @@ status_t fs_read_symlink(const char *path, char **targetp) {
  * @param str		Options string.
  * @param optsp		Where to store options structure array.
  * @param countp	Where to store number of arguments in array. */
-static void parse_mount_opts(const char *str, fs_mount_option_t **optsp,
-	size_t *countp)
-{
+static void parse_mount_opts(const char *str, fs_mount_option_t **optsp, size_t *countp) {
 	fs_mount_option_t *opts = NULL;
 	char *dup, *name, *value;
 	size_t count = 0;
@@ -1349,11 +1340,9 @@ static void parse_mount_opts(const char *str, fs_mount_option_t **optsp,
 				value = NULL;
 			}
 
-			opts = krealloc(opts, sizeof(*opts) * (count + 1),
-				MM_KERNEL);
+			opts = krealloc(opts, sizeof(*opts) * (count + 1), MM_KERNEL);
 			opts[count].name = kstrdup(name, MM_KERNEL);
-			opts[count].value = (value)
-				? kstrdup(value, MM_KERNEL) : NULL;
+			opts[count].value = (value) ? kstrdup(value, MM_KERNEL) : NULL;
 			count++;
 		}
 
@@ -1398,8 +1387,9 @@ static void free_mount_opts(fs_mount_option_t *opts, size_t count) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_mount(const char *device, const char *path, const char *type,
-	uint32_t flags, const char *opts)
+status_t
+fs_mount(const char *device, const char *path, const char *type, uint32_t flags,
+	const char *opts)
 {
 	fs_mount_option_t *opt_array;
 	size_t opt_count;
@@ -2303,8 +2293,9 @@ void fs_shutdown(void) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_fs_open(const char *path, uint32_t rights, uint32_t flags,
-	unsigned create, handle_t *handlep)
+status_t
+kern_fs_open(const char *path, uint32_t rights, uint32_t flags, unsigned create,
+	handle_t *handlep)
 {
 	object_handle_t *handle;
 	char *kpath = NULL;
@@ -2483,7 +2474,8 @@ status_t kern_fs_read_symlink(const char *path, char *buf, size_t size) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_fs_mount(const char *device, const char *path, const char *type,
+status_t
+kern_fs_mount(const char *device, const char *path, const char *type,
 	uint32_t flags, const char *opts)
 {
 	char *kdevice = NULL, *kpath = NULL, *ktype = NULL, *kopts = NULL;

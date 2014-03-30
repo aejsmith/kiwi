@@ -134,9 +134,10 @@ static void process_ctor(void *obj, void *data) {
  *			Reference count will be set to 1.
  * @return		STATUS_SUCCESS if successful, STATUS_PROCESS_LIMIT if
  *			unable to allocate an ID. */
-static status_t process_alloc(const char *name, process_id_t id,
-	process_t *parent, int priority, vm_aspace_t *aspace, token_t *token,
-	ipc_port_t *root_port, process_t **processp)
+static status_t
+process_alloc(const char *name, process_id_t id, process_t *parent, int priority,
+	vm_aspace_t *aspace, token_t *token, ipc_port_t *root_port,
+	process_t **processp)
 {
 	process_t *process;
 
@@ -513,9 +514,7 @@ fail:
  * @param source	Array to copy data of.
  * @param count		Number of array entries.
  * @param base		Pointer to address to copy to, updated after copying. */
-static void copy_argument_strings(char **dest, char **source, size_t count,
-	ptr_t *base)
-{
+static void copy_argument_strings(char **dest, char **source, size_t count, ptr_t *base) {
 	size_t i, len;
 
 	for(i = 0; i < count; i++) {
@@ -602,8 +601,9 @@ static void process_entry_thread(void *arg1, void *arg2) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t process_create(const char *const args[], const char *const env[],
-	uint32_t flags, int priority, process_t **procp)
+status_t
+process_create(const char *const args[], const char *const env[], uint32_t flags,
+	int priority, process_t **procp)
 {
 	process_load_t load;
 	process_t *process;
@@ -720,11 +720,13 @@ __init_text void process_init(void) {
 	id_allocator_reserve(&process_id_allocator, 0);
 
 	/* Create the process slab cache. */
-	process_cache = object_cache_create("process_cache", process_t,
-		process_ctor, NULL, NULL, 0, MM_BOOT);
+	process_cache = object_cache_create(
+		"process_cache", process_t, process_ctor, NULL, NULL, 0,
+		MM_BOOT);
 
 	/* Register the KDB command. */
-	kdb_register_command("process", "Print a list of running processes.",
+	kdb_register_command(
+		"process", "Print a list of running processes.",
 		kdb_cmd_process);
 
 	/* Create the kernel process and register the kernel image to it. */
@@ -801,9 +803,7 @@ static void process_object_close(object_handle_t *handle) {
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer.
  * @return		Status code describing result of the operation. */
-static status_t process_object_wait(object_handle_t *handle, unsigned event,
-	void *wait)
-{
+static status_t process_object_wait(object_handle_t *handle, unsigned event, void *wait) {
 	process_t *process = handle->private;
 
 	switch(event) {
@@ -811,8 +811,7 @@ static status_t process_object_wait(object_handle_t *handle, unsigned event,
 		if(process->state == PROCESS_DEAD) {
 			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&process->death_notifier,
-				object_wait_notifier, wait);
+			notifier_register(&process->death_notifier, object_wait_notifier, wait);
 		}
 
 		return STATUS_SUCCESS;
@@ -825,15 +824,12 @@ static status_t process_object_wait(object_handle_t *handle, unsigned event,
  * @param handle	Handle to process.
  * @param event		Event to wait for.
  * @param wait		Internal wait data pointer. */
-static void process_object_unwait(object_handle_t *handle, unsigned event,
-	void *wait)
-{
+static void process_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
 	process_t *process = handle->private;
 
 	switch(event) {
 	case PROCESS_EVENT_DEATH:
-		notifier_unregister(&process->death_notifier,
-			object_wait_notifier, wait);
+		notifier_unregister(&process->death_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
@@ -913,7 +909,8 @@ static void free_process_args(process_load_t *load) {
  * @param attrib	Attributes structure.
  * @param load		Pointer to information structure to fill in.
  * @return		Status code describing result of the operation. */
-static status_t copy_process_args(const char *path, const char *const args[],
+static status_t
+copy_process_args(const char *path, const char *const args[],
 	const char *const env[], const process_attrib_t *attrib,
 	process_load_t *load)
 {
@@ -1037,7 +1034,8 @@ err:
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_process_create(const char *path, const char *const args[],
+status_t
+kern_process_create(const char *path, const char *const args[],
 	const char *const env[], uint32_t flags,
 	const process_attrib_t *attrib, handle_t *handlep)
 {
@@ -1079,8 +1077,7 @@ status_t kern_process_create(const char *path, const char *const args[],
 		process->flags |= PROCESS_CRITICAL;
 
 	/* Duplicate handles into the new process. */
-	ret = object_process_create(process, curr_proc, load.map,
-		load.map_count);
+	ret = object_process_create(process, curr_proc, load.map, load.map_count);
 	if(ret != STATUS_SUCCESS)
 		goto out_release_process;
 
@@ -1096,8 +1093,7 @@ status_t kern_process_create(const char *path, const char *const args[],
 	}
 
 	/* Create and run the entry thread. */
-	ret = thread_create("main", process, 0, process_entry_thread, &load,
-		NULL, &thread);
+	ret = thread_create("main", process, 0, process_entry_thread, &load, NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
 		if(handlep)
 			object_handle_detach(uhandle);
@@ -1154,7 +1150,8 @@ out_free_args:
  * @return		Does not return on success, returns status code on
  *			failure.
  */
-status_t kern_process_exec(const char *path, const char *const args[],
+status_t
+kern_process_exec(const char *path, const char *const args[],
 	const char *const env[], uint32_t flags,
 	const process_attrib_t *attrib)
 {
@@ -1169,8 +1166,7 @@ status_t kern_process_exec(const char *path, const char *const args[],
 	}
 
 	if(curr_proc->threads.next->next != &curr_proc->threads) {
-		kprintf(LOG_WARN, "kern_process_exec: TODO: Terminate other "
-			"threads\n");
+		kprintf(LOG_WARN, "kern_process_exec: TODO: Terminate other threads\n");
 		return STATUS_NOT_IMPLEMENTED;
 	}
 
@@ -1184,8 +1180,7 @@ status_t kern_process_exec(const char *path, const char *const args[],
 		goto err_free_args;
 
 	/* Create the entry thread to finish loading the program. */
-	ret = thread_create("main", curr_proc, 0, process_entry_thread, &load,
-		NULL, &thread);
+	ret = thread_create("main", curr_proc, 0, process_entry_thread, &load, NULL, &thread);
 	if(ret != STATUS_SUCCESS)
 		goto err_free_args;
 
@@ -1321,8 +1316,7 @@ status_t kern_process_clone(handle_t *handlep) {
 	/* Clone handles and other per-process information. */
 	object_process_clone(process, curr_proc);
 	elf_process_clone(process, curr_proc);
-	memcpy(process->signal_act, curr_proc->signal_act,
-		sizeof(process->signal_act));
+	memcpy(process->signal_act, curr_proc->signal_act, sizeof(process->signal_act));
 	process->signal_mask = curr_proc->signal_mask;
 
 	/* Create a new handle. This takes over the initial reference added by
