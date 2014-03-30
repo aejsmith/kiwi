@@ -33,9 +33,6 @@
 #define ELF_ENDIAN		ELFDATA2LSB
 #define ELF_MACHINE		ELF_EM_X86_64
 
-/* FIXME: Better place for this. */
-#define PAGE_SIZE		0x1000
-
 /** TLS settings. */
 #define TLS_VARIANT2		1	/**< Use variant II. */
 

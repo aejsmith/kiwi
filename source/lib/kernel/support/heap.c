@@ -47,7 +47,7 @@ static heap_chunk_t *map_chunk(size_t size) {
 	heap_chunk_t *chunk;
 	status_t ret;
 
-	size = ROUND_UP(size, PAGE_SIZE);
+	size = ROUND_UP(size, page_size);
 	ret = kern_vm_map((void **)&chunk, size, VM_ADDRESS_ANY,
 		VM_PROT_READ | VM_PROT_WRITE, VM_MAP_PRIVATE, INVALID_HANDLE,
 		0, "libkernel_heap");

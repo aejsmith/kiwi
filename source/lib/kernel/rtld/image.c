@@ -168,9 +168,9 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 	/* Map the BSS if required. */
 	if(phdr->p_memsz > phdr->p_filesz) {
 		start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr
-			+ phdr->p_filesz, PAGE_SIZE);
+			+ phdr->p_filesz, page_size);
 		end = (elf_addr_t)image->load_base + ROUND_UP(phdr->p_vaddr
-			+ phdr->p_memsz, PAGE_SIZE);
+			+ phdr->p_memsz, page_size);
 		size = end - start;
 
 		/* Must be writable to be able to clear later. */
@@ -194,10 +194,10 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 		return STATUS_SUCCESS;
 
 	/* Load the data. */
-	start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr, PAGE_SIZE);
-	end = (elf_addr_t)image->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
+	start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr, page_size);
+	end = (elf_addr_t)image->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_filesz, page_size);
 	size = end - start;
-	offset = ROUND_DOWN(phdr->p_offset, PAGE_SIZE);
+	offset = ROUND_DOWN(phdr->p_offset, page_size);
 	dprintf("rtld: %s: loading header %zu to [%p,%p)\n", path, i, start, start + size);
 
 	/* Map the data in. Set the private flag if mapping as writeable. */
@@ -321,7 +321,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 
 			if((phdrs[i].p_vaddr + phdrs[i].p_memsz) > image->load_size) {
 				image->load_size = ROUND_UP(phdrs[i].p_vaddr
-					+ phdrs[i].p_memsz, PAGE_SIZE);
+					+ phdrs[i].p_memsz, page_size);
 			}
 		}
 
@@ -350,9 +350,9 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 			 * EHDR and the PHDRs. */
 			if(!image->ehdr && !image->phdrs) {
 				image->ehdr = image->load_base
-					+ ROUND_DOWN(phdrs[i].p_vaddr, PAGE_SIZE);
+					+ ROUND_DOWN(phdrs[i].p_vaddr, page_size);
 				image->phdrs = image->load_base
-					+ ROUND_DOWN(phdrs[i].p_vaddr, PAGE_SIZE)
+					+ ROUND_DOWN(phdrs[i].p_vaddr, page_size)
 					+ ehdr.e_phoff;
 				image->num_phdrs = ehdr.e_phnum;
 			}
@@ -609,7 +609,7 @@ void *rtld_init(process_args_t *args, bool dry_run) {
 	/* Finish setting up the libkernel image structure. */
 	libkernel_image.load_size = ROUND_UP(
 		(elf_addr_t)_end - (elf_addr_t)libkernel_image.load_base,
-		PAGE_SIZE);
+		page_size);
 	rtld_symbol_init(&libkernel_image);
 	list_init(&libkernel_image.header);
 	list_append(&loaded_images, &libkernel_image.header);

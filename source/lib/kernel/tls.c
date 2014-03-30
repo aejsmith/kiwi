@@ -212,7 +212,7 @@ status_t tls_init(void) {
 	dtv[0] = static_dtv_size;
 
 	/* Allocate the TLS block. */
-	size = ROUND_UP(initial_block_size(), PAGE_SIZE);
+	size = ROUND_UP(initial_block_size(), page_size);
 	ret = kern_vm_map(&alloc, size, VM_ADDRESS_ANY, VM_PROT_READ | VM_PROT_WRITE,
 		VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
 	if(ret != STATUS_SUCCESS) {
@@ -232,7 +232,7 @@ status_t tls_init(void) {
 /** Destroy the TLS block for the current thread.
  * @todo		Will need to free dynamically allocated blocks here. */
 void tls_destroy(void) {
-	size_t size = ROUND_UP(initial_block_size(), PAGE_SIZE);
+	size_t size = ROUND_UP(initial_block_size(), page_size);
 	tls_tcb_t *tcb = tls_tcb_get();
 
 	dprintf("tls: freeing block %p (size: %zu) for thread %d\n",

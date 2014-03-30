@@ -24,11 +24,15 @@
 #include <kernel/private/thread.h>
 #include <kernel/object.h>
 #include <kernel/signal.h>
+#include <kernel/system.h>
 
 #include <elf.h>
 #include <string.h>
 
 #include "libkernel.h"
+
+/** System page size. */
+size_t page_size;
 
 /** Kernel library main function.
  * @param args		Process argument block.
@@ -88,6 +92,9 @@ void libkernel_init(process_args_t *args, ptr_t load_base) {
 			break;
 		}
 	}
+
+	/* Get the system page size. */
+	kern_system_info(SYSTEM_INFO_PAGE_SIZE, &page_size);
 
 	/* Save the current process ID for the kern_process_id() wrapper. */
 	curr_process_id = _kern_process_id(PROCESS_SELF);
