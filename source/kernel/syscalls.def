@@ -31,14 +31,16 @@ type image_id_t int16_t;
 
 syscall kern_fatal(ptr_t);
 syscall kern_shutdown(int);
-syscall kern_system_time(ptr_t);
-syscall kern_unix_time(ptr_t);
 
 syscall kern_module_load(ptr_t, ptr_t);
 #syscall kern_module_info(ptr_t, ptr_t);
 
+syscall kern_time_get(uint, ptr_t);
+syscall kern_time_set(uint, ptr_t);
+
 syscall kern_object_type(handle_t);
 syscall kern_object_wait(ptr_t, size_t, uint32_t, nstime_t);
+
 syscall kern_handle_flags(handle_t, ptr_t);
 syscall kern_handle_set_flags(handle_t, uint32_t);
 syscall kern_handle_duplicate(handle_t, handle_t, ptr_t);

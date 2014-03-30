@@ -90,7 +90,8 @@ static timer_device_t *timer_device = NULL;
  * @param min		Minute (0-59).
  * @param sec		Second (0-59).
  * @return		Number of nanoseconds since the epoch. */
-nstime_t time_to_unix(unsigned year, unsigned month, unsigned day, unsigned hour,
+nstime_t
+time_to_unix(unsigned year, unsigned month, unsigned day, unsigned hour,
 	unsigned min, unsigned sec)
 {
 	uint32_t seconds = 0;
@@ -622,16 +623,55 @@ status_t kern_timer_stop(handle_t handle, nstime_t *remp) {
 	return ret;
 }
 
-/** Get the system time (time since boot).
- * @param timep		Where to store number of nanoseconds since boot.
- * @return		Status code describing result of the operation. */
-status_t kern_system_time(nstime_t *timep) {
-	return write_user(timep, system_time());
+/**
+ * Get the current time from a time source.
+ *
+ * Gets the current time, in nanoseconds, from the specified time source. There
+ * are currently 2 time sources defined:
+ *  - TIME_SYSTEM: A monotonic timer which gives the time since the system was
+ *    started.
+ *  - TIME_REAL: Real time given as time since the UNIX epoch. This can be
+ *    changed with kern_time_set().
+ *
+ * @param source	Time source to get from.
+ * @param timep		Where to store time in nanoseconds.
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_ARG if time source is invalid or timep is
+ *			NULL.
+ */
+status_t kern_time_get(unsigned source, nstime_t *timep) {
+	nstime_t time;
+
+	if(!timep)
+		return STATUS_INVALID_ARG;
+
+	switch(source) {
+	case TIME_SYSTEM:
+		time = system_time();
+		break;
+	case TIME_REAL:
+		time = unix_time();
+		break;
+	default:
+		return STATUS_INVALID_ARG;
+	}
+
+	return write_user(timep, time);
 }
 
-/** Get the time since the UNIX epoch.
- * @param timep		Where to store number of nanoseconds since the epoch.
- * @return		Status code describing result of the operation. */
-status_t kern_unix_time(nstime_t *timep) {
-	return write_user(timep, unix_time());
+/**
+ * Set the current time.
+ *
+ * Sets the current time, in nanoseconds, for a time source. Currently only
+ * the TIME_REAL source (see kern_time_get()) can be changed.
+ *
+ * @param source	Time source to set.
+ * @param time		New time value in nanoseconds.
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_ARG if time source is invalid.
+ */
+status_t kern_time_set(unsigned source, nstime_t time) {
+	return STATUS_NOT_IMPLEMENTED;
 }
