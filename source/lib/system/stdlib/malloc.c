@@ -1,6 +1,28 @@
+/*
+ * Copyright (C) 2009-2014 Alex Smith
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/**
+ * @file
+ * @brief		Memory allocation functions.
+ */
+
 #include <kernel/mutex.h>
 #include <kernel/object.h>
 #include <kernel/status.h>
+#include <kernel/system.h>
 #include <kernel/vm.h>
 
 #include <errno.h>
@@ -12,20 +34,27 @@
 #define LACKS_SYS_MMAN_H
 #define LACKS_STDLIB_H
 
-/* Available features */
 #define HAVE_MMAP			1
 #define HAVE_MREMAP			0
 #define HAVE_MORECORE			0
 #define NO_MALLINFO			1
 
-/* Misc macro defines. */
-#define ABORT				libsystem_fatal("dlmalloc abort");
-#define USAGE_ERROR_ACTION(m, p)	\
+#define ABORT \
+	libsystem_fatal("dlmalloc abort");
+#define USAGE_ERROR_ACTION(m, p) \
 	libsystem_fatal("dlmalloc usage error (%s:%d): %p, %p (ret: %p)\n", \
-                   __FUNCTION__, __LINE__, m, p, __builtin_return_address(0));
-#define MALLOC_FAILURE_ACTION		errno = ENOMEM;
-// FIXME
-#define malloc_getpagesize		((size_t)0x1000)
+		__FUNCTION__, __LINE__, m, p, __builtin_return_address(0));
+#define MALLOC_FAILURE_ACTION \
+	errno = ENOMEM;
+
+/** Get the system page size. */
+#define malloc_getpagesize \
+	__extension__ \
+	({ \
+		size_t __size; \
+		kern_system_info(SYSTEM_INFO_PAGE_SIZE, &__size); \
+		__size; \
+	})
 
 /** Wrapper for allocations. */
 static inline void *mmap_wrapper(size_t size) {
@@ -46,16 +75,14 @@ static inline int munmap_wrapper(void *start, size_t length) {
 	return kern_vm_unmap(start, length);
 }
 
-/* To stop it defining dev_zero_fd. */
-#define MAP_ANONYMOUS		0
-
 #define MMAP(s)			mmap_wrapper((s))
 #define DIRECT_MMAP(s)		mmap_wrapper((s))
 #define MUNMAP(a, s)		munmap_wrapper((a), (s))
 
-/* Locking. */
-#define USE_LOCKS		2
+/* To stop it defining dev_zero_fd. */
+#define MAP_ANONYMOUS		0
 
+#define USE_LOCKS		2
 #define MLOCK_T			int32_t
 #define INITIAL_LOCK(sl)	do { *(sl) = MUTEX_INITIALIZER; } while(0)
 #define ACQUIRE_LOCK(sl)	kern_mutex_lock((sl), -1)
