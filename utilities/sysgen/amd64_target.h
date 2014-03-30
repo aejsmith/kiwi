@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,16 +19,16 @@
  * @brief		AMD64 system call code generator.
  */
 
-#ifndef __AMD64TARGET_H
-#define __AMD64TARGET_H
+#ifndef SYSGEN_AMD64_TARGET_H
+#define SYSGEN_AMD64_TARGET_H
 
 #include "sysgen.h"
 
 /** AMD64 target class. */
 class AMD64Target : public Target {
 public:
-	void AddTypes(TypeMap &map);
-	void Generate(std::ostream &stream, const SyscallList &calls);
+	void add_types(TypeMap &map);
+	void generate(std::ostream &stream, const SyscallList &calls);
 };
 
-#endif /* __AMD64TARGET_H */
+#endif /* SYSGEN_AMD64_TARGET_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,11 +16,11 @@
 
 /**
  * @file
- * @brief		Kiwi system call code generator.
+ * @brief		System call code generator.
  */
 
-#ifndef __SYSGEN_H
-#define __SYSGEN_H
+#ifndef SYSGEN_H
+#define SYSGEN_H
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -34,8 +34,9 @@
 
 /** Structure representing a type. */
 struct Type {
-	Type(size_t c = 0) : count(c) {}
 	size_t count;			/**< Number of parameters this type takes. */
+public:
+	Type(size_t c = 0) : count(c) {}
 };
 
 /** Type of the type map. */
@@ -49,39 +50,49 @@ public:
 		kHiddenAttribute = (1<<0),
 		kWrappedAttribute = (1<<1),
 	};
-
+public:
 	Syscall(const char *name, unsigned long id) :
-		m_name(name), m_id(id), m_param_count(0), m_attributes(0)
+		m_name(name), m_id(id), m_num_params(0), m_attributes(0)
 	{}
 
 	/** Add a parameter to the call.
-	 * @param type		Type of the call. */
-	void AddParameter(Type type) {
-		m_param_count += type.count;
+	 * @param type		Type of the parameter. */
+	void add_param(Type type) {
+		m_num_params += type.count;
 	}
 
-	bool SetAttribute(const char *name);
+	/** Set an attribute.
+	 * @param attriubte	Attribute to set. */
+	void set_attribute(unsigned attribute) {
+		m_attributes |= attribute;
+
+		if(attribute == kWrappedAttribute) {
+			/* Wrapped implies hidden, as the real call version
+			 * should not be visible. */
+			m_attributes |= kHiddenAttribute;
+		}
+	}
 
 	/** Get the name of the call.
 	 * @return		Reference to call name. */
-	const std::string &GetName() const { return m_name; }
+	const std::string &name() const { return m_name; }
 
 	/** Get the ID of the call.
 	 * @return		ID of the function. */
-	unsigned long GetID() const { return m_id; }
+	unsigned long id() const { return m_id; }
 
 	/** Get the parameter count.
 	 * @return		Number of parameters. */
-	size_t GetParameterCount() const { return m_param_count; }
+	size_t num_params() const { return m_num_params; }
 
 	/** Get the call attributes.
 	 * @return		Attributes for the call. */
-	int GetAttributes() const { return m_attributes; }
+	unsigned attributes() const { return m_attributes; }
 private:
 	std::string m_name;		/**< Name of the call. */
 	unsigned long m_id;		/**< ID of the call. */
-	size_t m_param_count;		/**< Number of parameters. */
-	int m_attributes;		/**< Attributes for the call. */
+	size_t m_num_params;		/**< Number of parameters. */
+	unsigned m_attributes;		/**< Attributes for the call. */
 };
 
 /** Type of a system call list. */
@@ -94,12 +105,12 @@ public:
 
 	/** Add the target's basic types to the type map.
 	 * @param map		Map to add to. */
-	virtual void AddTypes(TypeMap &map) = 0;
+	virtual void add_types(TypeMap &map) = 0;
 
 	/** Generate system call functions.
 	 * @param stream	Stream to write to.
 	 * @param calls		List of calls to generate. */
-	virtual void Generate(std::ostream &stream, const SyscallList &calls) = 0;
+	virtual void generate(std::ostream &stream, const SyscallList &calls) = 0;
 };
 
 extern "C" {
@@ -126,4 +137,4 @@ extern int yyparse(void);
 }
 #endif
 
-#endif /* __SYSGEN_H */
+#endif /* SYSGEN_H */

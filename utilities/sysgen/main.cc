@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,8 +26,7 @@
 #include <iostream>
 #include <map>
 
-#include "AMD64Target.h"
-#include "IA32Target.h"
+#include "amd64_target.h"
 #include "sysgen.h"
 
 using namespace std;
@@ -67,22 +66,6 @@ static bool verbose_mode = false;
 	if(verbose_mode) { \
 		cout << current_file << ':' << current_line << ": " << m << endl; \
 	}
-
-/** Set a system call attribute.
- * @param name		Name of the attribute.
- * @return		Whether the attribute was valid. */
-bool Syscall::SetAttribute(const char *name) {
-	if(strcmp(name, "hidden") == 0) {
-		m_attributes |= kHiddenAttribute;
-		return true;
-	} else if(strcmp(name, "wrapped") == 0) {
-		/* Wrapped implies hidden, as the real call version should not
-		 * be visible. */
-		m_attributes |= (kWrappedAttribute | kHiddenAttribute);
-		return true;
-	}
-	return false;
-}
 
 /** Create a new identifier structure.
  * @param str		Value of identifier.
@@ -138,19 +121,27 @@ void add_syscall(const char *name, identifier_t *params, identifier_t *attribs, 
 	}
 
 	Syscall *call = new Syscall(name, num);
+
 	while(params) {
 		TypeMap::iterator it = type_map.find(params->str);
 		if(it == type_map.end()) {
 			COMPILE_ERROR("Parameter type `" << params->str << "' does not exist.");
 		} else {
-			call->AddParameter(it->second);
+			call->add_param(it->second);
 		}
+
 		params = params->next;
 	}
+
 	while(attribs) {
-		if(!call->SetAttribute(attribs->str)) {
+		if(strcmp(attribs->str, "hidden") == 0) {
+			call->set_attribute(Syscall::kHiddenAttribute);
+		} else if(strcmp(attribs->str, "wrapped") == 0) {
+			call->set_attribute(Syscall::kWrappedAttribute);
+		} else {
 			COMPILE_ERROR("Invalid attribute `" << attribs->str << "'.");
 		}
+
 		attribs = attribs->next;
 	}
 
@@ -167,14 +158,16 @@ static void generate_kernel_table(ostream &stream, const string &name) {
 	stream << "#include <syscall.h>" << endl;
 
 	BOOST_FOREACH(const Syscall *call, syscall_list) {
-		stream << "extern void " << call->GetName() << "(void);" << endl;
+		stream << "extern void " << call->name() << "(void);" << endl;
 	}
 
 	stream << "syscall_t " << name << "[] = {" << endl;
+
 	BOOST_FOREACH(const Syscall *call, syscall_list) {
-		stream << "	[" << call->GetID() << "] = { .addr = (ptr_t)" << call->GetName();
-		stream << ", .count = " << call->GetParameterCount() << " }," << endl;
+		stream << "	[" << call->id() << "] = { .addr = (ptr_t)" << call->name();
+		stream << ", .count = " << call->num_params() << " }," << endl;
 	}
+
 	stream << "};" << endl;
 	stream << "size_t " << name << "_size = ARRAY_SIZE(" << name << ");" << endl;
 }
@@ -188,7 +181,7 @@ static void generate_header(ostream &stream, const string &name) {
 	stream << "#define " << name << endl << endl;
 
 	BOOST_FOREACH(const Syscall *call, syscall_list) {
-		stream << "#define __NR_" << call->GetName() << ' ' << call->GetID() << endl;
+		stream << "#define __NR_" << call->name() << ' ' << call->id() << endl;
 	}
 
 	stream << endl << "#endif" << endl;
@@ -265,13 +258,11 @@ int main(int argc, char **argv) {
 	Target *target;
 	if(strcmp(argv[i], "amd64") == 0) {
 		target = new AMD64Target();
-	} else if(strcmp(argv[i], "ia32") == 0) {
-		target = new IA32Target();
 	} else {
 		cerr << "Unrecognised target `" << argv[i] << "'." << endl;
 		return 1;
 	}
-	target->AddTypes(type_map);
+	target->add_types(type_map);
 
 	/* Parse the input file. */
 	current_file = argv[++i];
@@ -285,9 +276,8 @@ int main(int argc, char **argv) {
 	fclose(yyin);
 
 	/* Check whether enough information has been given. */
-	if(syscall_list.empty()) {
+	if(syscall_list.empty())
 		COMPILE_ERROR("At least 1 system call must be defined.");
-	}
 
 	/* Check for errors. */
 	if(had_error) {
@@ -302,7 +292,7 @@ int main(int argc, char **argv) {
 		} else if(header.length()) {
 			generate_header(cout, header);
 		} else {
-			target->Generate(cout, syscall_list);
+			target->generate(cout, syscall_list);
 		}
 	} else {
 		ofstream stream;
@@ -317,8 +307,9 @@ int main(int argc, char **argv) {
 		} else if(header.length()) {
 			generate_header(stream, header);
 		} else {
-			target->Generate(stream, syscall_list);
+			target->generate(stream, syscall_list);
 		}
+
 		stream.close();
 	}
 
