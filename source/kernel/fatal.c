@@ -103,7 +103,7 @@ void __assert_fail(const char *cond, const char *file, int line) {
  *
  * @param message	Message to print.
  */
-void kern_fatal(const char *message) {
+void kern_system_fatal(const char *message) {
 	char *kmessage;
 
 	if(!security_check_priv(PRIV_FATAL))

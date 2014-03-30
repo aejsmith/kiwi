@@ -76,6 +76,7 @@ sources = FeatureSources(config, [
     'dpc.c',
     'elf.c',
     'fatal.c',
+    'info.c',
     'init.c',
     'kdb.c',
     'log.c',

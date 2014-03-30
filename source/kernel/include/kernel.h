@@ -60,7 +60,7 @@ extern void platform_poweroff(void);
 
 extern void update_boot_progress(int percent);
 
-extern void system_shutdown(int action);
+extern void system_shutdown(unsigned action);
 
 extern void fatal_etc(struct intr_frame *frame, const char *fmt, ...) __noreturn __printf(2, 3);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,12 +28,17 @@
 extern "C" {
 #endif
 
+/** System information values. */
+#define SYSTEM_INFO_PAGE_SIZE	1	/**< System page size (unsigned long). */
+
+extern status_t kern_system_info(unsigned what, void *buf);
+
 /** Actions for kern_shutdown(). */
 #define SHUTDOWN_REBOOT		1	/**< Reboot the system. */
 #define SHUTDOWN_POWEROFF	2	/**< Power off the system. */
 
-extern status_t kern_shutdown(int action);
-extern void kern_fatal(const char *message);
+extern status_t kern_system_shutdown(unsigned action);
+extern void kern_system_fatal(const char *message);
 
 #ifdef __cplusplus
 }
