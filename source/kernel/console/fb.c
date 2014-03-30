@@ -69,7 +69,7 @@ extern unsigned char logo_ppm[];
 #define OFFSET(x, y)		(((y * fb_info.width) + x) * fb_info.bytes_per_pixel)
 
 /** Lock for the framebuffer console. */
-static SPINLOCK_DECLARE(fb_lock);
+static SPINLOCK_DEFINE(fb_lock);
 
 /** Framebuffer information. */
 static fb_info_t fb_info;

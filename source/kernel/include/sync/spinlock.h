@@ -31,16 +31,16 @@ typedef struct spinlock {
 	const char *name;		/**< Name of the spinlock. */
 } spinlock_t;
 
-/** Initializes a statically-declared spinlock. */
-#define SPINLOCK_INITIALIZER(_name)	\
+/** Initializes a statically defined spinlock. */
+#define SPINLOCK_INITIALIZER(_name) \
 	{ \
 		.value = 1, \
 		.state = 0, \
 		.name = _name, \
 	}
 
-/** Statically declares a new spinlock. */
-#define SPINLOCK_DECLARE(_var)		\
+/** Statically defines a new spinlock. */
+#define SPINLOCK_DEFINE(_var) \
 	spinlock_t _var = SPINLOCK_INITIALIZER(#_var)
 
 /** Check if a spinlock is held.

@@ -32,16 +32,16 @@ typedef struct condvar {
 	const char *name;		/**< Name of the condition variable. */
 } condvar_t;
 
-/** Initializes a statically declared condition variable. */
-#define CONDVAR_INITIALIZER(_var, _name)	\
+/** Initializes a statically defined condition variable. */
+#define CONDVAR_INITIALIZER(_var, _name) \
 	{ \
 		.lock = SPINLOCK_INITIALIZER("condvar_lock"), \
 		.threads = LIST_INITIALIZER(_var.threads), \
 		.name = _name, \
 	}
 
-/** Statically declares a new condition variable. */
-#define CONDVAR_DECLARE(_var)			\
+/** Statically defines a new condition variable. */
+#define CONDVAR_DEFINE(_var) \
 	condvar_t _var = CONDVAR_INITIALIZER(_var, #_var)
 
 extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *lock, nstime_t timeout,

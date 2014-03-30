@@ -54,7 +54,7 @@
 KBOOT_VIDEO(KBOOT_VIDEO_LFB | KBOOT_VIDEO_VGA, 0, 0, 0);
 
 /** VGA console lock. */
-static SPINLOCK_DECLARE(vga_lock);
+static SPINLOCK_DEFINE(vga_lock);
 
 /** VGA console details. */
 static uint16_t *vga_mapping;		/**< VGA memory mapping. */
@@ -67,8 +67,8 @@ static uint16_t vga_cursor_y;		/**< Y position of the cursor. */
 #define I8042_BUFFER_SIZE	16
 
 /** Keyboard implementation details. */
-static SEMAPHORE_DECLARE(i8042_sem, 0);
-static SPINLOCK_DECLARE(i8042_lock);
+static SEMAPHORE_DEFINE(i8042_sem, 0);
+static SPINLOCK_DEFINE(i8042_lock);
 static uint16_t i8042_buffer[I8042_BUFFER_SIZE];
 static size_t i8042_buffer_start = 0;
 static size_t i8042_buffer_size = 0;

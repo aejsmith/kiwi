@@ -35,8 +35,8 @@ typedef struct rwlock {
 	const char *name;		/**< Name of the lock. */
 } rwlock_t;
 
-/** Initializes a statically declared readers-writer lock. */
-#define RWLOCK_INITIALIZER(_var, _name)		\
+/** Initializes a statically defined readers-writer lock. */
+#define RWLOCK_INITIALIZER(_var, _name) \
 	{ \
 		.held = 0, \
 		.readers = 0, \
@@ -45,8 +45,8 @@ typedef struct rwlock {
 		.name = _name, \
 	}
 
-/** Statically declares a new readers-writer lock. */
-#define RWLOCK_DECLARE(_var)			\
+/** Statically defines a new readers-writer lock. */
+#define RWLOCK_DEFINE(_var) \
 	rwlock_t _var = RWLOCK_INITIALIZER(_var, #_var)
 
 extern status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags);

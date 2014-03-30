@@ -42,8 +42,8 @@ typedef struct mutex {
 	#endif
 } mutex_t;
 
-/** Initializes a statically declared mutex. */
-#define MUTEX_INITIALIZER(_var, _name, _flags)	\
+/** Initializes a statically defined mutex. */
+#define MUTEX_INITIALIZER(_var, _name, _flags) \
 	{ \
 		.value = 0, \
 		.flags = _flags, \
@@ -53,8 +53,8 @@ typedef struct mutex {
 		.name = _name, \
 	}
 
-/** Statically declares a new mutex. */
-#define MUTEX_DECLARE(_var, _flags)		\
+/** Statically defines a new mutex. */
+#define MUTEX_DEFINE(_var, _flags) \
 	mutex_t _var = MUTEX_INITIALIZER(_var, #_var, _flags)
 
 /** Mutex behaviour flags. */

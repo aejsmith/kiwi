@@ -86,8 +86,8 @@ typedef struct kdb_command_desc {
 } kdb_command_desc_t;
 
 /** Notifier to be called when entering/exiting KDB. */
-NOTIFIER_DECLARE(kdb_entry_notifier, NULL);
-NOTIFIER_DECLARE(kdb_exit_notifier, NULL);
+NOTIFIER_DEFINE(kdb_entry_notifier, NULL);
+NOTIFIER_DEFINE(kdb_exit_notifier, NULL);
 
 /** Whether KDB is currently running on any CPU. */
 atomic_t kdb_running = 0;
@@ -106,8 +106,8 @@ static char kdb_heap_area[KDB_HEAP_SIZE] __aligned(PAGE_SIZE);
 static fixed_heap_t kdb_heap;
 
 /** List of registered commands. */
-static LIST_DECLARE(kdb_commands);
-static SPINLOCK_DECLARE(kdb_commands_lock);
+static LIST_DEFINE(kdb_commands);
+static SPINLOCK_DEFINE(kdb_commands_lock);
 
 /** Pointers to lines in the command history. */
 static char *kdb_history[KDB_HISTORY_SIZE];

@@ -49,7 +49,7 @@ typedef struct smp_call {
 
 /** List of free call structures. */
 static smp_call_t *smp_call_pool = NULL;
-static SPINLOCK_DECLARE(smp_call_lock);
+static SPINLOCK_DEFINE(smp_call_lock);
 
 /** Whether SMP call system is enabled. */
 static bool smp_call_enabled = false;

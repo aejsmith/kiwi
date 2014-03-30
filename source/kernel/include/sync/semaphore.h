@@ -34,8 +34,8 @@ typedef struct semaphore {
 	const char *name;		/**< Name of the semaphore. */
 } semaphore_t;
 
-/** Initializes a statically declared semaphore. */
-#define SEMAPHORE_INITIALIZER(_var, _name, _initial)	\
+/** Initializes a statically defined semaphore. */
+#define SEMAPHORE_INITIALIZER(_var, _name, _initial) \
 	{ \
 		.count = _initial, \
 		.lock = SPINLOCK_INITIALIZER("semaphore_lock"), \
@@ -43,8 +43,8 @@ typedef struct semaphore {
 		.name = _name, \
 	}
 
-/** Statically declares a new semaphore. */
-#define SEMAPHORE_DECLARE(_var, _initial)		\
+/** Statically define a new semaphore. */
+#define SEMAPHORE_DEFINE(_var, _initial) \
 	semaphore_t _var = SEMAPHORE_INITIALIZER(_var, #_var, _initial)
 
 /** Get the current value of a semaphore.

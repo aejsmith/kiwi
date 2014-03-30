@@ -48,7 +48,7 @@ static uint32_t klog_start = 0;
 static uint32_t klog_length = 0;
 
 /** Lock protecting the kernel log. */
-static SPINLOCK_DECLARE(klog_lock);
+static SPINLOCK_DEFINE(klog_lock);
 
 /** KBoot log buffer. */
 kboot_log_t *kboot_log = NULL;

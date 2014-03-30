@@ -38,7 +38,7 @@
 #include <status.h>
 
 /** Notifier to be called when a fatal error occurs. */
-NOTIFIER_DECLARE(fatal_notifier, NULL);
+NOTIFIER_DEFINE(fatal_notifier, NULL);
 
 /** Atomic variable to protect against nested calls to fatal(). */
 static atomic_t in_fatal = 0;

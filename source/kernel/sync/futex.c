@@ -69,8 +69,8 @@ typedef struct futex_link {
 static slab_cache_t *futex_cache = NULL;
 
 /** Tree of all futexes, keyed by physical address. */
-static AVL_TREE_DECLARE(futex_tree);
-static MUTEX_DECLARE(futex_tree_lock, 0);
+static AVL_TREE_DEFINE(futex_tree);
+static MUTEX_DEFINE(futex_tree_lock, 0);
 
 /** Constructor for futex structures.
  * @param obj		Object to construct.

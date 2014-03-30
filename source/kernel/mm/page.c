@@ -147,7 +147,7 @@ static page_queue_t page_queues[PAGE_QUEUE_COUNT];
 
 /** Free page list. */
 static page_freelist_t free_page_lists[PAGE_FREE_LIST_COUNT];
-static MUTEX_DECLARE(free_page_lock, 0);
+static MUTEX_DEFINE(free_page_lock, 0);
 
 /** Physical memory ranges. */
 static memory_range_t memory_ranges[MEMORY_RANGE_MAX];
@@ -165,7 +165,7 @@ bool page_init_done = false;
  * @param arg2		Unused. */
 static void page_writer(void *arg1, void *arg2) {
 	page_queue_t *queue = &page_queues[PAGE_STATE_MODIFIED];
-	LIST_DECLARE(marker);
+	LIST_DEFINE(marker);
 	size_t written;
 	page_t *page;
 

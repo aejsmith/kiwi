@@ -93,8 +93,8 @@ typedef struct process_load {
 } process_load_t;
 
 /** Tree of all processes. */
-static AVL_TREE_DECLARE(process_tree);
-static RWLOCK_DECLARE(process_tree_lock);
+static AVL_TREE_DEFINE(process_tree);
+static RWLOCK_DEFINE(process_tree_lock);
 
 /** Process ID allocator. */
 static id_allocator_t process_id_allocator;

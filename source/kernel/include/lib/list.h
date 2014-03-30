@@ -59,15 +59,15 @@ typedef struct list {
 	for(list_t *iter = (list)->prev, *_##iter = iter->prev; \
 		iter != (list); iter = _##iter, _##iter = _##iter->prev)
 
-/** Initializes a statically declared linked list. */
+/** Initializes a statically defined linked list. */
 #define LIST_INITIALIZER(_var) \
 	{ \
 		.prev = &_var, \
 		.next = &_var, \
 	}
 
-/** Statically declares a new linked list. */
-#define LIST_DECLARE(_var) \
+/** Statically defines a new linked list. */
+#define LIST_DEFINE(_var) \
 	list_t _var = LIST_INITIALIZER(_var)
 
 /** Get a pointer to the structure containing a list node.

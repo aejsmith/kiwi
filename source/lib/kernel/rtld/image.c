@@ -51,7 +51,7 @@ static const char *library_search_dirs[] = {
 };
 
 /** List of loaded images. */
-LIST_DECLARE(loaded_images);
+LIST_DEFINE(loaded_images);
 
 /** Image structure representing the kernel library. */
 rtld_image_t libkernel_image = {

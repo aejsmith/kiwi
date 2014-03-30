@@ -81,13 +81,13 @@ static list_t kmem_freelists[KMEM_FREELISTS];
 static ptr_t kmem_freemap = 0;
 
 /** Sorted list of all kernel memory ranges. */
-static LIST_DECLARE(kmem_ranges);
+static LIST_DEFINE(kmem_ranges);
 
 /** Pool of free range structures. */
-static LIST_DECLARE(kmem_range_pool);
+static LIST_DEFINE(kmem_range_pool);
 
 /** Global kernel memory lock. */
-static MUTEX_DECLARE(kmem_lock, 0);
+static MUTEX_DEFINE(kmem_lock, 0);
 
 /** Allocate a new range structure.
  * @param mmflag	Allocation behaviour flags.

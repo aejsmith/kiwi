@@ -86,25 +86,25 @@
 static file_ops_t fs_file_ops;
 
 /** List of registered FS types (protected by fs_mount_lock). */
-static LIST_DECLARE(fs_types);
+static LIST_DEFINE(fs_types);
 
 /** List of all mounts. */
 static mount_id_t next_mount_id = 1;
-static LIST_DECLARE(fs_mount_list);
-static MUTEX_DECLARE(fs_mount_lock, 0);
+static LIST_DEFINE(fs_mount_list);
+static MUTEX_DEFINE(fs_mount_lock, 0);
 
 /** Caches of filesystem structures. */
 static slab_cache_t *fs_node_cache;
 static slab_cache_t *fs_dentry_cache;
 
 /** Unused directory entries. */
-static LIST_DECLARE(unused_entries);
-static SPINLOCK_DECLARE(unused_entries_lock);
+static LIST_DEFINE(unused_entries);
+static SPINLOCK_DEFINE(unused_entries_lock);
 static size_t unused_entry_count = 0;
 
 /** Unused nodes. */
-static LIST_DECLARE(unused_nodes);
-static SPINLOCK_DECLARE(unused_nodes_lock);
+static LIST_DEFINE(unused_nodes);
+static SPINLOCK_DEFINE(unused_nodes_lock);
 static size_t unused_node_count = 0;
 
 /** Mount at the root of the filesystem. */

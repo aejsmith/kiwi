@@ -34,10 +34,10 @@ typedef struct fork_handler {
 } fork_handler_t;
 
 /** List of fork handlers. */
-static LIST_DECLARE(fork_handlers);
+static LIST_DEFINE(fork_handlers);
 
 /** List of child processes created via fork(). */
-LIST_DECLARE(child_processes);
+LIST_DEFINE(child_processes);
 
 /** Lock for child process list. */
 int32_t child_processes_lock = MUTEX_INITIALIZER;

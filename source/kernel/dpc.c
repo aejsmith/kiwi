@@ -43,12 +43,12 @@ typedef struct dpc_request {
 } dpc_request_t;
 
 /** Lists of free and pending DPC requests. */
-static LIST_DECLARE(dpc_free);
-static LIST_DECLARE(dpc_requests);
-static SPINLOCK_DECLARE(dpc_lock);
+static LIST_DEFINE(dpc_free);
+static LIST_DEFINE(dpc_requests);
+static SPINLOCK_DEFINE(dpc_lock);
 
 /** Semaphore that the DPC thread waits on. */
-static SEMAPHORE_DECLARE(dpc_request_sem, 0);
+static SEMAPHORE_DEFINE(dpc_request_sem, 0);
 
 /** DPC thread. */
 static thread_t *dpc_thread = NULL;

@@ -104,8 +104,8 @@ static slab_cache_t slab_slab_cache;		/**< Cache for slab structures. */
 static slab_cache_t *slab_percpu_cache = NULL;	/**< Cache for per-CPU structures. */
 
 /** List of all slab caches. */
-static LIST_DECLARE(slab_caches);
-static MUTEX_DECLARE(slab_caches_lock, 0);
+static LIST_DEFINE(slab_caches);
+static MUTEX_DEFINE(slab_caches_lock, 0);
 
 /** Destroy a slab.
  * @param cache		Cache to destroy in.

@@ -38,7 +38,7 @@ typedef struct heap_chunk {
 static int32_t heap_lock = MUTEX_INITIALIZER;
 
 /** Statically allocated heap. */
-static LIST_DECLARE(heap_chunks);
+static LIST_DEFINE(heap_chunks);
 
 /** Map a new chunk.
  * @param size		Minimum size required.

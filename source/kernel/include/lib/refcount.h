@@ -32,11 +32,12 @@
 /** Type containing a reference count */
 typedef atomic_t refcount_t;
 
-/** Initializes a statically declared reference count. */
-#define REFCOUNT_INITIALIZER(_initial)		_initial
+/** Initializes a statically defined reference count. */
+#define REFCOUNT_INITIALIZER(_initial) \
+	_initial
 
-/** Statically declares a new reference count. */
-#define REFCOUNT_DECLARE(_var, _initial)	\
+/** Statically defines a new reference count. */
+#define REFCOUNT_DEFINE(_var, _initial) \
 	refcount_t _var = REFCOUNT_INITIALIZER(_initial)
 
 /** Increase a reference count.
@@ -59,9 +60,8 @@ static inline int refcount_inc(refcount_t *ref) {
 static inline int refcount_dec(refcount_t *ref) {
 	int val = atomic_dec(ref) - 1;
 
-	if(unlikely(val < 0)) {
+	if(unlikely(val < 0))
 		fatal("Reference count %p went negative", ref);
-	}
 
 	return val;
 }
@@ -81,9 +81,8 @@ static inline int refcount_dec(refcount_t *ref) {
 static inline int refcount_dec_func(refcount_t *ref, void (*func)(refcount_t *)) {
 	int val = atomic_dec(ref) - 1;
 
-	if(unlikely(val < 0)) {
+	if(unlikely(val < 0))
 		func(ref);
-	}
 
 	return val;
 }

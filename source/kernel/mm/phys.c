@@ -54,7 +54,7 @@ typedef struct memory_type_range {
 /** Memory type ranges. */
 static memory_type_range_t memory_types[MEMORY_TYPE_RANGE_MAX];
 static size_t memory_types_count = 0;
-static SPINLOCK_DECLARE(memory_types_lock);
+static SPINLOCK_DEFINE(memory_types_lock);
 
 /** Map physical memory into the kernel address space.
  * @param addr		Physical address to map.

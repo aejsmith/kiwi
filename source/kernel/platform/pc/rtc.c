@@ -30,7 +30,7 @@
 #define BCD2DEC(num)	((((num & 0xF0) >> 4) * 10) + (num & 0x0F))
 
 /** Lock serialising accesses to the RTC. */
-static SPINLOCK_DECLARE(rtc_lock);
+static SPINLOCK_DEFINE(rtc_lock);
 
 /** Get the number of nanoseconds since the Epoch from the RTC.
  * @return		Number of nanoseconds since Epoch. */

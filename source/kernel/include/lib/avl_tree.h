@@ -52,14 +52,14 @@ typedef struct avl_tree {
 	for(avl_tree_node_t *iter = avl_tree_first((tree)), *_##iter = avl_tree_next(iter); \
 		iter != NULL; iter = _##iter, _##iter = avl_tree_next(iter))
 
-/** Initializes a statically declared AVL tree. */
+/** Initializes a statically defined AVL tree. */
 #define AVL_TREE_INITIALIZER() \
 	{ \
 		.root = NULL, \
 	}
 
-/** Statically declares a new AVL tree. */
-#define AVL_TREE_DECLARE(_var) \
+/** Statically defines a new AVL tree. */
+#define AVL_TREE_DEFINE(_var) \
 	avl_tree_t _var = AVL_TREE_INITIALIZER()
 
 /** Get a pointer to the structure containing an AVL tree node.

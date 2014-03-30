@@ -108,8 +108,8 @@ typedef struct thread_uspace_args {
 static bool thread_timeout(void *_thread);
 
 /** Tree of all threads. */
-static AVL_TREE_DECLARE(thread_tree);
-static RWLOCK_DECLARE(thread_tree_lock);
+static AVL_TREE_DEFINE(thread_tree);
+static RWLOCK_DEFINE(thread_tree_lock);
 
 /** Thread ID allocator. */
 static id_allocator_t thread_id_allocator;
@@ -118,9 +118,9 @@ static id_allocator_t thread_id_allocator;
 static slab_cache_t *thread_cache;
 
 /** Dead thread queue. */
-static LIST_DECLARE(dead_threads);
-static SPINLOCK_DECLARE(dead_thread_lock);
-static SEMAPHORE_DECLARE(dead_thread_sem, 0);
+static LIST_DEFINE(dead_threads);
+static SPINLOCK_DEFINE(dead_thread_lock);
+static SEMAPHORE_DEFINE(dead_thread_sem, 0);
 
 /** Constructor for thread objects.
  * @param obj		Pointer to object.

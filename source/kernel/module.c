@@ -60,8 +60,8 @@ typedef struct boot_module {
 } boot_module_t;
 
 /** List of loaded modules. */
-static LIST_DECLARE(module_list);
-static MUTEX_DECLARE(module_lock, 0);
+static LIST_DEFINE(module_list);
+static MUTEX_DEFINE(module_lock, 0);
 
 #ifdef KERNEL_MODULE_BASE
 /** Module memory allocation space. */

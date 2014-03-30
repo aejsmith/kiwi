@@ -40,7 +40,7 @@ cpu_t boot_cpu;
 /** Information about all CPUs. */
 size_t highest_cpu_id = 0;		/**< Highest CPU ID in the system. */
 size_t cpu_count = 0;			/**< Number of CPUs. */
-LIST_DECLARE(running_cpus);		/**< List of running CPUs. */
+LIST_DEFINE(running_cpus);		/**< List of running CPUs. */
 cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). */
 
 #if CONFIG_SMP

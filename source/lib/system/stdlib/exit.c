@@ -49,11 +49,11 @@ static atexit_func_t atexit_array[ATEXIT_MAX];
 static bool atexit_inited = false;
 
 /** List of free at-exit functions. */
-static LIST_DECLARE(atexit_free_funcs);
+static LIST_DEFINE(atexit_free_funcs);
 static size_t atexit_free_count = 0;
 
 /** List of registered at-exit functions. */
-static LIST_DECLARE(atexit_funcs);
+static LIST_DEFINE(atexit_funcs);
 static size_t atexit_count = 0;
 
 /** Locking to protect at-exit lists. */
