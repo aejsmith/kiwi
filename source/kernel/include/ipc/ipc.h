@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Alex Smith
+ * Copyright (C) 2013-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -44,6 +44,7 @@ typedef struct ipc_kmessage {
 	list_t header;			/**< Link to message queue. */
 	refcount_t count;		/**< Reference count. */
 	ipc_message_t msg;		/**< Wrapped user message structure. */
+	security_context_t security;	/**< Security context that the message was sent with. */
 	void *data;			/**< Attached data (NULL if size is 0). */
 	object_handle_t *handle;	/**< Attached handle (can be NULL). */
 } ipc_kmessage_t;
@@ -61,7 +62,7 @@ typedef struct ipc_endpoint {
 	ipc_kmessage_t *pending;	/**< Message with pending data/handle. */
 
 	notifier_t hangup_notifier;	/**< Notifier for remote end being closed. */
-	notifier_t receive_notifier;	/**< Notifier for message arrival. */
+	notifier_t message_notifier;	/**< Notifier for message arrival. */
 } ipc_endpoint_t;
 
 /** IPC endpoint behaviour flags. */
@@ -91,8 +92,6 @@ typedef struct ipc_connection {
 	list_t header;			/**< Link to connection list. */
 	condvar_t open_cvar;		/**< Condition for connecting thread to wait on. */
 	ipc_client_t *client;		/**< Pointer to client information structure. */
-	ipc_kmessage_t *payload;	/**< Payload message. */
-	status_t status;		/**< Setup status code. */
 } ipc_connection_t;
 
 /** Definitions for endpoint IDs. */
@@ -116,7 +115,6 @@ typedef struct ipc_port_ops {
 	 *
 	 * @param port		Port being connected to (locked).
 	 * @param endpoint	Endpoint for server side of the connection.
-	 * @param payload	Payload message (NULL if no payload).
 	 * @param timeout	Timeout in nanoseconds. 0 should return
 	 *			immediately if unable to connect without delay,
 	 *			-1 should block forever.
@@ -124,7 +122,7 @@ typedef struct ipc_port_ops {
 	 * @return		Status code describing result of the operation.
 	 */
 	status_t (*connect)(struct ipc_port *port, ipc_endpoint_t *endpoint,
-		ipc_kmessage_t *payload, nstime_t timeout);
+		nstime_t timeout);
 } ipc_port_ops_t;
 
 /** IPC port structure. */
@@ -137,7 +135,7 @@ typedef struct ipc_port {
 	size_t owner_count;		/**< References from the owner. */
 	list_t waiting;			/**< List of in-progress connection attempts. */
 	condvar_t listen_cvar;		/**< Connection condition variable. */
-	notifier_t listen_notifier;	/**< Notifier for connection attempts. */
+	notifier_t connection_notifier;	/**< Notifier for connection attempts. */
 } ipc_port_t;
 
 /** Kernel internal IPC flags. */
@@ -154,7 +152,7 @@ extern void ipc_kmessage_set_handle(ipc_kmessage_t *msg,
 /** Check whether a message has attached data.
  * @param msg		Message to check.
  * @return		Whether data is attached. */
-static inline bool ipc_kmessage_has_attached(ipc_kmessage_t *msg) {
+static inline bool ipc_kmessage_has_attachment(ipc_kmessage_t *msg) {
 	return (msg->data || msg->handle);
 }
 

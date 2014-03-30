@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Alex Smith
+ * Copyright (C) 2013-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,15 +37,15 @@ extern "C" {
 
 /** Structure describing an IPC message. */
 typedef struct ipc_message {
-	uint32_t id;
+	uint32_t id;				/**< Message identifier. */
 	uint16_t flags;				/**< Message flags. */
 	uint16_t size;				/**< Size of attached data. */
+	nstime_t timestamp;			/**< System time at which message was sent. */
 	unsigned long args[6];			/**< Inline message arguments. */
 } ipc_message_t;
 
 /** IPC message flags. */
-#define IPC_MESSAGE_VALID		(1<<0)	/**< Message is valid (ignored when sending). */
-#define IPC_MESSAGE_HANDLE		(1<<1)	/**< Message has an attached handle. */
+#define IPC_MESSAGE_HANDLE		(1<<0)	/**< Message has an attached handle. */
 
 /** Structure describing an IPC client. */
 typedef struct ipc_client {
@@ -54,11 +54,11 @@ typedef struct ipc_client {
 } ipc_client_t;
 
 /** IPC port event IDs. */
-#define PORT_EVENT_LISTEN		0	/**< A connection is being made to the port. */
+#define PORT_EVENT_CONNECTION		0	/**< A connection is being made to the port. */
 
 /** IPC connection event IDs. */
 #define CONNECTION_EVENT_HANGUP		0	/**< Remote end hung up or port was deleted. */
-#define CONNECTION_EVENT_RECEIVE	1	/**< A message is received. */
+#define CONNECTION_EVENT_MESSAGE	1	/**< A message is received. */
 
 /** Special process port IDs (negative values to distinguish from handles). */
 #define PROCESS_ROOT_PORT		(-1)
@@ -66,27 +66,17 @@ typedef struct ipc_client {
 /** Thread special port IDs (must not conflict with process IDs). */
 #define THREAD_EXCEPTION_PORT		(-10)
 
-/** Behaviour flags for kern_port_listen(). */
-#define PORT_LISTEN_ACCEPT		(1<<0)	/**< Immediately accept the connection. */
-
 extern status_t kern_port_create(handle_t *handlep);
-extern status_t kern_port_listen(handle_t handle, unsigned flags,
-	ipc_message_t *payload, ipc_client_t *client, nstime_t timeout,
-	handle_t *handlep);
-
-extern status_t kern_connection_open(handle_t port,
-	const ipc_message_t *payload, const void *data, handle_t attached,
+extern status_t kern_port_listen(handle_t handle, ipc_client_t *client,
 	nstime_t timeout, handle_t *handlep);
 
-extern status_t kern_connection_accept(handle_t handle);
-extern status_t kern_connection_reject(handle_t handle, status_t status);
-extern status_t kern_connection_forward(handle_t handle, handle_t port,
-	const ipc_message_t *payload, const void *data, handle_t attached);
+extern status_t kern_connection_open(handle_t port, nstime_t timeout,
+	handle_t *handlep);
 
 extern status_t kern_connection_send(handle_t handle, const ipc_message_t *msg,
 	const void *data, handle_t attached, nstime_t timeout);
 extern status_t kern_connection_receive(handle_t handle, ipc_message_t *msg,
-	nstime_t timeout);
+	security_context_t *security, nstime_t timeout);
 extern status_t kern_connection_receive_data(handle_t handle, void *data);
 extern status_t kern_connection_receive_handle(handle_t handle,
 	handle_t *attachedp);

@@ -71,8 +71,6 @@
 #define STATUS_DIFFERENT_FS		45	/**< Link source and destination on different FS. */
 #define STATUS_IS_DIR			46	/**< Not a directory. */
 #define STATUS_CONN_HUNGUP		47	/**< Connection was hung up. */
-#define STATUS_CONN_ACTIVE		48	/**< Connection is already active. */
-#define STATUS_CONN_INACTIVE		49	/**< Connection is currently inactive. */
 
 #if !defined(KERNEL) && !defined(__ASM__)
 #include <kernel/types.h>

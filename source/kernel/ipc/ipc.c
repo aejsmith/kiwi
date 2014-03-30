@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Alex Smith
+ * Copyright (C) 2013-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,10 +18,8 @@
  * @file
  * @brief		IPC interface.
  *
- * @todo		When opening a connection, if timeout is 0 but there
- *			is a listener with PORT_LISTEN_ACCEPT, we can return
- *			without error. This is somewhat tricky to implement
- *			though.
+ * @todo		We don't handle 0 timeout in user_ipc_port_connect()
+ *			properly.
  */
 
 #include <ipc/ipc.h>
@@ -62,7 +60,7 @@ static void ipc_port_ctor(void *obj, void *data) {
 	mutex_init(&port->lock, "ipc_port_lock", 0);
 	list_init(&port->waiting);
 	condvar_init(&port->listen_cvar, "ipc_port_listen");
-	notifier_init(&port->listen_notifier, port);
+	notifier_init(&port->connection_notifier, port);
 }
 
 /** Disown an IPC port.
@@ -117,8 +115,7 @@ static void port_object_detach(object_handle_t *handle, process_t *process) {
 	if(process == port->owner && --port->owner_count == 0) {
 		ipc_port_disown(port);
 
-		dprintf("ipc: process %" PRId32 " disowned port %p\n",
-			process->id, port);
+		dprintf("ipc: process %" PRId32 " disowned port %p\n", process->id, port);
 	}
 
 	mutex_unlock(&port->lock);
@@ -129,16 +126,14 @@ static void port_object_detach(object_handle_t *handle, process_t *process) {
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t port_object_wait(object_handle_t *handle, unsigned event,
-	void *wait)
-{
+static status_t port_object_wait(object_handle_t *handle, unsigned event, void *wait) {
 	ipc_port_t *port = handle->private;
 	status_t ret;
 
 	mutex_lock(&port->lock);
 
 	switch(event) {
-	case PORT_EVENT_LISTEN:
+	case PORT_EVENT_CONNECTION:
 		if(curr_proc != port->owner) {
 			mutex_unlock(&port->lock);
 			return STATUS_ACCESS_DENIED;
@@ -147,8 +142,7 @@ static status_t port_object_wait(object_handle_t *handle, unsigned event,
 		if(!list_empty(&port->waiting)) {
 			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&port->listen_notifier,
-				object_wait_notifier, wait);
+			notifier_register(&port->connection_notifier, object_wait_notifier, wait);
 		}
 
 		ret = STATUS_SUCCESS;
@@ -166,15 +160,12 @@ static status_t port_object_wait(object_handle_t *handle, unsigned event,
  * @param handle	Handle to the port.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer. */
-static void port_object_unwait(object_handle_t *handle, unsigned event,
-	void *wait)
-{
+static void port_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
 	ipc_port_t *port = handle->private;
 
 	switch(event) {
-	case PORT_EVENT_LISTEN:
-		notifier_unregister(&port->listen_notifier,
-			object_wait_notifier, wait);
+	case PORT_EVENT_CONNECTION:
+		notifier_unregister(&port->connection_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
@@ -215,7 +206,7 @@ static void ipc_connection_ctor(void *obj, void *data) {
 		condvar_init(&endpoint->space_cvar, "ipc_connection_send");
 		condvar_init(&endpoint->data_cvar, "ipc_connection_receive");
 		notifier_init(&endpoint->hangup_notifier, endpoint);
-		notifier_init(&endpoint->receive_notifier, endpoint);
+		notifier_init(&endpoint->message_notifier, endpoint);
 	}
 }
 
@@ -249,9 +240,7 @@ static void connection_object_close(object_handle_t *handle) {
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t connection_object_wait(object_handle_t *handle, unsigned event,
-	void *wait)
-{
+static status_t connection_object_wait(object_handle_t *handle, unsigned event, void *wait) {
 	ipc_endpoint_t *endpoint = handle->private;
 	status_t ret;
 
@@ -262,18 +251,16 @@ static status_t connection_object_wait(object_handle_t *handle, unsigned event,
 		if(endpoint->conn->state == IPC_CONNECTION_CLOSED) {
 			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&endpoint->hangup_notifier,
-				object_wait_notifier, wait);
+			notifier_register(&endpoint->hangup_notifier, object_wait_notifier, wait);
 		}
 
 		ret = STATUS_SUCCESS;
 		break;
-	case CONNECTION_EVENT_RECEIVE:
+	case CONNECTION_EVENT_MESSAGE:
 		if(endpoint->message_count) {
 			object_wait_signal(wait, 0);
 		} else {
-			notifier_register(&endpoint->receive_notifier,
-				object_wait_notifier, wait);
+			notifier_register(&endpoint->message_notifier, object_wait_notifier, wait);
 		}
 
 		ret = STATUS_SUCCESS;
@@ -291,19 +278,15 @@ static status_t connection_object_wait(object_handle_t *handle, unsigned event,
  * @param handle	Handle to the connection.
  * @param event		Event that is being waited for.
  * @param wait		Internal data pointer. */
-static void connection_object_unwait(object_handle_t *handle, unsigned event,
-	void *wait)
-{
+static void connection_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
 	ipc_endpoint_t *endpoint = handle->private;
 
 	switch(event) {
 	case CONNECTION_EVENT_HANGUP:
-		notifier_unregister(&endpoint->hangup_notifier,
-			object_wait_notifier, wait);
+		notifier_unregister(&endpoint->hangup_notifier, object_wait_notifier, wait);
 		break;
-	case CONNECTION_EVENT_RECEIVE:
-		notifier_unregister(&endpoint->receive_notifier,
-			object_wait_notifier, wait);
+	case CONNECTION_EVENT_MESSAGE:
+		notifier_unregister(&endpoint->message_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
@@ -323,10 +306,12 @@ static object_type_t connection_object_type = {
  * @param flags		Behaviour flags.
  * @param timeout	Timeout in nanoseconds.
  * @return		Status code describing result of the operation. */
-static status_t queue_message(ipc_connection_t *conn, ipc_endpoint_t *endpoint,
+static status_t
+queue_message(ipc_connection_t *conn, ipc_endpoint_t *endpoint,
 	ipc_kmessage_t *msg, unsigned flags, nstime_t timeout)
 {
 	nstime_t absolute;
+	unsigned sleep;
 	status_t ret;
 
 	assert(conn->state != IPC_CONNECTION_SETUP);
@@ -337,14 +322,19 @@ static status_t queue_message(ipc_connection_t *conn, ipc_endpoint_t *endpoint,
 	if(endpoint->flags & IPC_ENDPOINT_DROP)
 		return STATUS_SUCCESS;
 
+	/* Save the message timestamp and security context. */
+	msg->msg.timestamp = system_time();
+	memcpy(&msg->security, security_current_context(), sizeof(msg->security));
+
 	/* Wait for queue space if we're not forcing the send. */
 	if(!(flags & IPC_FORCE)) {
 		absolute = (timeout > 0) ? system_time() + timeout : timeout;
+		sleep = SLEEP_ABSOLUTE
+			| ((flags & IPC_INTERRUPTIBLE) ? SLEEP_INTERRUPTIBLE : 0);
+
 		while(endpoint->message_count >= IPC_QUEUE_MAX) {
-			ret = condvar_wait_etc(&endpoint->space_cvar,
-				&conn->lock, absolute, SLEEP_ABSOLUTE
-					| ((flags & IPC_INTERRUPTIBLE)
-						? SLEEP_INTERRUPTIBLE : 0));
+			ret = condvar_wait_etc(&endpoint->space_cvar, &conn->lock,
+				absolute, sleep);
 
 			/* Connection could have been closed while we were
 			 * waiting (see ipc_connection_close()). */
@@ -363,7 +353,7 @@ static status_t queue_message(ipc_connection_t *conn, ipc_endpoint_t *endpoint,
 	list_append(&endpoint->messages, &msg->header);
 	endpoint->message_count++;
 	condvar_signal(&endpoint->data_cvar);
-	notifier_run(&endpoint->receive_notifier, NULL, false);
+	notifier_run(&endpoint->message_notifier, NULL, false);
 	return STATUS_SUCCESS;
 }
 
@@ -374,11 +364,12 @@ static status_t queue_message(ipc_connection_t *conn, ipc_endpoint_t *endpoint,
  * @param timeout	Timeout in nanoseconds.
  * @param msgp		Where to store pointer to received message.
  * @return		Status code describing result of the operation. */
-static status_t receive_message(ipc_connection_t *conn,
-	ipc_endpoint_t *endpoint, unsigned flags, nstime_t timeout,
-	ipc_kmessage_t **msgp)
+static status_t
+receive_message(ipc_connection_t *conn, ipc_endpoint_t *endpoint,
+	unsigned flags, nstime_t timeout, ipc_kmessage_t **msgp)
 {
 	nstime_t absolute;
+	unsigned sleep;
 	ipc_kmessage_t *msg;
 	status_t ret;
 
@@ -393,10 +384,9 @@ static status_t receive_message(ipc_connection_t *conn,
 
 	/* Wait for a message to arrive. */
 	absolute = (timeout > 0) ? system_time() + timeout : timeout;
+	sleep = SLEEP_ABSOLUTE | ((flags & IPC_INTERRUPTIBLE) ? SLEEP_INTERRUPTIBLE : 0);
 	while(!endpoint->message_count) {
-		ret = condvar_wait_etc(&endpoint->data_cvar, &conn->lock,
-			absolute, SLEEP_ABSOLUTE | ((flags & IPC_INTERRUPTIBLE)
-				? SLEEP_INTERRUPTIBLE : 0));
+		ret = condvar_wait_etc(&endpoint->data_cvar, &conn->lock, absolute, sleep);
 
 		/* Connection could have been closed while we were waiting (see
 		 * ipc_connection_close()). */
@@ -425,9 +415,8 @@ static status_t receive_message(ipc_connection_t *conn,
 /**
  * Allocate a message structure.
  *
- * Allocates a new, zeroed IPC message structure. The message has the
- * IPC_MESSAGE_VALID flag set. To attach data to the message, use
- * ipc_kmessage_set_data(). To attach a handle to the message, use
+ * Allocates a new, zeroed IPC message structure. To attach data to the message,
+ * use ipc_kmessage_set_data(). To attach a handle to the message, use
  * ipc_kmessage_set_handle().
  *
  * @return		Pointer to allocated message.
@@ -439,7 +428,6 @@ ipc_kmessage_t *ipc_kmessage_alloc(void) {
 	memset(msg, 0, sizeof(*msg));
 	refcount_set(&msg->count, 1);
 	list_init(&msg->header);
-	msg->msg.flags = IPC_MESSAGE_VALID;
 	return msg;
 }
 
@@ -553,8 +541,6 @@ void ipc_connection_close(ipc_endpoint_t *endpoint) {
 			ipc_kmessage_release(endpoint->pending);
 			endpoint->pending = NULL;
 		}
-	} else if(conn->state == IPC_CONNECTION_SETUP) {
-		condvar_broadcast(&conn->open_cvar);
 	}
 
 	if(conn->state != IPC_CONNECTION_CLOSED) {
@@ -563,7 +549,7 @@ void ipc_connection_close(ipc_endpoint_t *endpoint) {
 	}
 
 	assert(notifier_empty(&endpoint->hangup_notifier));
-	assert(notifier_empty(&endpoint->receive_notifier));
+	assert(notifier_empty(&endpoint->message_notifier));
 
 	dprintf("ipc: closed endpoint %p (conn: %p)\n", endpoint, conn);
 
@@ -604,7 +590,8 @@ void ipc_connection_close(ipc_endpoint_t *endpoint) {
  *			STATUS_CONN_HUNGUP if the remote end has hung up the
  *			connection.
  */
-status_t ipc_connection_send(ipc_endpoint_t *endpoint, ipc_kmessage_t *msg,
+status_t
+ipc_connection_send(ipc_endpoint_t *endpoint, ipc_kmessage_t *msg,
 	unsigned flags, nstime_t timeout)
 {
 	ipc_connection_t *conn = endpoint->conn;
@@ -645,7 +632,8 @@ status_t ipc_connection_send(ipc_endpoint_t *endpoint, ipc_kmessage_t *msg,
  *			STATUS_CONN_HUNGUP if the remote end has hung up the
  *			connection.
  */
-status_t ipc_connection_receive(ipc_endpoint_t *endpoint, unsigned flags,
+status_t
+ipc_connection_receive(ipc_endpoint_t *endpoint, unsigned flags,
 	nstime_t timeout, ipc_kmessage_t **msgp)
 {
 	ipc_connection_t *conn = endpoint->conn;
@@ -724,7 +712,7 @@ void ipc_port_release(ipc_port_t *port) {
 		return;
 
 	assert(list_empty(&port->waiting));
-	assert(notifier_empty(&port->listen_notifier));
+	assert(notifier_empty(&port->connection_notifier));
 
 	dprintf("ipc: destroying port %p\n", port);
 
@@ -775,8 +763,9 @@ __init_text void ipc_init(void) {
  * @param handle	Attached handle.
  * @param kmsgp		Where to store pointer to kernel message.
  * @return		Status code describing result of the operation. */
-static status_t copy_message_from_user(const ipc_message_t *umsg,
-	const void *data, handle_t handle, ipc_kmessage_t **kmsgp)
+static status_t
+copy_message_from_user(const ipc_message_t *umsg, const void *data,
+	handle_t handle, ipc_kmessage_t **kmsgp)
 {
 	ipc_kmessage_t *kmsg = ipc_kmessage_alloc();
 	status_t ret;
@@ -787,8 +776,6 @@ static status_t copy_message_from_user(const ipc_message_t *umsg,
 	ret = memcpy_from_user(&kmsg->msg, umsg, sizeof(kmsg->msg));
 	if(ret != STATUS_SUCCESS)
 		goto err;
-
-	kmsg->msg.flags |= IPC_MESSAGE_VALID;
 
 	if(kmsg->msg.size) {
 		if(kmsg->msg.size > IPC_DATA_MAX) {
@@ -836,30 +823,25 @@ err:
 /** Connect to a port owned by a user process.
  * @param port		Port being connected to (locked).
  * @param endpoint	Endpoint for server side of the connection.
- * @param payload	Payload message (NULL if no payload).
  * @param timeout	Timeout in nanoseconds.
  * @return		Status code describing result of the operation. */
-static status_t user_ipc_port_connect(ipc_port_t *port,
-	ipc_endpoint_t *endpoint, ipc_kmessage_t *payload, nstime_t timeout)
+static status_t
+user_ipc_port_connect(ipc_port_t *port, ipc_endpoint_t *endpoint,
+	nstime_t timeout)
 {
 	ipc_connection_t *conn = endpoint->conn;
 	ipc_client_t client;
 	status_t ret;
 
-	/* Save client information and payload. Payload will be referenced by
-	 * the listener if it needs to keep it, so that it won't be freed after
-	 * we return. */
+	/* Save client information. */
 	client.pid = curr_proc->id;
-	memcpy(&client.security, security_current_context(),
-		sizeof(client.security));
+	memcpy(&client.security, security_current_context(), sizeof(client.security));
 	conn->client = &client;
-	conn->payload = payload;
-	conn->status = STATUS_CONN_HUNGUP;
 
 	/* Queue the connection on the port. */
 	list_append(&port->waiting, &conn->header);
 	condvar_signal(&port->listen_cvar);
-	notifier_run(&port->listen_notifier, NULL, false);
+	notifier_run(&port->connection_notifier, NULL, false);
 
 	/* We are called with the connection lock held. */
 	mutex_unlock(&conn->lock);
@@ -887,10 +869,9 @@ static status_t user_ipc_port_connect(ipc_port_t *port,
 	/* Similarly, the connection could have been closed or the port could
 	 * have been disowned (see ipc_port_disown()). */
 	if(conn->state == IPC_CONNECTION_CLOSED)
-		ret = conn->status;
+		ret = STATUS_CONN_HUNGUP;
 
 	conn->client = NULL;
-	conn->payload = NULL;
 
 	/* If we are returning success, we have to drop the reference for the
 	 * server added by kern_connection_open(). kern_port_listen() adds an
@@ -932,16 +913,17 @@ status_t kern_port_create(handle_t *handlep) {
 	ipc_port_t *port;
 	status_t ret;
 
+	if(!handlep)
+		return STATUS_INVALID_ARG;
+
 	port = ipc_port_create(&user_ipc_port_ops, NULL);
 	port->owner = curr_proc;
 
 	/* This handle takes over the reference added by ipc_port_create(). */
 	handle = object_handle_create(&port_object_type, port);
 	ret = object_handle_attach(handle, NULL, handlep);
-	if(ret == STATUS_SUCCESS) {
-		dprintf("ipc: process %" PRId32 " created port %p\n",
-			curr_proc->id, port);
-	}
+	if(ret == STATUS_SUCCESS)
+		dprintf("ipc: process %" PRId32 " created port %p\n", curr_proc->id, port);
 
 	object_handle_release(handle);
 	return ret;
@@ -951,38 +933,14 @@ status_t kern_port_create(handle_t *handlep) {
  * Listen for a connection on a port.
  *
  * Listens for a connection on the given port. Only the process that created
- * a port may listen on it. When a connection attempt is received, the payload
- * message sent by the client (if any) will be returned, as well as details of
- * the client (its PID and security context)
- *
- * This function returns a handle to the server's side of the connection. Unless
- * the PORT_LISTEN_ACCEPT flag is specified, the connection is initially in the
- * "setup" state. The thread that initiated the connection remains blocked
- * until the connection enters the "active" state. While the connection is in
- * setup, no messages can be sent or received on the connection. The server can
- * either accept, reject, or forward the connection on to another port.
- * Accepting makes the connection active and causes the connecting thread to
- * return success from kern_connection_open(). Rejecting closes the connection
- * and causes kern_connection_open() to return error. Forwarding redirects the
- * connection attempt onto another port. If the PORT_LISTEN_ACCEPT flag is
- * specified, the connection will be immediately accepted and put into the
- * active state.
- *
- * If the client sends a payload message and the payload argument is NULL, the
- * payload will be dropped. If it does not send a payload, and the payload
- * argument is not NULL, the message structure pointed to by payload will be
- * zeroed out. Otherwise, the payload message sent by the client will be stored
- * there and the IPC_MESSAGE_VALID flag will be set on it to indicate that a
- * payload was sent. If data or a handle is attached to the payload message,
- * they can be retrieved using kern_connection_receive_{data,handle}() on the
- * returned connection handle.
+ * a port may listen on it. When a connection is received, a handle to the
+ * server side of the connection is returned, as well as details of the client
+ * process (its PID and security context).
  *
  * Once created, connection objects have no relation to the port they were
  * opened on. If the port is destroyed, any active connections remain open.
  *
  * @param handle	Handle to port to listen on.
- * @param flags		Behaviour flag to the function.
- * @param payload	Where to store payload message (can be NULL).
  * @param client	Where to store client information (can be NULL).
  * @param timeout	Timeout in nanoseconds. A negative value will block
  *			until a connection attempt is received. A value of 0
@@ -1000,8 +958,8 @@ status_t kern_port_create(handle_t *handlep) {
  *			STATUS_INTERRUPTED if the calling thread is interrupted
  *			while waiting for a connection.
  */
-status_t kern_port_listen(handle_t handle, unsigned flags,
-	ipc_message_t *payload, ipc_client_t *client, nstime_t timeout,
+status_t
+kern_port_listen(handle_t handle, ipc_client_t *client, nstime_t timeout,
 	handle_t *handlep)
 {
 	object_handle_t *khandle;
@@ -1010,6 +968,9 @@ status_t kern_port_listen(handle_t handle, unsigned flags,
 	ipc_connection_t *conn;
 	ipc_endpoint_t *endpoint;
 	status_t ret;
+
+	if(!handlep)
+		return STATUS_INVALID_ARG;
 
 	ret = object_handle_lookup(handle, OBJECT_TYPE_PORT, &khandle);
 	if(ret != STATUS_SUCCESS)
@@ -1045,32 +1006,8 @@ status_t kern_port_listen(handle_t handle, unsigned flags,
 			goto out_unlock_conn;
 	}
 
-	if(payload) {
-		if(conn->payload) {
-			ret = memcpy_to_user(payload, &conn->payload->msg,
-				sizeof(*payload));
-			if(ret != STATUS_SUCCESS)
-				goto out_unlock_conn;
-
-			if(ipc_kmessage_has_attached(conn->payload)) {
-				/* Reference the message so that it won't be
-				 * freed by kern_connection_open() if it
-				 * returns. */
-				refcount_inc(&conn->payload->count);
-				endpoint->pending = conn->payload;
-			}
-		} else {
-			/* Zero the structure so that IPC_MESSAGE_VALID is not
-			 * set. */
-			ret = memset_user(payload, 0, sizeof(*payload));
-			if(ret != STATUS_SUCCESS)
-				goto out_unlock_conn;
-		}
-	}
-
 	refcount_inc(&conn->count);
-	ret = object_handle_open(&connection_object_type, endpoint, NULL,
-		handlep);
+	ret = object_handle_open(&connection_object_type, endpoint, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		/* We do not want the close callback to be called if this
 		 * fails, just leave the connection waiting on the port. */
@@ -1078,16 +1015,15 @@ status_t kern_port_listen(handle_t handle, unsigned flags,
 		goto out_unlock_conn;
 	}
 
+	/* Activate the connection and wake the connecting thread. */
+	conn->state = IPC_CONNECTION_ACTIVE;
+	condvar_broadcast(&conn->open_cvar);
+	list_remove(&conn->header);
+
 	dprintf("ipc: process %" PRId32 " received connection on port %p "
 		"(conn: %p, endpoint: %p)\n", curr_proc->id, port, conn,
 		endpoint);
 
-	if(flags & PORT_LISTEN_ACCEPT) {
-		conn->state = IPC_CONNECTION_ACTIVE;
-		condvar_broadcast(&conn->open_cvar);
-	}
-
-	list_remove(&conn->header);
 	ret = STATUS_SUCCESS;
 
 out_unlock_conn:
@@ -1102,90 +1038,72 @@ out_unlock_port:
  * Open a connection on a port.
  *
  * Opens a connection to another process via a port handle, or a special port
- * identifier. An optional payload message can be sent along with the
- * connection which will be delivered to the server process. The function will
- * remain blocked until either the server receives and accepts the connection,
- * or until the given timeout expires.
+ * identifier. The function will remain blocked until either the server receives
+ * the connection, or until the given timeout expires.
  *
  * A number of per-process/per-thread special ports are defined, which can be
  * given as the port argument to this function. PROCESS_ROOT_PORT connects to
  * the current process' root port, which is typically a port owned by a service
- * manager process that allows processes to reach other system services.
+ * manager process that can be used by processes to reach other system services.
  * THREAD_EXCEPTION_PORT connects to the current thread's exception port, which
  * is a port managed by the kernel and used to deliver notifications of thread
  * exceptions.
  *
  * @param port		Handle to port or special port ID to connect to.
- * @param payload	Optional payload message (can be NULL).
- * @param data		Data to attach to payload (must not be NULL if payload
- *			has a non-zero size, ignored otherwise).
- * @param attached	Attached handle (must be a valid handle to a
- *			transferrable object if payload has IPC_MESSAGE_HANDLE
- *			flag set, ignored otherwise).
  * @param timeout	Timeout in nanoseconds. A negative value will block
- *			until the connection is received and accepted/rejected.
- *			A value of 0 will return an error immediately if the
- *			connection cannot be made without delay (this is only
- *			the case if the port owner is listening with the
- *			PORT_LISTEN_ACCEPT flag set). Otherwise, the function
- *			will return an error if the connection is not either
- *			accepted or rejected within the given time period.
+ *			until the connection is received. A value of 0 will
+ *			return an error immediately if the connection cannot be
+ *			made without delay (i.e. if the server process is not
+ *			currently listening on the port). Otherwise, the
+ *			function will return an error if the connection is not
+ *			received within the given time period.
  * @param handlep	Where to store handle to client side of the connection.
  *
  * @return		STATUS_SUCCESS if connection is successfully opened.
  *			STATUS_CONN_HUNGUP if the port is dead.
  *			STATUS_WOULD_BLOCK if timeout is 0 and the connection
  *			cannot be accepted immediately.
- *			STATUS_TIMED_OUT if timeout passes without a connection
- *			attempt.
+ *			STATUS_TIMED_OUT if timeout passes without the
+ *			connection being received.
  *			STATUS_INTERRUPTED if the calling thread is interrupted
  *			while waiting for a connection.
- *			If the server rejects the connection, it can give any
- *			status code to return here (except STATUS_SUCCESS).
  */
-status_t kern_connection_open(handle_t _port, const ipc_message_t *payload,
-	const void *data, handle_t attached, nstime_t timeout,
-	handle_t *handlep)
-{
+status_t kern_connection_open(handle_t port, nstime_t timeout, handle_t *handlep) {
 	object_handle_t *khandle;
-	ipc_port_t *port;
-	ipc_kmessage_t *kmsg = NULL;
+	ipc_port_t *kport;
 	ipc_connection_t *conn;
 	ipc_endpoint_t *server, *client;
 	status_t ret;
 
-	if(_port < 0) {
-		switch(_port) {
+	if(!handlep)
+		return STATUS_INVALID_ARG;
+
+	if(port < 0) {
+		switch(port) {
 		case PROCESS_ROOT_PORT:
-			port = curr_proc->root_port;
+			kport = curr_proc->root_port;
 			break;
 		default:
 			return STATUS_INVALID_ARG;
 		}
 
-		if(!port)
+		if(!kport)
 			return STATUS_NOT_FOUND;
 
-		refcount_inc(&port->count);
+		refcount_inc(&kport->count);
 	} else {
-		ret = object_handle_lookup(_port, OBJECT_TYPE_PORT, &khandle);
+		ret = object_handle_lookup(port, OBJECT_TYPE_PORT, &khandle);
 		if(ret != STATUS_SUCCESS)
 			return ret;
 
-		port = khandle->private;
-		refcount_inc(&port->count);
+		kport = khandle->private;
+		refcount_inc(&kport->count);
 		object_handle_release(khandle);
 	}
 
-	if(payload) {
-		ret = copy_message_from_user(payload, data, attached, &kmsg);
-		if(ret != STATUS_SUCCESS)
-			goto out_release_port;
-	}
+	mutex_lock(&kport->lock);
 
-	mutex_lock(&port->lock);
-
-	if(!port->owner) {
+	if(!kport->owner) {
 		ret = STATUS_CONN_HUNGUP;
 		goto out_unlock_port;
 	}
@@ -1204,7 +1122,7 @@ status_t kern_connection_open(handle_t _port, const ipc_message_t *payload,
 
 	mutex_lock(&conn->lock);
 
-	ret = port->ops->connect(port, server, kmsg, timeout);
+	ret = kport->ops->connect(kport, server, timeout);
 	if(ret != STATUS_SUCCESS)
 		goto err_close_conn;
 
@@ -1212,7 +1130,7 @@ status_t kern_connection_open(handle_t _port, const ipc_message_t *payload,
 	mutex_unlock(&conn->lock);
 
 	dprintf("ipc: process %" PRId32 " connected to port %p (conn: %p, "
-		"endpoint: %p)\n", curr_proc->id, port, conn, client);
+		"endpoint: %p)\n", curr_proc->id, kport, conn, client);
 
 	ret = object_handle_open(&connection_object_type, client, NULL, handlep);
 	if(ret != STATUS_SUCCESS)
@@ -1225,171 +1143,20 @@ err_close_conn:
 	ipc_connection_close(client);
 	ipc_connection_release(conn);
 out_unlock_port:
-	mutex_unlock(&port->lock);
-
-	if(kmsg)
-		ipc_kmessage_release(kmsg);
-out_release_port:
-	ipc_port_release(port);
+	mutex_unlock(&kport->lock);
+	ipc_port_release(kport);
 	return ret;
-}
-
-/**
- * Accept a connection.
- *
- * Accepts the given connection and puts it into the active state. This unblocks
- * the connecting thread and enables messages to be sent/received on the
- * connection. This function is only valid on the server side of a connection
- * (i.e. returned from kern_port_listen()), and only when the connection is
- * currently in the setup state.
- *
- * @param handle	Handle to connection to accept.
- *
- * @return		STATUS_SUCCESS if connection is now active.
- *			STATUS_INVALID_HANDLE if handle is invalid.
- *			STATUS_CONN_HUNGUP if the client hung up (may occur if
- *			its kern_connection_open() call times out or is
- *			interrupted).
- *			STATUS_CONN_ACTIVE if the connection is already active.
- */
-status_t kern_connection_accept(handle_t handle) {
-	object_handle_t *khandle;
-	ipc_endpoint_t *endpoint;
-	ipc_connection_t *conn;
-	status_t ret;
-
-	ret = object_handle_lookup(handle, OBJECT_TYPE_CONNECTION, &khandle);
-	if(ret != STATUS_SUCCESS)
-		return ret;
-
-	endpoint = khandle->private;
-	conn = endpoint->conn;
-
-	mutex_lock(&conn->lock);
-
-	if(conn->state == IPC_CONNECTION_ACTIVE) {
-		ret = STATUS_CONN_ACTIVE;
-		goto out_unlock_conn;
-	} else if(conn->state == IPC_CONNECTION_CLOSED) {
-		ret = STATUS_CONN_HUNGUP;
-		goto out_unlock_conn;
-	}
-
-	conn->state = IPC_CONNECTION_ACTIVE;
-	condvar_broadcast(&conn->open_cvar);
-	ret = STATUS_SUCCESS;
-
-out_unlock_conn:
-	mutex_unlock(&conn->lock);
-	object_handle_release(khandle);
-	return ret;
-}
-
-/**
- * Reject a connection.
- *
- * Rejects the given connection and closes the connection handle. This causes
- * the connecting thread's call to kern_connection_open() to return the
- * specified error. If the client has hung up, this will be silently ignored -
- * the connection handle will be closed and the function will return success
- * regardless. This function is only valid on the server side of a connection
- * (i.e. returned from kern_port_listen()), and only when the connection is
- * currently in the setup state.
- *
- * @param handle	Handle to connection to reject.
- * @param status	Status code to return to caller. Must not be
- *			STATUS_SUCCESS.
- *
- * @return		STATUS_SUCCESS if successfully rejected and the handle
- *			is closed.
- *			STATUS_INVALID_HANDLE if handle is invalid.
- *			STATUS_CONN_ACTIVE if the connection is already active.
- */
-status_t kern_connection_reject(handle_t handle, status_t status) {
-	object_handle_t *khandle;
-	ipc_endpoint_t *endpoint;
-	ipc_connection_t *conn;
-	status_t ret;
-
-	if(status <= STATUS_SUCCESS)
-		return STATUS_INVALID_ARG;
-
-	ret = object_handle_lookup(handle, OBJECT_TYPE_CONNECTION, &khandle);
-	if(ret != STATUS_SUCCESS)
-		return ret;
-
-	endpoint = khandle->private;
-	conn = endpoint->conn;
-
-	mutex_lock(&conn->lock);
-
-	if(conn->state == IPC_CONNECTION_ACTIVE) {
-		mutex_unlock(&conn->lock);
-		object_handle_release(khandle);
-		return STATUS_CONN_ACTIVE;
-	}
-
-	if(conn->state != IPC_CONNECTION_CLOSED) {
-		/* This is a shortcut version of ipc_connection_close(). We
-		 * cannot rely on just detaching the provided handle to close
-		 * the connection: the process could have used
-		 * kern_handle_duplicate(), in which case detaching the handle
-		 * would not close the connection. */
-		conn->status = status;
-		conn->state = IPC_CONNECTION_CLOSED;
-		condvar_broadcast(&conn->open_cvar);
-	}
-
-	mutex_unlock(&conn->lock);
-	object_handle_release(khandle);
-	object_handle_detach(handle);
-	return STATUS_SUCCESS;
-}
-
-/**
- * Forward a connection.
- *
- * Forwards the given connection on to another port, and closes the connection
- * handle in the current process. A new payload message can be attached to the
- * connection attempt to the new port. The behaviour of this function is to
- * make it as though the original kern_connection_open() call was made directly
- * to the new port with the payload message specified to this function. If the
- * client has hung up, this will be silently ignored - the connection handle
- * will be closed and the function will return success regardless. If the new
- * port is dead, this function will succeed but the kern_connection_open() call
- * will immediately return an error. This function is only valid on the server
- * side of a connection (i.e. returned from kern_port_listen()), and only when
- * the connection is currently in the setup state.
- *
- * @param handle	Handle to connection to forward.
- * @param port		Handle to port to forward to.
- * @param payload	Optional payload message (can be NULL).
- * @param data		Data to attach to payload (must not be NULL if payload
- *			has a non-zero size, ignored otherwise).
- * @param attached	Attached handle (must be a valid handle to a
- *			transferrable object if payload has IPC_MESSAGE_HANDLE
- *			flag set, ignored otherwise).
- *
- * @return		STATUS_SUCCESS if successfully rejected and the handle
- *			is closed.
- *			STATUS_INVALID_HANDLE if handle or port is invalid.
- *			STATUS_IN_USE if the connection is already active.
- */
-status_t kern_connection_forward(handle_t handle, handle_t port,
-	const ipc_message_t *payload, const void *data, handle_t attached)
-{
-	return STATUS_NOT_IMPLEMENTED;
 }
 
 /**
  * Send a message on connection.
  *
- * Queues a message at the remote end of a connection. The connection must be
- * in the active state. Messages are sent asynchronously. Message queues have a
- * finite length to prevent flooding when a process is not able to handle the
- * volume of incoming messages: if the remote message queue is full, this
- * function can block. If a received data buffer or handle are currently pending
- * from a previous call to kern_connection_receive(), they will be discarded.
+ * Queues a message at the remote end of a connection. Messages are sent
+ * asynchronously. Message queues have a finite length to prevent flooding when
+ * a process is not able to handle the volume of incoming messages: if the
+ * remote message queue is full, this function can block. If a received data
+ * buffer or handle are currently pending from a previous call to
+ * kern_connection_receive(), they will be discarded.
  *
  * @param handle	Handle to connection.
  * @param msg		Message to send.
@@ -1415,8 +1182,9 @@ status_t kern_connection_forward(handle_t handle, handle_t port,
  *			STATUS_CONN_HUNGUP if the remote end has hung up the
  *			connection.
  */
-status_t kern_connection_send(handle_t handle, const ipc_message_t *msg,
-	const void *data, handle_t attached, nstime_t timeout)
+status_t
+kern_connection_send(handle_t handle, const ipc_message_t *msg, const void *data,
+	handle_t attached, nstime_t timeout)
 {
 	object_handle_t *khandle;
 	ipc_endpoint_t *endpoint;
@@ -1437,23 +1205,16 @@ status_t kern_connection_send(handle_t handle, const ipc_message_t *msg,
 
 	mutex_lock(&conn->lock);
 
-	if(conn->state == IPC_CONNECTION_SETUP) {
-		ret = STATUS_CONN_INACTIVE;
-		goto out_unlock_conn;
-	}
-
 	/* Clear any pending data left at our endpoint. */
 	if(endpoint->pending) {
 		ipc_kmessage_release(endpoint->pending);
 		endpoint->pending = NULL;
 	}
 
-	ret = queue_message(conn, endpoint->remote, kmsg, IPC_INTERRUPTIBLE,
-		timeout);
-
-out_unlock_conn:
+	ret = queue_message(conn, endpoint->remote, kmsg, IPC_INTERRUPTIBLE, timeout);
 	mutex_unlock(&conn->lock);
 	ipc_kmessage_release(kmsg);
+
 out_release_conn:
 	object_handle_release(khandle);
 	return ret;
@@ -1474,6 +1235,9 @@ out_release_conn:
  *
  * @param handle	Handle to connection.
  * @param msg		Where to store received message.
+ * @param security	Where to store the security context of the thread that
+ *			sent the message at the time the message was sent (can
+ *			be NULL).
  * @param timeout	Timeout in nanoseconds. A negative value will block
  *			until a message is received. A value of 0 will return
  *			an error immediately if there are no messages queued.
@@ -1490,8 +1254,9 @@ out_release_conn:
  *			STATUS_CONN_HUNGUP if the remote end has hung up the
  *			connection.
  */
-status_t kern_connection_receive(handle_t handle, ipc_message_t *msg,
-	nstime_t timeout)
+status_t
+kern_connection_receive(handle_t handle, ipc_message_t *msg,
+	security_context_t *security, nstime_t timeout)
 {
 	object_handle_t *khandle;
 	ipc_endpoint_t *endpoint;
@@ -1507,11 +1272,6 @@ status_t kern_connection_receive(handle_t handle, ipc_message_t *msg,
 	conn = endpoint->conn;
 
 	mutex_lock(&conn->lock);
-
-	if(conn->state == IPC_CONNECTION_SETUP) {
-		ret = STATUS_CONN_INACTIVE;
-		goto out_unlock_conn;
-	}
 
 	/* Clear any pending data left at our endpoint. */
 	if(endpoint->pending) {
@@ -1531,9 +1291,18 @@ status_t kern_connection_receive(handle_t handle, ipc_message_t *msg,
 		goto out_unlock_conn;
 	}
 
+	if(security) {
+		ret = memcpy_to_user(security, &kmsg->security, sizeof(*security));
+		if(ret != STATUS_SUCCESS) {
+			/* Same as above. */
+			ipc_kmessage_release(kmsg);
+			goto out_unlock_conn;
+		}
+	}
+
 	/* Save the message if there is data or a handle to retrieve, otherwise
 	 * free it. */
-	if(ipc_kmessage_has_attached(kmsg)) {
+	if(ipc_kmessage_has_attachment(kmsg)) {
 		/* Hmm, not sure whether this is actually necessary. */
 		if(endpoint->pending)
 			ipc_kmessage_release(endpoint->pending);

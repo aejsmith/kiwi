@@ -29,9 +29,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_MESSAGE_PAYLOAD	1
-#define TEST_MESSAGE_PING	2
-#define TEST_MESSAGE_PONG	3
+#define TEST_MESSAGE_PING	1
+#define TEST_MESSAGE_PONG	2
 
 #define TEST_DATA_LEN		128
 
@@ -42,13 +41,12 @@ extern char **environ;
 static void dump_message(ipc_message_t *msg) {
 	int i;
 
-	printf(" flags   = 0x%x\n", msg->flags);
-	if(msg->flags & IPC_MESSAGE_VALID) {
-		printf(" id      = %u\n", msg->id);
-		printf(" size    = %u\n", msg->size);
-		for(i = 0; i < 6; i++)
-			printf(" args[%d] = 0x%lx\n", i, msg->args[i]);
-	}
+	printf(" flags     = 0x%x\n", msg->flags);
+	printf(" id        = %u\n", msg->id);
+	printf(" size      = %u\n", msg->size);
+	printf(" timestamp = %llu\n", msg->timestamp);
+	for(i = 0; i < 6; i++)
+		printf(" args[%d]   = 0x%lx\n", i, msg->args[i]);
 }
 
 static bool spawn_client(handle_t port) {
@@ -62,8 +60,7 @@ static bool spawn_client(handle_t port) {
 	attrib.map = map;
 	attrib.count = 3;
 
-	ret = kern_process_create(args[0], args, (const char *const *)environ,
-		0, &attrib, NULL);
+	ret = kern_process_create(args[0], args, (const char *const *)environ, 0, &attrib, NULL);
 	if(ret != STATUS_SUCCESS) {
 		fprintf(stderr, "Failed to create process: %d\n", ret);
 		return false;
@@ -90,30 +87,20 @@ static int test_server(void) {
 	if(!spawn_client(port))
 		return EXIT_FAILURE;
 
-	ret = kern_port_listen(port, 0, &msg, &client, -1, &conn);
+	ret = kern_port_listen(port, &client, -1, &conn);
 	if(ret != STATUS_SUCCESS) {
 		fprintf(stderr, "Failed to listen for connection: %d\n", ret);
 		return EXIT_FAILURE;
 	}
 
 	printf("Server got connection (handle: %d)\n", conn);
-	printf("Payload message:\n");
-	dump_message(&msg);
 	printf("Client PID: %d\n", client.pid);
 
-	ret = kern_connection_accept(conn);
-	if(ret != STATUS_SUCCESS) {
-		fprintf(stderr, "Failed to accept connection: %d\n", ret);
-		return EXIT_FAILURE;
-	}
-
 	while(true) {
-		ret = kern_connection_receive(conn, &msg, -1);
+		ret = kern_connection_receive(conn, &msg, NULL, -1);
 		if(ret != STATUS_SUCCESS) {
-			if(ret != STATUS_CONN_HUNGUP) {
-				fprintf(stderr, "Server failed to receive message: %d\n",
-					ret);
-			}
+			if(ret != STATUS_CONN_HUNGUP)
+				fprintf(stderr, "Server failed to receive message: %d\n", ret);
 
 			return EXIT_FAILURE;
 		}
@@ -131,6 +118,7 @@ static int test_server(void) {
 
 		data[sizeof(data) - 1] = 0;
 		printf("%s\n", data);
+		dump_message(&msg);
 
 		snprintf(data, sizeof(data), "PONG %lu", msg.args[0]);
 		msg.id = TEST_MESSAGE_PONG;
@@ -151,17 +139,7 @@ static int test_client(void) {
 	handle_t conn;
 	status_t ret;
 
-	memset(&msg, 0, sizeof(msg));
-	msg.id = TEST_MESSAGE_PAYLOAD;
-	msg.args[0] = 0xdeadbeef;
-	msg.args[1] = 0xdeadcafe;
-	msg.args[2] = 0xdeadc0de;
-	msg.args[3] = 0xcafebeef;
-	msg.args[4] = 0xcafebabe;
-	msg.args[5] = 0x1337cafe;
-
-	ret = kern_connection_open(PROCESS_ROOT_PORT, &msg, NULL,
-		INVALID_HANDLE, -1, &conn);
+	ret = kern_connection_open(PROCESS_ROOT_PORT, -1, &conn);
 	if(ret != STATUS_SUCCESS) {
 		fprintf(stderr, "Failed to open connection: %d\n", ret);
 		return EXIT_FAILURE;
@@ -174,6 +152,11 @@ static int test_client(void) {
 		msg.id = TEST_MESSAGE_PING;
 		msg.size = sizeof(data);
 		msg.args[0] = count;
+		msg.args[1] = 0xdeadcafe;
+		msg.args[2] = 0xdeadc0de;
+		msg.args[3] = 0xcafebeef;
+		msg.args[4] = 0xcafebabe;
+		msg.args[5] = 0x1337cafe;
 
 		ret = kern_connection_send(conn, &msg, data, INVALID_HANDLE, -1);
 		if(ret != STATUS_SUCCESS) {
@@ -181,7 +164,7 @@ static int test_client(void) {
 			return EXIT_FAILURE;
 		}
 
-		ret = kern_connection_receive(conn, &msg, -1);
+		ret = kern_connection_receive(conn, &msg, NULL, -1);
 		if(ret != STATUS_SUCCESS) {
 			fprintf(stderr, "Client failed to receive message: %d\n", ret);
 			return EXIT_FAILURE;
@@ -203,6 +186,7 @@ static int test_client(void) {
 
 		data[sizeof(data) - 1] = 0;
 		printf("%s\n", data);
+		dump_message(&msg);
 
 		if(count++ != TEST_PING_COUNT)
 			kern_thread_sleep(1000000000, NULL);
