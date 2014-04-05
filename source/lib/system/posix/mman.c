@@ -51,7 +51,7 @@
  *			(with errno set appropriately).
  */
 void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) {
-	unsigned kspec;
+	unsigned kspec, type;
 	uint32_t kprotection = 0;
 	uint32_t kflags = 0;
 	status_t ret;
@@ -62,7 +62,8 @@ void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) 
 	}
 
 	/* Through the POSIX interface, only allow files to be mapped. */
-	if(!(flags & MAP_ANONYMOUS) && kern_object_type(fd) != OBJECT_TYPE_FILE) {
+	ret = kern_object_type(fd, &type);
+	if(ret != STATUS_SUCCESS || type != OBJECT_TYPE_FILE) {
 		errno = EBADF;
 		return MAP_FAILED;
 	}

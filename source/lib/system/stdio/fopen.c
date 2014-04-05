@@ -20,6 +20,7 @@
  */
 
 #include <kernel/object.h>
+#include <kernel/status.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -118,10 +119,13 @@ FILE *fopen(const char *restrict path, const char *restrict mode) {
  * @return		Pointer to stream on success, NULL on failure.
  */
 FILE *fdopen(int fd, const char *mode) {
+	unsigned type;
 	FILE *stream;
+	status_t ret;
 
 	/* Check if the file descriptor is valid. */
-	if(kern_object_type(fd) != OBJECT_TYPE_FILE) {
+	ret = kern_object_type(fd, &type);
+	if(ret != STATUS_SUCCESS || type != OBJECT_TYPE_FILE) {
 		errno = EBADF;
 		return NULL;
 	}

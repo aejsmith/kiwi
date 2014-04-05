@@ -60,7 +60,7 @@ typedef struct object_event {
 /** Behaviour flags for kern_object_wait(). */
 #define OBJECT_WAIT_ALL		(1<<0)	/**< Wait for all the specified events to occur. */
 
-extern int kern_object_type(handle_t handle);
+extern status_t kern_object_type(handle_t handle, unsigned *typep);
 extern status_t kern_object_wait(object_event_t *events, size_t count,
 	uint32_t flags, nstime_t timeout);
 

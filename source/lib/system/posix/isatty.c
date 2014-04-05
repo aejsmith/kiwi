@@ -34,12 +34,16 @@
  * @return		1 if a TTY, 0 if not. */
 int isatty(int fd) {
 	file_info_t info;
+	unsigned type;
 	status_t ret;
 
-	switch(kern_object_type(fd)) {
-	case -1:
-		errno = EBADF;
+	ret = kern_object_type(fd, &type);
+	if(ret != STATUS_SUCCESS) {
+		libsystem_status_to_errno(ret);
 		return 0;
+	}
+
+	switch(type) {
 	case OBJECT_TYPE_FILE:
 		ret = kern_file_info(fd, &info);
 		if(ret != STATUS_SUCCESS) {

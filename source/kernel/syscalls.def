@@ -39,7 +39,7 @@ syscall kern_module_load(ptr_t, ptr_t);
 syscall kern_time_get(uint, ptr_t);
 syscall kern_time_set(uint, ptr_t);
 
-syscall kern_object_type(handle_t);
+syscall kern_object_type(handle_t, ptr_t);
 syscall kern_object_wait(ptr_t, size_t, uint32_t, nstime_t);
 
 syscall kern_handle_flags(handle_t, ptr_t);
