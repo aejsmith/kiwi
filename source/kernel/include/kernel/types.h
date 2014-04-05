@@ -22,7 +22,7 @@
 #ifndef __KERNEL_TYPES_H
 #define __KERNEL_TYPES_H
 
-#ifdef KERNEL
+#ifdef __KERNEL
 # include <types.h>
 #else
 # define __need_size_t

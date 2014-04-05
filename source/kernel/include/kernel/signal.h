@@ -166,7 +166,7 @@ typedef struct sigaction {
 	sigset_t sa_mask;		/**< Bitmap of signals to block during handler execution. */
 	int sa_flags;			/**< Flags controlling signal behaviour. */
 
-	#if defined(KERNEL) || defined(LIBKERNEL)
+	#ifdef __KERNEL_PRIVATE
 	/** Fields for internal use only. */
 	void *sa_restorer;		/**< Return address for handler. */
 	#endif

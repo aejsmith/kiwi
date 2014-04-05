@@ -22,7 +22,7 @@
 #ifndef __ELF_H
 #define __ELF_H
 
-#ifdef KERNEL
+#ifdef __KERNEL
 # include <types.h>
 #else
 # include <stdint.h>

@@ -28,6 +28,8 @@
 extern "C" {
 #endif
 
+struct cpu_context;
+
 /** Value used to refer to an invalid handle.
  * @note		This is used to mean various things, for example with
  *			thread/process functions it refers to the current

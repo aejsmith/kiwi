@@ -19,6 +19,7 @@
  * @brief		C library startup code.
  */
 
+#define __KERNEL_PRIVATE
 #include <kernel/private/process.h>
 
 #include <stdio.h>

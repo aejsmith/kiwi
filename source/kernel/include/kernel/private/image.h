@@ -28,6 +28,8 @@
 extern "C" {
 #endif
 
+#ifdef __KERNEL_PRIVATE
+
 /** Structure containing image information for the kernel. */
 typedef struct image_info {
 	const char *name;		/**< Name of the image. */
@@ -41,6 +43,8 @@ typedef struct image_info {
 
 extern status_t kern_image_register(image_info_t *info, image_id_t *idp);
 extern status_t kern_image_unregister(image_id_t id);
+
+#endif /* __KERNEL_PRIVATE */
 
 #ifdef __cplusplus
 }

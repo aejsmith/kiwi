@@ -117,7 +117,8 @@ env = manager.CreateBare(name = 'kernel', flags = {
         '-nostdlib',
     ],
     'CPPDEFINES': {
-        'KERNEL': None,
+        '__KERNEL': None,
+        '__KERNEL_PRIVATE': None,
     },
 })
 

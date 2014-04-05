@@ -22,9 +22,7 @@
 #ifndef __TERMIOS_H
 #define __TERMIOS_H
 
-#ifndef KERNEL
-# include <sys/types.h>
-#endif
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -168,7 +166,6 @@ struct winsize {
 /** Terminal master requests. */
 #define TTY_MASTER_ID		64	/**< Get the slave device ID. */
 
-#ifndef KERNEL
 extern speed_t cfgetispeed(const struct termios *tio);
 extern speed_t cfgetospeed(const struct termios *tio);
 extern int cfsetispeed(struct termios *tio, speed_t speed);
@@ -180,7 +177,6 @@ extern int tcgetattr(int fd, struct termios *tiop);
 extern pid_t tcgetsid(int fd);
 extern int tcsendbreak(int fd, int duration);
 extern int tcsetattr(int fd, int action, const struct termios *tio);
-#endif
 
 #ifdef __cplusplus
 }

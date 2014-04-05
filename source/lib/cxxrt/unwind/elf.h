@@ -22,12 +22,8 @@
 #ifndef __ELF_H
 #define __ELF_H
 
-#ifdef KERNEL
-# include <types.h>
-#else
-# include <stdint.h>
-# define __packed	__attribute__((packed))
-#endif
+#include <stdint.h>
+#define __packed	__attribute__((packed))
 
 /** Basic 32-bit ELF types. */
 typedef uint32_t Elf32_Addr;

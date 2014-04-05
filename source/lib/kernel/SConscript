@@ -23,7 +23,11 @@ env = manager.Create(flags = {
     # this library should not be exported.
     'CCFLAGS': ['-ffreestanding', '-fvisibility=hidden', '-nostdinc'],
 
-    'CPPDEFINES': ['LIBKERNEL'],
+    'CPPDEFINES': {
+        '__LIBKERNEL': None,
+        '__KERNEL_PRIVATE': None,
+    },
+
     'CPPPATH': [
         Dir('.'),
         Dir('arch/%s' % (config['ARCH'])),

@@ -28,11 +28,16 @@
 extern "C" {
 #endif
 
+#ifdef __KERNEL_PRIVATE
+
 extern void kern_signal_return(void);
 
-#ifndef KERNEL
+#ifdef __LIBKERNEL
+
 extern status_t _kern_signal_action(int num, const sigaction_t *newp, sigaction_t *oldp);
-#endif
+
+#endif /* __LIBKERNEL */
+#endif /* __KERNEL_PRIVATE */
 
 #ifdef __cplusplus
 }
