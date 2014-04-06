@@ -31,9 +31,6 @@ extern "C" {
 /** Timer events. */
 #define TIMER_EVENT_FIRED	1	/**< Event for the timer firing. */
 
-/** Timer flags. */
-#define TIMER_SIGNAL		(1<<0)	/**< Send SIGALRM upon timer completion. */
-
 /** Timer mode values. */
 #define TIMER_ONESHOT		1	/**< Fire the timer event only once. */
 #define TIMER_PERIODIC		2	/**< Fire the event at regular intervals until stopped. */

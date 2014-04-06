@@ -86,7 +86,6 @@
 #include <mm/vm_cache.h>
 
 #include <proc/process.h>
-#include <proc/signal.h>
 #include <proc/thread.h>
 
 #include <assert.h>
@@ -976,7 +975,6 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 	vm_aspace_t *as = curr_cpu->aspace;
 	ptr_t base;
 	vm_region_t *region;
-	siginfo_t info;
 	status_t ret;
 	bool in_usermem;
 
@@ -1082,26 +1080,8 @@ out:
 	if(intr_frame_from_user(frame)) {
 		kdb_enter(KDB_REASON_USER, frame);
 
-		/* Send a signal to the thread. */
-		memset(&info, 0, sizeof(info));
-		info.si_addr = (void *)frame->ip;
-		switch(ret) {
-		case STATUS_INVALID_ADDR:
-			info.si_signo = SIGSEGV;
-			info.si_code = SEGV_MAPERR;
-			break;
-		case STATUS_ACCESS_DENIED:
-			info.si_signo = SIGSEGV;
-			info.si_code = SEGV_ACCERR;
-			break;
-		default:
-			info.si_signo = SIGBUS;
-			info.si_code = BUS_ADRERR;
-			break;
-		}
-
-		signal_send(curr_thread, info.si_signo, &info, true);
-		ret = STATUS_SUCCESS;
+		// TODO: Exception. Specify type of error in exception.
+		process_exit(EXIT_REASON_NORMAL, 255);
 	} else if(curr_thread->in_usermem && is_user_address((void *)addr)) {
 		/* Handle faults in safe user memory access functions. */
 		kprintf(LOG_DEBUG, "vm: thread %" PRId32 " (%s) faulted in "

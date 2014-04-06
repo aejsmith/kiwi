@@ -151,14 +151,12 @@ process_alloc(const char *name, process_id_t id, process_t *parent, int priority
 	refcount_set(&process->count, 1);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
 	object_process_init(process);
-	memset(process->signal_act, 0, sizeof(process->signal_act));
 	process->flags = 0;
 	process->priority = priority;
 	process->token = token;
 	process->aspace = aspace;
 	process->next_image_id = 0;
 	process->root_port = root_port;
-	process->signal_mask = 0;
 	process->state = PROCESS_CREATED;
 	process->id = id;
 	process->name = kstrdup(name, MM_KERNEL);
@@ -1211,13 +1209,6 @@ kern_process_exec(const char *path, const char *const args[],
 	curr_proc->name = load.path;
 	preempt_enable();
 
-	/* Reset signal handling state. */
-	memset(curr_proc->signal_act, 0, sizeof(curr_proc->signal_act));
-	curr_proc->signal_mask = 0;
-	curr_thread->signal_stack.ss_sp = NULL;
-	curr_thread->signal_stack.ss_size = 0;
-	curr_thread->signal_stack.ss_flags = SS_DISABLE;
-
 	/* Free all currently loaded images. */
 	elf_process_cleanup(curr_proc);
 	curr_proc->next_image_id = 0;
@@ -1316,8 +1307,6 @@ status_t kern_process_clone(handle_t *handlep) {
 	/* Clone handles and other per-process information. */
 	object_process_clone(process, curr_proc);
 	elf_process_clone(process, curr_proc);
-	memcpy(process->signal_act, curr_proc->signal_act, sizeof(process->signal_act));
-	process->signal_mask = curr_proc->signal_mask;
 
 	/* Create a new handle. This takes over the initial reference added by
 	 * process_alloc(). */
@@ -1345,8 +1334,6 @@ status_t kern_process_clone(handle_t *handlep) {
 	spinlock_unlock(&curr_thread->lock);
 
 	/* Inherit other per-thread attributes from the calling thread. */
-	memcpy(&thread->signal_stack, &curr_thread->signal_stack,
-		sizeof(thread->signal_stack));
 	thread->ustack = curr_thread->ustack;
 	thread->ustack_size = curr_thread->ustack_size;
 

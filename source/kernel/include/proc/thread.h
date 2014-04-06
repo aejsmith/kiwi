@@ -25,7 +25,6 @@
 #include <arch/setjmp.h>
 #include <arch/thread.h>
 
-#include <kernel/signal.h>
 #include <kernel/thread.h>
 
 #include <lib/avl_tree.h>
@@ -108,12 +107,6 @@ typedef struct thread {
 	 * count reaches 0, the thread is destroyed.
 	 */
 	refcount_t count;
-
-	/** Signal information. */
-	sigset_t signal_mask;		/**< Signal mask for the thread. */
-	sigset_t pending_signals;	/**< Bitmap of pending signals. */
-	siginfo_t signal_info[NSIG];	/**< Information associated with pending signals. */
-	stack_t signal_stack;		/**< Alternate signal stack. */
 
 	/** Overridden security token for the thread (if any). */
 	token_t *token;

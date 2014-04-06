@@ -36,10 +36,10 @@
  *			returning from siglongjmp().
  */
 int sigsetjmp(sigjmp_buf env, int savemask) {
-	if(savemask)
-		sigprocmask(SIG_BLOCK, NULL, &env->mask);
+	//if(savemask)
+	//	sigprocmask(SIG_BLOCK, NULL, &env->mask);
 
-	env->restore_mask = savemask;
+	//env->restore_mask = savemask;
 	return setjmp(env->buf);
 }
 
@@ -54,8 +54,8 @@ int sigsetjmp(sigjmp_buf env, int savemask) {
  * @param val		Value that the original sigsetjmp() call should return.
  */
 void siglongjmp(sigjmp_buf env, int val) {
-	if(env->restore_mask)
-		sigprocmask(SIG_SETMASK, &env->mask, NULL);
+	//if(env->restore_mask)
+	//	sigprocmask(SIG_SETMASK, &env->mask, NULL);
 
 	longjmp(env->buf, val);
 }

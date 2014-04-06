@@ -43,7 +43,7 @@ extern "C" {
 #define PRIV_FS_ADMIN			5	/**< Ability to bypass access checks on the filesystem. */
 #define PRIV_FS_SETROOT			6	/**< Ability to use the fs_setroot() system call. */
 #define PRIV_FS_MOUNT			7	/**< Ability to mount/unmount filesystems. */
-#define PRIV_PROCESS_ADMIN		8	/**< Ability to signal/control any process/thread. */
+#define PRIV_PROCESS_ADMIN		8	/**< Ability to control any process/thread. */
 
 /** Currently highest defined privilege. */
 #define PRIV_MAX			8

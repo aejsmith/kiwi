@@ -73,7 +73,6 @@
 
 #include <proc/process.h>
 #include <proc/sched.h>
-#include <proc/signal.h>
 #include <proc/thread.h>
 
 #include <security/security.h>
@@ -627,10 +626,6 @@ void thread_at_kernel_exit(void) {
 	/* Clear the interrupted flag. */
 	curr_thread->flags &= ~THREAD_INTERRUPTED;
 
-	/* Handle pending signals. */
-	if(curr_thread->pending_signals)
-		signal_handle_pending();
-
 	/* Preempt if required. */
 	if(curr_cpu->should_preempt)
 		sched_preempt();
@@ -799,7 +794,6 @@ thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->last_time = 0;
 	thread->kernel_time = 0;
 	thread->user_time = 0;
-	thread->pending_signals = 0;
 	thread->in_usermem = false;
 	thread->token = NULL;
 	thread->active_token = NULL;
@@ -810,13 +804,6 @@ thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->name[THREAD_NAME_MAX - 1] = 0;
 	thread->ustack = 0;
 	thread->ustack_size = 0;
-
-	/* Initialize signal handling state. */
-	thread->signal_mask = 0;
-	memset(thread->signal_info, 0, sizeof(thread->signal_info));
-	thread->signal_stack.ss_sp = NULL;
-	thread->signal_stack.ss_size = 0;
-	thread->signal_stack.ss_flags = SS_DISABLE;
 
 	/* Add the thread to the owner. */
 	process_attach_thread(owner, thread);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,7 +33,6 @@
 
 #include <proc/process.h>
 #include <proc/sched.h>
-#include <proc/signal.h>
 
 #include <kdb.h>
 #include <kernel.h>
@@ -92,18 +91,14 @@ static void kmode_except_handler(intr_frame_t *frame) {
 /** Generic exception handler.
  * @param frame		Interrupt stack frame. */
 static void except_handler(intr_frame_t *frame) {
-	siginfo_t info;
-
 	if(frame->cs & 3) {
+		// TODO: Fix this.
 		kprintf(LOG_DEBUG, "arch: sending SIGSEGV to thread %" PRId32 " (%s) "
 			"due to exception %lu (%s) at %p\n", curr_thread->id,
 			curr_thread->name, frame->num, except_strings[frame->num],
 			frame->ip);
 		kdb_enter(KDB_REASON_USER, frame);
-
-		memset(&info, 0, sizeof(info));
-		info.si_addr = (void *)frame->ip;
-		signal_send(curr_thread, SIGSEGV, &info, true);
+		process_exit(EXIT_REASON_NORMAL, 255);
 	} else {
 		kmode_except_handler(frame);
 	}
@@ -112,19 +107,14 @@ static void except_handler(intr_frame_t *frame) {
 /** Divide Error (#DE) fault handler.
  * @param frame		Interrupt stack frame. */
 static void de_fault(intr_frame_t *frame) {
-	siginfo_t info;
-
 	if(frame->cs & 3) {
+		// TODO: Fix this.
 		kprintf(LOG_DEBUG, "arch: sending SIGFPE to thread %" PRId32 " (%s) "
 			"due to exception %lu (%s) at %p\n", curr_thread->id,
 			curr_thread->name, frame->num, except_strings[frame->num],
 			frame->ip);
 		kdb_enter(KDB_REASON_USER, frame);
-
-		memset(&info, 0, sizeof(info));
-		info.si_code = FPE_INTDIV;
-		info.si_addr = (void *)frame->ip;
-		signal_send(curr_thread, SIGFPE, &info, true);
+		process_exit(EXIT_REASON_NORMAL, 255);
 	} else {
 		kmode_except_handler(frame);
 	}
@@ -146,19 +136,14 @@ static void nmi_handler(intr_frame_t *frame) {
 /** Invalid Opcode (#UD) fault handler.
  * @param frame		Interrupt stack frame. */
 static void ud_fault(intr_frame_t *frame) {
-	siginfo_t info;
-
 	if(frame->cs & 3) {
+		// TODO: Fix this.
 		kprintf(LOG_DEBUG, "arch: sending SIGILL to thread %" PRId32 " (%s) "
 			"due to exception %lu (%s) at %p\n", curr_thread->id,
 			curr_thread->name, frame->num, except_strings[frame->num],
 			frame->ip);
 		kdb_enter(KDB_REASON_USER, frame);
-
-		memset(&info, 0, sizeof(info));
-		info.si_code = ILL_ILLOPC;
-		info.si_addr = (void *)frame->ip;
-		signal_send(curr_thread, SIGILL, &info, true);
+		process_exit(EXIT_REASON_NORMAL, 255);
 	} else {
 		kmode_except_handler(frame);
 	}
@@ -235,30 +220,20 @@ static void page_fault(intr_frame_t *frame) {
 }
 
 /** FPU Floating-Point Error (#MF) fault handler.
- * @todo		Get FPU status and convert to correct signal code.
  * @param frame		Interrupt stack frame. */
 static void mf_fault(intr_frame_t *frame) {
-	siginfo_t info;
-
 	if(frame->cs & 3) {
-		memset(&info, 0, sizeof(info));
-		info.si_addr = (void *)frame->ip;
-		signal_send(curr_thread, SIGFPE, &info, true);
+		process_exit(EXIT_REASON_NORMAL, 255);
 	} else {
 		kmode_except_handler(frame);
 	}
 }
 
 /** SIMD Floating-Point (#XM) fault handler.
- * @todo		Get FPU status and convert to correct signal code.
  * @param frame		Interrupt stack frame. */
 static void xm_fault(intr_frame_t *frame) {
-	siginfo_t info;
-
 	if(frame->cs & 3) {
-		memset(&info, 0, sizeof(info));
-		info.si_addr = (void *)frame->ip;
-		signal_send(curr_thread, SIGFPE, &info, true);
+		process_exit(EXIT_REASON_NORMAL, 255);
 	} else {
 		kmode_except_handler(frame);
 	}

@@ -28,7 +28,6 @@ sources = FeatureSources(config, [
     'lapic.c',
     'mmu.c',
     'setjmp.S',
-    'signal.c',
     ('SMP', 'smp.c'),
     'switch.S',
     'thread.c',

@@ -19,9 +19,6 @@
  * @brief		Alternate signal stack function.
  */
 
-#include <kernel/signal.h>
-#include <kernel/status.h>
-
 #include <signal.h>
 
 #include "libsystem.h"
@@ -41,13 +38,6 @@
  * @return		0 on success, -1 on failure.
  */
 int sigaltstack(const stack_t *restrict ss, stack_t *restrict oldss) {
-	status_t ret;
-
-	ret = kern_signal_stack(ss, oldss);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
-
-	return 0;
+	libsystem_stub("sigaltstack", false);
+	return -1;
 }

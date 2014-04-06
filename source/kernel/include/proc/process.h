@@ -25,7 +25,6 @@
 #include <io/context.h>
 
 #include <kernel/process.h>
-#include <kernel/signal.h>
 
 #include <lib/avl_tree.h>
 #include <lib/notifier.h>
@@ -82,10 +81,6 @@ typedef struct process {
 
 	/** Special ports. */
 	struct ipc_port *root_port;	/**< Root port. */
-
-	/** Signal information. */
-	sigset_t signal_mask;		/**< Bitmap of masked signals. */
-	sigaction_t signal_act[NSIG];	/**< Signal action structures. */
 
 	/** State of the process. */
 	enum {

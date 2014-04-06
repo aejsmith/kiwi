@@ -82,7 +82,6 @@ typedef struct process_attrib {
 
 /** Process exit reason codes. */
 #define EXIT_REASON_NORMAL	1	/**< Normal exit (status is exit code). */
-#define EXIT_REASON_SIGNAL	2	/**< Exited due to a signal (status is signal number). */
 
 /** Process priority classes. */
 #define PRIORITY_CLASS_LOW	0	/**< Low priority. */

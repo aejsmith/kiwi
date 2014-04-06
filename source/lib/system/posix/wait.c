@@ -47,8 +47,8 @@ static inline int convert_exit_status(int status, int reason) {
 	switch(reason) {
 	case EXIT_REASON_NORMAL:
 		return (status << 8) | __WEXITED;
-	case EXIT_REASON_SIGNAL:
-		return (status << 8) | __WSIGNALED;
+	//case EXIT_REASON_SIGNAL:
+	//	return (status << 8) | __WSIGNALED;
 	default:
 		libsystem_fatal("unhandled exit reason %s", reason);
 	}

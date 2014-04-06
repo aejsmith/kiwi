@@ -23,7 +23,6 @@
 #include <kernel/private/process.h>
 #include <kernel/private/thread.h>
 #include <kernel/object.h>
-#include <kernel/signal.h>
 #include <kernel/system.h>
 
 #include <elf.h>
@@ -157,6 +156,6 @@ void libkernel_init(process_args_t *args, ptr_t load_base) {
 void libkernel_abort(void) {
 	/* Try to raise a SIGABRT, failing that (signal may be blocked) then
 	 * just exit. */
-	kern_signal_send(PROCESS_SELF, SIGABRT);
+	//kern_signal_send(PROCESS_SELF, SIGABRT);
 	kern_process_exit(-1);
 }

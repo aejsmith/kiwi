@@ -32,7 +32,6 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 
-#include <proc/signal.h>
 #include <proc/thread.h>
 
 #include <assert.h>
@@ -528,10 +527,6 @@ static object_type_t timer_object_type = {
  * @return		Whether to preempt. */
 static bool user_timer_func(void *_timer) {
 	user_timer_t *timer = _timer;
-
-	/* Send an alarm signal if required. */
-	if(timer->flags & TIMER_SIGNAL)
-		signal_send(timer->thread, SIGALRM, NULL, false);
 
 	/* Signal the event. */
 	if(!notifier_run(&timer->notifier, NULL, true))

@@ -49,7 +49,6 @@ sources = map(File, [
     'init.c',
     'mutex.c',
     'process.c',
-    'signal.c',
     'status_list.c',
     'syscalls.S',
     'thread.c',
