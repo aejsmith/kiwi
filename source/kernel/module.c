@@ -81,7 +81,7 @@ ptr_t module_mem_alloc(size_t size) {
 		ptr_t addr;
 		size_t i;
 
-		size = ROUND_UP(size, PAGE_SIZE);
+		size = round_up(size, PAGE_SIZE);
 
 		if(size > remaining_module_size)
 			return 0;
@@ -101,7 +101,7 @@ ptr_t module_mem_alloc(size_t size) {
 		remaining_module_size -= size;
 		return addr;
 	#else
-		return kmem_alloc(ROUND_UP(size, PAGE_SIZE), MM_NOWAIT);
+		return kmem_alloc(round_up(size, PAGE_SIZE), MM_NOWAIT);
 	#endif
 }
 
@@ -110,7 +110,7 @@ ptr_t module_mem_alloc(size_t size) {
  * @param size		Size of the allocation. */
 void module_mem_free(ptr_t base, size_t size) {
 	#ifndef KERNEL_MODULE_BASE
-	kmem_free((void *)base, ROUND_UP(size, PAGE_SIZE));
+	kmem_free((void *)base, round_up(size, PAGE_SIZE));
 	#endif
 }
 

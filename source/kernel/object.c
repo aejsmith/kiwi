@@ -595,9 +595,9 @@ status_t object_process_exec(process_t *process, handle_t map[][2],
 		}
 	}
 
-	SWAP(process->handles.handles, new.handles);
-	SWAP(process->handles.flags, new.flags);
-	SWAP(process->handles.bitmap, new.bitmap);
+	swap(process->handles.handles, new.handles);
+	swap(process->handles.flags, new.flags);
+	swap(process->handles.bitmap, new.bitmap);
 
 	/* Finally, attach all handles in the new table. */
 	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {

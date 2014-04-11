@@ -123,7 +123,7 @@ status_t io_request_copy(io_request_t *request, void *buf, size_t size) {
 		}
 
 		vec_start = request->transferred - offset;
-		vec_size = MIN(request->vecs[i].size - vec_start, size);
+		vec_size = min(request->vecs[i].size - vec_start, size);
 		vec_buf = request->vecs[i].buffer + vec_start;
 
 		if(request->op == IO_OP_WRITE) {

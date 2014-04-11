@@ -70,7 +70,7 @@ file_map_t *file_map_create(size_t blksize, file_map_ops_t *ops, void *data) {
 
 	if(blksize > PAGE_SIZE) {
 		fatal("Block size too big");
-	} else if(!IS_POW2(blksize)) {
+	} else if(!is_pow2(blksize)) {
 		fatal("Block size is not a power of 2");
 	}
 

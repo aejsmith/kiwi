@@ -71,7 +71,7 @@ void *kmalloc(size_t size, unsigned mmflag) {
 		/* If exactly a power-of-two, then highbit(total) will work,
 		 * else we want the next size up. Remember that the highbit
 		 * function returns (log2(n) + 1). */
-		idx = (IS_POW2(total)) ? highbit(total) - 1 : highbit(total);
+		idx = (is_pow2(total)) ? highbit(total) - 1 : highbit(total);
 		if(idx < KMALLOC_CACHE_MIN)
 			idx = KMALLOC_CACHE_MIN;
 		idx -= KMALLOC_CACHE_MIN;
@@ -83,7 +83,7 @@ void *kmalloc(size_t size, unsigned mmflag) {
 		addr->cache = kmalloc_caches[idx];
 	} else {
 		/* Fall back on kmem. */
-		addr = kmem_alloc(ROUND_UP(total, PAGE_SIZE), mmflag & MM_FLAG_MASK);
+		addr = kmem_alloc(round_up(total, PAGE_SIZE), mmflag & MM_FLAG_MASK);
 		if(unlikely(!addr))
 			return NULL;
 
@@ -139,7 +139,7 @@ void *krealloc(void *addr, size_t size, unsigned mmflag) {
 		return ret;
 
 	/* Copy the block data using the smallest of the two sizes. */
-	memcpy(ret, addr, MIN(tag->size, size));
+	memcpy(ret, addr, min(tag->size, size));
 
 	/* Zero any new space if requested. */
 	if(mmflag & MM_ZERO && size > tag->size)
@@ -167,7 +167,7 @@ void kfree(void *addr) {
 		/* If the cache pointer is not set, assume the allocation came
 		 * directly from kmem. */
 		if(!tag->cache) {
-			kmem_free(tag, ROUND_UP(tag->size + sizeof(alloc_tag_t), PAGE_SIZE));
+			kmem_free(tag, round_up(tag->size + sizeof(alloc_tag_t), PAGE_SIZE));
 			return;
 		}
 

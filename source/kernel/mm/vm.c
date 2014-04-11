@@ -1126,8 +1126,8 @@ static vm_region_t *trim_regions(vm_aspace_t *as, ptr_t start, size_t size) {
 		/* Calculate the overlapping part of the region. If there is
 		 * none, we can finish. */
 		region_end = region->start + region->size - 1;
-		match_start = MAX(start, region->start);
-		match_end = MIN(end, region_end);
+		match_start = max(start, region->start);
+		match_end = min(end, region_end);
 		if(match_end <= match_start)
 			break;
 

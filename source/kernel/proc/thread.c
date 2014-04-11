@@ -1095,7 +1095,7 @@ kern_thread_create(const char *name, const thread_entry_t *entry,
 		args->sp = (ptr_t)kentry.stack + kentry.stack_size;
 	} else {
 		if(kentry.stack_size) {
-			kentry.stack_size = ROUND_UP(kentry.stack_size, PAGE_SIZE);
+			kentry.stack_size = round_up(kentry.stack_size, PAGE_SIZE);
 		} else {
 			kentry.stack_size = USTACK_SIZE;
 		}

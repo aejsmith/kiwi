@@ -134,8 +134,8 @@ status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
 		if(phdrs[i].p_type != ELF_PT_LOAD)
 			continue;
 
-		start = ROUND_DOWN(phdrs[i].p_vaddr, PAGE_SIZE);
-		end = ROUND_UP(phdrs[i].p_vaddr + phdrs[i].p_memsz, PAGE_SIZE);
+		start = round_down(phdrs[i].p_vaddr, PAGE_SIZE);
+		end = round_up(phdrs[i].p_vaddr + phdrs[i].p_memsz, PAGE_SIZE);
 		size = end - start;
 
 		ret = vm_reserve(as, start, size);
@@ -180,8 +180,8 @@ static status_t do_load_phdr(elf_image_t *image, size_t i, object_handle_t *hand
 
 	/* Map an anonymous region if memory size is greater than file size. */
 	if(phdr->p_memsz > phdr->p_filesz) {
-		start = image->load_base + ROUND_DOWN(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
-		end = image->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
+		start = image->load_base + round_down(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
+		end = image->load_base + round_up(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
 		size = end - start;
 
 		dprintf("elf: %s: loading BSS for %zu to %p (size: %zu)\n", image->name,
@@ -207,10 +207,10 @@ static status_t do_load_phdr(elf_image_t *image, size_t i, object_handle_t *hand
 		return STATUS_SUCCESS;
 
 	/* Work out the address to map to and the offset in the file. */
-	start = image->load_base + ROUND_DOWN(phdr->p_vaddr, PAGE_SIZE);
-	end = image->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
+	start = image->load_base + round_down(phdr->p_vaddr, PAGE_SIZE);
+	end = image->load_base + round_up(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
 	size = end - start;
-	offset = ROUND_DOWN(phdr->p_offset, PAGE_SIZE);
+	offset = round_down(phdr->p_offset, PAGE_SIZE);
 
 	dprintf("elf: %s: loading program header %zu to %p (size: %zu)\n",
 		image->name, i, start, size);
@@ -286,7 +286,7 @@ status_t elf_binary_load(object_handle_t *handle, const char *path, vm_aspace_t 
 				continue;
 
 			if((image->phdrs[i].p_vaddr + image->phdrs[i].p_memsz) > image->load_size) {
-				image->load_size = ROUND_UP(
+				image->load_size = round_up(
 					image->phdrs[i].p_vaddr + image->phdrs[i].p_memsz,
 					PAGE_SIZE);
 			}
@@ -449,7 +449,7 @@ static status_t load_module_sections(elf_image_t *image, object_handle_t *handle
 		case ELF_SHT_STRTAB:
 		case ELF_SHT_SYMTAB:
 			if(shdr->sh_addralign)
-				image->load_size = ROUND_UP(image->load_size, shdr->sh_addralign);
+				image->load_size = round_up(image->load_size, shdr->sh_addralign);
 
 			image->load_size += shdr->sh_size;
 			break;
@@ -472,7 +472,7 @@ static status_t load_module_sections(elf_image_t *image, object_handle_t *handle
 		switch(shdr->sh_type) {
 		case ELF_SHT_NOBITS:
 			if(shdr->sh_addralign)
-				dest = ROUND_UP(dest, shdr->sh_addralign);
+				dest = round_up(dest, shdr->sh_addralign);
 
 			shdr->sh_addr = dest;
 
@@ -486,7 +486,7 @@ static status_t load_module_sections(elf_image_t *image, object_handle_t *handle
 		case ELF_SHT_STRTAB:
 		case ELF_SHT_SYMTAB:
 			if(shdr->sh_addralign)
-				dest = ROUND_UP(dest, shdr->sh_addralign);
+				dest = round_up(dest, shdr->sh_addralign);
 
 			shdr->sh_addr = (elf_addr_t)dest;
 

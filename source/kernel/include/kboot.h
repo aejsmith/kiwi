@@ -42,7 +42,7 @@ extern void *kboot_tag_iterate(uint32_t type, void *current);
  * @param offset	Offset of the data to get.
  * @return		Pointer to data. */
 #define kboot_tag_data(tag, offset)	\
-	((void *)(ROUND_UP((ptr_t)tag + sizeof(*tag), 8) + offset))
+	((void *)(round_up((ptr_t)tag + sizeof(*tag), 8) + offset))
 
 extern bool kboot_boolean_option(const char *name);
 extern uint64_t kboot_integer_option(const char *name);

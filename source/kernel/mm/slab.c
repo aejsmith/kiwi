@@ -252,7 +252,7 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 
 		/* Find the slab corresponding to the object. The structure
 		 * will be at the end of the slab. */
-		slab = (slab_t *)(ROUND_DOWN((ptr_t)obj, cache->slab_size) + (cache->slab_size - sizeof(slab_t)));
+		slab = (slab_t *)(round_down((ptr_t)obj, cache->slab_size) + (cache->slab_size - sizeof(slab_t)));
 		if(unlikely(slab->parent != cache))
 			fatal("Free (%s): slab structure for %p invalid (%p)", cache->name, obj, slab->parent);
 	}
@@ -447,7 +447,7 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 		} else if(cc->previous && cc->previous->rounds) {
 			/* Previous has rounds, exchange loaded with previous
 			 * and allocate from it. */
-			SWAP(cc->loaded, cc->previous);
+			swap(cc->loaded, cc->previous);
 			ret = cc->loaded->objects[--cc->loaded->rounds];
 			local_irq_restore(state);
 			return ret;
@@ -498,7 +498,7 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 		} else if(cc->previous && cc->previous->rounds < SLAB_MAGAZINE_SIZE) {
 			/* Previous has spare slots, exchange them and insert
 			 * the object. */
-			SWAP(cc->loaded, cc->previous);
+			swap(cc->loaded, cc->previous);
 			cc->loaded->objects[cc->loaded->rounds++] = obj;
 			local_irq_restore(state);
 			return true;
@@ -680,7 +680,7 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name,
 	status_t ret;
 
 	assert(size);
-	assert(!align || IS_POW2(align));
+	assert(!align || is_pow2(align));
 	assert(!(flags & SLAB_CACHE_LATEMAG));
 
 	mutex_init(&cache->depot_lock, "slab_depot_lock", 0);
@@ -709,10 +709,10 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name,
 	cache->colour_next = 0;
 
 	/* Alignment must be at lest SLAB_ALIGN_MIN. */
-	cache->align = MAX(SLAB_ALIGN_MIN, align);
+	cache->align = max(SLAB_ALIGN_MIN, align);
 
 	/* Make sure the object size is aligned. */
-	size = ROUND_UP(size, cache->align);
+	size = round_up(size, cache->align);
 	cache->obj_size = size;
 
 	/* If the cache contains large objects, set the large flag which causes
@@ -721,7 +721,7 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name,
 		cache->flags |= SLAB_CACHE_LARGE;
 
 		/* Compute the appropriate slab size. */
-		cache->slab_size = ROUND_UP(size, PAGE_SIZE);
+		cache->slab_size = round_up(size, PAGE_SIZE);
 		while((cache->slab_size % size) > (cache->slab_size / SLAB_WASTE_FRACTION))
 			cache->slab_size += PAGE_SIZE;
 

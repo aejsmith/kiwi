@@ -406,8 +406,8 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 		if(!list->minaddr && !list->maxaddr)
 			continue;
 
-		base = MAX(minaddr, list->minaddr);
-		end = MIN(maxaddr - 1, list->maxaddr - 1);
+		base = max(minaddr, list->minaddr);
+		end = min(maxaddr - 1, list->maxaddr - 1);
 
 		if(base == list->minaddr && end == (list->maxaddr - 1)) {
 			/* Exact fit. */
@@ -472,8 +472,8 @@ static page_t *phys_alloc_slowpath(page_num_t count, phys_ptr_t align,
 		total = 0;
 
 		/* Check if this range contains pages in the requested range. */
-		match_start = MAX(minaddr, range->start);
-		match_end = MIN(maxaddr - 1, range->end - 1);
+		match_start = max(minaddr, range->start);
+		match_end = min(maxaddr - 1, range->end - 1);
 		if(match_end <= match_start)
 			continue;
 
@@ -536,9 +536,9 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 	assert(size);
 	assert(!(size % PAGE_SIZE));
 	assert(!(align % PAGE_SIZE));
-	assert(!align || IS_POW2(align));
+	assert(!align || is_pow2(align));
 	assert(!(boundary % PAGE_SIZE));
-	assert(!boundary || IS_POW2(boundary));
+	assert(!boundary || is_pow2(boundary));
 	assert(!(minaddr % PAGE_SIZE));
 	assert(!(maxaddr % PAGE_SIZE));
 	assert(!(minaddr && maxaddr) || maxaddr > minaddr);
@@ -877,7 +877,7 @@ __init_text void page_init(void) {
 	}
 
 	/* Determine how much space we need for the page database. */
-	pages_size = ROUND_UP(sizeof(page_t) * total_page_count, PAGE_SIZE);
+	pages_size = round_up(sizeof(page_t) * total_page_count, PAGE_SIZE);
 	kprintf(LOG_NOTICE, "page: have %zu pages, using %" PRIuPHYS "KiB for page database\n",
 		total_page_count, pages_size / 1024);
 	if(pages_size > KERNEL_PDB_SIZE)

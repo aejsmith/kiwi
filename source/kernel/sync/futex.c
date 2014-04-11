@@ -127,7 +127,7 @@ static status_t futex_lookup(int32_t *addr, futex_t **futexp) {
 		return STATUS_INVALID_ARG;
 
 	/* Get the page containing the address and the offset within it. */
-	base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
+	base = round_down((ptr_t)addr, PAGE_SIZE);
 	offset = (ptr_t)addr - base;
 
 	/* Lock the page for read and write access and look up the physical
@@ -182,7 +182,7 @@ static status_t futex_lookup(int32_t *addr, futex_t **futexp) {
 static void futex_finish(int32_t *addr) {
 	ptr_t base;
 
-	base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
+	base = round_down((ptr_t)addr, PAGE_SIZE);
 	vm_unlock_page(curr_proc->aspace, base);
 }
 

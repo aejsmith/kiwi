@@ -660,16 +660,16 @@ __init_text void arch_mmu_init(void) {
 	 * large pages. */
 	kprintf(LOG_NOTICE, "mmu: mapping kernel sections:\n");
 	map_kernel("text",
-		ROUND_DOWN((ptr_t)__text_seg_start, LARGE_PAGE_SIZE),
-		ROUND_UP((ptr_t)__text_seg_end, LARGE_PAGE_SIZE),
+		round_down((ptr_t)__text_seg_start, LARGE_PAGE_SIZE),
+		round_up((ptr_t)__text_seg_end, LARGE_PAGE_SIZE),
 		VM_PROT_READ | VM_PROT_EXECUTE);
 	map_kernel("data",
-		ROUND_DOWN((ptr_t)__data_seg_start, LARGE_PAGE_SIZE),
-		ROUND_UP((ptr_t)__data_seg_end, LARGE_PAGE_SIZE),
+		round_down((ptr_t)__data_seg_start, LARGE_PAGE_SIZE),
+		round_up((ptr_t)__data_seg_end, LARGE_PAGE_SIZE),
 		VM_PROT_READ | VM_PROT_WRITE);
 	map_kernel("init",
-		ROUND_DOWN((ptr_t)__init_seg_start, PAGE_SIZE),
-		ROUND_UP((ptr_t)__init_seg_end, PAGE_SIZE),
+		round_down((ptr_t)__init_seg_start, PAGE_SIZE),
+		round_up((ptr_t)__init_seg_end, PAGE_SIZE),
 		VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE);
 
 	/* Search for the highest physical address we have in the memory map. */
@@ -680,7 +680,7 @@ __init_text void arch_mmu_init(void) {
 	}
 
 	/* We always map at least 8GB, and align to a 1GB boundary. */
-	highest_phys = ROUND_UP(MAX(0x200000000UL, highest_phys), 0x40000000UL);
+	highest_phys = round_up(max(0x200000000UL, highest_phys), 0x40000000UL);
 	kprintf(LOG_DEBUG, "mmu: mapping physical memory up to 0x%" PRIxPHYS "\n",
 		highest_phys);
 

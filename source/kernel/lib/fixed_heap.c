@@ -57,7 +57,7 @@ void *fixed_heap_alloc(fixed_heap_t *heap, size_t size) {
 		return NULL;
 
 	/* Minimum size and alignment of 8 bytes. */
-	total = ROUND_UP(size, 8) + sizeof(fixed_heap_tag_t);
+	total = round_up(size, 8) + sizeof(fixed_heap_tag_t);
 
 	/* Search for a free segment. */
 	for(tag = heap->tags; tag; tag = tag->next) {
@@ -131,7 +131,7 @@ void fixed_heap_free(fixed_heap_t *heap, void *ptr) {
  * @param size		Size of memory area. */
 void fixed_heap_init(fixed_heap_t *heap, void *mem, size_t size) {
 	assert(size >= (sizeof(fixed_heap_tag_t) + 8));
-	assert(IS_POW2(size));
+	assert(is_pow2(size));
 
 	/* Create an initial free segment covering the entire chunk. */
 	heap->tags = mem;

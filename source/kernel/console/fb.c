@@ -404,7 +404,7 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
 
 	/* Map in the framebuffer and allocate a backbuffer. */
 	size = info->width * info->height * info->bytes_per_pixel;
-	size = ROUND_UP(size, PAGE_SIZE);
+	size = round_up(size, PAGE_SIZE);
 	mapping = phys_map(fb_info.addr, size, mmflag);
 	if(!mapping)
 		return STATUS_NO_MEMORY;
@@ -429,13 +429,13 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
 	was_boot = fb_backbuffer == fb_mapping;
 	have_prev = main_console.out == &fb_console_out_ops && !was_boot;
 	size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
-	size = ROUND_UP(size, PAGE_SIZE);
+	size = round_up(size, PAGE_SIZE);
 
 	/* Swap out the old framebuffer for the new one. */
 	memcpy(&fb_info, info, sizeof(fb_info));
-	SWAP(fb_mapping, mapping);
-	SWAP(fb_backbuffer, backbuffer);
-	SWAP(fb_console_glyphs, glyphs);
+	swap(fb_mapping, mapping);
+	swap(fb_backbuffer, backbuffer);
+	swap(fb_console_glyphs, glyphs);
 	fb_console_cols = cols;
 	fb_console_rows = rows;
 
@@ -619,7 +619,7 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
 	fb_info.width = video->lfb.width;
 	fb_info.height = video->lfb.height;
 	fb_info.depth = video->lfb.bpp;
-	fb_info.bytes_per_pixel = ROUND_UP(video->lfb.bpp, 8) / 8;
+	fb_info.bytes_per_pixel = round_up(video->lfb.bpp, 8) / 8;
 	fb_info.addr = video->lfb.fb_phys;
 	fb_info.red_position = video->lfb.red_pos;
 	fb_info.red_size = video->lfb.red_size;

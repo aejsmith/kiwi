@@ -196,7 +196,7 @@ static thread_t *sched_pick_thread(sched_cpu_t *cpu) {
 		/* The active queue is empty. If there are threads on the
 		 * expired queue, swap them. */
 		if(cpu->expired->bitmap) {
-			SWAP(cpu->active, cpu->expired);
+			swap(cpu->active, cpu->expired);
 		} else {
 			return NULL;
 		}
@@ -424,7 +424,7 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 	 * the CPU's current load. We round up to a multiple of the CPU count
 	 * rather than rounding down here to stop us from loading off threads
 	 * unnecessarily. */
-	average = (ROUND_UP(total, cpu_count) / cpu_count);
+	average = (round_up(total, cpu_count) / cpu_count);
 	load = cpu->sched->total;
 
 	/* If the CPU has less than or equal to the average, we're OK to keep

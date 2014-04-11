@@ -187,7 +187,7 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 		/* 512 for the header, plus the file size if necessary. */
 		offset += 512;
 		if(size)
-			offset += ROUND_UP(size, 512);
+			offset += round_up(size, 512);
 	}
 
 	kfree(header);

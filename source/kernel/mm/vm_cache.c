@@ -383,8 +383,8 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
 	/* Now work out the start page and the end page. Subtract one from
 	 * count to prevent end from going onto the next page when the offset
 	 * plus the count is an exact multiple of PAGE_SIZE. */
-	start = ROUND_DOWN(request->offset, PAGE_SIZE);
-	end = ROUND_DOWN((request->offset + (request->total - 1)), PAGE_SIZE);
+	start = round_down(request->offset, PAGE_SIZE);
+	end = round_down((request->offset + (request->total - 1)), PAGE_SIZE);
 
 	/* If we're not starting on a page boundary, we need to do a partial
 	 * transfer on the initial page to get us up to a page boundary. 

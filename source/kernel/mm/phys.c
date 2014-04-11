@@ -73,8 +73,8 @@ void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
 
 	/* Outside the physical map area. Must instead allocate some kernel
 	 * memory space and map there. */
-	base = ROUND_DOWN(addr, PAGE_SIZE);
-	end = ROUND_UP(addr + size, PAGE_SIZE);
+	base = round_down(addr, PAGE_SIZE);
+	end = round_up(addr + size, PAGE_SIZE);
 	return kmem_map(base, end - base, mmflag);
 }
 
@@ -88,8 +88,8 @@ void phys_unmap(void *addr, size_t size, bool shared) {
 	/* If the range lies within the physical map area, don't need to do
 	 * anything. Otherwise, unmap and free from kernel memory. */
 	if((ptr_t)addr < KERNEL_PMAP_BASE || (ptr_t)addr > KERNEL_PMAP_END) {
-		base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
-		end = ROUND_UP((ptr_t)addr + size, PAGE_SIZE);
+		base = round_down((ptr_t)addr, PAGE_SIZE);
+		end = round_up((ptr_t)addr + size, PAGE_SIZE);
 		
 		kmem_unmap((void *)base, end - base, shared);
 	}

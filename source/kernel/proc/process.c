@@ -484,7 +484,7 @@ static status_t process_load(process_load_t *load, process_t *parent) {
 	for(load->env_count = 0;
 		load->env[load->env_count];
 		size += (strlen(load->env[load->env_count++]) + sizeof(char *)));
-	size = ROUND_UP(size, PAGE_SIZE);
+	size = round_up(size, PAGE_SIZE);
 
 	/* Create a mapping for it. */
 	ret = vm_map(load->aspace, &load->arg_block, size, VM_ADDRESS_ANY,
@@ -1203,8 +1203,8 @@ kern_process_exec(const char *path, const char *const args[],
 	/* Switch over to the new address space. */
 	preempt_disable();
 	vm_aspace_switch(load.aspace);
-	SWAP(curr_proc->aspace, load.aspace);
-	SWAP(curr_proc->token, load.token);
+	swap(curr_proc->aspace, load.aspace);
+	swap(curr_proc->token, load.token);
 	name = curr_proc->name;
 	curr_proc->name = load.path;
 	preempt_enable();

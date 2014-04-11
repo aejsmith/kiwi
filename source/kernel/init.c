@@ -248,7 +248,7 @@ __init_text void *kboot_tag_iterate(uint32_t type, void *current) {
 
 	do {
 		header = (header)
-			? (kboot_tag_t *)ROUND_UP((ptr_t)header + header->size, 8)
+			? (kboot_tag_t *)round_up((ptr_t)header + header->size, 8)
 			: kboot_tag_list;
 		if(header->type == KBOOT_TAG_NONE)
 			header = NULL;
@@ -270,7 +270,7 @@ static __init_text void *lookup_option(const char *name, uint32_t type) {
 			if(tag->type != type)
 				fatal("Kernel option `%s' has incorrect type", name);
 
-			return kboot_tag_data(tag, ROUND_UP(tag->name_size, 8));
+			return kboot_tag_data(tag, round_up(tag->name_size, 8));
 		}
 	}
 
