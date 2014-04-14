@@ -100,11 +100,11 @@ void libkernel_init(process_args_t *args, ptr_t load_base) {
 
 	/* If we're the first process, open handles to the kernel console. */
 	if(curr_process_id == 1) {
-		kern_device_open("/kconsole", FILE_RIGHT_READ, 0, &handle);
+		kern_device_open("/kconsole", FILE_ACCESS_READ, 0, &handle);
 		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
-		kern_device_open("/kconsole", FILE_RIGHT_WRITE, 0, &handle);
+		kern_device_open("/kconsole", FILE_ACCESS_WRITE, 0, &handle);
 		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
-		kern_device_open("/kconsole", FILE_RIGHT_WRITE, 0, &handle);
+		kern_device_open("/kconsole", FILE_ACCESS_WRITE, 0, &handle);
 		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
 	}
 

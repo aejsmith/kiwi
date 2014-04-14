@@ -279,7 +279,7 @@ status_t module_load(const char *path, char *depbuf) {
 	assert(path);
 
 	/* Open a handle to the file. */
-	ret = fs_open(path, FILE_RIGHT_READ, 0, 0, &handle);
+	ret = fs_open(path, FILE_ACCESS_READ, 0, 0, &handle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 

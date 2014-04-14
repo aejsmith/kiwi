@@ -92,7 +92,7 @@ static int ls_command(std::vector<std::string> args) {
 	std::string dir = (args.size() > 1) ? args[1] : ".";
 
 	handle_t handle;
-	ret = kern_fs_open(dir.c_str(), FILE_RIGHT_READ, 0, FS_OPEN, &handle);
+	ret = kern_fs_open(dir.c_str(), FILE_ACCESS_READ, 0, FS_OPEN, &handle);
 	if(ret != STATUS_SUCCESS) {
 		printf("Failed to open directory '%s': %d (%s)\n", dir.c_str(),
 			ret, __kernel_status_strings[ret]);

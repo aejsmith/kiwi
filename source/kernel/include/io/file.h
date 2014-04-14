@@ -120,7 +120,7 @@ typedef struct file_handle {
 		struct device *device;	/**< Device node. */
 	};
 
-	uint32_t rights;		/**< Rights the handle was opened with. */
+	uint32_t access;		/**< Access rights the handle was opened with. */
 	uint32_t flags;			/**< Flags modifying handle behaviour. */
 	void *private;			/**< Implementation data pointer. */
 	mutex_t lock;			/**< Lock to protect offset. */
@@ -132,9 +132,9 @@ typedef struct file_handle {
  * Implementation functions.
  */
 
-extern bool file_access(file_t *file, uint32_t rights);
+extern bool file_access(file_t *file, uint32_t access);
 
-extern file_handle_t *file_handle_alloc(file_t *file, uint32_t rights,
+extern file_handle_t *file_handle_alloc(file_t *file, uint32_t access,
 	uint32_t flags);
 extern void file_handle_free(file_handle_t *fhandle);
 extern object_handle_t *file_handle_create(file_handle_t *fhandle);
@@ -157,8 +157,8 @@ extern status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf,
 	size_t size);
 extern status_t file_rewind_dir(object_handle_t *handle);
 
-extern status_t file_rights(object_handle_t *handle, uint32_t *rightsp);
-extern status_t file_flags(object_handle_t *handle, uint32_t *flagsp);
+extern status_t file_state(object_handle_t *handle, uint32_t *accessp,
+	uint32_t *flagsp, offset_t *offsetp);
 extern status_t file_set_flags(object_handle_t *handle, uint32_t flags);
 extern status_t file_seek(object_handle_t *handle, unsigned action,
 	offset_t offset, offset_t *resultp);

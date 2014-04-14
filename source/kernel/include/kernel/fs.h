@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,7 +48,7 @@ typedef struct mount_info {
 /** Behaviour flags for kern_fs_unmount(). */
 #define FS_UNMOUNT_FORCE	(1<<0)	/**< Force unmounting even if unable to flush data. */
 
-extern status_t kern_fs_open(const char *path, uint32_t rights, uint32_t flags,
+extern status_t kern_fs_open(const char *path, uint32_t access, uint32_t flags,
 	unsigned create, handle_t *handlep);
 
 extern status_t kern_fs_create_dir(const char *path);

@@ -89,7 +89,7 @@ static bool path_exists(const char *path) {
 	dprintf("  trying %s... ", path);
 
 	/* Attempt to open it to see if it is there. */
-	ret = kern_fs_open(path, FILE_RIGHT_READ, 0, 0, &handle);
+	ret = kern_fs_open(path, FILE_ACCESS_READ, 0, 0, &handle);
 	if(ret != STATUS_SUCCESS) {
 		dprintf("returned %d\n", ret);
 		return false;
@@ -244,7 +244,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	status_t ret;
 
 	/* Try to open the image. */
-	ret = kern_fs_open(path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0, &handle);
+	ret = kern_fs_open(path, FILE_ACCESS_READ | FILE_ACCESS_EXECUTE, 0, 0, &handle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 

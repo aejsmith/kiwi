@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -73,9 +73,9 @@ typedef struct io_vec {
 } io_vec_t;
 
 /** Access rights for files. */
-#define FILE_RIGHT_READ		(1<<0)	/**< Open for reading. */
-#define FILE_RIGHT_WRITE	(1<<1)	/**< Open for writing. */
-#define FILE_RIGHT_EXECUTE	(1<<2)	/**< Open for execution. */
+#define FILE_ACCESS_READ	(1<<0)	/**< File can be read. */
+#define FILE_ACCESS_WRITE	(1<<1)	/**< File can be written. */
+#define FILE_ACCESS_EXECUTE	(1<<2)	/**< File can be executed. */
 
 /** Behaviour flags for file handles. */
 #define FILE_NONBLOCK		(1<<0)	/**< I/O operations on the handle should not block. */
@@ -105,8 +105,8 @@ extern status_t kern_file_read_dir(handle_t handle, dir_entry_t *buf,
 	size_t size);
 extern status_t kern_file_rewind_dir(handle_t handle);
 
-extern status_t kern_file_rights(handle_t handle, uint32_t *rightsp);
-extern status_t kern_file_flags(handle_t handle, uint32_t *flagsp);
+extern status_t kern_file_state(handle_t handle, uint32_t *accessp,
+	uint32_t *flagsp, offset_t *offsetp);
 extern status_t kern_file_set_flags(handle_t handle, uint32_t flags);
 extern status_t kern_file_seek(handle_t handle, unsigned action,
 	offset_t offset, offset_t *resultp);

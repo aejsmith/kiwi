@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -675,7 +675,7 @@ fs_lookup_internal(char *path, fs_dentry_t *entry, unsigned flags, unsigned nest
 
 		/* We're trying to descend into the directory, check for
 		 * execute permission. */
-		if(!file_access(&node->file, FILE_RIGHT_EXECUTE)) {
+		if(!file_access(&node->file, FILE_ACCESS_EXECUTE)) {
 			ret = STATUS_ACCESS_DENIED;
 			goto err_release;
 		}
@@ -883,7 +883,7 @@ static status_t fs_create_prepare(const char *path, fs_dentry_t **entryp) {
 	if(fs_node_is_read_only(parent->node)) {
 		ret = STATUS_READ_ONLY;
 		goto out_release_parent;
-	} else if(!file_access(&parent->node->file, FILE_RIGHT_WRITE)) {
+	} else if(!file_access(&parent->node->file, FILE_ACCESS_WRITE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out_release_parent;
 	}
@@ -1146,7 +1146,7 @@ static file_ops_t fs_file_ops = {
  * it will be created as a regular file.
  *
  * @param path		Path to open.
- * @param rights	Requested access rights for the handle.
+ * @param access	Requested access rights for the handle.
  * @param flags		Behaviour flags for the handle.
  * @param create	Whether to create the file. If FS_OPEN, the file will
  *			not be created if it doesn't exist. If FS_CREATE, it
@@ -1158,7 +1158,7 @@ static file_ops_t fs_file_ops = {
  * @return		Status code describing result of the operation.
  */
 status_t
-fs_open(const char *path, uint32_t rights, uint32_t flags, unsigned create,
+fs_open(const char *path, uint32_t access, uint32_t flags, unsigned create,
 	object_handle_t **handlep)
 {
 	fs_dentry_t *entry;
@@ -1203,21 +1203,21 @@ fs_open(const char *path, uint32_t rights, uint32_t flags, unsigned create,
 			return STATUS_NOT_SUPPORTED;
 		}
 
-		/* Check for correct access rights. We don't do this when we
-		 * have first created the file: we allow the requested access
-		 * regardless of the ACL upon first creation. TODO: The read-
-		 * only FS check should be moved to an access() hook when ACLs
-		 * are implemented. */
-		if(rights && !file_access(&node->file, rights)) {
+		/* Check for the requested access to the file. We don't do this
+		 * when we have first created the file: we allow the requested
+		 * access regardless of the ACL upon first creation. TODO: The
+		 * read-only FS check should be moved to an access() hook when
+		 * ACLs are implemented. */
+		if(access && !file_access(&node->file, access)) {
 			fs_dentry_release(entry);
 			return STATUS_ACCESS_DENIED;
-		} else if(rights & FILE_RIGHT_WRITE && fs_node_is_read_only(node)) {
+		} else if(access & FILE_ACCESS_WRITE && fs_node_is_read_only(node)) {
 			fs_dentry_release(entry);
 			return STATUS_READ_ONLY;
 		}
 	}
 
-	handle = file_handle_alloc(&node->file, rights, flags);
+	handle = file_handle_alloc(&node->file, access, flags);
 	handle->entry = entry;
 
 	/* Call the FS' open hook, if any. */
@@ -1254,7 +1254,7 @@ status_t fs_create_dir(const char *path) {
  * Create a FIFO.
  *
  * Creates a new FIFO in the filesystem. A FIFO is a named pipe. Opening it
- * with FILE_RIGHT_READ will give access to the read end, and FILE_RIGHT_WRITE
+ * with FILE_ACCESS_READ will give access to the read end, and FILE_ACCESS_WRITE
  * gives access to the write end.
  *
  * @param path		Path to FIFO to create.
@@ -1861,7 +1861,7 @@ status_t fs_unlink(const char *path) {
 	} else if(fs_node_is_read_only(parent->node)) {
 		ret = STATUS_READ_ONLY;
 		goto out_release_entry;
-	} else if(!file_access(&parent->node->file, FILE_RIGHT_WRITE)) {
+	} else if(!file_access(&parent->node->file, FILE_ACCESS_WRITE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out_release_entry;
 	} else if(!parent->node->ops->unlink) {
@@ -2282,7 +2282,7 @@ void fs_shutdown(void) {
  * it will be created as a regular file.
  *
  * @param path		Path to open.
- * @param rights	Requested access rights for the handle.
+ * @param access	Requested access rights for the handle.
  * @param flags		Behaviour flags for the handle.
  * @param create	Whether to create the file. If FS_OPEN, the file will
  *			not be created if it doesn't exist. If FS_CREATE, it
@@ -2294,7 +2294,7 @@ void fs_shutdown(void) {
  * @return		Status code describing result of the operation.
  */
 status_t
-kern_fs_open(const char *path, uint32_t rights, uint32_t flags, unsigned create,
+kern_fs_open(const char *path, uint32_t access, uint32_t flags, unsigned create,
 	handle_t *handlep)
 {
 	object_handle_t *handle;
@@ -2308,7 +2308,7 @@ kern_fs_open(const char *path, uint32_t rights, uint32_t flags, unsigned create,
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	ret = fs_open(kpath, rights, flags, create, &handle);
+	ret = fs_open(kpath, access, flags, create, &handle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
@@ -2352,7 +2352,7 @@ status_t kern_fs_create_dir(const char *path) {
  * Create a FIFO.
  *
  * Creates a new FIFO in the filesystem. A FIFO is a named pipe. Opening it
- * with FILE_RIGHT_READ will give access to the read end, and FILE_RIGHT_WRITE
+ * with FILE_ACCESS_READ will give access to the read end, and FILE_ACCESS_WRITE
  * gives access to the write end.
  *
  * @param path		Path to FIFO to create.
@@ -2625,7 +2625,7 @@ status_t kern_fs_set_curr_dir(const char *path) {
 	}
 
 	/* Must have execute permission to use as working directory. */
-	if(!file_access(&entry->node->file, FILE_RIGHT_EXECUTE)) {
+	if(!file_access(&entry->node->file, FILE_ACCESS_EXECUTE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out_release;
 	}
@@ -2678,7 +2678,7 @@ status_t kern_fs_set_root_dir(const char *path) {
 	}
 
 	/* Must have execute permission to use as working directory. */
-	if(!file_access(&entry->node->file, FILE_RIGHT_EXECUTE)) {
+	if(!file_access(&entry->node->file, FILE_ACCESS_EXECUTE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out_release;
 	}

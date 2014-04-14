@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,21 +31,22 @@
 
 /** Convert POSIX open() flags to kernel flags.
  * @param oflag		POSIX open flags.
- * @param krightsp	Where to store kernel rights.
+ * @param kaccessp	Where to store kernel access rights.
  * @param kflagsp	Where to store kernel flags.
  * @param kcreatep	Where to store kernel creation flags. */
-static inline void convert_open_flags(int oflag, uint32_t *krightsp,
-	uint32_t *kflagsp, unsigned *kcreatep)
+static inline void
+convert_open_flags(int oflag, uint32_t *kaccessp, uint32_t *kflagsp,
+	unsigned *kcreatep)
 {
-	uint32_t krights = 0;
+	uint32_t kaccess = 0;
 	uint32_t kflags = 0;
 
 	if(oflag & O_RDONLY)
-		krights |= FILE_RIGHT_READ;
+		kaccess |= FILE_ACCESS_READ;
 	if(oflag & O_WRONLY)
-		krights |= FILE_RIGHT_WRITE;
+		kaccess |= FILE_ACCESS_WRITE;
 
-	*krightsp = krights;
+	*kaccessp = kaccess;
 
 	if(oflag & O_NONBLOCK)
 		kflags |= FILE_NONBLOCK;
@@ -71,8 +72,7 @@ static inline void convert_open_flags(int oflag, uint32_t *krightsp,
 int open(const char *path, int oflag, ...) {
 	file_type_t type;
 	file_info_t info;
-	uint32_t rights;
-	uint32_t kflags;
+	uint32_t kaccess, kflags;
 	unsigned kcreate;
 	handle_t handle;
 	status_t ret;
@@ -113,7 +113,7 @@ int open(const char *path, int oflag, ...) {
 	}
 
 	/* Convert the flags to kernel flags. */
-	convert_open_flags(oflag, &rights, &kflags, &kcreate);
+	convert_open_flags(oflag, &kaccess, &kflags, &kcreate);
 
 	/* Open according to the entry type. */
 	switch(type) {
@@ -139,7 +139,7 @@ int open(const char *path, int oflag, ...) {
 		//}
 
 		/* Open the file, creating it if necessary. */
-		ret = kern_fs_open(path, rights, kflags, kcreate, &handle);
+		ret = kern_fs_open(path, kaccess, kflags, kcreate, &handle);
 		if(ret != STATUS_SUCCESS) {
 			libsystem_status_to_errno(ret);
 			return -1;

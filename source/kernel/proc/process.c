@@ -445,8 +445,7 @@ static status_t process_load(process_load_t *load, process_t *parent) {
 	 * we must reserve space to ensure that the mappings we create below
 	 * for the arguments/stack don't end up placed where the binary wants
 	 * to be. */
-	ret = fs_open(load->path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE,
-		0, 0, &handle);
+	ret = fs_open(load->path, FILE_ACCESS_READ | FILE_ACCESS_EXECUTE, 0, 0, &handle);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -462,7 +461,7 @@ static status_t process_load(process_load_t *load, process_t *parent) {
 	 * with the previous kernel. */
 	if(!kernel_library) {
 		ret = fs_open(LIBKERNEL_PATH,
-			FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0,
+			FILE_ACCESS_READ | FILE_ACCESS_EXECUTE, 0, 0,
 			&kernel_library);
 		if(ret != STATUS_SUCCESS)
 			fatal("Could not open kernel library (%d)", ret);

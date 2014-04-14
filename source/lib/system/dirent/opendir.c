@@ -36,7 +36,7 @@ DIR *opendir(const char *path) {
 	if(!dir)
 		return NULL;
 
-	ret = kern_fs_open(path, FILE_RIGHT_READ, 0, 0, &dir->handle);
+	ret = kern_fs_open(path, FILE_ACCESS_READ, 0, 0, &dir->handle);
 	if(ret != STATUS_SUCCESS) {
 		libsystem_status_to_errno(ret);
 		free(dir);

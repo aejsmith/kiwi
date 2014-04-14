@@ -103,18 +103,20 @@ static int fcntl_setfd(int fd, int flags) {
  * @param fd		File descriptor.
  * @return		File status flags on success, -1 on failure. */
 static int fcntl_getfl(int fd) {
-	uint32_t kflags;
+	uint32_t kaccess, kflags;
 	int flags = 0;
 	status_t ret;
 
-	ret = kern_file_flags(fd, &kflags);
+	ret = kern_file_state(fd, &kaccess, &kflags, NULL);
 	if(ret != STATUS_SUCCESS) {
 		libsystem_status_to_errno(ret);
 		return -1;
 	}
 
-	flags |= ((kflags & FILE_NONBLOCK) ? 0 : O_NONBLOCK);
-	flags |= ((kflags & FILE_APPEND) ? 0 : O_APPEND);
+	flags |= ((kaccess & FILE_ACCESS_READ) ? O_RDONLY : 0);
+	flags |= ((kaccess & FILE_ACCESS_WRITE) ? O_WRONLY : 0);
+	flags |= ((kflags & FILE_NONBLOCK) ? O_NONBLOCK : 0);
+	flags |= ((kflags & FILE_APPEND) ? O_APPEND : 0);
 	return flags;
 }
 
@@ -126,8 +128,8 @@ static int fcntl_setfl(int fd, int flags) {
 	uint32_t kflags = 0;
 	status_t ret;
 
-	kflags |= ((flags & O_NONBLOCK) ? 0 : FILE_NONBLOCK);
-	kflags |= ((flags & O_APPEND) ? 0 : FILE_APPEND);
+	kflags |= ((flags & O_NONBLOCK) ? FILE_NONBLOCK : 0);
+	kflags |= ((flags & O_APPEND) ? FILE_APPEND : 0);
 
 	ret = kern_file_set_flags(fd, kflags);
 	if(ret != STATUS_SUCCESS) {
