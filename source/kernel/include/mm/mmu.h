@@ -59,19 +59,19 @@ typedef struct mmu_ops {
 	 * @param ctx		Context to map in.
 	 * @param virt		Virtual address to map.
 	 * @param phys		Physical address to map to.
-	 * @param protect	Mapping protection flags.
+	 * @param access	Mapping access flags.
 	 * @param mmflag	Allocation behaviour flags.
 	 * @return		Status code describing result of the operation. */
 	status_t (*map)(struct mmu_context *ctx, ptr_t virt, phys_ptr_t phys,
-		uint32_t protect, unsigned mmflag);
+		uint32_t access, unsigned mmflag);
 
-	/** Modify protection flags on a range of mappings.
+	/** Remap a range with different access flags.
 	 * @param ctx		Context to modify.
 	 * @param virt		Start of range to update.
 	 * @param size		Size of range to update.
-	 * @param protect	New protection flags. */
-	void (*protect)(struct mmu_context *ctx, ptr_t virt, size_t size,
-		uint32_t protect);
+	 * @param access	New access flags. */
+	void (*remap)(struct mmu_context *ctx, ptr_t virt, size_t size,
+		uint32_t access);
 
 	/** Unmap a page in a context.
 	 * @param ctx		Context to unmap in.
@@ -92,10 +92,10 @@ typedef struct mmu_ops {
 	 * @param virt		Virtual address to query.
 	 * @param physp		Where to store physical address the page is
 	 *			mapped to.
-	 * @param protectp	Where to store protection flags for the mapping.
+	 * @param accessp	Where to store access flags for the mapping.
 	 * @return		Whether a page is mapped at the virtual address. */
 	bool (*query)(struct mmu_context *ctx, ptr_t virt, phys_ptr_t *physp,
-		uint32_t *protectp);
+		uint32_t *accessp);
 
 	/** Flush a context prior to unlocking.
 	 * @param ctx		Context to flush. */
@@ -123,13 +123,13 @@ extern void mmu_context_lock(mmu_context_t *ctx);
 extern void mmu_context_unlock(mmu_context_t *ctx);
 
 extern status_t mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-	uint32_t protect, unsigned mmflag);
-extern void mmu_context_protect(mmu_context_t *ctx, ptr_t virt, size_t size,
-	uint32_t protect);
+	uint32_t access, unsigned mmflag);
+extern void mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size,
+	uint32_t access);
 extern bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared,
 	page_t **pagep);
 extern bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp,
-	uint32_t *protectp);
+	uint32_t *accessp);
 
 extern void mmu_context_load(mmu_context_t *ctx);
 extern void mmu_context_unload(mmu_context_t *ctx);

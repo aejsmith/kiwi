@@ -488,14 +488,14 @@ static status_t process_load(process_load_t *load, process_t *parent) {
 
 	/* Create a mapping for it. */
 	ret = vm_map(load->aspace, &load->arg_block, size, VM_ADDRESS_ANY,
-		VM_PROT_READ | VM_PROT_WRITE, VM_MAP_PRIVATE, NULL, 0,
+		VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE, NULL, 0,
 		"process_args");
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
 	/* Create a stack mapping. */
 	ret = vm_map(load->aspace, &load->stack, USTACK_SIZE, VM_ADDRESS_ANY,
-		VM_PROT_READ | VM_PROT_WRITE, VM_MAP_PRIVATE | VM_MAP_STACK,
+		VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE | VM_MAP_STACK,
 		NULL, 0, "main_stack");
 	if(ret != STATUS_SUCCESS)
 		goto fail;

@@ -61,8 +61,9 @@ static inline void *mmap_wrapper(size_t size) {
 	status_t ret;
 	void *addr;
 
-	ret = kern_vm_map(&addr, size, VM_ADDRESS_ANY, VM_PROT_READ | VM_PROT_WRITE,
-		VM_MAP_PRIVATE, INVALID_HANDLE, 0, "dlmalloc");
+	ret = kern_vm_map(&addr, size, VM_ADDRESS_ANY,
+		VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE, INVALID_HANDLE,
+		0, "dlmalloc");
 	if(ret != STATUS_SUCCESS) {
 		return (void *)-1;
 	}

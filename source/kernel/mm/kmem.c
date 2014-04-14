@@ -426,24 +426,22 @@ void *kmem_alloc(size_t size, unsigned mmflag) {
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		page = page_alloc(mmflag & MM_FLAG_MASK);
 		if(unlikely(!page)) {
-			kprintf(LOG_DEBUG, "kmem: unable to allocate pages to "
-				"back allocation\n");
+			kprintf(LOG_DEBUG, "kmem: unable to allocate pages to back allocation\n");
 			goto fail;
 		}
 
 		/* Map the page into the kernel address space. */
 		ret = mmu_context_map(&kernel_mmu_context, addr + i, page->addr,
-			VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE,
+			VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
 			mmflag & MM_FLAG_MASK);
 		if(ret != STATUS_SUCCESS) {
-			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%"
-				PRIxPHYS " to %p\n", page->addr, addr + i);
+			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n",
+				page->addr, addr + i);
 			page_free(page);
 			goto fail;
 		}
 
-		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", page->addr,
-			addr + i);
+		dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", page->addr, addr + i);
 	}
 
 	/* Zero the range if requested. */
@@ -455,8 +453,7 @@ void *kmem_alloc(size_t size, unsigned mmflag) {
 fail:
 	/* Go back and reverse what we have done. */
 	for(; i; i -= PAGE_SIZE) {
-		mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE),
-			true, &page);
+		mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), true, &page);
 		page_free(page);
 	}
 	mmu_context_unlock(&kernel_mmu_context);
@@ -508,11 +505,11 @@ void *kmem_map(phys_ptr_t base, size_t size, unsigned mmflag) {
 	/* Back the allocation with the required page range. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		ret = mmu_context_map(&kernel_mmu_context, addr + i, base + i,
-			VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE,
+			VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
 			mmflag & MM_FLAG_MASK);
 		if(ret != STATUS_SUCCESS) {
-			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%"
-				PRIxPHYS " to %p\n", base + i, addr + i);
+			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n",
+				base + i, addr + i);
 			goto fail;
 		}
 
@@ -625,7 +622,6 @@ __init_text void kmem_late_init(void) {
 	if(boot_end != KERNEL_KMEM_BASE) {
 		/* The pages have already been freed, so we don't want to free
 		 * them again, but do need to unmap them. */
-		kmem_unmap((void *)KERNEL_KMEM_BASE,
-			boot_end - KERNEL_KMEM_BASE, true);
+		kmem_unmap((void *)KERNEL_KMEM_BASE, boot_end - KERNEL_KMEM_BASE, true);
 	}
 }

@@ -48,7 +48,7 @@
  *    but the page has not been copied, because no write fault has occurred).
  *    If, when a write fault occurs on a page, the page structure reference
  *    count is greater than 1, the page is copied. Otherwise, the page is just
- *    remapped as read-write (if the region is VM_PROT_WRITE, that is).
+ *    remapped as read-write (if the region is VM_ACCESS_WRITE, that is).
  *  - Each object also contains an array of reference counts for each page that
  *    the object can cover. This array is used to track how many regions are
  *    mapping each page of the object, allowing pages to be freed when no more
@@ -333,8 +333,8 @@ static status_t vm_amap_map(vm_amap_t *map, offset_t offset, size_t size) {
 	/* Increase the region reference counts for pages in the region. */
 	for(i = start; i < end; i++) {
 		if(map->rref[i] == UINT16_MAX) {
-			kprintf(LOG_DEBUG, "vm: anon object %p rref[%zu] is at "
-				"maximum value!\n", map, i);
+			kprintf(LOG_DEBUG, "vm: anon object %p rref[%zu] is at maximum value!\n",
+				map, i);
 
 			/* Go and undo what we've done. */
 			for(j = start; j < i; j++)
@@ -371,8 +371,8 @@ static void vm_amap_unmap(vm_amap_t *map, offset_t offset, size_t size) {
 		assert(map->rref[i]);
 
 		if(--map->rref[i] == 0 && map->pages[i]) {
-			dprintf("vm: anon object %p rref[%zu] reached 0, freeing "
-				"0x%" PRIxPHYS "\n", map, i, map->pages[i]->addr);
+			dprintf("vm: anon object %p rref[%zu] reached 0, freeing 0x%"
+				PRIxPHYS "\n", map, i, map->pages[i]->addr);
 
 			if(refcount_dec(&map->pages[i]->count) == 0)
 				page_free(map->pages[i]);
@@ -393,33 +393,35 @@ static void vm_amap_unmap(vm_amap_t *map, offset_t offset, size_t size) {
  * @note		Address space and MMU context should be locked.
  * @param region	Region to map in.
  * @param addr		Virtual address to map.
- * @param access	Required access for the page.
+ * @param requested	Requested access for the page.
  * @param physp		Where to store physical address of page.
  * @return		Status code describing the result of the operation. */
-static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, phys_ptr_t *physp) {
+static status_t
+map_anon_page(vm_region_t *region, ptr_t addr, uint32_t requested,
+	phys_ptr_t *physp)
+{
 	vm_amap_t *amap = region->amap;
 	phys_ptr_t phys;
-	uint32_t protect;
+	uint32_t access;
 	bool exist;
 	offset_t offset;
 	size_t idx;
 	page_t *page, *prev;
 	status_t ret;
 
-	/* Check if the page is already mapped. If it is and the protection
-	 * flags are sufficient for the required acesss, we don't need to do
-	 * anything. */
-	exist = mmu_context_query(region->as->mmu, addr, &phys, &protect);
-	if(exist && (protect & access) == access) {
+	/* Check if the page is already mapped. If it is and the access flags
+	 * include the requested acesss, we don't need to do anything. */
+	exist = mmu_context_query(region->as->mmu, addr, &phys, &access);
+	if(exist && (access & requested) == requested) {
 		if(physp)
 			*physp = phys;
 
 		return STATUS_SUCCESS;
 	}
 
-	/* Protection flags to map with. The write flag is cleared later on if
+	/* Access flags to map with. The write flag is cleared later on if
 	 * the page needs to be mapped read only. */
-	protect = region->protection;
+	access = region->access;
 
 	/* Work out the offset into the object. */
 	offset = region->amap_offset + (addr - region->start);
@@ -436,7 +438,7 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 		refcount_inc(&amap->pages[idx]->count);
 		amap->curr_size++;
 		phys = amap->pages[idx]->addr;
-	} else if(access & VM_PROT_WRITE) {
+	} else if(requested & VM_ACCESS_WRITE) {
 		if(amap->pages[idx]) {
 			assert(refcount_get(&amap->pages[idx]->count) > 0);
 
@@ -446,9 +448,9 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 			if(refcount_get(&amap->pages[idx]->count) > 1) {
 				assert(region->flags & VM_MAP_PRIVATE);
 
-				dprintf("vm:  anon write fault: copying page %zu "
-					"(addr: 0x%" PRIxPHYS ", refcount: %" 
-					PRId32 ")\n", idx, amap->pages[idx]->addr,
+				dprintf("vm:  anon write fault: copying page %zu (addr: 0x%"
+					PRIxPHYS ", refcount: %" PRId32 ")\n",
+					idx, amap->pages[idx]->addr,
 					amap->pages[idx]->count);
 
 				page = page_copy(amap->pages[idx], MM_KERNEL);
@@ -496,8 +498,8 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 				prev = page_lookup(phys);
 			}
 
-			dprintf("vm:  anon write fault: copying page 0x%" PRIxPHYS
-				" from %p\n", phys, region->handle);
+			dprintf("vm:  anon write fault: copying page 0x%"
+				PRIxPHYS " from %p\n", phys, region->handle);
 
 			page = page_alloc(MM_KERNEL);
 			phys_copy(page->addr, phys, MM_KERNEL);
@@ -520,7 +522,7 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 			 * page. */
 			if(refcount_get(&amap->pages[idx]->count) > 1) {
 				assert(region->flags & VM_MAP_PRIVATE);
-				protect &= ~VM_PROT_WRITE;
+				access &= ~VM_ACCESS_WRITE;
 			}
 
 			phys = amap->pages[idx]->addr;
@@ -546,25 +548,26 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 				region->handle);
 
 			phys = page->addr;
-			protect &= ~VM_PROT_WRITE;
+			access &= ~VM_ACCESS_WRITE;
 		}
 	}
 
-	/* The page address should now be stored in phys, and protection flags
-	 * should be set correctly. If there is an existing mapping, remove it. */
+	/* The page address should now be stored in phys, and access flags
+	 * should be set correctly. If there is an existing mapping, remove
+	 * it. */
 	if(exist) {
 		if(!mmu_context_unmap(region->as->mmu, addr, true, NULL))
 			fatal("Could not remove previous mapping for %p", addr);
 	}
 
 	/* Map the entry in. Should always succeed with MM_KERNEL set. */
-	mmu_context_map(region->as->mmu, addr, phys, protect, MM_KERNEL);
+	mmu_context_map(region->as->mmu, addr, phys, access, MM_KERNEL);
 
 	if(physp)
 		*physp = phys;
 
-	dprintf("vm: mapped 0x%" PRIxPHYS " at %p (as: %p, protect: 0x%x)\n",
-		phys, addr, region->as, protect);
+	dprintf("vm: mapped 0x%" PRIxPHYS " at %p (as: %p, access: 0x%x)\n",
+		phys, addr, region->as, access);
 	mutex_unlock(&amap->lock);
 	return STATUS_SUCCESS;
 }
@@ -578,16 +581,16 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t access, 
 static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *physp) {
 	offset_t offset;
 	phys_ptr_t phys;
-	uint32_t protect;
+	uint32_t access;
 	page_t *page;
 	status_t ret;
 
 	assert(region->handle);
 
 	/* Check if the page is already mapped. */
-	if(mmu_context_query(region->as->mmu, addr, &phys, &protect)) {
+	if(mmu_context_query(region->as->mmu, addr, &phys, &access)) {
 		/* Should always have the correct mapping flags. */
-		assert((protect & region->protection) == region->protection);
+		assert((access & region->access) == region->access);
 
 		if(physp)
 			*physp = phys;
@@ -602,8 +605,8 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *phy
 	offset = (offset_t)(addr - region->start) + region->obj_offset;
 	ret = region->ops->get_page(region, offset, &page);
 	if(ret != STATUS_SUCCESS) {
-		dprintf("vm: failed to get page at offset 0x%" PRIx64 " from "
-			"%p: %d\n", offset, region->handle, ret);
+		dprintf("vm: failed to get page at offset 0x%" PRIx64 " from %p: %d\n",
+			offset, region->handle, ret);
 		return ret;
 	}
 
@@ -612,14 +615,13 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *phy
 	 * before locking the address space, as if pages need to be reclaimed
 	 * we could run into issues because we're holding the address space and
 	 * context locks. */
-	mmu_context_map(region->as->mmu, addr, page->addr, region->protection,
-		MM_KERNEL);
+	mmu_context_map(region->as->mmu, addr, page->addr, region->access, MM_KERNEL);
 
 	if(physp)
 		*physp = page->addr;
 
-	dprintf("vm: mapped 0x%" PRIxPHYS " at %p (as: %p, protect: 0x%x)\n",
-		page->addr, addr, region->as, region->protection);
+	dprintf("vm: mapped 0x%" PRIxPHYS " at %p (as: %p, access: 0x%x)\n",
+		page->addr, addr, region->as, region->access);
 	return STATUS_SUCCESS;
 }
 
@@ -627,16 +629,14 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *phy
  * @note		Address space and MMU context should be locked.
  * @param region	Region to map in.
  * @param addr		Virtual address to map.
- * @param access	Required access for the page.
+ * @param requested	Requested access for the page.
  * @param physp		Where to store physical address of page.
  * @return		Status code describing the result of the operation. */
-static status_t map_page(vm_region_t *region, ptr_t addr, uint32_t access,
-	phys_ptr_t *physp)
-{
+static status_t map_page(vm_region_t *region, ptr_t addr, uint32_t requested, phys_ptr_t *physp) {
 	assert(vm_region_contains(region, addr));
 
 	return (region->amap)
-		? map_anon_page(region, addr, access, physp)
+		? map_anon_page(region, addr, requested, physp)
 		: map_object_page(region, addr, physp);
 }
 
@@ -698,7 +698,7 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	dest->as = as;
 	dest->start = src->start;
 	dest->size = src->size;
-	dest->protection = src->protection;
+	dest->access = src->access;
 	dest->flags = src->flags;
 	dest->state = src->state;
 	dest->ops = src->ops;
@@ -722,13 +722,12 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 		/* This is a private region. Write-protect all mappings on the
 		 * source region and then clone the anonymous map. */
 		mmu_context_lock(src->as->mmu);
-		mmu_context_protect(src->as->mmu, src->start, src->size,
-			src->protection & ~VM_PROT_WRITE);
+		mmu_context_remap(src->as->mmu, src->start, src->size,
+			src->access & ~VM_ACCESS_WRITE);
 		mmu_context_unlock(src->as->mmu);
 
 		assert(src->amap);
-		dest->amap = vm_amap_clone(src->amap, src->amap_offset,
-			src->size);
+		dest->amap = vm_amap_clone(src->amap, src->amap_offset, src->size);
 		dest->amap_offset = 0;
 
 		dprintf("vm: copied private region %p (map: %p) to %p (map: %p)\n",
@@ -914,7 +913,7 @@ status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access, phys_ptr_t *
 	}
 
 	/* Check whether the access is allowed. */
-	if((region->protection & access) != access) {
+	if((region->access & access) != access) {
 		mutex_unlock(&as->lock);
 		return STATUS_ACCESS_DENIED;
 	}
@@ -980,10 +979,9 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 
 	assert(!local_irq_state());
 
-	dprintf("vm: %s-mode page fault at %p (thread: %" PRId32 ", as: %p, reason: %d, "
-		"access: 0x%" PRIx32 ")\n",
-		(intr_frame_from_user(frame)) ? "user" : "kernel", addr,
-		curr_thread->id, as, reason, access);
+	dprintf("vm: %s-mode page fault at %p (thread: %" PRId32 ", as: %p, reason: %d, access: 0x%"
+		PRIx32 ")\n", (intr_frame_from_user(frame)) ? "user" : "kernel",
+		addr, curr_thread->id, as, reason, access);
 
 	/* If we don't have an address space, don't do anything. There won't be
 	 * anything to send a signal to, either. */
@@ -994,8 +992,7 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 	 * is only held within the functions in this file, and they should not
 	 * incur a page fault (if they do there's something wrong!). */
 	if(unlikely(mutex_held(&as->lock) && as->lock.holder == curr_thread)) {
-		kprintf(LOG_WARN, "vm: fault on %p with lock held at %pS\n", as,
-			frame->ip);
+		kprintf(LOG_WARN, "vm: fault on %p with lock held at %pS\n", as, frame->ip);
 		return STATUS_INVALID_ADDR;
 	}
 
@@ -1021,11 +1018,11 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 	assert(region->amap || region->handle);
 
 	/* Check whether the access is allowed. */
-	if(!(region->protection & access)) {
+	if(!(region->access & access)) {
 		kprintf(LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at %p: "
-			"access violation (access: 0x%x, protection: 0x%x)\n",
+			"access violation (access: 0x%x, allowed: 0x%x)\n",
 			curr_thread->id, curr_thread->name, addr, access,
-			region->protection);
+			region->access);
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	}
@@ -1044,12 +1041,12 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 	local_irq_enable();
 
 	if(region->amap) {
-		/* Do some sanity checks if this is a protection fault. The only
-		 * access type protection faults should be is write. COW faults
-		 * should never occur on non-private regions, either. */
-		if(reason == VM_FAULT_PROTECTION) {
-			if(access != VM_PROT_WRITE) {
-				fatal("Non-write protection fault at %p on %p (%d)",
+		/* Do some sanity checks if this is an access violation fault.
+		 * The only access faults we should get are write faults. COW
+		 * faults should never occur on non-private regions, either. */
+		if(reason == VM_FAULT_ACCESS) {
+			if(access != VM_ACCESS_WRITE) {
+				fatal("Non-write access fault at %p on %p (%d)",
 					addr, region->amap, access);
 			} else if(!(region->flags & VM_MAP_PRIVATE)) {
 				fatal("Copy-on-write fault at %p on non-private region",
@@ -1158,12 +1155,11 @@ static vm_region_t *trim_regions(vm_aspace_t *as, ptr_t start, size_t size) {
 			new_size = match_start - region->start;
 
 			split = slab_cache_alloc(vm_region_cache, MM_KERNEL);
-			split->name = (region->name)
-				? kstrdup(region->name, MM_KERNEL) : NULL;
+			split->name = (region->name) ? kstrdup(region->name, MM_KERNEL) : NULL;
 			split->as = as;
 			split->start = match_end + 1;
 			split->size = region_end - match_end;
-			split->protection = region->protection;
+			split->access = region->access;
 			split->flags = region->flags;
 			split->state = region->state;
 			split->ops = region->ops;
@@ -1179,16 +1175,13 @@ static vm_region_t *trim_regions(vm_aspace_t *as, ptr_t start, size_t size) {
 
 				if(split->amap) {
 					refcount_inc(&split->amap->count);
-					split->amap_offset += split->start
-						- region->start;
+					split->amap_offset += split->start - region->start;
 				} else {
-					split->obj_offset += split->start
-						- region->start;
+					split->obj_offset += split->start - region->start;
 				}
 
 				/* Insert the split region to the tree. */
-				avl_tree_insert(&as->tree, split->start,
-					&split->tree_link);
+				avl_tree_insert(&as->tree, split->start, &split->tree_link);
 			} else if(split->state == VM_REGION_FREE) {
 				/* Insert the split region to the free list. */
 				vm_freelist_insert(split, split->size);
@@ -1275,12 +1268,13 @@ static void insert_region(vm_aspace_t *as, vm_region_t *region) {
 /** Allocate space in an address space.
  * @param as		Address space to allocate in (should be locked).
  * @param size		Size of space required.
- * @param protection	Protection flags for the region.
+ * @param access	Access flags for the region.
  * @param flags		Flags for the region.
  * @param name		Name of the region (will not be copied).
  * @return		Pointer to region if allocated, NULL if not. */
-static vm_region_t *alloc_region(vm_aspace_t *as, size_t size,
-	uint32_t protection, uint32_t flags, char *name)
+static vm_region_t *
+alloc_region(vm_aspace_t *as, size_t size, uint32_t access, uint32_t flags,
+	char *name)
 {
 	vm_region_t *region, *split;
 	unsigned list, i;
@@ -1315,13 +1309,12 @@ static vm_region_t *alloc_region(vm_aspace_t *as, size_t size,
 			 * is simple: the region is free, so we don't need to
 			 * deal with copying object details. */
 			if(region->size > size) {
-				split = slab_cache_alloc(vm_region_cache,
-					MM_KERNEL);
+				split = slab_cache_alloc(vm_region_cache, MM_KERNEL);
 				split->name = NULL;
 				split->as = as;
 				split->start = region->start + size;
 				split->size = region->size - size;
-				split->protection = 0;
+				split->access = 0;
 				split->flags = 0;
 				split->state = VM_REGION_FREE;
 				split->handle = NULL;
@@ -1340,7 +1333,7 @@ static vm_region_t *alloc_region(vm_aspace_t *as, size_t size,
 			}
 
 			/* Set region state and add to the tree. */
-			region->protection = protection;
+			region->access = access;
 			region->flags = flags;
 			region->state = VM_REGION_ALLOCATED;
 			region->name = name;
@@ -1368,7 +1361,7 @@ static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
 	region->as = as;
 	region->start = start;
 	region->size = size;
-	region->protection = 0;
+	region->access = 0;
 	region->flags = 0;
 	region->state = state;
 	region->handle = NULL;
@@ -1422,7 +1415,7 @@ static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
  *			the mapping at/
  * @param size		Size of mapping (multiple of page size).
  * @param spec		Address specification (VM_ADDRESS_*).
- * @param protection	Memory protection flags (VM_PROT_*).
+ * @param access	Allowed access flags (VM_ACCESS_*).
  * @param flags		Mapping behaviour flags (VM_MAP_*).
  * @param handle	Handle to object to map in. If NULL, then the region
  *			will be an anonymous memory mapping.
@@ -1432,8 +1425,9 @@ static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
-	uint32_t protection, uint32_t flags, object_handle_t *handle,
+status_t
+vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
+	uint32_t access, uint32_t flags, object_handle_t *handle,
 	offset_t offset, const char *name)
 {
 	vm_region_t *region = NULL;
@@ -1445,7 +1439,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 
 	if(!size || size % PAGE_SIZE) {
 		return STATUS_INVALID_ARG;
-	} else if(!protection) {
+	} else if(!access) {
 		return STATUS_INVALID_ARG;
 	}
 
@@ -1487,7 +1481,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 	switch(spec) {
 	case VM_ADDRESS_ANY:
 		/* Allocate some space. */
-		region = alloc_region(as, size, protection, flags, dup);
+		region = alloc_region(as, size, access, flags, dup);
 		if(!region) {
 			mutex_unlock(&as->lock);
 			kfree(dup);
@@ -1506,7 +1500,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 		region->as = as;
 		region->start = addr;
 		region->size = size;
-		region->protection = protection;
+		region->access = access;
 		region->flags = flags;
 		region->state = VM_REGION_ALLOCATED;
 		region->name = dup;
@@ -1524,8 +1518,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 		ret = handle->type->map(handle, region);
 		if(ret != STATUS_SUCCESS) {
 			/* Free up the region again. */
-			free_region(as, region->start, region->size,
-				VM_REGION_FREE);
+			free_region(as, region->start, region->size, VM_REGION_FREE);
 			mutex_unlock(&as->lock);
 			return ret;
 		}
@@ -1545,10 +1538,10 @@ status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
 		region->amap = NULL;
 	}
 
-	dprintf("vm: mapped region [%p,%p) in %p (spec: %u, protection: 0x%"
-		PRIx32 ", flags: 0x%" PRIx32 ", handle: %p, offset: 0x%" PRIx64
-		")\n", region->start, region->start + region->size, as, spec,
-		protection, flags, handle, offset);
+	dprintf("vm: mapped region [%p,%p) in %p (spec: %u, access: 0x%" PRIx32
+		", flags: 0x%" PRIx32 ", handle: %p, offset: 0x%" PRIx64 ")\n",
+		region->start, region->start + region->size, as, spec, access,
+		flags, handle, offset);
 
 	*addrp = region->start;
 	mutex_unlock(&as->lock);
@@ -1661,7 +1654,7 @@ vm_aspace_t *vm_aspace_create(vm_aspace_t *parent) {
 	region->as = as;
 	region->start = USER_BASE;
 	region->size = USER_SIZE;
-	region->protection = 0;
+	region->access = 0;
 	region->flags = 0;
 	region->state = VM_REGION_FREE;
 	region->handle = NULL;
@@ -1863,11 +1856,11 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
 	kdb_printf("as:          %p\n", region->as);
 	kdb_printf("start:       %p\n", region->start);
 	kdb_printf("size:        0x%zx\n", region->size);
-	kdb_printf("protection:  %c%c%c (0x%" PRIx32 ")\n",
-		(region->protection & VM_PROT_READ) ? 'R' : '-',
-		(region->protection & VM_PROT_WRITE) ? 'W' : '-',
-		(region->protection & VM_PROT_EXECUTE) ? 'X' : '-',
-		region->protection);
+	kdb_printf("access:      %c%c%c (0x%" PRIx32 ")\n",
+		(region->access & VM_ACCESS_READ) ? 'R' : '-',
+		(region->access & VM_ACCESS_WRITE) ? 'W' : '-',
+		(region->access & VM_ACCESS_EXECUTE) ? 'X' : '-',
+		region->access);
 	kdb_printf("flags:       0x%" PRIx32 "\n", region->flags);
 	switch(region->state) {
 	case VM_REGION_FREE:
@@ -1906,9 +1899,9 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
 static void dump_region(vm_region_t *region) {
 	kdb_printf("%-18p 0x%-12zx %c%c%c     0x%-3" PRIx32 " ",
 		region->start, region->size,
-		(region->protection & VM_PROT_READ) ? 'R' : '-',
-		(region->protection & VM_PROT_WRITE) ? 'W' : '-',
-		(region->protection & VM_PROT_EXECUTE) ? 'X' : '-',
+		(region->access & VM_ACCESS_READ) ? 'R' : '-',
+		(region->access & VM_ACCESS_WRITE) ? 'W' : '-',
+		(region->access & VM_ACCESS_EXECUTE) ? 'X' : '-',
 		region->flags);
 
 	switch(region->state) {
@@ -2002,10 +1995,10 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
 
 	if(mode == DUMP_FREE) kdb_printf("List ");
 	kdb_printf("%-18s %-14s %-7s %-5s %-5s %-10s %s\n",
-		"Start", "Size", "Protect", "Flags", "State", "Offset", "Name");
+		"Start", "Size", "Access", "Flags", "State", "Offset", "Name");
 	if(mode == DUMP_FREE) kdb_printf("==== ");
 	kdb_printf("%-18s %-14s %-7s %-5s %-5s %-10s %s\n",
-		"=====", "====", "=======", "=====", "=====", "======", "====");
+		"=====", "====", "======", "=====", "=====", "======", "====");
 
 	switch(mode) {
 	case DUMP_ALL:
@@ -2098,7 +2091,7 @@ __init_text void vm_init(void) {
  *			the mapping at/
  * @param size		Size of mapping (multiple of page size).
  * @param spec		Address specification (VM_ADDRESS_*).
- * @param protection	Memory protection flags (VM_PROT_*).
+ * @param access	Allowed access flags (VM_ACCESS_*).
  * @param flags		Mapping behaviour flags (VM_MAP_*).
  * @param handle	Handle to object to map in. If INVALID_HANDLE, then
  *			the region will be an anonymous memory mapping.
@@ -2108,7 +2101,8 @@ __init_text void vm_init(void) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_vm_map(void **addrp, size_t size, unsigned spec, uint32_t protection,
+status_t
+kern_vm_map(void **addrp, size_t size, unsigned spec, uint32_t access,
 	uint32_t flags, handle_t handle, offset_t offset, const char *name)
 {
 	object_handle_t *khandle = NULL;
@@ -2137,9 +2131,8 @@ status_t kern_vm_map(void **addrp, size_t size, unsigned spec, uint32_t protecti
 		}
 	}
 
-	ret = vm_map(curr_proc->aspace, &addr, size, spec, protection, flags,
+	ret = vm_map(curr_proc->aspace, &addr, size, spec, access, flags,
 		khandle, offset, kname);
-
 	if(ret == STATUS_SUCCESS) {
 		ret = write_user((ptr_t *)addrp, addr);
 		if(ret != STATUS_SUCCESS)

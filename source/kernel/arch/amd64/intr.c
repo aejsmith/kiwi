@@ -201,11 +201,10 @@ static void page_fault(intr_frame_t *frame) {
 	}
 
 	addr = x86_read_cr2();
-	reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION
-		: VM_FAULT_NOT_PRESENT;
+	reason = (frame->err_code & (1<<0)) ? VM_FAULT_ACCESS : VM_FAULT_UNMAPPED;
 	access = (cpu_features.xd && frame->err_code & (1<<4))
-		? VM_PROT_EXECUTE
-		: ((frame->err_code & (1<<1)) ? VM_PROT_WRITE : VM_PROT_READ);
+		? VM_ACCESS_EXECUTE
+		: ((frame->err_code & (1<<1)) ? VM_ACCESS_WRITE : VM_ACCESS_READ);
 
 	/* Check if a reserved bit fault. This is always fatal. */
 	if(frame->err_code & (1<<3))

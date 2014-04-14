@@ -99,17 +99,17 @@ static inline uint64_t table_mapping_flags(mmu_context_t *ctx) {
 /** Get the flags to map a page with.
  * @param ctx		Context being mapped in.
  * @param phys		Physical address being mapped.
- * @param protect	Protection flags.
+ * @param access	Access flags.
  * @return		Flags to map page with. */
-static inline uint64_t mapping_flags(mmu_context_t *ctx, phys_ptr_t phys, uint32_t protect) {
+static inline uint64_t mapping_flags(mmu_context_t *ctx, phys_ptr_t phys, uint32_t access) {
 	uint64_t flags;
 	unsigned type;
 
 	/* Determine mapping flags. Kernel mappings have the global flag set. */
 	flags = X86_PTE_PRESENT;
-	if(protect & VM_PROT_WRITE)
+	if(access & VM_ACCESS_WRITE)
 		flags |= X86_PTE_WRITE;
-	if(!(protect & VM_PROT_EXECUTE) && cpu_features.xd)
+	if(!(access & VM_ACCESS_EXECUTE) && cpu_features.xd)
 		flags |= X86_PTE_NOEXEC;
 	if(is_kernel_context(ctx)) {
 		flags |= X86_PTE_GLOBAL;
@@ -354,11 +354,12 @@ static void amd64_mmu_destroy(mmu_context_t *ctx) {
  * @param ctx		Context to map in.
  * @param virt		Virtual address to map.
  * @param phys		Physical address to map to.
- * @param protect	Mapping protection flags.
+ * @param access	Mapping access flags.
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing result of the operation. */
-static status_t amd64_mmu_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-	uint32_t protect, unsigned mmflag)
+static status_t
+amd64_mmu_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t access,
+	unsigned mmflag)
 {
 	uint64_t *ptbl;
 	unsigned pte;
@@ -374,16 +375,16 @@ static status_t amd64_mmu_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
 		fatal("Mapping %p which is already mapped", virt);
 
 	/* Set the PTE. */
-	set_pte(&ptbl[pte], phys | mapping_flags(ctx, phys, protect));
+	set_pte(&ptbl[pte], phys | mapping_flags(ctx, phys, access));
 	return STATUS_SUCCESS;
 }
 
-/** Modify protection flags on a range of mappings.
+/** Remap a range with different access flags.
  * @param ctx		Context to modify.
  * @param virt		Start of range to update.
  * @param size		Size of range to update.
- * @param protect	New protection flags. */
-static void amd64_mmu_protect(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t protect) {
+ * @param access	New access flags. */
+static void amd64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
 	uint64_t *ptbl = NULL, prev, entry;
 	unsigned pte;
 	ptr_t end;
@@ -411,9 +412,9 @@ static void amd64_mmu_protect(mmu_context_t *ctx, ptr_t virt, size_t size, uint3
 				prev = ptbl[pte];
 
 				entry = (prev & X86_PTE_PROTECT_MASK);
-				if(protect & VM_PROT_WRITE)
+				if(access & VM_ACCESS_WRITE)
 					entry |= X86_PTE_WRITE;
-				if(!(protect & VM_PROT_EXECUTE) && cpu_features.xd)
+				if(!(access & VM_ACCESS_EXECUTE) && cpu_features.xd)
 					entry |= X86_PTE_NOEXEC;
 
 				if(test_and_set_pte(&ptbl[pte], prev, entry) == prev)
@@ -477,9 +478,12 @@ static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t 
  * @param ctx		Context to query.
  * @param virt		Virtual address to query.
  * @param physp		Where to store physical address the page is mapped to.
- * @param protectp	Where to store protection flags for the mapping.
+ * @param accessp	Where to store access flags for the mapping.
  * @return		Whether a page is mapped at the virtual address. */
-static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, uint32_t *protectp) {
+static bool
+amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp,
+	uint32_t *accessp)
+{
 	uint64_t *pdir, *ptbl, entry;
 	phys_ptr_t phys;
 	unsigned pde, pte;
@@ -513,10 +517,10 @@ static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, u
 	if(ret) {
 		if(physp)
 			*physp = phys;
-		if(protectp) {
-			*protectp = VM_PROT_READ
-				| ((entry & X86_PTE_WRITE) ? VM_PROT_WRITE : 0)
-				| ((entry & X86_PTE_NOEXEC) ? 0 : VM_PROT_EXECUTE);
+		if(accessp) {
+			*accessp = VM_ACCESS_READ
+				| ((entry & X86_PTE_WRITE) ? VM_ACCESS_WRITE : 0)
+				| ((entry & X86_PTE_NOEXEC) ? 0 : VM_ACCESS_EXECUTE);
 		}
 	}
 
@@ -596,7 +600,7 @@ static mmu_ops_t amd64_mmu_ops = {
 	.init = amd64_mmu_init,
 	.destroy = amd64_mmu_destroy,
 	.map = amd64_mmu_map,
-	.protect = amd64_mmu_protect,
+	.remap = amd64_mmu_remap,
 	.unmap = amd64_mmu_unmap,
 	.query = amd64_mmu_query,
 	.flush = amd64_mmu_flush,
@@ -607,8 +611,8 @@ static mmu_ops_t amd64_mmu_ops = {
  * @param name		Name of the section.
  * @param start		Start of the section.
  * @param end		End of the section.
- * @param protect	Mapping protection flags. */
-static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t protect) {
+ * @param access	Mapping access flags. */
+static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t access) {
 	kboot_tag_core_t *core;
 	phys_ptr_t phys, i;
 	uint64_t *pdir, *ptbl;
@@ -626,7 +630,7 @@ static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t protec
 			pdir = get_pdir(&kernel_mmu_context, i, true, MM_BOOT);
 			pde = (i % 0x40000000) / LARGE_PAGE_SIZE;
 			set_pte(&pdir[pde], (phys + i - start)
-				| mapping_flags(&kernel_mmu_context, phys + i - start, protect)
+				| mapping_flags(&kernel_mmu_context, phys + i - start, access)
 				| X86_PTE_LARGE);
 		}
 	} else {
@@ -634,12 +638,12 @@ static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t protec
 			ptbl = get_ptbl(&kernel_mmu_context, i, true, MM_BOOT);
 			pte = (i % 0x200000) / PAGE_SIZE;
 			set_pte(&ptbl[pte], (phys + i - start)
-				| mapping_flags(&kernel_mmu_context, phys + i - start, protect));
+				| mapping_flags(&kernel_mmu_context, phys + i - start, access));
 		}
 	}
 
 	kprintf(LOG_NOTICE, " %s: [%p,%p) -> 0x%" PRIxPHYS" (0x%x)\n", name, start,
-		end, phys, protect);
+		end, phys, access);
 }
 
 /** Create the kernel MMU context. */
@@ -662,15 +666,15 @@ __init_text void arch_mmu_init(void) {
 	map_kernel("text",
 		round_down((ptr_t)__text_seg_start, LARGE_PAGE_SIZE),
 		round_up((ptr_t)__text_seg_end, LARGE_PAGE_SIZE),
-		VM_PROT_READ | VM_PROT_EXECUTE);
+		VM_ACCESS_READ | VM_ACCESS_EXECUTE);
 	map_kernel("data",
 		round_down((ptr_t)__data_seg_start, LARGE_PAGE_SIZE),
 		round_up((ptr_t)__data_seg_end, LARGE_PAGE_SIZE),
-		VM_PROT_READ | VM_PROT_WRITE);
+		VM_ACCESS_READ | VM_ACCESS_WRITE);
 	map_kernel("init",
 		round_down((ptr_t)__init_seg_start, PAGE_SIZE),
 		round_up((ptr_t)__init_seg_end, PAGE_SIZE),
-		VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE);
+		VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE);
 
 	/* Search for the highest physical address we have in the memory map. */
 	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {

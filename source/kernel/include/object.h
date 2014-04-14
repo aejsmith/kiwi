@@ -79,8 +79,8 @@ typedef struct object_type {
 	 *
 	 * This function is called when an object is to be mapped into memory.
 	 * It should check whether the current thread has permission to perform
-	 * the mapping with the protection flags set in the region. It should
-	 * then either map the entire region up front, or set the region's
+	 * the mapping with the access flags set in the region. It should then
+	 * either map the entire region up front, or set the region's
 	 * operations structure pointer to allow the region content to be
 	 * demand paged.
 	 *

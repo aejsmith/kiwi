@@ -1103,7 +1103,7 @@ kern_thread_create(const char *name, const thread_entry_t *entry,
 		snprintf(str, sizeof(str), "%s_stack", kname);
 
 		ret = vm_map(curr_proc->aspace, &thread->ustack, kentry.stack_size,
-			VM_ADDRESS_ANY, VM_PROT_READ | VM_PROT_WRITE,
+			VM_ADDRESS_ANY, VM_ACCESS_READ | VM_ACCESS_WRITE,
 			VM_MAP_PRIVATE | VM_MAP_STACK, NULL, 0, str);
 		if(ret != STATUS_SUCCESS)
 			goto fail;

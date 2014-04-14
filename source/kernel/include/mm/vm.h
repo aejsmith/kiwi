@@ -87,7 +87,7 @@ typedef struct vm_region {
 	struct vm_aspace *as;		/**< Address space that the region belongs to. */
 	ptr_t start;			/**< Base address of the region. */
 	size_t size;			/**< Size of the region. */
-	uint32_t protection;		/**< Protection flags for the region. */
+	uint32_t access;		/**< Access flags for the region. */
 	uint32_t flags;			/**< Region behaviour flags. */
 
 	/** Allocation state of the region. */
@@ -132,10 +132,8 @@ typedef struct vm_aspace {
 } vm_aspace_t;
 
 /** Page fault reason codes. */
-enum {
-	VM_FAULT_NOT_PRESENT,		/**< Fault caused by a not present page. */
-	VM_FAULT_PROTECTION,		/**< Fault caused by a protection violation. */
-};
+#define VM_FAULT_UNMAPPED	1	/**< Fault on an unmapped virtual address. */
+#define VM_FAULT_ACCESS		2	/**< Fault caused by an access violation. */
 
 extern status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access,
 	phys_ptr_t *physp);
@@ -145,7 +143,7 @@ extern status_t vm_fault(struct intr_frame *frame, ptr_t addr, int reason,
 	uint32_t access);
 
 extern status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
-	uint32_t protection, uint32_t flags, object_handle_t *handle,
+	uint32_t access, uint32_t flags, object_handle_t *handle,
 	offset_t offset, const char *name);
 extern status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
 extern status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);

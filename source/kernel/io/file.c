@@ -95,11 +95,11 @@ static status_t file_object_map(object_handle_t *handle, vm_region_t *region) {
 
 	/* Check for the necessary access rights. Don't need write permission
 	 * for private mappings, changes won't be written back to the file. */
-	if(region->protection & VM_PROT_READ) {
+	if(region->access & VM_ACCESS_READ) {
 		rights |= FILE_RIGHT_READ;
-	} else if(region->protection & VM_PROT_WRITE && !(region->flags & VM_MAP_PRIVATE)) {
+	} else if(region->access & VM_ACCESS_WRITE && !(region->flags & VM_MAP_PRIVATE)) {
 		rights |= FILE_RIGHT_WRITE;
-	} else if(region->protection & VM_PROT_EXECUTE) {
+	} else if(region->access & VM_ACCESS_EXECUTE) {
 		rights |= FILE_RIGHT_EXECUTE;
 	}
 

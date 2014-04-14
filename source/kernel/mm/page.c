@@ -888,7 +888,7 @@ __init_text void page_init(void) {
 	/* Allocate and map the database. */
 	for(i = 0; i < pages_size; i += PAGE_SIZE) {
 		mmu_context_map(&kernel_mmu_context, KERNEL_PDB_BASE + i,
-			page_early_alloc(), VM_PROT_READ | VM_PROT_WRITE,
+			page_early_alloc(), VM_ACCESS_READ | VM_ACCESS_WRITE,
 			MM_BOOT);
 	}
 

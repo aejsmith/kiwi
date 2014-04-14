@@ -32,10 +32,10 @@ extern "C" {
 #define VM_ADDRESS_ANY		1	/**< Place at any address. */
 #define VM_ADDRESS_EXACT	2	/**< Place at exactly the address specified. */
 
-/** Mapping protection flags. */
-#define VM_PROT_READ		(1<<0)	/**< Mapping should be readable. */
-#define VM_PROT_WRITE		(1<<1)	/**< Mapping should be writable. */
-#define VM_PROT_EXECUTE		(1<<2)	/**< Mapping should be executable. */
+/** Mapping access flags. */
+#define VM_ACCESS_READ		(1<<0)	/**< Mapping should be readable. */
+#define VM_ACCESS_WRITE		(1<<1)	/**< Mapping should be writable. */
+#define VM_ACCESS_EXECUTE	(1<<2)	/**< Mapping should be executable. */
 
 /** Behaviour flags for kern_vm_map(). */
 #define VM_MAP_PRIVATE		(1<<0)	/**< Modifications should not be visible to other processes. */
@@ -44,7 +44,7 @@ extern "C" {
 #define VM_MAP_INHERIT		(1<<3)	/**< Region will be duplicated to child processes. */
 
 extern status_t kern_vm_map(void **addrp, size_t size, unsigned spec,
-	uint32_t protection, uint32_t flags, handle_t handle, offset_t offset,
+	uint32_t access, uint32_t flags, handle_t handle, offset_t offset,
 	const char *name);
 extern status_t kern_vm_unmap(void *start, size_t size);
 

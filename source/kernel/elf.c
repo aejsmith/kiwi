@@ -155,24 +155,25 @@ status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
  * @param handle	Handle to image.
  * @param as		Address space to load into.
  * @return		Status code describing result of the operation. */
-static status_t do_load_phdr(elf_image_t *image, size_t i, object_handle_t *handle,
+static status_t
+do_load_phdr(elf_image_t *image, size_t i, object_handle_t *handle,
 	vm_aspace_t *as)
 {
 	elf_phdr_t *phdr = &image->phdrs[i];
-	uint32_t protection = 0;
+	uint32_t access = 0;
 	ptr_t start, end;
 	size_t size;
 	offset_t offset;
 	status_t ret;
 
-	/* Work out the protection flags to use. */
+	/* Work out the access flags to use. */
 	if(phdr->p_flags & ELF_PF_R)
-		protection |= VM_PROT_READ;
+		access |= VM_ACCESS_READ;
 	if(phdr->p_flags & ELF_PF_W)
-		protection |= VM_PROT_WRITE;
+		access |= VM_ACCESS_WRITE;
 	if(phdr->p_flags & ELF_PF_X)
-		protection |= VM_PROT_EXECUTE;
-	if(!protection) {
+		access |= VM_ACCESS_EXECUTE;
+	if(!access) {
 		dprintf("elf: %s: program header %zu has no protection flags set\n",
 			image->name, i);
 		return STATUS_MALFORMED_IMAGE;
@@ -189,14 +190,14 @@ static status_t do_load_phdr(elf_image_t *image, size_t i, object_handle_t *hand
 
 		/* We have to have it writeable for us to be able to clear it
 		 * later on. */
-		if(!(protection & VM_PROT_WRITE)) {
+		if(!(access & VM_ACCESS_WRITE)) {
 			dprintf("elf: %s: program header %zu should be writeable\n",
 				image->name, i);
 			return STATUS_MALFORMED_IMAGE;
 		}
 
 		/* Create an anonymous memory region for it. */
-		ret = vm_map(as, &start, size, VM_ADDRESS_EXACT, protection,
+		ret = vm_map(as, &start, size, VM_ADDRESS_EXACT, access,
 			VM_MAP_PRIVATE, NULL, 0, NULL);
 		if(ret != STATUS_SUCCESS)
 			return ret;
@@ -218,8 +219,8 @@ static status_t do_load_phdr(elf_image_t *image, size_t i, object_handle_t *hand
 	/* Map the data in. Set the private flag if mapping as writeable. We do
 	 * not need to check whether the supplied addresses are valid - vm_map()
 	 * will reject them if they aren't. */
-	return vm_map(as, &start, size, VM_ADDRESS_EXACT, protection,
-		(protection & VM_PROT_WRITE) ? VM_MAP_PRIVATE : 0,
+	return vm_map(as, &start, size, VM_ADDRESS_EXACT, access,
+		(access & VM_ACCESS_WRITE) ? VM_MAP_PRIVATE : 0,
 		handle, offset, NULL);
 }
 
@@ -231,7 +232,8 @@ static status_t do_load_phdr(elf_image_t *image, size_t i, object_handle_t *hand
  *			requires the binary to be ELF_ET_DYN.
  * @param imagep	Where to store image to pass to elf_binary_finish().
  * @return		Status code describing result of the operation. */
-status_t elf_binary_load(object_handle_t *handle, const char *path, vm_aspace_t *as,
+status_t
+elf_binary_load(object_handle_t *handle, const char *path, vm_aspace_t *as,
 	ptr_t dest, elf_image_t **imagep)
 {
 	elf_image_t *image;
@@ -295,7 +297,7 @@ status_t elf_binary_load(object_handle_t *handle, const char *path, vm_aspace_t 
 		/* If a location is specified, force the binary to be there. */
 		image->load_base = dest;
 		ret = vm_map(as, &image->load_base, image->load_size,
-			(dest) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY, VM_PROT_READ,
+			(dest) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY, VM_ACCESS_READ,
 			VM_MAP_PRIVATE, NULL, 0, NULL);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
@@ -844,7 +846,8 @@ bool elf_symbol_from_addr(elf_image_t *image, ptr_t addr, symbol_t *symbol, size
  * @param exported	Whether to only look up exported symbols.
  * @param symbol	Symbol structure to fill in.
  * @return		Whether a symbol by this name was found. */
-bool elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
+bool
+elf_symbol_lookup(elf_image_t *image, const char *name, bool global,
 	bool exported, symbol_t *symbol)
 {
 	elf_shdr_t *shdr;

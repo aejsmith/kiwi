@@ -147,20 +147,20 @@ static status_t load_library(const char *name, rtld_image_t *req, rtld_image_t *
 static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t handle,
 	const char *path, size_t i)
 {
-	uint32_t protection = 0;
+	uint32_t access = 0;
 	elf_addr_t start, end;
 	offset_t offset;
 	status_t ret;
 	size_t size;
 
-	/* Work out the protection flags to use. */
+	/* Work out the access flags to use. */
 	if(phdr->p_flags & ELF_PF_R)
-		protection |= VM_PROT_READ;
+		access |= VM_ACCESS_READ;
 	if(phdr->p_flags & ELF_PF_W)
-		protection |= VM_PROT_WRITE;
+		access |= VM_ACCESS_WRITE;
 	if(phdr->p_flags & ELF_PF_X)
-		protection |= VM_PROT_EXECUTE;
-	if(!protection) {
+		access |= VM_ACCESS_EXECUTE;
+	if(!access) {
 		dprintf("rtld: %s: program header %zu has no protection flags\n", path, i);
 		return STATUS_MALFORMED_IMAGE;
 	}
@@ -174,14 +174,14 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 		size = end - start;
 
 		/* Must be writable to be able to clear later. */
-		if(!(protection & VM_PROT_WRITE)) {
+		if(!(access & VM_ACCESS_WRITE)) {
 			dprintf("rtld: %s: program header %zu should be writable\n",
 				path, i);
 			return STATUS_MALFORMED_IMAGE;
 		}
 
 		/* Create an anonymous region for it. */
-		ret = kern_vm_map((void **)&start, size, VM_ADDRESS_EXACT, protection,
+		ret = kern_vm_map((void **)&start, size, VM_ADDRESS_EXACT, access,
 			VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
 		if(ret != STATUS_SUCCESS) {
 			dprintf("rtld: %s: unable to create anonymous BSS region (%d)\n",
@@ -201,8 +201,8 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 	dprintf("rtld: %s: loading header %zu to [%p,%p)\n", path, i, start, start + size);
 
 	/* Map the data in. Set the private flag if mapping as writeable. */
-	ret = kern_vm_map((void **)&start, size, VM_ADDRESS_EXACT, protection,
-		(protection & VM_PROT_WRITE) ? VM_MAP_PRIVATE : 0, handle,
+	ret = kern_vm_map((void **)&start, size, VM_ADDRESS_EXACT, access,
+		(access & VM_ACCESS_WRITE) ? VM_MAP_PRIVATE : 0, handle,
 		offset, NULL);
 	if(ret != STATUS_SUCCESS) {
 		dprintf("rtld: %s: unable to map file data into memory (%d)\n", path, ret);
@@ -327,7 +327,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 
 		/* Allocate a chunk of memory for it. */
 		ret = kern_vm_map(&image->load_base, image->load_size, VM_ADDRESS_ANY,
-			VM_PROT_READ, VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
+			VM_ACCESS_READ, VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
 		if(ret != STATUS_SUCCESS) {
 			dprintf("rtld: %s: unable to allocate memory (%d)\n", path, ret);
 			goto fail;

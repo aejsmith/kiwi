@@ -132,8 +132,7 @@ static status_t futex_lookup(int32_t *addr, futex_t **futexp) {
 
 	/* Lock the page for read and write access and look up the physical
 	 * address of it. */
-	ret = vm_lock_page(curr_proc->aspace, base, VM_PROT_READ | VM_PROT_WRITE,
-		&phys);
+	ret = vm_lock_page(curr_proc->aspace, base, VM_ACCESS_READ | VM_ACCESS_WRITE, &phys);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 

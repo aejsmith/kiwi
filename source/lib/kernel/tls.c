@@ -213,8 +213,9 @@ status_t tls_init(void) {
 
 	/* Allocate the TLS block. */
 	size = ROUND_UP(initial_block_size(), page_size);
-	ret = kern_vm_map(&alloc, size, VM_ADDRESS_ANY, VM_PROT_READ | VM_PROT_WRITE,
-		VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
+	ret = kern_vm_map(&alloc, size, VM_ADDRESS_ANY,
+		VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE,
+		INVALID_HANDLE, 0, NULL);
 	if(ret != STATUS_SUCCESS) {
 		free(dtv);
 		return ret;

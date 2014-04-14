@@ -52,7 +52,7 @@
  */
 void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) {
 	unsigned kspec, type;
-	uint32_t kprotection = 0;
+	uint32_t kaccess = 0;
 	uint32_t kflags = 0;
 	status_t ret;
 
@@ -71,11 +71,11 @@ void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) 
 	kspec = (flags & MAP_FIXED) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY;
 
 	if(prot & PROT_READ)
-		kprotection |= VM_PROT_READ;
+		kaccess |= VM_ACCESS_READ;
 	if(prot & PROT_WRITE)
-		kprotection |= VM_PROT_WRITE;
+		kaccess |= VM_ACCESS_WRITE;
 	if(prot & PROT_EXEC)
-		kprotection |= VM_PROT_EXECUTE;
+		kaccess |= VM_ACCESS_EXECUTE;
 
 	if((flags & (MAP_PRIVATE | MAP_SHARED)) == MAP_PRIVATE) {
 		kflags |= VM_MAP_PRIVATE;
@@ -84,7 +84,7 @@ void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) 
 		return MAP_FAILED;
 	}
 
-	ret = kern_vm_map(&start, size, kspec, kprotection, kflags, fd, offset, NULL);
+	ret = kern_vm_map(&start, size, kspec, kaccess, kflags, fd, offset, NULL);
 	if(ret != STATUS_SUCCESS) {
 		libsystem_status_to_errno(ret);
 		return MAP_FAILED;

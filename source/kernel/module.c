@@ -72,47 +72,62 @@ static size_t remaining_module_size = KERNEL_MODULE_SIZE;
 /** Kernel module structure. */
 module_t kernel_module;
 
+#ifdef KERNEL_MODULE_BASE
+
 /** Allocate memory suitable to hold a kernel module.
  * @param size		Size of the allocation.
  * @return		Address allocated or 0 if no available memory. */
 ptr_t module_mem_alloc(size_t size) {
-	#ifdef KERNEL_MODULE_BASE
-		page_t *page;
-		ptr_t addr;
-		size_t i;
+	page_t *page;
+	ptr_t addr;
+	size_t i;
 
-		size = round_up(size, PAGE_SIZE);
+	size = round_up(size, PAGE_SIZE);
+	if(size > remaining_module_size)
+		return 0;
 
-		if(size > remaining_module_size)
-			return 0;
+	addr = next_module_addr;
 
-		addr = next_module_addr;
+	mmu_context_lock(&kernel_mmu_context);
 
-		mmu_context_lock(&kernel_mmu_context);
-		for(i = 0; i < size; i += PAGE_SIZE) {
-			page = page_alloc(MM_BOOT);
-			mmu_context_map(&kernel_mmu_context, addr + i, page->addr,
-				VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE,
-				MM_BOOT);
-		}
-		mmu_context_unlock(&kernel_mmu_context);
+	for(i = 0; i < size; i += PAGE_SIZE) {
+		page = page_alloc(MM_BOOT);
+		mmu_context_map(&kernel_mmu_context, addr + i, page->addr,
+			VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
+			MM_BOOT);
+	}
 
-		next_module_addr += size;
-		remaining_module_size -= size;
-		return addr;
-	#else
-		return kmem_alloc(round_up(size, PAGE_SIZE), MM_NOWAIT);
-	#endif
+	mmu_context_unlock(&kernel_mmu_context);
+
+	next_module_addr += size;
+	remaining_module_size -= size;
+	return addr;
 }
 
 /** Free memory holding a module.
  * @param base		Base of the allocation.
  * @param size		Size of the allocation. */
 void module_mem_free(ptr_t base, size_t size) {
-	#ifndef KERNEL_MODULE_BASE
-	kmem_free((void *)base, round_up(size, PAGE_SIZE));
-	#endif
+	/* TODO */
 }
+
+#else /* KERNEL_MODULE_BASE */
+
+/** Allocate memory suitable to hold a kernel module.
+ * @param size		Size of the allocation.
+ * @return		Address allocated or 0 if no available memory. */
+ptr_t module_mem_alloc(size_t size) {
+	return kmem_alloc(round_up(size, PAGE_SIZE), MM_NOWAIT);
+}
+
+/** Free memory holding a module.
+ * @param base		Base of the allocation.
+ * @param size		Size of the allocation. */
+void module_mem_free(ptr_t base, size_t size) {
+	kmem_free((void *)base, round_up(size, PAGE_SIZE));
+}
+
+#endif /* KERNEL_MODULE_BASE */
 
 /** Find a module in the module list.
  * @param name		Name of module to find.
