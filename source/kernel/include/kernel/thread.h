@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #ifndef __KERNEL_THREAD_H
 #define __KERNEL_THREAD_H
 
+#include <kernel/context.h>
 #include <kernel/limits.h>
 #include <kernel/object.h>
 #include <kernel/security.h>
@@ -56,6 +57,12 @@ typedef struct thread_entry {
 	size_t stack_size;
 } thread_entry_t;
 
+/** Saved thread state. */
+typedef struct thread_state {
+	cpu_context_t context;		/**< CPU context (register state, etc). */
+	unsigned ipl;			/**< Interrupt priority level. */
+} thread_state_t;
+
 /** Handle value used to refer to the current thread. */
 #define THREAD_SELF		INVALID_HANDLE
 
@@ -67,15 +74,18 @@ typedef struct thread_entry {
 #define THREAD_PRIORITY_NORMAL	1	/**< Normal priority. */
 #define THREAD_PRIORITY_HIGH	2	/**< High priority. */
 
+/** Thread interrupt priority level (IPL) definitions. */
+#define THREAD_IPL_MAX		15	/**< Maximum IPL (all interrupts blocked). */
+
 extern status_t kern_thread_create(const char *name,
 	const thread_entry_t *entry, uint32_t flags, handle_t *handlep);
 extern status_t kern_thread_open(thread_id_t id, handle_t *handlep);
 extern thread_id_t kern_thread_id(handle_t handle);
 extern status_t kern_thread_security(handle_t handle, security_context_t *ctx);
 extern status_t kern_thread_status(handle_t handle, int *statusp);
-extern status_t kern_thread_port(handle_t handle, int32_t id,
-	handle_t *handlep);
 
+extern status_t kern_thread_ipl(unsigned *iplp);
+extern status_t kern_thread_set_ipl(unsigned ipl);
 extern status_t kern_thread_token(handle_t *handlep);
 extern status_t kern_thread_set_token(handle_t handle);
 extern status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp);

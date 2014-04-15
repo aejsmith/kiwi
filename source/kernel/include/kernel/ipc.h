@@ -63,9 +63,6 @@ typedef struct ipc_client {
 /** Special process port IDs (negative values to distinguish from handles). */
 #define PROCESS_ROOT_PORT		(-1)
 
-/** Thread special port IDs (must not conflict with process IDs). */
-#define THREAD_EXCEPTION_PORT		(-10)
-
 extern status_t kern_port_create(handle_t *handlep);
 extern status_t kern_port_listen(handle_t handle, ipc_client_t *client,
 	nstime_t timeout, handle_t *handlep);

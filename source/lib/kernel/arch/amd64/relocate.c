@@ -22,12 +22,14 @@
 #include "libkernel.h"
 
 /** Relocate the library.
- * @param dyn		Pointer to dynamic section.
- * @param load_base	Load base address. */
-void libkernel_relocate(elf_dyn_t *dyn, ptr_t load_base) {
+ * @param args		Process argument block.
+ * @param dyn		Pointer to dynamic section. */
+void libkernel_relocate(process_args_t *args, elf_dyn_t *dyn) {
 	elf_rela_t *reloc;
-	elf_addr_t *addr;
+	elf_addr_t *addr, load_base;
 	size_t size, ent, i;
+
+	load_base = (elf_addr_t)args->load_base;
 
 	for (i = 0; dyn[i].d_tag != ELF_DT_NULL; ++i) {
 		switch (dyn[i].d_tag) {

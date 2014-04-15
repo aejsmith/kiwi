@@ -255,6 +255,10 @@ void intr_handler(intr_frame_t *frame) {
 	/* Call the handler. */
 	intr_table[frame->num](frame);
 
+	/* Preempt if required. */
+	if(curr_cpu->should_preempt)
+		sched_preempt();
+
 	if(user) {
 		thread_at_kernel_exit();
 
@@ -263,11 +267,6 @@ void intr_handler(intr_frame_t *frame) {
 		 * it knows whether to return via the IRET path, but as we're
 		 * returning using IRET anyway it doesn't matter to us. */
 		curr_thread->arch.flags &= ~ARCH_THREAD_IFRAME_MODIFIED;
-	} else {
-		/* Preempt if required. When returning to userspace, this is
-		 * done by thread_at_kernel_exit(). */
-		if(curr_cpu->should_preempt)
-			sched_preempt();
 	}
 }
 

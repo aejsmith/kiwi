@@ -34,9 +34,8 @@
 size_t page_size;
 
 /** Kernel library main function.
- * @param args		Process argument block.
- * @param load_base	Load base address. */
-void libkernel_init(process_args_t *args, ptr_t load_base) {
+ * @param args		Process argument block. */
+void libkernel_init(process_args_t *args) {
 	rtld_image_t *image;
 	elf_ehdr_t *ehdr;
 	elf_phdr_t *phdrs;
@@ -49,7 +48,7 @@ void libkernel_init(process_args_t *args, ptr_t load_base) {
 
 	/* Fill in the libkernel image structure with information we have. */
 	image = &libkernel_image;
-	image->load_base = (void *)load_base;
+	image->load_base = args->load_base;
 	image->dyntab = _DYNAMIC;
 
 	/* Populate the dynamic table and do address fixups. */
@@ -68,7 +67,7 @@ void libkernel_init(process_args_t *args, ptr_t load_base) {
 		case ELF_DT_SYMTAB:
 		case ELF_DT_JMPREL:
 		case ELF_DT_REL_TYPE:
-			image->dyntab[i].d_un.d_ptr += load_base;
+			image->dyntab[i].d_un.d_ptr += (elf_addr_t)args->load_base;
 			break;
 		}
 
@@ -76,15 +75,15 @@ void libkernel_init(process_args_t *args, ptr_t load_base) {
 	}
 
 	/* Find out where our TLS segment is loaded to. */
-	ehdr = (elf_ehdr_t *)load_base;
-	phdrs = (elf_phdr_t *)((elf_addr_t)load_base + ehdr->e_phoff);
+	ehdr = (elf_ehdr_t *)args->load_base;
+	phdrs = (elf_phdr_t *)(args->load_base + ehdr->e_phoff);
 	for(i = 0; i < ehdr->e_phnum; i++) {
 		if(phdrs[i].p_type == ELF_PT_TLS) {
 			if(!phdrs[i].p_memsz)
 				break;
 
 			image->tls_module_id = tls_alloc_module_id();
-			image->tls_image = (void *)(load_base + phdrs[i].p_vaddr);
+			image->tls_image = args->load_base + phdrs[i].p_vaddr;
 			image->tls_filesz = phdrs[i].p_filesz;
 			image->tls_memsz = phdrs[i].p_memsz;
 			image->tls_align = phdrs[i].p_align;
@@ -97,6 +96,9 @@ void libkernel_init(process_args_t *args, ptr_t load_base) {
 
 	/* Save the current process ID for the kern_process_id() wrapper. */
 	curr_process_id = _kern_process_id(PROCESS_SELF);
+
+	/* Let the kernel know where kern_thread_restore() is. */
+	kern_process_control(PROCESS_SET_RESTORE, kern_thread_restore, NULL);
 
 	/* If we're the first process, open handles to the kernel console. */
 	if(curr_process_id == 1) {

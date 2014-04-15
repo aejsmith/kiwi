@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,10 +31,10 @@ extern "C" {
 #ifdef __KERNEL_PRIVATE
 
 /** Actions for kern_thread_control(). */
-#define THREAD_GET_TLS_ADDR	1	/**< Get TLS base address. */
-#define THREAD_SET_TLS_ADDR	2	/**< Set TLS base address. */
+#define THREAD_SET_TLS_ADDR	1	/**< Set TLS base address. */
 
 extern status_t kern_thread_control(unsigned action, const void *in, void *out);
+extern void kern_thread_restore(void);
 
 #ifdef __LIBKERNEL
 

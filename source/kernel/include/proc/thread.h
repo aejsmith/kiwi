@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Alex Smith
+ * Copyright (C) 2008-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -108,6 +108,10 @@ typedef struct thread {
 	 */
 	refcount_t count;
 
+	/** User mode interrupt information. */
+	unsigned ipl;			/**< User mode interrupt priority level. */
+	list_t interrupts;		/**< Pending user mode interrupts. */
+
 	/** Overridden security token for the thread (if any). */
 	token_t *token;
 
@@ -140,12 +144,38 @@ typedef struct thread {
 	list_t owner_link;		/**< Link to parent process. */
 } thread_t;
 
-/** Internal flags for a thread (do not set these). */
+/** Internal flags for a thread. */
 #define THREAD_INTERRUPTIBLE	(1<<0)	/**< Thread is in an interruptible sleep. */
 #define THREAD_INTERRUPTED	(1<<1)	/**< Thread has been interrupted. */
 #define THREAD_KILLED		(1<<2)	/**< Thread has been killed. */
 #define THREAD_PREEMPTED	(1<<3)	/**< Thread was preempted while preemption disabled. */
 #define THREAD_RWLOCK_WRITER	(1<<3)	/**< Thread is blocked on an rwlock for writing. */
+
+/** User mode thread interrupt structure. */
+typedef struct thread_interrupt {
+	list_t header;			/**< Link to interrupt list. */
+
+	unsigned priority;		/**< Interrupt priority. */
+
+	/**
+	 * Address of user handler function.
+	 *
+	 * Address of the user-mode interrupt handler function. The function
+	 * will be called with a pointer to the interrupt data as its first
+	 * argument, and a pointer to the saved thread state as its second
+	 * argument.
+	 */
+	ptr_t handler;
+
+	/**
+	 * Size of interrupt data.
+	 *
+	 * Size of the interrupt data to pass to the handler, which should
+	 * immediately follow this structure. The data will be copied onto the
+	 * thread's user stack and the handler will receive a pointer to it.
+	 */
+	size_t size;
+} thread_interrupt_t;
 
 /** Sleeping behaviour flags. */
 #define SLEEP_INTERRUPTIBLE	(1<<0)	/**< Sleep should be interruptible. */
@@ -156,24 +186,25 @@ typedef struct thread {
 
 extern void arch_thread_init(thread_t *thread, void *stack, void (*entry)(void));
 extern void arch_thread_destroy(thread_t *thread);
+extern void arch_thread_clone(thread_t *thread, struct intr_frame *frame);
 extern void arch_thread_switch(thread_t *thread, thread_t *prev);
-extern ptr_t arch_thread_tls_addr(thread_t *thread);
-extern status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr);
-extern void arch_thread_clone(thread_t *thread, thread_t *parent,
-	struct intr_frame *frame);
-extern void arch_thread_prepare_userspace(struct intr_frame *frame, ptr_t entry,
-	ptr_t stack, ptr_t arg1, ptr_t arg2);
-extern void arch_thread_enter_userspace(struct intr_frame *frame) __noreturn;
+extern void arch_thread_set_tls_addr(ptr_t addr);
+extern void arch_thread_user_setup(struct intr_frame *frame, ptr_t entry,
+	ptr_t sp, ptr_t arg);
+extern void arch_thread_user_enter(struct intr_frame *frame) __noreturn;
+extern status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt,
+	unsigned ipl);
+extern status_t arch_thread_interrupt_restore(unsigned *iplp);
 
 extern void thread_retain(thread_t *thread);
 extern void thread_release(thread_t *thread);
 
+extern void thread_rename(thread_t *thread, const char *name);
 extern void thread_wire(thread_t *thread);
 extern void thread_unwire(thread_t *thread);
 extern void thread_wake(thread_t *thread);
-extern bool thread_interrupt(thread_t *thread);
 extern void thread_kill(thread_t *thread);
-extern void thread_rename(thread_t *thread, const char *name);
+extern void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt);
 
 extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout,
 	const char *name, unsigned flags);

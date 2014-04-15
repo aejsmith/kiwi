@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Alex Smith
+ * Copyright (C) 2008-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -156,6 +156,7 @@ process_alloc(const char *name, process_id_t id, process_t *parent, int priority
 	process->token = token;
 	process->aspace = aspace;
 	process->next_image_id = 0;
+	process->thread_restore = 0;
 	process->root_port = root_port;
 	process->state = PROCESS_CREATED;
 	process->id = id;
@@ -169,9 +170,8 @@ process_alloc(const char *name, process_id_t id, process_t *parent, int priority
 	avl_tree_insert(&process_tree, process->id, &process->tree_link);
 	rwlock_unlock(&process_tree_lock);
 
-	dprintf("process: created process %" PRId32 " (%s) (process: %p, "
-		"parent: %p)\n", process->id, process->name, process,
-		parent);
+	dprintf("process: created process %" PRId32 " (%s) (process: %p, parent: %p)\n",
+		process->id, process->name, process, parent);
 
 	*processp = process;
 	return STATUS_SUCCESS;
@@ -553,6 +553,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	addr += (load->env_count + 1) * sizeof(char *);
 	uargs->arg_count = load->arg_count;
 	uargs->env_count = load->env_count;
+	uargs->load_base = (void *)LIBKERNEL_BASE;
 
 	/* Copy path string, arguments and environment variables. */
 	strcpy(uargs->path, load->path);
@@ -572,12 +573,11 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	if(!curr_proc->load)
 		semaphore_up(&load->sem, 1);
 
-	dprintf("process: entering userspace in new process (entry: %p, stack: "
-		"%p, args: %p)\n", entry, stack, addr);
+	dprintf("process: entering user mode in new process (entry: %p, stack: %p, args: %p)\n",
+		entry, stack, addr);
 
-	/* Need to pass the load address as second argument for libkernel. */
-	arch_thread_prepare_userspace(&frame, entry, stack, addr, LIBKERNEL_BASE);
-	arch_thread_enter_userspace(&frame);
+	arch_thread_user_setup(&frame, entry, stack, addr);
+	arch_thread_user_enter(&frame);
 }
 
 /**
@@ -786,7 +786,7 @@ void process_shutdown(void) {
 }
 
 /**
- * Userspace interface.
+ * System calls.
  */
 
 /** Closes a handle to a process.
@@ -1249,7 +1249,7 @@ static void process_clone_thread(void *arg1, void *arg2) {
 	memcpy(&frame, arg1, sizeof(frame));
 	kfree(arg1);
 
-	arch_thread_enter_userspace(&frame);
+	arch_thread_user_enter(&frame);
 }
 
 /**
@@ -1329,7 +1329,7 @@ status_t kern_process_clone(handle_t *handlep) {
 
 	/* Clone arch-specific thread attributes and get the frame to restore. */
 	spinlock_lock(&curr_thread->lock);
-	arch_thread_clone(thread, curr_thread, frame);
+	arch_thread_clone(thread, frame);
 	spinlock_unlock(&curr_thread->lock);
 
 	/* Inherit other per-thread attributes from the calling thread. */
@@ -1586,8 +1586,6 @@ void kern_process_exit(int status) {
  * @param out		Pointer to output buffer.
  * @return		Status code describing result of the operation. */
 status_t kern_process_control(unsigned action, const void *in, void *out) {
-	status_t ret;
-
 	switch(action) {
 	case PROCESS_LOADED:
 		mutex_lock(&curr_proc->lock);
@@ -1599,13 +1597,14 @@ status_t kern_process_control(unsigned action, const void *in, void *out) {
 		}
 
 		mutex_unlock(&curr_proc->lock);
+		return STATUS_SUCCESS;
+	case PROCESS_SET_RESTORE:
+		if(!is_user_address(in))
+			return STATUS_INVALID_ADDR;
 
-		ret = STATUS_SUCCESS;
-		break;
+		curr_proc->thread_restore = (ptr_t)in;
+		return STATUS_SUCCESS;
 	default:
-		ret = STATUS_INVALID_ARG;
-		break;
+		return STATUS_INVALID_ARG;
 	}
-
-	return ret;
 }

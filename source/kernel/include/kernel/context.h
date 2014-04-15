@@ -39,6 +39,7 @@ typedef struct cpu_context {
 	unsigned long rdi;
 	unsigned long rsi;
 	unsigned long rbp;
+	unsigned long rsp;
 	unsigned long r8;
 	unsigned long r9;
 	unsigned long r10;
@@ -47,9 +48,8 @@ typedef struct cpu_context {
 	unsigned long r13;
 	unsigned long r14;
 	unsigned long r15;
-	unsigned long rip;
 	unsigned long rflags;
-	unsigned long rsp;
+	unsigned long rip;
 
 	// TODO: FPU state...
 } cpu_context_t;

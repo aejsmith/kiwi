@@ -145,6 +145,6 @@ extern void tls_destroy(void);
 
 extern void libkernel_abort(void) __noreturn;
 
-extern void libkernel_init(process_args_t *args, ptr_t load_base);
+extern void libkernel_init(process_args_t *args);
 
 #endif /* __LIBKERNEL_H */

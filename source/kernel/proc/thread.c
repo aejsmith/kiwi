@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Alex Smith
+ * Copyright (C) 2008-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,17 +30,17 @@
  * and if it reaches 0 (i.e. there are no handles/pointers to it left), it will
  * be immediately destroyed.
  *
- * Thread interruption is handled using the THREAD_INTERRUPTIBLE and
- * THREAD_INTERRUPTED flags. When a thread goes into interruptible sleep, its
- * THREAD_INTERRUPTIBLE flag is set. When thread_interrupt() is called on a
- * thread, that flag is checked. If it is set, the sleep will be interrupted
- * causing the thread's thread_sleep() call to return an error. Otherwise,
- * the THREAD_INTERRUPTED flag will be set. This flag is checked by
- * thread_sleep() when entering interruptible sleep. If it is set then the call
- * returns error immediately. The flag is cleared at kernel exit. The result of
- * all of this is that if a thread is interrupted while in the kernel but not
- * in interruptible sleep, the interrupt will be handled as soon as the thread
- * reaches a point where it can be interrupted.
+ * Interruption of sleeping threads is handled using the THREAD_INTERRUPTIBLE
+ * and THREAD_INTERRUPTED flags. When a thread goes into interruptible sleep,
+ * its THREAD_INTERRUPTIBLE flag is set. When a thread is killed or a user mode
+ * interrupt is queued to it, the THREAD_INTERRUPTED flag is set, and if it has
+ * THREAD_INTERRUPTIBLE set, the sleep will be interrupted causing the thread's
+ * thread_sleep() call to return an error. The THREAD_INTERRUPTED flag is
+ * checked by thread_sleep() when entering interruptible sleep. If it is set
+ * then the call returns error immediately. This means that if a thread is
+ * interrupted while in the kernel but not in interruptible sleep, the interrupt
+ * will be handled as soon as the thread reaches a point where it can be
+ * interrupted.
  *
  * Threads are killed by setting the THREAD_KILLED flag and interrupting the
  * thread. The THREAD_KILLED flag is checked upon exit from the kernel, and
@@ -57,8 +57,6 @@
 
 #include <arch/frame.h>
 #include <arch/stack.h>
-
-#include <ipc/ipc.h>
 
 #include <kernel/private/thread.h>
 
@@ -131,6 +129,7 @@ static void thread_ctor(void *obj, void *data) {
 	refcount_set(&thread->count, 0);
 	list_init(&thread->runq_link);
 	list_init(&thread->wait_link);
+	list_init(&thread->interrupts);
 	list_init(&thread->owner_link);
 	timer_init(&thread->sleep_timer, "thread_sleep_timer", thread_timeout, thread, 0);
 	notifier_init(&thread->death_notifier, thread);
@@ -152,6 +151,8 @@ void thread_retain(thread_t *thread) {
 /** Clean up a thread's resources after it has died.
  * @param thread	Thread to clean up. */
 static void thread_cleanup(thread_t *thread) {
+	thread_interrupt_t *interrupt;
+
 	/* If the user stack was allocated by us on behalf of the program, we
 	 * should unmap it. */
 	if(thread->ustack_size)
@@ -160,6 +161,13 @@ static void thread_cleanup(thread_t *thread) {
 	arch_thread_destroy(thread);
 	kmem_free(thread->kstack, KSTACK_SIZE);
 	notifier_clear(&thread->death_notifier);
+
+	LIST_FOREACH_SAFE(&thread->interrupts, iter) {
+		interrupt = list_entry(iter, thread_interrupt_t, header);
+
+		list_remove(&interrupt->header);
+		kfree(interrupt);
+	}
 }
 
 /**
@@ -232,56 +240,15 @@ static void reaper_thread(void *arg1, void *arg2) {
 	}
 }
 
-/** Closes a handle to a thread.
- * @param handle	Handle being closed. */
-static void thread_object_close(object_handle_t *handle) {
-	thread_release(handle->private);
+/** Rename a thread.
+ * @param thread	Thread to rename.
+ * @param name		New name for the thread. */
+void thread_rename(thread_t *thread, const char *name) {
+	spinlock_lock(&thread->lock);
+	strncpy(thread->name, name, THREAD_NAME_MAX);
+	thread->name[THREAD_NAME_MAX - 1] = 0;
+	spinlock_unlock(&thread->lock);
 }
-
-/** Signal that a thread is being waited for.
- * @param handle	Handle to thread.
- * @param event		Event to wait for.
- * @param wait		Internal wait data pointer.
- * @return		Status code describing result of the operation. */
-static status_t thread_object_wait(object_handle_t *handle, unsigned event, void *wait) {
-	thread_t *thread = handle->private;
-
-	switch(event) {
-	case THREAD_EVENT_DEATH:
-		if(thread->state == THREAD_DEAD) {
-			object_wait_signal(wait, 0);
-		} else {
-			notifier_register(&thread->death_notifier, object_wait_notifier, wait);
-		}
-
-		return STATUS_SUCCESS;
-	default:
-		return STATUS_INVALID_EVENT;
-	}
-}
-
-/** Stop waiting for a thread.
- * @param handle	Handle to thread.
- * @param event		Event to wait for.
- * @param wait		Internal wait data pointer. */
-static void thread_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
-	thread_t *thread = handle->private;
-
-	switch(event) {
-	case THREAD_EVENT_DEATH:
-		notifier_unregister(&thread->death_notifier, object_wait_notifier, wait);
-		break;
-	}
-}
-
-/** Thread object type. */
-static object_type_t thread_object_type = {
-	.id = OBJECT_TYPE_THREAD,
-	.flags = OBJECT_TRANSFERRABLE,
-	.close = thread_object_close,
-	.wait = thread_object_wait,
-	.unwait = thread_object_unwait,
-};
 
 /**
  * Wire a thread to its current CPU.
@@ -403,11 +370,9 @@ static bool thread_timeout(void *_thread) {
  * Wake up a sleeping thread.
  *
  * Wakes up a thread that is currently asleep. This function is for use in the
- * implementation of synchronization mechanisms, never call it manually. If you
- * wish to interrupt a thread, use thread_interrupt() which will wake the
- * thread only if it has specified that it can be interrupted. The lock that
- * thread_sleep() was called with (if any) must be held. The thread will be
- * removed from any wait list it is attached to.
+ * implementation of synchronization mechanisms, never call it manually. The
+ * lock that thread_sleep() was called with (if any) must be held. The thread
+ * will be removed from any wait list it is attached to.
  *
  * @param thread	Thread to wake up.
  */
@@ -417,62 +382,22 @@ void thread_wake(thread_t *thread) {
 	spinlock_unlock(&thread->lock);
 }
 
-/** Internal part of thread_interrupt().
- * @param thread	Thread to interrupt.
- * @param flags		Extra flags to set.
- * @return		Whether the thread was interrupted. */
-static bool thread_interrupt_internal(thread_t *thread, unsigned flags) {
-	spinlock_t *lock;
-	bool ret = false;
-
-	/* Correct locking order, see thread_timeout(). */
-	lock = acquire_wait_lock(thread);
-
-	spinlock_lock(&thread->lock);
-	thread->flags |= flags;
+/** Internal thread interruption code.
+ * @param thread	Thread to interrupt. */
+static void thread_interrupt_internal(thread_t *thread) {
+	/* Set the interrupted flag to signal that there is an unblocked
+	 * interrupt pending. This flag is checked by thread_sleep() if entering
+	 * interruptible sleep, if it is set the call will return an error
+	 * immediately. */
+	thread->flags |= THREAD_INTERRUPTED;
 
 	if(thread->state == THREAD_SLEEPING && thread->flags & THREAD_INTERRUPTIBLE) {
 		thread->sleep_status = STATUS_INTERRUPTED;
 		thread_wake_unsafe(thread);
-		ret = true;
 	} else {
-		/* Thread is either not sleeping or not interruptible. Set the
-		 * interrupted flag which causes the next interruptible
-		 * thread_sleep() call to return an error immediately (the flag
-		 * is cleared at kernel entry and exit). */
-		thread->flags |= THREAD_INTERRUPTED;
-
 		/* If the thread is running on a different CPU, interrupt it. */
 		if(thread->cpu->id != curr_cpu->id && thread->state == THREAD_RUNNING)
 			smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
-	}
-
-	spinlock_unlock(&thread->lock);
-
-	if(lock)
-		spinlock_unlock(lock);
-
-	return ret;
-}
-
-/**
- * Interrupt a sleeping thread.
- *
- * If the thread is currently in an interruptible sleep, causes it to wake up
- * and return an error from the thread_sleep() call. If the thread is not
- * interruptible, its interrupted flag will be set which will cause an immediate
- * error return on the next interruptible sleep.
- *
- * @param thread	Thread to interrupt.
- *
- * @return		Whether the thread was interrupted.
- */
-bool thread_interrupt(thread_t *thread) {
-	/* Can't kill kernel threads. */
-	if(thread->owner != kernel_proc) {
-		return thread_interrupt_internal(thread, 0);
-	} else {
-		return false;
 	}
 }
 
@@ -481,23 +406,85 @@ bool thread_interrupt(thread_t *thread) {
  *
  * Ask a userspace thread to terminate as soon as possible (upon next exit from
  * the kernel). If the thread is currently in interruptible sleep, it will be
- * interrupted. You cannot terminate a kernel thread.
+ * woken. You cannot kill a kernel thread.
  *
  * @param thread	Thread to kill.
  */
 void thread_kill(thread_t *thread) {
-	if(thread->owner != kernel_proc)
-		thread_interrupt_internal(thread, THREAD_KILLED);
+	spinlock_t *lock;
+
+	if(thread->owner == kernel_proc)
+		return;
+
+	/* Correct locking order, see thread_timeout(). */
+	lock = acquire_wait_lock(thread);
+	spinlock_lock(&thread->lock);
+
+	thread->flags |= THREAD_KILLED;
+	thread_interrupt_internal(thread);
+
+	spinlock_unlock(&thread->lock);
+	if(lock)
+		spinlock_unlock(lock);
 }
 
-/** Rename a thread.
- * @param thread	Thread to rename.
- * @param name		New name for the thread. */
-void thread_rename(thread_t *thread, const char *name) {
+/**
+ * Interrupt a thread.
+ *
+ * Queue a user mode interrupt to a thread. Interrupts are queued highest
+ * priority first, and in FIFO order within priorities. Once the interrupt
+ * reaches the head of the queue and the thread's IPL does not block it, the
+ * thread will execute the handler upon its next return to user mode. If the
+ * interrupt can be executed immediately and the thread is currently in an
+ * interruptible sleep, it will be woken.
+ *
+ * @param thread	Thread to interrupt.
+ * @param interrupt	Interrupt to queue to the thread. Should be allocated
+ *			with kmalloc(), will be freed after the interrupt has
+ *			been handled.
+ */
+void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
+	spinlock_t *lock;
+	thread_interrupt_t *exist;
+
+	if(thread->owner == kernel_proc) {
+		kfree(interrupt);
+		return;
+	}
+
+	assert(interrupt->priority <= THREAD_IPL_MAX);
+	assert(is_user_address((void *)interrupt->handler));
+
+	list_init(&interrupt->header);
+
+	/* Correct locking order, see thread_timeout(). */
+	lock = acquire_wait_lock(thread);
 	spinlock_lock(&thread->lock);
-	strncpy(thread->name, name, THREAD_NAME_MAX);
-	thread->name[THREAD_NAME_MAX - 1] = 0;
+
+	/* Find where to insert the interrupt. List is ordered by highest
+	 * priority first, and in FIFO order within priorities. */
+	LIST_FOREACH(&thread->interrupts, iter) {
+		exist = list_entry(iter, thread_interrupt_t, header);
+
+		if(interrupt->priority > exist->priority) {
+			list_add_before(&exist->header, &interrupt->header);
+			break;
+		}
+	}
+
+	/* Place at the end if not already inserted. */
+	if(list_empty(&interrupt->header))
+		list_append(&thread->interrupts, &interrupt->header);
+
+	/* If the interrupt is the head of the list and the thread's IPL does
+	 * not block it, wake it up. */
+	exist = list_first(&thread->interrupts, thread_interrupt_t, header);
+	if(exist == interrupt && interrupt->priority >= thread->ipl)
+		thread_interrupt_internal(thread);
+
 	spinlock_unlock(&thread->lock);
+	if(lock)
+		spinlock_unlock(lock);
 }
 
 /**
@@ -548,7 +535,6 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsi
 	/* If interruptible and the interrupted flag is set, we also return an
 	 * error immediately. */
 	if(flags & SLEEP_INTERRUPTIBLE && curr_thread->flags & THREAD_INTERRUPTED) {
-		curr_thread->flags &= ~THREAD_INTERRUPTED;
 		ret = STATUS_INTERRUPTED;
 		goto cancel;
 	}
@@ -594,43 +580,6 @@ void thread_yield(void) {
 	sched_reschedule(state);
 }
 
-/** Perform tasks necessary when a thread is entering the kernel. */
-void thread_at_kernel_entry(void) {
-	nstime_t now;
-
-	/* Update accounting information. */
-	now = system_time();
-	curr_thread->user_time += now - curr_thread->last_time;
-	curr_thread->last_time = now;
-}
-
-/** Perform tasks necessary when a thread is returning to userspace. */
-void thread_at_kernel_exit(void) {
-	nstime_t now;
-
-	/* Clear active security token. */
-	if(curr_thread->active_token) {
-		token_release(curr_thread->active_token);
-		curr_thread->active_token = NULL;
-	}
-
-	/* Update accounting information. */
-	now = system_time();
-	curr_thread->kernel_time += now - curr_thread->last_time;
-	curr_thread->last_time = now;
-
-	/* Terminate the thread if killed. */
-	if(curr_thread->flags & THREAD_KILLED)
-		thread_exit();
-
-	/* Clear the interrupted flag. */
-	curr_thread->flags &= ~THREAD_INTERRUPTED;
-
-	/* Preempt if required. */
-	if(curr_cpu->should_preempt)
-		sched_preempt();
-}
-
 /** Terminate the current thread.
  * @note		Does not return. */
 void thread_exit(void) {
@@ -650,6 +599,74 @@ void thread_exit(void) {
 
 	sched_reschedule(state);
 	fatal("Shouldn't get here");
+}
+
+/** Perform tasks necessary when a thread is entering the kernel. */
+void thread_at_kernel_entry(void) {
+	nstime_t now;
+
+	/* Update accounting information. */
+	now = system_time();
+	curr_thread->user_time += now - curr_thread->last_time;
+	curr_thread->last_time = now;
+
+	/* Terminate the thread if killed. */
+	if(unlikely(curr_thread->flags & THREAD_KILLED))
+		thread_exit();
+}
+
+/** Perform tasks necessary when a thread is returning to userspace. */
+void thread_at_kernel_exit(void) {
+	thread_interrupt_t *interrupt;
+	unsigned ipl;
+	nstime_t now;
+	status_t ret;
+
+	/* Clear active security token. */
+	if(unlikely(curr_thread->active_token)) {
+		token_release(curr_thread->active_token);
+		curr_thread->active_token = NULL;
+	}
+
+	/* Check whether we have any pending interrupts to handle. */
+	if(unlikely(curr_thread->flags & THREAD_INTERRUPTED)) {
+		/* Terminate the thread if killed. */
+		if(curr_thread->flags & THREAD_KILLED)
+			thread_exit();
+
+		spinlock_lock(&curr_thread->lock);
+
+		assert(!list_empty(&curr_thread->interrupts));
+		interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
+		list_remove(&interrupt->header);
+		curr_thread->flags &= ~THREAD_INTERRUPTED;
+
+		assert(interrupt->priority >= curr_thread->ipl);
+
+		/* Raise the IPL to block further interrupts. */
+		ipl = curr_thread->ipl;
+		curr_thread->ipl = interrupt->priority + 1;
+
+		spinlock_unlock(&curr_thread->lock);
+
+		ret = arch_thread_interrupt_setup(interrupt, ipl);
+		if(unlikely(ret != STATUS_SUCCESS)) {
+			/* TODO: Once there is a way to use an alternate stack
+			 * for an exception handler we should queue up an
+			 * exception and retry to execute that instead. No point
+			 * doing so for the moment because trying to do that
+			 * will just fail again. When implementing this make
+			 * sure to preserve the original IPL properly. */
+			process_exit(0, EXIT_REASON_NORMAL);
+		}
+
+		kfree(interrupt);
+	}
+
+	/* Update accounting information. */
+	now = system_time();
+	curr_thread->kernel_time += now - curr_thread->last_time;
+	curr_thread->last_time = now;
 }
 
 /**
@@ -795,6 +812,7 @@ thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->kernel_time = 0;
 	thread->user_time = 0;
 	thread->in_usermem = false;
+	thread->ipl = 0;
 	thread->token = NULL;
 	thread->active_token = NULL;
 	thread->func = func;
@@ -964,15 +982,15 @@ __init_text void thread_init(void) {
 	id_allocator_init(&thread_id_allocator, 65535, MM_BOOT);
 
 	/* Create the thread slab cache. */
-	thread_cache = object_cache_create(
-		"thread_cache", thread_t, thread_ctor, NULL, NULL, 0, MM_BOOT);
+	thread_cache = object_cache_create("thread_cache", thread_t,
+		thread_ctor, NULL, NULL, 0, MM_BOOT);
 
 	/* Register our KDB commands. */
-	kdb_register_command(
-		"thread", "Print information about threads.",
+	kdb_register_command("thread",
+		"Print information about threads.",
 		kdb_cmd_thread);
-	kdb_register_command(
-		"kill", "Kill a running user thread.",
+	kdb_register_command("kill",
+		"Kill a running user thread.",
 		kdb_cmd_kill);
 
 	/* Initialize the scheduler. */
@@ -985,8 +1003,59 @@ __init_text void thread_init(void) {
 }
 
 /**
- * Userspace interface.
+ * System calls.
  */
+
+/** Closes a handle to a thread.
+ * @param handle	Handle being closed. */
+static void thread_object_close(object_handle_t *handle) {
+	thread_release(handle->private);
+}
+
+/** Signal that a thread is being waited for.
+ * @param handle	Handle to thread.
+ * @param event		Event to wait for.
+ * @param wait		Internal wait data pointer.
+ * @return		Status code describing result of the operation. */
+static status_t thread_object_wait(object_handle_t *handle, unsigned event, void *wait) {
+	thread_t *thread = handle->private;
+
+	switch(event) {
+	case THREAD_EVENT_DEATH:
+		if(thread->state == THREAD_DEAD) {
+			object_wait_signal(wait, 0);
+		} else {
+			notifier_register(&thread->death_notifier, object_wait_notifier, wait);
+		}
+
+		return STATUS_SUCCESS;
+	default:
+		return STATUS_INVALID_EVENT;
+	}
+}
+
+/** Stop waiting for a thread.
+ * @param handle	Handle to thread.
+ * @param event		Event to wait for.
+ * @param wait		Internal wait data pointer. */
+static void thread_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
+	thread_t *thread = handle->private;
+
+	switch(event) {
+	case THREAD_EVENT_DEATH:
+		notifier_unregister(&thread->death_notifier, object_wait_notifier, wait);
+		break;
+	}
+}
+
+/** Thread object type. */
+static object_type_t thread_object_type = {
+	.id = OBJECT_TYPE_THREAD,
+	.flags = OBJECT_TRANSFERRABLE,
+	.close = thread_object_close,
+	.wait = thread_object_wait,
+	.unwait = thread_object_unwait,
+};
 
 /** Look up a thread given a handle.
  * @param handle	Handle to thread, or THREAD_SELF for calling thread.
@@ -1021,10 +1090,9 @@ static void thread_uspace_trampoline(void *_args, void *arg2) {
 	thread_uspace_args_t *args = _args;
 	intr_frame_t frame;
 
-	arch_thread_prepare_userspace(&frame, args->entry, args->sp,
-		args->arg, 0);
+	arch_thread_user_setup(&frame, args->entry, args->sp, args->arg);
 	kfree(args);
-	arch_thread_enter_userspace(&frame);
+	arch_thread_user_enter(&frame);
 }
 
 /** Create a new thread.
@@ -1246,43 +1314,67 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 }
 
 /**
- * Get one of a thread's special ports.
+ * Get the calling thread's IPL.
  *
- * Gets a handle to one of a thread's special ports. The calling thread must
- * have privileged access to the process owning the thread, i.e. the user IDs
- * must match, or it must have the PRIV_PROCESS_ADMIN privilege.
+ * Gets the calling thread's current interrupt priority level (IPL). The IPL
+ * is used to block interrupts to a thread's normal flow of execution. There
+ * are 2 sources of thread interrupts: exceptions and asynchronous object event
+ * notifications. Exceptions are raised at a fixed priority, and object event
+ * notifications are raised at the priority they are registered with. Any
+ * interrupts raised with a priority lower than the thread's current IPL will
+ * not be handled until the IPL is set less than or equal to that priority.
+ * When an interrupt handler is executed, the IPL is raised to 1 higher than
+ * the interrupt's priority, and the previous IPL is restored once the handler
+ * returns.
  *
- * @param handle	Handle to thread, or THREAD_SELF for calling thread.
- * @param id		Special port ID.
- * @param handlep	Where to store handle to port.
+ * @param iplp		Where to store current IPL.
  *
  * @return		STATUS_SUCCESS on success.
- *			STATUS_INVALID_HANDLE if thread handle is invalid.
- *			STATUS_ACCESS_DENIED if calling thread does not have
- *			sufficient privileges to access the thread's special
- *			ports.
- *			STATUS_INVALID_ARG if port ID is invalid.
- *			STATUS_NOT_FOUND if port does not exist.
+ *			STATUS_INVALID_ARG if iplp is NULL.
+ *			STATUS_INVALID_ADDR if iplp is an invalid address.
  */
-status_t kern_thread_port(handle_t handle, int32_t id, handle_t *handlep) {
-	thread_t *thread;
-	status_t ret;
-
-	if(!handlep)
+status_t kern_thread_ipl(unsigned *iplp) {
+	if(!iplp)
 		return STATUS_INVALID_ARG;
 
-	ret = thread_handle_lookup(handle, &thread);
-	if(ret != STATUS_SUCCESS)
-		return ret;
+	return write_user(iplp, curr_thread->ipl);
+}
 
-	if(!process_access(thread->owner)) {
-		thread_release(thread);
-		return STATUS_ACCESS_DENIED;
+/**
+ * Set the calling thread's IPL.
+ *
+ * Sets the calling thread's current interrupt priority level (IPL) (see
+ * kern_thread_ipl() for a description of the IPL). If the new IPL is lower
+ * than the current IPL, any pending interrupts which have become unblocked
+ * will be executed.
+ *
+ * @param ipl		New IPL (must be less than or equal to THREAD_IPL_MAX).
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_ARG if the new IPL is invalid.
+ */
+status_t kern_thread_set_ipl(unsigned ipl) {
+	thread_interrupt_t *interrupt;
+
+	if(ipl > THREAD_IPL_MAX)
+		return STATUS_INVALID_ARG;
+
+	spinlock_lock(&curr_thread->lock);
+
+	curr_thread->ipl = ipl;
+
+	/* Check whether there are any pending interrupts that have now become
+	 * unblocked. If so they, set the flag so that they will be executed
+	 * when we return to user mode. */
+	curr_thread->flags &= ~THREAD_INTERRUPTED;
+	if(!list_empty(&curr_thread->interrupts)) {
+		interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
+		if(interrupt->priority >= ipl)
+			curr_thread->flags |= THREAD_INTERRUPTED;
 	}
 
-	/* TODO. */
-	thread_release(thread);
-	return ret;
+	spinlock_unlock(&curr_thread->lock);
+	return STATUS_SUCCESS;
 }
 
 /**
@@ -1411,19 +1503,30 @@ void kern_thread_exit(int status) {
  * @param out		Pointer to output buffer.
  * @return		Status code describing result of the operation. */
 status_t kern_thread_control(unsigned action, const void *in, void *out) {
+	switch(action) {
+	case THREAD_SET_TLS_ADDR:
+		if(!is_user_address(in))
+			return STATUS_INVALID_ADDR;
+
+		arch_thread_set_tls_addr((ptr_t)in);
+		return STATUS_SUCCESS;
+	default:
+		return STATUS_INVALID_ARG;
+	}
+}
+
+/** Restore previous state upon return from an interrupt handler. */
+void kern_thread_restore(void) {
+	unsigned ipl;
 	status_t ret;
 
-	switch(action) {
-	case THREAD_GET_TLS_ADDR:
-		ret = write_user((ptr_t *)out, arch_thread_tls_addr(curr_thread));
-		break;
-	case THREAD_SET_TLS_ADDR:
-		ret = arch_thread_set_tls_addr(curr_thread, (ptr_t)in);
-		break;
-	default:
-		ret = STATUS_INVALID_ARG;
-		break;
+	ret = arch_thread_interrupt_restore(&ipl);
+	if(ret != STATUS_SUCCESS) {
+		/* TODO: Same as in thread_at_kernel_exit(). */
+		process_exit(0, EXIT_REASON_NORMAL);
 	}
 
-	return ret;
+	ret = kern_thread_set_ipl(ipl);
+	if(ret != STATUS_SUCCESS)
+		process_exit(0, EXIT_REASON_NORMAL);
 }

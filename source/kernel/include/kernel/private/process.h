@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,10 +37,12 @@ typedef struct process_args {
 	char **env;			/**< Environment variable array. */
 	size_t arg_count;		/**< Number of entries in argument array (excluding NULL). */
 	size_t env_count;		/**< Number of entries in environment array (excluding NULL). */
+	void *load_base;		/**< Load base of libkernel. */
 } process_args_t;
 
 /** Actions for kern_process_control(). */
 #define PROCESS_LOADED		1	/**< Signal that process is loaded. */
+#define PROCESS_SET_RESTORE	2	/**< Set the thread restore function. */
 
 extern status_t kern_process_control(unsigned action, const void *in, void *out);
 

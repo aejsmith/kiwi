@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Alex Smith
+ * Copyright (C) 2008-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -78,6 +78,7 @@ typedef struct process {
 	avl_tree_t futexes;		/**< Tree of futexes that the process has accessed. */
 	list_t images;			/**< List of loaded images. */
 	image_id_t next_image_id;	/**< Next image ID. */
+	ptr_t thread_restore;		/**< Address of kern_thread_restore() in libkernel. */
 
 	/** Special ports. */
 	struct ipc_port *root_port;	/**< Root port. */

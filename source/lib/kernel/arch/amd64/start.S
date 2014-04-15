@@ -24,17 +24,14 @@
 .section .text, "ax", @progbits
 
 /** Kernel library entry point.
- * @param %rdi		Process argument block.
- * @param %rsi		Load base address. */
+ * @param %rdi		Process argument block. */
 FUNCTION_START(libkernel_start)
 	/* Relocate ourself. */
 	pushq	%rdi
-	pushq	%rsi
-	leaq	_DYNAMIC(%rip), %rdi
+	leaq	_DYNAMIC(%rip), %rsi
 	call	libkernel_relocate
 
 	/* Call the main function. */
-	popq	%rsi
 	popq	%rdi
 	call	libkernel_init
 	ret

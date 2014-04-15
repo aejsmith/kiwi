@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,14 +27,23 @@
 #include <x86/fpu.h>
 
 #include <lib/string.h>
+#include <lib/utility.h>
 
 #include <mm/aspace.h>
+#include <mm/safe.h>
 
+#include <proc/process.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
 
+#include <assert.h>
 #include <cpu.h>
 #include <status.h>
+
+/** FLAGS values to restore. */
+#define RESTORE_FLAGS	(X86_FLAGS_CF | X86_FLAGS_PF | X86_FLAGS_AF \
+	| X86_FLAGS_ZF | X86_FLAGS_SF | X86_FLAGS_TF | X86_FLAGS_DF \
+	| X86_FLAGS_OF | X86_FLAGS_AC)
 
 extern void amd64_context_switch(ptr_t new_rsp, ptr_t *old_rsp);
 extern void amd64_context_restore(ptr_t new_rsp);
@@ -75,6 +84,30 @@ void arch_thread_init(thread_t *thread, void *stack, void (*entry)(void)) {
  * @param thread	Thread to clean up. */
 void arch_thread_destroy(thread_t *thread) {
 	/* Nothing happens. */
+}
+
+/** Clone the current thread.
+ * @param thread	New thread to clone into.
+ * @param frame		Frame to prepare for new thread to enter user mode with
+ *			arch_thread_user_enter(). */
+void arch_thread_clone(thread_t *thread, intr_frame_t *frame) {
+	thread->arch.flags = curr_thread->arch.flags & ARCH_THREAD_HAVE_FPU;
+	thread->arch.tls_base = curr_thread->arch.tls_base;
+
+	if(x86_fpu_state()) {
+		/* FPU is currently enabled so the latest state may not have
+		 * been saved. */
+		x86_fpu_save(thread->arch.fpu);
+	} else if(curr_thread->flags & ARCH_THREAD_HAVE_FPU) {
+		memcpy(thread->arch.fpu, curr_thread->arch.fpu, sizeof(thread->arch.fpu));
+	}
+
+	/* Duplicate the user interrupt frame. This should be valid as we
+	 * only get here via a system call. */
+	memcpy(frame, curr_thread->arch.user_iframe, sizeof(*frame));
+
+	/* The new thread should return success from the system call. */
+	frame->ax = STATUS_SUCCESS;
 }
 
 /** Switch to another thread.
@@ -132,76 +165,148 @@ void arch_thread_switch(thread_t *thread, thread_t *prev) {
 	}
 }
 
-/** Get the TLS address for a thread.
- * @param thread	Thread to get for.
- * @return		TLS address of thread. */
-ptr_t arch_thread_tls_addr(thread_t *thread) {
-	return thread->arch.tls_base;
-}
-
-/** Set the TLS address for a thread.
- * @param thread	Thread to set for.
- * @param addr		TLS address.
- * @return		Status code describing result of the operation. */
-status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr) {
-	if(addr > USER_END)
-		return STATUS_INVALID_ADDR;
-
+/** Set the TLS address for the current thread.
+ * @param addr		TLS address. */
+void arch_thread_set_tls_addr(ptr_t addr) {
 	/* The AMD64 ABI uses the FS segment register to access the TLS data.
 	 * Save the address to be written to the FS base upon each thread
 	 * switch. */
-	thread->arch.tls_base = (ptr_t)addr;
-	if(thread == curr_thread)
-		x86_write_msr(X86_MSR_FS_BASE, thread->arch.tls_base);
-
-	return STATUS_SUCCESS;
+	curr_thread->arch.tls_base = addr;
+	x86_write_msr(X86_MSR_FS_BASE, addr);
 }
 
-/** Clone a thread.
- * @param thread	Cloned thread.
- * @param parent	Parent thread.
- * @param frame		Frame to fill with a copy of the parent's current frame. */
-void arch_thread_clone(thread_t *thread, thread_t *parent, intr_frame_t *frame) {
-	thread->arch.flags = parent->arch.flags & ARCH_THREAD_HAVE_FPU;
-	thread->arch.tls_base = parent->arch.tls_base;
-
-	/* Clone the parent's FPU state. */
-	if(parent == curr_thread && x86_fpu_state()) {
-		/* FPU is currently enabled so the latest state may not have
-		 * been saved. */
-		x86_fpu_save(thread->arch.fpu);
-	} else if(parent->flags & ARCH_THREAD_HAVE_FPU) {
-		memcpy(thread->arch.fpu, parent->arch.fpu, sizeof(thread->arch.fpu));
-	}
-
-	/* Duplicate the user interrupt frame. This should be valid as we
-	 * only get here via a system call. */
-	memcpy(frame, parent->arch.user_iframe, sizeof(*frame));
-
-	/* The new thread should return success from the system call. */
-	frame->ax = STATUS_SUCCESS;
-}
-
-/** Prepare a frame to enter userspace.
+/** Prepare an interrupt frame to enter user mode.
  * @param frame		Frame to prepare.
  * @param entry		Entry function.
- * @param stack		Stack pointer.
- * @param arg1		First argument to function.
- * @param arg2		Second argument to function. */
-void arch_thread_prepare_userspace(intr_frame_t *frame, ptr_t entry,
-	ptr_t stack, ptr_t arg1, ptr_t arg2)
-{
+ * @param sp		Stack pointer.
+ * @param arg		First argument to function. */
+void arch_thread_user_setup(intr_frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
 	/* Correctly align the stack pointer for ABI requirements. */
-	stack -= sizeof(unsigned long);
+	sp -= sizeof(unsigned long);
 
 	/* Clear out the frame to zero all GPRs. */
 	memset(frame, 0, sizeof(*frame));
 
-	frame->di = arg1;
-	frame->si = arg2;
+	frame->di = arg;
 	frame->ip = entry;
 	frame->cs = USER_CS | 0x3;
 	frame->flags = X86_FLAGS_IF | X86_FLAGS_ALWAYS1;
-	frame->sp = stack;
+	frame->sp = sp;
 	frame->ss = USER_DS | 0x3;
+}
+
+/** Prepare to execute a user mode interrupt.
+ * @param interrupt	Interrupt to execute.
+ * @param ipl		Previous IPL.
+ * @return		Status code describing result of the operation. */
+status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl) {
+	intr_frame_t *frame;
+	ptr_t data_addr, state_addr, ret_addr;
+	thread_state_t state;
+	status_t ret;
+
+	frame = curr_thread->arch.user_iframe;
+	assert(frame->cs & 3);
+
+	/* Work out where to place stuff on the user stack. We must not clobber
+	 * the red zone (128 bytes below the stack pointer). Ensure that we
+	 * satisfy ABI constraints - ((RSP + 8) % 16) == 0 upon entry to the
+	 * handler. */
+	data_addr = round_down(frame->sp - 128 - interrupt->size, 16);
+	state_addr = round_down(data_addr - sizeof(state), 16);
+	ret_addr = state_addr - 8;
+
+	if(interrupt->size) {
+		/* Copy interrupt data. */
+		ret = memcpy_to_user((void *)data_addr, interrupt + 1, interrupt->size);
+		if(ret != STATUS_SUCCESS)
+			return ret;
+	}
+
+	/* Save the thread state. TODO: FPU context. */
+	state.context.rax = frame->ax;
+	state.context.rbx = frame->bx;
+	state.context.rcx = frame->cx;
+	state.context.rdx = frame->dx;
+	state.context.rdi = frame->di;
+	state.context.rsi = frame->si;
+	state.context.rbp = frame->bp;
+	state.context.rsp = frame->sp;
+	state.context.r8 = frame->r8;
+	state.context.r9 = frame->r9;
+	state.context.r10 = frame->r10;
+	state.context.r11 = frame->r11;
+	state.context.r12 = frame->r12;
+	state.context.r13 = frame->r13;
+	state.context.r14 = frame->r14;
+	state.context.r15 = frame->r15;
+	state.context.rflags = frame->flags;
+	state.context.rip = frame->ip;
+	state.ipl = ipl;
+
+	ret = memcpy_to_user((void *)state_addr, &state, sizeof(state));
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	/* Write return address. */
+	ret = write_user((ptr_t *)ret_addr, curr_proc->thread_restore);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	/* Modify the interrupt frame to return to the handler. */
+	frame->ip = interrupt->handler;
+	frame->sp = ret_addr;
+	frame->di = data_addr;
+	frame->si = state_addr;
+
+	/* We must return from system calls via the IRET path because we have
+	 * modified the frame. */
+	curr_thread->arch.flags |= ARCH_THREAD_IFRAME_MODIFIED;
+	return STATUS_SUCCESS;
+}
+
+/** Restore previous state after returning from a user mode interrupt.
+ * @param iplp		Where to store previous IPL.
+ * @return		Status code describing result of the operation. */
+status_t arch_thread_interrupt_restore(unsigned *iplp) {
+	intr_frame_t *frame;
+	thread_state_t state;
+	status_t ret;
+
+	frame = curr_thread->arch.user_iframe;
+	assert(frame->cs & 3);
+
+	/* The stack pointer should point at the state structure due to the
+	 * return address being popped. Copy it back. */
+	ret = memcpy_from_user(&state, (void *)frame->sp, sizeof(state));
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	/* Save the IPL to restore. */
+	*iplp = state.ipl;
+
+	/* Restore the context. */
+	frame->ax = state.context.rax;
+	frame->bx = state.context.rbx;
+	frame->cx = state.context.rcx;
+	frame->dx = state.context.rdx;
+	frame->di = state.context.rdi;
+	frame->si = state.context.rsi;
+	frame->bp = state.context.rbp;
+	frame->sp = state.context.rsp;
+	frame->r8 = state.context.r8;
+	frame->r9 = state.context.r9;
+	frame->r10 = state.context.r10;
+	frame->r11 = state.context.r11;
+	frame->r12 = state.context.r12;
+	frame->r13 = state.context.r13;
+	frame->r14 = state.context.r14;
+	frame->r15 = state.context.r15;
+	frame->flags &= ~RESTORE_FLAGS;
+	frame->flags |= state.context.rflags & RESTORE_FLAGS;
+	frame->ip = state.context.rip;
+
+	/* Same as above. */
+	curr_thread->arch.flags |= ARCH_THREAD_IFRAME_MODIFIED;
+	return STATUS_SUCCESS;
 }
