@@ -27,15 +27,13 @@
 
 #include <types.h>
 
+#if USER_BASE > 0
+
 /** Check whether an address is a user address.
  * @param addr		Address to check.
  * @return		Whether the address is a user address. */
 static inline bool is_user_address(const void *addr) {
-	#if USER_BASE > 0
 	return ((ptr_t)addr >= USER_BASE && (ptr_t)addr <= USER_END);
-	#else
-	return ((ptr_t)addr < USER_SIZE);
-	#endif 
 }
 
 /** Check if an address range is within userspace memory.
@@ -45,15 +43,25 @@ static inline bool is_user_address(const void *addr) {
 static inline bool is_user_range(const void *addr, size_t size) {
 	if(!size) size = 1;
 
-	#if USER_BASE > 0
 	return ((ptr_t)addr >= USER_BASE
 		&& (ptr_t)addr + size - 1 <= USER_END
 		&& (ptr_t)addr + size - 1 >= (ptr_t)addr);
-	#else
+}
+
+#else /* USER_BASE > 0 */
+
+static inline bool is_user_address(const void *addr) {
+	return ((ptr_t)addr < USER_SIZE);
+}
+
+static inline bool is_user_range(const void *addr, size_t size) {
+	if(!size) size = 1;
+
 	return ((ptr_t)addr + size - 1 <= USER_END
 		&& (ptr_t)addr + size -1 >= (ptr_t)addr);
-	#endif
 }
+
+#endif /* USER_BASE > 0 */
 
 extern status_t memcpy_from_user(void *dest, const void *src, size_t count);
 extern status_t memcpy_to_user(void *dest, const void *src, size_t count);
