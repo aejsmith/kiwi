@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Alex Smith
+ * Copyright (C) 2008-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +22,7 @@
 #include <arch/io.h>
 
 #include <x86/cpu.h>
-#include <x86/intr.h>
+#include <x86/interrupt.h>
 #include <x86/lapic.h>
 
 #include <lib/string.h>
@@ -66,13 +66,13 @@ static inline void lapic_eoi(void) {
 
 /** Spurious interrupt handler.
  * @param frame		Interrupt stack frame. */
-static void lapic_spurious_handler(intr_frame_t *frame) {
+static void lapic_spurious_interrupt(frame_t *frame) {
 	kprintf(LOG_DEBUG, "lapic: received spurious interrupt\n");
 }
 
 /** IPI interrupt handler.
  * @param frame		Interrupt stack frame. */
-static void lapic_ipi_handler(intr_frame_t *frame) {
+static void lapic_ipi_interrupt(frame_t *frame) {
 	smp_ipi_handler();
 	lapic_eoi();
 }
@@ -93,7 +93,7 @@ static timer_device_t lapic_timer_device = {
 
 /** Timer interrupt handler.
  * @param frame		Interrupt stack frame. */
-static void lapic_timer_handler(intr_frame_t *frame) {
+static void lapic_timer_interrupt(frame_t *frame) {
 	curr_cpu->should_preempt = timer_tick();
 	lapic_eoi();
 }
@@ -211,9 +211,9 @@ __init_text void lapic_init(void) {
 	timer_device_set(&lapic_timer_device);
 
 	/* Install interrupt vectors. */
-	intr_table[LAPIC_VECT_SPURIOUS] = lapic_spurious_handler;
-	intr_table[LAPIC_VECT_TIMER] = lapic_timer_handler;
-	intr_table[LAPIC_VECT_IPI] = lapic_ipi_handler;
+	interrupt_table[LAPIC_VECT_SPURIOUS] = lapic_spurious_interrupt;
+	interrupt_table[LAPIC_VECT_TIMER] = lapic_timer_interrupt;
+	interrupt_table[LAPIC_VECT_IPI] = lapic_ipi_interrupt;
 }
 
 /** Initialize the local APIC on the current CPU. */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -147,7 +147,7 @@ PRIVATE_FUNCTION_START(isr_common)
 
 	/* Call the interrupt handler. */
 	movq	%rsp, %rdi
-	call	intr_handler
+	call	interrupt_handler
 
 	/* Restore the saved registers. */
 	POP_REGS
@@ -187,14 +187,14 @@ FUNCTION_START(syscall_entry)
 	PUSH_REGS
 
 	/* Save the user-mode interrupt frame pointer. */
-	movq	%rsp, %gs:ARCH_THREAD_OFF_USER_IFRAME
+	movq	%rsp, %gs:ARCH_THREAD_OFF_USER_FRAME
 
 	/* Perform kernel entry work and enable interrupts. */
 	call	thread_at_kernel_entry
 	sti
 
 	/* Get back the call number and check whether it is valid. */
-	movq	IFRAME_OFF_AX(%rsp), %rbx
+	movq	FRAME_OFF_AX(%rsp), %rbx
 	cmp	syscall_table_size, %rbx
 	jae	.Linval
 
@@ -208,16 +208,16 @@ FUNCTION_START(syscall_entry)
 	/* Restore arguments and perform the call. The argument that should be
 	 * in RCX is passed in R10, as RCX is used by SYSCALL/SYSRET as the
 	 * return IP. */
-	movq	IFRAME_OFF_DI(%rsp), %rdi
-	movq	IFRAME_OFF_SI(%rsp), %rsi
-	movq	IFRAME_OFF_DX(%rsp), %rdx
-	movq	IFRAME_OFF_R10(%rsp), %rcx
-	movq	IFRAME_OFF_R8(%rsp), %r8
-	movq	IFRAME_OFF_R9(%rsp), %r9
+	movq	FRAME_OFF_DI(%rsp), %rdi
+	movq	FRAME_OFF_SI(%rsp), %rsi
+	movq	FRAME_OFF_DX(%rsp), %rdx
+	movq	FRAME_OFF_R10(%rsp), %rcx
+	movq	FRAME_OFF_R8(%rsp), %r8
+	movq	FRAME_OFF_R9(%rsp), %r9
 	call	*syscall_table(,%rbx,1)
 .Lreturn:
 	/* Save the return value of the system call. */
-	movq	%rax, IFRAME_OFF_AX(%rsp)
+	movq	%rax, FRAME_OFF_AX(%rsp)
 
 	/* Disable interrupts and perform kernel exit work. */
 	cli
@@ -225,9 +225,9 @@ FUNCTION_START(syscall_entry)
 
 	/* If we're going to execute a user-mode signal handler, or we have
 	 * returned from a signal handler, the signal frame setup code will
-	 * have set the ARCH_THREAD_IFRAME_MODIFIED flag. When this flag is
+	 * have set the ARCH_THREAD_FRAME_MODIFIED flag. When this flag is
 	 * set, we return via IRET as it doesn't clobber certain registers. */
-	testl	$ARCH_THREAD_IFRAME_MODIFIED, %gs:ARCH_THREAD_OFF_FLAGS
+	testl	$ARCH_THREAD_FRAME_MODIFIED, %gs:ARCH_THREAD_OFF_FLAGS
 	jnz	.Liret
 
 	/* Restore saved registers, RFLAGS/RIP for SYSRET, and the userspace
@@ -255,19 +255,19 @@ FUNCTION_START(syscall_entry)
 
 	/* Copy the arguments. The source is the userspace stack pointer + 8. */
 	movq	%rsp, %rdi
-	movq	IFRAME_OFF_SP(%r12), %rsi
+	movq	FRAME_OFF_SP(%r12), %rsi
 	add	$8, %rsi
 	call	memcpy_from_user
 	cmp	$STATUS_SUCCESS, %eax
 	jne	.Lcpyfail
 
 	/* Restore the arguments passed in registers and perform the call. */
-	movq	IFRAME_OFF_DI(%r12), %rdi
-	movq	IFRAME_OFF_SI(%r12), %rsi
-	movq	IFRAME_OFF_DX(%r12), %rdx
-	movq	IFRAME_OFF_R10(%r12), %rcx
-	movq	IFRAME_OFF_R8(%r12), %r8
-	movq	IFRAME_OFF_R9(%r12), %r9
+	movq	FRAME_OFF_DI(%r12), %rdi
+	movq	FRAME_OFF_SI(%r12), %rsi
+	movq	FRAME_OFF_DX(%r12), %rdx
+	movq	FRAME_OFF_R10(%r12), %rcx
+	movq	FRAME_OFF_R8(%r12), %r8
+	movq	FRAME_OFF_R9(%r12), %r9
 	call	*syscall_table(,%rbx,1)
 
 	/* Restore stack pointer then return. */
@@ -275,7 +275,7 @@ FUNCTION_START(syscall_entry)
 	jmp	.Lreturn
 .Liret:
 	/* Clear the modified flag. */
-	andl	$~ARCH_THREAD_IFRAME_MODIFIED, %gs:ARCH_THREAD_OFF_FLAGS
+	andl	$~ARCH_THREAD_FRAME_MODIFIED, %gs:ARCH_THREAD_OFF_FLAGS
 
 	/* Restore the registers, get rid of interrupt/error code. */
 	POP_REGS

@@ -90,7 +90,7 @@ void arch_thread_destroy(thread_t *thread) {
  * @param thread	New thread to clone into.
  * @param frame		Frame to prepare for new thread to enter user mode with
  *			arch_thread_user_enter(). */
-void arch_thread_clone(thread_t *thread, intr_frame_t *frame) {
+void arch_thread_clone(thread_t *thread, frame_t *frame) {
 	thread->arch.flags = curr_thread->arch.flags & ARCH_THREAD_HAVE_FPU;
 	thread->arch.tls_base = curr_thread->arch.tls_base;
 
@@ -104,7 +104,7 @@ void arch_thread_clone(thread_t *thread, intr_frame_t *frame) {
 
 	/* Duplicate the user interrupt frame. This should be valid as we
 	 * only get here via a system call. */
-	memcpy(frame, curr_thread->arch.user_iframe, sizeof(*frame));
+	memcpy(frame, curr_thread->arch.user_frame, sizeof(*frame));
 
 	/* The new thread should return success from the system call. */
 	frame->ax = STATUS_SUCCESS;
@@ -180,7 +180,7 @@ void arch_thread_set_tls_addr(ptr_t addr) {
  * @param entry		Entry function.
  * @param sp		Stack pointer.
  * @param arg		First argument to function. */
-void arch_thread_user_setup(intr_frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
+void arch_thread_user_setup(frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
 	/* Correctly align the stack pointer for ABI requirements. */
 	sp -= sizeof(unsigned long);
 
@@ -200,12 +200,12 @@ void arch_thread_user_setup(intr_frame_t *frame, ptr_t entry, ptr_t sp, ptr_t ar
  * @param ipl		Previous IPL.
  * @return		Status code describing result of the operation. */
 status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl) {
-	intr_frame_t *frame;
+	frame_t *frame;
 	ptr_t data_addr, state_addr, ret_addr;
 	thread_state_t state;
 	status_t ret;
 
-	frame = curr_thread->arch.user_iframe;
+	frame = curr_thread->arch.user_frame;
 	assert(frame->cs & 3);
 
 	/* Work out where to place stuff on the user stack. We must not clobber
@@ -261,7 +261,7 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
 
 	/* We must return from system calls via the IRET path because we have
 	 * modified the frame. */
-	curr_thread->arch.flags |= ARCH_THREAD_IFRAME_MODIFIED;
+	curr_thread->arch.flags |= ARCH_THREAD_FRAME_MODIFIED;
 	return STATUS_SUCCESS;
 }
 
@@ -269,11 +269,11 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
  * @param iplp		Where to store previous IPL.
  * @return		Status code describing result of the operation. */
 status_t arch_thread_interrupt_restore(unsigned *iplp) {
-	intr_frame_t *frame;
+	frame_t *frame;
 	thread_state_t state;
 	status_t ret;
 
-	frame = curr_thread->arch.user_iframe;
+	frame = curr_thread->arch.user_frame;
 	assert(frame->cs & 3);
 
 	/* The stack pointer should point at the state structure due to the
@@ -307,6 +307,6 @@ status_t arch_thread_interrupt_restore(unsigned *iplp) {
 	frame->ip = state.context.rip;
 
 	/* Same as above. */
-	curr_thread->arch.flags |= ARCH_THREAD_IFRAME_MODIFIED;
+	curr_thread->arch.flags |= ARCH_THREAD_FRAME_MODIFIED;
 	return STATUS_SUCCESS;
 }

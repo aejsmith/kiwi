@@ -23,7 +23,7 @@
 
 #include <x86/cpu.h>
 #include <x86/descriptor.h>
-#include <x86/intr.h>
+#include <x86/interrupt.h>
 
 #include <lib/string.h>
 
@@ -198,5 +198,5 @@ __init_text void idt_init(void) {
 
 	/* In tss_init() we point the first IST entry at the double fault
 	 * stack. Point the double fault IDT entry at this stack. */
-	kernel_idt[X86_EXCEPT_DF].ist = 1;
+	kernel_idt[X86_EXCEPTION_DF].ist = 1;
 }

@@ -65,7 +65,7 @@ static void fatal_printf_helper(char ch, void *data, int *total) {
  * @param fmt		Error message format string.
  * @param ...		Arguments to substitute into format string.
  */
-void fatal_etc(intr_frame_t *frame, const char *fmt, ...) {
+void fatal_etc(frame_t *frame, const char *fmt, ...) {
 	va_list args;
 
 	local_irq_disable();

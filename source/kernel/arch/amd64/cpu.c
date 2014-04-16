@@ -25,7 +25,7 @@
 
 #include <x86/cpu.h>
 #include <x86/descriptor.h>
-#include <x86/intr.h>
+#include <x86/interrupt.h>
 #include <x86/lapic.h>
 #include <x86/tsc.h>
 
@@ -82,7 +82,7 @@ void cpu_dump(cpu_t *cpu) {
 __init_text void arch_cpu_early_init(void) {
 	/* Initialize the global IDT and the interrupt handler table. */
 	idt_init();
-	intr_init();
+	interrupt_init();
 }
 
 /** Comparison function for qsort() on an array of uint64_t's.

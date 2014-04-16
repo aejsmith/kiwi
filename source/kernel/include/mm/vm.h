@@ -37,7 +37,7 @@
 #include <cpu.h>
 #include <object.h>
 
-struct intr_frame;
+struct frame;
 struct mmu_context;
 struct vm_aspace;
 struct vm_region;
@@ -139,11 +139,10 @@ extern status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access,
 	phys_ptr_t *physp);
 extern void vm_unlock_page(vm_aspace_t *as, ptr_t addr);
 
-extern void vm_fault(struct intr_frame *frame, ptr_t addr, int reason,
-	uint32_t access);
+extern bool vm_fault(struct frame *frame, ptr_t addr, int reason, uint32_t access);
 
-extern status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,
-	uint32_t access, uint32_t flags, object_handle_t *handle,
+extern status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size,
+	unsigned spec, uint32_t access, uint32_t flags, object_handle_t *handle,
 	offset_t offset, const char *name);
 extern status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
 extern status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);

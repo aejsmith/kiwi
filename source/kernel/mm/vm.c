@@ -967,8 +967,9 @@ void vm_unlock_page(vm_aspace_t *as, ptr_t addr) {
 /** Page fault handler.
  * @param addr		Address the fault occurred at.
  * @param reason	Reason for the fault.
- * @param access	Type of memory access that caused the fault. */
-void vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) {
+ * @param access	Type of memory access that caused the fault.
+ * @return		Whether the fault was handled. */
+bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
 	vm_aspace_t *as = curr_cpu->aspace;
 	exception_info_t exception;
 	ptr_t base;
@@ -977,29 +978,26 @@ void vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) {
 
 	assert(!local_irq_state());
 
-	user = intr_frame_from_user(frame);
-
-	dprintf("vm: %s-mode page fault at %p (thread: %" PRId32 ", as: %p, reason: %d, "
-		"access: 0x%" PRIx32 ")\n", (user) ? "user" : "kernel", addr,
-		curr_thread->id, as, reason, access);
-
 	memset(&exception, 0, sizeof(exception));
 	exception.addr = (void *)addr;
 
+	user = frame_from_user(frame);
+
+	dprintf("vm: %s mode page fault at %p (thread: %" PRId32 ", as: %p, reason: %d, "
+		"access: 0x%" PRIx32 ")\n", (user) ? "user" : "kernel", addr,
+		curr_thread->id, as, reason, access);
+
 	/* If we don't have an address space, don't do anything. There won't be
 	 * anything to send a signal to, either. */
-	if(unlikely(!as)) {
-		exception.code = EXCEPTION_ADDR_UNMAPPED;
-		goto unhandled;
-	}
+	if(unlikely(!as))
+		return false;
 
 	/* Safe to take the lock despite us being in an interrupt - the lock
 	 * is only held within the functions in this file, and they should not
 	 * incur a page fault (if they do there's something wrong!). */
 	if(unlikely(mutex_held(&as->lock) && as->lock.holder == curr_thread)) {
 		kprintf(LOG_WARN, "vm: fault on %p with lock held at %pS\n", as, frame->ip);
-		exception.code = EXCEPTION_ADDR_UNMAPPED;
-		goto unhandled;
+		return false;
 	}
 
 	in_usermem = curr_thread->in_usermem;
@@ -1080,24 +1078,21 @@ out:
 	mutex_unlock(&as->lock);
 	curr_thread->in_usermem = in_usermem;
 
-	if(likely(!exception.code))
-		return;
-
-	if(user) {
-		thread_exception(&exception);
-		return;
-	} else if(curr_thread->in_usermem && is_user_address((void *)addr)) {
-		/* Handle faults in safe user memory access functions. */
-		kprintf(LOG_DEBUG, "vm: thread %" PRId32 " (%s) faulted in "
-			"user memory access at %p (ip: %p)\n", curr_thread->id,
-			curr_thread->name, addr, frame->ip);
-		longjmp(curr_thread->usermem_context, 1);
+	if(unlikely(exception.code)) {
+		if(user) {
+			thread_exception(&exception);
+		} else if(curr_thread->in_usermem && is_user_address((void *)addr)) {
+			/* Handle faults in safe user memory access functions. */
+			kprintf(LOG_DEBUG, "vm: thread %" PRId32 " (%s) faulted in "
+				"user memory access at %p (ip: %p)\n", curr_thread->id,
+				curr_thread->name, addr, frame->ip);
+			longjmp(curr_thread->usermem_context, 1);
+		} else {
+			return false;
+		}
 	}
 
-unhandled:
-	fatal_etc(frame,
-		"Unhandled %s-mode page fault exception at %p (%u)",
-		(user) ? "user" : "kernel", addr, exception.code);
+	return true;
 }
 
 /**

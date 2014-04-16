@@ -532,7 +532,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	process_load_t *load = arg1;
 	ptr_t addr, stack, entry;
 	process_args_t *uargs;
-	intr_frame_t frame;
+	frame_t frame;
 
 	/* Copy stack details to the thread so that it'll get unmapped if this
 	 * thread exits. */
@@ -1239,7 +1239,7 @@ err_free_args:
  * @param arg1		Pointer to cloned frame.
  * @param arg2		User-specified handle location. */
 static void process_clone_thread(void *arg1, void *arg2) {
-	intr_frame_t frame;
+	frame_t frame;
 
 	/* Set the user's handle to INVALID_HANDLE for it to determine that it
 	 * is the child process. This should succeed as in the parent process
@@ -1281,7 +1281,7 @@ status_t kern_process_clone(handle_t *handlep) {
 	process_t *process;
 	object_handle_t *khandle;
 	handle_t uhandle;
-	intr_frame_t *frame;
+	frame_t *frame;
 	thread_t *thread;
 	status_t ret;
 

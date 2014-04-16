@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -80,11 +80,11 @@ static inline bool kdb_help(int argc, char **argv) {
 	return (argc > 1 && strcmp(argv[1], "--help") == 0);
 }
 
-struct intr_frame;
+struct frame;
 struct thread;
 
 extern atomic_t kdb_running;
-extern struct intr_frame *curr_kdb_frame;
+extern struct frame *curr_kdb_frame;
 extern notifier_t kdb_entry_notifier;
 extern notifier_t kdb_exit_notifier;
 
@@ -104,8 +104,8 @@ extern void arch_kdb_trap_cpus(void);
 static inline void arch_kdb_trap_cpus(void) {}
 #endif
 
-extern kdb_status_t kdb_main(kdb_reason_t reason, struct intr_frame *frame, unsigned index);
-extern void kdb_except_handler(const char *name, struct intr_frame *frame);
+extern kdb_status_t kdb_main(kdb_reason_t reason, struct frame *frame, unsigned index);
+extern void kdb_exception(const char *name, struct frame *frame);
 
 extern void kdb_vprintf(const char *fmt, va_list args);
 extern void kdb_printf(const char *fmt, ...) __printf(1, 2);
@@ -114,7 +114,7 @@ extern void *kdb_malloc(size_t size);
 extern void kdb_free(void *addr);
 extern kdb_status_t kdb_parse_expression(char *exp, uint64_t *valp, char **strp);
 
-extern void kdb_enter(kdb_reason_t reason, struct intr_frame *frame);
+extern void kdb_enter(kdb_reason_t reason, struct frame *frame);
 
 extern void kdb_register_command(const char *name, const char *description, kdb_command_t func);
 extern void kdb_unregister_command(const char *name);

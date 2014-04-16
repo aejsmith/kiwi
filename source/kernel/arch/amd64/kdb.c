@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,7 @@
 #include <arch/stack.h>
 
 #include <x86/cpu.h>
-#include <x86/intr.h>
+#include <x86/interrupt.h>
 #include <x86/lapic.h>
 
 #include <lib/string.h>
@@ -47,7 +47,7 @@ typedef struct breakpoint {
 	ptr_t addr;			/**< Address of the breakpoint. */
 } breakpoint_t;
 
-extern void kdb_db_handler(intr_frame_t *frame);
+extern void kdb_db_exception(frame_t *frame);
 
 /** Breakpoint/watchpoint tracking structures. */
 static breakpoint_t kdb_breakpoints[KDB_BREAKPOINT_COUNT];
@@ -72,7 +72,7 @@ static inline void setup_debug_regs() {
  * @param reason	Reason for entry to the debugger.
  * @param frame		Interrupt frame.
  * @param index		Index of breakpoint or watchpoint that caused entry. */
-static void kdb_enter_internal(kdb_reason_t reason, intr_frame_t *frame, unsigned index) {
+static void kdb_enter_internal(kdb_reason_t reason, frame_t *frame, unsigned index) {
 	/* Disable breakpoints while KDB is running. */
 	x86_write_dr7(0);
 
@@ -86,9 +86,9 @@ static void kdb_enter_internal(kdb_reason_t reason, intr_frame_t *frame, unsigne
 	setup_debug_regs();
 }
 
-/** Debug interrupt handler.
+/** Debug exception handler.
  * @param frame		Interrupt frame. */
-void kdb_db_handler(intr_frame_t *frame) {
+void kdb_db_exception(frame_t *frame) {
 	kdb_reason_t reason = KDB_REASON_USER;
 	unsigned long dr6;
 	unsigned i = 0;
@@ -130,7 +130,7 @@ void kdb_db_handler(intr_frame_t *frame) {
  * @param reason	Reason for entry.
  * @param frame		Interrupt frame that caused entry (if NULL one will be
  *			generated). */
-void kdb_enter(kdb_reason_t reason, intr_frame_t *frame) {
+void kdb_enter(kdb_reason_t reason, frame_t *frame) {
 	if(frame) {
 		kdb_enter_internal(reason, frame, 0);
 	} else {
@@ -391,7 +391,7 @@ void arch_kdb_dump_registers(void) {
 		curr_kdb_frame->ss);
 
 	switch(curr_kdb_frame->num) {
-	case X86_EXCEPT_PF:
+	case X86_EXCEPTION_PF:
 		kdb_printf("EC:  0x%04lx (%s/%s%s%s)\n", curr_kdb_frame->err_code,
 			(curr_kdb_frame->err_code & (1<<0)) ? "protection" : "not-present",
 			(curr_kdb_frame->err_code & (1<<1)) ? "write" : "read",
@@ -399,12 +399,12 @@ void arch_kdb_dump_registers(void) {
 			(curr_kdb_frame->err_code & (1<<4)) ? "/execute" : "");
 		kdb_printf("CR2: 0x%016lx\n", x86_read_cr2());
 		break;
-	case X86_EXCEPT_DF:
-	case X86_EXCEPT_TS:
-	case X86_EXCEPT_NP:
-	case X86_EXCEPT_SS:
-	case X86_EXCEPT_GP:
-	case X86_EXCEPT_AC:
+	case X86_EXCEPTION_DF:
+	case X86_EXCEPTION_TS:
+	case X86_EXCEPTION_NP:
+	case X86_EXCEPTION_SS:
+	case X86_EXCEPTION_GP:
+	case X86_EXCEPTION_AC:
 		kdb_printf("EC:  0x%04lx\n", curr_kdb_frame->err_code);
 		break;
 	}

@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2011 Alex Smith
+# Copyright (C) 2009-2014 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -23,7 +23,7 @@ sources = FeatureSources(config, [
     'descriptor.c',
     'elf.c',
     'entry.S',
-    'intr.c',
+    'interrupt.c',
     'kdb.c',
     'lapic.c',
     'mmu.c',

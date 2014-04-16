@@ -73,10 +73,11 @@ typedef void (*exception_handler_t)(exception_info_t *info,
 #define EXCEPTION_FLOAT_DIV_ZERO	8	/**< Floating point division by zero. */
 #define EXCEPTION_FLOAT_OVERFLOW	9	/**< Floating point overflow. */
 #define EXCEPTION_FLOAT_UNDERFLOW	10	/**< Floating point underflow. */
-#define EXCEPTION_FLOAT_RESULT		11	/**< Inexact floating point result. */
-#define EXCEPTION_FLOAT_INVALID		12	/**< Other invalid floating point operation. */
-#define EXCEPTION_BREAKPOINT		13	/**< Breakpoint. */
-#define EXCEPTION_MAX			14
+#define EXCEPTION_FLOAT_PRECISION	11	/**< Inexact floating point result. */
+#define EXCEPTION_FLOAT_DENORMAL	12	/**< Denormalized operand. */
+#define EXCEPTION_FLOAT_INVALID		13	/**< Other invalid floating point operation. */
+#define EXCEPTION_BREAKPOINT		14	/**< Breakpoint. */
+#define EXCEPTION_MAX			15
 
 #ifdef __cplusplus
 }

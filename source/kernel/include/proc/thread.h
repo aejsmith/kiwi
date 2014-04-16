@@ -40,7 +40,7 @@
 #include <time.h>
 
 struct cpu;
-struct intr_frame;
+struct frame;
 struct process;
 
 /** Entry function for a thread. */
@@ -190,12 +190,12 @@ typedef struct thread_interrupt {
 
 extern void arch_thread_init(thread_t *thread, void *stack, void (*entry)(void));
 extern void arch_thread_destroy(thread_t *thread);
-extern void arch_thread_clone(thread_t *thread, struct intr_frame *frame);
+extern void arch_thread_clone(thread_t *thread, struct frame *frame);
 extern void arch_thread_switch(thread_t *thread, thread_t *prev);
 extern void arch_thread_set_tls_addr(ptr_t addr);
-extern void arch_thread_user_setup(struct intr_frame *frame, ptr_t entry,
-	ptr_t sp, ptr_t arg);
-extern void arch_thread_user_enter(struct intr_frame *frame) __noreturn;
+extern void arch_thread_user_setup(struct frame *frame, ptr_t entry, ptr_t sp,
+	ptr_t arg);
+extern void arch_thread_user_enter(struct frame *frame) __noreturn;
 extern status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt,
 	unsigned ipl);
 extern status_t arch_thread_interrupt_restore(unsigned *iplp);

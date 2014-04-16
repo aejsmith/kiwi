@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,7 +30,7 @@
 #include <lib/notifier.h>
 
 struct cpu;
-struct intr_frame;
+struct frame;
 struct kboot_tag;
 
 extern notifier_t fatal_notifier;
@@ -62,7 +62,7 @@ extern void update_boot_progress(int percent);
 
 extern void system_shutdown(unsigned action);
 
-extern void fatal_etc(struct intr_frame *frame, const char *fmt, ...) __noreturn __printf(2, 3);
+extern void fatal_etc(struct frame *frame, const char *fmt, ...) __noreturn __printf(2, 3);
 
 /** Handle an unrecoverable kernel error.
  * @param fmt		Error message format string.

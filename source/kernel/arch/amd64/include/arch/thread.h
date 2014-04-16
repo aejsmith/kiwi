@@ -27,7 +27,7 @@
 #include <types.h>
 
 struct cpu;
-struct intr_frame;
+struct frame;
 struct thread;
 
 /** x86-specific thread structure.
@@ -47,7 +47,7 @@ typedef struct __packed arch_thread {
 	/** Saved context switch stack pointer. */
 	ptr_t saved_rsp;
 
-	struct intr_frame *user_iframe;		/**< Frame from last user-mode entry. */
+	struct frame *user_frame;		/**< Frame from last user-mode entry. */
 	unsigned long flags;			/**< Flags for the thread. */
 	ptr_t tls_base;				/**< TLS base address. */
 
@@ -69,14 +69,14 @@ static inline struct thread *arch_curr_thread(void) {
 #endif /* __ASM__ */
 
 /** Flags for arch_thread_t. */
-#define ARCH_THREAD_IFRAME_MODIFIED	(1<<0)	/**< Interrupt frame was modified. */
+#define ARCH_THREAD_FRAME_MODIFIED	(1<<0)	/**< Interrupt frame was modified. */
 #define ARCH_THREAD_HAVE_FPU		(1<<1)	/**< Thread has an FPU state saved. */
 #define ARCH_THREAD_FREQUENT_FPU	(1<<2)	/**< FPU is frequently used by the thread. */
 
 /** Offsets in arch_thread_t. */
 #define ARCH_THREAD_OFF_KERNEL_RSP	0x10
 #define ARCH_THREAD_OFF_USER_RSP	0x18
-#define ARCH_THREAD_OFF_USER_IFRAME	0x28
+#define ARCH_THREAD_OFF_USER_FRAME	0x28
 #define ARCH_THREAD_OFF_FLAGS		0x30
 
 #endif /* __ARCH_THREAD_H */
