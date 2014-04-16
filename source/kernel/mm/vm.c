@@ -1033,12 +1033,12 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
 	}
 
 	/* If the region is a stack region, check if we've hit the guard page.
-	 * TODO: Stack direction. Also, stack overflow exception code? */
+	 * TODO: Stack direction. */
 	if(region->flags & VM_MAP_STACK && base == region->start) {
 		kprintf(LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at %p: "
 			"hit stack guard page\n", curr_thread->id, curr_thread->name,
 			addr);
-		exception.code = EXCEPTION_ADDR_UNMAPPED;
+		exception.code = EXCEPTION_STACK_OVERFLOW;
 		goto out;
 	}
 

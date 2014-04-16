@@ -65,19 +65,20 @@ typedef void (*exception_handler_t)(exception_info_t *info,
 /** Exception codes. */
 #define EXCEPTION_ADDR_UNMAPPED		1	/**< Access to non-existant memory mapping. */
 #define EXCEPTION_ACCESS_VIOLATION	2	/**< Violation of mapping access flags. */
-#define EXCEPTION_PAGE_ERROR		3	/**< Error while attempting to load a page. */
-#define EXCEPTION_INVALID_ALIGNMENT	4	/**< Incorrectly aligned access. */
-#define EXCEPTION_INVALID_INSTRUCTION	5	/**< Invalid instruction. */
-#define EXCEPTION_INT_DIV_ZERO		6	/**< Integer division by zero. */
-#define EXCEPTION_INT_OVERFLOW		7	/**< Integer overflow. */
-#define EXCEPTION_FLOAT_DIV_ZERO	8	/**< Floating point division by zero. */
-#define EXCEPTION_FLOAT_OVERFLOW	9	/**< Floating point overflow. */
-#define EXCEPTION_FLOAT_UNDERFLOW	10	/**< Floating point underflow. */
-#define EXCEPTION_FLOAT_PRECISION	11	/**< Inexact floating point result. */
-#define EXCEPTION_FLOAT_DENORMAL	12	/**< Denormalized operand. */
-#define EXCEPTION_FLOAT_INVALID		13	/**< Other invalid floating point operation. */
-#define EXCEPTION_BREAKPOINT		14	/**< Breakpoint. */
-#define EXCEPTION_MAX			15
+#define EXCEPTION_STACK_OVERFLOW	3	/**< Hit stack guard page. */
+#define EXCEPTION_PAGE_ERROR		4	/**< Error while attempting to load a page. */
+#define EXCEPTION_INVALID_ALIGNMENT	5	/**< Incorrectly aligned access. */
+#define EXCEPTION_INVALID_INSTRUCTION	6	/**< Invalid instruction. */
+#define EXCEPTION_INT_DIV_ZERO		7	/**< Integer division by zero. */
+#define EXCEPTION_INT_OVERFLOW		8	/**< Integer overflow. */
+#define EXCEPTION_FLOAT_DIV_ZERO	9	/**< Floating point division by zero. */
+#define EXCEPTION_FLOAT_OVERFLOW	10	/**< Floating point overflow. */
+#define EXCEPTION_FLOAT_UNDERFLOW	11	/**< Floating point underflow. */
+#define EXCEPTION_FLOAT_PRECISION	12	/**< Inexact floating point result. */
+#define EXCEPTION_FLOAT_DENORMAL	13	/**< Denormalized operand. */
+#define EXCEPTION_FLOAT_INVALID		14	/**< Other invalid floating point operation. */
+#define EXCEPTION_BREAKPOINT		15	/**< Breakpoint. */
+#define EXCEPTION_MAX			16
 
 #ifdef __cplusplus
 }
