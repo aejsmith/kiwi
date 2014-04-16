@@ -25,6 +25,7 @@
 #include <arch/setjmp.h>
 #include <arch/thread.h>
 
+#include <kernel/exception.h>
 #include <kernel/thread.h>
 
 #include <lib/avl_tree.h>
@@ -111,6 +112,9 @@ typedef struct thread {
 	/** User mode interrupt information. */
 	unsigned ipl;			/**< User mode interrupt priority level. */
 	list_t interrupts;		/**< Pending user mode interrupts. */
+
+	/** Exception handler table. */
+	exception_handler_t exceptions[EXCEPTION_MAX];
 
 	/** Overridden security token for the thread (if any). */
 	token_t *token;
@@ -211,6 +215,7 @@ extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout,
 extern void thread_yield(void);
 extern void thread_at_kernel_entry(void);
 extern void thread_at_kernel_exit(void);
+extern void thread_exception(exception_info_t *info);
 extern void thread_exit(void) __noreturn;
 
 extern thread_t *thread_lookup_unsafe(thread_id_t id);

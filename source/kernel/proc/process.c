@@ -157,6 +157,7 @@ process_alloc(const char *name, process_id_t id, process_t *parent, int priority
 	process->aspace = aspace;
 	process->next_image_id = 0;
 	process->thread_restore = 0;
+	memset(process->exceptions, 0, sizeof(process->exceptions));
 	process->root_port = root_port;
 	process->state = PROCESS_CREATED;
 	process->id = id;
@@ -1564,6 +1565,34 @@ status_t kern_process_set_token(handle_t handle) {
 	token_release(curr_proc->token);
 	curr_proc->token = token;
 	mutex_unlock(&curr_proc->lock);
+	return STATUS_SUCCESS;
+}
+
+/**
+ * Set an exception handler.
+ *
+ * Set a process-wide exception handler. In addition to the process-wide set of
+ * handlers, each thread has its own set of handlers. If a per-thread handler
+ * is set, it is used over the process-wide handler when an exception occurs.
+ * If there is neither a per-thread handler or a process-wide handler for an
+ * exception that occurs, the whole process is killed.
+ *
+ * @param code		Exception to set handler for.
+ * @param handler	Handler function to use (NULL to unset the process-wide
+ *			handler).
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_ARG if code is invalid.
+ *			STATUS_INVALID_ADDR if handler is an invalid address.
+ */
+status_t kern_process_set_exception(unsigned code, exception_handler_t handler) {
+	if(code >= EXCEPTION_MAX) {
+		return STATUS_INVALID_ARG;
+	} else if(handler && !is_user_address(handler)) {
+		return STATUS_INVALID_ADDR;
+	}
+
+	curr_proc->exceptions[code] = handler;
 	return STATUS_SUCCESS;
 }
 

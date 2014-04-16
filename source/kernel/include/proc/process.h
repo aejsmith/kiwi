@@ -80,6 +80,9 @@ typedef struct process {
 	image_id_t next_image_id;	/**< Next image ID. */
 	ptr_t thread_restore;		/**< Address of kern_thread_restore() in libkernel. */
 
+	/** Exception handler table. */
+	exception_handler_t exceptions[EXCEPTION_MAX];
+
 	/** Special ports. */
 	struct ipc_port *root_port;	/**< Root port. */
 

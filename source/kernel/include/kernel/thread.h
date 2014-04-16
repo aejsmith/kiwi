@@ -23,6 +23,7 @@
 #define __KERNEL_THREAD_H
 
 #include <kernel/context.h>
+#include <kernel/exception.h>
 #include <kernel/limits.h>
 #include <kernel/object.h>
 #include <kernel/security.h>
@@ -75,6 +76,7 @@ typedef struct thread_state {
 #define THREAD_PRIORITY_HIGH	2	/**< High priority. */
 
 /** Thread interrupt priority level (IPL) definitions. */
+#define THREAD_IPL_EXCEPTION	14	/**< Exception level. */
 #define THREAD_IPL_MAX		15	/**< Maximum IPL (all interrupts blocked). */
 
 extern status_t kern_thread_create(const char *name,
@@ -88,6 +90,9 @@ extern status_t kern_thread_ipl(unsigned *iplp);
 extern status_t kern_thread_set_ipl(unsigned ipl);
 extern status_t kern_thread_token(handle_t *handlep);
 extern status_t kern_thread_set_token(handle_t handle);
+extern status_t kern_thread_set_exception(unsigned code,
+	exception_handler_t handler);
+
 extern status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp);
 extern void kern_thread_exit(int status) __attribute__((noreturn));
 

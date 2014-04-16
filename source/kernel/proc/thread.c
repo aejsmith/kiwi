@@ -601,6 +601,29 @@ void thread_exit(void) {
 	fatal("Shouldn't get here");
 }
 
+/** Handle a user mode thread exception.
+ * @param info		Exception information structure (will be copied). */
+void thread_exception(exception_info_t *info) {
+	exception_handler_t handler;
+	thread_interrupt_t *interrupt;
+
+	handler = curr_thread->exceptions[info->code];
+	if(!handler)
+		handler = curr_proc->exceptions[info->code];
+
+	if(!handler || curr_thread->ipl > THREAD_IPL_EXCEPTION)
+		process_exit(info->code, EXIT_REASON_EXCEPTION);
+
+	interrupt = kmalloc(sizeof(*interrupt) + sizeof(*info), MM_KERNEL);
+	memcpy(interrupt + 1, info, sizeof(*info));
+	interrupt->priority = THREAD_IPL_EXCEPTION;
+	interrupt->handler = (ptr_t)handler;
+	interrupt->size = sizeof(*info);
+
+	thread_interrupt(curr_thread, interrupt);
+	assert(curr_thread->flags & THREAD_INTERRUPTED);
+}
+
 /** Perform tasks necessary when a thread is entering the kernel. */
 void thread_at_kernel_entry(void) {
 	nstime_t now;
@@ -657,7 +680,7 @@ void thread_at_kernel_exit(void) {
 			 * doing so for the moment because trying to do that
 			 * will just fail again. When implementing this make
 			 * sure to preserve the original IPL properly. */
-			process_exit(0, EXIT_REASON_NORMAL);
+			process_exit(0, EXIT_REASON_KILLED);
 		}
 
 		kfree(interrupt);
@@ -774,8 +797,7 @@ thread_create(const char *name, process_t *owner, unsigned flags,
 	if(!owner)
 		owner = kernel_proc;
 
-	/* Allocate a thread structure from the cache. The thread constructor
-	 * caches a kernel stack with the thread for us. */
+	/* Allocate a thread structure from the cache. */
 	thread = slab_cache_alloc(thread_cache, MM_KERNEL);
 
 	/* Allocate an ID for the thread. */
@@ -813,6 +835,7 @@ thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->user_time = 0;
 	thread->in_usermem = false;
 	thread->ipl = 0;
+	memset(thread->exceptions, 0, sizeof(thread->exceptions));
 	thread->token = NULL;
 	thread->active_token = NULL;
 	thread->func = func;
@@ -1454,7 +1477,34 @@ status_t kern_thread_set_token(handle_t handle) {
 	curr_thread->token = token;
 
 	mutex_unlock(&curr_proc->lock);
+	return STATUS_SUCCESS;
+}
 
+/**
+ * Set an exception handler.
+ *
+ * Set an exception handler for the current thread. Each thread has its own set
+ * of exception handlers in addition to the process-wide handlers. If a handler
+ * is set to non-NULL in a thread, it will be used instead of the process-wide
+ * handler (if any). If there is neither a per-thread handler or a process-wide
+ * handler for an exception that occurs, the whole process is killed.
+ *
+ * @param code		Exception to set handler for.
+ * @param handler	Handler function to use (NULL to unset the per-thread
+ *			handler).
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_ARG if code is invalid.
+ *			STATUS_INVALID_ADDR if handler is an invalid address.
+ */
+status_t kern_thread_set_exception(unsigned code, exception_handler_t handler) {
+	if(code >= EXCEPTION_MAX) {
+		return STATUS_INVALID_ARG;
+	} else if(handler && !is_user_address(handler)) {
+		return STATUS_INVALID_ADDR;
+	}
+
+	curr_thread->exceptions[code] = handler;
 	return STATUS_SUCCESS;
 }
 
@@ -1523,10 +1573,10 @@ void kern_thread_restore(void) {
 	ret = arch_thread_interrupt_restore(&ipl);
 	if(ret != STATUS_SUCCESS) {
 		/* TODO: Same as in thread_at_kernel_exit(). */
-		process_exit(0, EXIT_REASON_NORMAL);
+		process_exit(0, EXIT_REASON_KILLED);
 	}
 
 	ret = kern_thread_set_ipl(ipl);
 	if(ret != STATUS_SUCCESS)
-		process_exit(0, EXIT_REASON_NORMAL);
+		process_exit(0, EXIT_REASON_KILLED);
 }

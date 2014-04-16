@@ -96,6 +96,7 @@ syscall kern_process_status(handle_t, ptr_t, ptr_t);
 syscall kern_process_port(handle_t, int32_t, ptr_t);
 syscall kern_process_token(ptr_t);
 syscall kern_process_set_token(handle_t);
+syscall kern_process_set_exception(uint, ptr_t);
 syscall kern_process_exit(int);
 syscall kern_process_control(uint, ptr_t, ptr_t) hidden;
 
@@ -108,6 +109,7 @@ syscall kern_thread_ipl(ptr_t);
 syscall kern_thread_set_ipl(uint);
 syscall kern_thread_token(ptr_t);
 syscall kern_thread_set_token(handle_t);
+syscall kern_thread_set_exception(uint, ptr_t);
 syscall kern_thread_sleep(nstime_t, ptr_t);
 syscall kern_thread_exit(int) wrapped;
 syscall kern_thread_control(uint, ptr_t, ptr_t) hidden;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #ifndef __KERNEL_PROCESS_H
 #define __KERNEL_PROCESS_H
 
+#include <kernel/exception.h>
 #include <kernel/security.h>
 #include <kernel/thread.h>
 
@@ -82,6 +83,8 @@ typedef struct process_attrib {
 
 /** Process exit reason codes. */
 #define EXIT_REASON_NORMAL	1	/**< Normal exit (status is exit code). */
+#define EXIT_REASON_KILLED	2	/**< Process was killed (no status). */
+#define EXIT_REASON_EXCEPTION	3	/**< Unhandled exception (status is exception code). */
 
 /** Process priority classes. */
 #define PRIORITY_CLASS_LOW	0	/**< Low priority. */
@@ -109,6 +112,9 @@ extern status_t kern_process_port(handle_t handle, int32_t id,
 
 extern status_t kern_process_token(handle_t *handlep);
 extern status_t kern_process_set_token(handle_t handle);
+extern status_t kern_process_set_exception(unsigned code,
+	exception_handler_t handler);
+
 extern void kern_process_exit(int status) __attribute__((noreturn));
 
 #ifdef __cplusplus
