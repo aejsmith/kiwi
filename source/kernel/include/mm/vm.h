@@ -139,7 +139,7 @@ extern status_t vm_lock_page(vm_aspace_t *as, ptr_t addr, uint32_t access,
 	phys_ptr_t *physp);
 extern void vm_unlock_page(vm_aspace_t *as, ptr_t addr);
 
-extern status_t vm_fault(struct intr_frame *frame, ptr_t addr, int reason,
+extern void vm_fault(struct intr_frame *frame, ptr_t addr, int reason,
 	uint32_t access);
 
 extern status_t vm_map(vm_aspace_t *as, ptr_t *addrp, size_t size, unsigned spec,

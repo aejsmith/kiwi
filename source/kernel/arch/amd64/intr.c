@@ -92,7 +92,6 @@ static void kmode_except_handler(intr_frame_t *frame) {
  * @param frame		Interrupt stack frame. */
 static void except_handler(intr_frame_t *frame) {
 	if(frame->cs & 3) {
-		// TODO: Fix this.
 		kprintf(LOG_DEBUG, "arch: sending SIGSEGV to thread %" PRId32 " (%s) "
 			"due to exception %lu (%s) at %p\n", curr_thread->id,
 			curr_thread->name, frame->num, except_strings[frame->num],
@@ -192,7 +191,6 @@ static void page_fault(intr_frame_t *frame) {
 	ptr_t addr;
 	int reason;
 	uint32_t access;
-	status_t ret;
 
 	/* We can't service a page fault while running KDB. */
 	if(unlikely(atomic_get(&kdb_running) == 2)) {
@@ -210,12 +208,7 @@ static void page_fault(intr_frame_t *frame) {
 	if(frame->err_code & (1<<3))
 		fatal("Reserved bit page fault exception at %p", addr);;
 
-	ret = vm_fault(frame, addr, reason, access);
-	if(ret != STATUS_SUCCESS) {
-		fatal_etc(frame,
-			"Unhandled %s-mode page fault exception at %p (%d)",
-			(frame->cs & 3) ? "user" : "kernel", addr, ret);
-	}
+	vm_fault(frame, addr, reason, access);
 }
 
 /** FPU Floating-Point Error (#MF) fault handler.

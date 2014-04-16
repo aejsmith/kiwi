@@ -967,33 +967,39 @@ void vm_unlock_page(vm_aspace_t *as, ptr_t addr) {
 /** Page fault handler.
  * @param addr		Address the fault occurred at.
  * @param reason	Reason for the fault.
- * @param access	Type of memory access that caused the fault.
- * @return		STATUS_SUCCESS if the fault has been handled in some
- *			way, other status code if not. */
-status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) {
+ * @param access	Type of memory access that caused the fault. */
+void vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) {
 	vm_aspace_t *as = curr_cpu->aspace;
+	exception_info_t exception;
 	ptr_t base;
 	vm_region_t *region;
-	status_t ret;
-	bool in_usermem;
+	bool user, in_usermem;
 
 	assert(!local_irq_state());
 
-	dprintf("vm: %s-mode page fault at %p (thread: %" PRId32 ", as: %p, reason: %d, access: 0x%"
-		PRIx32 ")\n", (intr_frame_from_user(frame)) ? "user" : "kernel",
-		addr, curr_thread->id, as, reason, access);
+	user = intr_frame_from_user(frame);
+
+	dprintf("vm: %s-mode page fault at %p (thread: %" PRId32 ", as: %p, reason: %d, "
+		"access: 0x%" PRIx32 ")\n", (user) ? "user" : "kernel", addr,
+		curr_thread->id, as, reason, access);
+
+	memset(&exception, 0, sizeof(exception));
+	exception.addr = (void *)addr;
 
 	/* If we don't have an address space, don't do anything. There won't be
 	 * anything to send a signal to, either. */
-	if(unlikely(!as))
-		return STATUS_INVALID_ADDR;
+	if(unlikely(!as)) {
+		exception.code = EXCEPTION_ADDR_UNMAPPED;
+		goto unhandled;
+	}
 
 	/* Safe to take the lock despite us being in an interrupt - the lock
 	 * is only held within the functions in this file, and they should not
 	 * incur a page fault (if they do there's something wrong!). */
 	if(unlikely(mutex_held(&as->lock) && as->lock.holder == curr_thread)) {
 		kprintf(LOG_WARN, "vm: fault on %p with lock held at %pS\n", as, frame->ip);
-		return STATUS_INVALID_ADDR;
+		exception.code = EXCEPTION_ADDR_UNMAPPED;
+		goto unhandled;
 	}
 
 	in_usermem = curr_thread->in_usermem;
@@ -1010,7 +1016,7 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 		kprintf(LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at %p: "
 			"no region found\n", curr_thread->id, curr_thread->name,
 			addr);
-		ret = STATUS_INVALID_ADDR;
+		exception.code = EXCEPTION_ADDR_UNMAPPED;
 		goto out;
 	}
 
@@ -1023,17 +1029,18 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 			"access violation (access: 0x%x, allowed: 0x%x)\n",
 			curr_thread->id, curr_thread->name, addr, access,
 			region->access);
-		ret = STATUS_ACCESS_DENIED;
+		exception.code = EXCEPTION_ACCESS_VIOLATION;
+		exception.access = access;
 		goto out;
 	}
 
 	/* If the region is a stack region, check if we've hit the guard page.
-	 * TODO: Stack direction. */
+	 * TODO: Stack direction. Also, stack overflow exception code? */
 	if(region->flags & VM_MAP_STACK && base == region->start) {
 		kprintf(LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at %p: "
 			"hit stack guard page\n", curr_thread->id, curr_thread->name,
 			addr);
-		ret = STATUS_INVALID_ADDR;
+		exception.code = EXCEPTION_ADDR_UNMAPPED;
 		goto out;
 	}
 
@@ -1054,31 +1061,31 @@ status_t vm_fault(intr_frame_t *frame, ptr_t addr, int reason, uint32_t access) 
 			}
 		}
 
-		ret = map_anon_page(region, base, access, NULL);
+		exception.status = map_anon_page(region, base, access, NULL);
 	} else {
-		ret = map_object_page(region, base, NULL);
+		exception.status = map_object_page(region, base, NULL);
 	}
 
 	local_irq_disable();
 	mmu_context_unlock(as->mmu);
 
-	if(ret != STATUS_SUCCESS) {
-		kprintf(LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at %p "
-			"returned %d\n", curr_thread->id, curr_thread->name,
-			addr, ret);
+	if(exception.status != STATUS_SUCCESS) {
+		exception.code = EXCEPTION_PAGE_ERROR;
+		kprintf(LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at %p: "
+			"failed to map page: %d\n", curr_thread->id, curr_thread->name,
+			addr, exception.status);
 	}
+
 out:
 	mutex_unlock(&as->lock);
 	curr_thread->in_usermem = in_usermem;
 
-	if(ret == STATUS_SUCCESS)
-		return ret;
+	if(likely(!exception.code))
+		return;
 
-	if(intr_frame_from_user(frame)) {
-		kdb_enter(KDB_REASON_USER, frame);
-
-		// TODO: Exception. Specify type of error in exception.
-		process_exit(EXIT_REASON_NORMAL, 255);
+	if(user) {
+		thread_exception(&exception);
+		return;
 	} else if(curr_thread->in_usermem && is_user_address((void *)addr)) {
 		/* Handle faults in safe user memory access functions. */
 		kprintf(LOG_DEBUG, "vm: thread %" PRId32 " (%s) faulted in "
@@ -1087,7 +1094,10 @@ out:
 		longjmp(curr_thread->usermem_context, 1);
 	}
 
-	return ret;
+unhandled:
+	fatal_etc(frame,
+		"Unhandled %s-mode page fault exception at %p (%u)",
+		(user) ? "user" : "kernel", addr, exception.code);
 }
 
 /**
