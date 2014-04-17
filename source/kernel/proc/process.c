@@ -1295,9 +1295,14 @@ status_t kern_process_clone(handle_t *handlep) {
 		return ret;
 	}
 
+	mutex_lock(&curr_proc->lock);
+
 	/* Clone handles and other per-process information. */
 	object_process_clone(process, curr_proc);
 	elf_process_clone(process, curr_proc);
+	memcpy(&process->exceptions, &curr_proc->exceptions, sizeof(process->exceptions));
+
+	mutex_unlock(&curr_proc->lock);
 
 	/* Create a new handle. This takes over the initial reference added by
 	 * process_alloc(). */
@@ -1325,6 +1330,7 @@ status_t kern_process_clone(handle_t *handlep) {
 	spinlock_unlock(&curr_thread->lock);
 
 	/* Inherit other per-thread attributes from the calling thread. */
+	memcpy(&thread->exceptions, &curr_thread->exceptions, sizeof(thread->exceptions));
 	thread->ustack = curr_thread->ustack;
 	thread->ustack_size = curr_thread->ustack_size;
 
@@ -1628,7 +1634,11 @@ status_t kern_process_set_exception(unsigned code, exception_handler_t handler) 
 		return STATUS_INVALID_ADDR;
 	}
 
+	/* Locking is necessary here due to the memcpy() of the exception table
+	 * in kern_process_clone(). Setting should be atomic. */
+	mutex_lock(&curr_proc->lock);
 	curr_proc->exceptions[code] = handler;
+	mutex_unlock(&curr_proc->lock);
 	return STATUS_SUCCESS;
 }
 
