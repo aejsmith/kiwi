@@ -38,8 +38,9 @@ extern void kern_thread_restore(void);
 
 #ifdef __LIBKERNEL
 
-extern status_t _kern_thread_create(const char *name, thread_entry_t *entry,
-	uint32_t flags, handle_t *handlep);
+extern status_t _kern_thread_create(const char *name, thread_entry_t entry,
+	void *arg, const thread_stack_t *stack, uint32_t flags,
+	handle_t *handlep);
 extern thread_id_t _kern_thread_id(handle_t handle);
 extern void _kern_thread_exit(int status) __attribute__((noreturn));
 

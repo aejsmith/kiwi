@@ -514,10 +514,10 @@ static void copy_argument_strings(char **dest, char **source, size_t count, ptr_
 	dest[count] = NULL;
 }
 
-/** Entry thread for a new process.
+/** Entry point for a new process.
  * @param arg1		Pointer to creation information structure.
  * @param arg2		Unused. */
-static void process_entry_thread(void *arg1, void *arg2) {
+static void process_entry_trampoline(void *arg1, void *arg2) {
 	process_load_t *load = arg1;
 	ptr_t addr, stack, entry;
 	process_args_t *uargs;
@@ -625,7 +625,7 @@ process_create(const char *const args[], const char *const env[], uint32_t flags
 		process->flags |= PROCESS_CRITICAL;
 
 	/* Create and run the entry thread. */
-	ret = thread_create("main", process, 0, process_entry_thread, &load,
+	ret = thread_create("main", process, 0, process_entry_trampoline, &load,
 		NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
 		process_release(process);
@@ -1080,7 +1080,8 @@ kern_process_create(const char *path, const char *const args[],
 	}
 
 	/* Create and run the entry thread. */
-	ret = thread_create("main", process, 0, process_entry_thread, &load, NULL, &thread);
+	ret = thread_create("main", process, 0, process_entry_trampoline, &load,
+		NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
 		if(handlep)
 			object_handle_detach(uhandle);
@@ -1167,7 +1168,8 @@ kern_process_exec(const char *path, const char *const args[],
 		goto err_free_args;
 
 	/* Create the entry thread to finish loading the program. */
-	ret = thread_create("main", curr_proc, 0, process_entry_thread, &load, NULL, &thread);
+	ret = thread_create("main", curr_proc, 0, process_entry_trampoline,
+		&load, NULL, &thread);
 	if(ret != STATUS_SUCCESS)
 		goto err_free_args;
 
@@ -1212,7 +1214,7 @@ kern_process_exec(const char *path, const char *const args[],
 	/* Free up old process information. We swapped the address space, token
 	 * and root port pointers into the load structure, so they will get
 	 * freed by free_process_args(). Don't swap name until now because it
-	 * is used by process_entry_thread(). */
+	 * is used by process_entry_trampoline(). */
 	load.path = name;
 	free_process_args(&load);
 	thread_exit();
@@ -1224,10 +1226,10 @@ err_free_args:
 	return ret;
 }
 
-/** Entry thread for a cloned process.
+/** Entry point for a cloned process.
  * @param arg1		Pointer to cloned frame.
  * @param arg2		User-specified handle location. */
-static void process_clone_thread(void *arg1, void *arg2) {
+static void process_clone_trampoline(void *arg1, void *arg2) {
 	frame_t frame;
 
 	/* Set the user's handle to INVALID_HANDLE for it to determine that it
@@ -1308,7 +1310,7 @@ status_t kern_process_clone(handle_t *handlep) {
 
 	/* Create the entry thread. */
 	frame = kmalloc(sizeof(*frame), MM_KERNEL);
-	ret = thread_create(curr_thread->name, process, 0, process_clone_thread,
+	ret = thread_create(curr_thread->name, process, 0, process_clone_trampoline,
 		frame, handlep, &thread);
 	object_handle_release(khandle);
 	if(ret != STATUS_SUCCESS) {

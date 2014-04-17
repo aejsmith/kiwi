@@ -49,11 +49,10 @@ extern void amd64_context_switch(ptr_t new_rsp, ptr_t *old_rsp);
 extern void amd64_context_restore(ptr_t new_rsp);
 
 /** Initialize AMD64-specific thread data.
- * @param thread	Thread to initialize.
- * @param stack		Base of the kernel stack for the thread.
- * @param entry		Entry point for the thread. */
-void arch_thread_init(thread_t *thread, void *stack, void (*entry)(void)) {
+ * @param thread	Thread to initialize. */
+void arch_thread_init(thread_t *thread) {
 	unsigned long *sp;
+	ptr_t entry;
 
 	thread->arch.parent = thread;
 	thread->arch.flags = 0;
@@ -61,14 +60,15 @@ void arch_thread_init(thread_t *thread, void *stack, void (*entry)(void)) {
 	thread->arch.fpu_count = 0;
 
 	/* Point the RSP for SYSCALL entry at the top of the stack. */
-	thread->arch.kernel_rsp = (ptr_t)stack + KSTACK_SIZE;
+	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
 
 	/* Initialize the kernel stack. First value is a fake return address to
 	 * make the backtrace end correctly and maintain ABI alignment
 	 * requirements: ((RSP - 8) % 16) == 0 on entry to a function. */
+	entry = (ptr_t)thread_trampoline;
 	sp = (unsigned long *)thread->arch.kernel_rsp;
 	*--sp = 0;			/* Fake return address for backtrace. */
-	*--sp = (ptr_t)entry;		/* RIP/Return address. */
+	*--sp = entry;			/* RIP/Return address. */
 	*--sp = 0;			/* RBP. */
 	*--sp = 0;			/* RBX. */
 	*--sp = 0;			/* R12. */

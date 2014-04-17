@@ -32,31 +32,34 @@
 extern "C" {
 #endif
 
-/** Thread entry information. */
-typedef struct thread_entry {
-	void (*func)(void *);		/**< Entry point for the thread. */
-	void *arg;			/**< Argument to the entry function. */
-
+/** Thread stack information. */
+typedef struct thread_stack {
 	/**
 	 * Base of stack.
 	 *
 	 * Base address of the stack area for the process. The kernel deals with
-	 * setting the stack pointer within the specified area. If NULL, a stack
-	 * will be allocated by the kernel, and will be freed automatically
-	 * when the thread terminates. If not NULL, it is the responsibility of
-	 * the program to free the stack after the thread terminates.
+	 * setting the stack pointer within the specified area. When creating
+	 * a new thread, if the base is NULL, a stack will be allocated by the
+	 * kernel, and will be freed automatically when the thread terminates.
+	 * If not NULL, it is the responsibility of the program to free the
+	 * stack after the thread terminates.
 	 */
-	void *stack;
+	void *base;
 
 	/**
 	 * Size of the stack.
 	 *
 	 * If stack is not NULL, then this should be the non-zero size of the
 	 * provided stack. Otherwise, it is used as the size of the stack to
-	 * create, with zero indicating that the default size should be used.
+	 * allocate, with zero indicating that the default size should be used.
 	 */
-	size_t stack_size;
-} thread_entry_t;
+	size_t size;
+} thread_stack_t;
+
+/** Thread entry point type.
+ * @param arg		Argument passed via kern_thread_create().
+ * @return		Thread exit status. */
+typedef int (*thread_entry_t)(void *arg);
 
 /** Saved thread state. */
 typedef struct thread_state {
@@ -79,8 +82,9 @@ typedef struct thread_state {
 #define THREAD_IPL_EXCEPTION	14	/**< Exception level. */
 #define THREAD_IPL_MAX		15	/**< Maximum IPL (all interrupts blocked). */
 
-extern status_t kern_thread_create(const char *name,
-	const thread_entry_t *entry, uint32_t flags, handle_t *handlep);
+extern status_t kern_thread_create(const char *name, thread_entry_t entry,
+	void *arg, const thread_stack_t *stack, uint32_t flags,
+	handle_t *handlep);
 extern status_t kern_thread_open(thread_id_t id, handle_t *handlep);
 extern thread_id_t kern_thread_id(handle_t handle);
 extern status_t kern_thread_security(handle_t handle, security_context_t *ctx);

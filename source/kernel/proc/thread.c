@@ -95,12 +95,12 @@
 # define dprintf(fmt...)	
 #endif
 
-/** Thread creation arguments structure, for thread_uspace_trampoline(). */
-typedef struct thread_uspace_args {
+/** Thread creation arguments structure, for thread_user_trampoline(). */
+typedef struct thread_user_args {
 	ptr_t sp;			/**< Stack pointer. */
 	ptr_t entry;			/**< Entry point address. */
 	ptr_t arg;			/**< Argument. */
-} thread_uspace_args_t;
+} thread_user_args_t;
 
 static bool thread_timeout(void *_thread);
 
@@ -118,6 +118,24 @@ static slab_cache_t *thread_cache;
 static LIST_DEFINE(dead_threads);
 static SPINLOCK_DEFINE(dead_thread_lock);
 static SEMAPHORE_DEFINE(dead_thread_sem, 0);
+
+/** Thread entry function wrapper. */
+void thread_trampoline(void) {
+	/* Upon switching to a newly-created thread's context, execution will
+	 * jump to this function, rather than going back to the scheduler.
+	 * It is therefore necessary to perform post-switch tasks now. */
+	sched_post_switch(true);
+
+	dprintf("thread: entered thread %" PRId32 " (%s) on CPU %" PRIu32 "\n",
+		curr_thread->id, curr_thread->name, curr_cpu->id);
+
+	/* Set the last time to now so that accounting information is correct. */
+	curr_thread->last_time = system_time();
+
+	/* Run the thread's main function and then exit when it returns. */
+	curr_thread->func(curr_thread->arg1, curr_thread->arg2);
+	thread_exit();
+}
 
 /** Constructor for thread objects.
  * @param obj		Pointer to object.
@@ -753,24 +771,6 @@ thread_t *thread_lookup(thread_id_t id) {
 	return thread;
 }
 
-/** Thread entry function wrapper. */
-static void thread_trampoline(void) {
-	/* Upon switching to a newly-created thread's context, execution will
-	 * jump to this function, rather than going back to the scheduler.
-	 * It is therefore necessary to perform post-switch tasks now. */
-	sched_post_switch(true);
-
-	dprintf("thread: entered thread %" PRId32 " (%s) on CPU %" PRIu32 "\n",
-		curr_thread->id, curr_thread->name, curr_cpu->id);
-
-	/* Set the last time to now so that accounting information is correct. */
-	curr_thread->last_time = system_time();
-
-	/* Run the thread's main function and then exit when it returns. */
-	curr_thread->func(curr_thread->arg1, curr_thread->arg2);
-	thread_exit();
-}
-
 /**
  * Create a new kernel mode thread.
  *
@@ -819,7 +819,7 @@ thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->kstack = kmem_alloc(KSTACK_SIZE, MM_KERNEL);
 
 	/* Initialize the architecture-specific data. */
-	arch_thread_init(thread, thread->kstack, thread_trampoline);
+	arch_thread_init(thread);
 
 	/* Initially set the CPU to NULL - the thread will be assigned to a
 	 * CPU when thread_run() is called on it. */
@@ -1119,8 +1119,8 @@ static status_t thread_handle_lookup(handle_t handle, thread_t **threadp) {
 /** Entry function for a userspace thread.
  * @param _args		Argument structure pointer (will be freed).
  * @param arg2		Unused. */
-static void thread_uspace_trampoline(void *_args, void *arg2) {
-	thread_uspace_args_t *args = _args;
+static void thread_user_trampoline(void *_args, void *arg2) {
+	thread_user_args_t *args = _args;
 	frame_t frame;
 
 	arch_thread_user_setup(&frame, args->entry, args->sp, args->arg);
@@ -1128,20 +1128,32 @@ static void thread_uspace_trampoline(void *_args, void *arg2) {
 	arch_thread_user_enter(&frame);
 }
 
-/** Create a new thread.
- * @param name		Name of the thread to create.
- * @param entry		Details of the entry point and stack for the new thread.
- *			See the documentation for thread_entry_t for details of
- *			the purpose of each member.
+/**
+ * Create a new thread.
+ *
+ * Create a new thread within the calling process and start it executing at
+ * the given entry function. If a stack is provided for the thread, that will
+ * be used, and the stack will not be freed when the thread exits. Otherwise,
+ * a stack will be allocated for the thread with a default size, and will be
+ * freed when the thread exits.
+ *
+ * @param name		Name to give the thread.
+ * @param entry		Thread entry point.
+ * @param arg		Argument to pass to the entry point.
+ * @param stack		Details of the stack to use/allocate for the new thread
+ *			(optional). See the documentation for thread_stack_t
+ *			for details.
  * @param flags		Creation behaviour flags.
- * @param handlep	Where to store handle to the thread (can be NULL).
- * @return		Status code describing result of the operation. */
+ * @param handlep	Where to store handle to the thread (optional).
+ *
+ * @return		Status code describing result of the operation.
+ */
 status_t
-kern_thread_create(const char *name, const thread_entry_t *entry,
-	uint32_t flags, handle_t *handlep)
+kern_thread_create(const char *name, thread_entry_t entry, void *arg,
+	const thread_stack_t *stack, uint32_t flags, handle_t *handlep)
 {
-	thread_entry_t kentry;
-	thread_uspace_args_t *args;
+	thread_stack_t kstack;
+	thread_user_args_t *args;
 	thread_t *thread = NULL;
 	object_handle_t *khandle;
 	handle_t uhandle = -1;
@@ -1149,34 +1161,44 @@ kern_thread_create(const char *name, const thread_entry_t *entry,
 	char *kname;
 	status_t ret;
 
-	ret = memcpy_from_user(&kentry, entry, sizeof(kentry));
-	if(ret != STATUS_SUCCESS)
-		return ret;
-
-	if(!kentry.func)
+	if(!name || !entry)
 		return STATUS_INVALID_ARG;
 
-	if(kentry.stack) {
-		if(!kentry.stack_size)
-			return STATUS_INVALID_ARG;
+	if(!is_user_address(entry))
+		return STATUS_INVALID_ADDR;
 
-		if(!is_user_range(kentry.stack, kentry.stack_size))
-			return STATUS_INVALID_ADDR;
+	if(stack) {
+		ret = memcpy_from_user(&kstack, stack, sizeof(kstack));
+		if(ret != STATUS_SUCCESS)
+			return ret;
+
+		if(kstack.base) {
+			if(!kstack.size) {
+				return STATUS_INVALID_ARG;
+			} else if(!is_user_range(kstack.base, kstack.size)) {
+				return STATUS_INVALID_ADDR;
+			}
+		}
+	} else {
+		kstack.base = NULL;
+		kstack.size = 0;
 	}
 
 	ret = strndup_from_user(name, THREAD_NAME_MAX, &kname);
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	/* Create arguments structure. This will be freed by the entry thread. */
-	args = kmalloc(sizeof(thread_uspace_args_t), MM_KERNEL);
-	args->entry = (ptr_t)kentry.func;
-	args->arg = (ptr_t)kentry.arg;
+	/* Create arguments structure. This will be freed by the entry
+	 * trampoline. */
+	args = kmalloc(sizeof(thread_user_args_t), MM_KERNEL);
+	args->entry = (ptr_t)entry;
+	args->arg = (ptr_t)arg;
 
 	/* Create the thread, but do not run it yet. We attempt to create the
 	 * handle to the thread before running it as this allows us to
 	 * terminate it if not successful. */
-	ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args, NULL, &thread);
+	ret = thread_create(kname, curr_proc, 0, thread_user_trampoline, args,
+		NULL, &thread);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -1192,28 +1214,30 @@ kern_thread_create(const char *name, const thread_entry_t *entry,
 	}
 
 	/* Create a userspace stack. TODO: Stack direction! */
-	if(kentry.stack) {
-		args->sp = (ptr_t)kentry.stack + kentry.stack_size;
+	if(kstack.base) {
+		args->sp = (ptr_t)kstack.base + kstack.size;
 	} else {
-		if(kentry.stack_size) {
-			kentry.stack_size = round_up(kentry.stack_size, PAGE_SIZE);
+		if(kstack.size) {
+			kstack.size = round_up(kstack.size, PAGE_SIZE);
 		} else {
-			kentry.stack_size = USTACK_SIZE;
+			kstack.size = USTACK_SIZE;
 		}
 
 		snprintf(str, sizeof(str), "%s_stack", kname);
 
-		ret = vm_map(curr_proc->aspace, &thread->ustack, kentry.stack_size,
+		ret = vm_map(curr_proc->aspace, &thread->ustack, kstack.size,
 			VM_ADDRESS_ANY, VM_ACCESS_READ | VM_ACCESS_WRITE,
 			VM_MAP_PRIVATE | VM_MAP_STACK, NULL, 0, str);
 		if(ret != STATUS_SUCCESS)
 			goto fail;
 
 		/* Stack will be unmapped when the thread exits by
-		 * thread_cleanup(). */
-		thread->ustack_size = kentry.stack_size;
+		 * thread_cleanup(). Do not set until here as will be freed if
+		 * ustack_size is non-zero, so if we set above and then fail
+		 * vm_map(), thread_cleanup() will try to free. */
+		thread->ustack_size = kstack.size;
 
-		args->sp = thread->ustack + kentry.stack_size;
+		args->sp = thread->ustack + kstack.size;
 	}
 
 	thread_run(thread);
