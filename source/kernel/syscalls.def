@@ -101,7 +101,7 @@ syscall kern_process_set_exception(uint, ptr_t);
 syscall kern_process_exit(int);
 syscall kern_process_control(uint, ptr_t, ptr_t) hidden;
 
-syscall kern_thread_create(ptr_t, ptr_t, uint32_t, ptr_t) wrapped;
+syscall kern_thread_create(ptr_t, ptr_t, ptr_t, ptr_t, uint32_t, ptr_t) wrapped;
 syscall kern_thread_open(thread_id_t, ptr_t);
 syscall kern_thread_id(handle_t) wrapped;
 syscall kern_thread_security(handle_t, ptr_t);
