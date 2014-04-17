@@ -104,6 +104,7 @@ extern status_t kern_process_security(handle_t handle, security_context_t *ctx);
 extern status_t kern_process_port(handle_t handle, int32_t id,
 	handle_t *handlep);
 extern status_t kern_process_status(handle_t handle, int *statusp, int *reasonp);
+extern status_t kern_process_kill(handle_t handle);
 
 extern status_t kern_process_token(handle_t *handlep);
 extern status_t kern_process_set_token(handle_t handle);

@@ -637,8 +637,10 @@ void thread_at_kernel_entry(void) {
 	curr_thread->last_time = now;
 
 	/* Terminate the thread if killed. */
-	if(unlikely(curr_thread->flags & THREAD_KILLED))
+	if(unlikely(curr_thread->flags & THREAD_KILLED)) {
+		curr_thread->reason = EXIT_REASON_KILLED;
 		thread_exit();
+	}
 }
 
 /** Perform tasks necessary when a thread is returning to userspace. */
@@ -1350,6 +1352,38 @@ status_t kern_thread_status(handle_t handle, int *statusp, int *reasonp) {
 }
 
 /**
+ * Kill a thread.
+ *
+ * Kill the thread (i.e. cause it to immediately exit) referred to by the
+ * specified handle. The calling thread must have privileged access to the
+ * process owning the thread.
+ *
+ * @param handle	Handle to thread.
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_HANDLE if handle is invalid.
+ *			STATUS_ACCESS_DENIED if the caller does not have
+ *			privileged access to the thread.
+ */
+status_t kern_thread_kill(handle_t handle) {
+	thread_t *thread;
+	status_t ret;
+
+	ret = thread_handle_lookup(handle, &thread);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	if(!process_access(thread->owner)) {
+		ret = STATUS_ACCESS_DENIED;
+	} else {
+		thread_kill(thread);
+	}
+
+	thread_release(thread);
+	return ret;
+}
+
+/**
  * Get the calling thread's IPL.
  *
  * Gets the calling thread's current interrupt priority level (IPL). The IPL
@@ -1557,7 +1591,6 @@ status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp) {
  * @param status	Exit status code. */
 void kern_thread_exit(int status) {
 	curr_thread->status = status;
-	curr_thread->reason = EXIT_REASON_NORMAL;
 	thread_exit();
 }
 

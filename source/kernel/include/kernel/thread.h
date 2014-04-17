@@ -85,6 +85,7 @@ extern status_t kern_thread_open(thread_id_t id, handle_t *handlep);
 extern thread_id_t kern_thread_id(handle_t handle);
 extern status_t kern_thread_security(handle_t handle, security_context_t *ctx);
 extern status_t kern_thread_status(handle_t handle, int *statusp, int *reasonp);
+extern status_t kern_thread_kill(handle_t handle);
 
 extern status_t kern_thread_ipl(unsigned *iplp);
 extern status_t kern_thread_set_ipl(unsigned ipl);

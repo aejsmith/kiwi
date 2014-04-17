@@ -1502,6 +1502,50 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 	return ret;
 }
 
+/**
+ * Kill a process.
+ *
+ * Kill the process (i.e. cause it to immediately exit) referred to by the
+ * specified handle. The calling thread must have privileged access to the
+ * process.
+ *
+ * @param handle	Handle to process.
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_HANDLE if handle is invalid.
+ *			STATUS_ACCESS_DENIED if the caller does not have
+ *			privileged access to the process.
+ */
+status_t kern_process_kill(handle_t handle) {
+	process_t *process;
+	thread_t *thread;
+	status_t ret;
+
+	ret = process_handle_lookup(handle, &process);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	if(!process_access(process)) {
+		ret = STATUS_ACCESS_DENIED;
+	} else {
+		mutex_lock(&process->lock);
+
+		process->reason = EXIT_REASON_KILLED;
+
+		/* Kill all of the process' threads. If this is the current
+		 * process, we will exit when returning back to user mode. */
+		LIST_FOREACH_SAFE(&process->threads, iter) {
+			thread = list_entry(iter, thread_t, owner_link);
+			thread_kill(thread);
+		}
+
+		mutex_unlock(&process->lock);
+	}
+
+	process_release(process);
+	return ret;
+}
+
 /** Get the calling process' security token.
  * @param handlep	Where to store handle to token.
  * @return		Status code describing the result of the operation. */
@@ -1597,7 +1641,6 @@ status_t kern_process_set_exception(unsigned code, exception_handler_t handler) 
  */
 void kern_process_exit(int status) {
 	curr_proc->status = status;
-	curr_proc->reason = EXIT_REASON_NORMAL;
 	process_exit();
 }
 
