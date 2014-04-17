@@ -144,6 +144,7 @@ typedef struct thread {
 	char name[THREAD_NAME_MAX];	/**< Name of the thread. */
 	notifier_t death_notifier;	/**< Notifier for thread death. */
 	int status;			/**< Exit status of the thread. */
+	int reason;			/**< Exit reason of the thread. */
 	struct process *owner;		/**< Pointer to parent process. */
 	list_t owner_link;		/**< Link to parent process. */
 } thread_t;

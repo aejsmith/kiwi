@@ -104,7 +104,7 @@ syscall kern_thread_create(ptr_t, ptr_t, uint32_t, ptr_t) wrapped;
 syscall kern_thread_open(thread_id_t, ptr_t);
 syscall kern_thread_id(handle_t) wrapped;
 syscall kern_thread_security(handle_t, ptr_t);
-syscall kern_thread_status(handle_t, ptr_t);
+syscall kern_thread_status(handle_t, ptr_t, ptr_t);
 syscall kern_thread_ipl(ptr_t);
 syscall kern_thread_set_ipl(uint);
 syscall kern_thread_token(ptr_t);

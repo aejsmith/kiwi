@@ -355,17 +355,8 @@ bool process_access(process_t *process) {
 	return ret;
 }
 
-/**
- * Terminate the calling process.
- *
- * Terminates the calling process. All threads in the process will also be
- * terminated. The status and reason codes given can be retrieved by any
- * processes with a handle to the process with kern_process_status().
- *
- * @param status	Exit status code.
- * @param reason	Exit reason.
- */
-void process_exit(int status, int reason) {
+/** Terminate the calling process and all of its threads. */
+void process_exit(void) {
 	thread_t *thread;
 
 	mutex_lock(&curr_proc->lock);
@@ -377,8 +368,6 @@ void process_exit(int status, int reason) {
 			thread_kill(thread);
 	}
 
-	curr_proc->status = status;
-	curr_proc->reason = reason;
 	mutex_unlock(&curr_proc->lock);
 
 	thread_exit();
@@ -1426,36 +1415,6 @@ status_t kern_process_security(handle_t handle, security_context_t *ctx) {
 	return ret;
 }
 
-/** Query the exit status of a process.
- * @param handle	Handle to process.
- * @param statusp	Where to store exit status of process (can be NULL).
- * @param reasonp	Where to store exit reason (can be NULL).
- * @return		Status code describing result of the operation. */
-status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
-	process_t *process;
-	status_t ret;
-
-	/* Although getting the status of the current process is silly (it'll
-	 * error below), support it anyway for consistency's sake. */
-	ret = process_handle_lookup(handle, &process);
-	if(ret != STATUS_SUCCESS)
-		return ret;
-
-	if(process->state != PROCESS_DEAD) {
-		process_release(process);
-		return STATUS_STILL_RUNNING;
-	}
-
-	if(statusp)
-		ret = write_user(statusp, process->status);
-
-	if(reasonp)
-		ret = write_user(reasonp, process->reason);
-
-	process_release(process);
-	return ret;
-}
-
 /**
  * Get one of a process' special ports.
  *
@@ -1508,6 +1467,37 @@ status_t kern_process_port(handle_t handle, int32_t id, handle_t *handlep) {
 
 	ret = ipc_port_publish(port, NULL, handlep);
 out:
+	process_release(process);
+	return ret;
+}
+
+/** Query the exit status of a process.
+ * @param handle	Handle to process.
+ * @param statusp	Where to store exit status of process (can be NULL).
+ * @param reasonp	Where to store exit reason (can be NULL).
+ * @return		Status code describing result of the operation. */
+status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
+	process_t *process;
+	status_t ret;
+
+	/* Although getting the status of the current process is silly (it'll
+	 * error below), support it anyway for consistency's sake. */
+	ret = process_handle_lookup(handle, &process);
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	if(!process_access(process)) {
+		ret = STATUS_ACCESS_DENIED;
+	} else if(process->state != PROCESS_DEAD) {
+		ret = STATUS_STILL_RUNNING;
+	}
+
+	if(ret == STATUS_SUCCESS && statusp)
+		ret = write_user(statusp, process->status);
+
+	if(ret == STATUS_SUCCESS && reasonp)
+		ret = write_user(reasonp, process->reason);
+
 	process_release(process);
 	return ret;
 }
@@ -1606,7 +1596,9 @@ status_t kern_process_set_exception(unsigned code, exception_handler_t handler) 
  * @param status	Exit status code.
  */
 void kern_process_exit(int status) {
-	process_exit(status, EXIT_REASON_NORMAL);
+	curr_proc->status = status;
+	curr_proc->reason = EXIT_REASON_NORMAL;
+	process_exit();
 }
 
 /** Perform operations on the current process (for internal use by libkernel).

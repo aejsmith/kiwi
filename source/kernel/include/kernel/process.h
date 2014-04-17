@@ -23,8 +23,9 @@
 #define __KERNEL_PROCESS_H
 
 #include <kernel/exception.h>
+#include <kernel/exit.h>
+#include <kernel/object.h>
 #include <kernel/security.h>
-#include <kernel/thread.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,11 +82,6 @@ typedef struct process_attrib {
 /** Process object events. */
 #define PROCESS_EVENT_DEATH	1	/**< Wait for process death. */
 
-/** Process exit reason codes. */
-#define EXIT_REASON_NORMAL	1	/**< Normal exit (status is exit code). */
-#define EXIT_REASON_KILLED	2	/**< Process was killed (no status). */
-#define EXIT_REASON_EXCEPTION	3	/**< Unhandled exception (status is exception code). */
-
 /** Process priority classes. */
 #define PRIORITY_CLASS_LOW	0	/**< Low priority. */
 #define PRIORITY_CLASS_NORMAL	1	/**< Normal priority. */
@@ -105,10 +101,9 @@ extern status_t kern_process_clone(handle_t *handlep);
 extern status_t kern_process_open(process_id_t id, handle_t *handlep);
 extern process_id_t kern_process_id(handle_t handle);
 extern status_t kern_process_security(handle_t handle, security_context_t *ctx);
-extern status_t kern_process_status(handle_t handle, int *statusp,
-	int *reasonp);
 extern status_t kern_process_port(handle_t handle, int32_t id,
 	handle_t *handlep);
+extern status_t kern_process_status(handle_t handle, int *statusp, int *reasonp);
 
 extern status_t kern_process_token(handle_t *handlep);
 extern status_t kern_process_set_token(handle_t handle);

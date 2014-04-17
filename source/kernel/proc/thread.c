@@ -611,8 +611,11 @@ void thread_exception(exception_info_t *info) {
 	if(!handler)
 		handler = curr_proc->exceptions[info->code];
 
-	if(!handler || curr_thread->ipl > THREAD_IPL_EXCEPTION)
-		process_exit(info->code, EXIT_REASON_EXCEPTION);
+	if(!handler || curr_thread->ipl > THREAD_IPL_EXCEPTION) {
+		curr_proc->status = info->code;
+		curr_proc->reason = EXIT_REASON_EXCEPTION;
+		process_exit();
+	}
 
 	interrupt = kmalloc(sizeof(*interrupt) + sizeof(*info), MM_KERNEL);
 	memcpy(interrupt + 1, info, sizeof(*info));
@@ -654,8 +657,10 @@ void thread_at_kernel_exit(void) {
 	/* Check whether we have any pending interrupts to handle. */
 	if(unlikely(curr_thread->flags & THREAD_INTERRUPTED)) {
 		/* Terminate the thread if killed. */
-		if(curr_thread->flags & THREAD_KILLED)
+		if(curr_thread->flags & THREAD_KILLED) {
+			curr_thread->reason = EXIT_REASON_KILLED;
 			thread_exit();
+		}
 
 		spinlock_lock(&curr_thread->lock);
 
@@ -680,7 +685,8 @@ void thread_at_kernel_exit(void) {
 			 * doing so for the moment because trying to do that
 			 * will just fail again. When implementing this make
 			 * sure to preserve the original IPL properly. */
-			process_exit(0, EXIT_REASON_KILLED);
+			curr_proc->reason = EXIT_REASON_KILLED;
+			process_exit();
 		}
 
 		kfree(interrupt);
@@ -845,6 +851,8 @@ thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->name[THREAD_NAME_MAX - 1] = 0;
 	thread->ustack = 0;
 	thread->ustack_size = 0;
+	thread->status = 0;
+	thread->reason = EXIT_REASON_NORMAL;
 
 	/* Add the thread to the owner. */
 	process_attach_thread(owner, thread);
@@ -1313,8 +1321,9 @@ status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
 /** Query the exit status of a thread.
  * @param handle	Handle to thread.
  * @param statusp	Where to store exit status of thread (can be NULL).
+ * @param reasonp	Where to store exit reason (can be NULL).
  * @return		Status code describing result of the operation. */
-status_t kern_thread_status(handle_t handle, int *statusp) {
+status_t kern_thread_status(handle_t handle, int *statusp, int *reasonp) {
 	thread_t *thread;
 	status_t ret;
 
@@ -1324,13 +1333,17 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
-	if(thread->state != THREAD_DEAD) {
-		thread_release(thread);
-		return STATUS_STILL_RUNNING;
+	if(!process_access(thread->owner)) {
+		ret = STATUS_ACCESS_DENIED;
+	} else if(thread->state != THREAD_DEAD) {
+		ret = STATUS_STILL_RUNNING;
 	}
 
-	if(statusp)
+	if(ret == STATUS_SUCCESS && statusp)
 		ret = write_user(statusp, thread->status);
+
+	if(ret == STATUS_SUCCESS && reasonp)
+		ret = write_user(reasonp, thread->reason);
 
 	thread_release(thread);
 	return ret;
@@ -1544,6 +1557,7 @@ status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp) {
  * @param status	Exit status code. */
 void kern_thread_exit(int status) {
 	curr_thread->status = status;
+	curr_thread->reason = EXIT_REASON_NORMAL;
 	thread_exit();
 }
 
@@ -1573,10 +1587,13 @@ void kern_thread_restore(void) {
 	ret = arch_thread_interrupt_restore(&ipl);
 	if(ret != STATUS_SUCCESS) {
 		/* TODO: Same as in thread_at_kernel_exit(). */
-		process_exit(0, EXIT_REASON_KILLED);
+		curr_proc->reason = EXIT_REASON_KILLED;
+		process_exit();
 	}
 
 	ret = kern_thread_set_ipl(ipl);
-	if(ret != STATUS_SUCCESS)
-		process_exit(0, EXIT_REASON_KILLED);
+	if(ret != STATUS_SUCCESS) {
+		curr_proc->reason = EXIT_REASON_KILLED;
+		process_exit();
+	}
 }
