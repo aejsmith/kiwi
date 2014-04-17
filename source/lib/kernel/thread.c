@@ -110,6 +110,12 @@ kern_thread_create(const char *name, thread_entry_t entry, void *arg,
 	 * we will get stuck. We should create an event object instead and wait
 	 * on both that and the thread so we get woken if the thread dies. */
 	kern_futex_wait((int32_t *)&create.futex, 0, -1);
+
+	/* If the thread failed initialization it will have exited. We must
+	 * close the handle if this is the case. */
+	if(handlep && create.ret != STATUS_SUCCESS)
+		kern_handle_close(*handlep);
+
 	return create.ret;
 }
 
