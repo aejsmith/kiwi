@@ -61,11 +61,11 @@ typedef struct thread_stack {
  * @return		Thread exit status. */
 typedef int (*thread_entry_t)(void *arg);
 
-/** Saved thread state. */
-typedef struct thread_state {
-	cpu_context_t context;		/**< CPU context (register state, etc). */
+/** Saved thread context. */
+typedef struct thread_context {
+	cpu_context_t cpu;		/**< CPU context (register state, etc). */
 	unsigned ipl;			/**< Interrupt priority level. */
-} thread_state_t;
+} thread_context_t;
 
 /** Handle value used to refer to the current thread. */
 #define THREAD_SELF		INVALID_HANDLE

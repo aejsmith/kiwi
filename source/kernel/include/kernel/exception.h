@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-struct thread_state;
+struct thread_context;
 
 /** Exception information structure. */
 typedef struct exception_info {
@@ -50,17 +50,17 @@ typedef struct exception_info {
  * Exception handler function type.
  *
  * Type of an exception handler function. When the exception that the handler
- * is registered for occurs, the thread's state will be saved and it will be
+ * is registered for occurs, the thread's context will be saved and it will be
  * made to execute the handler. The handler receives an exception information
- * structure and a copy of the previous thread state. If the handler returns,
- * the thread will attempt to restore the state. The handler can modify the
- * state before returning.
+ * structure and a copy of the previous thread context. If the handler returns,
+ * the thread will attempt to restore the context. The handler can modify the
+ * context before returning.
  *
  * @param info		Exception information structure.
- * @param state		Thread state when the exception occurred.
+ * @param context	Thread context when the exception occurred.
  */
 typedef void (*exception_handler_t)(exception_info_t *info,
-	struct thread_state *state);
+	struct thread_context *context);
 
 /** Exception codes. */
 #define EXCEPTION_ADDR_UNMAPPED		1	/**< Access to non-existant memory mapping. */

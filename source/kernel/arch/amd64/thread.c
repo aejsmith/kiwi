@@ -201,8 +201,8 @@ void arch_thread_user_setup(frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
  * @return		Status code describing result of the operation. */
 status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl) {
 	frame_t *frame;
-	ptr_t data_addr, state_addr, ret_addr;
-	thread_state_t state;
+	ptr_t data_addr, context_addr, ret_addr;
+	thread_context_t context;
 	status_t ret;
 
 	frame = curr_thread->arch.user_frame;
@@ -213,8 +213,8 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
 	 * satisfy ABI constraints - ((RSP + 8) % 16) == 0 upon entry to the
 	 * handler. */
 	data_addr = round_down(frame->sp - 128 - interrupt->size, 16);
-	state_addr = round_down(data_addr - sizeof(state), 16);
-	ret_addr = state_addr - 8;
+	context_addr = round_down(data_addr - sizeof(context), 16);
+	ret_addr = context_addr - 8;
 
 	if(interrupt->size) {
 		/* Copy interrupt data. */
@@ -223,28 +223,28 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
 			return ret;
 	}
 
-	/* Save the thread state. TODO: FPU context. */
-	state.context.rax = frame->ax;
-	state.context.rbx = frame->bx;
-	state.context.rcx = frame->cx;
-	state.context.rdx = frame->dx;
-	state.context.rdi = frame->di;
-	state.context.rsi = frame->si;
-	state.context.rbp = frame->bp;
-	state.context.rsp = frame->sp;
-	state.context.r8 = frame->r8;
-	state.context.r9 = frame->r9;
-	state.context.r10 = frame->r10;
-	state.context.r11 = frame->r11;
-	state.context.r12 = frame->r12;
-	state.context.r13 = frame->r13;
-	state.context.r14 = frame->r14;
-	state.context.r15 = frame->r15;
-	state.context.rflags = frame->flags;
-	state.context.rip = frame->ip;
-	state.ipl = ipl;
+	/* Save the thread context. TODO: FPU context. */
+	context.cpu.rax = frame->ax;
+	context.cpu.rbx = frame->bx;
+	context.cpu.rcx = frame->cx;
+	context.cpu.rdx = frame->dx;
+	context.cpu.rdi = frame->di;
+	context.cpu.rsi = frame->si;
+	context.cpu.rbp = frame->bp;
+	context.cpu.rsp = frame->sp;
+	context.cpu.r8 = frame->r8;
+	context.cpu.r9 = frame->r9;
+	context.cpu.r10 = frame->r10;
+	context.cpu.r11 = frame->r11;
+	context.cpu.r12 = frame->r12;
+	context.cpu.r13 = frame->r13;
+	context.cpu.r14 = frame->r14;
+	context.cpu.r15 = frame->r15;
+	context.cpu.rflags = frame->flags;
+	context.cpu.rip = frame->ip;
+	context.ipl = ipl;
 
-	ret = memcpy_to_user((void *)state_addr, &state, sizeof(state));
+	ret = memcpy_to_user((void *)context_addr, &context, sizeof(context));
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
@@ -257,7 +257,7 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
 	frame->ip = interrupt->handler;
 	frame->sp = ret_addr;
 	frame->di = data_addr;
-	frame->si = state_addr;
+	frame->si = context_addr;
 
 	/* We must return from system calls via the IRET path because we have
 	 * modified the frame. */
@@ -270,41 +270,41 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
  * @return		Status code describing result of the operation. */
 status_t arch_thread_interrupt_restore(unsigned *iplp) {
 	frame_t *frame;
-	thread_state_t state;
+	thread_context_t context;
 	status_t ret;
 
 	frame = curr_thread->arch.user_frame;
 	assert(frame->cs & 3);
 
-	/* The stack pointer should point at the state structure due to the
+	/* The stack pointer should point at the context structure due to the
 	 * return address being popped. Copy it back. */
-	ret = memcpy_from_user(&state, (void *)frame->sp, sizeof(state));
+	ret = memcpy_from_user(&context, (void *)frame->sp, sizeof(context));
 	if(ret != STATUS_SUCCESS)
 		return ret;
 
 	/* Save the IPL to restore. */
-	*iplp = state.ipl;
+	*iplp = context.ipl;
 
 	/* Restore the context. */
-	frame->ax = state.context.rax;
-	frame->bx = state.context.rbx;
-	frame->cx = state.context.rcx;
-	frame->dx = state.context.rdx;
-	frame->di = state.context.rdi;
-	frame->si = state.context.rsi;
-	frame->bp = state.context.rbp;
-	frame->sp = state.context.rsp;
-	frame->r8 = state.context.r8;
-	frame->r9 = state.context.r9;
-	frame->r10 = state.context.r10;
-	frame->r11 = state.context.r11;
-	frame->r12 = state.context.r12;
-	frame->r13 = state.context.r13;
-	frame->r14 = state.context.r14;
-	frame->r15 = state.context.r15;
+	frame->ax = context.cpu.rax;
+	frame->bx = context.cpu.rbx;
+	frame->cx = context.cpu.rcx;
+	frame->dx = context.cpu.rdx;
+	frame->di = context.cpu.rdi;
+	frame->si = context.cpu.rsi;
+	frame->bp = context.cpu.rbp;
+	frame->sp = context.cpu.rsp;
+	frame->r8 = context.cpu.r8;
+	frame->r9 = context.cpu.r9;
+	frame->r10 = context.cpu.r10;
+	frame->r11 = context.cpu.r11;
+	frame->r12 = context.cpu.r12;
+	frame->r13 = context.cpu.r13;
+	frame->r14 = context.cpu.r14;
+	frame->r15 = context.cpu.r15;
 	frame->flags &= ~RESTORE_FLAGS;
-	frame->flags |= state.context.rflags & RESTORE_FLAGS;
-	frame->ip = state.context.rip;
+	frame->flags |= context.cpu.rflags & RESTORE_FLAGS;
+	frame->ip = context.cpu.rip;
 
 	/* Same as above. */
 	curr_thread->arch.flags |= ARCH_THREAD_FRAME_MODIFIED;
