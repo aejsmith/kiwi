@@ -98,6 +98,7 @@ extern status_t kern_thread_set_token(handle_t handle);
 extern status_t kern_thread_set_exception(unsigned code,
 	exception_handler_t handler);
 
+extern status_t kern_thread_raise(exception_info_t *info);
 extern status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp);
 extern void kern_thread_exit(int status) __attribute__((noreturn));
 

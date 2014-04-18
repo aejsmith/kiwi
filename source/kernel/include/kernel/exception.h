@@ -78,7 +78,8 @@ typedef void (*exception_handler_t)(exception_info_t *info,
 #define EXCEPTION_FLOAT_DENORMAL	13	/**< Denormalized operand. */
 #define EXCEPTION_FLOAT_INVALID		14	/**< Other invalid floating point operation. */
 #define EXCEPTION_BREAKPOINT		15	/**< Breakpoint. */
-#define EXCEPTION_MAX			16
+#define EXCEPTION_ABORT			16	/**< Software abort. */
+#define EXCEPTION_MAX			17
 
 #ifdef __cplusplus
 }

@@ -112,6 +112,7 @@ syscall kern_thread_set_ipl(uint);
 syscall kern_thread_token(ptr_t);
 syscall kern_thread_set_token(handle_t);
 syscall kern_thread_set_exception(uint, ptr_t);
+syscall kern_thread_raise(ptr_t);
 syscall kern_thread_sleep(nstime_t, ptr_t);
 syscall kern_thread_exit(int) wrapped;
 syscall kern_thread_control(uint, ptr_t, ptr_t) hidden;
