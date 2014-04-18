@@ -115,6 +115,7 @@ typedef struct thread {
 
 	/** Exception handler table. */
 	exception_handler_t exceptions[EXCEPTION_MAX];
+	thread_stack_t exception_stack;	/**< Exception stack. */
 
 	/** Overridden security token for the thread (if any). */
 	token_t *token;
@@ -159,7 +160,6 @@ typedef struct thread {
 /** User mode thread interrupt structure. */
 typedef struct thread_interrupt {
 	list_t header;			/**< Link to interrupt list. */
-
 	unsigned priority;		/**< Interrupt priority. */
 
 	/**
@@ -171,6 +171,9 @@ typedef struct thread_interrupt {
 	 * argument.
 	 */
 	ptr_t handler;
+
+	/** Alternate stack to use (if base is NULL will not switch stack). */
+	thread_stack_t stack;
 
 	/**
 	 * Size of interrupt data.

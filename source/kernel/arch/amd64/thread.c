@@ -201,18 +201,25 @@ void arch_thread_user_setup(frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
  * @return		Status code describing result of the operation. */
 status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl) {
 	frame_t *frame;
-	ptr_t data_addr, context_addr, ret_addr;
+	ptr_t sp, data_addr, context_addr, ret_addr;
 	thread_context_t context;
 	status_t ret;
 
 	frame = curr_thread->arch.user_frame;
 	assert(frame->cs & 3);
 
-	/* Work out where to place stuff on the user stack. We must not clobber
-	 * the red zone (128 bytes below the stack pointer). Ensure that we
+	if(interrupt->stack.base) {
+		sp = (ptr_t)interrupt->stack.base + interrupt->stack.size;
+	} else {
+		/* We must not clobber the red zone (128 bytes below the stack
+		 * pointer). */
+		sp = frame->sp - 128;
+	}
+
+	/* Work out where to place stuff on the user stack. Ensure that we
 	 * satisfy ABI constraints - ((RSP + 8) % 16) == 0 upon entry to the
 	 * handler. */
-	data_addr = round_down(frame->sp - 128 - interrupt->size, 16);
+	data_addr = round_down(sp - interrupt->size, 16);
 	context_addr = round_down(data_addr - sizeof(context), 16);
 	ret_addr = context_addr - 8;
 

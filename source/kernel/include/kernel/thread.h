@@ -95,8 +95,9 @@ extern status_t kern_thread_ipl(unsigned *iplp);
 extern status_t kern_thread_set_ipl(unsigned ipl);
 extern status_t kern_thread_token(handle_t *handlep);
 extern status_t kern_thread_set_token(handle_t handle);
-extern status_t kern_thread_set_exception(unsigned code,
+extern status_t kern_thread_set_exception_handler(unsigned code,
 	exception_handler_t handler);
+extern status_t kern_thread_set_exception_stack(const thread_stack_t *stack);
 
 extern status_t kern_thread_raise(exception_info_t *info);
 extern status_t kern_thread_sleep(nstime_t nsecs, nstime_t *remp);

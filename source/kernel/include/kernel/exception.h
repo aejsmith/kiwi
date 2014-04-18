@@ -57,10 +57,10 @@ typedef struct exception_info {
  * context before returning.
  *
  * @param info		Exception information structure.
- * @param context	Thread context when the exception occurred.
+ * @param ctx		Thread context when the exception occurred.
  */
 typedef void (*exception_handler_t)(exception_info_t *info,
-	struct thread_context *context);
+	struct thread_context *ctx);
 
 /** Exception codes. */
 #define EXCEPTION_ADDR_UNMAPPED		1	/**< Access to non-existant memory mapping. */

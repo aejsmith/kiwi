@@ -642,6 +642,7 @@ void thread_exception(exception_info_t *info) {
 
 	interrupt = kmalloc(sizeof(*interrupt) + sizeof(*info), MM_KERNEL);
 	memcpy(interrupt + 1, info, sizeof(*info));
+	memcpy(&interrupt->stack, &curr_thread->exception_stack, sizeof(interrupt->stack));
 	interrupt->priority = THREAD_IPL_EXCEPTION;
 	interrupt->handler = (ptr_t)handler;
 	interrupt->size = sizeof(*info);
@@ -849,6 +850,8 @@ thread_create(const char *name, process_t *owner, unsigned flags,
 	thread->in_usermem = false;
 	thread->ipl = 0;
 	memset(thread->exceptions, 0, sizeof(thread->exceptions));
+	thread->exception_stack.base = 0;
+	thread->exception_stack.size = 0;
 	thread->token = NULL;
 	thread->active_token = NULL;
 	thread->func = func;
@@ -1573,7 +1576,7 @@ status_t kern_thread_set_token(handle_t handle) {
  *			STATUS_INVALID_ARG if code is invalid.
  *			STATUS_INVALID_ADDR if handler is an invalid address.
  */
-status_t kern_thread_set_exception(unsigned code, exception_handler_t handler) {
+status_t kern_thread_set_exception_handler(unsigned code, exception_handler_t handler) {
 	if(code >= EXCEPTION_MAX) {
 		return STATUS_INVALID_ARG;
 	} else if(handler && !is_user_address(handler)) {
@@ -1581,6 +1584,47 @@ status_t kern_thread_set_exception(unsigned code, exception_handler_t handler) {
 	}
 
 	curr_thread->exceptions[code] = handler;
+	return STATUS_SUCCESS;
+}
+
+/**
+ * Set the exception stack.
+ *
+ * Sets an alternate stack to use when handling exceptions in the calling
+ * thread. The exception stack is set per-thread. The specified stack will be
+ * switched to whenever executing an exception handler on this thread.
+ *
+ * @param stack		Description of new stack to use. A specific stack range
+ *			must be specified - this function will not allocate a
+ *			stack. If NULL, the alternate exception stack will be
+ *			disabled and exceptions will be handled on the main
+ *			stack.
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_ARG if stack base is NULL or size is 0.
+ *			STATUS_INVALID_ADDR if stack range is invalid.
+ */
+status_t kern_thread_set_exception_stack(const thread_stack_t *stack) {
+	thread_stack_t kstack;
+	status_t ret;
+
+	if(stack) {
+		ret = memcpy_from_user(&kstack, stack, sizeof(kstack));
+		if(ret != STATUS_SUCCESS)
+			return ret;
+
+		if(!kstack.base || !kstack.size) {
+			return STATUS_INVALID_ARG;
+		} else if(!is_user_range(kstack.base, kstack.size)) {
+			return STATUS_INVALID_ADDR;
+		}
+
+		memcpy(&curr_thread->exception_stack, &kstack, sizeof(kstack));
+	} else {
+		curr_thread->exception_stack.base = 0;
+		curr_thread->exception_stack.size = 0;
+	}
+
 	return STATUS_SUCCESS;
 }
 
