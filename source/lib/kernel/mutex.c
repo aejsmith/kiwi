@@ -41,7 +41,7 @@
 /** Check whether a mutex is held.
  * @param lock		Lock to check.
  * @return		Whether the lock is held. */
-__export bool kern_mutex_held(int32_t *lock) {
+bool __export kern_mutex_held(int32_t *lock) {
 	return (*(volatile int32_t *)lock != 0);
 }
 
@@ -52,7 +52,7 @@ __export bool kern_mutex_held(int32_t *lock) {
  *			error will be returned if the lock cannot be acquired
  *			immediately.
  * @return		Status code describing result of the operation. */
-__export status_t kern_mutex_lock(int32_t *lock, nstime_t timeout) {
+status_t __export kern_mutex_lock(int32_t *lock, nstime_t timeout) {
 	status_t ret;
 	int32_t val;
 
@@ -85,7 +85,7 @@ __export status_t kern_mutex_lock(int32_t *lock, nstime_t timeout) {
 
 /** Release a mutex.
  * @param lock		Lock to release. */
-__export void kern_mutex_unlock(int32_t *lock) {
+void __export kern_mutex_unlock(int32_t *lock) {
 	if(__sync_fetch_and_sub((volatile int32_t *)lock, 1) != 1) {
 		/* There were waiters. Wake one up. */
 		*(volatile int32_t *)lock = 0;

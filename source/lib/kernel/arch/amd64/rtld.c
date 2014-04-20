@@ -29,12 +29,12 @@
  * @param size		Size of relocations.
  * @return		Status code describing result of the operation. */
 static status_t do_relocations(rtld_image_t *image, elf_rela_t *relocs, size_t size) {
-	elf_addr_t *addr, sym_addr;
-	const char *strtab, *name;
-	int type, symidx, bind;
-	rtld_image_t *source;
 	elf_sym_t *symtab;
+	const char *strtab, *name;
 	size_t i;
+	elf_addr_t *addr;
+	int type, symidx, bind;
+	rtld_symbol_t symbol;
 
 	symtab = (elf_sym_t *)image->dynamic[ELF_DT_SYMTAB];
 	strtab = (const char *)image->dynamic[ELF_DT_STRTAB];
@@ -45,13 +45,14 @@ static status_t do_relocations(rtld_image_t *image, elf_rela_t *relocs, size_t s
 		symidx = ELF64_R_SYM(relocs[i].r_info);
 		name   = strtab + symtab[symidx].st_name;
 		bind   = ELF_ST_BIND(symtab[symidx].st_info);
-		sym_addr = 0;
-		source = image;
+
+		symbol.addr = 0;
+		symbol.image = image;
 
 		if(symidx != 0) {
 			if(bind == ELF_STB_LOCAL) {
-				sym_addr = symtab[symidx].st_value;
-			} else if(!rtld_symbol_lookup(image, name, &sym_addr, &source)) {
+				symbol.addr = symtab[symidx].st_value;
+			} else if(!rtld_symbol_lookup(image, name, &symbol)) {
 				if(bind != ELF_STB_WEAK) {
 					printf("rtld: %s: cannot resolve symbol '%s'\n",
 						image->name, name);
@@ -65,30 +66,30 @@ static status_t do_relocations(rtld_image_t *image, elf_rela_t *relocs, size_t s
 		case ELF_R_X86_64_NONE:
 			break;
 		case ELF_R_X86_64_64:
-			*addr = sym_addr + relocs[i].r_addend;
+			*addr = symbol.addr + relocs[i].r_addend;
 			break;
 		case ELF_R_X86_64_PC32:
-			*addr = sym_addr + relocs[i].r_addend - relocs[i].r_offset;
+			*addr = symbol.addr + relocs[i].r_addend - relocs[i].r_offset;
 			break;
 		case ELF_R_X86_64_GLOB_DAT:
 		case ELF_R_X86_64_JUMP_SLOT:
-			*addr = sym_addr + relocs[i].r_addend;
+			*addr = symbol.addr + relocs[i].r_addend;
 			break;
 		case ELF_R_X86_64_RELATIVE:
 			*addr = (elf_addr_t)image->load_base + relocs[i].r_addend;
 			break;
 		case ELF_R_X86_64_COPY:
-			if(sym_addr)
-				memcpy((char *)addr, (char *)sym_addr, symtab[symidx].st_size);
+			if(symbol.addr)
+				memcpy((char *)addr, (char *)symbol.addr, symtab[symidx].st_size);
 			break;
 		case ELF_R_X86_64_DTPMOD64:
 			*addr = image->tls_module_id;
 			break;
 		case ELF_R_X86_64_DTPOFF64:
-			*addr = sym_addr + relocs[i].r_addend;
+			*addr = symbol.addr + relocs[i].r_addend;
 			break;
 		case ELF_R_X86_64_TPOFF64:
-			*addr = sym_addr + source->tls_offset + relocs[i].r_addend;
+			*addr = symbol.addr + symbol.image->tls_offset + relocs[i].r_addend;
 			break;
 		default:
 			dprintf("rtld: %s: unhandled relocation type %d\n", image->name, type);
@@ -102,7 +103,7 @@ static status_t do_relocations(rtld_image_t *image, elf_rela_t *relocs, size_t s
 /** Perform relocations for am image.
  * @param image		Image to relocate.
  * @return		Status code describing result of the operation. */
-status_t rtld_image_relocate(rtld_image_t *image) {
+status_t arch_rtld_image_relocate(rtld_image_t *image) {
 	elf_rela_t *relocs;
 	status_t ret;
 

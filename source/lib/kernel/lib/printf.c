@@ -21,7 +21,6 @@
 
 #include <kernel/device.h>
 #include <kernel/fs.h>
-#include <kernel/object.h>
 
 #include <stdarg.h>
 #include <string.h>
@@ -30,9 +29,6 @@
 
 /** Output handle to use (stderr). */
 #define OUTPUT_HANDLE		2
-
-/** Whether debug output is enabled. */
-bool libkernel_debug = false;
 
 /** Print a character.
  * @param ch		Character to print. */

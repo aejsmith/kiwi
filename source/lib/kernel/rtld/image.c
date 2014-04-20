@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -41,11 +41,8 @@
 /** Expected path to libkernel. */
 #define LIBKERNEL_PATH		"/system/lib/libkernel.so"
 
-extern char _end[];
-
 /** Array of directories to search for libraries in. */
 static const char *library_search_dirs[] = {
-	".",
 	"/system/lib",
 	NULL
 };
@@ -67,11 +64,12 @@ rtld_image_t *application_image;
 /** Check if a library is already loaded.
  * @param name		Name of library.
  * @return		Pointer to image structure if found. */
-static rtld_image_t *rtld_image_lookup(const char *name) {
+rtld_image_t *rtld_image_lookup(const char *name) {
 	rtld_image_t *image;
 
-	LIST_FOREACH_SAFE(&loaded_images, iter) {
+	LIST_FOREACH(&loaded_images, iter) {
 		image = list_entry(iter, rtld_image_t, header);
+
 		if(strcmp(image->name, name) == 0)
 			return image;
 	}
@@ -79,79 +77,20 @@ static rtld_image_t *rtld_image_lookup(const char *name) {
 	return NULL;
 }
 
-/** Check if a path exists.
- * @param path		Path to check.
- * @return		True if exists, false if not. */
-static bool path_exists(const char *path) {
-	handle_t handle;
-	status_t ret;
-
-	dprintf("  trying %s... ", path);
-
-	/* Attempt to open it to see if it is there. */
-	ret = kern_fs_open(path, FILE_ACCESS_READ, 0, 0, &handle);
-	if(ret != STATUS_SUCCESS) {
-		dprintf("returned %d\n", ret);
-		return false;
-	}
-
-	dprintf("success!\n");
-	kern_handle_close(handle);
-	return true;
-}
-
-/** Search for a library and then load it.
- * @param name		Name of library to load.
- * @param req		Image that requires this library.
- * @param imagep	Where to store pointer to image structure.
- * @return		STATUS_SUCCESS if loaded, STATUS_MISSING_LIBRARY if not
- *			found or another status code for failures. */
-static status_t load_library(const char *name, rtld_image_t *req, rtld_image_t **imagep) {
-	char buf[FS_PATH_MAX];
-	rtld_image_t *exist;
-	size_t i;
-
-	/* Check if it's already loaded. */
-	exist = rtld_image_lookup(name);
-	if(exist) {
-		if(exist->state == RTLD_IMAGE_LOADING) {
-			dprintf("rtld: cyclic dependency on %s detected!\n", exist->name);
-			return STATUS_MALFORMED_IMAGE;
-		}
-
-		dprintf("rtld: increasing reference count on %s (%p)\n", exist->name, exist);
-		exist->refcount++;
-		return STATUS_SUCCESS;
-	}
-
-	/* Look for the library in the search paths. */
-	for(i = 0; library_search_dirs[i]; i++) {
-		strcpy(buf, library_search_dirs[i]);
-		strcat(buf, "/");
-		strcat(buf, name);
-		if(path_exists(buf))
-			return rtld_image_load(buf, req, ELF_ET_DYN, NULL, imagep);
-	}
-
-	printf("rtld: could not find required library %s (required by %s)\n", name, req->name);
-	return STATUS_MISSING_LIBRARY;
-}
-
 /** Handle an ELF_PT_LOAD program header.
  * @param image		Image being loaded.
  * @param phdr		Program header.
  * @param handle	Handle to the file.
- * @param path		Path to the file.
  * @param i		Index of the program header.
  * @return		Status code describing result of the operation. */
-static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t handle,
-	const char *path, size_t i)
-{
+static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t handle, size_t i) {
 	uint32_t access = 0;
-	elf_addr_t start, end;
+	elf_addr_t load_base, start, end;
 	offset_t offset;
 	status_t ret;
 	size_t size;
+
+	load_base = (elf_addr_t)image->load_base;
 
 	/* Work out the access flags to use. */
 	if(phdr->p_flags & ELF_PF_R)
@@ -161,22 +100,21 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 	if(phdr->p_flags & ELF_PF_X)
 		access |= VM_ACCESS_EXECUTE;
 	if(!access) {
-		dprintf("rtld: %s: program header %zu has no protection flags\n", path, i);
+		dprintf("rtld: %s: program header %zu has no protection flags\n",
+			image->path, i);
 		return STATUS_MALFORMED_IMAGE;
 	}
 
 	/* Map the BSS if required. */
 	if(phdr->p_memsz > phdr->p_filesz) {
-		start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr
-			+ phdr->p_filesz, page_size);
-		end = (elf_addr_t)image->load_base + ROUND_UP(phdr->p_vaddr
-			+ phdr->p_memsz, page_size);
+		start = load_base + round_down(phdr->p_vaddr + phdr->p_filesz, page_size);
+		end = load_base + round_up(phdr->p_vaddr + phdr->p_memsz, page_size);
 		size = end - start;
 
 		/* Must be writable to be able to clear later. */
 		if(!(access & VM_ACCESS_WRITE)) {
 			dprintf("rtld: %s: program header %zu should be writable\n",
-				path, i);
+				image->path, i);
 			return STATUS_MALFORMED_IMAGE;
 		}
 
@@ -184,44 +122,50 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 		ret = kern_vm_map((void **)&start, size, VM_ADDRESS_EXACT, access,
 			VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
 		if(ret != STATUS_SUCCESS) {
-			dprintf("rtld: %s: unable to create anonymous BSS region (%d)\n",
-				path, ret);
+			dprintf("rtld: %s: unable to create anonymous BSS region: %d\n",
+				image->path, ret);
 			return ret;
 		}
 	}
 
+	/* Won't need to clear BSS if file size is 0, since we've just mapped
+	 * an anonymous zeroed region. */
 	if(phdr->p_filesz == 0)
 		return STATUS_SUCCESS;
 
-	/* Load the data. */
-	start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr, page_size);
-	end = (elf_addr_t)image->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_filesz, page_size);
+	start = load_base + round_down(phdr->p_vaddr, page_size);
+	end = load_base + round_up(phdr->p_vaddr + phdr->p_filesz, page_size);
 	size = end - start;
-	offset = ROUND_DOWN(phdr->p_offset, page_size);
-	dprintf("rtld: %s: loading header %zu to [%p,%p)\n", path, i, start, start + size);
+	offset = round_down(phdr->p_offset, page_size);
+
+	dprintf("rtld: %s: loading header %zu to [%p,%p)\n", image->path, i,
+		start, start + size);
 
 	/* Map the data in. Set the private flag if mapping as writeable. */
 	ret = kern_vm_map((void **)&start, size, VM_ADDRESS_EXACT, access,
 		(access & VM_ACCESS_WRITE) ? VM_MAP_PRIVATE : 0, handle,
 		offset, NULL);
 	if(ret != STATUS_SUCCESS) {
-		dprintf("rtld: %s: unable to map file data into memory (%d)\n", path, ret);
+		dprintf("rtld: %s: unable to map file data into memory: %d\n",
+			image->path, ret);
 		return ret;
 	}
 
 	/* Clear out BSS. */
 	if(phdr->p_filesz < phdr->p_memsz) {
-		start = (elf_addr_t)image->load_base + phdr->p_vaddr + phdr->p_filesz;
+		start = load_base + phdr->p_vaddr + phdr->p_filesz;
 		size = phdr->p_memsz - phdr->p_filesz;
-		dprintf("rtld: %s: clearing BSS for %zu at [%p,%p)\n", path, i,
-			start, start + size);
+
+		dprintf("rtld: %s: clearing BSS for %zu at [%p,%p)\n",
+			image->path, i, start, start + size);
+
 		memset((void *)start, 0, size);
 	}
 
 	return STATUS_SUCCESS;
 }
 
-/** Load an image into memory.
+/** Load an image.
  * @param path		Path to image file.
  * @param req		Image that requires this image. This is used to work
  *			out where to place the new image in the image list.
@@ -230,10 +174,12 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
  *			ELF_ET_EXEC.
  * @param imagep	Where to store pointer to image structure.
  * @return		Status code describing result of the operation. */
-status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp,
+static status_t
+load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 	rtld_image_t **imagep)
 {
 	handle_t handle;
+	file_info_t file;
 	size_t bytes, size, i;
 	elf_ehdr_t ehdr;
 	rtld_image_t *image = NULL;
@@ -247,6 +193,32 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	ret = kern_fs_open(path, FILE_ACCESS_READ | FILE_ACCESS_EXECUTE, 0, 0, &handle);
 	if(ret != STATUS_SUCCESS)
 		return ret;
+
+	ret = kern_file_info(handle, &file);
+	if(ret != STATUS_SUCCESS)
+		goto fail;
+
+	/* Search to see if this file is already loaded. */
+	LIST_FOREACH(&loaded_images, iter) {
+		image = list_entry(iter, rtld_image_t, header);
+
+		if(image->node == file.id && image->mount == file.mount) {
+			if(image->state == RTLD_IMAGE_LOADING) {
+				dprintf("rtld: cyclic dependency on %s detected!\n",
+					image->name);
+				return STATUS_MALFORMED_IMAGE;
+			}
+
+			dprintf("rtld: increasing reference count on %s (%p)\n",
+				image->name, image);
+			image->refcount++;
+
+			if(imagep)
+				*imagep = image;
+
+			return STATUS_SUCCESS;
+		}
+	}
 
 	/* Read in its header and ensure that it is valid. */
 	ret = kern_file_read(handle, &ehdr, sizeof(ehdr), 0, &bytes);
@@ -286,21 +258,21 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	}
 
 	/* Create a structure to track information about the image. */
-	image = malloc(sizeof(rtld_image_t));
+	image = calloc(1, sizeof(*image));
 	if(!image) {
 		ret = STATUS_NO_MEMORY;
 		goto fail;
 	}
-	memset(image, 0, sizeof(rtld_image_t));
+
+	image->node = file.id;
+	image->mount = file.mount;
 
 	/* Don't particularly care if we can't duplicate the path string, its
 	 * not important (only for debugging purposes). */
 	image->path = strdup(path);
 	list_init(&image->header);
 
-	/* Read in the program headers. Use alloca() because our malloc()
-	 * implementation does not support freeing, so we'd be wasting valuable
-	 * heap space. */
+	/* Read in the program headers. */
 	size = ehdr.e_phnum * ehdr.e_phentsize;
 	phdrs = alloca(size);
 	ret = kern_file_read(handle, phdrs, size, ehdr.e_phoff, &bytes);
@@ -320,14 +292,15 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 				continue;
 
 			if((phdrs[i].p_vaddr + phdrs[i].p_memsz) > image->load_size) {
-				image->load_size = ROUND_UP(phdrs[i].p_vaddr
-					+ phdrs[i].p_memsz, page_size);
+				image->load_size =
+					round_up(phdrs[i].p_vaddr + phdrs[i].p_memsz, page_size);
 			}
 		}
 
 		/* Allocate a chunk of memory for it. */
-		ret = kern_vm_map(&image->load_base, image->load_size, VM_ADDRESS_ANY,
-			VM_ACCESS_READ, VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
+		ret = kern_vm_map(&image->load_base, image->load_size,
+			VM_ADDRESS_ANY, VM_ACCESS_READ, VM_MAP_PRIVATE,
+			INVALID_HANDLE, 0, NULL);
 		if(ret != STATUS_SUCCESS) {
 			dprintf("rtld: %s: unable to allocate memory (%d)\n", path, ret);
 			goto fail;
@@ -342,7 +315,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	for(i = 0; i < ehdr.e_phnum; i++) {
 		switch(phdrs[i].p_type) {
 		case ELF_PT_LOAD:
-			ret = do_load_phdr(image, &phdrs[i], handle, path, i);
+			ret = do_load_phdr(image, &phdrs[i], handle, i);
 			if(ret != STATUS_SUCCESS)
 				goto fail;
 
@@ -350,9 +323,9 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 			 * EHDR and the PHDRs. */
 			if(!image->ehdr && !image->phdrs) {
 				image->ehdr = image->load_base
-					+ ROUND_DOWN(phdrs[i].p_vaddr, page_size);
+					+ round_down(phdrs[i].p_vaddr, page_size);
 				image->phdrs = image->load_base
-					+ ROUND_DOWN(phdrs[i].p_vaddr, page_size)
+					+ round_down(phdrs[i].p_vaddr, page_size)
 					+ ehdr.e_phoff;
 				image->num_phdrs = ehdr.e_phnum;
 			}
@@ -498,14 +471,21 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 			continue;
 
 		dep = (const char *)(image->dyntab[i].d_un.d_ptr + image->dynamic[ELF_DT_STRTAB]);
-		dprintf("rtld: %s: dependency on %s, loading...\n", path, dep);
-		ret = load_library(dep, image, NULL);
-		if(ret != STATUS_SUCCESS)
+		dprintf("rtld: %s: dependency on %s\n", path, dep);
+		ret = rtld_image_load(dep, image, NULL);
+		if(ret != STATUS_SUCCESS) {
+			if(ret == STATUS_NOT_FOUND) {
+				printf("rtld: could not find required library %s (required by %s)\n",
+					dep, image->name);
+				ret = STATUS_MISSING_LIBRARY;
+			}
+
 			goto fail;
+		}
 	}
 
 	/* We can now perform relocations. */
-	ret = rtld_image_relocate(image);
+	ret = arch_rtld_image_relocate(image);
 	if(ret != STATUS_SUCCESS)
 		goto fail;
 
@@ -545,100 +525,159 @@ fail:
 		list_remove(&image->header);
 		free(image);
 	}
+
 	kern_handle_close(handle);
 	return ret;
 }
 
-/** Unload an image from memory.
- * @param image		Image to unload. */
-void rtld_image_unload(rtld_image_t *image) {
-#if 0
-	void (*func)(void);
-	rtld_image_t *dep;
-	const char *name;
+/** Check if a path exists.
+ * @param path		Path to check.
+ * @return		True if exists, false if not. */
+static bool path_exists(const char *path) {
+	handle_t handle;
+	status_t ret;
+
+	dprintf("  trying %s... ", path);
+
+	/* Attempt to open it to see if it is there. */
+	ret = kern_fs_open(path, FILE_ACCESS_READ, 0, 0, &handle);
+	if(ret != STATUS_SUCCESS) {
+		dprintf("returned %d\n", ret);
+		return false;
+	}
+
+	dprintf("success!\n");
+	kern_handle_close(handle);
+	return true;
+}
+
+/** Search for a library and then load it.
+ * @param name		Name of library to load. If this contains a '/', it is
+ *			interpreted as an exact path. Otherwise, the library
+ *			search paths will be searched.
+ * @param req		Image that requires this library.
+ * @param imagep	Where to store pointer to image structure.
+ * @return		Status code describing result of the operation. */
+status_t rtld_image_load(const char *name, rtld_image_t *req, rtld_image_t **imagep) {
+	char buf[FS_PATH_MAX];
 	size_t i;
 
-	if(--image->refcount > 0) {
-		dprintf("RTLD: Decreased reference count of %p(%s)\n", image, image->name);
-		return;
-	}
+	dprintf("rtld: loading image %s\n", name);
 
-	/* Call the FINI function. */
-	if(image->dynamic[ELF_DT_FINI]) {
-		func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_FINI]);
-		dprintf("RTLD: Calling FINI function %p...\n", func);
-		func();
-	}
-
-	/* Unload all dependencies of the library. */
-	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		if(image->dyntab[i].d_tag != ELF_DT_NEEDED) {
-			continue;
+	if(!strchr(name, '/')) {
+		/* Look for the library in the search paths. */
+		for(i = 0; library_search_dirs[i]; i++) {
+			strcpy(buf, library_search_dirs[i]);
+			strcat(buf, "/");
+			strcat(buf, name);
+			if(path_exists(buf))
+				return load_image(buf, req, ELF_ET_DYN, NULL, imagep);
 		}
 
-		name = (const char *)(image->dyntab[i].d_un.d_ptr + image->dynamic[ELF_DT_STRTAB]);
-		LIST_FOREACH(&rtld_loaded_images, iter) {
-			dep = list_entry(iter, rtld_image_t, header);
-
-			if(strcmp(dep->name, name) == 0) {
-				rtld_image_unload(dep);
-			}
-		}
+		return STATUS_NOT_FOUND;
+	} else {
+		return load_image(name, req, ELF_ET_DYN, NULL, imagep);
 	}
-
-	dprintf("RTLD: Unloaded image %p(%s)\n", image, image->name);
-	if(image->load_base) {
-		kern_vm_unmap(image->load_base, image->load_size);
-	}
-	list_remove(&image->header);
-	free(image);
-#endif
-	printf("rtld: not implemented\n");
 }
+
 
 /** Initialise the runtime loader.
  * @param args		Process arguments structure pointer.
- * @param dry_run	Whether this is a dry run.
- * @return		Entry point for the program. */
-void *rtld_init(process_args_t *args, bool dry_run) {
+ * @param entryp	Where to store program entry point address.
+ * @return		Status code describing result of the operation. */
+status_t rtld_init(process_args_t *args, void **entryp) {
 	rtld_image_t *image;
+	file_info_t file;
+	elf_ehdr_t *ehdr;
+	elf_phdr_t *phdrs;
+	size_t i;
 	image_info_t info;
 	status_t ret;
-	void *entry;
 
-	/* Finish setting up the libkernel image structure. */
-	libkernel_image.load_size = ROUND_UP(
-		(elf_addr_t)_end - (elf_addr_t)libkernel_image.load_base,
-		page_size);
-	rtld_symbol_init(&libkernel_image);
-	list_init(&libkernel_image.header);
-	list_append(&loaded_images, &libkernel_image.header);
+	/* Fill in the libkernel image structure with information we have. */
+	image = &libkernel_image;
+	image->load_base = args->load_base;
+	image->load_size = round_up((elf_addr_t)_end - (elf_addr_t)args->load_base, page_size);
+	image->dyntab = _DYNAMIC;
+
+	ret = kern_fs_info(LIBKERNEL_PATH, true, &file);
+	if(ret != STATUS_SUCCESS) {
+		printf("rtld: could not get information for %s\n", LIBKERNEL_PATH);
+		libkernel_abort();
+	}
+
+	image->node = file.id;
+	image->mount = file.mount;
+
+	/* Populate the dynamic table and do address fixups. */
+	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
+		if(image->dyntab[i].d_tag >= ELF_DT_NUM) {
+			continue;
+		} else if(image->dyntab[i].d_tag == ELF_DT_NEEDED) {
+			continue;
+		}
+
+		/* Do address fixups. */
+		switch(image->dyntab[i].d_tag) {
+		case ELF_DT_HASH:
+		case ELF_DT_PLTGOT:
+		case ELF_DT_STRTAB:
+		case ELF_DT_SYMTAB:
+		case ELF_DT_JMPREL:
+		case ELF_DT_REL_TYPE:
+			image->dyntab[i].d_un.d_ptr += (elf_addr_t)args->load_base;
+			break;
+		}
+
+		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
+	}
+
+	/* Find out where our TLS segment is loaded to. */
+	ehdr = (elf_ehdr_t *)args->load_base;
+	phdrs = (elf_phdr_t *)(args->load_base + ehdr->e_phoff);
+	for(i = 0; i < ehdr->e_phnum; i++) {
+		if(phdrs[i].p_type == ELF_PT_TLS) {
+			if(!phdrs[i].p_memsz)
+				break;
+
+			image->tls_module_id = tls_alloc_module_id();
+			image->tls_image = args->load_base + phdrs[i].p_vaddr;
+			image->tls_filesz = phdrs[i].p_filesz;
+			image->tls_memsz = phdrs[i].p_memsz;
+			image->tls_align = phdrs[i].p_align;
+			break;
+		}
+	}
+
+	rtld_symbol_init(image);
+	list_init(&image->header);
+	list_append(&loaded_images, &image->header);
 
 	/* Register the image with the kernel. */
-	info.name = libkernel_image.name;
-	info.load_base = libkernel_image.load_base;
-	info.load_size = libkernel_image.load_size;
-	info.symtab = (void *)libkernel_image.dynamic[ELF_DT_SYMTAB];
-	info.sym_entsize = libkernel_image.dynamic[ELF_DT_SYMENT];
-	info.sym_size = libkernel_image.h_nchain * info.sym_entsize;
-	info.strtab = (void *)libkernel_image.dynamic[ELF_DT_STRTAB];
+	info.name = image->name;
+	info.load_base = image->load_base;
+	info.load_size = image->load_size;
+	info.symtab = (void *)image->dynamic[ELF_DT_SYMTAB];
+	info.sym_entsize = image->dynamic[ELF_DT_SYMENT];
+	info.sym_size = image->h_nchain * info.sym_entsize;
+	info.strtab = (void *)image->dynamic[ELF_DT_STRTAB];
 
-	ret = kern_image_register(&info, &libkernel_image.id);
+	ret = kern_image_register(&info, &image->id);
 	if(ret != STATUS_SUCCESS) {
-		printf("rtld: failed to register libkernel image (%d)\n", ret);
-		kern_process_exit(ret);
+		printf("rtld: failed to register libkernel image: %d\n", ret);
+		return ret;
 	}
 
 	/* Load the program. */
 	dprintf("rtld: loading program %s...\n", args->path);
-	ret = rtld_image_load(args->path, NULL, ELF_ET_EXEC, &entry, &application_image);
+	ret = load_image(args->path, NULL, ELF_ET_EXEC, entryp, &application_image);
 	if(ret != STATUS_SUCCESS) {
-		dprintf("rtld: failed to load binary (%d)\n", ret);
-		kern_process_exit(ret);
+		dprintf("rtld: failed to load binary: %d\n", ret);
+		return ret;
 	}
 
 	/* Print out the image list if required. */
-	if(libkernel_debug || dry_run) {
+	if(libkernel_debug || libkernel_dry_run) {
 		dprintf("rtld: final image list:\n");
 		LIST_FOREACH(&loaded_images, iter) {
 			image = list_entry(iter, rtld_image_t, header);
@@ -651,11 +690,11 @@ void *rtld_init(process_args_t *args, bool dry_run) {
 		}
 	}
 
-	return entry;
+	return STATUS_SUCCESS;
 }
 
 /* TODO: Move this out of here. */
-__export int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data) {
+int __export dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data) {
 	rtld_image_t *image;
 	struct dl_phdr_info info;
 	int ret;

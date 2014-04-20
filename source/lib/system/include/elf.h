@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2010 Alex Smith
+ * Copyright (C) 2007-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -47,14 +47,14 @@ typedef int64_t  Elf64_Sxword;
 
 /** ELF32 file header. */
 typedef struct {
-	unsigned char e_ident[16];		/**< ELF identiﬁcation. */
-	Elf32_Half    e_type;			/**< Object ﬁle type. */
+	unsigned char e_ident[16];		/**< ELF identification. */
+	Elf32_Half    e_type;			/**< Object file type. */
 	Elf32_Half    e_machine;		/**< Machine type. */
-	Elf32_Word    e_version;		/**< Object ﬁle version. */
+	Elf32_Word    e_version;		/**< Object file version. */
 	Elf32_Addr    e_entry;			/**< Entry point address. */
 	Elf32_Off     e_phoff;			/**< Program header offset. */
 	Elf32_Off     e_shoff;			/**< Section header offset. */
-	Elf32_Word    e_flags;			/**< Processor-speciﬁc ﬂags. */
+	Elf32_Word    e_flags;			/**< Processor-specific flags. */
 	Elf32_Half    e_ehsize;			/**< ELF header size. */
 	Elf32_Half    e_phentsize;		/**< Size of program header entry. */
 	Elf32_Half    e_phnum;			/**< Number of program header entries. */
@@ -65,14 +65,14 @@ typedef struct {
 
 /** ELF64 file header. */
 typedef struct {
-	unsigned char e_ident[16];		/**< ELF identiﬁcation. */
-	Elf64_Half    e_type;			/**< Object ﬁle type. */
+	unsigned char e_ident[16];		/**< ELF identification. */
+	Elf64_Half    e_type;			/**< Object file type. */
 	Elf64_Half    e_machine;		/**< Machine type. */
-	Elf64_Word    e_version;		/**< Object ﬁle version. */
+	Elf64_Word    e_version;		/**< Object file version. */
 	Elf64_Addr    e_entry;			/**< Entry point address. */
 	Elf64_Off     e_phoff;			/**< Program header offset. */
 	Elf64_Off     e_shoff;			/**< Section header offset. */
-	Elf64_Word    e_flags;			/**< Processor-speciﬁc ﬂags. */
+	Elf64_Word    e_flags;			/**< Processor-specific flags. */
 	Elf64_Half    e_ehsize;			/**< ELF header size. */
 	Elf64_Half    e_phentsize;		/**< Size of program header entry. */
 	Elf64_Half    e_phnum;			/**< Number of program header entries. */
@@ -95,11 +95,11 @@ typedef struct {
 #define ELF_EI_OSABI		7		/**< OS/ABI. */
 
 /** ELF types. */
-#define ELF_ET_NONE		0		/**< No ﬁle type. */
-#define ELF_ET_REL		1		/**< Relocatable object ﬁle. */
-#define ELF_ET_EXEC		2		/**< Executable ﬁle. */
-#define ELF_ET_DYN		3		/**< Shared object ﬁle. */
-#define ELF_ET_CORE		4		/**< Core ﬁle. */
+#define ELF_ET_NONE		0		/**< No file type. */
+#define ELF_ET_REL		1		/**< Relocatable object file. */
+#define ELF_ET_EXEC		2		/**< Executable file. */
+#define ELF_ET_DYN		3		/**< Shared object file. */
+#define ELF_ET_CORE		4		/**< Core file. */
 
 /** ELF classes. */
 #define ELFCLASS32		1		/**< 32-bit. */
@@ -205,10 +205,10 @@ typedef struct {
 /** ELF32 program header. */
 typedef struct {
 	Elf32_Word    p_type;			/**< Type of segment. */
-	Elf32_Off     p_offset;			/**< Offset in ﬁle. */
+	Elf32_Off     p_offset;			/**< Offset in file. */
 	Elf32_Addr    p_vaddr;			/**< Virtual address in memory. */
 	Elf32_Addr    p_paddr;			/**< Reserved. */
-	Elf32_Word    p_filesz;			/**< Size of segment in ﬁle. */
+	Elf32_Word    p_filesz;			/**< Size of segment in file. */
 	Elf32_Word    p_memsz;			/**< Size of segment in memory. */
 	Elf32_Word    p_flags;			/**< Segment attributes. */
 	Elf32_Word    p_align;			/**< Alignment of segment. */
@@ -218,10 +218,10 @@ typedef struct {
 typedef struct {
 	Elf64_Word  p_type;			/**< Type of segment. */
 	Elf64_Word  p_flags;			/**< Segment attributes. */
-	Elf64_Off   p_offset;			/**< Offset in ﬁle. */
+	Elf64_Off   p_offset;			/**< Offset in file. */
 	Elf64_Addr  p_vaddr;			/**< Virtual address in memory. */
 	Elf64_Addr  p_paddr;			/**< Reserved. */
-	Elf64_Xword p_filesz;			/**< Size of segment in ﬁle. */
+	Elf64_Xword p_filesz;			/**< Size of segment in file. */
 	Elf64_Xword p_memsz;			/**< Size of segment in memory. */
 	Elf64_Xword p_align;			/**< Alignment of segment. */
 } __packed Elf64_Phdr;
@@ -251,7 +251,7 @@ typedef struct {
 	Elf32_Word    sh_type;			/**< Section type. */
 	Elf32_Word    sh_flags;			/**< Section attributes. */
 	Elf32_Addr    sh_addr;			/**< Virtual address in memory. */
-	Elf32_Off     sh_offset;		/**< Offset in ﬁle. */
+	Elf32_Off     sh_offset;		/**< Offset in file. */
 	Elf32_Word    sh_size;			/**< Size of section. */
 	Elf32_Word    sh_link;			/**< Link to other section. */
 	Elf32_Word    sh_info;			/**< Miscellaneous information. */
@@ -265,7 +265,7 @@ typedef struct {
 	Elf64_Word  sh_type;			/**< Section type. */
 	Elf64_Xword sh_flags;			/**< Section attributes. */
 	Elf64_Addr  sh_addr;			/**< Virtual address in memory. */
-	Elf64_Off   sh_offset;			/**< Offset in ﬁle. */
+	Elf64_Off   sh_offset;			/**< Offset in file. */
 	Elf64_Xword sh_size;			/**< Size of section. */
 	Elf64_Word  sh_link;			/**< Link to other section. */
 	Elf64_Word  sh_info;			/**< Miscellaneous information. */
@@ -275,14 +275,14 @@ typedef struct {
 
 /** Section header types. */
 #define ELF_SHT_NULL		0		/**< Marks an unused section header. */
-#define ELF_SHT_PROGBITS	1		/**< Contains information deﬁned by the program. */
+#define ELF_SHT_PROGBITS	1		/**< Contains information defined by the program. */
 #define ELF_SHT_SYMTAB		2		/**< Contains a linker symbol table. */
 #define ELF_SHT_STRTAB		3		/**< Contains a string table. */
 #define ELF_SHT_RELA		4		/**< Contains "Rela" type relocation entries. */
 #define ELF_SHT_HASH		5		/**< Contains a symbol hash table. */
 #define ELF_SHT_DYNAMIC		6		/**< Contains dynamic linking tables. */
 #define ELF_SHT_NOTE		7		/**< Contains note information. */
-#define ELF_SHT_NOBITS		8		/**< Contains uninitialised space; does not occupy any space in the ﬁle. */
+#define ELF_SHT_NOBITS		8		/**< Contains uninitialised space; does not occupy any space in the file. */
 #define ELF_SHT_REL		9		/**< Contains "Rel" type relocation entries. */
 #define ELF_SHT_SHLIB		10		/**< Reserved. */
 #define ELF_SHT_DYNSYM		11		/**< Contains a dynamic loader symbol table. */
@@ -422,86 +422,86 @@ typedef struct {
 #define ELF64_R_INFO(s, t)	((((Elf64_Xword)(s)) << 32) + ((t) & 0xffffffffL))
 
 /** Relocation types - i386. */
-#define ELF_R_386_NONE		0		/**< No relocation. */
-#define ELF_R_386_32		1		/**< Direct 32-bit. */
-#define ELF_R_386_PC32		2		/**< PC relative 32-bit. */
-#define ELF_R_386_GOT32		3		/**< 32-bit GOT entry. */
-#define ELF_R_386_PLT32		4		/**< 32-bit PLT address. */
-#define ELF_R_386_COPY		5		/**< Copy symbol at runtime. */
-#define ELF_R_386_GLOB_DAT	6		/**< Create GOT entry. */
-#define ELF_R_386_JMP_SLOT	7		/**< Create PLT entry. */
-#define ELF_R_386_RELATIVE	8		/**< Adjust by program base. */
-#define ELF_R_386_GOTOFF	9		/**< 32-bit offset to GOT. */
-#define ELF_R_386_GOTPC		10		/**< 32-bit PC relative offset to GOT. */
-#define ELF_R_386_32PLT		11
-#define ELF_R_386_TLS_TPOFF	14		/**< Offset in static TLS block. */
-#define ELF_R_386_TLS_IE	15		/**< Address of GOT entry for static TLS block offset. */
-#define ELF_R_386_TLS_GOTIE	16		/**< GOT entry for static TLS block offset. */
-#define ELF_R_386_TLS_LE	17		/**< Offset relative to static TLS block. */
-#define ELF_R_386_TLS_GD	18		/**< Direct 32-bit for GNU version of general dynamic thread local data. */
-#define ELF_R_386_TLS_LDM	19		/**< Direct 32-bit for GNU version of local dynamic thread local data (LE). */
-#define ELF_R_386_16		20
-#define ELF_R_386_PC16		21
-#define ELF_R_386_8		22
-#define ELF_R_386_PC8		23
-#define ELF_R_386_TLS_GD_32	24		/**< Direct 32-bit for general dynamic thread local data. */
-#define ELF_R_386_TLS_GD_PUSH	25		/**< Tag for pushl in GD TLS code. */
-#define ELF_R_386_TLS_GD_CALL	26		/**< Relocation for call to __tls_get_addr(). */
-#define ELF_R_386_TLS_GD_POP	27		/**< Tag for popl in GD TLS code. */
-#define ELF_R_386_TLS_LDM_32	28		/**< Direct 32 bit for local dynamic thread local data (LE). */
-#define ELF_R_386_TLS_LDM_PUSH	29		/**< Tag for pushl in LDM TLS code. */
-#define ELF_R_386_TLS_LDM_CALL	30		/**< Relocation for call to __tls_get_addr() in LDM code. */
-#define ELF_R_386_TLS_LDM_POP	31		/**< Tag for popl in LDM TLS code. */
-#define ELF_R_386_TLS_LDO_32	32		/**< Offset relative to TLS block. */
-#define ELF_R_386_TLS_IE_32	33		/**< GOT entry for negated static TLS block offset. */
-#define ELF_R_386_TLS_LE_32	34		/**< Negated offset relative to static TLS block. */
-#define ELF_R_386_TLS_DTPMOD32	35		/**< ID of module containing symbol. */
-#define ELF_R_386_TLS_DTPOFF32	36		/**< Offset in TLS block. */
-#define ELF_R_386_TLS_TPOFF32	37		/**< Negated offset in static TLS block. */
-#define ELF_R_386_TLS_GOTDESC	39		/**< GOT offset for TLS descriptor. */
-#define ELF_R_386_TLS_DESC_CALL	40		/**< Marker of call through TLS descriptor for relaxation. */
-#define ELF_R_386_TLS_DESC	41		/**< TLS descriptor. */
-#define ELF_R_386_IRELATIVE	42		/**< Adjust indirectly by program base. */
+#define ELF_R_386_NONE			0	/**< No relocation. */
+#define ELF_R_386_32			1	/**< Direct 32-bit. */
+#define ELF_R_386_PC32			2	/**< PC relative 32-bit. */
+#define ELF_R_386_GOT32			3	/**< 32-bit GOT entry. */
+#define ELF_R_386_PLT32			4	/**< 32-bit PLT address. */
+#define ELF_R_386_COPY			5	/**< Copy symbol at runtime. */
+#define ELF_R_386_GLOB_DAT		6	/**< Create GOT entry. */
+#define ELF_R_386_JMP_SLOT		7	/**< Create PLT entry. */
+#define ELF_R_386_RELATIVE		8	/**< Adjust by program base. */
+#define ELF_R_386_GOTOFF		9	/**< 32-bit offset to GOT. */
+#define ELF_R_386_GOTPC			10	/**< 32-bit PC relative offset to GOT. */
+#define ELF_R_386_32PLT			11
+#define ELF_R_386_TLS_TPOFF		14	/**< Offset in static TLS block. */
+#define ELF_R_386_TLS_IE		15	/**< Address of GOT entry for static TLS block offset. */
+#define ELF_R_386_TLS_GOTIE		16	/**< GOT entry for static TLS block offset. */
+#define ELF_R_386_TLS_LE		17	/**< Offset relative to static TLS block. */
+#define ELF_R_386_TLS_GD		18	/**< Direct 32-bit for GNU version of general dynamic thread local data. */
+#define ELF_R_386_TLS_LDM		19	/**< Direct 32-bit for GNU version of local dynamic thread local data (LE). */
+#define ELF_R_386_16			20
+#define ELF_R_386_PC16			21
+#define ELF_R_386_8			22
+#define ELF_R_386_PC8			23
+#define ELF_R_386_TLS_GD_32		24	/**< Direct 32-bit for general dynamic thread local data. */
+#define ELF_R_386_TLS_GD_PUSH		25	/**< Tag for pushl in GD TLS code. */
+#define ELF_R_386_TLS_GD_CALL		26	/**< Relocation for call to __tls_get_addr(). */
+#define ELF_R_386_TLS_GD_POP		27	/**< Tag for popl in GD TLS code. */
+#define ELF_R_386_TLS_LDM_32		28	/**< Direct 32 bit for local dynamic thread local data (LE). */
+#define ELF_R_386_TLS_LDM_PUSH		29	/**< Tag for pushl in LDM TLS code. */
+#define ELF_R_386_TLS_LDM_CALL		30	/**< Relocation for call to __tls_get_addr() in LDM code. */
+#define ELF_R_386_TLS_LDM_POP		31	/**< Tag for popl in LDM TLS code. */
+#define ELF_R_386_TLS_LDO_32		32	/**< Offset relative to TLS block. */
+#define ELF_R_386_TLS_IE_32		33	/**< GOT entry for negated static TLS block offset. */
+#define ELF_R_386_TLS_LE_32		34	/**< Negated offset relative to static TLS block. */
+#define ELF_R_386_TLS_DTPMOD32		35	/**< ID of module containing symbol. */
+#define ELF_R_386_TLS_DTPOFF32		36	/**< Offset in TLS block. */
+#define ELF_R_386_TLS_TPOFF32		37	/**< Negated offset in static TLS block. */
+#define ELF_R_386_TLS_GOTDESC		39	/**< GOT offset for TLS descriptor. */
+#define ELF_R_386_TLS_DESC_CALL		40	/**< Marker of call through TLS descriptor for relaxation. */
+#define ELF_R_386_TLS_DESC		41	/**< TLS descriptor. */
+#define ELF_R_386_IRELATIVE		42	/**< Adjust indirectly by program base. */
 
 /** Relocation types - x86_64. */
-#define ELF_R_X86_64_NONE	0		/**< No relocation. */
-#define ELF_R_X86_64_64		1		/**< Direct 64-bit. */
-#define ELF_R_X86_64_PC32	2		/**< PC relative 32-bit signed. */
-#define ELF_R_X86_64_GOT32	3		/**< 32-bit GOT entry. */
-#define ELF_R_X86_64_PLT32	4		/**< 32-bit PLT address. */
-#define ELF_R_X86_64_COPY	5		/**< Copy symbol at runtime. */
-#define ELF_R_X86_64_GLOB_DAT	6		/**< Create GOT entry. */
-#define ELF_R_X86_64_JUMP_SLOT	7		/**< Create PLT entry. */
-#define ELF_R_X86_64_RELATIVE	8		/**< Adjust by program base. */
-#define ELF_R_X86_64_GOTPCREL	9		/**< 32-bit signed PC relative offset to GOT. */
-#define ELF_R_X86_64_32		10		/**< Direct 32-bit zero-extended. */
-#define ELF_R_X86_64_32S	11		/**< Direct 32-bit sign-extended. */
-#define ELF_R_X86_64_16		12		/**< Direct 16-bit zero-extended. */
-#define ELF_R_X86_64_PC16	13		/**< 16-bit sign-extended PC relative. */
-#define ELF_R_X86_64_8		14		/**< Direct 8-bit sign-extended. */
-#define ELF_R_X86_64_PC8	15		/**< 8-bit sign-extended PC relative. */
-#define ELF_R_X86_64_DTPMOD64	16		/**< ID of module containing symbol. */
-#define ELF_R_X86_64_DTPOFF64	17		/**< Offset in module's TLS block. */
-#define ELF_R_X86_64_TPOFF64	18		/**< Offset in initial TLS block. */
-#define ELF_R_X86_64_TLSGD	19		/**< 32-bit signed PC relative offset to two GOT entries (GD). */
-#define ELF_R_X86_64_TLSLD	20		/**< 32-bit signed PC relative offset to two GOT entries (LD). */
-#define ELF_R_X86_64_DTPOFF32	21		/**< Offset in TLS block. */
-#define ELF_R_X86_64_GOTTPOFF	22		/**< 32-bit signed PC relative offset to GOT entry (IE). */
-#define ELF_R_X86_64_TPOFF32	23		/**< Offset in initial TLS block. */
-#define ELF_R_X86_64_PC64	24		/**< PC relative 64-bit. */
-#define ELF_R_X86_64_GOTOFF64	25		/**< 64-bit offset to GOT. */
-#define ELF_R_X86_64_GOTPC32	26		/**< 32 bit signed PC relative offset to GOT. */
-#define ELF_R_X86_64_GOT64	27		/**< 64-bit GOT entry offset. */
-#define ELF_R_X86_64_GOTPCREL64	28		/**< 64-bit PC relative offset to GOT entry. */
-#define ELF_R_X86_64_GOTPC64	29		/**< 64-bit PC relative offset to GOT. */
-#define ELF_R_X86_64_GOTPLT64	30		/**< Like GOT64, says PLT entry needed. */
-#define ELF_R_X86_64_PLTOFF64	31		/**< 64-bit GOT relative offset to PLT entry. */
-#define ELF_R_X86_64_SIZE32	32		/**< Size of symbol plus 32-bit addend. */
-#define ELF_R_X86_64_SIZE64	33		/**< Size of symbol plus 64-bit addend. */
+#define ELF_R_X86_64_NONE		0	/**< No relocation. */
+#define ELF_R_X86_64_64			1	/**< Direct 64-bit. */
+#define ELF_R_X86_64_PC32		2	/**< PC relative 32-bit signed. */
+#define ELF_R_X86_64_GOT32		3	/**< 32-bit GOT entry. */
+#define ELF_R_X86_64_PLT32		4	/**< 32-bit PLT address. */
+#define ELF_R_X86_64_COPY		5	/**< Copy symbol at runtime. */
+#define ELF_R_X86_64_GLOB_DAT		6	/**< Create GOT entry. */
+#define ELF_R_X86_64_JUMP_SLOT		7	/**< Create PLT entry. */
+#define ELF_R_X86_64_RELATIVE		8	/**< Adjust by program base. */
+#define ELF_R_X86_64_GOTPCREL		9	/**< 32-bit signed PC relative offset to GOT. */
+#define ELF_R_X86_64_32			10	/**< Direct 32-bit zero-extended. */
+#define ELF_R_X86_64_32S		11	/**< Direct 32-bit sign-extended. */
+#define ELF_R_X86_64_16			12	/**< Direct 16-bit zero-extended. */
+#define ELF_R_X86_64_PC16		13	/**< 16-bit sign-extended PC relative. */
+#define ELF_R_X86_64_8			14	/**< Direct 8-bit sign-extended. */
+#define ELF_R_X86_64_PC8		15	/**< 8-bit sign-extended PC relative. */
+#define ELF_R_X86_64_DTPMOD64		16	/**< ID of module containing symbol. */
+#define ELF_R_X86_64_DTPOFF64		17	/**< Offset in module's TLS block. */
+#define ELF_R_X86_64_TPOFF64		18	/**< Offset in initial TLS block. */
+#define ELF_R_X86_64_TLSGD		19	/**< 32-bit signed PC relative offset to two GOT entries (GD). */
+#define ELF_R_X86_64_TLSLD		20	/**< 32-bit signed PC relative offset to two GOT entries (LD). */
+#define ELF_R_X86_64_DTPOFF32		21	/**< Offset in TLS block. */
+#define ELF_R_X86_64_GOTTPOFF		22	/**< 32-bit signed PC relative offset to GOT entry (IE). */
+#define ELF_R_X86_64_TPOFF32		23	/**< Offset in initial TLS block. */
+#define ELF_R_X86_64_PC64		24	/**< PC relative 64-bit. */
+#define ELF_R_X86_64_GOTOFF64		25	/**< 64-bit offset to GOT. */
+#define ELF_R_X86_64_GOTPC32		26	/**< 32 bit signed PC relative offset to GOT. */
+#define ELF_R_X86_64_GOT64		27	/**< 64-bit GOT entry offset. */
+#define ELF_R_X86_64_GOTPCREL64		28	/**< 64-bit PC relative offset to GOT entry. */
+#define ELF_R_X86_64_GOTPC64		29	/**< 64-bit PC relative offset to GOT. */
+#define ELF_R_X86_64_GOTPLT64		30	/**< Like GOT64, says PLT entry needed. */
+#define ELF_R_X86_64_PLTOFF64		31	/**< 64-bit GOT relative offset to PLT entry. */
+#define ELF_R_X86_64_SIZE32		32	/**< Size of symbol plus 32-bit addend. */
+#define ELF_R_X86_64_SIZE64		33	/**< Size of symbol plus 64-bit addend. */
 #define ELF_R_X86_64_GOTPC32_TLSDESC	34	/**< GOT offset for TLS descriptor. */
 #define ELF_R_X86_64_TLSDESC_CALL	35	/**< Marker for call through TLS descriptor. */
-#define ELF_R_X86_64_TLSDESC	36		/**< TLS descriptor. */
-#define ELF_R_X86_64_IRELATIVE	37		/**< Adjust indirectly by program base. */
+#define ELF_R_X86_64_TLSDESC		36	/**< TLS descriptor. */
+#define ELF_R_X86_64_IRELATIVE		37	/**< Adjust indirectly by program base. */
 
 /** ELF32 symbol information. */
 typedef struct {

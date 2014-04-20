@@ -41,9 +41,9 @@ sources = map(File, [
     'rtld/image.c',
     'rtld/symbol.c',
 
-    'support/heap.c',
-    'support/printf.c',
-    'support/string.c',
+    'lib/heap.c',
+    'lib/printf.c',
+    'lib/string.c',
 
     'fs.c',
     'init.c',

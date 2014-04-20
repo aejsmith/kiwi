@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,7 @@
 #define __LIBKERNEL_H
 
 #include <kernel/private/process.h>
+#include <kernel/private/thread.h>
 #include <kernel/status.h>
 
 #include <util/list.h>
@@ -36,11 +37,14 @@
 #define likely(x)		__builtin_expect(!!(x), 1)
 #define unlikely(x)		__builtin_expect(!!(x), 0)
 
-/** Round a value up. */
-#define ROUND_UP(value, nearest) \
+/** Round a value up.
+ * @param val		Value to round.
+ * @param nearest	Boundary to round up to.
+ * @return		Rounded value. */
+#define round_up(val, nearest) \
 	__extension__ \
 	({ \
-		typeof(value) __n = value; \
+		typeof(val) __n = val; \
 		if(__n % (nearest)) { \
 			__n -= __n % (nearest); \
 			__n += nearest; \
@@ -48,24 +52,32 @@
 		__n; \
 	})
 
-/** Round a value down. */
-#define ROUND_DOWN(value, nearest) \
+/** Round a value down.
+ * @param val		Value to round.
+ * @param nearest	Boundary to round up to.
+ * @return		Rounded value. */
+#define round_down(val, nearest) \
 	__extension__ \
 	({ \
-		typeof(value) __n = value; \
-		if(__n % (nearest)) { \
+		typeof(val) __n = val; \
+		if(__n % (nearest)) \
 			__n -= __n % (nearest); \
-		} \
 		__n; \
 	})
 
 /** Get the lowest value out of a pair of values. */
-#define MIN(a, b)		((a) < (b) ? (a) : (b))
+#define min(a, b) \
+	((a) < (b) ? (a) : (b))
 
 /** Get the highest value out of a pair of values. */
-#define MAX(a, b)		((a) < (b) ? (b) : (a))
+#define max(a, b) \
+	((a) < (b) ? (b) : (a))
 
 #include "arch.h"
+
+#if !defined(TLS_VARIANT_1) && !defined(TLS_VARIANT_2)
+# error "Architecture must define TLS_VARIANT_1 or TLS_VARIANT_2"
+#endif
 
 /** Structure describing a loaded image. */
 typedef struct rtld_image {
@@ -75,6 +87,8 @@ typedef struct rtld_image {
 	image_id_t id;			/**< ID of the image. */
 	const char *name;		/**< Shared object name of the library. */
 	const char *path;		/**< Full path to image file. */
+	node_id_t node;			/**< Node ID of image. */
+	mount_id_t mount;		/**< Mount that the node is on. */
 	int refcount;			/**< Reference count (tracks what is using the image). */
 	elf_ehdr_t *ehdr;		/**< ELF executable header. */
 	elf_phdr_t *phdrs;		/**< Address of program headers. */
@@ -107,12 +121,19 @@ typedef struct rtld_image {
 	} state;
 } rtld_image_t;
 
+/** Structure giving symbol information. */
+typedef struct rtld_symbol {
+	elf_addr_t addr;		/**< Symbol address. */
+	rtld_image_t *image;		/**< Image containing symbol. */
+} rtld_symbol_t;
+
 /** Pre-defined TLS module IDs. */
 #define APPLICATION_TLS_ID	1	/**< Application always has module ID 1. */
 #define LIBKERNEL_TLS_ID	2	/**< If libkernel has TLS, this will be its ID. */
 #define DYNAMIC_TLS_START	2	/**< Start of dynamically allocated IDs. */
 
 extern elf_dyn_t _DYNAMIC[];
+extern char _end[];
 
 extern list_t loaded_images;
 extern rtld_image_t libkernel_image;
@@ -120,22 +141,23 @@ extern rtld_image_t *application_image;
 
 extern __thread thread_id_t curr_thread_id;
 extern process_id_t curr_process_id;
-
 extern size_t page_size;
 
 extern bool libkernel_debug;
+extern bool libkernel_dry_run;
 
 /** Print a debug message. */
 #define dprintf(fmt...)		if(libkernel_debug) { printf(fmt); }
 
-extern status_t rtld_image_relocate(rtld_image_t *image);
-extern status_t rtld_image_load(const char *path, rtld_image_t *req, int type,
-	void **entryp, rtld_image_t **imagep);
-extern void rtld_image_unload(rtld_image_t *image);
-extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp,
-	rtld_image_t **sourcep);
+extern status_t arch_rtld_image_relocate(rtld_image_t *image);
+
+extern rtld_image_t *rtld_image_lookup(const char *name);
+extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name,
+	rtld_symbol_t *symbol);
 extern void rtld_symbol_init(rtld_image_t *image);
-extern void *rtld_init(process_args_t *args, bool dry_run);
+extern status_t rtld_image_load(const char *name, rtld_image_t *req,
+	rtld_image_t **imagep);
+extern status_t rtld_init(process_args_t *args, void **entryp);
 
 extern size_t tls_alloc_module_id(void);
 extern ptrdiff_t tls_tp_offset(rtld_image_t *image);
@@ -143,8 +165,7 @@ extern void *tls_get_addr(size_t module, size_t offset);
 extern status_t tls_init(void);
 extern void tls_destroy(void);
 
+extern void libkernel_init(process_args_t *args) __noreturn;
 extern void libkernel_abort(void) __noreturn;
-
-extern void libkernel_init(process_args_t *args);
 
 #endif /* __LIBKERNEL_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -91,7 +91,8 @@ void *tls_get_addr(size_t module, size_t offset) {
 	return (void *)(tcb->dtv[module] + offset);
 }
 
-#ifdef TLS_VARIANT2
+#ifdef TLS_VARIANT_2
+
 /** Work out the size to allocate for the initial TLS block.
  * @return		Size to allocate. */
 static size_t initial_block_size(void) {
@@ -103,7 +104,7 @@ static size_t initial_block_size(void) {
 	for(i = 1; i < static_dtv_size; i++) {
 		image = tls_module_lookup(i);
 		if(image)
-			size = ROUND_UP(size + image->tls_memsz, image->tls_align);
+			size = round_up(size + image->tls_memsz, image->tls_align);
 	}
 
 	/* Add on the TCB size. */
@@ -119,14 +120,14 @@ static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
 	rtld_image_t *image;
 	size_t i;
 
-	for(i = (static_dtv_size - 1); i >= 1; i--) {
+	for(i = static_dtv_size - 1; i >= 1; i--) {
 		image = tls_module_lookup(i);
 		if(!image)
 			continue;
 
 		/* Handle alignment requirements. */
 		if(image->tls_align)
-			base = ROUND_UP(base, image->tls_align);
+			base = round_up(base, image->tls_align);
 
 		dprintf("tls: loading image for module %s (%zu) to %p (offset %p) "
 			"for thread %d\n", image->name, image->tls_module_id, base,
@@ -136,16 +137,15 @@ static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
 		if(image->tls_filesz)
 			memcpy((void *)base, image->tls_image, image->tls_filesz);
 		if(image->tls_memsz - image->tls_filesz) {
-			memset((void *)(base + image->tls_filesz), 0, image->tls_memsz
-				- image->tls_filesz);
+			memset((void *)(base + image->tls_filesz), 0,
+				image->tls_memsz - image->tls_filesz);
 		}
 
 		base += image->tls_memsz;
 	}
 
 	/* Return the TCB address. */
-	dprintf("tls: thread pointer for thread %d is %p\n", _kern_thread_id(THREAD_SELF),
-		base);
+	dprintf("tls: thread pointer for thread %d is %p\n", _kern_thread_id(THREAD_SELF), base);
 	return (void *)base;
 }
 
@@ -166,19 +166,21 @@ ptrdiff_t tls_tp_offset(rtld_image_t *image) {
 	for(i = 1; i < image->tls_module_id; i++) {
 		exist = tls_module_lookup(i);
 		if(exist)
-			offset = ROUND_UP(offset + exist->tls_memsz, exist->tls_align);
+			offset = round_up(offset + exist->tls_memsz, exist->tls_align);
 	}
-	offset = ROUND_UP(offset + image->tls_memsz, image->tls_align);
+
+	offset = round_up(offset + image->tls_memsz, image->tls_align);
 
 	/* Want the negative of what we've worked out, the data is behind the
 	 * thread pointer. */
 	offset = -offset;
 	return offset;
 }
-#elif defined(TLS_VARIANT1)
-# error "TLS_VARIANT1 is not implemented"
-#else
-# error "Please define TLS_VARIANT1 or TLS_VARIANT2"
+
+#elif defined(TLS_VARIANT_1)
+
+#error "TLS_VARIANT1 is not implemented"
+
 #endif
 
 /** Initialise TLS for the current thread.
@@ -212,7 +214,7 @@ status_t tls_init(void) {
 	dtv[0] = static_dtv_size;
 
 	/* Allocate the TLS block. */
-	size = ROUND_UP(initial_block_size(), page_size);
+	size = round_up(initial_block_size(), page_size);
 	ret = kern_vm_map(&alloc, size, VM_ADDRESS_ANY,
 		VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE,
 		INVALID_HANDLE, 0, NULL);
@@ -233,7 +235,7 @@ status_t tls_init(void) {
 /** Destroy the TLS block for the current thread.
  * @todo		Will need to free dynamically allocated blocks here. */
 void tls_destroy(void) {
-	size_t size = ROUND_UP(initial_block_size(), page_size);
+	size_t size = round_up(initial_block_size(), page_size);
 	tls_tcb_t *tcb = tls_tcb_get();
 
 	dprintf("tls: freeing block %p (size: %zu) for thread %d\n",

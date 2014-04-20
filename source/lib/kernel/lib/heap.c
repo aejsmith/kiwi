@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,9 +29,9 @@
 
 /** Structure representing an area on the heap. */
 typedef struct heap_chunk {
-	list_t header;			/**< Link to chunk list. */
-	size_t size;			/**< Size of chunk including struct (low bit == used). */
-	bool allocated;			/**< Whether the chunk is allocated. */
+	list_t header;		/**< Link to chunk list. */
+	size_t size;		/**< Size of chunk including struct (low bit == used). */
+	bool allocated;		/**< Whether the chunk is allocated. */
 } heap_chunk_t;
 
 /** Lock to protect the heap. */
@@ -47,7 +47,7 @@ static heap_chunk_t *map_chunk(size_t size) {
 	heap_chunk_t *chunk;
 	status_t ret;
 
-	size = ROUND_UP(size, page_size);
+	size = round_up(size, page_size);
 	ret = kern_vm_map((void **)&chunk, size, VM_ADDRESS_ANY,
 		VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE, INVALID_HANDLE,
 		0, "libkernel_heap");
@@ -72,7 +72,7 @@ void *malloc(size_t size) {
 		return 0;
 
 	/* Align all allocations to 8 bytes. */
-	size = ROUND_UP(size, 8);
+	size = round_up(size, 8);
 	total = size + sizeof(heap_chunk_t);
 
 	kern_mutex_lock(&heap_lock, -1);
@@ -126,7 +126,7 @@ void *realloc(void *addr, size_t size) {
 		new = malloc(size);
 		if(addr) {
 			chunk = (heap_chunk_t *)((char *)addr - sizeof(heap_chunk_t));
-			memcpy(new, addr, MIN(chunk->size - sizeof(heap_chunk_t), size));
+			memcpy(new, addr, min(chunk->size - sizeof(heap_chunk_t), size));
 			free(addr);
 		}
 
@@ -134,7 +134,21 @@ void *realloc(void *addr, size_t size) {
 	}
 }
 
-/** Free memory allocated with kfree().
+/** Allocate zero-filled memory.
+ * @param nmemb		Number of elements.
+ * @param size		Size of each element.
+ * @return		Address of allocation, NULL on failure. */
+void *calloc(size_t nmemb, size_t size) {
+	void *ret;
+
+	ret = malloc(nmemb * size);
+	if(ret)
+		memset(ret, 0, nmemb * size);
+
+	return ret;
+}
+
+/** Free memory allocated with malloc().
  * @param addr		Address of allocation. */
 void free(void *addr) {
 	heap_chunk_t *chunk, *adj;

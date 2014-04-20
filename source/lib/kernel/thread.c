@@ -85,7 +85,7 @@ static int thread_trampoline(void *_create) {
  *
  * @return		Status code describing result of the operation.
  */
-__export status_t
+status_t __export
 kern_thread_create(const char *name, thread_entry_t entry, void *arg,
 	const thread_stack_t *stack, uint32_t flags, handle_t *handlep)
 {
@@ -123,7 +123,7 @@ kern_thread_create(const char *name, thread_entry_t entry, void *arg,
  * @param handle	Handle for thread to get ID of, or THREAD_SELF to get
  *			ID of the calling thread.
  * @return		Thread ID on success, -1 if handle is invalid. */
-__export thread_id_t kern_thread_id(handle_t handle) {
+thread_id_t __export kern_thread_id(handle_t handle) {
 	/* We save the current thread ID to avoid having to perform a kernel
 	 * call just to get our own ID. */
 	if(handle < 0) {
@@ -135,7 +135,7 @@ __export thread_id_t kern_thread_id(handle_t handle) {
 
 /** Terminate the calling thread.
  * @param status	Exit status code. */
-__export void kern_thread_exit(int status) {
+void __export kern_thread_exit(int status) {
 	tls_destroy();
 	_kern_thread_exit(status);
 }

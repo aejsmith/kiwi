@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,8 +23,8 @@
 
 /** Argument passed to __tls_get_addr(). */
 typedef struct tls_index {
-	unsigned long int ti_module;
-	unsigned long int ti_offset;
+	unsigned long ti_module;
+	unsigned long ti_offset;
 } tls_index_t;
 
 extern void *__tls_get_addr(tls_index_t *index) __export;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,7 +34,7 @@
 #define ELF_MACHINE		ELF_EM_X86_64
 
 /** TLS settings. */
-#define TLS_VARIANT2		1	/**< Use variant II. */
+#define TLS_VARIANT_2		1	/**< Use variant 2. */
 
 /** Address type. */
 typedef unsigned long ptr_t;
@@ -59,8 +59,9 @@ typedef struct tls_tcb {
 /** Get a pointer to the current thread's TCB.
  * @return		Pointer to TCB. */
 static inline tls_tcb_t *tls_tcb_get(void) {
-	unsigned long addr;
-	__asm__ volatile("movq %%fs:0, %0" : "=r"(addr));
+	ptr_t addr;
+
+	__asm__ __volatile__("movq %%fs:0, %0" : "=r"(addr));
 	return (tls_tcb_t *)addr;
 }
 

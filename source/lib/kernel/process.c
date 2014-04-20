@@ -49,7 +49,7 @@ process_id_t curr_process_id = -1;
  *
  * @return		Status code describing result of the operation.
  */
-__export status_t kern_process_clone(handle_t *handlep) {
+status_t __export kern_process_clone(handle_t *handlep) {
 	status_t ret;
 
 	ret = _kern_process_clone(handlep);
@@ -69,7 +69,7 @@ __export status_t kern_process_clone(handle_t *handlep) {
  * @param handle	Handle for process to get ID of, or PROCESS_SELF to get
  *			ID of the calling process.
  * @return		Process ID on success, -1 if handle is invalid. */
-__export process_id_t kern_process_id(handle_t handle) {
+process_id_t __export kern_process_id(handle_t handle) {
 	/* We save the current process ID to avoid having to perform a kernel
 	 * call just to get our own ID. */
 	if(handle < 0) {
