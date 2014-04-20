@@ -1080,6 +1080,7 @@ out:
 
 	if(unlikely(exception.code)) {
 		if(user) {
+			kdb_enter(KDB_REASON_USER, frame);
 			thread_exception(&exception);
 		} else if(curr_thread->in_usermem && is_user_address((void *)addr)) {
 			/* Handle faults in safe user memory access functions. */

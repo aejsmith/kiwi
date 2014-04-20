@@ -72,6 +72,8 @@ static void unhandled_exception(frame_t *frame, unsigned code) {
 			curr_thread->id, curr_thread->name, frame->num,
 			except_strings[frame->num], frame->ip);
 
+		kdb_enter(KDB_REASON_USER, frame);
+
 		memset(&exception, 0, sizeof(exception));
 		exception.code = code;
 		thread_exception(&exception);
