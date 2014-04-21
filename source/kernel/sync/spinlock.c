@@ -27,33 +27,46 @@
 #include <cpu.h>
 #include <status.h>
 
+#if CONFIG_SMP
+
 /** Internal spinlock locking code.
  * @param lock		Spinlock to acquire. */
-static inline __always_inline void spinlock_lock_internal(spinlock_t *lock) {
+static inline void spinlock_lock_internal(spinlock_t *lock) {
 	/* Attempt to take the lock. Prefer the uncontended case. */
-	if(unlikely(atomic_dec(&lock->value) != 1)) {
-		/* When running on a single processor there is no need for us
-		 * to spin as there should only ever be one thing here at any
-		 * one time, so just die. */
-		#if CONFIG_SMP
-		if(cpu_count > 1) {
-			while(true) {
-				/* Wait for it to become unheld. */
-				while(atomic_get(&lock->value) != 1)
-					arch_cpu_spin_hint();
+	if(likely(atomic_dec(&lock->value) == 1))
+		return;
 
-				/* Try to acquire it. */
-				if(atomic_dec(&lock->value) == 1)
-					break;
-			}
-		} else {
-		#endif
-			fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
-		#if CONFIG_SMP
+	/* When running on a single processor there is no need for us to spin
+	 * as there should only ever be one thing here at any one time, so just
+	 * die. */
+	if(likely(cpu_count > 1)) {
+		while(true) {
+			/* Wait for it to become unheld. */
+			while(atomic_get(&lock->value) != 1)
+				arch_cpu_spin_hint();
+
+			/* Try to acquire it. */
+			if(atomic_dec(&lock->value) == 1)
+				break;
 		}
-		#endif
+	} else {
+		fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
 	}
 }
+
+#else /* CONFIG_SMP */
+
+/** Internal spinlock locking code.
+ * @param lock		Spinlock to acquire. */
+static inline void spinlock_lock_internal(spinlock_t *lock) {
+	/* Same as above. When running on a single processor there is no need
+	 * for us to spin as there should only ever be one thing here at any
+	 * one time, so just die. */
+	if(unlikely(atomic_dec(&lock->value) != 1))
+		fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
+}
+
+#endif /* CONFIG_SMP */
 
 /**
  * Acquire a spinlock.
@@ -114,10 +127,7 @@ void spinlock_unlock(spinlock_t *lock) {
 	if(unlikely(!spinlock_held(lock)))
 		fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
 
-	/* Save state before unlocking in case it is overwritten by another
-	 * waiting CPU. */
 	state = lock->state;
-
 	atomic_set(&lock->value, 1);
 	local_irq_restore(state);
 }
