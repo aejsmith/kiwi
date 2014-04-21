@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,6 +49,9 @@
 #else
 # define dprintf(fmt...)	
 #endif
+
+/** Next kernel image ID (protected by kernel_proc lock). */
+static image_id_t next_kernel_image_id = 2;
 
 /** Check whether an ELF header is valid for the current system.
  * @param ehdr		Executable header.
@@ -757,7 +760,7 @@ status_t elf_module_finish(elf_image_t *image) {
 
 	/* Register the image in the kernel process. */
 	mutex_lock(&kernel_proc->lock);
-	image->id = kernel_proc->next_image_id++;
+	image->id = next_kernel_image_id++;
 	list_append(&kernel_proc->images, &image->header);
 	mutex_unlock(&kernel_proc->lock);
 
@@ -940,7 +943,7 @@ __init_text void elf_init(elf_image_t *image) {
 	void *mapping;
 
 	list_init(&image->header);
-	image->id = 0;
+	image->id = 1;
 	image->name = (char *)"kernel";
 	image->load_base = 0;
 	image->load_size = 0;
@@ -1017,8 +1020,6 @@ void elf_process_clone(process_t *process, process_t *parent) {
 		list_init(&clone->header);
 		list_append(&process->images, &clone->header);
 	}
-
-	process->next_image_id = parent->next_image_id;
 }
 
 /** Clean up ELF images attached to a process.
@@ -1036,16 +1037,16 @@ void elf_process_cleanup(process_t *process) {
 }
 
 /** Register an ELF image with the kernel.
+ * @param id		Image ID.
  * @param info		Image information structure.
- * @param idp		Where to store ID for image.
  * @return		Status code describing the result of the operation. */
-status_t kern_image_register(image_info_t *info, image_id_t *idp) {
+status_t kern_image_register(image_id_t id, image_info_t *info) {
 	image_info_t kinfo;
-	elf_image_t *image;
+	elf_image_t *image, *exist;
 	char *name;
 	status_t ret;
 
-	if(!info || !idp)
+	if(!info)
 		return STATUS_INVALID_ARG;
 
 	ret = memcpy_from_user(&kinfo, info, sizeof(kinfo));
@@ -1062,6 +1063,7 @@ status_t kern_image_register(image_info_t *info, image_id_t *idp) {
 
 	image = kmalloc(sizeof(*image), MM_KERNEL);
 	list_init(&image->header);
+	image->id = id;
 	image->load_base = (ptr_t)kinfo.load_base;
 	image->load_size = kinfo.load_size;
 	image->symtab = kinfo.symtab;
@@ -1080,22 +1082,25 @@ status_t kern_image_register(image_info_t *info, image_id_t *idp) {
 
 	mutex_lock(&curr_proc->lock);
 
-	ret = write_user(idp, curr_proc->next_image_id);
-	if(ret != STATUS_SUCCESS) {
-		mutex_unlock(&curr_proc->lock);
-		kfree(image->name);
-		kfree(image);
-		return ret;
+	LIST_FOREACH(&curr_proc->images, iter) {
+		exist = list_entry(iter, elf_image_t, header);
+
+		if(exist->id == id) {
+			mutex_unlock(&curr_proc->lock);
+			kfree(image->name);
+			kfree(image);
+			return STATUS_ALREADY_EXISTS;
+		}
 	}
 
-	image->id = curr_proc->next_image_id++;
 	list_append(&curr_proc->images, &image->header);
+
+	mutex_unlock(&curr_proc->lock);
 
 	dprintf("elf: registered image %" PRIu16 " (%s) in process %" PRIu32
 		" (load_base: %p, load_size: 0x%zx)\n", image->id, image->name,
 		curr_proc->id, image->load_base, image->load_size);
 
-	mutex_unlock(&curr_proc->lock);
 	return STATUS_SUCCESS;
 }
 

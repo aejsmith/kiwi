@@ -22,7 +22,6 @@
  *  - ELF Handling For Thread-Local Storage
  *    http://people.redhat.com/drepper/tls.pdf
  *
- * @todo		Reuse module IDs when modules are unloaded.
  * @todo		I don't think the offset calculation and alignment
  *			handling is quite right.
  * @todo		When cloning a process with kern_process_clone(), TLS
@@ -32,40 +31,14 @@
 #include <kernel/private/thread.h>
 #include <kernel/vm.h>
 
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "libkernel.h"
 
-/** Next module ID.
- * @note		Protected by the RTLD lock - this is only ever called
- *			from the RTLD which serialises image loading. */
-static size_t next_module_id = DYNAMIC_TLS_START;
-
 /** Statically allocated DTV size. */
 static ptr_t static_dtv_size = 0;
-
-/** Look up an RTLD image by TLS module ID.
- * @param id		Module ID.
- * @return		Pointer to image. */
-static rtld_image_t *tls_module_lookup(size_t id) {
-	rtld_image_t *image;
-
-	LIST_FOREACH(&loaded_images, iter) {
-		image = list_entry(iter, rtld_image_t, header);
-
-		if(image->tls_module_id == id)
-			return image;
-	}
-
-	return NULL;
-}
-
-/** Allocate a new module ID.
- * @return		Allocated module ID. */
-size_t tls_alloc_module_id(void) {
-	return next_module_id++;
-}
 
 /** Get a TLS address.
  * @note		This is not called directly by code, it is called from
@@ -75,7 +48,7 @@ size_t tls_alloc_module_id(void) {
  * @param offset	Offset of object.
  * @return		Address of current thread's copy of the variable. */
 void *tls_get_addr(size_t module, size_t offset) {
-	tls_tcb_t *tcb = tls_tcb_get();
+	tls_tcb_t *tcb = arch_tls_tcb();
 	size_t size;
 
 	/* Check if the DTV contains this module. */
@@ -102,8 +75,8 @@ static size_t initial_block_size(void) {
 	/* tlsoffset(1) = round(tlssize(1), align(1))
 	 * tlsoffset(m+1) = round(tlsoffset(m) + tlssize(m+1), align(m+1)) */
 	for(i = 1; i < static_dtv_size; i++) {
-		image = tls_module_lookup(i);
-		if(image)
+		image = rtld_image_lookup(i);
+		if(image && image->tls_memsz)
 			size = round_up(size + image->tls_memsz, image->tls_align);
 	}
 
@@ -121,17 +94,16 @@ static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
 	size_t i;
 
 	for(i = static_dtv_size - 1; i >= 1; i--) {
-		image = tls_module_lookup(i);
-		if(!image)
+		image = rtld_image_lookup(i);
+		if(!image || !image->tls_memsz)
 			continue;
 
 		/* Handle alignment requirements. */
 		if(image->tls_align)
 			base = round_up(base, image->tls_align);
 
-		dprintf("tls: loading image for module %s (%zu) to %p (offset %p) "
-			"for thread %d\n", image->name, image->tls_module_id, base,
-			-image->tls_offset, _kern_thread_id(THREAD_SELF));
+		dprintf("tls: loading image for module %s (%" PRId16 ") to %p (offset %p)\n",
+			image->name, image->id, base, -image->tls_offset);
 		dtv[i] = base;
 
 		if(image->tls_filesz)
@@ -144,8 +116,6 @@ static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
 		base += image->tls_memsz;
 	}
 
-	/* Return the TCB address. */
-	dprintf("tls: thread pointer for thread %d is %p\n", _kern_thread_id(THREAD_SELF), base);
 	return (void *)base;
 }
 
@@ -155,17 +125,17 @@ static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
  *			an initial image. */
 ptrdiff_t tls_tp_offset(rtld_image_t *image) {
 	ptrdiff_t offset = 0;
+	image_id_t i;
 	rtld_image_t *exist;
-	size_t i;
 
 	if(static_dtv_size)
 		return 0;
 
 	/* tlsoffset(1) = round(tlssize(1), align(1))
 	 * tlsoffset(m+1) = round(tlsoffset(m) + tlssize(m+1), align(m+1)) */
-	for(i = 1; i < image->tls_module_id; i++) {
-		exist = tls_module_lookup(i);
-		if(exist)
+	for(i = 1; i < image->id; i++) {
+		exist = rtld_image_lookup(i);
+		if(exist && exist->tls_memsz)
 			offset = round_up(offset + exist->tls_memsz, exist->tls_align);
 	}
 
@@ -179,18 +149,19 @@ ptrdiff_t tls_tp_offset(rtld_image_t *image) {
 
 #elif defined(TLS_VARIANT_1)
 
-#error "TLS_VARIANT1 is not implemented"
+#error "TLS_VARIANT_1 is not implemented"
 
 #endif
 
-/** Initialise TLS for the current thread.
+/** Allocate a TLS block for a new thread.
+ * @param tcbp		Where to store TCB address.
  * @return		Status code describing result of the operation. */
-status_t tls_init(void) {
+status_t tls_alloc(tls_tcb_t **tcbp) {
+	ptr_t *dtv;
 	tls_tcb_t *tcb;
-	status_t ret;
 	size_t size;
 	void *alloc;
-	ptr_t *dtv;
+	status_t ret;
 
 	/* All initial modules (the executable itself and the libraries loaded
 	 * along with it) must have their TLS blocks allocated statically.
@@ -203,7 +174,7 @@ status_t tls_init(void) {
 	 * to record the current size of the DTV to allow it to be dynamically
 	 * resized. */
 	if(!static_dtv_size)
-		static_dtv_size = next_module_id;
+		static_dtv_size = next_image_id;
 
 	/* Create the dynamic thread vector. */
 	dtv = malloc(static_dtv_size * sizeof(ptr_t));
@@ -216,29 +187,26 @@ status_t tls_init(void) {
 	/* Allocate the TLS block. */
 	size = round_up(initial_block_size(), page_size);
 	ret = kern_vm_map(&alloc, size, VM_ADDRESS_ANY,
-		VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE,
-		INVALID_HANDLE, 0, NULL);
+		VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE, INVALID_HANDLE,
+		0, NULL);
 	if(ret != STATUS_SUCCESS) {
 		free(dtv);
 		return ret;
 	}
 
-	/* Initialise it and tell the kernel our TLS address. */
 	tcb = initial_block_init((ptr_t)alloc, dtv);
-	tls_tcb_init(tcb);
+	arch_tls_tcb_init(tcb);
 	tcb->dtv = dtv;
 	tcb->base = alloc;
-	kern_thread_control(THREAD_SET_TLS_ADDR, tcb, NULL);
+
+	*tcbp = tcb;
 	return STATUS_SUCCESS;
 }
 
-/** Destroy the TLS block for the current thread.
- * @todo		Will need to free dynamically allocated blocks here. */
-void tls_destroy(void) {
-	size_t size = round_up(initial_block_size(), page_size);
-	tls_tcb_t *tcb = tls_tcb_get();
-
-	dprintf("tls: freeing block %p (size: %zu) for thread %d\n",
-		tcb->base, size, _kern_thread_id(THREAD_SELF));
-	kern_vm_unmap(tcb->base, size);
+/** Destroy a TLS block.
+ * @todo		Will need to free dynamically allocated blocks here.
+ * @param tcb		TCB to destroy. */
+void tls_destroy(tls_tcb_t *tcb) {
+	free(tcb->dtv);
+	kern_vm_unmap(tcb->base, round_up(initial_block_size(), page_size));
 }

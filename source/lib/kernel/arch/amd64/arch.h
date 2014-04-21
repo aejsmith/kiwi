@@ -58,14 +58,21 @@ typedef struct tls_tcb {
 
 /** Get a pointer to the current thread's TCB.
  * @return		Pointer to TCB. */
-static inline tls_tcb_t *tls_tcb_get(void) {
+static inline tls_tcb_t *arch_tls_tcb(void) {
 	ptr_t addr;
 
 	__asm__ __volatile__("movq %%fs:0, %0" : "=r"(addr));
 	return (tls_tcb_t *)addr;
 }
 
-extern void tls_tcb_init(tls_tcb_t *tcb);
+/** Initialise architecture-specific data in the TCB.
+ * @param tcb		Thread control block. */
+static inline void arch_tls_tcb_init(tls_tcb_t *tcb) {
+	/* The base of the FS segment is set to point to the start of the TCB.
+	 * The first 8 bytes in the TCB must contain the linear address of the
+	 * TCB, so that it can be obtained at %fs:0. */
+	tcb->tpt = tcb;
+}
 
 extern void libkernel_relocate(process_args_t *args, elf_dyn_t *dyn);
 

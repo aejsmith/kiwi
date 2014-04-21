@@ -41,7 +41,7 @@ typedef struct image_info {
 	void *strtab;			/**< String table. */
 } image_info_t;
 
-extern status_t kern_image_register(image_info_t *info, image_id_t *idp);
+extern status_t kern_image_register(image_id_t id, image_info_t *info);
 extern status_t kern_image_unregister(image_id_t id);
 
 #endif /* __KERNEL_PRIVATE */

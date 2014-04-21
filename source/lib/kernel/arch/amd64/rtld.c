@@ -83,7 +83,7 @@ static status_t do_relocations(rtld_image_t *image, elf_rela_t *relocs, size_t s
 				memcpy((char *)addr, (char *)symbol.addr, symtab[symidx].st_size);
 			break;
 		case ELF_R_X86_64_DTPMOD64:
-			*addr = image->tls_module_id;
+			*addr = image->id;
 			break;
 		case ELF_R_X86_64_DTPOFF64:
 			*addr = symbol.addr + relocs[i].r_addend;

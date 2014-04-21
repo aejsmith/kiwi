@@ -107,7 +107,6 @@ typedef struct rtld_image {
 	int h_nchain;			/**< Number of chain entries. */
 
 	/** TLS information. */
-	size_t tls_module_id;		/**< TLS module ID (0 if no TLS data). */
 	void *tls_image;		/**< Initial TLS image. */
 	size_t tls_filesz;		/**< File size of TLS image. */
 	size_t tls_memsz;		/**< Memory size of TLS image. */
@@ -127,14 +126,15 @@ typedef struct rtld_symbol {
 	rtld_image_t *image;		/**< Image containing symbol. */
 } rtld_symbol_t;
 
-/** Pre-defined TLS module IDs. */
-#define APPLICATION_TLS_ID	1	/**< Application always has module ID 1. */
-#define LIBKERNEL_TLS_ID	2	/**< If libkernel has TLS, this will be its ID. */
-#define DYNAMIC_TLS_START	2	/**< Start of dynamically allocated IDs. */
+/** Pre-defined image IDs. */
+#define APPLICATION_IMAGE_ID	1	/**< Application always has module ID 1. */
+#define LIBKERNEL_IMAGE_ID	2	/**< If libkernel has TLS, this will be its ID. */
+#define DYNAMIC_IMAGE_START	3	/**< Start of dynamically allocated IDs. */
 
 extern elf_dyn_t _DYNAMIC[];
 extern char _end[];
 
+extern image_id_t next_image_id;
 extern list_t loaded_images;
 extern rtld_image_t libkernel_image;
 extern rtld_image_t *application_image;
@@ -151,7 +151,7 @@ extern bool libkernel_dry_run;
 
 extern status_t arch_rtld_image_relocate(rtld_image_t *image);
 
-extern rtld_image_t *rtld_image_lookup(const char *name);
+extern rtld_image_t *rtld_image_lookup(image_id_t id);
 extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name,
 	rtld_symbol_t *symbol);
 extern void rtld_symbol_init(rtld_image_t *image);
@@ -159,11 +159,10 @@ extern status_t rtld_image_load(const char *name, rtld_image_t *req,
 	rtld_image_t **imagep);
 extern status_t rtld_init(process_args_t *args, void **entryp);
 
-extern size_t tls_alloc_module_id(void);
 extern ptrdiff_t tls_tp_offset(rtld_image_t *image);
 extern void *tls_get_addr(size_t module, size_t offset);
-extern status_t tls_init(void);
-extern void tls_destroy(void);
+extern status_t tls_alloc(tls_tcb_t **tcbp);
+extern void tls_destroy(tls_tcb_t *tcb);
 
 extern void libkernel_init(process_args_t *args) __noreturn;
 extern void libkernel_abort(void) __noreturn;

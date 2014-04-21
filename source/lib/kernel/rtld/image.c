@@ -47,11 +47,15 @@ static const char *library_search_dirs[] = {
 	NULL
 };
 
+/** Next image ID. */
+image_id_t next_image_id = DYNAMIC_IMAGE_START;
+
 /** List of loaded images. */
 LIST_DEFINE(loaded_images);
 
 /** Image structure representing the kernel library. */
 rtld_image_t libkernel_image = {
+	.id = LIBKERNEL_IMAGE_ID,
 	.name = "libkernel.so",
 	.path = LIBKERNEL_PATH,
 	.refcount = 0,
@@ -61,16 +65,16 @@ rtld_image_t libkernel_image = {
 /** Pointer to the application image. */
 rtld_image_t *application_image;
 
-/** Check if a library is already loaded.
- * @param name		Name of library.
+/** Look up an image by ID.
+ * @param id		ID of image to look up.
  * @return		Pointer to image structure if found. */
-rtld_image_t *rtld_image_lookup(const char *name) {
+rtld_image_t *rtld_image_lookup(image_id_t id) {
 	rtld_image_t *image;
 
 	LIST_FOREACH(&loaded_images, iter) {
 		image = list_entry(iter, rtld_image_t, header);
 
-		if(strcmp(image->name, name) == 0)
+		if(image->id == id)
 			return image;
 	}
 
@@ -180,9 +184,9 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 {
 	handle_t handle;
 	file_info_t file;
+	rtld_image_t *exist, *image = NULL;
 	size_t bytes, size, i;
 	elf_ehdr_t ehdr;
-	rtld_image_t *image = NULL;
 	elf_phdr_t *phdrs;
 	char *interp = NULL;
 	const char *dep;
@@ -200,21 +204,21 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 
 	/* Search to see if this file is already loaded. */
 	LIST_FOREACH(&loaded_images, iter) {
-		image = list_entry(iter, rtld_image_t, header);
+		exist = list_entry(iter, rtld_image_t, header);
 
-		if(image->node == file.id && image->mount == file.mount) {
-			if(image->state == RTLD_IMAGE_LOADING) {
+		if(exist->node == file.id && exist->mount == file.mount) {
+			if(exist->state == RTLD_IMAGE_LOADING) {
 				dprintf("rtld: cyclic dependency on %s detected!\n",
-					image->name);
+					exist->name);
 				return STATUS_MALFORMED_IMAGE;
 			}
 
 			dprintf("rtld: increasing reference count on %s (%p)\n",
-				image->name, image);
-			image->refcount++;
+				exist->name, exist);
+			exist->refcount++;
 
 			if(imagep)
-				*imagep = image;
+				*imagep = exist;
 
 			return STATUS_SUCCESS;
 		}
@@ -264,6 +268,9 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 		goto fail;
 	}
 
+	/* Allocate an image ID. */
+	image->id = (ehdr.e_type == ELF_ET_EXEC) ? APPLICATION_IMAGE_ID : next_image_id++;
+
 	image->node = file.id;
 	image->mount = file.mount;
 
@@ -297,12 +304,12 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 			}
 		}
 
-		/* Allocate a chunk of memory for it. */
+		/* Allocate a chunk of address space for it. */
 		ret = kern_vm_map(&image->load_base, image->load_size,
 			VM_ADDRESS_ANY, VM_ACCESS_READ, VM_MAP_PRIVATE,
 			INVALID_HANDLE, 0, NULL);
 		if(ret != STATUS_SUCCESS) {
-			dprintf("rtld: %s: unable to allocate memory (%d)\n", path, ret);
+			dprintf("rtld: %s: unable to allocate address space: %d\n", path, ret);
 			goto fail;
 		}
 	} else {
@@ -360,14 +367,6 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 					path);
 				ret = STATUS_MALFORMED_IMAGE;
 				goto fail;
-			}
-
-			/* Set the module ID. For the main executable, this
-			 * must be APPLICATION_TLS_ID. */
-			if(ehdr.e_type == ELF_ET_EXEC) {
-				image->tls_module_id = APPLICATION_TLS_ID;
-			} else {
-				image->tls_module_id = tls_alloc_module_id();
 			}
 
 			/* Record information about the initial TLS image. */
@@ -439,21 +438,22 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 	/* Set name and loading state, and fill out hash information.
 	 * FIXME: Just use basename of path for application, and for library
 	 * if SONAME not set. */
-	if(type == ELF_ET_DYN) {
-		image->name = (const char *)(image->dynamic[ELF_DT_SONAME]
-			+ image->dynamic[ELF_DT_STRTAB]);
-	} else {
-		image->name = "<application>";
-	}
+	image->name = (type == ELF_ET_DYN)
+		? (const char *)(image->dynamic[ELF_DT_SONAME] + image->dynamic[ELF_DT_STRTAB])
+		: "<application>";
 	image->state = RTLD_IMAGE_LOADING;
 	rtld_symbol_init(image);
 
 	/* Check if the image is already loaded. */
 	if(type == ELF_ET_DYN) {
-		if(rtld_image_lookup(image->name)) {
-			printf("rtld: %s: image with same name already loaded\n", path);
-			ret = STATUS_ALREADY_EXISTS;
-			goto fail;
+		LIST_FOREACH(&loaded_images, iter) {
+			exist = list_entry(iter, rtld_image_t, header);
+
+			if(strcmp(exist->name, image->name) == 0) {
+				printf("rtld: %s: image with same name already loaded\n", path);
+				ret = STATUS_ALREADY_EXISTS;
+				goto fail;
+			}
 		}
 	}
 
@@ -504,9 +504,9 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 	info.sym_size = image->h_nchain * info.sym_entsize;
 	info.strtab = (void *)image->dynamic[ELF_DT_STRTAB];
 
-	ret = kern_image_register(&info, &image->id);
+	ret = kern_image_register(image->id, &info);
 	if(ret != STATUS_SUCCESS) {
-		printf("rtld: failed to register image with kernel (%d)\n", ret);
+		printf("rtld: failed to register image with kernel: %d\n", ret);
 		goto fail;
 	}
 
@@ -640,7 +640,6 @@ status_t rtld_init(process_args_t *args, void **entryp) {
 			if(!phdrs[i].p_memsz)
 				break;
 
-			image->tls_module_id = tls_alloc_module_id();
 			image->tls_image = args->load_base + phdrs[i].p_vaddr;
 			image->tls_filesz = phdrs[i].p_filesz;
 			image->tls_memsz = phdrs[i].p_memsz;
@@ -662,7 +661,7 @@ status_t rtld_init(process_args_t *args, void **entryp) {
 	info.sym_size = image->h_nchain * info.sym_entsize;
 	info.strtab = (void *)image->dynamic[ELF_DT_STRTAB];
 
-	ret = kern_image_register(&info, &image->id);
+	ret = kern_image_register(image->id, &info);
 	if(ret != STATUS_SUCCESS) {
 		printf("rtld: failed to register libkernel image: %d\n", ret);
 		return ret;
@@ -675,6 +674,12 @@ status_t rtld_init(process_args_t *args, void **entryp) {
 		dprintf("rtld: failed to load binary: %d\n", ret);
 		return ret;
 	}
+
+	/* We must calculate the TLS offset for the libkernel image after the
+	 * application has been loaded because its TLS data is positioned after
+	 * the application's. */
+	if(image->tls_memsz)
+		image->tls_offset = tls_tp_offset(image);
 
 	/* Print out the image list if required. */
 	if(libkernel_debug || libkernel_dry_run) {

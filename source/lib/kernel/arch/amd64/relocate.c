@@ -53,7 +53,7 @@ void libkernel_relocate(process_args_t *args, elf_dyn_t *dyn) {
 			*addr = (elf_addr_t)load_base + reloc->r_addend;
 			break;
 		case ELF_R_X86_64_DTPMOD64:
-			*addr = LIBKERNEL_TLS_ID;
+			*addr = LIBKERNEL_IMAGE_ID;
 			break;
 		default:
 			kern_process_exit(STATUS_MALFORMED_IMAGE);

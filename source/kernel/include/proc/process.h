@@ -77,7 +77,6 @@ typedef struct process {
 	list_t threads;			/**< List of threads. */
 	avl_tree_t futexes;		/**< Tree of futexes that the process has accessed. */
 	list_t images;			/**< List of loaded images. */
-	image_id_t next_image_id;	/**< Next image ID. */
 	ptr_t thread_restore;		/**< Address of kern_thread_restore() in libkernel. */
 
 	/** Exception handler table. */

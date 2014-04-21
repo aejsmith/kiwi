@@ -148,5 +148,5 @@ syscall kern_timer_create(int, ptr_t);
 syscall kern_timer_start(handle_t, nstime_t, int);
 syscall kern_timer_stop(handle_t, ptr_t);
 
-syscall kern_image_register(ptr_t, ptr_t) hidden;
+syscall kern_image_register(image_id_t, ptr_t) hidden;
 syscall kern_image_unregister(image_id_t) hidden;

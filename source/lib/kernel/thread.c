@@ -23,14 +23,16 @@
 #include <kernel/object.h>
 #include <kernel/private/thread.h>
 
+#include <inttypes.h>
+
 #include "libkernel.h"
 
 /** Information used by thread_create(). */
 typedef struct thread_create {
-	status_t ret;			/**< Initialisation status. */
+	volatile int32_t futex;		/**< Futex to wait on. */
+	tls_tcb_t *tcb;			/**< TLS thread control block. */
 	thread_entry_t entry;		/**< Real entry point. */
 	void *arg;			/**< Real entry point argument. */
-	volatile int32_t futex;		/**< Futex to wait on. */
 } thread_create_t;
 
 /** Saved ID for the current thread. */
@@ -40,26 +42,26 @@ __thread thread_id_t curr_thread_id = -1;
  * @param _create	Pointer to information structure. */
 static int thread_trampoline(void *_create) {
 	thread_create_t *create = _create;
+	thread_id_t id;
 	thread_entry_t entry;
 	void *arg;
-	status_t ret;
+
+	id = _kern_thread_id(THREAD_SELF);
+
+	/* Set our TCB. */
+	dprintf("tls: TCB for thread %" PRId32 " is %p\n", id, create->tcb);
+	kern_thread_control(THREAD_SET_TLS_ADDR, create->tcb, NULL);
+
+	/* Save our ID. */
+	curr_thread_id = id;
 
 	/* After we unblock the creating thread, create is no longer valid. */
 	entry = create->entry;
 	arg = create->arg;
 
-	/* Attempt to initialise our TLS block. */
-	ret = create->ret = tls_init();
-
 	/* Unblock our creator. */
 	create->futex = 1;
 	kern_futex_wake((int32_t *)&create->futex, 1, NULL);
-
-	if(ret != STATUS_SUCCESS)
-		_kern_thread_exit(0);
-
-	/* Save our ID. */
-	curr_thread_id = _kern_thread_id(THREAD_SELF);
 
 	/* Call the real entry point. */
 	kern_thread_exit(entry(arg));
@@ -95,28 +97,28 @@ kern_thread_create(const char *name, thread_entry_t entry, void *arg,
 	if(!entry)
 		return STATUS_INVALID_ARG;
 
-	create.ret = STATUS_SUCCESS;
+	create.futex = 0;
 	create.entry = entry;
 	create.arg = arg;
-	create.futex = 0;
+
+	/* Allocate a TLS block. */
+	ret = tls_alloc(&create.tcb);
+	if(ret != STATUS_SUCCESS)
+		return ret;
 
 	/* Create the thread. */
 	ret = _kern_thread_create(name, thread_trampoline, &create, stack, flags, handlep);
-	if(ret != STATUS_SUCCESS)
+	if(ret != STATUS_SUCCESS) {
+		tls_destroy(create.tcb);
 		return ret;
+	}
 
 	/* Wait for the thread to complete TLS setup. TODO: There is a possible
 	 * bug here: if the thread somehow ends up killed before it wakes us
 	 * we will get stuck. We should create an event object instead and wait
 	 * on both that and the thread so we get woken if the thread dies. */
 	kern_futex_wait((int32_t *)&create.futex, 0, -1);
-
-	/* If the thread failed initialization it will have exited. We must
-	 * close the handle if this is the case. */
-	if(handlep && create.ret != STATUS_SUCCESS)
-		kern_handle_close(*handlep);
-
-	return create.ret;
+	return STATUS_SUCCESS;
 }
 
 /** Get the ID of a thread.
@@ -136,6 +138,11 @@ thread_id_t __export kern_thread_id(handle_t handle) {
 /** Terminate the calling thread.
  * @param status	Exit status code. */
 void __export kern_thread_exit(int status) {
-	tls_destroy();
+	tls_tcb_t *tcb = arch_tls_tcb();
+
+	dprintf("tls: destroying block %p for thread %" PRId32 "\n", tcb->base,
+		curr_thread_id);
+	tls_destroy(tcb);
+
 	_kern_thread_exit(status);
 }

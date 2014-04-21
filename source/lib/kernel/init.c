@@ -44,6 +44,7 @@ void libkernel_init(process_args_t *args) {
 	size_t i;
 	rtld_image_t *image;
 	void (*entry)(process_args_t *);
+	tls_tcb_t *tcb;
 	void (*func)(void);
 	status_t ret;
 
@@ -78,11 +79,10 @@ void libkernel_init(process_args_t *args) {
 		kern_process_exit(ret);
 
 	/* Set up TLS for the current thread. */
-	if(libkernel_image.tls_module_id)
-		libkernel_image.tls_offset = tls_tp_offset(&libkernel_image);
-	ret = tls_init();
+	ret = tls_alloc(&tcb);
 	if(ret != STATUS_SUCCESS)
 		kern_process_exit(ret);
+	kern_thread_control(THREAD_SET_TLS_ADDR, tcb, NULL);
 
 	/* Save the current thread ID in TLS for the kern_thread_id() wrapper. */
 	curr_thread_id = _kern_thread_id(THREAD_SELF);
