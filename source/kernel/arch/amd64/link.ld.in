@@ -40,10 +40,11 @@ SECTIONS {
 		*(.comment*)
 	}
 
-	. = KERNEL_VIRT_BASE + SIZEOF_HEADERS;
+	. = KERNEL_VIRT_BASE;
+	__text_seg_start = .;
 
+	. = . + SIZEOF_HEADERS;
 	.text : {
-		__text_seg_start = .;
 		__text_start = .;
 		*(.text)
 		*(.text.*)
@@ -56,7 +57,6 @@ SECTIONS {
 	} :text :note
 
 	. = ALIGN(PAGE_SIZE);
-
 	.rodata : {
 		__rodata_start = .;
 		*(.rodata)
@@ -70,9 +70,9 @@ SECTIONS {
 	/* Align the start of each segment to a large page boundary to allow
 	 * the kernel to be mapped with large pages. */
 	. = ALIGN(LARGE_PAGE_SIZE);
+	__data_seg_start = .;
 
 	.data : {
-		__data_seg_start = .;
 		__data_start = .;
 		*(.data)
 		*(.data.*)
@@ -93,11 +93,13 @@ SECTIONS {
 	__data_seg_end = .;
 
 	. = ALIGN(LARGE_PAGE_SIZE);
+	__init_seg_start = .;
 
-	.init : {
-		__init_seg_start = .;
+	.init.text : { *(.init.text) } :init
+
+	. = ALIGN(PAGE_SIZE);
+	.init.data : {
 		*(.init.data)
-		*(.init.text)
 
 		. = ALIGN(32);
 		__initcall_start = .;
