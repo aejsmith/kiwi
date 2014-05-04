@@ -29,7 +29,7 @@
 #include "libsystem.h"
 
 /** Early system library initialisation (run in .init). */
-static __init void libsystem_early_init(void) {
+static __sys_init void libsystem_early_init(void) {
 	/* Attempt to open standard I/O streams from existing handles. */
 	stdin = fdopen(STDIN_FILENO, "r");
 	stdout = fdopen(STDOUT_FILENO, "a");

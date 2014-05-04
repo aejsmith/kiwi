@@ -27,9 +27,6 @@
 #include <system/_internal.h>
 
 /** Compiler attribute/builtin macros. */
-#define __init			__attribute__((constructor))
-#define __fini			__attribute__((destructor))
-#define __hidden		__attribute__((visibility("hidden")))
 #define likely(x)		__builtin_expect(!!(x), 1)
 #define unlikely(x)		__builtin_expect(!!(x), 0)
 
@@ -43,10 +40,10 @@ extern const char *__errno_list[];
 extern size_t __errno_count;
 
 extern void libsystem_init(struct process_args *args);
-extern void libsystem_fatal(const char *fmt, ...) __libsystem_noreturn __hidden;
-extern void libsystem_stub(const char *name, bool fatal) __hidden;
+extern void libsystem_fatal(const char *fmt, ...) __sys_noreturn __sys_hidden;
+extern void libsystem_stub(const char *name, bool fatal) __sys_hidden;
 
-extern void libsystem_status_to_errno(status_t status) __hidden;
+extern void libsystem_status_to_errno(status_t status) __sys_hidden;
 
 extern int main(int argc, char **argv, char **envp);
 

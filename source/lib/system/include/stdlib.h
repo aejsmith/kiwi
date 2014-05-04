@@ -59,7 +59,7 @@ typedef struct {
 	long long quot, rem;
 } lldiv_t;
 
-extern void _Exit(int status) __libsystem_noreturn;
+extern void _Exit(int status) __sys_noreturn;
 extern void abort(void);
 extern int abs(int j);
 extern int atexit(void (*func)(void));
@@ -71,7 +71,7 @@ extern void *bsearch(const void *key, const void *base, size_t nmemb, size_t siz
 	int (*compar)(const void *, const void *));
 extern void *calloc(size_t nmemb, size_t size);
 extern div_t div(int num, int denom);
-extern void exit(int status) __libsystem_noreturn;
+extern void exit(int status) __sys_noreturn;
 extern void free(void *ptr);
 extern char *getenv(const char *name);
 //extern int getsubopt(char **optionp, char *const *keylistp, char **valuep);

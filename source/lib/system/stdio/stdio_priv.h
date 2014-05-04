@@ -47,8 +47,8 @@ struct scanf_args {
 typedef void (*printf_helper_t)(char, void *, int *);
 
 extern int do_printf(printf_helper_t helper, void *data, const char *restrict fmt,
-	va_list args) __hidden;
+	va_list args) __sys_hidden;
 extern int do_scanf(struct scanf_args *data, const char *restrict fmt,
-	va_list args) __hidden;
+	va_list args) __sys_hidden;
 
 #endif /* __STDIO_PRIV_H */

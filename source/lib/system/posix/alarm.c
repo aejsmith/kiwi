@@ -41,7 +41,7 @@ static void reset_alarm(void) {
 }
 
 /** Register the fork handler. */
-static __init void alarm_init(void) {
+static __sys_init void alarm_init(void) {
 	register_fork_handler(reset_alarm);
 }
 

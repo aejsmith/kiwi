@@ -38,13 +38,13 @@ typedef struct posix_process {
 	pid_t pid;			/**< ID of the process. */
 } posix_process_t;
 
-extern sys_list_t __hidden child_processes;
-extern int32_t __hidden child_processes_lock;
+extern sys_list_t __sys_hidden child_processes;
+extern int32_t __sys_hidden child_processes_lock;
 
-extern mode_t __hidden current_umask;
+extern mode_t __sys_hidden current_umask;
 
-extern void register_fork_handler(void (*func)(void)) __hidden;
+extern void register_fork_handler(void (*func)(void)) __sys_hidden;
 
-//extern object_acl_t *posix_mode_to_acl(object_acl_t *current, mode_t mode) __hidden;
+//extern object_acl_t *posix_mode_to_acl(object_acl_t *current, mode_t mode) __sys_hidden;
 
 #endif /* __POSIX_PRIV_H */
