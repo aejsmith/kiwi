@@ -26,7 +26,7 @@
 #include <kernel/private/thread.h>
 #include <kernel/status.h>
 
-#include <util/list.h>
+#include <system/list.h>
 
 #include <elf.h>
 #include <stdio.h>
@@ -81,7 +81,7 @@
 
 /** Structure describing a loaded image. */
 typedef struct rtld_image {
-	list_t header;			/**< Link to loaded images library. */
+	sys_list_t header;		/**< Link to loaded images library. */
 
 	/** Basic image information. */
 	image_id_t id;			/**< ID of the image. */
@@ -135,7 +135,7 @@ extern elf_dyn_t _DYNAMIC[];
 extern char _end[];
 
 extern image_id_t next_image_id;
-extern list_t loaded_images;
+extern sys_list_t loaded_images;
 extern rtld_image_t libkernel_image;
 extern rtld_image_t *application_image;
 

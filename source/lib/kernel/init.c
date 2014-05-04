@@ -94,8 +94,8 @@ void libkernel_init(process_args_t *args) {
 	kern_process_control(PROCESS_LOADED, NULL, NULL);
 
 	/* Run INIT functions for loaded images. */
-	LIST_FOREACH(&loaded_images, iter) {
-		image = list_entry(iter, rtld_image_t, header);
+	SYS_LIST_FOREACH(&loaded_images, iter) {
+		image = sys_list_entry(iter, rtld_image_t, header);
 		if(image->dynamic[ELF_DT_INIT]) {
 			func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_INIT]);
 			dprintf("rtld: %s: calling INIT function %p...\n", image->name, func);

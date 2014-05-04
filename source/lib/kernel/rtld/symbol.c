@@ -53,7 +53,7 @@ static unsigned long hash_symbol(const unsigned char *name) {
  */
 bool rtld_symbol_lookup(rtld_image_t *start, const char *name, rtld_symbol_t *symbol) {
 	unsigned long hash;
-	list_t *iter;
+	sys_list_t *iter;
 	rtld_image_t *image;
 	elf_sym_t *symtab;
 	const char *strtab;
@@ -71,7 +71,7 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, rtld_symbol_t *sy
 			continue;
 		}
 
-		image = list_entry(iter, rtld_image_t, header);
+		image = sys_list_entry(iter, rtld_image_t, header);
 		iter = iter->next;
 
 		/* If the hash table is empty we do not need to do anything. */

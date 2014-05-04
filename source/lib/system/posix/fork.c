@@ -29,15 +29,15 @@
 
 /** Structure containing a fork handler. */
 typedef struct fork_handler {
-	list_t header;			/**< List link. */
+	sys_list_t header;		/**< List link. */
 	void (*func)(void);		/**< Function to call. */
 } fork_handler_t;
 
 /** List of fork handlers. */
-static LIST_DEFINE(fork_handlers);
+static SYS_LIST_DEFINE(fork_handlers);
 
 /** List of child processes created via fork(). */
-LIST_DEFINE(child_processes);
+SYS_LIST_DEFINE(child_processes);
 
 /** Lock for child process list. */
 int32_t child_processes_lock = MUTEX_INITIALIZER;
@@ -81,33 +81,33 @@ pid_t fork(void) {
 
 		/* Empty the child processes list: anything in there is not our
 		 * child, but a child of our parent. */
-		LIST_FOREACH_SAFE(&child_processes, iter) {
-			process = list_entry(iter, posix_process_t, header);
+		SYS_LIST_FOREACH_SAFE(&child_processes, iter) {
+			process = sys_list_entry(iter, posix_process_t, header);
 
 			/* Handles are all invalid as they should not be marked
 			 * as inheritable, but try to close them anyway just in
 			 * case the user is doing something daft. */
 			kern_handle_close(process->handle);
-			list_remove(&process->header);
+			sys_list_remove(&process->header);
 			free(process);
 		}
 
 		/* Run post-fork handlers. */
-		LIST_FOREACH(&fork_handlers, iter) {
-			handler = list_entry(iter, fork_handler_t, header);
+		SYS_LIST_FOREACH(&fork_handlers, iter) {
+			handler = sys_list_entry(iter, fork_handler_t, header);
 			handler->func();
 		}
 
 		return 0;
 	} else {
-		list_init(&process->header);
+		sys_list_init(&process->header);
 		process->pid = kern_process_id(process->handle);
 		if(process->pid < 1)
 			libsystem_fatal("could not get ID of child");
 
 		/* Add it to the child list. */
 		kern_mutex_lock(&child_processes_lock, -1);
-		list_append(&child_processes, &process->header);
+		sys_list_append(&child_processes, &process->header);
 		kern_mutex_unlock(&child_processes_lock);
 
 		return process->pid;
@@ -124,6 +124,6 @@ void register_fork_handler(void (*func)(void)) {
 		libsystem_fatal("failed to register fork handler");
 
 	handler->func = func;
-	list_init(&handler->header);
-	list_append(&fork_handlers, &handler->header);
+	sys_list_init(&handler->header);
+	sys_list_append(&fork_handlers, &handler->header);
 }
