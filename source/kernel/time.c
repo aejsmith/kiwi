@@ -49,7 +49,6 @@ typedef struct user_timer {
 	timer_t timer;			/**< Kernel timer. */
 	notifier_t notifier;		/**< Notifier for the timer event. */
 	bool fired;			/**< Whether the event has fired. */
-	thread_t *thread;		/**< Thread that created the timer. */
 } user_timer_t;
 
 /** Check if a year is a leap year. */
@@ -552,7 +551,6 @@ status_t kern_timer_create(uint32_t flags, handle_t *handlep) {
 	notifier_init(&timer->notifier, timer);
 	timer->flags = flags;
 	timer->fired = false;
-	timer->thread = curr_thread;
 
 	handle = object_handle_create(&timer_object_type, timer);
 	ret = object_handle_attach(handle, NULL, handlep);
