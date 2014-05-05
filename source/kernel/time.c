@@ -484,7 +484,7 @@ static status_t timer_object_wait(object_handle_t *handle, unsigned event, void 
 	user_timer_t *timer = handle->private;
 
 	switch(event) {
-	case TIMER_EVENT_FIRED:
+	case TIMER_EVENT:
 		if(timer->fired) {
 			timer->fired = false;
 			object_wait_signal(wait, 0);
@@ -506,7 +506,7 @@ static void timer_object_unwait(object_handle_t *handle, unsigned event, void *w
 	user_timer_t *timer = handle->private;
 
 	switch(event) {
-	case TIMER_EVENT_FIRED:
+	case TIMER_EVENT:
 		notifier_unregister(&timer->notifier, object_wait_notifier, wait);
 		break;
 	}

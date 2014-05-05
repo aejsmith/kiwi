@@ -28,8 +28,8 @@
 extern "C" {
 #endif
 
-/** Timer events. */
-#define TIMER_EVENT_FIRED	1	/**< Event for the timer firing. */
+/** Event for the timer firing. */
+#define TIMER_EVENT		1
 
 /** Timer mode values. */
 #define TIMER_ONESHOT		1	/**< Fire the timer event only once. */
