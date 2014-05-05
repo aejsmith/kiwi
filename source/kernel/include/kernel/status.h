@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,41 +38,40 @@
 #define STATUS_OVERFLOW			12	/**< Integer overflow. */
 #define STATUS_NO_MEMORY		13	/**< Out of memory. */
 #define STATUS_NO_HANDLES		14	/**< No handles are available. */
-#define STATUS_NO_SEMAPHORES		15	/**< No semaphores are available. */
-#define STATUS_NO_AREAS			16	/**< No shared memory areas are available. */
-#define STATUS_PROCESS_LIMIT		17	/**< Process limit reached. */
-#define STATUS_THREAD_LIMIT		18	/**< Thread limit reached. */
-#define STATUS_READ_ONLY		19	/**< Object cannot be modified. */
-#define STATUS_PERM_DENIED		20	/**< Operation not permitted. */
-#define STATUS_ACCESS_DENIED		21	/**< Requested access rights denied. */
-#define STATUS_NOT_DIR			22	/**< Path component is not a directory. */
-#define STATUS_NOT_REGULAR		23	/**< Path does not refer to a regular file. */
-#define STATUS_NOT_SYMLINK		24	/**< Path does not refer to a symbolic link. */
-#define STATUS_NOT_MOUNT		25	/**< Path does not refer to root of a mount. */
-#define STATUS_NOT_FOUND		26	/**< Requested object could not be found. */
-#define STATUS_NOT_EMPTY		27	/**< Directory is not empty. */
-#define STATUS_ALREADY_EXISTS		28	/**< Object already exists. */
-#define STATUS_TOO_SMALL		29	/**< Provided buffer is too small. */
-#define STATUS_TOO_LARGE		30	/**< Provided buffer is too large. */
-#define STATUS_TOO_LONG			31	/**< Provided string is too long. */
-#define STATUS_DIR_FULL			32	/**< Directory is full. */
-#define STATUS_UNKNOWN_FS		33	/**< Filesystem has an unrecognised format. */
-#define STATUS_CORRUPT_FS		34	/**< Corruption detected on the filesystem. */
-#define STATUS_FS_FULL			35	/**< No space is available on the filesystem. */
-#define STATUS_SYMLINK_LIMIT		36	/**< Exceeded nested symbolic link limit. */
-#define STATUS_IN_USE			37	/**< Object is in use. */
-#define STATUS_DEVICE_ERROR		38	/**< An error occurred during a hardware operation. */
-#define STATUS_STILL_RUNNING		39	/**< Process/thread is still running. */
-#define STATUS_UNKNOWN_IMAGE		40	/**< Executable image has an unrecognised format. */
-#define STATUS_MALFORMED_IMAGE		41	/**< Executable image format is incorrect. */
-#define STATUS_MISSING_LIBRARY		42	/**< Required library not found. */
-#define STATUS_MISSING_SYMBOL		43	/**< Referenced symbol not found. */
-#define STATUS_TRY_AGAIN		44	/**< Attempt the operation again. */
-#define STATUS_DIFFERENT_FS		45	/**< Link source and destination on different FS. */
-#define STATUS_IS_DIR			46	/**< Not a directory. */
-#define STATUS_CONN_HUNGUP		47	/**< Connection was hung up. */
+#define STATUS_PROCESS_LIMIT		15	/**< Process limit reached. */
+#define STATUS_THREAD_LIMIT		16	/**< Thread limit reached. */
+#define STATUS_READ_ONLY		17	/**< Object cannot be modified. */
+#define STATUS_PERM_DENIED		18	/**< Operation not permitted. */
+#define STATUS_ACCESS_DENIED		19	/**< Requested access rights denied. */
+#define STATUS_NOT_DIR			20	/**< Path component is not a directory. */
+#define STATUS_NOT_REGULAR		21	/**< Path does not refer to a regular file. */
+#define STATUS_NOT_SYMLINK		22	/**< Path does not refer to a symbolic link. */
+#define STATUS_NOT_MOUNT		23	/**< Path does not refer to root of a mount. */
+#define STATUS_NOT_FOUND		24	/**< Requested object could not be found. */
+#define STATUS_NOT_EMPTY		25	/**< Directory is not empty. */
+#define STATUS_ALREADY_EXISTS		26	/**< Object already exists. */
+#define STATUS_TOO_SMALL		27	/**< Provided buffer is too small. */
+#define STATUS_TOO_LARGE		28	/**< Provided buffer is too large. */
+#define STATUS_TOO_LONG			29	/**< Provided string is too long. */
+#define STATUS_DIR_FULL			30	/**< Directory is full. */
+#define STATUS_UNKNOWN_FS		31	/**< Filesystem has an unrecognised format. */
+#define STATUS_CORRUPT_FS		32	/**< Corruption detected on the filesystem. */
+#define STATUS_FS_FULL			33	/**< No space is available on the filesystem. */
+#define STATUS_SYMLINK_LIMIT		34	/**< Exceeded nested symbolic link limit. */
+#define STATUS_IN_USE			35	/**< Object is in use. */
+#define STATUS_DEVICE_ERROR		36	/**< An error occurred during a hardware operation. */
+#define STATUS_STILL_RUNNING		37	/**< Process/thread is still running. */
+#define STATUS_UNKNOWN_IMAGE		38	/**< Executable image has an unrecognised format. */
+#define STATUS_MALFORMED_IMAGE		39	/**< Executable image format is incorrect. */
+#define STATUS_MISSING_LIBRARY		40	/**< Required library not found. */
+#define STATUS_MISSING_SYMBOL		41	/**< Referenced symbol not found. */
+#define STATUS_TRY_AGAIN		42	/**< Attempt the operation again. */
+#define STATUS_DIFFERENT_FS		43	/**< Link source and destination on different FS. */
+#define STATUS_IS_DIR			44	/**< Not a directory. */
+#define STATUS_CONN_HUNGUP		45	/**< Connection was hung up. */
 
-#if !defined(KERNEL) && !defined(__ASM__)
+#if !defined(__KERNEL) && !defined(__ASM__)
+
 #include <kernel/types.h>
 
 #ifdef __cplusplus
@@ -85,5 +84,7 @@ extern size_t __kernel_status_size;
 #ifdef __cplusplus
 }
 #endif
-#endif
+
+#endif /* !__KERNEL && !__ASM__ */
+
 #endif /* __KERNEL_STATUS_H */

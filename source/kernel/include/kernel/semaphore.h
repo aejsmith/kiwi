@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Semaphore functions.
+ * @brief		Semaphore object.
  */
 
 #ifndef __KERNEL_SEMAPHORE_H
@@ -28,9 +28,10 @@
 extern "C" {
 #endif
 
-extern status_t kern_semaphore_create(const char *name, size_t count, handle_t *handlep);
-extern status_t kern_semaphore_open(semaphore_id_t id, handle_t *handlep);
-extern semaphore_id_t kern_semaphore_id(handle_t handle);
+/** Event for the semaphore count becoming non-zero. */
+#define SEMAPHORE_EVENT		1
+
+extern status_t kern_semaphore_create(size_t count, handle_t *handlep);
 extern status_t kern_semaphore_down(handle_t handle, nstime_t timeout);
 extern status_t kern_semaphore_up(handle_t handle, size_t count);
 

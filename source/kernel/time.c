@@ -466,6 +466,10 @@ __init_text void time_init(void) {
 	kdb_register_command("uptime", "Display the system uptime.", kdb_cmd_uptime);
 }
 
+/**
+ * User timer API.
+ */
+
 /** Closes a handle to a timer.
  * @param handle	Handle being closed. */
 static void timer_object_close(object_handle_t *handle) {
@@ -540,7 +544,6 @@ static bool user_timer_func(void *_timer) {
  * @return		Status code describing result of the operation. */
 status_t kern_timer_create(uint32_t flags, handle_t *handlep) {
 	user_timer_t *timer;
-	object_handle_t *handle;
 	status_t ret;
 
 	if(!handlep)
@@ -552,9 +555,10 @@ status_t kern_timer_create(uint32_t flags, handle_t *handlep) {
 	timer->flags = flags;
 	timer->fired = false;
 
-	handle = object_handle_create(&timer_object_type, timer);
-	ret = object_handle_attach(handle, NULL, handlep);
-	object_handle_release(handle);
+	ret = object_handle_open(&timer_object_type, timer, NULL, handlep);
+	if(ret != STATUS_SUCCESS)
+		kfree(timer);
+
 	return ret;
 }
 

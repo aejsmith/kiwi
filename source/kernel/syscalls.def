@@ -18,9 +18,6 @@ type status_t int32_t;
 type handle_t int32_t;
 type process_id_t int32_t;
 type thread_id_t int32_t;
-type port_id_t int32_t;
-type semaphore_id_t int32_t;
-type area_id_t int32_t;
 type mount_id_t uint16_t;
 type node_id_t uint64_t;
 type nstime_t int64_t;
@@ -128,11 +125,9 @@ syscall kern_connection_receive(handle_t, ptr_t, ptr_t, nstime_t);
 syscall kern_connection_receive_data(handle_t, ptr_t);
 syscall kern_connection_receive_handle(handle_t, ptr_t);
 
-#syscall kern_semaphore_create(ptr_t, size_t, ptr_t);
-#syscall kern_semaphore_open(semaphore_id_t, ptr_t);
-#syscall kern_semaphore_id(handle_t);
-#syscall kern_semaphore_down(handle_t, nstime_t);
-#syscall kern_semaphore_up(handle_t, size_t);
+syscall kern_semaphore_create(size_t, ptr_t);
+syscall kern_semaphore_down(handle_t, nstime_t);
+syscall kern_semaphore_up(handle_t, size_t);
 
 #syscall kern_area_create(size_t, handle_t, offset_t, object_rights_t, ptr_t);
 #syscall kern_area_open(area_id_t, object_rights_t, ptr_t);
