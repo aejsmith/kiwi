@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 #include <sync/rwlock.h>
 
 struct fs_dentry;
+struct process;
 
 /** Structure containing an I/O context. */
 typedef struct io_context {
@@ -33,11 +34,7 @@ typedef struct io_context {
 	struct fs_dentry *curr_dir;	/**< Current working directory. */
 } io_context_t;
 
-extern void io_context_init(io_context_t *context, io_context_t *parent);
-extern void io_context_destroy(io_context_t *context);
-extern void io_context_set_curr_dir(io_context_t *context,
-	struct fs_dentry *entry);
-extern void io_context_set_root_dir(io_context_t *context,
-	struct fs_dentry *entry);
+extern void io_process_init(struct process *process, struct process *parent);
+extern void io_process_cleanup(struct process *process);
 
 #endif /* __IO_CONTEXT_H */

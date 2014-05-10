@@ -73,7 +73,7 @@ typedef struct process {
 	token_t *token;			/**< Security token for the process. */
 	struct vm_aspace *aspace;	/**< Process' address space. */
 	handle_table_t handles;		/**< Table of open handles. */
-	io_context_t ioctx;		/**< I/O context structure. */
+	io_context_t io;		/**< I/O context. */
 	list_t threads;			/**< List of threads. */
 	avl_tree_t futexes;		/**< Tree of futexes that the process has accessed. */
 	list_t images;			/**< List of loaded images. */

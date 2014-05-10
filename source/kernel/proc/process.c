@@ -148,15 +148,15 @@ process_alloc(const char *name, process_id_t id, process_t *parent, int priority
 	}
 
 	process = slab_cache_alloc(process_cache, MM_KERNEL);
+	memset(process->exceptions, 0, sizeof(process->exceptions));
 	refcount_set(&process->count, 1);
-	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
+	io_process_init(process, parent);
 	object_process_init(process);
 	process->flags = 0;
 	process->priority = priority;
 	process->token = token;
 	process->aspace = aspace;
 	process->thread_restore = 0;
-	memset(process->exceptions, 0, sizeof(process->exceptions));
 	process->root_port = root_port;
 	process->state = PROCESS_CREATED;
 	process->id = id;
@@ -191,8 +191,9 @@ static void process_cleanup(process_t *process) {
 	if(process->root_port)
 		ipc_port_release(process->root_port);
 
-	io_context_destroy(&process->ioctx);
+	io_process_cleanup(process);
 	object_process_cleanup(process);
+
 	notifier_clear(&process->death_notifier);
 }
 

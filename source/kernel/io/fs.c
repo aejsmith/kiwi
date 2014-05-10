@@ -568,8 +568,8 @@ fs_lookup_internal(char *path, fs_dentry_t *entry, unsigned flags, unsigned nest
 			path++;
 
 		/* Start from the root directory of the current process. */
-		assert(curr_proc->ioctx.root_dir);
-		entry = curr_proc->ioctx.root_dir;
+		assert(curr_proc->io.root_dir);
+		entry = curr_proc->io.root_dir;
 		fs_dentry_retain(entry);
 
 		if(path[0] || flags & FS_LOOKUP_LOCK)
@@ -583,8 +583,8 @@ fs_lookup_internal(char *path, fs_dentry_t *entry, unsigned flags, unsigned nest
 	} else {
 		if(!entry) {
 			/* Start from the current working directory. */
-			assert(curr_proc->ioctx.curr_dir);
-			entry = curr_proc->ioctx.curr_dir;
+			assert(curr_proc->io.curr_dir);
+			entry = curr_proc->io.curr_dir;
 			fs_dentry_retain(entry);
 		}
 
@@ -685,7 +685,7 @@ fs_lookup_internal(char *path, fs_dentry_t *entry, unsigned flags, unsigned nest
 		if(tok[0] == '.' && tok[1] == '.' && !tok[2]) {
 			/* Do not allow the lookup to ascend past the process'
 			 * root directory. */
-			if(entry == curr_proc->ioctx.root_dir)
+			if(entry == curr_proc->io.root_dir)
 				continue;
 
 			assert(entry != root_mount->root);
@@ -757,7 +757,7 @@ static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **entryp
 	/* Take the I/O context lock for reading across the entire lookup to
 	 * prevent other threads from changing the root directory of the process
 	 * while the lookup is being performed. */
-	rwlock_read_lock(&curr_proc->ioctx.lock);
+	rwlock_read_lock(&curr_proc->io.lock);
 
 	/* Duplicate path so that fs_lookup_internal() can modify it. */
 	dup = kstrdup(path, MM_KERNEL);
@@ -765,7 +765,7 @@ static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **entryp
 	/* Look up the path string. */
 	ret = fs_lookup_internal(dup, NULL, flags, 0, entryp);
 	kfree(dup);
-	rwlock_unlock(&curr_proc->ioctx.lock);
+	rwlock_unlock(&curr_proc->io.lock);
 	return ret;
 }
 
@@ -777,10 +777,10 @@ static status_t fs_dentry_path(fs_dentry_t *entry, char **pathp) {
 	char *buf = NULL, *tmp;
 	size_t total = 0, len;
 
-	rwlock_read_lock(&curr_proc->ioctx.lock);
+	rwlock_read_lock(&curr_proc->io.lock);
 
 	/* Loop through until we reach the root. */
-	while(entry != curr_proc->ioctx.root_dir && entry != root_mount->root) {
+	while(entry != curr_proc->io.root_dir && entry != root_mount->root) {
 		if(entry == entry->mount->root)
 			entry = entry->mount->mountpoint;
 
@@ -802,12 +802,12 @@ static status_t fs_dentry_path(fs_dentry_t *entry, char **pathp) {
 		entry = entry->parent;
 		if(!entry) {
 			/* Unlinked entry. */
-			rwlock_unlock(&curr_proc->ioctx.lock);
+			rwlock_unlock(&curr_proc->io.lock);
 			return STATUS_NOT_FOUND;
 		}
 	}
 
-	rwlock_unlock(&curr_proc->ioctx.lock);
+	rwlock_unlock(&curr_proc->io.lock);
 
 	/* Prepend a '/'. */
 	tmp = kmalloc((++total) + 1, MM_KERNEL);
@@ -1497,9 +1497,9 @@ fs_mount(const char *device, const char *path, const char *type, uint32_t flags,
 
 		/* Give the kernel process a correct current/root directory. */
 		fs_dentry_retain(root_mount->root);
-		curr_proc->ioctx.root_dir = root_mount->root;
+		curr_proc->io.root_dir = root_mount->root;
 		fs_dentry_retain(root_mount->root);
-		curr_proc->ioctx.curr_dir = root_mount->root;
+		curr_proc->io.curr_dir = root_mount->root;
 	}
 
 	dprintf("fs: mounted %s%s%s on %s (mount: %p, root: %p)\n",
@@ -1693,13 +1693,13 @@ status_t fs_path(object_handle_t *handle, char **pathp) {
 
 		entry = fhandle->entry;
 	} else {
-		rwlock_read_lock(&curr_proc->ioctx.lock);
-		entry = curr_proc->ioctx.curr_dir;
+		rwlock_read_lock(&curr_proc->io.lock);
+		entry = curr_proc->io.curr_dir;
 	}
 
 	ret = fs_dentry_path(entry, pathp);
 	if(!handle)
-		rwlock_unlock(&curr_proc->ioctx.lock);
+		rwlock_unlock(&curr_proc->io.lock);
 
 	return ret;
 }
@@ -2630,8 +2630,9 @@ status_t kern_fs_set_curr_dir(const char *path) {
 		goto out_release;
 	}
 
-	/* Release after setting, it is retained by io_context_set_curr_dir(). */
-	io_context_set_curr_dir(&curr_proc->ioctx, entry);
+	rwlock_write_lock(&curr_proc->io.lock);
+	swap(entry, curr_proc->io.curr_dir);
+	rwlock_unlock(&curr_proc->io.lock);
 out_release:
 	fs_dentry_release(entry);
 out_free:
@@ -2655,7 +2656,7 @@ out_free:
  * @return		Status code describing result of the operation.
  */
 status_t kern_fs_set_root_dir(const char *path) {
-	fs_dentry_t *entry;
+	fs_dentry_t *entry, *curr;
 	char *kpath;
 	status_t ret;
 
@@ -2683,8 +2684,17 @@ status_t kern_fs_set_root_dir(const char *path) {
 		goto out_release;
 	}
 
-	/* Release after setting, it is retained by io_context_set_curr_dir(). */
-	io_context_set_root_dir(&curr_proc->ioctx, entry);
+	/* We set both the root and current directories to this entry, so we
+	 * need to add another reference. */
+	fs_dentry_retain(entry);
+	curr = entry;
+
+	rwlock_write_lock(&curr_proc->io.lock);
+	swap(entry, curr_proc->io.root_dir);
+	swap(curr, curr_proc->io.curr_dir);
+	rwlock_unlock(&curr_proc->io.lock);
+
+	fs_dentry_release(curr);
 out_release:
 	fs_dentry_release(entry);
 out_free:
