@@ -794,7 +794,11 @@ static status_t process_object_wait(object_handle_t *handle, object_event_t *eve
 	switch(event->event) {
 	case PROCESS_EVENT_DEATH:
 		if(process->state == PROCESS_DEAD) {
-			object_event_signal(event, 0);
+			/* For edge-triggered, there's no point adding to the
+			 * notifier if it's already dead, it won't become dead
+			 * again. */
+			if(!(event->flags & OBJECT_EVENT_EDGE))
+				object_event_signal(event, 0);
 		} else {
 			notifier_register(&process->death_notifier, object_event_notifier, event);
 		}

@@ -1066,7 +1066,11 @@ static status_t thread_object_wait(object_handle_t *handle, object_event_t *even
 	switch(event->event) {
 	case THREAD_EVENT_DEATH:
 		if(thread->state == THREAD_DEAD) {
-			object_event_signal(event, 0);
+			/* For edge-triggered, there's no point adding to the
+			 * notifier if it's already dead, it won't become dead
+			 * again. */
+			if(!(event->flags & OBJECT_EVENT_EDGE))
+				object_event_signal(event, 0);
 		} else {
 			notifier_register(&thread->death_notifier, object_event_notifier, event);
 		}

@@ -488,8 +488,7 @@ static status_t timer_object_wait(object_handle_t *handle, object_event_t *event
 
 	switch(event->event) {
 	case TIMER_EVENT:
-		if(timer->fired) {
-			timer->fired = false;
+		if(!(event->flags & OBJECT_EVENT_EDGE) && timer->fired) {
 			object_event_signal(event, 0);
 		} else {
 			notifier_register(&timer->notifier, object_event_notifier, event);
@@ -529,10 +528,10 @@ static object_type_t timer_object_type = {
 static bool user_timer_func(void *_timer) {
 	user_timer_t *timer = _timer;
 
-	/* Signal the event. */
-	if(!notifier_run(&timer->notifier, NULL, true))
+	if(timer->timer.mode == TIMER_ONESHOT)
 		timer->fired = true;
 
+	notifier_run(&timer->notifier, NULL, false);
 	return false;
 }
 
@@ -560,14 +559,26 @@ status_t kern_timer_create(uint32_t flags, handle_t *handlep) {
 	return ret;
 }
 
-/** Start a timer.
+/**
+ * Start a timer.
+ *
+ * Starts a timer. A timer can be started in one of two modes. TIMER_ONESHOT
+ * will fire the timer event once after the specified time period. After the
+ * time period has expired, the timer will remain in the fired state, i.e. a
+ * level-triggered wait on the timer event will be immediately signalled, until
+ * it is restarted or stopped.
+ *
+ * TIMER_PERIODIC fires the timer event periodically at the specified interval
+ * until it is restarted or stopped. After each event the fired state is
+ * cleared, i.e. an edge-triggered wait on the timer will see a rising edge
+ * after each period.
+ *
  * @param handle	Handle to timer object.
  * @param interval	Interval of the timer in nanoseconds.
- * @param mode		Mode of the timer. If TIMER_ONESHOT, the timer event
- *			will only be fired once after the specified time period.
- *			If TIMER_PERIODIC, it will be fired periodically at the
- *			specified interval, until timer_stop() is called.
- * @return		Status code describing result of the operation. */
+ * @param mode		Mode of the timer.
+ *
+ * @return		Status code describing result of the operation.
+ */
 status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode) {
 	object_handle_t *khandle;
 	user_timer_t *timer;
@@ -583,6 +594,7 @@ status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode) {
 	timer = khandle->private;
 
 	timer_stop(&timer->timer);
+	timer->fired = false;
 	timer_start(&timer->timer, interval, mode);
 	object_handle_release(khandle);
 	return STATUS_SUCCESS;
@@ -606,12 +618,13 @@ status_t kern_timer_stop(handle_t handle, nstime_t *remp) {
 
 	if(!list_empty(&timer->timer.header)) {
 		timer_stop(&timer->timer);
+		timer->fired = false;
 		if(remp) {
 			rem = system_time() - timer->timer.target;
 			ret = write_user(remp, rem);
 		}
 	} else if(remp) {
-		ret = memset_user(remp, 0, sizeof(*remp));
+		ret = write_user(remp, 0);
 	}
 
 	object_handle_release(khandle);
