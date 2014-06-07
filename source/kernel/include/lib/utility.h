@@ -82,6 +82,18 @@
 		b = __tmp; \
 	}
 
+/** Get a pointer to the object containing a given object.
+ * @param ptr		Pointer to child object.
+ * @param type		Type of parent object.
+ * @param member	Member in parent.
+ * @return		Pointer to parent object. */
+#define container_of(ptr, type, member) \
+	__extension__ \
+	({ \
+		const typeof(((type *)0)->member) *__mptr = ptr; \
+		(type *)((char *)__mptr - offsetof(type, member)); \
+	})
+
 /** Implementation for native-sized values. */
 static inline int highbit_native(unsigned long val) {
 	if(!val)
