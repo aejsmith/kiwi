@@ -19,8 +19,8 @@
  * @brief		AMD64 assembly code definitions.
  */
 
-#ifndef __AMD64_ASM_H
-#define __AMD64_ASM_H
+#ifndef __SYSTEM_AMD64_ASM_H
+#define __SYSTEM_AMD64_ASM_H
 
 /** Macro to define the beginning of a global function. */
 #define FUNCTION_START(name)		\
@@ -42,4 +42,4 @@
 	.global name; \
 	name:
 
-#endif /* __AMD64_ASM_H */
+#endif /* __SYSTEM_AMD64_ASM_H */

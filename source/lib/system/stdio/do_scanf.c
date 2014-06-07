@@ -36,7 +36,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 #define	BUF		513	/* Maximum length of numeric string. */
 

@@ -28,7 +28,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#include "posix_priv.h"
+#include "posix/posix.h"
 
 /** Convert a mode to a set of rights.
  * @param mode		Mode to convert (the part of interest should be in the

@@ -21,7 +21,7 @@
 
 #include <unistd.h>
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Write a character to a stream.
  * @param ch		Character to write.

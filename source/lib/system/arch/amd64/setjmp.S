@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2011-2013 Alex Smith
- * 
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
@@ -19,7 +19,7 @@
  * @brief		AMD64 non-local jump functions.
  */
 
-#include <amd64/asm.h>
+#include <system/amd64/asm.h>
 
 /** Context offsets. */
 #define JMP_OFF_IP		0	/**< RIP offset. */

@@ -27,7 +27,7 @@
 #include <poll.h>
 #include <stdlib.h>
 
-#include "posix_priv.h"
+#include "posix/posix.h"
 
 /** Information used to update poll table from info returned by kernel. */
 typedef struct poll_convert {

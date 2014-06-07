@@ -19,7 +19,7 @@
  * @brief		File stream status functions.
  */
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Clear stream error and EOF status.
  * @param stream	Stream to clear. */

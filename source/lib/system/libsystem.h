@@ -24,7 +24,7 @@
 
 #include <kernel/types.h>
 
-#include <system/_internal.h>
+#include <system/defs.h>
 
 /** Compiler attribute/builtin macros. */
 #define likely(x)		__builtin_expect(!!(x), 1)

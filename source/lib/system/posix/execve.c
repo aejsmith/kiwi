@@ -27,7 +27,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "posix_priv.h"
+#include "posix/posix.h"
 
 /** Execute a file with an interpreter.
  * @param fd		File descriptor referring to file.

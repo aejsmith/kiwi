@@ -21,7 +21,7 @@
 
 #include <stdio.h>
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Flush a file stream's buffer.
  * @param stream	File stream to flush.

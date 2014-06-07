@@ -28,7 +28,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Standard input/output streams. */
 FILE *stdin = NULL;

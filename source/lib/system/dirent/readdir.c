@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dirent_priv.h"
+#include "dirent/dirent.h"
 
 /** Read a directory entry.
  * @param dir		Directory stream to read from.

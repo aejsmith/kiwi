@@ -22,7 +22,7 @@
 #ifndef __INTTYPES_H
 #define __INTTYPES_H
 
-#include <arch/types.h>
+#include <system/arch/types.h>
 
 #include <stddef.h>
 #include <stdint.h>

@@ -19,10 +19,10 @@
  * @brief		Exit functions.
  */
 
+#include <core/list.h>
+
 #include <kernel/mutex.h>
 #include <kernel/process.h>
-
-#include <system/list.h>
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -37,7 +37,7 @@ extern void __cxa_finalize(void *d);
 
 /** Structure defining an at-exit function. */
 typedef struct atexit_func {
-	sys_list_t header;		/**< List header. */
+	core_list_t header;		/**< List header. */
 
 	void (*func)(void *);		/**< Function pointer. */
 	void *arg;			/**< Function argument. */
@@ -49,11 +49,11 @@ static atexit_func_t atexit_array[ATEXIT_MAX];
 static bool atexit_inited = false;
 
 /** List of free at-exit functions. */
-static SYS_LIST_DEFINE(atexit_free_funcs);
+static CORE_LIST_DEFINE(atexit_free_funcs);
 static size_t atexit_free_count = 0;
 
 /** List of registered at-exit functions. */
-static SYS_LIST_DEFINE(atexit_funcs);
+static CORE_LIST_DEFINE(atexit_funcs);
 static size_t atexit_count = 0;
 
 /** Locking to protect at-exit lists. */
@@ -67,8 +67,8 @@ static atexit_func_t *atexit_alloc(void) {
 
 	if(!atexit_inited) {
 		for(i = 0; i < ATEXIT_MAX; i++) {
-			sys_list_init(&atexit_array[i].header);
-			sys_list_append(&atexit_free_funcs, &atexit_array[i].header);
+			core_list_init(&atexit_array[i].header);
+			core_list_append(&atexit_free_funcs, &atexit_array[i].header);
 			atexit_free_count++;
 		}
 
@@ -76,11 +76,11 @@ static atexit_func_t *atexit_alloc(void) {
 	}
 
 	if(atexit_free_count) {
-		if(sys_list_empty(&atexit_free_funcs))
+		if(core_list_empty(&atexit_free_funcs))
 			libsystem_fatal("atexit data is corrupted");
 
-		func = sys_list_entry(atexit_free_funcs.next, atexit_func_t, header);
-		sys_list_remove(&func->header);
+		func = core_list_entry(atexit_free_funcs.next, atexit_func_t, header);
+		core_list_remove(&func->header);
 	}
 
 	return func;
@@ -89,7 +89,7 @@ static atexit_func_t *atexit_alloc(void) {
 /** Free an at-exit function structure.
  * @param func		Function structure. */
 static void atexit_free(atexit_func_t *func) {
-	sys_list_append(&atexit_free_funcs, &func->header);
+	core_list_append(&atexit_free_funcs, &func->header);
 	atexit_free_count++;
 }
 
@@ -112,7 +112,7 @@ int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
 	func->arg = arg;
 	func->dso = dso;
 
-	sys_list_prepend(&atexit_funcs, &func->header);
+	core_list_prepend(&atexit_funcs, &func->header);
 	atexit_count++;
 	kern_mutex_unlock(&atexit_lock);
 	return 0;
@@ -124,8 +124,8 @@ void __cxa_finalize(void *d) {
 	atexit_func_t *func;
 	size_t count;
 restart:
-	SYS_LIST_FOREACH_SAFE(&atexit_funcs, iter) {
-		func = sys_list_entry(iter, atexit_func_t, header);
+	CORE_LIST_FOREACH_SAFE(&atexit_funcs, iter) {
+		func = core_list_entry(iter, atexit_func_t, header);
 		count = atexit_count;
 
 		if(!d || d == func->dso) {

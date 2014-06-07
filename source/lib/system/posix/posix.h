@@ -19,13 +19,13 @@
  * @brief		POSIX internal functions/definitions.
  */
 
-#ifndef __POSIX_PRIV_H
-#define __POSIX_PRIV_H
+#ifndef __SYSTEM_POSIX_H
+#define __SYSTEM_POSIX_H
+
+#include <core/list.h>
 
 #include <kernel/mutex.h>
 #include <kernel/object.h>
-
-#include <system/list.h>
 
 #include <unistd.h>
 
@@ -33,12 +33,12 @@
 
 /** Structure containing details of a POSIX process. */
 typedef struct posix_process {
-	sys_list_t header;		/**< Link to process list. */
+	core_list_t header;		/**< Link to process list. */
 	handle_t handle;		/**< Handle to process. */
 	pid_t pid;			/**< ID of the process. */
 } posix_process_t;
 
-extern sys_list_t __sys_hidden child_processes;
+extern core_list_t __sys_hidden child_processes;
 extern int32_t __sys_hidden child_processes_lock;
 
 extern mode_t __sys_hidden current_umask;
@@ -47,4 +47,4 @@ extern void register_fork_handler(void (*func)(void)) __sys_hidden;
 
 //extern object_acl_t *posix_mode_to_acl(object_acl_t *current, mode_t mode) __sys_hidden;
 
-#endif /* __POSIX_PRIV_H */
+#endif /* __SYSTEM_POSIX_H */

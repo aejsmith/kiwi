@@ -20,7 +20,7 @@
  */
 
 #include <unistd.h>
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Read character from a stream.
  * @param stream	Stream to read from.

@@ -19,8 +19,6 @@
  * @brief		Memory setting function.
  */
 
-#include <arch/types.h>
-
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>

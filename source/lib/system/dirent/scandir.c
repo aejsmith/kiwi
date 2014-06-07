@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dirent_priv.h"
+#include "dirent/dirent.h"
 
 /**
  * Get an array of directory entries.

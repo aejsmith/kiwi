@@ -22,7 +22,7 @@
 #ifndef __LINK_H
 #define __LINK_H
 
-#include <arch/types.h>
+#include <system/arch/types.h>
 
 #include <elf.h>
 #include <stdio.h>

@@ -22,9 +22,8 @@
 #ifndef __SETJMP_H
 #define __SETJMP_H
 
-#include <arch/setjmp.h>
-
-#include <system/_internal.h>
+#include <system/arch/setjmp.h>
+#include <system/defs.h>
 
 #include <signal.h>
 

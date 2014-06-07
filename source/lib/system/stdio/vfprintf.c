@@ -19,7 +19,7 @@
  * @brief		Formatted output functions.
  */
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Helper for vfprintf().
  * @param ch		Character to print.

@@ -22,7 +22,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /**
  * Unformat data from a stream.

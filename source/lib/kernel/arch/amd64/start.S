@@ -19,7 +19,7 @@
  * @brief		AMD64 kernel library startup code.
  */
 
-#include <amd64/asm.h>
+#include <system/amd64/asm.h>
 
 .section .text, "ax", @progbits
 

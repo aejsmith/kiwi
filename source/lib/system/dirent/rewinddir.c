@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dirent_priv.h"
+#include "dirent/dirent.h"
 
 /** Reset a directory stream's position to the beginning.
  * @param dir		Directory stream to rewind. */

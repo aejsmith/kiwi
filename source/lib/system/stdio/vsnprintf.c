@@ -19,7 +19,7 @@
  * @brief		String formatting functions.
  */
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Data used by vsnprintf_helper(). */
 struct vsnprintf_data {

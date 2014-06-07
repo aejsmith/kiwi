@@ -25,7 +25,7 @@
 
 #include <unistd.h>
 
-#include "posix_priv.h"
+#include "posix/posix.h"
 
 /** Alarm timer handle. */
 static handle_t alarm_handle = INVALID_HANDLE;

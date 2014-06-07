@@ -24,8 +24,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "stdio/stdio.h"
+
 #include "libsystem.h"
-#include "stdio/stdio_priv.h"
 
 /** Helper for libsystem_fatal().
  * @param ch		Character to print.

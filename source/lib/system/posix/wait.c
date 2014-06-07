@@ -33,7 +33,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#include "posix_priv.h"
+#include "posix/posix.h"
 
 /** Wait for a child process to stop or terminate.
  * @param statusp	Where to store process exit status.
@@ -78,8 +78,8 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 	kern_mutex_lock(&child_processes_lock, -1);
 
 	/* Build an array of handles to wait for. */
-	SYS_LIST_FOREACH(&child_processes, iter) {
-		process = sys_list_entry(iter, posix_process_t, header);
+	CORE_LIST_FOREACH(&child_processes, iter) {
+		process = core_list_entry(iter, posix_process_t, header);
 		if(pid == -1 || process->pid == pid) {
 			tmp = realloc(events, sizeof(*events) * (count + 1));
 			if(!tmp)
@@ -119,8 +119,8 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		if(!(events[i].flags & OBJECT_EVENT_SIGNALLED))
 			continue;
 
-		SYS_LIST_FOREACH(&child_processes, iter) {
-			process = sys_list_entry(iter, posix_process_t, header);
+		CORE_LIST_FOREACH(&child_processes, iter) {
+			process = core_list_entry(iter, posix_process_t, header);
 
 			if(process->handle == events[i].handle) {
 				/* Get the exit status. */
@@ -133,7 +133,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 
 				/* Clean up the process. */
 				kern_handle_close(process->handle);
-				sys_list_remove(&process->header);
+				core_list_remove(&process->header);
 				free(process);
 				goto out;
 			}

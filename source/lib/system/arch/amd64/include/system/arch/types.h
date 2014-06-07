@@ -16,15 +16,13 @@
 
 /**
  * @file
- * @brief		AMD64 POSIX definitions.
+ * @brief		AMD64 type definitions.
  */
 
-#ifndef __ARCH_UNISTD_H
-#define __ARCH_UNISTD_H
+#ifndef __SYSTEM_ARCH_TYPES_H
+#define __SYSTEM_ARCH_TYPES_H
 
-/** POSIX environment definitions. */
-#define _POSIX_V7_LP64_OFF64		1
-#define _POSIX_V6_LP64_OFF64		1
-#define _XBS5_LP64_OFF64		1
+/** Word size of the architecture. */
+#define __WORDSIZE	64
 
-#endif /* __ARCH_UNISTD_H */
+#endif /* __SYSTEM_ARCH_TYPES_H */

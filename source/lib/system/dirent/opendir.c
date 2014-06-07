@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dirent_priv.h"
+#include "dirent/dirent.h"
 
 /** Open a new directory stream.
  * @param path		Path to directory.

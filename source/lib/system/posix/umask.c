@@ -22,7 +22,7 @@
  */
 
 #include <sys/stat.h>
-#include "posix_priv.h"
+#include "posix/posix.h"
 
 /** Current file mode creation mask. */
 mode_t current_umask = 022;

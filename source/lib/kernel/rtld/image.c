@@ -51,7 +51,7 @@ static const char *library_search_dirs[] = {
 image_id_t next_image_id = DYNAMIC_IMAGE_START;
 
 /** List of loaded images. */
-SYS_LIST_DEFINE(loaded_images);
+CORE_LIST_DEFINE(loaded_images);
 
 /** Image structure representing the kernel library. */
 rtld_image_t libkernel_image = {
@@ -71,8 +71,8 @@ rtld_image_t *application_image;
 rtld_image_t *rtld_image_lookup(image_id_t id) {
 	rtld_image_t *image;
 
-	SYS_LIST_FOREACH(&loaded_images, iter) {
-		image = sys_list_entry(iter, rtld_image_t, header);
+	CORE_LIST_FOREACH(&loaded_images, iter) {
+		image = core_list_entry(iter, rtld_image_t, header);
 
 		if(image->id == id)
 			return image;
@@ -203,8 +203,8 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 		goto fail;
 
 	/* Search to see if this file is already loaded. */
-	SYS_LIST_FOREACH(&loaded_images, iter) {
-		exist = sys_list_entry(iter, rtld_image_t, header);
+	CORE_LIST_FOREACH(&loaded_images, iter) {
+		exist = core_list_entry(iter, rtld_image_t, header);
 
 		if(exist->node == file.id && exist->mount == file.mount) {
 			if(exist->state == RTLD_IMAGE_LOADING) {
@@ -277,7 +277,7 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 	/* Don't particularly care if we can't duplicate the path string, its
 	 * not important (only for debugging purposes). */
 	image->path = strdup(path);
-	sys_list_init(&image->header);
+	core_list_init(&image->header);
 
 	/* Read in the program headers. */
 	size = ehdr.e_phnum * ehdr.e_phentsize;
@@ -446,8 +446,8 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 
 	/* Check if the image is already loaded. */
 	if(type == ELF_ET_DYN) {
-		SYS_LIST_FOREACH(&loaded_images, iter) {
-			exist = sys_list_entry(iter, rtld_image_t, header);
+		CORE_LIST_FOREACH(&loaded_images, iter) {
+			exist = core_list_entry(iter, rtld_image_t, header);
 
 			if(strcmp(exist->name, image->name) == 0) {
 				printf("rtld: %s: image with same name already loaded\n", path);
@@ -460,9 +460,9 @@ load_image(const char *path, rtld_image_t *req, int type, void **entryp,
 	/* Add the library into the library list before checking dependencies
 	 * so that we can check if something has a cyclic dependency. */
 	if(req) {
-		sys_list_add_before(&req->header, &image->header);
+		core_list_add_before(&req->header, &image->header);
 	} else {
-		sys_list_append(&loaded_images, &image->header);
+		core_list_append(&loaded_images, &image->header);
 	}
 
 	/* Load libraries that we depend on. */
@@ -522,7 +522,7 @@ fail:
 		if(image->load_base)
 			kern_vm_unmap(image->load_base, image->load_size);
 
-		sys_list_remove(&image->header);
+		core_list_remove(&image->header);
 		free(image);
 	}
 
@@ -649,8 +649,8 @@ status_t rtld_init(process_args_t *args, void **entryp) {
 	}
 
 	rtld_symbol_init(image);
-	sys_list_init(&image->header);
-	sys_list_append(&loaded_images, &image->header);
+	core_list_init(&image->header);
+	core_list_append(&loaded_images, &image->header);
 
 	/* Register the image with the kernel. */
 	info.name = image->name;
@@ -684,8 +684,8 @@ status_t rtld_init(process_args_t *args, void **entryp) {
 	/* Print out the image list if required. */
 	if(libkernel_debug || libkernel_dry_run) {
 		dprintf("rtld: final image list:\n");
-		SYS_LIST_FOREACH(&loaded_images, iter) {
-			image = sys_list_entry(iter, rtld_image_t, header);
+		CORE_LIST_FOREACH(&loaded_images, iter) {
+			image = core_list_entry(iter, rtld_image_t, header);
 			if(image->path) {
 				printf("  %s => %s (%p)\n", image->name, image->path,
 					image->load_base);
@@ -706,8 +706,8 @@ int __export dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void
 
 	// FIXME: lock.
 
-	SYS_LIST_FOREACH(&loaded_images, iter) {
-		image = sys_list_entry(iter, rtld_image_t, header);
+	CORE_LIST_FOREACH(&loaded_images, iter) {
+		image = core_list_entry(iter, rtld_image_t, header);
 
 		info.dlpi_addr = (elf_addr_t)image->load_base;
 		info.dlpi_name = image->name;

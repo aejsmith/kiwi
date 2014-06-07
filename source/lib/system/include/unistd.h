@@ -22,7 +22,7 @@
 #ifndef __UNISTD_H
 #define __UNISTD_H
 
-#include <arch/unistd.h>
+#include <system/arch/unistd.h>
 
 #include <stdio.h>
 

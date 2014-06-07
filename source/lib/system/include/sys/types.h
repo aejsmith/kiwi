@@ -24,7 +24,7 @@
 
 #include <kernel/types.h>
 
-#include <system/_pthread.h>
+#include <system/pthread.h>
 
 #ifdef __cplusplus
 extern "C" {

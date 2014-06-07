@@ -21,8 +21,8 @@
  * @todo		Make all of these opaque structures?
  */
 
-#ifndef __SYSTEM__PTHREAD_H
-#define __SYSTEM__PTHREAD_H
+#ifndef __SYSTEM_PTHREAD_H
+#define __SYSTEM_PTHREAD_H
 
 #include <kernel/types.h>
 
@@ -76,4 +76,4 @@ typedef int32_t pthread_attr_t;
 }
 #endif
 
-#endif /* __SYSTEM__PTHREAD_H */
+#endif /* __SYSTEM_PTHREAD_H */

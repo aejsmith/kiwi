@@ -20,7 +20,7 @@
  */
 
 #include <stdlib.h>
-#include "dirent_priv.h"
+#include "dirent/dirent.h"
 
 /** Close a directory stream.
  * @param dir		Directory stream to close.

@@ -21,7 +21,7 @@
 
 #include <unistd.h>
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Reposition a stream's file pointer.
  * @param stream	Stream to reposition.

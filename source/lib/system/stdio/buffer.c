@@ -20,7 +20,7 @@
  */
 
 #include <errno.h>
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Set a stream's buffering mode.
  * @param stream	Stream to set mode for.

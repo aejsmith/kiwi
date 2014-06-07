@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,25 +16,26 @@
 
 /**
  * @file
- * @brief		AMD64 setjmp definitions.
+ * @brief		Directory handling functions.
  */
 
-#ifndef __ARCH_SETJMP_H
-#define __ARCH_SETJMP_H
+#ifndef __SYSTEM_DIRENT_H
+#define __SYSTEM_DIRENT_H
 
-/**
- * Jump buffer size.
- *
- * On AMD64 we have the following layout:
- *  jmp_buf[0] = Return address
- *  jmp_buf[1] = rsp
- *  jmp_buf[2] = rbp
- *  jmp_buf[3] = rbx
- *  jmp_buf[4] = r12
- *  jmp_buf[5] = r13
- *  jmp_buf[6] = r14
- *  jmp_buf[7] = r15
- */
-#define JMP_BUF_SIZE		8
+#include <kernel/fs.h>
+#include <kernel/object.h>
+#include <kernel/status.h>
 
-#endif /* __ARCH_SETJMP_H */
+#include <dirent.h>
+
+#include "libsystem.h"
+
+/** Size of the internal directory entry buffer. */
+#define DIRSTREAM_BUF_SIZE	0x1000
+
+struct __dstream_internal {
+	handle_t handle;		/**< Handle to the directory. */
+	char buf[DIRSTREAM_BUF_SIZE];	/**< Buffer for entry structures. */
+};
+
+#endif /* __SYSTEM_DIRENT_H */

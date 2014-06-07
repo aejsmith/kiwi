@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,26 +16,15 @@
 
 /**
  * @file
- * @brief		Directory handling functions.
+ * @brief		AMD64 POSIX definitions.
  */
 
-#ifndef __DIRENT_PRIV_H
-#define __DIRENT_PRIV_H
+#ifndef __SYSTEM_ARCH_UNISTD_H
+#define __SYSTEM_ARCH_UNISTD_H
 
-#include <kernel/fs.h>
-#include <kernel/object.h>
-#include <kernel/status.h>
+/** POSIX environment definitions. */
+#define _POSIX_V7_LP64_OFF64		1
+#define _POSIX_V6_LP64_OFF64		1
+#define _XBS5_LP64_OFF64		1
 
-#include <dirent.h>
-
-#include "libsystem.h"
-
-/** Size of the internal directory entry buffer. */
-#define DIRSTREAM_BUF_SIZE	0x1000
-
-struct __dstream_internal {
-	handle_t handle;		/**< Handle to the directory. */
-	char buf[DIRSTREAM_BUF_SIZE];	/**< Buffer for entry structures. */
-};
-
-#endif /* __DIRENT_PRIV_H */
+#endif /* __SYSTEM_ARCH_UNISTD_H */

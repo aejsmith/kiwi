@@ -19,7 +19,7 @@
  * @brief		Get string functions.
  */
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /**
  * Read a string from standard input.

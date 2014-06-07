@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,21 +16,25 @@
 
 /**
  * @file
- * @brief		File close function.
+ * @brief		AMD64 setjmp definitions.
  */
 
-#include <stdlib.h>
-#include <unistd.h>
+#ifndef __SYSTEM_ARCH_SETJMP_H
+#define __SYSTEM_ARCH_SETJMP_H
 
-#include "stdio/stdio.h"
+/**
+ * Jump buffer size.
+ *
+ * On AMD64 we have the following layout:
+ *  jmp_buf[0] = Return address
+ *  jmp_buf[1] = rsp
+ *  jmp_buf[2] = rbp
+ *  jmp_buf[3] = rbx
+ *  jmp_buf[4] = r12
+ *  jmp_buf[5] = r13
+ *  jmp_buf[6] = r14
+ *  jmp_buf[7] = r15
+ */
+#define JMP_BUF_SIZE		8
 
-/** Close a file stream.
- * @param stream	File stream to close.
- * @return		0 on success, EOF on failure. */
-int fclose(FILE *stream) {
-	if(close(stream->fd) != 0)
-		return EOF;
-
-	free(stream);
-	return 0;
-}
+#endif /* __SYSTEM_ARCH_SETJMP_H */

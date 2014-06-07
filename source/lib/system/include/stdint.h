@@ -22,7 +22,7 @@
 #ifndef __STDINT_H
 #define __STDINT_H
 
-#include <arch/types.h>
+#include <system/arch/types.h>
 
 typedef signed char int8_t;
 typedef signed short int16_t;

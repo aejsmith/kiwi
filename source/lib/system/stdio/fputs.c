@@ -21,7 +21,7 @@
 
 #include <string.h>
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /** Write a string to a file stream.
  * @param s		String to write.

@@ -27,7 +27,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 
-#include "posix_priv.h"
+#include "posix/posix.h"
 
 /** Convert POSIX open() flags to kernel flags.
  * @param oflag		POSIX open flags.

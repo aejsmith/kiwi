@@ -21,7 +21,7 @@
 
 #include <unistd.h>
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /**
  * Write to a file stream.

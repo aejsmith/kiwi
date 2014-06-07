@@ -22,7 +22,7 @@
 #ifndef __PTHREAD_H
 #define __PTHREAD_H
 
-#include <system/_pthread.h>
+#include <system/pthread.h>
 
 #include <sched.h>
 

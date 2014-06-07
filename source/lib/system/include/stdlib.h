@@ -29,7 +29,7 @@
 
 #include <sys/wait.h>
 
-#include <system/_internal.h>
+#include <system/defs.h>
 
 #include <locale.h>
 

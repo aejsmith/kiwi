@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "stdio_priv.h"
+#include "stdio/stdio.h"
 
 /* Flags to specify special behaviour. */
 #define PRINTF_ZERO_PAD		(1<<0)	/**< Pad with zeros. */

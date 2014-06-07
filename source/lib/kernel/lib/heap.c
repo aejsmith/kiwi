@@ -29,7 +29,7 @@
 
 /** Structure representing an area on the heap. */
 typedef struct heap_chunk {
-	sys_list_t header;	/**< Link to chunk list. */
+	core_list_t header;	/**< Link to chunk list. */
 	size_t size;		/**< Size of chunk including struct (low bit == used). */
 	bool allocated;		/**< Whether the chunk is allocated. */
 } heap_chunk_t;
@@ -38,7 +38,7 @@ typedef struct heap_chunk {
 static int32_t heap_lock = MUTEX_INITIALIZER;
 
 /** Statically allocated heap. */
-static SYS_LIST_DEFINE(heap_chunks);
+static CORE_LIST_DEFINE(heap_chunks);
 
 /** Map a new chunk.
  * @param size		Minimum size required.
@@ -56,8 +56,8 @@ static heap_chunk_t *map_chunk(size_t size) {
 
 	chunk->size = size;
 	chunk->allocated = false;
-	sys_list_init(&chunk->header);
-	sys_list_append(&heap_chunks, &chunk->header);
+	core_list_init(&chunk->header);
+	core_list_append(&heap_chunks, &chunk->header);
 	return chunk;
 }
 
@@ -78,8 +78,8 @@ void *malloc(size_t size) {
 	kern_mutex_lock(&heap_lock, -1);
 
 	/* Search for a free chunk. */
-	SYS_LIST_FOREACH(&heap_chunks, iter) {
-		chunk = sys_list_entry(iter, heap_chunk_t, header);
+	CORE_LIST_FOREACH(&heap_chunks, iter) {
+		chunk = core_list_entry(iter, heap_chunk_t, header);
 		if(!chunk->allocated && chunk->size >= total) {
 			break;
 		} else {
@@ -101,8 +101,8 @@ void *malloc(size_t size) {
 		new = (heap_chunk_t *)((char *)chunk + total);
 		new->size = chunk->size - total;
 		new->allocated = false;
-		sys_list_init(&new->header);
-		sys_list_add_after(&chunk->header, &new->header);
+		core_list_init(&new->header);
+		core_list_add_after(&chunk->header, &new->header);
 		chunk->size = total;
 	}
 
@@ -168,17 +168,17 @@ void free(void *addr) {
 
 	/* Coalesce adjacent free segments. */
 	if(chunk->header.next != &heap_chunks) {
-		adj = sys_list_entry(chunk->header.next, heap_chunk_t, header);
+		adj = core_list_entry(chunk->header.next, heap_chunk_t, header);
 		if(!adj->allocated && adj == (heap_chunk_t *)((char *)chunk + chunk->size)) {
 			chunk->size += adj->size;
-			sys_list_remove(&adj->header);
+			core_list_remove(&adj->header);
 		}
 	}
 	if(chunk->header.prev != &heap_chunks) {
-		adj = sys_list_entry(chunk->header.prev, heap_chunk_t, header);
+		adj = core_list_entry(chunk->header.prev, heap_chunk_t, header);
 		if(!adj->allocated && chunk == (heap_chunk_t *)((char *)adj + adj->size)) {
 			adj->size += chunk->size;
-			sys_list_remove(&chunk->header);
+			core_list_remove(&chunk->header);
 		}
 	}
 
