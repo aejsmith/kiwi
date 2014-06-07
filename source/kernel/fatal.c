@@ -72,7 +72,7 @@ void fatal_etc(frame_t *frame, const char *fmt, ...) {
 
 	if(atomic_inc(&in_fatal) == 0) {
 		/* Run callback functions registered. */
-		notifier_run_unlocked(&fatal_notifier, NULL, false);
+		notifier_run_unsafe(&fatal_notifier, NULL, false);
 
 		do_printf(fatal_printf_helper, NULL, "\nFATAL: ");
 		va_start(args, fmt);

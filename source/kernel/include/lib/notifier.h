@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,7 +34,7 @@ typedef struct notifier {
 /** Initializes a statically declared notifier. */
 #define NOTIFIER_INITIALIZER(_var, _data) \
 	{ \
-		.lock = MUTEX_INITIALIZER(_var.lock, "notifier_lock", 0), \
+		.lock = MUTEX_INITIALIZER(_var.lock, "notifier_lock", MUTEX_RECURSIVE), \
 		.functions = LIST_INITIALIZER(_var.functions), \
 		.data = _data, \
 	}
@@ -44,23 +44,23 @@ typedef struct notifier {
 	notifier_t _var = NOTIFIER_INITIALIZER(_var, _data)
 
 /** Check if a notifier's function list is empty.
- * @param notif		Notifier to check.
+ * @param notifier		Notifier to check.
  * @return		Whether the function list is empty. */
-static inline bool notifier_empty(notifier_t *notif) {
-	return list_empty(&notif->functions);
+static inline bool notifier_empty(notifier_t *notifier) {
+	return list_empty(&notifier->functions);
 }
 
-/** Notifier callback function type.
+/** Notifier function type.
  * @param arg1		Data argument associated with the notifier.
  * @param arg2		Data argument registered with the function.
  * @param arg3		Data argument passed to notifier_run(). */
-typedef void (*notifier_cb_t)(void *arg1, void *arg2, void *arg3);
+typedef void (*notifier_func_t)(void *arg1, void *arg2, void *arg3);
 
-extern void notifier_init(notifier_t *notif, void *data);
-extern void notifier_clear(notifier_t *notif);
-extern bool notifier_run_unlocked(notifier_t *notif, void *data, bool destroy);
-extern bool notifier_run(notifier_t *notif, void *data, bool destroy);
-extern void notifier_register(notifier_t *notif, notifier_cb_t func, void *data);
-extern void notifier_unregister(notifier_t *notif, notifier_cb_t func, void *data);
+extern void notifier_init(notifier_t *notifier, void *data);
+extern void notifier_clear(notifier_t *notifier);
+extern bool notifier_run_unsafe(notifier_t *notifier, void *data, bool destroy);
+extern bool notifier_run(notifier_t *notifier, void *data, bool destroy);
+extern void notifier_register(notifier_t *notifier, notifier_func_t func, void *data);
+extern void notifier_unregister(notifier_t *notifier, notifier_func_t func, void *data);
 
 #endif /* __LIB_NOTIFIER_H */

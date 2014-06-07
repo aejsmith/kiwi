@@ -867,7 +867,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, frame_t *frame, unsigned index) {
 	curr_kdb_frame = frame;
 
 	/* Run entry notifiers. */
-	notifier_run_unlocked(&kdb_entry_notifier, NULL, false);
+	notifier_run_unsafe(&kdb_entry_notifier, NULL, false);
 
 	/* Print information about why we've entered the debugger and where from. */
 	if(reason == KDB_REASON_BREAK) {
@@ -976,7 +976,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, frame_t *frame, unsigned index) {
 	}
 
 	/* Run exit notifiers. */
-	notifier_run_unlocked(&kdb_exit_notifier, NULL, false);
+	notifier_run_unsafe(&kdb_exit_notifier, NULL, false);
 
 	atomic_set(&kdb_running, 0);
 	local_irq_restore(state);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,61 +27,55 @@
 typedef struct notifier_func {
 	list_t header;			/**< Link to notifier. */
 
-	notifier_cb_t func;		/**< Function to call. */
+	notifier_func_t func;		/**< Function to call. */
 	void *data;			/**< Second data argument for function. */
-} notifier_func_t;
+} notifier_entry_t;
 
 /** Initialize a notifier.
- * @param notif		Notifier to initialize.
+ * @param notifier	Notifier to initialize.
  * @param data		Pointer to pass as first argument to functions. */
-void notifier_init(notifier_t *notif, void *data) {
-	mutex_init(&notif->lock, "notifier_lock", 0);
-	list_init(&notif->functions);
-	notif->data = data;
+void notifier_init(notifier_t *notifier, void *data) {
+	/* We use a recursive lock as when we're used for object events,
+	 * a call to object_event_signal() from notifier_run() can call the
+	 * unwait function which would call back into notifier_unregister(). */
+	mutex_init(&notifier->lock, "notifier_lock", MUTEX_RECURSIVE);
+	list_init(&notifier->functions);
+	notifier->data = data;
 }
 
-/**
- * Remove all functions from a notifier.
- *
- * Removes all functions registered with a notifier and frees data used to
- * store function information.
- *
- * @param notif		Notifier to destroy.
- */
-void notifier_clear(notifier_t *notif) {
-	notifier_func_t *nf;
+/** Remove all functions from a notifier.
+ * @param notifier	Notifier to destroy. */
+void notifier_clear(notifier_t *notifier) {
+	notifier_entry_t *entry;
 
-	mutex_lock(&notif->lock);
-	LIST_FOREACH_SAFE(&notif->functions, iter) {
-		nf = list_entry(iter, notifier_func_t, header);
-		list_remove(&nf->header);
-		kfree(nf);
+	mutex_lock(&notifier->lock);
+
+	while(!list_empty(&notifier->functions)) {
+		entry = list_first(&notifier->functions, notifier_entry_t, header);
+		list_remove(&entry->header);
+		kfree(entry);
 	}
-	mutex_unlock(&notif->lock);
+
+	mutex_unlock(&notifier->lock);
 }
 
-/**
- * Runs all functions on a notifier.
- *
- * Runs all the functions currently registered for a notifier, without taking
- * the lock.
- *
- * @param notif		Notifier to run.
+/** Runs all functions on a notifier without taking the lock.
+ * @param notifier	Notifier to run.
  * @param data		Pointer to pass as third argument to functions.
  * @param destroy	Whether to remove functions after calling them.
- *
- * @return		Whther any handlers were called.
- */
-bool notifier_run_unlocked(notifier_t *notif, void *data, bool destroy) {
-	notifier_func_t *nf;
+ * @return		Whether any handlers were called. */
+bool notifier_run_unsafe(notifier_t *notifier, void *data, bool destroy) {
+	notifier_entry_t *entry;
 	bool called = false;
 
-	LIST_FOREACH_SAFE(&notif->functions, iter) {
-		nf = list_entry(iter, notifier_func_t, header);
-		nf->func(notif->data, nf->data, data);
+	/* The callback function may call into notifier_unregister(). */
+	LIST_FOREACH_SAFE(&notifier->functions, iter) {
+		entry = list_entry(iter, notifier_entry_t, header);
+
+		entry->func(notifier->data, entry->data, data);
 		if(destroy) {
-			list_remove(&nf->header);
-			kfree(nf);
+			list_remove(&entry->header);
+			kfree(entry);
 		}
 
 		called = true;
@@ -91,53 +85,54 @@ bool notifier_run_unlocked(notifier_t *notif, void *data, bool destroy) {
 }
 
 /** Runs all functions on a notifier.
- * @param notif		Notifier to run.
+ * @param notifier	Notifier to run.
  * @param data		Pointer to pass as third argument to functions.
  * @param destroy	Whether to remove functions after calling them.
  * @return		Whther any handlers were called. */
-bool notifier_run(notifier_t *notif, void *data, bool destroy) {
+bool notifier_run(notifier_t *notifier, void *data, bool destroy) {
 	bool ret;
 
-	mutex_lock(&notif->lock);
-	ret = notifier_run_unlocked(notif, data, destroy);
-	mutex_unlock(&notif->lock);
+	mutex_lock(&notifier->lock);
+	ret = notifier_run_unsafe(notifier, data, destroy);
+	mutex_unlock(&notifier->lock);
 
 	return ret;
 }
 
 /** Add a function to a notifier.
- * @param notif		Notifier to add to.
+ * @param notifier	Notifier to add to.
  * @param func		Function to add.
  * @param data		Pointer to pass as second argument to function. */
-void notifier_register(notifier_t *notif, notifier_cb_t func, void *data) {
-	notifier_func_t *nf = kmalloc(sizeof(notifier_func_t), MM_KERNEL);
+void notifier_register(notifier_t *notifier, notifier_func_t func, void *data) {
+	notifier_entry_t *entry;
 
-	list_init(&nf->header);
-	nf->func = func;
-	nf->data = data;
+	entry = kmalloc(sizeof(notifier_entry_t), MM_KERNEL);
+	list_init(&entry->header);
+	entry->func = func;
+	entry->data = data;
 
-	mutex_lock(&notif->lock);
-	list_append(&notif->functions, &nf->header);
-	mutex_unlock(&notif->lock);
+	mutex_lock(&notifier->lock);
+	list_append(&notifier->functions, &entry->header);
+	mutex_unlock(&notifier->lock);
 }
 
 /** Remove a function from a notifier.
- * @param notif		Notifier to remove from.
+ * @param notifier	Notifier to remove from.
  * @param func		Function to remove.
  * @param data		Data argument function was registered with. */
-void notifier_unregister(notifier_t *notif, notifier_cb_t func, void *data) {
-	notifier_func_t *nf;
+void notifier_unregister(notifier_t *notifier, notifier_func_t func, void *data) {
+	notifier_entry_t *entry;
 
-	mutex_lock(&notif->lock);
+	mutex_lock(&notifier->lock);
 
-	LIST_FOREACH_SAFE(&notif->functions, iter) {
-		nf = list_entry(iter, notifier_func_t, header);
+	LIST_FOREACH_SAFE(&notifier->functions, iter) {
+		entry = list_entry(iter, notifier_entry_t, header);
 
-		if(nf->func == func && nf->data == data) {
-			list_remove(&nf->header);
-			kfree(nf);
+		if(entry->func == func && entry->data == data) {
+			list_remove(&entry->header);
+			kfree(entry);
 		}
 	}
 
-	mutex_unlock(&notif->lock);
+	mutex_unlock(&notifier->lock);
 }
