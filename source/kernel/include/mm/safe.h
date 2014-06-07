@@ -25,6 +25,7 @@
 #include <mm/aspace.h>
 #include <mm/mm.h>
 
+#include <assert.h>
 #include <types.h>
 
 #if USER_BASE > 0
@@ -80,7 +81,7 @@ extern status_t arrcpy_from_user(const char *const src[], char ***arrayp);
 	__extension__ \
 	({ \
 		status_t __ret; \
-		_Static_assert(sizeof(*(ptr)) == 8 \
+		static_assert(sizeof(*(ptr)) == 8 \
 			|| sizeof(*(ptr)) == 4 \
 			|| sizeof(*(ptr)) == 2 \
 			|| sizeof(*(ptr)) == 1, \
@@ -111,7 +112,7 @@ extern status_t arrcpy_from_user(const char *const src[], char ***arrayp);
 	({ \
 		status_t __ret; \
 		typeof(*(ptr)) __val = (val); \
-		_Static_assert(sizeof(*(ptr)) == 8 \
+		static_assert(sizeof(*(ptr)) == 8 \
 			|| sizeof(*(ptr)) == 4 \
 			|| sizeof(*(ptr)) == 2 \
 			|| sizeof(*(ptr)) == 1, \
