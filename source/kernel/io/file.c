@@ -59,26 +59,24 @@ static char *file_object_name(object_handle_t *handle) {
 /** Signal that a file event is being waited for.
  * @param handle	Handle to the file.
  * @param event		Event that is being waited for.
- * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t file_object_wait(object_handle_t *handle, unsigned event, void *wait) {
+static status_t file_object_wait(object_handle_t *handle, object_event_t *event) {
 	file_handle_t *fhandle = handle->private;
 
 	if(!fhandle->file->ops->wait)
 		return STATUS_NOT_SUPPORTED;
 
-	return fhandle->file->ops->wait(fhandle, event, wait);
+	return fhandle->file->ops->wait(fhandle, event);
 }
 
 /** Stop waiting for a file event.
  * @param handle	Handle to the file.
- * @param event		Event that is being waited for.
- * @param wait		Internal data pointer. */
-static void file_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
+ * @param event		Event that is being waited for. */
+static void file_object_unwait(object_handle_t *handle, object_event_t *event) {
 	file_handle_t *fhandle = handle->private;
 
 	assert(fhandle->file->ops->unwait);
-	return fhandle->file->ops->unwait(fhandle, event, wait);
+	return fhandle->file->ops->unwait(fhandle, event);
 }
 
 /** Map a file object into memory.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Alex Smith
+ * Copyright (C) 2010-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,8 @@
 extern "C" {
 #endif
 
+struct thread_context;
+
 /** Value used to refer to an invalid handle.
  * @note		This is used to mean various things, for example with
  *			thread/process functions it refers to the current
@@ -53,16 +55,39 @@ extern "C" {
 typedef struct object_event {
 	handle_t handle;		/**< Handle to wait on. */
 	unsigned event;			/**< Event to wait for. */
+	uint32_t flags;			/**< Flags for the event. */
 	unsigned long data;		/**< Integer data associated with the event. */
-	bool signalled;			/**< Whether the event was signalled. */
+	void *udata;			/**< User data, passed through unmodified. */
 } object_event_t;
+
+/** Object event flags. */
+#define OBJECT_EVENT_ERROR	(1<<0)	/**< Set if an error occurred in this event. */
+#define OBJECT_EVENT_SIGNALLED	(1<<1)	/**< Set if this event is signalled. */
+#define OBJECT_EVENT_ONESHOT	(1<<2)	/**< Remove after firing the first time. */
+#define OBJECT_EVENT_EDGE	(1<<3)	/**< Event should be edge triggered rather than level. */
 
 /** Behaviour flags for kern_object_wait(). */
 #define OBJECT_WAIT_ALL		(1<<0)	/**< Wait for all the specified events to occur. */
 
+/**
+ * Object event callback function.
+ *
+ * Type of an object event callback function. The function will be called
+ * via a thread interrupt when the event that is registered for occurs. While
+ * the function is executing, the thread's IPL will be raised to 1 above the
+ * priority the callback was registered with, thus blocking further interrupts
+ * while it is executing. When the function returns the IPL will be restored.
+ *
+ * @param event		Event structure.
+ * @param ctx		Thread context before the function was called.
+ */
+typedef void (*object_callback_t)(object_event_t *event, struct thread_context *ctx);
+
 extern status_t kern_object_type(handle_t handle, unsigned *typep);
 extern status_t kern_object_wait(object_event_t *events, size_t count,
 	uint32_t flags, nstime_t timeout);
+extern status_t kern_object_callback(object_event_t *event,
+	object_callback_t callback, unsigned priority);
 
 extern status_t kern_handle_flags(handle_t handle, uint32_t *flagsp);
 extern status_t kern_handle_set_flags(handle_t handle, uint32_t flags);

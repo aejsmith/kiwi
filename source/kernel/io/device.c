@@ -52,23 +52,21 @@ static void device_file_close(file_handle_t *handle) {
 /** Signal that a device event is being waited for.
  * @param handle	File handle structure.
  * @param event		Event that is being waited for.
- * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t device_file_wait(file_handle_t *handle, unsigned event, void *wait) {
+static status_t device_file_wait(file_handle_t *handle, object_event_t *event) {
 	device_t *device = handle->device;
 
 	return (device->ops && device->ops->wait && device->ops->unwait)
-		? device->ops->wait(device, handle, event, wait)
+		? device->ops->wait(device, handle, event)
 		: STATUS_INVALID_EVENT;
 }
 
 /** Stop waiting for a device event.
  * @param handle	File handle structure.
- * @param event		Event that is being waited for.
- * @param wait		Internal data pointer. */
-static void device_file_unwait(file_handle_t *handle, unsigned event, void *wait) {
+ * @param event		Event that is being waited for. */
+static void device_file_unwait(file_handle_t *handle, object_event_t *event) {
 	assert(handle->device->ops);
-	return handle->device->ops->unwait(handle->device, handle, event, wait);
+	return handle->device->ops->unwait(handle->device, handle, event);
 }
 
 /** Perform I/O on a device.

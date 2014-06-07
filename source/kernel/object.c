@@ -20,9 +20,10 @@
  *
  * @todo		Make handle tables resizable, based on process limits
  *			or something (e.g. rlimit).
+ * @todo		Multi-level array for handle tables? It's quite large
+ *			at the moment.
  */
 
-#include <lib/atomic.h>
 #include <lib/bitmap.h>
 
 #include <mm/malloc.h>
@@ -50,22 +51,53 @@
 /** Maximum number of handles. */
 #define HANDLE_TABLE_SIZE	512
 
-/** Object wait synchronization information. */
-typedef struct object_wait_sync {
-	spinlock_t lock;		/**< Lock for the structure. */
-	thread_t *thread;		/**< Thread which is waiting. */
-	size_t count;			/**< Number of remaining events to be signalled. */
-} object_wait_sync_t;
+/** Object waiter structure. */
+typedef struct object_waiter {
+	list_t header;				/**< Link to waiters list. */
+	spinlock_t lock;			/**< Lock for the structure. */
+	thread_t *thread;			/**< Thread which is waiting. */
+	size_t count;				/**< Number of remaining events to be signalled. */
+} object_waiter_t;
 
 /** Object waiting internal data structure. */
 typedef struct object_wait {
-	object_event_t info;		/**< Userspace-supplied event information. */
-	object_handle_t *handle;	/**< Handle being waited on. */
-	object_wait_sync_t *sync;	/**< Synchronization object for the wait. */
+	object_event_t event;			/**< User-supplied event information. */
+	object_handle_t *handle;		/**< Handle being waited on. */
+
+	/** Type of the wait. */
+	enum {
+		OBJECT_WAIT_NORMAL,		/**< Wait is a call to kern_object_wait(). */
+		OBJECT_WAIT_CALLBACK,		/**< Wait is a callback. */
+	} type;
+
+	union {
+		/** Normal wait data. */
+		struct {
+			/** Waiter calling kern_object_wait(). */
+			object_waiter_t *waiter;
+
+			list_t waits_link;	/**< Link to list of all wait structures. */
+		};
+
+		/** Callback data. */
+		struct {
+			thread_t *thread;	/**< Target thread. */
+			list_t handle_link;	/**< Link to handle events list. */
+			list_t thread_link;	/**< Link to thread events list. */
+
+			/** Callback function. */
+			object_callback_t callback;
+
+			unsigned priority;	/**< Callback priority. */
+		};
+	};
 } object_wait_t;
 
 /** Cache for handle structures. */
 static slab_cache_t *object_handle_cache;
+
+/** Cache for object wait structures. */
+static slab_cache_t *object_wait_cache;
 
 /** Object type names. */
 static const char *object_type_names[] = {
@@ -80,35 +112,6 @@ static const char *object_type_names[] = {
 	[OBJECT_TYPE_CONNECTION] = "OBJECT_TYPE_CONNECTION",
 	[OBJECT_TYPE_SEMAPHORE] = "OBJECT_TYPE_SEMAPHORE",
 };
-
-/** Notifier function to use for object waiting.
- * @param arg1		Unused.
- * @param arg2		Wait structure pointer.
- * @param arg3		Data for the event (unsigned long cast to void *). */
-void object_wait_notifier(void *arg1, void *arg2, void *arg3) {
-	object_wait_signal(arg2, (unsigned long)arg3);
-}
-
-/** Signal that an event being waited for has occurred.
- * @param wait		Internal data pointer.
- * @param data		Event data to return to waiter. */
-void object_wait_signal(void *_wait, unsigned long data) {
-	object_wait_t *wait = _wait;
-
-	wait->info.signalled = true;
-	wait->info.data = data;
-
-	spinlock_lock(&wait->sync->lock);
-
-	/* Don't decrement the count if its already 0, only wake if thread is
-	 * actually sleeping. */
-	if(wait->sync->count && --wait->sync->count == 0 && wait->sync->thread) {
-		thread_wake(wait->sync->thread);
-		wait->sync->thread = NULL;
-	}
-
-	spinlock_unlock(&wait->sync->lock);
-}
 
 /**
  * Create a handle to an object.
@@ -169,6 +172,121 @@ void object_handle_release(object_handle_t *handle) {
 	}
 }
 
+/** Look up a handle with the table locked.
+ * @param id		Handle ID to look up.
+ * @param type		Required object type ID (if negative, no type checking
+ *			will be performed).
+ * @param handlep	Where to store pointer to handle structure.
+ * @return		Status code describing result of the operation. */
+static status_t lookup_handle(handle_t id, int type, object_handle_t **handlep) {
+	handle_table_t *table = &curr_proc->handles;
+	object_handle_t *handle;
+
+	assert(handlep);
+
+	if(id < 0 || id >= HANDLE_TABLE_SIZE)
+		return STATUS_INVALID_HANDLE;
+
+	handle = table->handles[id];
+	if(!handle)
+		return STATUS_INVALID_HANDLE;
+
+	/* Check if the type is the type the caller wants. */
+	if(type >= 0 && handle->type->id != (unsigned)type)
+		return STATUS_INVALID_HANDLE;
+
+	object_handle_retain(handle);
+	*handlep = handle;
+	return STATUS_SUCCESS;
+}
+
+/** Attach a handle to the current process' handle table.
+ * @param handle	Handle to attach.
+ * @param idp		If not NULL, a kernel location to store handle ID in.
+ * @param uidp		If not NULL, a user location to store handle ID in.
+ * @param retain	Whether to retain the handle.
+ * @return		Status code describing result of the operation. */
+static status_t attach_handle(object_handle_t *handle, handle_t *idp, handle_t *uidp, bool retain) {
+	handle_table_t *table = &curr_proc->handles;
+	handle_t id;
+	status_t ret;
+
+	assert(handle);
+	assert(idp || uidp);
+
+	/* Find a handle ID in the table. */
+	id = bitmap_ffz(table->bitmap, HANDLE_TABLE_SIZE);
+	if(id < 0)
+		return STATUS_NO_HANDLES;
+
+	if(idp)
+		*idp = id;
+
+	if(uidp) {
+		ret = write_user(uidp, id);
+		if(ret != STATUS_SUCCESS)
+			return ret;
+	}
+
+	if(retain)
+		object_handle_retain(handle);
+
+	if(handle->type->attach)
+		handle->type->attach(handle, curr_proc);
+
+	table->handles[id] = handle;
+	table->flags[id] = 0;
+	bitmap_set(table->bitmap, id);
+
+	dprintf("object: allocated handle %" PRId32 " in process %" PRId32 " (type: %u, private: %p)\n",
+		id, curr_proc->id, handle->type->id, handle->private);
+
+	return STATUS_SUCCESS;
+}
+
+/** Remove a callback.
+ * @note		Handle table must be locked.
+ * @param wait		Wait structure for the callback. */
+static void remove_callback(object_wait_t *wait) {
+	wait->handle->type->unwait(wait->handle, &wait->event);
+
+	list_remove(&wait->handle_link);
+	list_remove(&wait->thread_link);
+	slab_cache_free(object_wait_cache, wait);
+}
+
+/** Detach a handle from the current process' handle table.
+ * @param id		ID of handle to detach.
+ * @return		Status code describing result of the operation. */
+static status_t detach_handle(handle_t id) {
+	handle_table_t *table = &curr_proc->handles;
+	object_handle_t *handle;
+	object_wait_t *wait;
+
+	if(id < 0 || id >= HANDLE_TABLE_SIZE || !table->handles[id])
+		return STATUS_INVALID_HANDLE;
+
+	handle = table->handles[id];
+
+	if(handle->type->detach)
+		handle->type->detach(handle, curr_proc);
+
+	/* Unregister any callbacks registered. */
+	while(!list_empty(&table->callbacks[id])) {
+		wait = list_first(&table->callbacks[id], object_wait_t, handle_link);
+		remove_callback(wait);
+	}
+
+	dprintf("object: detached handle %" PRId32 " from process %" PRId32 " (count: %d)\n",
+		id, curr_proc->id, refcount_get(&handle->count));
+
+	object_handle_release(handle);
+	table->handles[id] = NULL;
+	table->flags[id] = 0;
+	bitmap_clear(table->bitmap, id);
+	return STATUS_SUCCESS;
+}
+
 /**
  * Look up a handle in a the current process' handle table.
  *
@@ -185,110 +303,12 @@ void object_handle_release(object_handle_t *handle) {
  * @return		Status code describing result of the operation.
  */
 status_t object_handle_lookup(handle_t id, int type, object_handle_t **handlep) {
-	handle_table_t *table = &curr_proc->handles;
-	object_handle_t *handle;
-
-	assert(handlep);
-
-	if(id < 0 || id >= HANDLE_TABLE_SIZE)
-		return STATUS_INVALID_HANDLE;
-
-	rwlock_read_lock(&table->lock);
-
-	handle = table->handles[id];
-	if(!handle) {
-		rwlock_unlock(&table->lock);
-		return STATUS_INVALID_HANDLE;
-	}
-
-	/* Check if the type is the type the caller wants. */
-	if(type >= 0 && handle->type->id != (unsigned)type) {
-		rwlock_unlock(&table->lock);
-		return STATUS_INVALID_HANDLE;
-	}
-
-	object_handle_retain(handle);
-	rwlock_unlock(&table->lock);
-
-	*handlep = handle;
-	return STATUS_SUCCESS;
-}
-
-/** Internal part of object_handle_attach().
- * @param handle	Handle to attach.
- * @param idp		If not NULL, a kernel location to store handle ID in.
- * @param uidp		If not NULL, a user location to store handle ID in.
- * @param retain	Whether to retain the handle.
- * @return		Status code describing result of the operation. */
-static status_t attach_handle(object_handle_t *handle, handle_t *idp, handle_t *uidp, bool retain) {
-	handle_table_t *table = &curr_proc->handles;
-	handle_t id;
 	status_t ret;
 
-	assert(handle);
-	assert(idp || uidp);
-
-	rwlock_write_lock(&table->lock);
-
-	/* Find a handle ID in the table. */
-	id = bitmap_ffz(table->bitmap, HANDLE_TABLE_SIZE);
-	if(id < 0) {
-		rwlock_unlock(&table->lock);
-		return STATUS_NO_HANDLES;
-	}
-
-	if(idp)
-		*idp = id;
-
-	if(uidp) {
-		ret = write_user(uidp, id);
-		if(ret != STATUS_SUCCESS) {
-			rwlock_unlock(&table->lock);
-			return ret;
-		}
-	}
-
-	if(retain)
-		object_handle_retain(handle);
-
-	if(handle->type->attach)
-		handle->type->attach(handle, curr_proc);
-
-	table->handles[id] = handle;
-	table->flags[id] = 0;
-	bitmap_set(table->bitmap, id);
-
-	rwlock_unlock(&table->lock);
-
-	dprintf("object: allocated handle %" PRId32 " in process %" PRId32
-		" (type: %u, private: %p)\n", id, curr_proc->id, handle->type->id,
-		handle->private);
-	return STATUS_SUCCESS;
-}
-
-/** Detach a handle from the current process' handle table.
- * @param id		ID of handle to detach.
- * @return		Status code describing result of the operation. */
-static status_t detach_handle(handle_t id) {
-	handle_table_t *table = &curr_proc->handles;
-	object_handle_t *handle;
-
-	if(id < 0 || id >= HANDLE_TABLE_SIZE || !table->handles[id])
-		return STATUS_INVALID_HANDLE;
-
-	handle = table->handles[id];
-
-	if(handle->type->detach)
-		handle->type->detach(handle, curr_proc);
-
-	dprintf("object: detached handle %" PRId32 " from process %" PRId32 " (count: %d)\n",
-		id, curr_proc->id, refcount_get(&handle->count));
-
-	object_handle_release(handle);
-	table->handles[id] = NULL;
-	table->flags[id] = 0;
-	bitmap_clear(table->bitmap, id);
-	return STATUS_SUCCESS;
+	rwlock_read_lock(&curr_proc->handles.lock);
+	ret = lookup_handle(id, type, handlep);
+	rwlock_unlock(&curr_proc->handles.lock);
+	return ret;
 }
 
 /**
@@ -304,7 +324,12 @@ static status_t detach_handle(handle_t id) {
  * @return		Status code describing result of the operation.
  */
 status_t object_handle_attach(object_handle_t *handle, handle_t *idp, handle_t *uidp) {
-	return attach_handle(handle, idp, uidp, true);
+	status_t ret;
+
+	rwlock_write_lock(&curr_proc->handles.lock);
+	ret = attach_handle(handle, idp, uidp, true);
+	rwlock_unlock(&curr_proc->handles.lock);
+	return ret;
 }
 
 /**
@@ -352,7 +377,10 @@ status_t object_handle_open(object_type_t *type, void *private, handle_t *idp, h
 	status_t ret;
 
 	handle = object_handle_create(type, private);
+
+	rwlock_write_lock(&curr_proc->handles.lock);
 	ret = attach_handle(handle, idp, uidp, false);
+	rwlock_unlock(&curr_proc->handles.lock);
 	if(ret != STATUS_SUCCESS) {
 		slab_cache_free(object_handle_cache, handle);
 		return ret;
@@ -365,12 +393,17 @@ status_t object_handle_open(object_type_t *type, void *private, handle_t *idp, h
  * @param process	Process to initialize. */
 void object_process_init(process_t *process) {
 	handle_table_t *table = &process->handles;
+	size_t i;
 
 	rwlock_init(&table->lock, "handle_table_lock");
 
 	table->handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->handles[0]), MM_KERNEL);
 	table->flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(table->flags[0]), MM_KERNEL);
+	table->callbacks = kmalloc(HANDLE_TABLE_SIZE * sizeof(table->callbacks[0]), MM_KERNEL);
 	table->bitmap = bitmap_alloc(HANDLE_TABLE_SIZE, MM_KERNEL);
+
+	for(i = 0; i < HANDLE_TABLE_SIZE; i++)
+		list_init(&table->callbacks[i]);
 }
 
 /** Destroy a process' handle table.
@@ -386,15 +419,20 @@ void object_process_cleanup(process_t *process) {
 			if(handle->type->detach)
 				handle->type->detach(handle, process);
 
-			dprintf("object: detached handle %" PRId32 " from process %" PRId32
-				" (count: %d)\n", i, process->id,
-				refcount_get(&handle->count));
+			dprintf("object: detached handle %" PRId32 " from process %" PRId32 " (count: %d)\n",
+				i, process->id, refcount_get(&handle->count));
 
 			object_handle_release(handle);
 		}
+
+		/* Callback list should be empty, by this point all threads
+		 * should have been cleaned up and therefore removed their
+		 * callbacks. */
+		assert(list_empty(&table->callbacks[i]));
 	}
 
 	kfree(table->bitmap);
+	kfree(table->callbacks);
 	kfree(table->flags);
 	kfree(table->handles);
 }
@@ -406,8 +444,8 @@ void object_process_cleanup(process_t *process) {
  * @param source	Source handle ID.
  * @param process	Process to attach to, if any.
  * @return		Status code describing result of the operation. */
-static status_t
-inherit_handle(handle_table_t *table, handle_t dest, handle_table_t *parent,
+static status_t inherit_handle(
+	handle_table_t *table, handle_t dest, handle_table_t *parent,
 	handle_t source, process_t *process)
 {
 	object_handle_t *handle;
@@ -440,12 +478,7 @@ inherit_handle(handle_table_t *table, handle_t dest, handle_table_t *parent,
 	return STATUS_SUCCESS;
 }
 
-/**
- * Duplicate handles to a new process.
- *
- * Duplicates handles from a process into a newly created process, either using
- * provided mapping information, or based on the inheritable flag of handles.
- *
+/** Duplicate handles to a new process.
  * @param process	Newly created process.
  * @param parent	Parent process.
  * @param map		An array specifying handles to add to the new table.
@@ -456,17 +489,8 @@ inherit_handle(handle_table_t *table, handle_t dest, handle_table_t *parent,
  *			map will be ignored and all handles with the inheritable
  *			flag set will be duplicated. If 0, no handles will be
  *			duplicated.
- *
- * @return		STATUS_SUCCESS on success (always the case with no map).
- *			STATUS_INVALID_HANDLE if the given map specifies a
- *			non-existant handle in the parent.
- *			STATUS_ALREADY_EXISTS if the given map maps multiple
- *			handles from the parent to the same ID in the new table.
- */
-status_t
-object_process_create(process_t *process, process_t *parent, handle_t map[][2],
-	ssize_t count)
-{
+ * @return		Status code describing result of the operation. */
+status_t object_process_create(process_t *process, process_t *parent, handle_t map[][2], ssize_t count) {
 	ssize_t i;
 	status_t ret;
 
@@ -479,8 +503,7 @@ object_process_create(process_t *process, process_t *parent, handle_t map[][2],
 		assert(map);
 
 		for(i = 0; i < count; i++) {
-			ret = inherit_handle(&process->handles, map[i][1], &parent->handles,
-				map[i][0], process);
+			ret = inherit_handle(&process->handles, map[i][1], &parent->handles, map[i][0], process);
 			if(ret != STATUS_SUCCESS)
 				goto out;
 		}
@@ -489,10 +512,8 @@ object_process_create(process_t *process, process_t *parent, handle_t map[][2],
 		for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
 			/* Flag can only be set if handle is not NULL and the
 			 * type allows transferring. */
-			if(parent->handles.flags[i] & HANDLE_INHERITABLE) {
-				inherit_handle(&process->handles, i, &parent->handles,
-					i, process);
-			}
+			if(parent->handles.flags[i] & HANDLE_INHERITABLE)
+				inherit_handle(&process->handles, i, &parent->handles, i, process);
 		}
 	}
 
@@ -504,14 +525,7 @@ out:
 	return ret;
 }
 
-/**
- * Close handles when executing a new program.
- *
- * If no map is specified, closes all non-inheritable handles in the given
- * process. If a map is specified, replaces the process' handle table with a
- * new table containing all handles from the old table specified by the map.
- *
- * @param process	Process that is executing a new program.
+/** Close handles when executing a new program.
  * @param map		An array specifying handles to add to the new table.
  *			The first ID of each entry specifies the handle in the
  *			parent, and the second specifies the ID to give it in
@@ -520,14 +534,8 @@ out:
  *			map will be ignored and all handles with the inheritable
  *			flag set will be duplicated. If 0, no handles will be
  *			duplicated.
- *
- * @return		STATUS_SUCCESS on success (always the case with no map).
- *			STATUS_INVALID_HANDLE if the given map specifies a
- *			non-existant handle in the parent.
- *			STATUS_ALREADY_EXISTS if the given map maps multiple
- *			handles from the parent to the same ID in the new table.
- */
-status_t object_process_exec(process_t *process, handle_t map[][2], ssize_t count) {
+ * @return		Status code describing result of the operation. */
+status_t object_process_exec(handle_t map[][2], ssize_t count) {
 	handle_table_t new;
 	ssize_t i;
 	object_handle_t *handle;
@@ -546,14 +554,18 @@ status_t object_process_exec(process_t *process, handle_t map[][2], ssize_t coun
 
 	new.handles = kcalloc(HANDLE_TABLE_SIZE, sizeof(new.handles[0]), MM_KERNEL);
 	new.flags = kcalloc(HANDLE_TABLE_SIZE, sizeof(new.flags[0]), MM_KERNEL);
+	new.callbacks = kmalloc(HANDLE_TABLE_SIZE * sizeof(new.callbacks[0]), MM_KERNEL);
 	new.bitmap = bitmap_alloc(HANDLE_TABLE_SIZE, MM_KERNEL);
+
+	/* We don't inherit any callbacks. */
+	for(i = 0; i < HANDLE_TABLE_SIZE; i++)
+		list_init(&new.callbacks[i]);
 
 	if(count > 0) {
 		assert(map);
 
 		for(i = 0; i < count; i++) {
-			ret = inherit_handle(&new, map[i][1], &process->handles,
-				map[i][0], NULL);
+			ret = inherit_handle(&new, map[i][1], &curr_proc->handles, map[i][0], NULL);
 			if(ret != STATUS_SUCCESS) {
 				while(i--) {
 					handle = new.handles[map[i][1]];
@@ -565,52 +577,54 @@ status_t object_process_exec(process_t *process, handle_t map[][2], ssize_t coun
 		}
 	} else if(count < 0) {
 		for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
-			if(process->handles.flags[i] & HANDLE_INHERITABLE)
-				inherit_handle(&new, i, &process->handles, i, NULL);
+			if(curr_proc->handles.flags[i] & HANDLE_INHERITABLE)
+				inherit_handle(&new, i, &curr_proc->handles, i, NULL);
 		}
 	}
+
+	/* Clean up all callbacks for the current thread. */
+	object_thread_cleanup(curr_thread);
 
 	/* Now we can detach and release all handles in the old table. */
 	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
-		handle = process->handles.handles[i];
+		handle = curr_proc->handles.handles[i];
 		if(handle) {
 			if(handle->type->detach)
-				handle->type->detach(handle, process);
+				handle->type->detach(handle, curr_proc);
 
 			object_handle_release(handle);
 		}
+
+		/* At this point there should be no callbacks, all other threads
+		 * are terminated and we cleaned up the current thread's
+		 * callbacks above. */
+		assert(list_empty(&curr_proc->handles.callbacks[i]));
 	}
 
-	swap(process->handles.handles, new.handles);
-	swap(process->handles.flags, new.flags);
-	swap(process->handles.bitmap, new.bitmap);
+	swap(curr_proc->handles.handles, new.handles);
+	swap(curr_proc->handles.flags, new.flags);
+	swap(curr_proc->handles.callbacks, new.callbacks);
+	swap(curr_proc->handles.bitmap, new.bitmap);
 
 	/* Finally, attach all handles in the new table. */
 	for(i = 0; i < HANDLE_TABLE_SIZE; i++) {
-		handle = process->handles.handles[i];
+		handle = curr_proc->handles.handles[i];
 		if(handle && handle->type->attach)
-			handle->type->attach(handle, process);
+			handle->type->attach(handle, curr_proc);
 	}
 
 	ret = STATUS_SUCCESS;
 out:
 	kfree(new.bitmap);
+	kfree(new.callbacks);
 	kfree(new.flags);
 	kfree(new.handles);
 	return ret;
 }
 
-/**
- * Clone an existing process' handle table to a new process.
- *
- * Clones all handles, including non-inheritable ones (unless they are of a
- * non-transferrable type), from an existing process' handle table to a new
- * process. The table entries will all refer to the same underlying handles as
- * the old table.
- *
+/** Clone handles from a new process' parent.
  * @param process	New process.
- * @param parent	Original process.
- */
+ * @param parent	Parent process. */
 void object_process_clone(process_t *process, process_t *parent) {
 	size_t i;
 
@@ -623,6 +637,72 @@ void object_process_clone(process_t *process, process_t *parent) {
 	}
 
 	rwlock_unlock(&parent->handles.lock);
+}
+
+/** Clean up callbacks registered by a thread.
+ * @param thread	Thread to clean up. */
+void object_thread_cleanup(thread_t *thread) {
+	object_wait_t *wait;
+
+	rwlock_write_lock(&thread->owner->handles.lock);
+
+	while(!list_empty(&thread->callbacks)) {
+		wait = list_first(&thread->callbacks, object_wait_t, thread_link);
+		remove_callback(wait);
+	}
+
+	rwlock_unlock(&thread->owner->handles.lock);
+}
+
+/** Signal that an event being waited for has occurred.
+ * @param event		Object event structure.
+ * @param data		Event data to return to waiter. */
+void object_event_signal(object_event_t *event, unsigned long data) {
+	object_wait_t *wait = container_of(event, object_wait_t, event);
+	thread_interrupt_t *interrupt;
+
+	event->flags |= OBJECT_EVENT_SIGNALLED;
+	event->data = data;
+
+	switch(wait->type) {
+	case OBJECT_WAIT_NORMAL:
+		spinlock_lock(&wait->waiter->lock);
+
+		/* Don't decrement the count if its already 0, only wake if
+		 * thread is actually sleeping. */
+		if(wait->waiter->count && --wait->waiter->count == 0 && wait->waiter->thread) {
+			thread_wake(wait->waiter->thread);
+			wait->waiter->thread = NULL;
+		}
+
+		spinlock_unlock(&wait->waiter->lock);
+		break;
+	case OBJECT_WAIT_CALLBACK:
+		interrupt = kmalloc(sizeof(*interrupt) + sizeof(*event), MM_KERNEL);
+		memcpy(interrupt + 1, event, sizeof(*event));
+		interrupt->stack.base = NULL;
+		interrupt->stack.size = 0;
+		interrupt->priority = wait->priority;
+		interrupt->handler = (ptr_t)wait->callback;
+		interrupt->size = sizeof(*event);
+		thread_interrupt(wait->thread, interrupt);
+
+		if(event->flags & OBJECT_EVENT_ONESHOT) {
+			rwlock_write_lock(&curr_proc->handles.lock);
+			remove_callback(wait);
+			rwlock_unlock(&curr_proc->handles.lock);
+		}
+
+		break;
+	}
+}
+
+/** Notifier function to use for object waiting.
+ * @param arg1		Unused.
+ * @param arg2		Event structure pointer.
+ * @param arg3		Data for the event (unsigned long cast to void *). */
+void object_event_notifier(void *arg1, void *arg2, void *arg3) {
+	object_event_signal(arg2, (unsigned long)arg3);
 }
 
 /** Print a list of a process' handles.
@@ -641,8 +721,7 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 		kdb_printf("Prints out a list of all currently open handles in a process.\n");
 		return KDB_SUCCESS;
 	} else if(argc != 2) {
-		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n",
-			argv[0]);
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
 		return KDB_FAILURE;
 	}
 
@@ -674,15 +753,14 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 	return KDB_SUCCESS;
 }
 
-/** Initialize the handle caches. */
+/** Initialize the object manager. */
 __init_text void object_init(void) {
 	object_handle_cache = object_cache_create("object_handle_cache",
 		object_handle_t, NULL, NULL, NULL, 0, MM_BOOT);
+	object_wait_cache = object_cache_create("object_wait_cache",
+		object_wait_t, NULL, NULL, NULL, 0, MM_BOOT);
 
-	/* Register the KDB commands. */
-	kdb_register_command("handles",
-		"Inspect a process' handle table.",
-		kdb_cmd_handles);
+	kdb_register_command("handles", "Inspect a process' handle table.", kdb_cmd_handles);
 }
 
 /** Get the type of an object referred to by a handle.
@@ -717,114 +795,256 @@ status_t kern_object_type(handle_t handle, unsigned *typep) {
  * OBJECT_WAIT_ALL times out or is interrupted, some of the events may have
  * fired, so the events array will be updated with the status of each event.
  *
- * @param events	Array of structures describing events to wait for. If
- *			the function returns STATUS_SUCCESS, STATUS_TIMED_OUT,
- *			STATUS_INTERRUPTED or STATUS_WOULD_BLOCK, the signalled
- *			field of each structure will be updated to reflect
- *			whether or not the event was signalled, and if set to
- *			true then the data field will be updated with the data
- *			value associated with the event.
+ * If an event has the OBJECT_EVENT_EDGE flag set, it will only be signalled
+ * upon a change of the event condition from false to true - if it is already
+ * true when this function is called, it will not be signalled. Otherwise, if
+ * the event condition is true when this function is called, it will be
+ * signalled immediately. The use of edge-triggered mode with this function is
+ * somewhat racy: it is easy to miss edges and then potentially block
+ * indefinitely. For reliable edge-triggered event tracking, use a watcher.
+ *
+ * @param events	Array of structures describing events to wait for. Upon
+ *			return, the flags field of each event will be updated
+ *			according to the result of the function. If an error
+ *			occurred while processing an event, it will have the
+ *			OBJECT_EVENT_ERROR flag set. If the event was signalled,
+ *			it will have the OBJECT_EVENT_SIGNALLED flag set.
  * @param count		Number of array entries.
- * @param flags		Behaviour flags for waiting. See above
+ * @param flags		Behaviour flags for waiting.
  * @param timeout	Maximum time to wait in nanoseconds. A value of 0 will
- *			cause the function to return immediately if the none of
- *			the events have already occurred, and a value of -1 will
- *			block indefinitely until one of events happens.
+ *			cause the function to return immediately if no events
+ *			are signalled, and a value of -1 will block indefinitely
+ *			until one of events is signalled.
  *
  * @return		STATUS_SUCCESS if successful.
  *			STATUS_INVALID_ARG if count is 0 or too big, or if
  *			events is NULL.
  *			STATUS_INVALID_HANDLE if a handle does not exist.
- *			STATUS_INVALID_EVENT if an incorrect event ID is used.
+ *			STATUS_INVALID_EVENT if an invalid event ID is used.
  *			STATUS_WOULD_BLOCK if the timeout is 0 and no events
  *			have already occurred.
  *			STATUS_TIMED_OUT if the timeout expires.
  *			STATUS_INTERRUPTED if the sleep was interrupted.
  */
 status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags, nstime_t timeout) {
-	object_wait_sync_t sync;
-	object_wait_t *waits;
-	object_handle_t *handle;
+	object_waiter_t waiter;
+	list_t waits;
+	object_wait_t *wait;
 	status_t ret, err;
 	size_t i;
 
-	/* TODO: Is this a sensible limit to impose? Do we even need one? We
-	 * allocate via MM_USER so it won't cause problems if it's too large
-	 * to allocate. */
+	/* TODO: Is this a sensible limit to impose? Do we even need one? If
+	 * it gets removed, should change MM_KERNEL to MM_USER below. */
 	if(!count || count > 1024 || !events)
 		return STATUS_INVALID_ARG;
 
-	/* Initialize the synchronization information. Thread is set to NULL
-	 * initially so that object_wait_signal() does not try to wake us if
-	 * an event is signalled while setting up the waits. */
-	spinlock_init(&sync.lock, "object_wait_lock");
-	sync.thread = NULL;
-	sync.count = (flags & OBJECT_WAIT_ALL) ? count : 1;
+	/* Thread is set to NULL initially so that object_event_signal() does
+	 * not try to wake us if an event is signalled while setting up the
+	 * waits. */
+	spinlock_init(&waiter.lock, "object_waiter_lock");
+	waiter.thread = NULL;
+	waiter.count = (flags & OBJECT_WAIT_ALL) ? count : 1;
 
-	waits = kmalloc(count * sizeof(*waits), MM_USER);
-	if(!waits)
-		return STATUS_NO_MEMORY;
-
+	/* Copy across all event information and set up waits. */
+	list_init(&waits);
 	for(i = 0; i < count; i++) {
-		ret = memcpy_from_user(&waits[i].info, &events[i], sizeof(*events));
-		if(ret != STATUS_SUCCESS)
-			goto out;
+		wait = slab_cache_alloc(object_wait_cache, MM_KERNEL);
 
-		ret = object_handle_lookup(waits[i].info.handle, -1, &handle);
+		ret = memcpy_from_user(&wait->event, &events[i], sizeof(wait->event));
 		if(ret != STATUS_SUCCESS) {
-			goto out;
-		} else if(!handle->type->wait || !handle->type->unwait) {
-			ret = STATUS_INVALID_EVENT;
-			object_handle_release(handle);
+			slab_cache_free(object_wait_cache, wait);
 			goto out;
 		}
 
-		waits[i].sync = &sync;
-		waits[i].handle = handle;
-		waits[i].info.signalled = false;
+		wait->event.flags &= ~(OBJECT_EVENT_SIGNALLED | OBJECT_EVENT_ERROR);
+		wait->handle = NULL;
+		wait->type = OBJECT_WAIT_NORMAL;
+		wait->waiter = &waiter;
+		list_init(&wait->waits_link);
+		list_append(&waits, &wait->waits_link);
 
-		ret = handle->type->wait(handle, waits[i].info.event, &waits[i]);
+		ret = object_handle_lookup(wait->event.handle, -1, &wait->handle);
 		if(ret != STATUS_SUCCESS) {
-			object_handle_release(handle);
+			wait->event.flags |= OBJECT_EVENT_ERROR;
+			goto out;
+		} else if(!wait->handle->type->wait || !wait->handle->type->unwait) {
+			wait->event.flags |= OBJECT_EVENT_ERROR;
+			ret = STATUS_INVALID_EVENT;
+			goto out;
+		}
+
+		ret = wait->handle->type->wait(wait->handle, &wait->event);
+		if(ret != STATUS_SUCCESS) {
+			wait->event.flags |= OBJECT_EVENT_ERROR;
 			goto out;
 		}
 	}
 
-	spinlock_lock(&sync.lock);
+	spinlock_lock(&waiter.lock);
 
 	/* Now we wait for the events. If all the events required have already
 	 * been signalled, don't sleep. */
-	if(sync.count == 0) {
+	if(waiter.count == 0) {
 		ret = STATUS_SUCCESS;
-		spinlock_unlock(&sync.lock);
+		spinlock_unlock(&waiter.lock);
 	} else {
-		sync.thread = curr_thread;
-		ret = thread_sleep(&sync.lock, timeout, "object_wait", SLEEP_INTERRUPTIBLE);
+		waiter.thread = curr_thread;
+		ret = thread_sleep(&waiter.lock, timeout, "object_wait", SLEEP_INTERRUPTIBLE);
 	}
 out:
 	/* Cancel all waits which have been set up. */
-	while(i--) {
-		handle = waits[i].handle;
-		handle->type->unwait(handle, waits[i].info.event, &waits[i]);
-		object_handle_release(handle);
+	for(i = 0; !list_empty(&waits); i++) {
+		wait = list_first(&waits, object_wait_t, waits_link);
 
-		/* If we're waiting with OBJECT_WAIT_ALL and we've timed out or
-		 * been interrupted, some of the events could have fired so
-		 * return them. */
-		switch(ret) {
-		case STATUS_SUCCESS:
-		case STATUS_TIMED_OUT:
-		case STATUS_INTERRUPTED:
-		case STATUS_WOULD_BLOCK:
-			err = memcpy_to_user(&events[i], &waits[i].info, sizeof(*events));
+		if(wait->handle) {
+			if(!(wait->event.flags & OBJECT_EVENT_ERROR))
+				wait->handle->type->unwait(wait->handle, &wait->event);
+
+			object_handle_release(wait->handle);
+		}
+
+		/* Write back the updated flags and event data. */
+		err = write_user(&events[i].flags, wait->event.flags);
+		if(err != STATUS_SUCCESS) {
+			ret = err;
+		} else if(wait->event.flags & OBJECT_EVENT_SIGNALLED) {
+			err = write_user(&events[i].data, wait->event.data);
 			if(err != STATUS_SUCCESS)
 				ret = err;
+		}
 
-			break;
+		list_remove(&wait->waits_link);
+		slab_cache_free(object_wait_cache, wait);
+	}
+
+	return ret;
+}
+
+/**
+ * Set up an asynchronous object event callback.
+ *
+ * Register a callback function to be called asynchronously via a thread
+ * interrupt when the specified object event occurs. This function only
+ * supports edge-triggered events: the OBJECT_EVENT_EDGE flag must be set. The
+ * callback will be executed every time the event condition changes to become
+ * true. If the OBJECT_EVENT_ONESHOT flag is set, the callback function will be
+ * removed the first time the event occurs
+ *
+ * Callbacks are per-thread, i.e. will be delivered to the thread that
+ * registered it, and per-handle table entry, i.e. will be removed when the
+ * handle table entry it was registered on is closed, rather than when all
+ * entries in the process referring to the same underlying open handle are
+ * closed. There can only be one callback registered at a time per handle ID/
+ * event ID pair in a thread. If a callback for the event is already registered
+ * in the current thread, it will be replaced. Passing NULL as the callback
+ * function causes any callback registered in the current thread for the
+ * specified event to be removed.
+ *
+ * The callback is registered with a priority which the callback interrupt will
+ * be delivered with. Raising the IPL to above this priority will cause the
+ * callback to be temporarily blocked. If the event occurs while the interrupt
+ * is blocked, the callback will be executed as soon as the IPL is lowered to
+ * unblock it. While the callback is executing, the IPL is raised to 1 above
+ * it's priority. It is be restored to its previous value upon return from the
+ * callback. If the callback function lowers the IPL to unblock itself and the
+ * event occurs again before it returns, it will be re-entered. The nesting of
+ * interrupt handlers that occurs in this case may result in a stack overflow,
+ * and for this reason, it is recommended that callbacks do not lower the IPL
+ * and instead let it be restored by the kernel after returning.
+ *
+ * @param event		Event description.
+ * @param callback	Callback function to register, NULL to remove callback.
+ * @param priority	Priority to deliver callback interrupt with. This must
+ *			be lower than THREAD_IPL_EXCEPTION.
+ *
+ * @return		STATUS_SUCCESS on success.
+ *			STATUS_INVALID_ARG if event is NULL or priority is
+ *			invalid.
+ *			STATUS_INVALID_HANDLE if a handle does not exist.
+ *			STATUS_INVALID_EVENT if an invalid event ID is used.
+ *			STATUS_NOT_SUPPORTED if OBJECT_EVENT_EDGE is not set.
+ */
+status_t kern_object_callback(object_event_t *event, object_callback_t callback, unsigned priority) {
+	object_event_t kevent;
+	object_wait_t *wait;
+	status_t ret, err;
+
+	if(!event || priority >= THREAD_IPL_EXCEPTION) {
+		return STATUS_INVALID_ARG;
+	} else if(callback && !is_user_address(callback)) {
+		return STATUS_INVALID_ADDR;
+	}
+
+	ret = memcpy_from_user(&kevent, event, sizeof(kevent));
+	if(ret != STATUS_SUCCESS)
+		return ret;
+
+	kevent.flags &= ~(OBJECT_EVENT_SIGNALLED | OBJECT_EVENT_ERROR);
+	if(!(kevent.flags & OBJECT_EVENT_EDGE))
+		return STATUS_NOT_SUPPORTED;
+
+	rwlock_write_lock(&curr_proc->handles.lock);
+
+	/* See if we have a callback already registered to update. */
+	LIST_FOREACH(&curr_thread->callbacks, iter) {
+		wait = list_entry(iter, object_wait_t, thread_link);
+
+		if(wait->event.handle == kevent.handle && wait->event.event == kevent.event) {
+			if(callback) {
+				/* Wait is already set up - simply update the
+				 * callback and priority. */
+				wait->callback = callback;
+				wait->priority = priority;
+			} else {
+				/* We're removing the callback. */
+				remove_callback(wait);
+			}
+
+			rwlock_unlock(&curr_proc->handles.lock);
+			return STATUS_SUCCESS;
 		}
 	}
 
-	kfree(waits);
+	wait = slab_cache_alloc(object_wait_cache, MM_KERNEL);
+	list_init(&wait->handle_link);
+	list_init(&wait->thread_link);
+	memcpy(&wait->event, &kevent, sizeof(wait->event));
+	wait->type = OBJECT_WAIT_CALLBACK;
+	wait->thread = curr_thread;
+	wait->callback = callback;
+	wait->priority = priority;
+
+	/* Table is already locked. */
+	ret = lookup_handle(wait->event.handle, -1, &wait->handle);
+	if(ret != STATUS_SUCCESS) {
+		goto err_free;
+	} else if(!wait->handle->type->wait || !wait->handle->type->unwait) {
+		ret = STATUS_INVALID_EVENT;
+		goto err_release_handle;
+	}
+
+	ret = wait->handle->type->wait(wait->handle, &wait->event);
+	if(ret != STATUS_SUCCESS)
+		goto err_release_handle;
+
+	list_append(&curr_proc->handles.callbacks[wait->event.handle], &wait->handle_link);
+	list_append(&curr_thread->callbacks, &wait->thread_link);
+
+	rwlock_unlock(&curr_proc->handles.lock);
+	return STATUS_SUCCESS;
+err_release_handle:
+	object_handle_release(wait->handle);
+err_free:
+	slab_cache_free(object_wait_cache, wait);
+	rwlock_unlock(&curr_proc->handles.lock);
+
+	/* Not strictly necessary - there's only one event that could have had
+	 * an error, but let's be consistent. */
+	kevent.flags |= OBJECT_EVENT_ERROR;
+	err = write_user(&event->flags, kevent.flags);
+	if(err != STATUS_SUCCESS)
+		ret = err;
+
 	return ret;
 }
 
@@ -985,7 +1205,7 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *newp) {
 
 /** Close a handle.
  * @param handle	Handle ID to close.
- * @return		STATUS_SUCCESS if successful.
+ * @return		STATUS_SUCCESS on success.
  *			STATUS_INVALID_HANDLE if handle does not exist. */
 status_t kern_handle_close(handle_t handle) {
 	return object_handle_detach(handle);

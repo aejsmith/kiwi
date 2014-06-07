@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -244,20 +244,20 @@ status_t pipe_io(pipe_t *pipe, io_request_t *request, bool nonblock) {
  * @param pipe		Pipe to wait for.
  * @param write		Whether to wait to be writable (pipe is classed as
  *			writable when there is space in the buffer).
- * @param wait		Internal wait data pointer.
+ * @param event		Object event structure.
  */
-void pipe_wait(pipe_t *pipe, bool write, void *wait) {
+void pipe_wait(pipe_t *pipe, bool write, object_event_t *event) {
 	if(write) {
 		if(semaphore_count(&pipe->space_sem)) {
-			object_wait_signal(wait, 0);
+			object_event_signal(event, 0);
 		} else {
-			notifier_register(&pipe->space_notifier, object_wait_notifier, wait);
+			notifier_register(&pipe->space_notifier, object_event_notifier, event);
 		}
 	} else {
 		if(semaphore_count(&pipe->data_sem)) {
-			object_wait_signal(wait, 0);
+			object_event_signal(event, 0);
 		} else {
-			notifier_register(&pipe->data_notifier, object_wait_notifier, wait);
+			notifier_register(&pipe->data_notifier, object_event_notifier, event);
 		}
 	}
 }
@@ -265,11 +265,10 @@ void pipe_wait(pipe_t *pipe, bool write, void *wait) {
 /** Stop waiting for a pipe event.
  * @param pipe		Pipe to stop waiting for.
  * @param write		Whether waiting to be writable.
- * @param wait		Internal wait data pointer. */
-void pipe_unwait(pipe_t *pipe, bool write, void *wait) {
-	notifier_t *notifier = (write) ? &pipe->space_notifier
-		: &pipe->data_notifier;
-	notifier_unregister(notifier, object_wait_notifier, wait);
+ * @param event		Object event structure. */
+void pipe_unwait(pipe_t *pipe, bool write, object_event_t *event) {
+	notifier_t *notifier = (write) ? &pipe->space_notifier : &pipe->data_notifier;
+	notifier_unregister(notifier, object_event_notifier, event);
 }
 
 /** Create a new pipe.

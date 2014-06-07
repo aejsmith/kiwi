@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2014 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -46,13 +46,11 @@ typedef struct pipe {
 	size_t end;			/**< End position of buffer. */
 } pipe_t;
 
-extern status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock,
-	size_t *bytesp);
-extern status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock,
-	size_t *bytesp);
+extern status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *bytesp);
+extern status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_t *bytesp);
 extern status_t pipe_io(pipe_t *pipe, struct io_request *request, bool nonblock);
-extern void pipe_wait(pipe_t *pipe, bool write, void *wait);
-extern void pipe_unwait(pipe_t *pipe, bool write, void *wait);
+extern void pipe_wait(pipe_t *pipe, bool write, object_event_t *event);
+extern void pipe_unwait(pipe_t *pipe, bool write, object_event_t *event);
 
 extern pipe_t *pipe_create(void);
 extern void pipe_destroy(pipe_t *pipe);

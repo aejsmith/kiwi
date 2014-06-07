@@ -786,18 +786,17 @@ static void process_object_close(object_handle_t *handle) {
 
 /** Signal that a process is being waited for.
  * @param handle	Handle to process.
- * @param event		Event to wait for.
- * @param wait		Internal wait data pointer.
+ * @param event		Event being waited for.
  * @return		Status code describing result of the operation. */
-static status_t process_object_wait(object_handle_t *handle, unsigned event, void *wait) {
+static status_t process_object_wait(object_handle_t *handle, object_event_t *event) {
 	process_t *process = handle->private;
 
-	switch(event) {
+	switch(event->event) {
 	case PROCESS_EVENT_DEATH:
 		if(process->state == PROCESS_DEAD) {
-			object_wait_signal(wait, 0);
+			object_event_signal(event, 0);
 		} else {
-			notifier_register(&process->death_notifier, object_wait_notifier, wait);
+			notifier_register(&process->death_notifier, object_event_notifier, event);
 		}
 
 		return STATUS_SUCCESS;
@@ -808,14 +807,13 @@ static status_t process_object_wait(object_handle_t *handle, unsigned event, voi
 
 /** Stop waiting for a process.
  * @param handle	Handle to process.
- * @param event		Event to wait for.
- * @param wait		Internal wait data pointer. */
-static void process_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
+ * @param event		Event being waited for. */
+static void process_object_unwait(object_handle_t *handle, object_event_t *event) {
 	process_t *process = handle->private;
 
-	switch(event) {
+	switch(event->event) {
 	case PROCESS_EVENT_DEATH:
-		notifier_unregister(&process->death_notifier, object_wait_notifier, wait);
+		notifier_unregister(&process->death_notifier, object_event_notifier, event);
 		break;
 	}
 }
@@ -1172,7 +1170,7 @@ kern_process_exec(const char *path, const char *const args[],
 	if(ret != STATUS_SUCCESS)
 		goto err_free_args;
 
-	ret = object_process_exec(curr_proc, load.map, load.map_count);
+	ret = object_process_exec(load.map, load.map_count);
 	if(ret != STATUS_SUCCESS)
 		goto err_release_thread;
 

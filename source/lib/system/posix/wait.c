@@ -88,7 +88,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 			events = tmp;
 			events[count].handle = process->handle;
 			events[count].event = PROCESS_EVENT_DEATH;
-			events[count].signalled = false;
+			events[count].flags = 0;
 			count++;
 		}
 	}
@@ -116,7 +116,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 
 	/* Only take the first exited process. */
 	for(i = 0; i < count; i++) {
-		if(!events[i].signalled)
+		if(!(events[i].flags & OBJECT_EVENT_SIGNALLED))
 			continue;
 
 		SYS_LIST_FOREACH(&child_processes, iter) {

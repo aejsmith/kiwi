@@ -51,16 +51,13 @@ typedef struct file_ops {
 	 *			function and return success.
 	 * @param handle	File handle structure.
 	 * @param event		Event that is being waited for.
-	 * @param wait		Internal data pointer to be passed to
-	 *			object_wait_signal() or object_wait_notifier().
 	 * @return		Status code describing result of the operation. */
-	status_t (*wait)(struct file_handle *handle, unsigned event, void *wait);
+	status_t (*wait)(struct file_handle *handle, object_event_t *event);
 
 	/** Stop waiting for a file event.
 	 * @param handle	File handle structure.
-	 * @param event		Event that is being waited for.
-	 * @param wait		Internal data pointer. */
-	void (*unwait)(struct file_handle *handle, unsigned event, void *wait);
+	 * @param event		Event that is being waited for. */
+	void (*unwait)(struct file_handle *handle, object_event_t *event);
 
 	/** Perform I/O on a file.
 	 * @param handle	File handle structure.

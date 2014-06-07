@@ -1002,18 +1002,16 @@ static char *fs_file_name(file_handle_t *handle) {
 /** Signal that a file event is being waited for.
  * @param handle	File handle structure.
  * @param event		Event that is being waited for.
- * @param wait		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_wait(file_handle_t *handle, unsigned event, void *wait) {
+static status_t fs_file_wait(file_handle_t *handle, object_event_t *event) {
 	/* TODO. */
 	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Stop waiting for a file.
  * @param handle	File handle structure.
- * @param event		Event that is being waited for.
- * @param wait		Internal data pointer. */
-static void fs_file_unwait(file_handle_t *handle, unsigned event, void *wait) {
+ * @param event		Event that is being waited for. */
+static void fs_file_unwait(file_handle_t *handle, object_event_t *event) {
 	/* TODO. */
 }
 

@@ -31,6 +31,7 @@
 
 struct object_handle;
 struct process;
+struct thread;
 struct vm_region;
 
 /** Kernel object type structure. */
@@ -57,22 +58,36 @@ typedef struct object_type {
 	 * @param process	Process the handle is being detached from. */
 	void (*detach)(struct object_handle *handle, struct process *process);
 
-	/** Signal that an object event is being waited for.
-	 * @note		If the event being waited for has occurred
-	 *			already, this function should call the callback
-	 *			function and return success.
+	/**
+	 * Start waiting for an object event.
+	 *
+	 * This function is called when a thread starts waiting for an event
+	 * on an object. It should check that the specified event is valid,
+	 * and then arrange for object_event_signal() to be called when the
+	 * event occurs. If waiting in level-triggered mode and the event being
+	 * waited for has occurred already, this function should call
+	 * object_event_signal() immediately. Do NOT call it for edge-triggered
+	 * mode.
+	 *
 	 * @param handle	Handle to object.
 	 * @param event		Event that is being waited for.
-	 * @param wait		Internal data pointer to be passed to
-	 *			object_wait_signal() or object_wait_notifier().
-	 * @return		Status code describing result of the operation. */
-	status_t (*wait)(struct object_handle *handle, unsigned event, void *wait);
+	 *
+	 * @return		Status code describing result of the operation.
+	 */
+	status_t (*wait)(struct object_handle *handle, object_event_t *event);
 
-	/** Stop waiting for an object.
+	/**
+	 * Stop waiting for an object event.
+	 *
+	 * Stop a wait previously set up with wait(). Note that this function
+	 * may be called from object_event_signal() so be careful with regard
+	 * to locking. If using notifiers, these handle recursive locking
+	 * properly.
+	 *
 	 * @param handle	Handle to object.
 	 * @param event		Event that is being waited for.
-	 * @param wait		Internal data pointer. */
-	void (*unwait)(struct object_handle *handle, unsigned event, void *wait);
+	 */
+	void (*unwait)(struct object_handle *handle, object_event_t *event);
 
 	/**
 	 * Map an object into memory.
@@ -107,11 +122,9 @@ typedef struct handle_table {
 	rwlock_t lock;			/**< Lock to protect table. */
 	object_handle_t **handles;	/**< Array of allocated handles. */
 	uint32_t *flags;		/**< Array of entry flags. */
+	list_t *callbacks;		/**< Array of callback lists for each entry. */
 	unsigned long *bitmap;		/**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
-
-extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
-extern void object_wait_signal(void *wait, unsigned long data);
 
 extern object_handle_t *object_handle_create(object_type_t *type, void *private);
 extern void object_handle_retain(object_handle_t *handle);
@@ -129,10 +142,14 @@ extern void object_process_init(struct process *process);
 extern void object_process_cleanup(struct process *process);
 extern status_t object_process_create(struct process *process,
 	struct process *parent, handle_t map[][2], ssize_t count);
-extern status_t object_process_exec(struct process *process, handle_t map[][2],
-	ssize_t count);
+extern status_t object_process_exec(handle_t map[][2], ssize_t count);
 extern void object_process_clone(struct process *process,
 	struct process *parent);
+
+extern void object_thread_cleanup(struct thread *thread);
+
+extern void object_event_signal(object_event_t *event, unsigned long data);
+extern void object_event_notifier(void *arg1, void *arg2, void *arg3);
 
 extern void object_init(void);
 

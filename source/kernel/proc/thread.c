@@ -148,6 +148,7 @@ static void thread_ctor(void *obj, void *data) {
 	list_init(&thread->runq_link);
 	list_init(&thread->wait_link);
 	list_init(&thread->interrupts);
+	list_init(&thread->callbacks);
 	list_init(&thread->owner_link);
 	timer_init(&thread->sleep_timer, "thread_sleep_timer", thread_timeout, thread, 0);
 	notifier_init(&thread->death_notifier, thread);
@@ -179,6 +180,8 @@ static void thread_cleanup(thread_t *thread) {
 	arch_thread_destroy(thread);
 	kmem_free(thread->kstack, KSTACK_SIZE);
 	notifier_clear(&thread->death_notifier);
+
+	object_thread_cleanup(thread);
 
 	LIST_FOREACH_SAFE(&thread->interrupts, iter) {
 		interrupt = list_entry(iter, thread_interrupt_t, header);
@@ -1055,18 +1058,17 @@ static void thread_object_close(object_handle_t *handle) {
 
 /** Signal that a thread is being waited for.
  * @param handle	Handle to thread.
- * @param event		Event to wait for.
- * @param wait		Internal wait data pointer.
+ * @param event		Event being waited for.
  * @return		Status code describing result of the operation. */
-static status_t thread_object_wait(object_handle_t *handle, unsigned event, void *wait) {
+static status_t thread_object_wait(object_handle_t *handle, object_event_t *event) {
 	thread_t *thread = handle->private;
 
-	switch(event) {
+	switch(event->event) {
 	case THREAD_EVENT_DEATH:
 		if(thread->state == THREAD_DEAD) {
-			object_wait_signal(wait, 0);
+			object_event_signal(event, 0);
 		} else {
-			notifier_register(&thread->death_notifier, object_wait_notifier, wait);
+			notifier_register(&thread->death_notifier, object_event_notifier, event);
 		}
 
 		return STATUS_SUCCESS;
@@ -1077,14 +1079,13 @@ static status_t thread_object_wait(object_handle_t *handle, unsigned event, void
 
 /** Stop waiting for a thread.
  * @param handle	Handle to thread.
- * @param event		Event to wait for.
- * @param wait		Internal wait data pointer. */
-static void thread_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
+ * @param event		Event being waited for. */
+static void thread_object_unwait(object_handle_t *handle, object_event_t *event) {
 	thread_t *thread = handle->private;
 
-	switch(event) {
+	switch(event->event) {
 	case THREAD_EVENT_DEATH:
-		notifier_unregister(&thread->death_notifier, object_wait_notifier, wait);
+		notifier_unregister(&thread->death_notifier, object_event_notifier, event);
 		break;
 	}
 }

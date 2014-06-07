@@ -88,8 +88,8 @@ static timer_device_t *timer_device = NULL;
  * @param min		Minute (0-59).
  * @param sec		Second (0-59).
  * @return		Number of nanoseconds since the epoch. */
-nstime_t
-time_to_unix(unsigned year, unsigned month, unsigned day, unsigned hour,
+nstime_t time_to_unix(
+	unsigned year, unsigned month, unsigned day, unsigned hour,
 	unsigned min, unsigned sec)
 {
 	uint32_t seconds = 0;
@@ -481,19 +481,18 @@ static void timer_object_close(object_handle_t *handle) {
 
 /** Signal that a timer is being waited for.
  * @param handle	Handle to timer.
- * @param event		Event to wait for.
- * @param wait		Internal wait data pointer.
+ * @param event		Event being waited for.
  * @return		Status code describing result of the operation. */
-static status_t timer_object_wait(object_handle_t *handle, unsigned event, void *wait) {
+static status_t timer_object_wait(object_handle_t *handle, object_event_t *event) {
 	user_timer_t *timer = handle->private;
 
-	switch(event) {
+	switch(event->event) {
 	case TIMER_EVENT:
 		if(timer->fired) {
 			timer->fired = false;
-			object_wait_signal(wait, 0);
+			object_event_signal(event, 0);
 		} else {
-			notifier_register(&timer->notifier, object_wait_notifier, wait);
+			notifier_register(&timer->notifier, object_event_notifier, event);
 		}
 
 		return STATUS_SUCCESS;
@@ -504,14 +503,13 @@ static status_t timer_object_wait(object_handle_t *handle, unsigned event, void 
 
 /** Stop waiting for a timer.
  * @param handle	Handle to timer.
- * @param event		Event to wait for.
- * @param wait		Internal wait data pointer. */
-static void timer_object_unwait(object_handle_t *handle, unsigned event, void *wait) {
+ * @param event		Event being waited for. */
+static void timer_object_unwait(object_handle_t *handle, object_event_t *event) {
 	user_timer_t *timer = handle->private;
 
-	switch(event) {
+	switch(event->event) {
 	case TIMER_EVENT:
-		notifier_unregister(&timer->notifier, object_wait_notifier, wait);
+		notifier_unregister(&timer->notifier, object_event_notifier, event);
 		break;
 	}
 }
