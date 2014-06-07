@@ -38,7 +38,7 @@
 extern void __assert_fail(const char *cond, const char *file, int line) __noreturn;
 
 #ifndef __cplusplus
-#define static_assert(cond)	_Static_assert(cond)
+#define static_assert(cond, err)	_Static_assert(cond, err)
 #endif
 
 #endif /* __ASSERT_H */
