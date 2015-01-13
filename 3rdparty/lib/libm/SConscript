@@ -25,6 +25,7 @@ env = manager.Create(flags = {
         '-Wno-sign-compare',
         '-Wno-parentheses',
         '-Wno-uninitialized',
+        '-Wno-absolute-value',
     ],
 })
 

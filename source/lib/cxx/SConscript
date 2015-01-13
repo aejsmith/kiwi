@@ -24,6 +24,7 @@ env = manager.Create(
             'LIBCXXRT': None,
             'cxx_EXPORTS': None,
         },
+        'CXXFLAGS': ['-Wno-old-style-cast'],
 
         # We must use -nodefaultlibs as by default the build system would try
         # to make us link to ourself.

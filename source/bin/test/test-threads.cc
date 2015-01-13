@@ -44,7 +44,7 @@ static bool exiting = false;
 static int thread_func(void *id) {
 	std::unique_lock<std::mutex> lock(test_lock);
 
-	if((unsigned long)id == 0) {
+	if(reinterpret_cast<unsigned long>(id) == 0) {
 		while(!exiting) {
 			lock.unlock();
 			sleep(1);
@@ -55,9 +55,9 @@ static int thread_func(void *id) {
 		}
 	} else {
 		while(!exiting) {
-			printf("Thread %u waiting\n", (unsigned long)id);
+			printf("Thread %u waiting\n", reinterpret_cast<unsigned long>(id));
 			test_cond.wait(lock);
-			printf("Thread %u woken\n", (unsigned long)id);
+			printf("Thread %u woken\n", reinterpret_cast<unsigned long>(id));
 		}
 	}
 
@@ -83,8 +83,7 @@ int main(int argc, char **argv) {
 
 	object_event_t events[NUM_THREADS];
 	for(i = 0; i < NUM_THREADS; i++) {
-		ret = kern_thread_create("test", thread_func, (void *)i, nullptr,
-			0, &events[i].handle);
+		ret = kern_thread_create("test", thread_func, reinterpret_cast<void *>(i), nullptr, 0, &events[i].handle);
 		if(ret != STATUS_SUCCESS) {
 			fprintf(stderr, "Failed to create thread: %d\n", ret);
 			return EXIT_FAILURE;

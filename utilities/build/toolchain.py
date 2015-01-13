@@ -95,6 +95,8 @@ class ToolchainComponent:
                 self.execute('tar -C %s -xjf %s' % (self.manager.builddir, target))
             elif name[-7:] == '.tar.gz':
                 self.execute('tar -C %s -xzf %s' % (self.manager.builddir, target))
+            elif name[-7:] == '.tar.xz':
+                self.execute('tar -C %s -xJf %s' % (self.manager.builddir, target))
 
     # Helper function to execute a command and throw an exception if required
     # status not returned.
@@ -163,19 +165,19 @@ class BinutilsComponent(ToolchainComponent):
 # Component definition for LLVM/Clang.
 class LLVMComponent(ToolchainComponent):
     name = 'llvm'
-    version = '3.4'
+    version = '3.5.1'
     generic = True
     source = [
-        'http://llvm.org/releases/' + version + '/llvm-' + version + '.src.tar.gz',
-        'http://llvm.org/releases/' + version + '/clang-' + version + '.src.tar.gz',
+        'http://llvm.org/releases/' + version + '/llvm-' + version + '.src.tar.xz',
+        'http://llvm.org/releases/' + version + '/cfe-' + version + '.src.tar.xz',
     ]
     patches = [
-        ('llvm-' + version + '-kiwi.patch', 'llvm-' + version, 1),
+        ('llvm-' + version + '-kiwi.patch', 'llvm-' + version + '.src', 1),
     ]
 
     def build(self):
         # Move clang sources to the right place.
-        os.rename('clang-%s' % (self.version), 'llvm-%s/tools/clang' % (self.version))
+        os.rename('cfe-%s.src' % (self.version), 'llvm-%s.src/tools/clang' % (self.version))
 
         self.patch()
 
@@ -194,7 +196,7 @@ class LLVMComponent(ToolchainComponent):
 
         # Build and install it.
         os.mkdir('llvm-build')
-        self.execute('../llvm-%s/configure %s' % (self.version, confopts), 'llvm-build')
+        self.execute('../llvm-%s.src/configure %s' % (self.version, confopts), 'llvm-build')
         self.execute('make -j%d' % (self.manager.makejobs), 'llvm-build')
         self.execute('make install', 'llvm-build')
 
@@ -202,6 +204,7 @@ class LLVMComponent(ToolchainComponent):
 class CompilerRTComponent(ToolchainComponent):
     name = 'compiler-rt'
     version = '3.4'
+    # change back version below when updating
     generic = False
     source = [
         'http://llvm.org/releases/' + version + '/compiler-rt-' + version + '.src.tar.gz',
@@ -225,7 +228,7 @@ class CompilerRTComponent(ToolchainComponent):
         for arch in archs:
             shutil.copyfile(os.path.join('compiler-rt-%s' % self.version, 'clang_kiwi',
                     arch, 'libcompiler_rt.a'),
-                os.path.join(self.manager.genericdir, 'lib', 'clang', self.version,
+                os.path.join(self.manager.genericdir, 'lib', 'clang', '3.5.1',
                     'libclang_rt.%s.a' % arch))
 
 # Component definition for GCC.
