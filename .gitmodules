@@ -3,10 +3,10 @@
 	url = git://git.alex-smith.me.uk/kiwi/kboot.git
 [submodule "3rdparty/lib/libcxx"]
 	path = 3rdparty/lib/libcxx
-	url = git://git.alex-smith.me.uk/kiwi/libcxx.git
+	url = https://github.com/aejsmith/kiwi-libcxx.git
 [submodule "3rdparty/lib/libcxxrt"]
 	path = 3rdparty/lib/libcxxrt
 	url = https://github.com/pathscale/libcxxrt.git
 [submodule "3rdparty/lib/libunwind"]
 	path = 3rdparty/lib/libunwind
-	url = git://git.alex-smith.me.uk/kiwi/libunwind.git
+	url = https://github.com/aejsmith/kiwi-libunwind.git
