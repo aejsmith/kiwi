@@ -78,8 +78,6 @@ def iso_image_func(target, source, env):
     config = env['_CONFIG']
 
     fsimage = str(source[-1])
-    cdboot = str(env['CDBOOT'])
-    loader = str(env['LOADER'])
     kernel = str(env['KERNEL'])
 
     # Create the work directory.
@@ -94,7 +92,7 @@ def iso_image_func(target, source, env):
         shutil.copy(str(mod), os.path.join(tmpdir, 'kiwi', 'modules'))
 
     # Write the configuration.
-    f = open(os.path.join(tmpdir, 'boot', 'loader.cfg'), 'w')
+    f = open(os.path.join(tmpdir, 'boot', 'kboot.cfg'), 'w')
     f.write('set "timeout" 5\n')
     f.write('entry "Kiwi" {\n')
     if len(config['FORCE_VIDEO_MODE']) > 0:
@@ -103,26 +101,17 @@ def iso_image_func(target, source, env):
     f.write('}\n')
     f.close()
 
-    # Create the loader by concatenating the CD boot sector and the loader
-    # together.
-    f = open(os.path.join(tmpdir, 'boot', 'cdboot.img'), 'w')
-    f.write(open(cdboot, 'r').read())
-    f.write(open(loader, 'r').read())
-    f.close()
-
     # Create the ISO.
     verbose = (ARGUMENTS.get('V') == '1') and '' or '>> /dev/null 2>&1'
-    if os.system('mkisofs -J -R -l -b boot/cdboot.img -V "Kiwi CDROM" ' + \
-            '-boot-load-size 4 -boot-info-table -no-emul-boot ' + \
-            '-o %s %s %s' % (target[0], tmpdir, verbose)) != 0:
-        print "Could not find mkisofs! Please ensure that it is installed."
-        shutil.rmtree(tmpdir)
-        return 1
+    config = env['_CONFIG']
+    ret = os.system(
+        '%s --bin-dir=build/%s-%s/boot/bin --targets="%s" --label="Kiwi CDROM" %s %s %s' %
+            (env['KBOOT_MKISO'], config['ARCH'], config['PLATFORM'], config['KBOOT_TARGETS'],
+                target[0], tmpdir, verbose))
 
-    # Clean up.
     shutil.rmtree(tmpdir)
-    return 0
+    return ret
 def iso_image_emitter(target, source, env):
     assert len(source) == 1
-    return (target, [env['KERNEL'], env['LOADER'], env['CDBOOT']] + env['MODULES'] + source)
+    return (target, [env['KERNEL'], env['KBOOT_MKISO']] + env['KBOOT'] + env['MODULES'] + source)
 iso_image_builder = Builder(action = Action(iso_image_func, '$GENCOMSTR'), emitter = iso_image_emitter)

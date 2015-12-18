@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2013 Alex Smith
+# Copyright (C) 2009-2015 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -28,24 +28,32 @@ class BuildManager:
         self.AddVariable('_MANAGER', self)
 
         # Create compile strings that will be added to all environments.
-        def compile_string(msg, name):
-            if ARGUMENTS.get('V') == '1':
-                return None
-            return ' \033[0;32m%-6s\033[0m %s' % (msg, name)
-        self.AddVariable('ARCOMSTR', compile_string('AR', '$TARGET'))
-        self.AddVariable('ASCOMSTR', compile_string('ASM', '$SOURCE'))
-        self.AddVariable('ASPPCOMSTR', compile_string('ASM', '$SOURCE'))
-        self.AddVariable('CCCOMSTR', compile_string('CC', '$SOURCE'))
-        self.AddVariable('SHCCCOMSTR', compile_string('CC', '$SOURCE'))
-        self.AddVariable('CXXCOMSTR', compile_string('CXX', '$SOURCE'))
-        self.AddVariable('SHCXXCOMSTR', compile_string('CXX', '$SOURCE'))
-        self.AddVariable('YACCCOMSTR', compile_string('YACC', '$SOURCE'))
-        self.AddVariable('LEXCOMSTR', compile_string('LEX', '$SOURCE'))
-        self.AddVariable('LINKCOMSTR', compile_string('LINK', '$TARGET'))
-        self.AddVariable('SHLINKCOMSTR', compile_string('SHLINK', '$TARGET'))
-        self.AddVariable('RANLIBCOMSTR', compile_string('RANLIB', '$TARGET'))
-        self.AddVariable('GENCOMSTR', compile_string('GEN', '$TARGET'))
-        self.AddVariable('STRIPCOMSTR', compile_string('STRIP', '$TARGET'))
+        verbose = ARGUMENTS.get('V') == '1'
+        def compile_str(msg):
+            return None if verbose else '\033[0;32m%8s\033[0m $TARGET' % (msg)
+        def compile_str_func(msg, target, source, env):
+            return '\033[0;32m%8s\033[0m %s' % (msg, str(target[0]))
+
+        self.AddVariable('ARCOMSTR',     compile_str('AR'))
+        self.AddVariable('ASCOMSTR',     compile_str('ASM'))
+        self.AddVariable('ASPPCOMSTR',   compile_str('ASM'))
+        self.AddVariable('CCCOMSTR',     compile_str('CC'))
+        self.AddVariable('SHCCCOMSTR',   compile_str('CC'))
+        self.AddVariable('CXXCOMSTR',    compile_str('CXX'))
+        self.AddVariable('SHCXXCOMSTR',  compile_str('CXX'))
+        self.AddVariable('YACCCOMSTR',   compile_str('YACC'))
+        self.AddVariable('LEXCOMSTR',    compile_str('LEX'))
+        self.AddVariable('LINKCOMSTR',   compile_str('LINK'))
+        self.AddVariable('SHLINKCOMSTR', compile_str('SHLINK'))
+        self.AddVariable('RANLIBCOMSTR', compile_str('RANLIB'))
+        self.AddVariable('GENCOMSTR',    compile_str('GEN'))
+        self.AddVariable('STRIPCOMSTR',  compile_str('STRIP'))
+
+        if not verbose:
+            # Substfile doesn't provide a method to override the output. Hack around.
+            func = lambda t, s, e: compile_str_func('GEN', t, s, e)
+            self.host_template['BUILDERS']['Substfile'].action.strfunction = func
+            self.target_template['BUILDERS']['Substfile'].action.strfunction = func
 
         # Add builders from builders.py
         self.AddBuilder('LDScript', builders.ld_script_builder)

@@ -39,3 +39,7 @@ config PLATFORM
 	string
 	default "pc" if PLATFORM_PC
 	default "malta" if PLATFORM_MALTA
+
+config KBOOT_TARGETS
+        string
+        default "bios,efi-amd64,efi-ia32" if PLATFORM_PC

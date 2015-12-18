@@ -64,11 +64,6 @@ config ARCH
 	default "amd64" if ARCH_AMD64
 	default "mips" if ARCH_MIPS
 
-config BOOTARCH
-	string
-	default "x86" if ARCH_AMD64
-	default ARCH
-
 config TOOLCHAIN_TARGET
 	string
 	default "x86_64-kiwi" if ARCH_AMD64

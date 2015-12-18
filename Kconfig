@@ -101,10 +101,6 @@ config DEBUG
 	  system will generally be slower, so don't enable it unless you are
 	  doing kernel development or have another reason to.
 
-menu "KBoot configuration"
-source "source/boot/Kconfig"
-endmenu
-
 menu "Kernel configuration"
 source "source/kernel/Kconfig"
 endmenu
