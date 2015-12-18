@@ -789,7 +789,7 @@ static __init_text int boot_range_compare(const void *a, const void *b) {
 	const boot_range_t *second = (const boot_range_t *)b;
 
 	if(first->freelist == second->freelist) {
-		return (first->start < second->start) ? -1 : (first->start > second->start);
+		return (first->start > second->start) ? -1 : (first->start < second->start);
 	} else {
 		return (first->freelist < second->freelist) ? -1 : 1;
 	}
