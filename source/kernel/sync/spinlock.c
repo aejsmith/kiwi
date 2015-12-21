@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Spinlock implementation.
+ * @brief               Spinlock implementation.
  */
 
 #include <arch/barrier.h>
@@ -30,40 +30,39 @@
 #if CONFIG_SMP
 
 /** Internal spinlock locking code.
- * @param lock		Spinlock to acquire. */
+ * @param lock          Spinlock to acquire. */
 static inline void spinlock_lock_internal(spinlock_t *lock) {
-	/* Attempt to take the lock. Prefer the uncontended case. */
-	if(likely(atomic_dec(&lock->value) == 1))
-		return;
+    /* Attempt to take the lock. Prefer the uncontended case. */
+    if (likely(atomic_dec(&lock->value) == 1))
+        return;
 
-	/* When running on a single processor there is no need for us to spin
-	 * as there should only ever be one thing here at any one time, so just
-	 * die. */
-	if(likely(cpu_count > 1)) {
-		while(true) {
-			/* Wait for it to become unheld. */
-			while(atomic_get(&lock->value) != 1)
-				arch_cpu_spin_hint();
+    /* When running on a single processor there is no need for us to spin as
+     * there should only ever be one thing here at any one time, so just die. */
+    if (likely(cpu_count > 1)) {
+        while (true) {
+            /* Wait for it to become unheld. */
+            while (atomic_get(&lock->value) != 1)
+                arch_cpu_spin_hint();
 
-			/* Try to acquire it. */
-			if(atomic_dec(&lock->value) == 1)
-				break;
-		}
-	} else {
-		fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
-	}
+            /* Try to acquire it. */
+            if (atomic_dec(&lock->value) == 1)
+                break;
+        }
+    } else {
+        fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
+    }
 }
 
 #else /* CONFIG_SMP */
 
 /** Internal spinlock locking code.
- * @param lock		Spinlock to acquire. */
+ * @param lock          Spinlock to acquire. */
 static inline void spinlock_lock_internal(spinlock_t *lock) {
-	/* Same as above. When running on a single processor there is no need
-	 * for us to spin as there should only ever be one thing here at any
-	 * one time, so just die. */
-	if(unlikely(atomic_dec(&lock->value) != 1))
-		fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
+    /* Same as above. When running on a single processor there is no need for
+     * us to spin as there should only ever be one thing here at any one time,
+     * so just die. */
+    if (unlikely(atomic_dec(&lock->value) != 1))
+        fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
 }
 
 #endif /* CONFIG_SMP */
@@ -77,17 +76,17 @@ static inline void spinlock_lock_internal(spinlock_t *lock) {
  * spinlocks disable interrupts while locked so nothing should attempt to
  * acquire an already held spinlock on a single-processor system.
  *
- * @param lock		Spinlock to acquire.
+ * @param lock          Spinlock to acquire.
  */
 void spinlock_lock(spinlock_t *lock) {
-	bool state;
+    bool state;
 
-	/* Disable interrupts while locked to ensure that nothing else
-	 * will run on the current CPU for the duration of the lock. */
-	state = local_irq_disable();
+    /* Disable interrupts while locked to ensure that nothing else will run on
+     * the current CPU for the duration of the lock. */
+    state = local_irq_disable();
 
-	spinlock_lock_internal(lock);
-	lock->state = state;
+    spinlock_lock_internal(lock);
+    lock->state = state;
 }
 
 /**
@@ -104,12 +103,12 @@ void spinlock_lock(spinlock_t *lock) {
  * lock that was acquired with this function MUST be released with
  * spinlock_unlock_noirq().
  *
- * @param lock		Spinlock to acquire.
+ * @param lock          Spinlock to acquire.
  */
 void spinlock_lock_noirq(spinlock_t *lock) {
-	assert(!local_irq_state());
+    assert(!local_irq_state());
 
-	spinlock_lock_internal(lock);
+    spinlock_lock_internal(lock);
 }
 
 /**
@@ -119,33 +118,33 @@ void spinlock_lock_noirq(spinlock_t *lock) {
  * was before the lock was acquired. This should only be used if the lock was
  * acquired using spinlock_lock().
  *
- * @param lock		Spinlock to release.
+ * @param lock          Spinlock to release.
  */
 void spinlock_unlock(spinlock_t *lock) {
-	bool state;
+    bool state;
 
-	if(unlikely(!spinlock_held(lock)))
-		fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
+    if (unlikely(!spinlock_held(lock)))
+        fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
 
-	state = lock->state;
-	atomic_set(&lock->value, 1);
-	local_irq_restore(state);
+    state = lock->state;
+    atomic_set(&lock->value, 1);
+    local_irq_restore(state);
 }
 
 /** Release a spinlock without changing interrupt state.
- * @param lock		Spinlock to release. */
+ * @param lock          Spinlock to release. */
 void spinlock_unlock_noirq(spinlock_t *lock) {
-	if(unlikely(!spinlock_held(lock)))
-		fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
+    if (unlikely(!spinlock_held(lock)))
+        fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
 
-	atomic_set(&lock->value, 1);
+    atomic_set(&lock->value, 1);
 }
 
 /** Initialize a spinlock.
- * @param lock		Spinlock to initialize.
- * @param name		Name of the spinlock, used for debugging purposes. */
+ * @param lock          Spinlock to initialize.
+ * @param name          Name of the spinlock, used for debugging purposes. */
 void spinlock_init(spinlock_t *lock, const char *name) {
-	atomic_set(&lock->value, 1);
-	lock->name = name;
-	lock->state = false;
+    atomic_set(&lock->value, 1);
+    lock->name = name;
+    lock->state = false;
 }

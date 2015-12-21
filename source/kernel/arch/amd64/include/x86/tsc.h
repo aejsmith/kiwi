@@ -16,18 +16,19 @@
 
 /**
  * @file
- * @brief		x86 TSC handling functions.
+ * @brief               x86 TSC handling functions.
  */
 
 #ifndef __X86_TSC_H
 #define __X86_TSC_H
 
 /** Read the Time Stamp Counter.
- * @return		Value of the TSC. */
+ * @return              Value of the TSC. */
 static inline uint64_t x86_rdtsc(void) {
-	uint32_t high, low;
-	__asm__ volatile("rdtsc" : "=a"(low), "=d"(high));
-	return ((uint64_t)high << 32) | low;
+    uint32_t high, low;
+
+    __asm__ volatile("rdtsc" : "=a"(low), "=d"(high));
+    return ((uint64_t)high << 32) | low;
 }
 
 extern void tsc_init_target(void);

@@ -16,30 +16,30 @@
 
 /**
  * @file
- * @brief		AMD64 assembly code definitions.
+ * @brief               AMD64 assembly code definitions.
  */
 
 #ifndef __SYSTEM_AMD64_ASM_H
 #define __SYSTEM_AMD64_ASM_H
 
 /** Macro to define the beginning of a global function. */
-#define FUNCTION_START(name)		\
-	.global name; \
-	.type name, @function; \
-	name:
+#define FUNCTION_START(name) \
+    .global name; \
+    .type name, @function; \
+    name:
 
 /** Macro to define the beginning of a private function. */
-#define PRIVATE_FUNCTION_START(name)	\
-	.type name, @function; \
-	name:
+#define PRIVATE_FUNCTION_START(name) \
+    .type name, @function; \
+    name:
 
 /** Macro to define the end of a function. */
-#define FUNCTION_END(name)		\
-	.size name, . - name
+#define FUNCTION_END(name) \
+    .size name, . - name
 
 /** Macro to define a global symbol. */
-#define SYMBOL(name)			\
-	.global name; \
-	name:
+#define SYMBOL(name) \
+    .global name; \
+    name:
 
 #endif /* __SYSTEM_AMD64_ASM_H */

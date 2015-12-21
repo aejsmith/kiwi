@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX get PID function.
+ * @brief               POSIX get PID function.
  */
 
 #include <kernel/process.h>
@@ -24,14 +24,14 @@
 #include <unistd.h>
 
 /** Get the current process ID.
- * @return		ID of calling process. */
+ * @return              ID of calling process. */
 pid_t getpid(void) {
-	return kern_process_id(-1);
+    return kern_process_id(-1);
 }
 
 /** Get the parent process ID.
- * @return		ID of the parent process. */
+ * @return              ID of the parent process. */
 pid_t getppid(void) {
-	/* TODO. */
-	return 0;
+    /* TODO. */
+    return 0;
 }

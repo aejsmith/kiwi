@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX close function.
+ * @brief               POSIX close function.
  */
 
 #include <kernel/object.h>
@@ -27,15 +27,16 @@
 #include "libsystem.h"
 
 /** Close a file descriptor.
- * @param fd		File descriptor to close.
- * @return		0 on success, -1 on failure with errno set appropriately. */
+ * @param fd            File descriptor to close.
+ * @return              0 on success, -1 on failure with errno set appropriately. */
 int close(int fd) {
-	status_t ret;
+    status_t ret;
 
-	ret = kern_handle_close(fd);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
-	return 0;
+    ret = kern_handle_close(fd);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
+
+    return 0;
 }

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Kernel module functions.
+ * @brief               Kernel module functions.
  */
 
 #ifndef __KERNEL_MODULE_H
@@ -31,14 +31,14 @@ extern "C" {
 
 /** Module information structure. */
 typedef struct module_info {
-	char name[MODULE_NAME_MAX];	/**< Name of the module. */
-	char desc[MODULE_DESC_MAX];	/**< Description of the module. */
-	size_t count;			/**< Reference count of the module. */
-	size_t load_size;		/**< Size of the module in memory. */
+    char name[MODULE_NAME_MAX];     /**< Name of the module. */
+    char desc[MODULE_DESC_MAX];     /**< Description of the module. */
+    size_t count;                   /**< Reference count of the module. */
+    size_t load_size;               /**< Size of the module in memory. */
 } module_info_t;
 
 extern status_t kern_module_load(const char *path, char *depbuf);
-extern status_t kern_module_info(module_info_t *infop, size_t *countp);
+extern status_t kern_module_info(module_info_t *_info, size_t *_count);
 
 #ifdef __cplusplus
 }

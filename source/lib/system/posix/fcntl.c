@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX file control functions.
+ * @brief               POSIX file control functions.
  */
 
 #include <kernel/fs.h>
@@ -30,114 +30,114 @@
 #include "libsystem.h"
 
 /** Perform the F_DUPFD{,_CLOEXEC} commands.
- * @param fd		File descriptor.
- * @param dest		Minimum ID for new descriptor.
- * @param cloexec	Whether to set the cloexec flag.
- * @return		New FD on success, -1 on failure. */
+ * @param fd            File descriptor.
+ * @param dest          Minimum ID for new descriptor.
+ * @param cloexec       Whether to set the cloexec flag.
+ * @return              New FD on success, -1 on failure. */
 static int fcntl_dupfd(int fd, int dest, bool cloexec) {
-	status_t ret;
-	handle_t new;
+    status_t ret;
+    handle_t new;
 
-	/* TODO: Implement this. */
-	if(dest > 0) {
-		errno = ENOSYS;
-		return -1;
-	}
+    /* TODO: Implement this. */
+    if (dest > 0) {
+        errno = ENOSYS;
+        return -1;
+    }
 
-	ret = kern_handle_duplicate(fd, INVALID_HANDLE, &new);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_handle_duplicate(fd, INVALID_HANDLE, &new);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	if(!cloexec) {
-		ret = kern_handle_set_flags(new, HANDLE_INHERITABLE);
-		if(ret != STATUS_SUCCESS) {
-			kern_handle_close(new);
-			libsystem_status_to_errno(ret);
-			return -1;
-		}
-	}
+    if (!cloexec) {
+        ret = kern_handle_set_flags(new, HANDLE_INHERITABLE);
+        if (ret != STATUS_SUCCESS) {
+            kern_handle_close(new);
+            libsystem_status_to_errno(ret);
+            return -1;
+        }
+    }
 
-	return new;
+    return new;
 }
 
 /** Perform the F_GETFD command.
- * @param fd		File descriptor.
- * @return		FD flags on success, -1 on failure. */
+ * @param fd            File descriptor.
+ * @return              FD flags on success, -1 on failure. */
 static int fcntl_getfd(int fd) {
-	uint32_t kflags;
-	int flags = 0;
-	status_t ret;
+    uint32_t kflags;
+    int flags = 0;
+    status_t ret;
 
-	ret = kern_handle_flags(fd, &kflags);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_handle_flags(fd, &kflags);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	flags |= ((kflags & HANDLE_INHERITABLE) ? 0 : FD_CLOEXEC);
-	return flags;
+    flags |= ((kflags & HANDLE_INHERITABLE) ? 0 : FD_CLOEXEC);
+    return flags;
 }
 
 /** Perform the F_SETFD command.
- * @param fd		File descriptor.
- * @param flags		New flags.
- * @return		0 on success, -1 on failure. */
+ * @param fd            File descriptor.
+ * @param flags         New flags.
+ * @return              0 on success, -1 on failure. */
 static int fcntl_setfd(int fd, int flags) {
-	uint32_t kflags = 0;
-	status_t ret;
+    uint32_t kflags = 0;
+    status_t ret;
 
-	kflags = ((flags & FD_CLOEXEC) ? 0 : HANDLE_INHERITABLE);
+    kflags = ((flags & FD_CLOEXEC) ? 0 : HANDLE_INHERITABLE);
 
-	ret = kern_handle_set_flags(fd, kflags);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_handle_set_flags(fd, kflags);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }
 
 /** Perform the F_GETFL command.
- * @param fd		File descriptor.
- * @return		File status flags on success, -1 on failure. */
+ * @param fd            File descriptor.
+ * @return              File status flags on success, -1 on failure. */
 static int fcntl_getfl(int fd) {
-	uint32_t kaccess, kflags;
-	int flags = 0;
-	status_t ret;
+    uint32_t kaccess, kflags;
+    int flags = 0;
+    status_t ret;
 
-	ret = kern_file_state(fd, &kaccess, &kflags, NULL);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_file_state(fd, &kaccess, &kflags, NULL);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	flags |= ((kaccess & FILE_ACCESS_READ) ? O_RDONLY : 0);
-	flags |= ((kaccess & FILE_ACCESS_WRITE) ? O_WRONLY : 0);
-	flags |= ((kflags & FILE_NONBLOCK) ? O_NONBLOCK : 0);
-	flags |= ((kflags & FILE_APPEND) ? O_APPEND : 0);
-	return flags;
+    flags |= ((kaccess & FILE_ACCESS_READ) ? O_RDONLY : 0);
+    flags |= ((kaccess & FILE_ACCESS_WRITE) ? O_WRONLY : 0);
+    flags |= ((kflags & FILE_NONBLOCK) ? O_NONBLOCK : 0);
+    flags |= ((kflags & FILE_APPEND) ? O_APPEND : 0);
+    return flags;
 }
 
 /** Perform the F_SETFL command.
- * @param fd		File descriptor.
- * @param flags		New flags.
- * @return		0 on success, -1 on failure. */
+ * @param fd            File descriptor.
+ * @param flags         New flags.
+ * @return              0 on success, -1 on failure. */
 static int fcntl_setfl(int fd, int flags) {
-	uint32_t kflags = 0;
-	status_t ret;
+    uint32_t kflags = 0;
+    status_t ret;
 
-	kflags |= ((flags & O_NONBLOCK) ? FILE_NONBLOCK : 0);
-	kflags |= ((flags & O_APPEND) ? FILE_APPEND : 0);
+    kflags |= ((flags & O_NONBLOCK) ? FILE_NONBLOCK : 0);
+    kflags |= ((flags & O_APPEND) ? FILE_APPEND : 0);
 
-	ret = kern_file_set_flags(fd, kflags);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_file_set_flags(fd, kflags);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -168,47 +168,47 @@ static int fcntl_setfl(int fd, int flags) {
  *  - F_SETFL: Set file status flags and access flags (see F_GETFL). The return
  *    value (on success) is 0.
  * 
- * @param fd		File descriptor to control.
- * @param cmd		Command to perform.
- * @param ...		Optional argument specific to the command.
+ * @param fd            File descriptor to control.
+ * @param cmd           Command to perform.
+ * @param ...           Optional argument specific to the command.
  *
- * @return		Dependent on the command performed on success, -1 on
- *			failure (errno will be set appropriately).
+ * @return              Dependent on the command performed on success, -1 on
+ *                      failure (errno will be set appropriately).
  */
 int fcntl(int fd, int cmd, ...) {
-	int arg, ret = -1;
-	va_list args;
+    int arg, ret = -1;
+    va_list args;
 
-	va_start(args, cmd);
+    va_start(args, cmd);
 
-	switch(cmd) {
-	case F_DUPFD:
-		arg = va_arg(args, int);
-		ret = fcntl_dupfd(fd, arg, false);
-		break;
-	case F_DUPFD_CLOEXEC:
-		arg = va_arg(args, int);
-		ret = fcntl_dupfd(fd, arg, true);
-		break;
-	case F_GETFD:
-		ret = fcntl_getfd(fd);
-		break;
-	case F_SETFD:
-		arg = va_arg(args, int);
-		ret = fcntl_setfd(fd, arg);
-		break;
-	case F_GETFL:
-		ret = fcntl_getfl(fd);
-		break;
-	case F_SETFL:
-		arg = va_arg(args, int);
-		ret = fcntl_setfl(fd, arg);
-		break;
-	default:
-		errno = EINVAL;
-		break;
-	}
+    switch (cmd) {
+    case F_DUPFD:
+        arg = va_arg(args, int);
+        ret = fcntl_dupfd(fd, arg, false);
+        break;
+    case F_DUPFD_CLOEXEC:
+        arg = va_arg(args, int);
+        ret = fcntl_dupfd(fd, arg, true);
+        break;
+    case F_GETFD:
+        ret = fcntl_getfd(fd);
+        break;
+    case F_SETFD:
+        arg = va_arg(args, int);
+        ret = fcntl_setfd(fd, arg);
+        break;
+    case F_GETFL:
+        ret = fcntl_getfl(fd);
+        break;
+    case F_SETFL:
+        arg = va_arg(args, int);
+        ret = fcntl_setfl(fd, arg);
+        break;
+    default:
+        errno = EINVAL;
+        break;
+    }
 
-	va_end(args);
-	return ret;
+    va_end(args);
+    return ret;
 }

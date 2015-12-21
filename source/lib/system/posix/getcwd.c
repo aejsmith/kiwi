@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX get working directory function.
+ * @brief               POSIX get working directory function.
  */
 
 #include <kernel/fs.h>
@@ -29,38 +29,38 @@
 #include "libsystem.h"
 
 /** Get the path to the current working directory.
- * @param buf		Buffer to place path string in.
- * @param size		Size of the buffer. If it is too small, errno will be
- *			set to ERANGE.
- * @return		Pointer to buffer or NULL on failure. */
+ * @param buf           Buffer to place path string in.
+ * @param size          Size of the buffer. If it is too small, errno will be
+ *                      set to ERANGE.
+ * @return              Pointer to buffer or NULL on failure. */
 char *getcwd(char *buf, size_t size) {
-	status_t ret;
+    status_t ret;
 
-	if(!size || !buf) {
-		errno = EINVAL;
-		return NULL;
-	}
+    if (!size || !buf) {
+        errno = EINVAL;
+        return NULL;
+    }
 
-	ret = kern_fs_curr_dir(buf, size);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return NULL;
-	}
+    ret = kern_fs_curr_dir(buf, size);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return NULL;
+    }
 
-	return buf;
+    return buf;
 }
 
 /** Get the path to the current working directory.
- * @param buf		Buffer to place path string in. Must be at least
- *			PATH_MAX bytes long.
- * @return		Pointer to buffer or NULL on failure. */
+ * @param buf           Buffer to place path string in. Must be at least
+ *                      PATH_MAX bytes long.
+ * @return              Pointer to buffer or NULL on failure. */
 char *getwd(char *buf) {
-	if(!getcwd(buf, PATH_MAX)) {
-		if(errno == ERANGE)
-			errno = ENAMETOOLONG;
+    if (!getcwd(buf, PATH_MAX)) {
+        if (errno == ERANGE)
+            errno = ENAMETOOLONG;
 
-		return NULL;
-	}
+        return NULL;
+    }
 
-	return buf;
+    return buf;
 }

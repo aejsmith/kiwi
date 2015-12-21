@@ -16,13 +16,13 @@
 
 /**
  * @file
- * @brief		PC IRQ definitions.
+ * @brief               PC IRQ definitions.
  */
 
 #ifndef __PLATFORM_IRQ_H
 #define __PLATFORM_IRQ_H
 
 /** Number of IRQs (32 hardware exceptions). */
-#define IRQ_COUNT	(256 - 32)
+#define IRQ_COUNT       (256 - 32)
 
 #endif /* __PLATFORM_IRQ_H */

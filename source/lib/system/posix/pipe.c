@@ -16,16 +16,16 @@
 
 /**
  * @file
- * @brief		POSIX pipe creation function.
+ * @brief               POSIX pipe creation function.
  */
 
 #include <unistd.h>
 #include "libsystem.h"
 
 /** Create an interprocess channel.
- * @param fds		Where to store file descriptors to each end of pipe.
- * @return		0 on success, -1 on failure. */
+ * @param fds           Where to store file descriptors to each end of pipe.
+ * @return              0 on success, -1 on failure. */
 int pipe(int fds[2]) {
-	libsystem_stub("pipe", false);
-	return -1;
+    libsystem_stub("pipe", false);
+    return -1;
 }

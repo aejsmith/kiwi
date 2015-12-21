@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		String functions.
+ * @brief               String functions.
  */
 
 #ifndef __STRINGS_H
@@ -33,11 +33,11 @@ extern "C" {
 #define __need_size_t
 #include <stddef.h>
 
-#define bzero(b, len)		(memset((b), '\0', (len)), (void)0)
-#define bcopy(b1, b2, len)	(memmove((b2), (b1), (len)), (void)0)
-#define bcmp(b1, b2, len)	memcmp((b1), (b2), (size_t)(len))
-#define index(a, b)		strchr((a),(b))
-#define rindex(a, b)		strrchr((a),(b))
+#define bzero(b, len)       (memset((b), '\0', (len)), (void)0)
+#define bcopy(b1, b2, len)  (memmove((b2), (b1), (len)), (void)0)
+#define bcmp(b1, b2, len)   memcmp((b1), (b2), (size_t)(len))
+#define index(a, b)         strchr((a),(b))
+#define rindex(a, b)        strrchr((a),(b))
 
 #ifdef __cplusplus
 }

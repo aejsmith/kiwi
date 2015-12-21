@@ -16,14 +16,14 @@
 
 /**
  * @file
- * @brief		Deferred procedure call functions.
+ * @brief               Deferred procedure call functions.
  */
 
 #ifndef __DPC_H
 #define __DPC_H
 
 /** Handler function for a DPC.
- * @param arg		Argument passed to dpc_run(). */
+ * @param arg           Argument passed to dpc_run(). */
 typedef void (*dpc_function_t)(void *arg);
 
 extern void dpc_request(dpc_function_t func, void *arg);

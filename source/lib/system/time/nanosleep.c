@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX nanosecond sleep function.
+ * @brief               POSIX nanosecond sleep function.
  */
 
 #include <kernel/status.h>
@@ -26,30 +26,30 @@
 #include <time.h>
 
 /** High resolution sleep.
- * @param rqtp		Requested sleep time.
- * @param rmtp		Where to store remaining time if interrupted.
- * @return		0 on success, -1 on failure. */
+ * @param rqtp          Requested sleep time.
+ * @param rmtp          Where to store remaining time if interrupted.
+ * @return              0 on success, -1 on failure. */
 int nanosleep(const struct timespec *rqtp, struct timespec *rmtp) {
-	nstime_t ns, rem;
-	status_t ret;
+    nstime_t ns, rem;
+    status_t ret;
 
-	if(rqtp->tv_sec < 0 || rqtp->tv_nsec < 0 || rqtp->tv_nsec >= 1000000000) {
-		errno = EINVAL;
-		return -1;
-	}
+    if (rqtp->tv_sec < 0 || rqtp->tv_nsec < 0 || rqtp->tv_nsec >= 1000000000) {
+        errno = EINVAL;
+        return -1;
+    }
 
-	ns = ((nstime_t)rqtp->tv_sec * 1000000000) + rqtp->tv_nsec;
+    ns = ((nstime_t)rqtp->tv_sec * 1000000000) + rqtp->tv_nsec;
 
-	ret = kern_thread_sleep(ns, &rem);
-	if(ret == STATUS_INTERRUPTED) {
-		if(rmtp) {
-			rmtp->tv_nsec = rem % 1000000000;
-			rmtp->tv_sec = rem / 1000000000;
-		}
+    ret = kern_thread_sleep(ns, &rem);
+    if (ret == STATUS_INTERRUPTED) {
+        if (rmtp) {
+            rmtp->tv_nsec = rem % 1000000000;
+            rmtp->tv_sec = rem / 1000000000;
+        }
 
-		errno = EINTR;
-		return -1;
-	}
+        errno = EINTR;
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }

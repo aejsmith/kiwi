@@ -16,9 +16,10 @@
 
 /**
  * @file
- * @brief		Password functions.
+ * @brief               Password functions.
  *
- * @todo		Implement all of this.
+ * TODO:
+ *  - Implement all of this.
  */
 
 #include <pwd.h>
@@ -27,39 +28,39 @@
 #include "libsystem.h"
 
 static struct passwd stub_pwd = {
-        .pw_name = (char *)"admin",
-        .pw_passwd = (char *)"meow",
-       	.pw_uid = 0,
-        .pw_gid = 0,
-        .pw_dir = (char *)"/users/admin",
-        .pw_shell = (char *)"/system/binaries/bash",
-        .pw_gecos = (char *)"Administrator",
+    .pw_name = (char *)"admin",
+    .pw_passwd = (char *)"meow",
+    .pw_uid = 0,
+    .pw_gid = 0,
+    .pw_dir = (char *)"/users/admin",
+    .pw_shell = (char *)"/system/binaries/bash",
+    .pw_gecos = (char *)"Administrator",
 };
 
-static bool getpwent_called = false;
+static bool getpwent_called;
 
 void endpwent(void) {
-	getpwent_called = false;
-        return;
+    getpwent_called = false;
+    return;
 }
 
 struct passwd *getpwent(void) {
-	if(!getpwent_called) {
-		getpwent_called = true;
-		return &stub_pwd;
-	} else {
-		return NULL;
-	}
+    if (!getpwent_called) {
+        getpwent_called = true;
+        return &stub_pwd;
+    } else {
+        return NULL;
+    }
 }
 
 void setpwent(void) {
-        return;
+    return;
 }
 
 struct passwd *getpwuid(uid_t uid) {
-        return &stub_pwd;
+    return &stub_pwd;
 }
 
 char *getlogin(void) {
-	return stub_pwd.pw_name;
+    return stub_pwd.pw_name;
 }

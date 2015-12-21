@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Semaphore object.
+ * @brief               Semaphore object.
  */
 
 #ifndef __KERNEL_SEMAPHORE_H
@@ -29,9 +29,9 @@ extern "C" {
 #endif
 
 /** Event for the semaphore count becoming non-zero. */
-#define SEMAPHORE_EVENT		1
+#define SEMAPHORE_EVENT     1
 
-extern status_t kern_semaphore_create(size_t count, handle_t *handlep);
+extern status_t kern_semaphore_create(size_t count, handle_t *_handle);
 extern status_t kern_semaphore_down(handle_t handle, nstime_t timeout);
 extern status_t kern_semaphore_up(handle_t handle, size_t count);
 

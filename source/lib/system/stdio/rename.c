@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Rename file function.
+ * @brief               Rename file function.
  */
 
 #include <kernel/fs.h>
@@ -27,17 +27,17 @@
 #include "libsystem.h"
 
 /** Rename a filesystem entry.
- * @param source	Path to rename.
- * @param dest		Path to rename to.
- * @return		0 on success, -1 on failure. */
+ * @param source        Path to rename.
+ * @param dest          Path to rename to.
+ * @return              0 on success, -1 on failure. */
 int rename(const char *source, const char *dest) {
-	status_t ret;
+    status_t ret;
 
-	ret = kern_fs_rename(source, dest);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_rename(source, dest);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }

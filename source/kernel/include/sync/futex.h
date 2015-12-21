@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Futex implementation.
+ * @brief               Futex implementation.
  */
 
 #ifndef __SYNC_FUTEX_H

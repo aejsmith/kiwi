@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Input/output multiplexing.
+ * @brief               Input/output multiplexing.
  */
 
 #include <sys/poll.h>

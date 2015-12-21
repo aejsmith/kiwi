@@ -16,38 +16,38 @@
 
 /**
  * @file
- * @brief		AMD64 address space layout definitions.
+ * @brief               AMD64 address space layout definitions.
  *
  * This file contains definitions for the virtual address space layout. The
  * layout on AMD64 is as follows:
- *  0x0000000000000000-0x00007FFFFFFFFFFF - 128TB - User address space.
+ *  0x0000000000000000-0x00007fffffffffff - 128TB - User address space.
  *   ... non-canonical address space ...
- *  0xFFFF800000000000-0xFFFFFEFFFFFFFFFF - 127TB - Physical map area.
- *  0xFFFFFF0000000000-0xFFFFFF7FFFFFFFFF - 512GB - Page database.
- *  0xFFFFFF8000000000-0xFFFFFFFF7FFFFFFF - 510GB - Kernel allocation area.
- *  0xFFFFFFFF80000000-0xFFFFFFFFFFFFFFFF - 2GB   - Kernel image/modules.
+ *  0xffff800000000000-0xfffffeffffffffff - 127TB - Physical map area.
+ *  0xffffff0000000000-0xffffff7fffffffff - 512GB - Page database.
+ *  0xffffff8000000000-0xffffffff7fffffff - 510GB - Kernel allocation area.
+ *  0xffffffff80000000-0xffffffffffffffff - 2GB   - Kernel image/modules.
  */
 
 #ifndef __ARCH_ASPACE_H
 #define __ARCH_ASPACE_H
 
 /** Memory layout definitions. */
-#define USER_BASE		0x0000000000000000	/**< User address space base. */
-#define USER_SIZE		0x0000800000000000	/**< User address space size (128TB). */
-#define LIBKERNEL_BASE		0x00007FFFF0000000	/**< Location of kernel library. */
-#define LIBKERNEL_SIZE		0x0000000010000000	/**< Maximum size of kernel library. */
-#define KERNEL_BASE		0xFFFF800000000000	/**< Kernel address space base. */
-#define KERNEL_SIZE		0x0000800000000000	/**< Kernel address space size (128TB). */
-#define KERNEL_PMAP_BASE	0xFFFF800000000000	/**< Physical map area base. */
-#define KERNEL_PMAP_SIZE	0x00007F0000000000	/**< Physical map area size (127TB). */
-#define KERNEL_PMAP_OFFSET	0x0000000000000000	/**< Physical map area offset. */
-#define KERNEL_PDB_BASE		0xFFFFFF0000000000	/**< Page database base. */
-#define KERNEL_PDB_SIZE		0x0000008000000000	/**< Page database size (512GB). */
-#define KERNEL_KMEM_BASE	0xFFFFFF8000000000	/**< Kernel allocation area base. */
-#define KERNEL_KMEM_SIZE	0x0000007F80000000	/**< Kernel allocation area size (510GB). */
-#define KERNEL_VIRT_BASE	0xFFFFFFFF80000000	/**< Kernel virtual base address. */
-#define KERNEL_MODULE_BASE	0xFFFFFFFFC0000000	/**< Module area base. */
-#define KERNEL_MODULE_SIZE	0x0000000040000000	/**< Module area size (1GB). */
+#define USER_BASE           0x0000000000000000  /**< User address space base. */
+#define USER_SIZE           0x0000800000000000  /**< User address space size (128TB). */
+#define LIBKERNEL_BASE      0x00007ffff0000000  /**< Location of kernel library. */
+#define LIBKERNEL_SIZE      0x0000000010000000  /**< Maximum size of kernel library. */
+#define KERNEL_BASE         0xffff800000000000  /**< Kernel address space base. */
+#define KERNEL_SIZE         0x0000800000000000  /**< Kernel address space size (128TB). */
+#define KERNEL_PMAP_BASE    0xffff800000000000  /**< Physical map area base. */
+#define KERNEL_PMAP_SIZE    0x00007f0000000000  /**< Physical map area size (127TB). */
+#define KERNEL_PMAP_OFFSET  0x0000000000000000  /**< Physical map area offset. */
+#define KERNEL_PDB_BASE     0xffffff0000000000  /**< Page database base. */
+#define KERNEL_PDB_SIZE     0x0000008000000000  /**< Page database size (512GB). */
+#define KERNEL_KMEM_BASE    0xffffff8000000000  /**< Kernel allocation area base. */
+#define KERNEL_KMEM_SIZE    0x0000007f80000000  /**< Kernel allocation area size (510GB). */
+#define KERNEL_VIRT_BASE    0xffffffff80000000  /**< Kernel virtual base address. */
+#define KERNEL_MODULE_BASE  0xffffffffc0000000  /**< Module area base. */
+#define KERNEL_MODULE_SIZE  0x0000000040000000  /**< Module area size (1GB). */
 
 #ifndef __ASM__
 extern char __text_seg_start[], __text_seg_end[];

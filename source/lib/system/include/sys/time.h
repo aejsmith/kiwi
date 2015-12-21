@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX time functions/definitions.
+ * @brief               POSIX time functions/definitions.
  */
 
 #ifndef __SYS_TIME_H
@@ -31,8 +31,8 @@ extern "C" {
 
 /** Time value structure. */
 struct timeval {
-	time_t tv_sec;			/**< Seconds. */
-	suseconds_t tv_usec;		/**< Additional microseconds since. */
+    time_t tv_sec;                  /**< Seconds. */
+    suseconds_t tv_usec;            /**< Additional microseconds since. */
 };
 
 extern int gettimeofday(struct timeval *tv, void *tz);

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Event notification system.
+ * @brief               Event notification system.
  */
 
 #ifndef __LIB_NOTIFIER_H
@@ -26,34 +26,34 @@
 
 /** Notifier structure. */
 typedef struct notifier {
-	mutex_t lock;			/**< Lock to protect list. */
-	list_t functions;		/**< Functions to call when the event occurs. */
-	void *data;			/**< Data to pass to functions. */
+    mutex_t lock;               /**< Lock to protect list. */
+    list_t functions;           /**< Functions to call when the event occurs. */
+    void *data;                 /**< Data to pass to functions. */
 } notifier_t;
 
 /** Initializes a statically declared notifier. */
 #define NOTIFIER_INITIALIZER(_var, _data) \
-	{ \
-		.lock = MUTEX_INITIALIZER(_var.lock, "notifier_lock", MUTEX_RECURSIVE), \
-		.functions = LIST_INITIALIZER(_var.functions), \
-		.data = _data, \
-	}
+    { \
+        .lock = MUTEX_INITIALIZER(_var.lock, "notifier_lock", MUTEX_RECURSIVE), \
+        .functions = LIST_INITIALIZER(_var.functions), \
+        .data = _data, \
+    }
 
 /** Statically defines a new notifier. */
 #define NOTIFIER_DEFINE(_var, _data) \
-	notifier_t _var = NOTIFIER_INITIALIZER(_var, _data)
+    notifier_t _var = NOTIFIER_INITIALIZER(_var, _data)
 
 /** Check if a notifier's function list is empty.
- * @param notifier		Notifier to check.
- * @return		Whether the function list is empty. */
+ * @param notifier      Notifier to check.
+ * @return              Whether the function list is empty. */
 static inline bool notifier_empty(notifier_t *notifier) {
-	return list_empty(&notifier->functions);
+    return list_empty(&notifier->functions);
 }
 
 /** Notifier function type.
- * @param arg1		Data argument associated with the notifier.
- * @param arg2		Data argument registered with the function.
- * @param arg3		Data argument passed to notifier_run(). */
+ * @param arg1          Data argument associated with the notifier.
+ * @param arg2          Data argument registered with the function.
+ * @param arg3          Data argument passed to notifier_run(). */
 typedef void (*notifier_func_t)(void *arg1, void *arg2, void *arg3);
 
 extern void notifier_init(notifier_t *notifier, void *data);

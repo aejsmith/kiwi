@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Native language support data types.
+ * @brief               Native language support data types.
  */
 
 #ifndef __NL_TYPES_H
@@ -39,10 +39,10 @@ typedef void *nl_catd;
 typedef int nl_item;
 
 /* Default message set. */
-#define NL_SETD			1
+#define NL_SETD             1
 
 /** Flag for catopen() to use LC_MESSAGES rather than LANG in the environment. */
-#define NL_CAT_LOCALE		(1<<0)
+#define NL_CAT_LOCALE       (1<<0)
 
 // Needed for libcxx build.
 #ifdef __cplusplus

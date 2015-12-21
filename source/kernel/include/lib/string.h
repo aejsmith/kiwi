@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		String handling functions.
+ * @brief               String handling functions.
  */
 
 #ifndef __LIB_STRING_H

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Memory moving function.
+ * @brief               Memory moving function.
  */
 
 #include <string.h>
@@ -27,27 +27,26 @@
  * Copies bytes from a source memory area to a destination memory area,
  * where both areas may overlap.
  *
- * @param dest		The memory area to copy to.
- * @param src		The memory area to copy from.
- * @param count		The number of bytes to copy.
+ * @param dest          The memory area to copy to.
+ * @param src           The memory area to copy from.
+ * @param count         The number of bytes to copy.
  *
- * @return		Destination location.
+ * @return              Destination location.
  */
 void *memmove(void *dest, const void *src, size_t count) {
-	const char *b = src;
-	char *a = dest;
+    const unsigned char *s;
+    unsigned char *d;
 
-	if(src != dest) {
-		if(src > dest) {
-			memcpy(dest, src, count);
-		} else {
-			a += count - 1;
-			b += count - 1;
-			while(count--) {
-				*a-- = *b--;
-			}
-		}
-	}
+    if (src != dest) {
+        if (src > dest) {
+            memcpy(dest, src, count);
+        } else {
+            d = (unsigned char *)dest + (count - 1);
+            s = (const unsigned char *)src + (count - 1);
+            while (count--)
+                *d-- = *s--;
+        }
+    }
 
-	return dest;
+    return dest;
 }

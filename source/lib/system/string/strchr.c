@@ -16,46 +16,46 @@
 
 /**
  * @file
- * @brief		String searching functions.
+ * @brief               String searching functions.
  */
 
+#include <stdbool.h>
 #include <string.h>
 
-/** Find the first occurrence of a character in a string.
- * @param s		Pointer to the string to search.
- * @param c		Character to search for.
- * @return		NULL if token not found, otherwise pointer to token. */
+/** Find first occurrence of a character in a string.
+ * @param s             Pointer to the string to search.
+ * @param c             Character to search for.
+ * @return              NULL if token not found, otherwise pointer to token. */
 char *strchr(const char *s, int c) {
-	char ch = c;
+    char ch = c;
 
-	for (;;) {
-		if(*s == ch) {
-			break;
-		} else if(!*s) {
-			return NULL;
-		} else {
-			s++;
-		}
-	}
+    while (true) {
+        if (*s == ch) {
+            break;
+        } else if (!*s) {
+            return NULL;
+        } else {
+            s++;
+        }
+    }
 
-	return (char *)s;
+    return (char *)s;
 }
 
-/** Find the last occurrence of a character in a string.
- * @param s		Pointer to the string to search.
- * @param c		Character to search for.
- * @return		NULL if token not found, otherwise pointer to token. */
+/** Find last occurrence of a character in a string.
+ * @param s             Pointer to the string to search.
+ * @param c             Character to search for.
+ * @return              NULL if token not found, otherwise pointer to token. */
 char *strrchr(const char *s, int c) {
-	const char *l = NULL;
+    const char *l = NULL;
 
-	for(;;) {
-		if(*s == c)
-			l = s;
-		if(!*s)
-			return (char *)l;
+    while (true) {
+        if (*s == c)
+            l = s;
+        if (!*s)
+            return (char *)l;
+        s++;
+    }
 
-		s++;
-	}
-
-	return (char *)l;
+    return (char *)l;
 }

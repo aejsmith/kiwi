@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX process waiting functions.
+ * @brief               POSIX process waiting functions.
  */
 
 #ifndef __SYS_WAIT_H
@@ -29,24 +29,24 @@ extern "C" {
 #endif
 
 /** Process exit status codes. */
-#define __WEXITED	(1<<0)		/**< Process exited normally. */
-#define __WSIGNALED	(1<<1)		/**< Process exited because of a signal. */
-#define __WSTOPPED	(1<<2)		/**< Process was stopped. */
+#define __WEXITED       (1<<0)      /**< Process exited normally. */
+#define __WSIGNALED     (1<<1)      /**< Process exited because of a signal. */
+#define __WSTOPPED      (1<<2)      /**< Process was stopped. */
 
 /** Status macros for waitpid(). */
-#define WIFEXITED(x)	(((x) & 0xFF) == __WEXITED)
-#define WIFSIGNALED(x)	(((x) & 0xFF) == __WSIGNALED)
-#define WIFSTOPPED(x)	(((x) & 0xFF) == __WSTOPPED)
-#define WEXITSTATUS(x)	(((x) & 0xFF00) >> 8)
-#define WTERMSIG(x)	(((x) & 0xFF00) >> 8)
-#define WSTOPSIG(x)	(((x) & 0xFF00) >> 8)
+#define WIFEXITED(x)    (((x) & 0xff) == __WEXITED)
+#define WIFSIGNALED(x)  (((x) & 0xff) == __WSIGNALED)
+#define WIFSTOPPED(x)   (((x) & 0xff) == __WSTOPPED)
+#define WEXITSTATUS(x)  (((x) & 0xff00) >> 8)
+#define WTERMSIG(x)     (((x) & 0xff00) >> 8)
+#define WSTOPSIG(x)     (((x) & 0xff00) >> 8)
 
 /** Options for waitpid(). */
-#define WNOHANG		(1<<0)		/**< Do not wait for a child. */
+#define WNOHANG         (1<<0)      /**< Do not wait for a child. */
 
-extern pid_t wait(int *statusp);
+extern pid_t wait(int *_status);
 /* int waitid(idtype_t, id_t, siginfo_t *, int); */
-extern pid_t waitpid(pid_t pid, int *statusp, int flags);
+extern pid_t waitpid(pid_t pid, int *_status, int flags);
 
 #ifdef __cplusplus
 }

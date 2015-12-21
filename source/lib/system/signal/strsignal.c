@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Signal string functions.
+ * @brief               Signal string functions.
  */
 
 #include <signal.h>
@@ -25,38 +25,38 @@
 
 /** Array of signal strings. */
 const char *const sys_siglist[NSIG] = {
-	[SIGHUP]   = "Hangup",
-	[SIGINT]   = "Interrupt",
-	[SIGQUIT]  = "Quit",
-	[SIGILL]   = "Illegal instruction",
-	[SIGTRAP]  = "Trace trap",
-	[SIGABRT]  = "Aborted",
-	[SIGBUS]   = "Bus error",
-	[SIGFPE]   = "Floating-point exception",
-	[SIGKILL]  = "Killed",
-	[SIGCHLD]  = "Child death/stop",
-	[SIGSEGV]  = "Segmentation fault",
-	[SIGSTOP]  = "Stopped",
-	[SIGPIPE]  = "Broken pipe",
-	[SIGALRM]  = "Alarm call",
-	[SIGTERM]  = "Terminated",
-	[SIGUSR1]  = "User signal 1",
-	[SIGUSR2]  = "User signal 2",
-	[SIGCONT]  = "Continued",
-	[SIGURG]   = "Urgent I/O condition",
-	[SIGTSTP]  = "Stopped (terminal)",
-	[SIGTTIN]  = "Stopped (terminal input)",
-	[SIGTTOU]  = "Stopped (terminal output)",
-	[SIGWINCH] = "Window changed",
+    [SIGHUP]   = "Hangup",
+    [SIGINT]   = "Interrupt",
+    [SIGQUIT]  = "Quit",
+    [SIGILL]   = "Illegal instruction",
+    [SIGTRAP]  = "Trace trap",
+    [SIGABRT]  = "Aborted",
+    [SIGBUS]   = "Bus error",
+    [SIGFPE]   = "Floating-point exception",
+    [SIGKILL]  = "Killed",
+    [SIGCHLD]  = "Child death/stop",
+    [SIGSEGV]  = "Segmentation fault",
+    [SIGSTOP]  = "Stopped",
+    [SIGPIPE]  = "Broken pipe",
+    [SIGALRM]  = "Alarm call",
+    [SIGTERM]  = "Terminated",
+    [SIGUSR1]  = "User signal 1",
+    [SIGUSR2]  = "User signal 2",
+    [SIGCONT]  = "Continued",
+    [SIGURG]   = "Urgent I/O condition",
+    [SIGTSTP]  = "Stopped (terminal)",
+    [SIGTTIN]  = "Stopped (terminal input)",
+    [SIGTTOU]  = "Stopped (terminal output)",
+    [SIGWINCH] = "Window changed",
 };
 
 /** Get string representation of a signal number.
- * @return		Pointer to string. */
+ * @return              Pointer to string. */
 char *strsignal(int sig) {
-	if(sig < 0 || sig >= NSIG) {
-		return (char *)"Unknown signal";
-	}
-	return (char *)sys_siglist[sig];
+    if (sig < 0 || sig >= NSIG)
+        return (char *)"Unknown signal";
+
+    return (char *)sys_siglist[sig];
 }
 
 /**
@@ -65,15 +65,15 @@ char *strsignal(int sig) {
  * Display a message on standard error followed by a string representation
  * of a signal.
  *
- * @param sig		Signal number to print.
- * @param s		Optional message to precede signal with.
+ * @param sig           Signal number to print.
+ * @param s             Optional message to precede signal with.
  */
 void psignal(int sig, const char *s) {
-	if(s && s[0]) {
-		fprintf(stderr, "%s: %s\n", s, strsignal(sig));
-	} else {
-		fprintf(stderr, "%s\n", strsignal(sig));
-	}
+    if (s && s[0]) {
+        fprintf(stderr, "%s: %s\n", s, strsignal(sig));
+    } else {
+        fprintf(stderr, "%s\n", strsignal(sig));
+    }
 }
 
 /**
@@ -82,9 +82,9 @@ void psignal(int sig, const char *s) {
  * Display a message on standard error followed by a string representation
  * of a signal.
  *
- * @param info		Signal to print information on.
- * @param s		Optional message to precede signal with.
+ * @param info          Signal to print information on.
+ * @param s             Optional message to precede signal with.
  */
 void psiginfo(const siginfo_t *info, const char *s) {
-	psignal(info->si_signo, s);
+    psignal(info->si_signo, s);
 }

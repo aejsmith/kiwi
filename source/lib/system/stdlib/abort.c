@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Abort function.
+ * @brief               Abort function.
  */
 
 #include <signal.h>
@@ -24,17 +24,17 @@
 
 /** Abort program execution. */
 void abort(void) {
-	sigset_t set;
+    sigset_t set;
 
-	/* First time we raise we just ensure that the signal is unblocked. */
-	sigemptyset(&set);
-	sigaddset(&set, SIGABRT);
-	sigprocmask(SIG_UNBLOCK, &set, NULL);
-	raise(SIGABRT);
+    /* First time we raise we just ensure that the signal is unblocked. */
+    sigemptyset(&set);
+    sigaddset(&set, SIGABRT);
+    sigprocmask(SIG_UNBLOCK, &set, NULL);
+    raise(SIGABRT);
 
-	/* If we're still alive, we reset the signal to the default action and
-	 * then raise again. */
-	signal(SIGABRT, SIG_DFL);
-	raise(SIGABRT);
-	_Exit(255);
+    /* If we're still alive, we reset the signal to the default action and then
+     * raise again. */
+    signal(SIGABRT, SIG_DFL);
+    raise(SIGABRT);
+    _Exit(255);
 }

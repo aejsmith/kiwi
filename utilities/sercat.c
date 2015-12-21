@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Serial port read/write utility.
+ * @brief               Serial port read/write utility.
  */
 
 #include <fcntl.h>
@@ -37,118 +37,122 @@ static int serial_fd;
 
 /** At-exit handler to reset terminal. */
 static void reset_term(void) {
-	tcsetattr(0, TCSANOW, &orig_tio);
+    tcsetattr(0, TCSANOW, &orig_tio);
 }
 
 /** At-exit handler to flush port. */
 static void flush_port(void) {
-	tcflush(serial_fd, TCIOFLUSH);
+    tcflush(serial_fd, TCIOFLUSH);
 }
 
 /** Signal handler to reset terminal.
- * @param signo		Signal number. */
+ * @param signo     Signal number. */
 static void signal_handler(int signo) {
-	/* Exit via exit() to ensure reset_term() gets called. */
-	exit(0);
+    /* Exit via exit() to ensure reset_term() gets called. */
+    exit(0);
 }
 
 /** Initialise the TTY.
- * @return		Whether successful. */
+ * @return              Whether successful. */
 static bool init_term(void) {
-	struct termios ntio;
+    struct termios ntio;
 
-	if(tcgetattr(0, &orig_tio) != 0) {
-		perror("tcgetattr");
-		return false;
-	}
-	memcpy(&ntio, &orig_tio, sizeof(ntio));
+    if (tcgetattr(0, &orig_tio) != 0) {
+        perror("tcgetattr");
+        return false;
+    }
 
-	ntio.c_lflag &= ~(ECHO | ICANON);
-	ntio.c_cc[VMIN] = 0;
-	ntio.c_cc[VTIME] = 0;
+    memcpy(&ntio, &orig_tio, sizeof(ntio));
 
-	if(tcsetattr(0, TCSANOW, &ntio) != 0) {
-		perror("tcsetattr");
-		return false;
-	}
+    ntio.c_lflag &= ~(ECHO | ICANON);
+    ntio.c_cc[VMIN] = 0;
+    ntio.c_cc[VTIME] = 0;
 
-	setbuf(stdout, NULL);
+    if (tcsetattr(0, TCSANOW, &ntio) != 0) {
+        perror("tcsetattr");
+        return false;
+    }
 
-	/* Register an at-exit handler to reset the TTY. */
-	atexit(reset_term);
-	return true;
+    setbuf(stdout, NULL);
+
+    /* Register an at-exit handler to reset the TTY. */
+    atexit(reset_term);
+    return true;
 }
 
 /** Open the serial port.
- * @param path		Path to port device.
- * @return		Whether successful. */
+ * @param path          Path to port device.
+ * @return              Whether successful. */
 static bool open_serial(const char *path) {
-	struct termios tio;
+    struct termios tio;
 
-	serial_fd = open(path, O_RDWR);
-	if(serial_fd < 0) {
-		perror("open");
-		return false;
-	}
+    serial_fd = open(path, O_RDWR);
+    if (serial_fd < 0) {
+        perror("open");
+        return false;
+    }
 
-	if(tcgetattr(serial_fd, &tio) != 0) {
-		perror("tcgetattr");
-		return false;
-	}
+    if (tcgetattr(serial_fd, &tio) != 0) {
+        perror("tcgetattr");
+        return false;
+    }
 
-	cfsetspeed(&tio, B38400);
-	tio.c_cflag |= CS8;
-	tio.c_iflag &= ~ICRNL;
-	tio.c_oflag = 0;
-	tio.c_lflag &= ~(ECHO | ICANON);
-	tio.c_cc[VMIN] = 0;
-	tio.c_cc[VTIME] = 0;
+    cfsetspeed(&tio, B38400);
+    tio.c_cflag |= CS8;
+    tio.c_iflag &= ~ICRNL;
+    tio.c_oflag = 0;
+    tio.c_lflag &= ~(ECHO | ICANON);
+    tio.c_cc[VMIN] = 0;
+    tio.c_cc[VTIME] = 0;
 
-	if(tcsetattr(serial_fd, TCSANOW, &tio) != 0) {
-		perror("tcsetattr");
-		return false;
-	}
+    if (tcsetattr(serial_fd, TCSANOW, &tio) != 0) {
+        perror("tcsetattr");
+        return false;
+    }
 
-	/* Register an at-exit handler to flush the port. */
-	atexit(flush_port);
-	return true;
+    /* Register an at-exit handler to flush the port. */
+    atexit(flush_port);
+    return true;
 }
 
 int main(int argc, char **argv) {
-	struct pollfd fds[] = {
-		{ 0, POLLIN },
-		{ 0, POLLIN },
-	};
-	char ch;
+    struct pollfd fds[] = {
+        { 0, POLLIN },
+        { 0, POLLIN },
+    };
+    char ch;
 
-	if(argc != 2) {
-		printf("Usage: %s <port>\n", argv[0]);
-		return 1;
-	}
+    if (argc != 2) {
+        printf("Usage: %s <port>\n", argv[0]);
+        return 1;
+    }
 
-	if(!open_serial(argv[1])) {
-		return 1;
-	} else if(!init_term()) {
-		return 1;
-	}
-	fds[1].fd = serial_fd;
+    if (!open_serial(argv[1])) {
+        return 1;
+    } else if (!init_term()) {
+        return 1;
+    }
 
-	/* Register signal handlers to clean up properly. */
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
+    fds[1].fd = serial_fd;
 
-	/* Wait for input/output. */
-	while(poll(fds, 2, -1) > 0) {
-		if(fds[0].revents & POLLIN) {
-			read(0, &ch, 1);
-			write(serial_fd, &ch, 1);
-		} else if(fds[1].revents & POLLIN) {
-			read(serial_fd, &ch, 1);
-			if(ch == '\r') {
-				continue;
-			}
-			putchar(ch);
-		}
-	}
-	return 0;
+    /* Register signal handlers to clean up properly. */
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+
+    /* Wait for input/output. */
+    while (poll(fds, 2, -1) > 0) {
+        if (fds[0].revents & POLLIN) {
+            read(0, &ch, 1);
+            write(serial_fd, &ch, 1);
+        } else if (fds[1].revents & POLLIN) {
+            read(serial_fd, &ch, 1);
+
+            if (ch == '\r')
+                continue;
+
+            putchar(ch);
+        }
+    }
+
+    return 0;
 }

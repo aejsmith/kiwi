@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Thread scheduler.
+ * @brief               Thread scheduler.
  */
 
 #ifndef __PROC_SCHED_H

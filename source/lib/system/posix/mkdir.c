@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX make directory function.
+ * @brief               POSIX make directory function.
  */
 
 #include <kernel/fs.h>
@@ -27,18 +27,18 @@
 #include "libsystem.h"
 
 /** Create a directory.
- * @todo		Convert mode to ACL.
- * @param path		Path to directory.
- * @param mode		Mode to create directory with.
- * @return		0 on success, -1 on failure. */
+ * @todo                Convert mode to ACL.
+ * @param path          Path to directory.
+ * @param mode          Mode to create directory with.
+ * @return              0 on success, -1 on failure. */
 int mkdir(const char *path, mode_t mode) {
-	status_t ret;
+    status_t ret;
 
-	ret = kern_fs_create_dir(path);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_create_dir(path);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }

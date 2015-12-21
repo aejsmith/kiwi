@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Memory file functions.
+ * @brief               Memory file functions.
  */
 
 #include <io/memory_file.h>
@@ -29,58 +29,58 @@
 
 /** Data used by a memory file. */
 typedef struct memory_file {
-	file_t file;			/**< File header. */
-	const void *data;		/**< File data. */
-	size_t size;			/**< Size of the data. */
+    file_t file;                    /**< File header. */
+    const void *data;               /**< File data. */
+    size_t size;                    /**< Size of the data. */
 } memory_file_t;
 
 /** Close a handle to a memory file.
- * @param file		File being closed.
- * @param handle	File handle structure. */
+ * @param file          File being closed.
+ * @param handle        File handle structure. */
 static void memory_file_close(file_handle_t *handle) {
-	kfree(handle->file);
+    kfree(handle->file);
 }
 
 /** Perform I/O on a memory file.
- * @param handle	File handle structure.
- * @param request	I/O request.
- * @return		Status code describing result of the operation. */
+ * @param handle        File handle structure.
+ * @param request       I/O request.
+ * @return              Status code describing result of the operation. */
 static status_t memory_file_io(file_handle_t *handle, io_request_t *request) {
-	memory_file_t *file = (memory_file_t *)handle->file;
-	size_t size;
+    memory_file_t *file = (memory_file_t *)handle->file;
+    size_t size;
 
-	assert(request->op == IO_OP_READ);
+    assert(request->op == IO_OP_READ);
 
-	if(request->offset >= (offset_t)file->size)
-		return STATUS_SUCCESS;
+    if (request->offset >= (offset_t)file->size)
+        return STATUS_SUCCESS;
 
-	size = ((request->offset + request->total) > file->size)
-		? file->size - request->offset
-		: request->total;
+    size = ((request->offset + request->total) > file->size)
+        ? file->size - request->offset
+        : request->total;
 
-	return io_request_copy(request, (void *)file->data + request->offset, size);
+    return io_request_copy(request, (void *)file->data + request->offset, size);
 }
 
 /** Get information about a memory file.
- * @param handle	File handle structure.
- * @param info		Information structure to fill in. */
+ * @param handle        File handle structure.
+ * @param info          Information structure to fill in. */
 static void memory_file_info(file_handle_t *handle, file_info_t *info) {
-	memory_file_t *file = (memory_file_t *)handle->file;
+    memory_file_t *file = (memory_file_t *)handle->file;
 
-	info->id = 0;
-	info->mount = 0;
-	info->type = file->file.type;
-	info->block_size = 1;
-	info->size = file->size;
-	info->links = 1;
-	info->created = info->accessed = info->modified = unix_time();
+    info->id = 0;
+    info->mount = 0;
+    info->type = file->file.type;
+    info->block_size = 1;
+    info->size = file->size;
+    info->links = 1;
+    info->created = info->accessed = info->modified = unix_time();
 }
 
 /** File operations for a memory-backed file. */
 static file_ops_t memory_file_ops = {
-	.close = memory_file_close,
-	.io = memory_file_io,
-	.info = memory_file_info,
+    .close = memory_file_close,
+    .io = memory_file_io,
+    .info = memory_file_info,
 };
 
 /**
@@ -92,24 +92,24 @@ static file_ops_t memory_file_ops = {
  * not be duplicated, and therefore it must remain in memory for the lifetime
  * of the handle.
  *
- * @note		Files created with this function do not support being
- *			memory-mapped.
+ * @note                Files created with this function do not support being
+ *                      memory-mapped.
  *
- * @param buf		Pointer to memory area to use.
- * @param size		Size of memory area.
+ * @param buf           Pointer to memory area to use.
+ * @param size          Size of memory area.
  *
- * @return		Pointer to handle to file (has FILE_ACCESS_READ set).
+ * @return              Pointer to handle to file (has FILE_ACCESS_READ set).
  */
 object_handle_t *memory_file_create(const void *buf, size_t size) {
-	memory_file_t *file;
-	file_handle_t *handle;
+    memory_file_t *file;
+    file_handle_t *handle;
 
-	file = kmalloc(sizeof(*file), MM_BOOT);
-	file->file.ops = &memory_file_ops;
-	file->file.type = FILE_TYPE_REGULAR;
-	file->data = buf;
-	file->size = size;
+    file = kmalloc(sizeof(*file), MM_BOOT);
+    file->file.ops = &memory_file_ops;
+    file->file.type = FILE_TYPE_REGULAR;
+    file->data = buf;
+    file->size = size;
 
-	handle = file_handle_alloc(&file->file, FILE_ACCESS_READ, 0);
-	return file_handle_create(handle);
+    handle = file_handle_alloc(&file->file, FILE_ACCESS_READ, 0);
+    return file_handle_create(handle);
 }

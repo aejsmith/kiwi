@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Formatted output function.
+ * @brief               Formatted output function.
  */
 
 #ifndef __LIB_PRINTF_H

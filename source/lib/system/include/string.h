@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		String functions.
+ * @brief               String functions.
  */
 
 #ifndef __STRING_H

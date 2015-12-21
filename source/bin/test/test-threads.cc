@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Test application.
+ * @brief               Test application.
  */
 
 #include <kernel/status.h>
@@ -35,82 +35,85 @@
 #include <string>
 #include <vector>
 
-#define NUM_THREADS	8
+#define NUM_THREADS     8
 
 static std::mutex test_lock;
 static std::condition_variable test_cond;
-static bool exiting = false;
+static bool exiting;
 
 static int thread_func(void *id) {
-	std::unique_lock<std::mutex> lock(test_lock);
+    std::unique_lock<std::mutex> lock(test_lock);
 
-	if(reinterpret_cast<unsigned long>(id) == 0) {
-		while(!exiting) {
-			lock.unlock();
-			sleep(1);
-			lock.lock();
+    if (reinterpret_cast<unsigned long>(id) == 0) {
+        while (!exiting) {
+            lock.unlock();
+            sleep(1);
+            lock.lock();
 
-			printf("Broadcasting\n");
-			test_cond.notify_all();
-		}
-	} else {
-		while(!exiting) {
-			printf("Thread %u waiting\n", reinterpret_cast<unsigned long>(id));
-			test_cond.wait(lock);
-			printf("Thread %u woken\n", reinterpret_cast<unsigned long>(id));
-		}
-	}
+            printf("Broadcasting\n");
+            test_cond.notify_all();
+        }
+    } else {
+        while (!exiting) {
+            printf("Thread %u waiting\n", reinterpret_cast<unsigned long>(id));
+            test_cond.wait(lock);
+            printf("Thread %u woken\n", reinterpret_cast<unsigned long>(id));
+        }
+    }
 
-	return 0;
+    return 0;
 }
 
 int main(int argc, char **argv) {
-	status_t ret;
+    status_t ret;
 
-	std::cout << "Hello, World! My arguments are:" << std::endl;
+    std::cout << "Hello, World! My arguments are:" << std::endl;
 
-	std::vector<std::string> args;
-	args.assign(argv, argv + argc);
+    std::vector<std::string> args;
+    args.assign(argv, argv + argc);
 
-	unsigned long i = 0;
-	for(const std::string &arg : args)
-		std::cout << " args[" << i++ << "] = '" << arg << "'" << std::endl;
+    unsigned long i = 0;
+    for (const std::string &arg : args)
+        std::cout << " args[" << i++ << "] = '" << arg << "'" << std::endl;
 
-	printf("Acquiring lock...\n");
-	test_lock.lock();
+    printf("Acquiring lock...\n");
+    test_lock.lock();
 
-	printf("Creating threads...\n");
+    printf("Creating threads...\n");
 
-	object_event_t events[NUM_THREADS];
-	for(i = 0; i < NUM_THREADS; i++) {
-		ret = kern_thread_create("test", thread_func, reinterpret_cast<void *>(i), nullptr, 0, &events[i].handle);
-		if(ret != STATUS_SUCCESS) {
-			fprintf(stderr, "Failed to create thread: %d\n", ret);
-			return EXIT_FAILURE;
-		}
+    object_event_t events[NUM_THREADS];
+    for (i = 0; i < NUM_THREADS; i++) {
+        ret = kern_thread_create(
+            "test", thread_func, reinterpret_cast<void *>(i), nullptr, 0,
+            &events[i].handle);
+        if (ret != STATUS_SUCCESS) {
+            fprintf(stderr, "Failed to create thread: %d\n", ret);
+            return EXIT_FAILURE;
+        }
 
-		events[i].event = THREAD_EVENT_DEATH;
+        events[i].event = THREAD_EVENT_DEATH;
 
-		printf("Created thread %" PRId32 ", handle %" PRId32 "\n",
-			kern_thread_id(events[i].handle), events[i].handle);
-	}
+        printf(
+            "Created thread %" PRId32 ", handle %" PRId32 "\n",
+            kern_thread_id(events[i].handle), events[i].handle);
+    }
 
-	printf("Unlocking...\n");
-	test_lock.unlock();
+    printf("Unlocking...\n");
+    test_lock.unlock();
 
-	sleep(20);
+    sleep(20);
 
-	test_lock.lock();
-	printf("Exiting...\n");
-	exiting = true;
-	test_lock.unlock();
+    test_lock.lock();
+    printf("Exiting...\n");
+    exiting = true;
+    test_lock.unlock();
 
-	ret = kern_object_wait(events, NUM_THREADS, OBJECT_WAIT_ALL, -1);
-	if(ret != STATUS_SUCCESS) {
-		fprintf(stderr, "Failed to wait for thread: %d\n", ret);
-		return EXIT_FAILURE;
-	}
+    ret = kern_object_wait(events, NUM_THREADS, OBJECT_WAIT_ALL, -1);
+    if (ret != STATUS_SUCCESS) {
+        fprintf(stderr, "Failed to wait for thread: %d\n", ret);
+        return EXIT_FAILURE;
+    }
 
-	printf("All threads exited\n");
-	return 0;
+    printf("All threads exited\n");
+    return 0;
 }

@@ -16,18 +16,18 @@
 
 /**
  * @file
- * @brief		Filesystem node creation function.
+ * @brief               Filesystem node creation function.
  */
 
 #include <sys/stat.h>
 #include "libsystem.h"
 
 /** Create a filesystem node.
- * @param path		Path to node to create.
- * @param mode		Mode to give the node.
- * @param dev		Device number.
- * @return		0 on success, -1 on failure. */
+ * @param path          Path to node to create.
+ * @param mode          Mode to give the node.
+ * @param dev           Device number.
+ * @return              0 on success, -1 on failure. */
 int mknod(const char *path, mode_t mode, dev_t dev) {
-	libsystem_stub("mknod", false);
-	return -1;
+    libsystem_stub("mknod", false);
+    return -1;
 }

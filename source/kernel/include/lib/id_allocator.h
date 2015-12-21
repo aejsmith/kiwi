@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Object ID allocator.
+ * @brief               Object ID allocator.
  */
 
 #ifndef __LIB_ID_ALLOCATOR_H
@@ -26,9 +26,9 @@
 
 /** ID allocator structure. */
 typedef struct id_allocator {
-	spinlock_t lock;		/**< Lock to protect the allocator. */
-	unsigned long *bitmap;		/**< Bitmap of IDs. */
-	size_t nbits;			/**< Number of bits in the bitmap. */
+    spinlock_t lock;            /**< Lock to protect the allocator. */
+    unsigned long *bitmap;      /**< Bitmap of IDs. */
+    size_t nbits;               /**< Number of bits in the bitmap. */
 } id_allocator_t;
 
 extern int32_t id_allocator_alloc(id_allocator_t *alloc);

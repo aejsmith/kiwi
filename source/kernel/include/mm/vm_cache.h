@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Page-based data cache.
+ * @brief               Page-based data cache.
  */
 
 #ifndef __MM_VM_CACHE_H
@@ -34,41 +34,41 @@ struct vm_cache;
 
 /** Structure containing operations for a page cache. */
 typedef struct vm_cache_ops {
-	/** Read a page of data from the source.
-	 * @note		If not provided, pages that need to be
-	 *			allocated will be zero-filled.
-	 * @param cache		Cache being read from.
-	 * @param buf		Buffer to read into.
-	 * @param offset	Offset to read from.
-	 * @return		Status code describing result of operation. */
-	status_t (*read_page)(struct vm_cache *cache, void *buf, offset_t offset);
+    /** Read a page of data from the source.
+     * @note                If not provided, pages that need to be allocated
+     *                      will be zero-filled.
+     * @param cache         Cache being read from.
+     * @param buf           Buffer to read into.
+     * @param offset        Offset to read from.
+     * @return              Status code describing result of operation. */
+    status_t (*read_page)(struct vm_cache *cache, void *buf, offset_t offset);
 
-	/** Write a page of data to the source.
-	 * @note		If not provided, pages in the cache will never
-	 *			be marked as modified.
-	 * @param cache		Cache to write to.
-	 * @param buf		Buffer containing data to write.
-	 * @param offset	Offset to write from.
-	 * @return		Status code describing result of operation. */
-	status_t (*write_page)(struct vm_cache *cache, const void *buf, offset_t offset);
+    /** Write a page of data to the source.
+     * @note                If not provided, pages in the cache will never be
+     *                      marked as modified.
+     * @param cache         Cache to write to.
+     * @param buf           Buffer containing data to write.
+     * @param offset        Offset to write from.
+     * @return              Status code describing result of operation. */
+    status_t (*write_page)(struct vm_cache *cache, const void *buf, offset_t offset);
 
-	/** Determine whether a page can be evicted.
-	 * @note		If not provided, then behaviour will be as
-	 *			though the function returns true.
-	 * @param cache		Cache the page belongs to.
-	 * @param page	 	Page to check.
-	 * @return		Whether the page can be evicted. */
-	bool (*evict_page)(struct vm_cache *cache, page_t *page);
+    /** Determine whether a page can be evicted.
+     * @note                If not provided, then behaviour will be as though
+     *                      the function returns true.
+     * @param cache         Cache the page belongs to.
+     * @param page          Page to check.
+     * @return              Whether the page can be evicted. */
+    bool (*evict_page)(struct vm_cache *cache, page_t *page);
 } vm_cache_ops_t;
 
 /** Structure containing a page-based data cache. */
 typedef struct vm_cache {
-	mutex_t lock;			/**< Lock protecting cache. */
-	avl_tree_t pages;		/**< Tree of pages. */
-	offset_t size;			/**< Size of the cache. */
-	vm_cache_ops_t *ops;		/**< Pointer to operations structure. */
-	void *data;			/**< Cache data pointer. */
-	bool deleted;			/**< Whether the cache is destroyed. */
+    mutex_t lock;                   /**< Lock protecting cache. */
+    avl_tree_t pages;               /**< Tree of pages. */
+    offset_t size;                  /**< Size of the cache. */
+    vm_cache_ops_t *ops;            /**< Pointer to operations structure. */
+    void *data;                     /**< Cache data pointer. */
+    bool deleted;                   /**< Whether the cache is destroyed. */
 } vm_cache_t;
 
 extern vm_region_ops_t vm_cache_region_ops;

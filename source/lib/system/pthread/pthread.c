@@ -16,10 +16,10 @@
 
 /**
  * @file
- * @brief		Main POSIX thread functions.
+ * @brief               Main POSIX thread functions.
  *
- * @note		See TODOs scattered around for things to do when we
- *			actually have threads implemented.
+ * See TODOs scattered around for things to do when we actually have threads
+ * implemented.
  */
 
 #include <pthread.h>
@@ -31,16 +31,16 @@
  * thread's kernel ID, it is a handle assigned by libsystem and is meaningless
  * to other processes.
  *
- * @return		POSIX thread ID for the calling thread.
+ * @return              POSIX thread ID for the calling thread.
  */
 pthread_t pthread_self(void) {
-	return (void *)0xdeadbeef;
+    return (void *)0xdeadbeef;
 }
 
 /** Determine whether 2 POSIX thread IDs are equal.
- * @param p1		First thread ID.
- * @param p2		Second thread ID.
- * @return		Non-zero if thread IDs are equal, zero otherwise. */
+ * @param p1            First thread ID.
+ * @param p2            Second thread ID.
+ * @return              Non-zero if thread IDs are equal, zero otherwise. */
 int pthread_equal(pthread_t p1, pthread_t p2) {
-	return (p1 == p2);
+    return (p1 == p2);
 }

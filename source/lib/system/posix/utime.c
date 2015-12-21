@@ -16,17 +16,17 @@
 
 /**
  * @file
- * @brief		POSIX utime() function.
+ * @brief               POSIX utime() function.
  */
 
 #include <utime.h>
 #include "libsystem.h"
 
 /** Set file access and modification times.
- * @param path		Path to file.
- * @param times		Structure containing new times.
- * @return		0 on success, -1 on failure. */
+ * @param path          Path to file.
+ * @param times         Structure containing new times.
+ * @return              0 on success, -1 on failure. */
 int utime(const char *path, const struct utimbuf *times) {
-	libsystem_stub("utime", false);
-	return -1;
+    libsystem_stub("utime", false);
+    return -1;
 }

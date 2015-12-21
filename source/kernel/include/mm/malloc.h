@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Memory allocation functions.
+ * @brief               Memory allocation functions.
  */
 
 #ifndef __MM_MALLOC_H

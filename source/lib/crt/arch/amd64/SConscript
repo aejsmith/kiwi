@@ -21,7 +21,9 @@ env.Object('%s/crti.o' % (str(env['_LIBOUTDIR'])), ['crti.S'])
 env.Object('%s/crtn.o' % (str(env['_LIBOUTDIR'])), ['crtn.S'])
 env.Object('%s/crtbegin.o' % (str(env['_LIBOUTDIR'])), ['crtbegin.S'])
 env.Object('%s/crtend.o' % (str(env['_LIBOUTDIR'])), ['crtend.S'])
-env.Object('%s/crtbeginS.o' % (str(env['_LIBOUTDIR'])), ['crtbegin.S'],
+env.Object(
+    '%s/crtbeginS.o' % (str(env['_LIBOUTDIR'])), ['crtbegin.S'],
     CPPDEFINES = {'PIC': None, 'SHARED': None })
-env.Object('%s/crtendS.o' % (str(env['_LIBOUTDIR'])), ['crtend.S'],
+env.Object(
+    '%s/crtendS.o' % (str(env['_LIBOUTDIR'])), ['crtend.S'],
     CPPDEFINES = {'PIC': None, 'SHARED': None })

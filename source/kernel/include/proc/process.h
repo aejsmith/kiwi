@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Process management functions.
+ * @brief               Process management functions.
  */
 
 #ifndef __PROC_PROCESS_H
@@ -42,75 +42,74 @@ struct vm_aspace;
 
 /** Structure containing details about a process. */
 typedef struct process {
-	/** Lock to protect the process data. */
-	mutex_t lock;
+    /** Lock to protect the process data. */
+    mutex_t lock;
 
-	/**
-	 * Reference count.
-	 *
-	 * This reference count counts the number of handles and pointers to
-	 * the process, as well as the number of threads attached (in any
-	 * state).
-	 */
-	refcount_t count;
+    /**
+     * Reference count.
+     *
+     * This reference count counts the number of handles and pointers to the
+     * process, as well as the number of threads attached (in any state).
+     */
+    refcount_t count;
 
-	/**
-	 * Running thread count.
-	 *
-	 * This counts the number of threads running in the process. It is used
-	 * to determine when the process has died and when we can free up its
-	 * resources: a process can potentially stay alive a long time after it
-	 * has died if a handle is open to it, but we should destroy its address
-	 * space, etc., as soon as the last thread dies.
-	 */
-	refcount_t running;
+    /**
+     * Running thread count.
+     *
+     * This counts the number of threads running in the process. It is used to
+     * determine when the process has died and when we can free up its
+     * resources: a process can potentially stay alive a long time after it has
+     * died if a handle is open to it, but we should destroy its address space,
+     * etc., as soon as the last thread dies.
+     */
+    refcount_t running;
 
-	/** Scheduling information. */
-	unsigned flags;			/**< Behaviour flags for the process. */
-	int priority;			/**< Priority class of the process. */
+    /** Scheduling information. */
+    unsigned flags;                     /**< Behaviour flags for the process. */
+    int priority;                       /**< Priority class of the process. */
 
-	/** Resource information. */
-	token_t *token;			/**< Security token for the process. */
-	struct vm_aspace *aspace;	/**< Process' address space. */
-	handle_table_t handles;		/**< Table of open handles. */
-	io_context_t io;		/**< I/O context. */
-	list_t threads;			/**< List of threads. */
-	avl_tree_t futexes;		/**< Tree of futexes that the process has accessed. */
-	list_t images;			/**< List of loaded images. */
-	ptr_t thread_restore;		/**< Address of kern_thread_restore() in libkernel. */
+    /** Resource information. */
+    token_t *token;                     /**< Security token for the process. */
+    struct vm_aspace *aspace;           /**< Process' address space. */
+    handle_table_t handles;             /**< Table of open handles. */
+    io_context_t io;                    /**< I/O context. */
+    list_t threads;                     /**< List of threads. */
+    avl_tree_t futexes;                 /**< Tree of futexes that the process has accessed. */
+    list_t images;                      /**< List of loaded images. */
+    ptr_t thread_restore;               /**< Address of kern_thread_restore() in libkernel. */
 
-	/** Exception handler table. */
-	exception_handler_t exceptions[EXCEPTION_MAX];
+    /** Exception handler table. */
+    exception_handler_t exceptions[EXCEPTION_MAX];
 
-	/** Special ports. */
-	struct ipc_port *root_port;	/**< Root port. */
+    /** Special ports. */
+    struct ipc_port *root_port;         /**< Root port. */
 
-	/** State of the process. */
-	enum {
-		PROCESS_CREATED,	/**< Created. */
-		PROCESS_RUNNING,	/**< Running. */
-		PROCESS_DEAD,		/**< Dead. */
-	} state;
+    /** State of the process. */
+    enum {
+        PROCESS_CREATED,                /**< Created. */
+        PROCESS_RUNNING,                /**< Running. */
+        PROCESS_DEAD,                   /**< Dead. */
+    } state;
 
-	/** Other process information. */
-	avl_tree_node_t tree_link;	/**< Link to process tree. */
-	process_id_t id;		/**< ID of the process. */
-	char *name;			/**< Name of the process. */
-	notifier_t death_notifier;	/**< Notifier for process death. */
-	int status;			/**< Exit status. */
-	int reason;			/**< Exit reason. */
-	struct process_load *load;	/**< Internal program loading information. */
+    /** Other process information. */
+    avl_tree_node_t tree_link;          /**< Link to process tree. */
+    process_id_t id;                    /**< ID of the process. */
+    char *name;                         /**< Name of the process. */
+    notifier_t death_notifier;          /**< Notifier for process death. */
+    int status;                         /**< Exit status. */
+    int reason;                         /**< Exit reason. */
+    struct process_load *load;          /**< Internal program loading information. */
 } process_t;
 
 /** Process flag definitions. */
-#define PROCESS_CRITICAL	(1<<0)	/**< Process is critical to system operation, cannot die. */
+#define PROCESS_CRITICAL        (1<<0)  /**< Process is critical to system operation, cannot die. */
 
 /** Internal priority classes. */
-#define PRIORITY_CLASS_SYSTEM	3	/**< Used for the kernel process. */
-#define PRIORITY_CLASS_MAX	3
+#define PRIORITY_CLASS_SYSTEM   3       /**< Used for the kernel process. */
+#define PRIORITY_CLASS_MAX      3
 
 /** Macro that expands to a pointer to the current process. */
-#define curr_proc		(curr_thread->owner)
+#define curr_proc               (curr_thread->owner)
 
 extern process_t *kernel_proc;
 
@@ -129,9 +128,9 @@ extern void process_exit(void) __noreturn;
 extern process_t *process_lookup_unsafe(process_id_t id);
 extern process_t *process_lookup(process_id_t id);
 
-extern status_t process_create(const char *const args[],
-	const char *const env[], uint32_t flags, int priority,
-	process_t **procp);
+extern status_t process_create(
+    const char *const args[], const char *const env[], uint32_t flags,
+    int priority, process_t **_process);
 
 extern void process_init(void);
 extern void process_shutdown(void);

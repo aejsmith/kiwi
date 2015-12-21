@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		I/O context functions.
+ * @brief               I/O context functions.
  */
 
 #ifndef __IO_CONTEXT_H
@@ -29,9 +29,9 @@ struct process;
 
 /** Structure containing an I/O context. */
 typedef struct io_context {
-	rwlock_t lock;			/**< Lock to protect context. */
-	struct fs_dentry *root_dir;	/**< Root directory. */
-	struct fs_dentry *curr_dir;	/**< Current working directory. */
+    rwlock_t lock;                  /**< Lock to protect context. */
+    struct fs_dentry *root_dir;     /**< Root directory. */
+    struct fs_dentry *curr_dir;     /**< Current working directory. */
 } io_context_t;
 
 extern void io_process_init(struct process *process, struct process *parent);

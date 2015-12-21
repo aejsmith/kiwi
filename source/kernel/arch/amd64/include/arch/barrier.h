@@ -16,14 +16,14 @@
 
 /**
  * @file
- * @brief		AMD64 memory barrier functions.
+ * @brief               AMD64 memory barrier functions.
  */
 
 #ifndef __ARCH_BARRIER_H
 #define __ARCH_BARRIER_H
 
-#define memory_barrier()	__asm__ volatile("mfence" ::: "memory")
-#define read_barrier()		__asm__ volatile("lfence" ::: "memory")
-#define write_barrier()		__asm__ volatile("sfence" ::: "memory")
+#define memory_barrier()    __asm__ volatile("mfence" ::: "memory")
+#define read_barrier()      __asm__ volatile("lfence" ::: "memory")
+#define write_barrier()     __asm__ volatile("sfence" ::: "memory")
 
 #endif /* __ARCH_BARRIER_H */

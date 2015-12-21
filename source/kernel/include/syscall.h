@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		System call dispatcher.
+ * @brief               System call dispatcher.
  */
 
 #ifndef __SYSCALL_H
@@ -26,8 +26,8 @@
 
 /** Structure describing a system call handler. */
 typedef struct __packed syscall {
-	ptr_t addr;			/**< Address of handler. */
-	size_t count;			/**< Number of arguments. */
+    ptr_t addr;                 /**< Address of handler. */
+    size_t count;               /**< Number of arguments. */
 } syscall_t;
 
 #endif /* __SYSCALL_H */

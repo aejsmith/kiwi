@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Memory allocation functions.
+ * @brief               Memory allocation functions.
  *
  * Simple set of malloc()/free() style functions implemented on top of the
  * slab allocator. The use of specialized slab caches is preferred over these
@@ -47,65 +47,65 @@
 
 /** Information structure prepended to allocations. */
 typedef struct alloc_tag {
-	size_t size;			/**< Size of the allocation. */
-	slab_cache_t *cache;		/**< Pointer to cache for allocation. */
+    size_t size;                    /**< Size of the allocation. */
+    slab_cache_t *cache;            /**< Pointer to cache for allocation. */
 } alloc_tag_t;
 
 /** Cache settings. */
-#define KMALLOC_CACHE_MIN	5	/**< Minimum cache size (2^5  == 32). */
-#define KMALLOC_CACHE_MAX	16	/**< Maximum cache size (2^16 == 64K). */
+#define KMALLOC_CACHE_MIN   5       /**< Minimum cache size (2^5  == 32). */
+#define KMALLOC_CACHE_MAX   16      /**< Maximum cache size (2^16 == 64K). */
 
 /** Slab caches for kmalloc(). */
 static slab_cache_t *kmalloc_caches[KMALLOC_CACHE_MAX - KMALLOC_CACHE_MIN + 1];
 
 /** Allocate a block of memory.
- * @param size		Size of block.
- * @param mmflag	Allocation behaviour flags.
- * @return		Pointer to block on success, NULL on failure. */
+ * @param size          Size of block.
+ * @param mmflag        Allocation behaviour flags.
+ * @return              Pointer to block on success, NULL on failure. */
 void *kmalloc(size_t size, unsigned mmflag) {
-	size_t total = size + sizeof(alloc_tag_t), idx;
-	alloc_tag_t *addr;
+    size_t total = size + sizeof(alloc_tag_t), idx;
+    alloc_tag_t *addr;
 
-	/* Use the slab caches where possible. */
-	if(total <= (1 << KMALLOC_CACHE_MAX)) {
-		/* If exactly a power-of-two, then highbit(total) will work,
-		 * else we want the next size up. Remember that the highbit
-		 * function returns (log2(n) + 1). */
-		idx = (is_pow2(total)) ? highbit(total) - 1 : highbit(total);
-		if(idx < KMALLOC_CACHE_MIN)
-			idx = KMALLOC_CACHE_MIN;
-		idx -= KMALLOC_CACHE_MIN;
+    /* Use the slab caches where possible. */
+    if (total <= (1 << KMALLOC_CACHE_MAX)) {
+        /* If exactly a power-of-two, then highbit(total) will work, else we
+         * want the next size up. Remember that the highbit function returns
+         * (log2(n) + 1). */
+        idx = (is_pow2(total)) ? highbit(total) - 1 : highbit(total);
+        if (idx < KMALLOC_CACHE_MIN)
+            idx = KMALLOC_CACHE_MIN;
+        idx -= KMALLOC_CACHE_MIN;
 
-		addr = slab_cache_alloc(kmalloc_caches[idx], mmflag);
-		if(unlikely(!addr))
-			return NULL;
+        addr = slab_cache_alloc(kmalloc_caches[idx], mmflag);
+        if (unlikely(!addr))
+            return NULL;
 
-		addr->cache = kmalloc_caches[idx];
-	} else {
-		/* Fall back on kmem. */
-		addr = kmem_alloc(round_up(total, PAGE_SIZE), mmflag & MM_FLAG_MASK);
-		if(unlikely(!addr))
-			return NULL;
+        addr->cache = kmalloc_caches[idx];
+    } else {
+        /* Fall back on kmem. */
+        addr = kmem_alloc(round_up(total, PAGE_SIZE), mmflag & MM_FLAG_MASK);
+        if (unlikely(!addr))
+            return NULL;
 
-		addr->cache = NULL;
-	}
+        addr->cache = NULL;
+    }
 
-	addr->size = size;
+    addr->size = size;
 
-	/* Zero the allocation if requested. */
-	if(mmflag & MM_ZERO)
-		memset(&addr[1], 0, size);
+    /* Zero the allocation if requested. */
+    if (mmflag & MM_ZERO)
+        memset(&addr[1], 0, size);
 
-	return &addr[1];
+    return &addr[1];
 }
 
 /** Allocate an array of zeroed memory.
- * @param nmemb		Number of array elements.
- * @param size		Size of each element.
- * @param mmflag	Allocation behaviour flags.
- * @return		Pointer to block on success, NULL on failure. */
+ * @param nmemb         Number of array elements.
+ * @param size          Size of each element.
+ * @param mmflag        Allocation behaviour flags.
+ * @return              Pointer to block on success, NULL on failure. */
 void *kcalloc(size_t nmemb, size_t size, unsigned mmflag) {
-	return kmalloc(nmemb * size, mmflag | MM_ZERO);
+    return kmalloc(nmemb * size, mmflag | MM_ZERO);
 }
 
 /**
@@ -116,38 +116,38 @@ void *kcalloc(size_t nmemb, size_t size, unsigned mmflag) {
  * kmalloc(size, mmflag). If MM_ZERO is specified, and the block size is being
  * increased, then the space difference will be zeroed.
  *
- * @param addr		Address to resize.
- * @param size		New size.
- * @param mmflag	Allocation behaviour flags.
+ * @param addr          Address to resize.
+ * @param size          New size.
+ * @param mmflag        Allocation behaviour flags.
  *
- * @return		Pointer to block on success, NULL on failure.
+ * @return              Pointer to block on success, NULL on failure.
  */
 void *krealloc(void *addr, size_t size, unsigned mmflag) {
-	alloc_tag_t *tag;
-	void *ret;
+    alloc_tag_t *tag;
+    void *ret;
 
-	if(!addr)
-		return kmalloc(size, mmflag);
+    if (!addr)
+        return kmalloc(size, mmflag);
 
-	tag = (alloc_tag_t *)((char *)addr - sizeof(alloc_tag_t));
-	if(tag->size == size)
-		return addr;
+    tag = (alloc_tag_t *)((char *)addr - sizeof(alloc_tag_t));
+    if (tag->size == size)
+        return addr;
 
-	/* Make a new allocation. */
-	ret = kmalloc(size, mmflag & ~MM_ZERO);
-	if(!ret)
-		return ret;
+    /* Make a new allocation. */
+    ret = kmalloc(size, mmflag & ~MM_ZERO);
+    if (!ret)
+        return ret;
 
-	/* Copy the block data using the smallest of the two sizes. */
-	memcpy(ret, addr, min(tag->size, size));
+    /* Copy the block data using the smallest of the two sizes. */
+    memcpy(ret, addr, min(tag->size, size));
 
-	/* Zero any new space if requested. */
-	if(mmflag & MM_ZERO && size > tag->size)
-		memset((char *)addr + tag->size, 0, size - tag->size);
+    /* Zero any new space if requested. */
+    if (mmflag & MM_ZERO && size > tag->size)
+        memset((char *)addr + tag->size, 0, size - tag->size);
 
-	/* Free the old allocation. */
-	kfree(addr);
-	return ret;
+    /* Free the old allocation. */
+    kfree(addr);
+    return ret;
 }
 
 /**
@@ -156,37 +156,36 @@ void *krealloc(void *addr, size_t size, unsigned mmflag) {
  * Frees a block of memory previously allocated with kmalloc(), kcalloc() or
  * krealloc().
  *
- * @param addr		Address to free. If NULL, nothing is done.
+ * @param addr          Address to free. If NULL, nothing is done.
  */
 void kfree(void *addr) {
-	alloc_tag_t *tag;
+    alloc_tag_t *tag;
 
-	if(addr) {
-		tag = (alloc_tag_t *)((char *)addr - sizeof(alloc_tag_t));
+    if (addr) {
+        tag = (alloc_tag_t *)((char *)addr - sizeof(alloc_tag_t));
 
-		/* If the cache pointer is not set, assume the allocation came
-		 * directly from kmem. */
-		if(!tag->cache) {
-			kmem_free(tag, round_up(tag->size + sizeof(alloc_tag_t), PAGE_SIZE));
-			return;
-		}
+        /* If the cache pointer is not set, assume the allocation came directly
+         * from kmem. */
+        if (!tag->cache) {
+            kmem_free(tag, round_up(tag->size + sizeof(alloc_tag_t), PAGE_SIZE));
+            return;
+        }
 
-		/* Free to the cache it came from. */
-		slab_cache_free(tag->cache, tag);
-	}
+        /* Free to the cache it came from. */
+        slab_cache_free(tag->cache, tag);
+    }
 }
 
 /** Initialize the allocator caches. */
 __init_text void malloc_init(void) {
-	char name[SLAB_NAME_MAX];
-	size_t i, size;
+    char name[SLAB_NAME_MAX];
+    size_t i, size;
 
-	for(i = 0; i < ARRAY_SIZE(kmalloc_caches); i++) {
-		size = (1 << (i + KMALLOC_CACHE_MIN));
-		snprintf(name, SLAB_NAME_MAX, "kmalloc_%zu", size);
-		name[SLAB_NAME_MAX - 1] = 0;
+    for (i = 0; i < array_size(kmalloc_caches); i++) {
+        size = (1 << (i + KMALLOC_CACHE_MIN));
+        snprintf(name, SLAB_NAME_MAX, "kmalloc_%zu", size);
+        name[SLAB_NAME_MAX - 1] = 0;
 
-		kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL,
-			NULL, 0, MM_BOOT);
-	}
+        kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL, NULL, 0, MM_BOOT);
+    }
 }

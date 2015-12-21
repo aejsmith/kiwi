@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Hardware interrupt handling code.
+ * @brief               Hardware interrupt handling code.
  */
 
 #include <device/irq.h>
@@ -39,21 +39,21 @@
 
 /** Structure describing a handler for an IRQ. */
 typedef struct irq_handler {
-	list_t header;			/**< List header. */
+    list_t header;              /**< List header. */
 
-	unsigned num;			/**< IRQ number. */
-	irq_top_t top;			/**< Top-half handler. */
-	irq_bottom_t bottom;		/**< Bottom-half handler. */
-	void *data;			/**< Argument to pass to handler. */
+    unsigned num;               /**< IRQ number. */
+    irq_top_t top;              /**< Top-half handler. */
+    irq_bottom_t bottom;        /**< Bottom-half handler. */
+    void *data;                 /**< Argument to pass to handler. */
 
-	thread_t *thread;		/**< Thread for deferred handling. */
-	semaphore_t sem;		/**< Semaphore to wait for interrupts on. */
+    thread_t *thread;           /**< Thread for deferred handling. */
+    semaphore_t sem;            /**< Semaphore to wait for interrupts on. */
 } irq_handler_t;
 
 /** An entry in the IRQ table. */
 typedef struct irq {
-	spinlock_t lock;		/**< Lock to protect handler list. */
-	list_t handlers;		/**< List of handler structures. */
+    spinlock_t lock;            /**< Lock to protect handler list. */
+    list_t handlers;            /**< List of handler structures. */
 } irq_t;
 
 /** IRQ controller being used. */
@@ -63,25 +63,25 @@ static irq_controller_t *irq_controller;
 static irq_t irq_table[IRQ_COUNT];
 
 /** IRQ handler thread main loop.
- * @param _handler	Pointer to handler structure.
- * @param arg2		Unused. */
+ * @param _handler      Pointer to handler structure.
+ * @param arg2          Unused. */
 static void irq_thread(void *_handler, void *arg2) {
-	irq_handler_t *handler = _handler;
+    irq_handler_t *handler = _handler;
 
-	assert(handler->bottom);
+    assert(handler->bottom);
 
-	while(true) {
-		semaphore_down(&handler->sem);
+    while (true) {
+        semaphore_down(&handler->sem);
 
-		/* If the list header is not attached the handler has been
-		 * removed, destroy it and exit. */
-		if(list_empty(&handler->header)) {
-			kfree(handler);
-			return;
-		}
+        /* If the list header is not attached the handler has been removed,
+         * destroy it and exit. */
+        if (list_empty(&handler->header)) {
+            kfree(handler);
+            return;
+        }
 
-		handler->bottom(handler->num, handler->data);
-	}
+        handler->bottom(handler->num, handler->data);
+    }
 }
 
 /**
@@ -94,75 +94,73 @@ static void irq_thread(void *_handler, void *arg2) {
  * a dedicated handler thread. If no top-half handler is specified then the
  * bottom-half handler will always be run.
  *
- * @param num		IRQ number.
- * @param top		Top-half handler, called in interrupt context.
- * @param bottom	Bottom-half handler, run in a seperate thread if
- *			requested by the top-half handler.
- * @param data		Data argument to pass to the handlers.
+ * @param num           IRQ number.
+ * @param top           Top-half handler, called in interrupt context.
+ * @param bottom        Bottom-half handler, run in a seperate thread if
+ *                      requested by the top-half handler.
+ * @param data          Data argument to pass to the handlers.
  *
- * @return		Status code describing result of the operation.
+ * @return              Status code describing result of the operation.
  */
 status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *data) {
-	irq_handler_t *handler, *exist;
-	char name[THREAD_NAME_MAX];
-	status_t ret;
-	bool enable;
+    irq_handler_t *handler, *exist;
+    char name[THREAD_NAME_MAX];
+    status_t ret;
+    bool enable;
 
-	if(num >= IRQ_COUNT || (!top && !bottom)) {
-		return STATUS_INVALID_ARG;
-	}
+    if (num >= IRQ_COUNT || (!top && !bottom))
+        return STATUS_INVALID_ARG;
 
-	handler = kmalloc(sizeof(irq_handler_t), MM_KERNEL);
-	list_init(&handler->header);
-	semaphore_init(&handler->sem, "irq_sem", 0);
-	handler->num = num;
-	handler->top = top;
-	handler->bottom = bottom;
-	handler->data = data;
-	handler->thread = NULL;
+    handler = kmalloc(sizeof(irq_handler_t), MM_KERNEL);
+    list_init(&handler->header);
+    semaphore_init(&handler->sem, "irq_sem", 0);
+    handler->num = num;
+    handler->top = top;
+    handler->bottom = bottom;
+    handler->data = data;
+    handler->thread = NULL;
 
-	/* Create a handler thread if necessary. */
-	if(handler->bottom) {
-		sprintf(name, "irq-%u", num);
-		ret = thread_create(name, NULL, 0, irq_thread, handler, NULL, &handler->thread);
-		if(ret != STATUS_SUCCESS) {
-			kfree(handler);
-			return ret;
-		}
-	}
+    /* Create a handler thread if necessary. */
+    if (handler->bottom) {
+        sprintf(name, "irq-%u", num);
+        ret = thread_create(name, NULL, 0, irq_thread, handler, NULL, &handler->thread);
+        if (ret != STATUS_SUCCESS) {
+            kfree(handler);
+            return ret;
+        }
+    }
 
-	spinlock_lock(&irq_table[num].lock);
+    spinlock_lock(&irq_table[num].lock);
 
-	/* Check if a handler exists with the same functions/data. */
-	LIST_FOREACH(&irq_table[num].handlers, iter) {
-		exist = list_entry(iter, irq_handler_t, header);
+    /* Check if a handler exists with the same functions/data. */
+    list_foreach(&irq_table[num].handlers, iter) {
+        exist = list_entry(iter, irq_handler_t, header);
 
-		if(exist->top == top && exist->bottom == bottom && exist->data == data) {
-			spinlock_unlock(&irq_table[num].lock);
-			if(handler->thread) {
-				thread_release(handler->thread);
-			}
-			kfree(handler);
-			return STATUS_ALREADY_EXISTS;
-		}
-	}
+        if (exist->top == top && exist->bottom == bottom && exist->data == data) {
+            spinlock_unlock(&irq_table[num].lock);
 
-	enable = list_empty(&irq_table[num].handlers);
-	list_append(&irq_table[num].handlers, &handler->header);
+            if (handler->thread)
+                thread_release(handler->thread);
 
-	/* Enable it if the list was empty before. */
-	if(enable && irq_controller->enable) {
-		irq_controller->enable(num);
-	}
+            kfree(handler);
+            return STATUS_ALREADY_EXISTS;
+        }
+    }
 
-	spinlock_unlock(&irq_table[num].lock);
+    enable = list_empty(&irq_table[num].handlers);
+    list_append(&irq_table[num].handlers, &handler->header);
 
-	/* Run the thread. */
-	if(handler->thread) {
-		thread_run(handler->thread);
-	}
+    /* Enable it if the list was empty before. */
+    if (enable && irq_controller->enable)
+        irq_controller->enable(num);
 
-	return STATUS_SUCCESS;
+    spinlock_unlock(&irq_table[num].lock);
+
+    /* Run the thread. */
+    if (handler->thread)
+        thread_run(handler->thread);
+
+    return STATUS_SUCCESS;
 }
 
 /**
@@ -172,134 +170,129 @@ status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *da
  * the handler functions/data argument the handler was originally registered
  * with in order to be able to find the correct handler to remove.
  *
- * @param num		IRQ number.
- * @param top		Top-half function handler was registered with.
- * @param bottom	Bottom-half function handler was registered with.
- * @param data		Data argument handler was registered with.
+ * @param num           IRQ number.
+ * @param top           Top-half function handler was registered with.
+ * @param bottom        Bottom-half function handler was registered with.
+ * @param data          Data argument handler was registered with.
  *
- * @return		Status code describing result of the operation.
+ * @return              Status code describing result of the operation.
  */
 status_t irq_unregister(unsigned num, irq_top_t top, irq_bottom_t bottom, void *data) {
-	irq_handler_t *handler;
+    irq_handler_t *handler;
 
-	if(num >= IRQ_COUNT) {
-		return STATUS_INVALID_ARG;
-	}
+    if (num >= IRQ_COUNT)
+        return STATUS_INVALID_ARG;
 
-	spinlock_lock(&irq_table[num].lock);
+    spinlock_lock(&irq_table[num].lock);
 
-	LIST_FOREACH(&irq_table[num].handlers, iter) {
-		handler = list_entry(iter, irq_handler_t, header);
+    list_foreach(&irq_table[num].handlers, iter) {
+        handler = list_entry(iter, irq_handler_t, header);
 
-		if(handler->top != top || handler->bottom != bottom || handler->data != data) {
-			continue;
-		}
+        if (handler->top != top || handler->bottom != bottom || handler->data != data)
+            continue;
 
-		list_remove(&handler->header);
+        list_remove(&handler->header);
 
-		/* Disable if list now empty. */
-		if(list_empty(&irq_table[num].handlers) && irq_controller->disable) {
-			irq_controller->disable(num);
-		}
+        /* Disable if list now empty. */
+        if (list_empty(&irq_table[num].handlers) && irq_controller->disable)
+            irq_controller->disable(num);
 
-		spinlock_unlock(&irq_table[num].lock);
+        spinlock_unlock(&irq_table[num].lock);
 
-		/* If the handler has a thread, we leave destruction of the
-		 * structure up to the thread - it checks whether the list
-		 * header is attached each time it is woken to determine if it
-		 * should exit. */
-		if(handler->thread) {
-			semaphore_up(&handler->sem, 1);
-			thread_release(handler->thread);
-		} else {
-			kfree(handler);
-		}
-		return STATUS_SUCCESS;
-	}
+        /* If the handler has a thread, we leave destruction of the structure
+         * up to the thread - it checks whether the list header is attached
+         * each time it is woken to determine if it should exit. */
+        if (handler->thread) {
+            semaphore_up(&handler->sem, 1);
+            thread_release(handler->thread);
+        } else {
+            kfree(handler);
+        }
 
-	spinlock_unlock(&irq_table[num].lock);
-	return STATUS_NOT_FOUND;
+        return STATUS_SUCCESS;
+    }
+
+    spinlock_unlock(&irq_table[num].lock);
+    return STATUS_NOT_FOUND;
 }
 
 /** Hardware interrupt handler.
- * @param num		IRQ number. */
+ * @param num           IRQ number. */
 void irq_handler(unsigned num) {
-	irq_handler_t *handler;
-	irq_status_t ret;
-	irq_mode_t mode;
+    irq_handler_t *handler;
+    irq_status_t ret;
+    irq_mode_t mode;
 
-	assert(irq_controller);
-	assert(num < IRQ_COUNT);
+    assert(irq_controller);
+    assert(num < IRQ_COUNT);
 
-	/* Execute any pre-handling function. */
-	if(irq_controller->pre_handle && !irq_controller->pre_handle(num)) {
-		return;
-	}
+    /* Execute any pre-handling function. */
+    if (irq_controller->pre_handle && !irq_controller->pre_handle(num))
+        return;
 
-	/* Get the trigger mode. */
-	mode = irq_controller->mode(num);
+    /* Get the trigger mode. */
+    mode = irq_controller->mode(num);
 
-	/* First see if any handlers with top-half functions take the IRQ. */
-	LIST_FOREACH_SAFE(&irq_table[num].handlers, iter) {
-		handler = list_entry(iter, irq_handler_t, header);
+    /* First see if any handlers with top-half functions take the IRQ. */
+    list_foreach_safe(&irq_table[num].handlers, iter) {
+        handler = list_entry(iter, irq_handler_t, header);
 
-		if(handler->top) {
-			ret = handler->top(num, handler->data);
-			switch(ret) {
-			case IRQ_PREEMPT:
-				curr_cpu->should_preempt = true;
-				break;
-			case IRQ_RUN_THREAD:
-				assert(handler->thread);
+        if (handler->top) {
+            ret = handler->top(num, handler->data);
+            switch (ret) {
+            case IRQ_PREEMPT:
+                curr_cpu->should_preempt = true;
+                break;
+            case IRQ_RUN_THREAD:
+                assert(handler->thread);
 
-				semaphore_up(&handler->sem, 1);
-				curr_cpu->should_preempt = true;
-				break;
-			default:
-				break;
-			}
+                semaphore_up(&handler->sem, 1);
+                curr_cpu->should_preempt = true;
+                break;
+            default:
+                break;
+            }
 
-			/* For edge-triggered interrupts we must invoke all
-			 * handlers, because multiple interrupt pulses can be
-			 * merged if they occur close together. */
-			if(mode == IRQ_MODE_LEVEL && ret != IRQ_UNHANDLED) {
-				goto out;
-			}
-		}
-	}
+            /* For edge-triggered interrupts we must invoke all handlers,
+             * because multiple interrupt pulses can be merged if they occur
+             * close together. */
+            if (mode == IRQ_MODE_LEVEL && ret != IRQ_UNHANDLED)
+                goto out;
+        }
+    }
 
-	/* No top-half handlers took the IRQ, or the IRQ is edge-triggered.
-	 * Run all handlers without top-half functions. */
-	LIST_FOREACH_SAFE(&irq_table[num].handlers, iter) {
-		handler = list_entry(iter, irq_handler_t, header);
+    /* No top-half handlers took the IRQ, or the IRQ is edge-triggered. Run all
+     * handlers without top-half functions. */
+    list_foreach_safe(&irq_table[num].handlers, iter) {
+        handler = list_entry(iter, irq_handler_t, header);
 
-		if(!handler->top) {
-			assert(handler->thread);
+        if (!handler->top) {
+            assert(handler->thread);
 
-			semaphore_up(&handler->sem, 1);
-			curr_cpu->should_preempt = true;
-		}
-	}
+            semaphore_up(&handler->sem, 1);
+            curr_cpu->should_preempt = true;
+        }
+    }
+
 out:
-	/* Perform post-handling actions. */
-	if(irq_controller->post_handle) {
-		irq_controller->post_handle(num);
-	}
+    /* Perform post-handling actions. */
+    if (irq_controller->post_handle)
+        irq_controller->post_handle(num);
 }
 
 /** Initialize the IRQ handling system.
- * @param ctrlr		IRQ controller to use. */
+ * @param ctrlr         IRQ controller to use. */
 __init_text void irq_init(irq_controller_t *ctrlr) {
-	size_t i;
+    size_t i;
 
-	assert(ctrlr->mode);
+    assert(ctrlr->mode);
 
-	/* Initialize the IRQ table. */
-	for(i = 0; i < IRQ_COUNT; i++) {
-		spinlock_init(&irq_table[i].lock, "irq_lock");
-		list_init(&irq_table[i].handlers);
-	}
+    /* Initialize the IRQ table. */
+    for (i = 0; i < IRQ_COUNT; i++) {
+        spinlock_init(&irq_table[i].lock, "irq_lock");
+        list_init(&irq_table[i].handlers);
+    }
 
-	/* Set the controller. */
-	irq_controller = ctrlr;
+    /* Set the controller. */
+    irq_controller = ctrlr;
 }

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX internal functions/definitions.
+ * @brief               POSIX internal functions/definitions.
  */
 
 #ifndef __SYSTEM_POSIX_H
@@ -33,9 +33,9 @@
 
 /** Structure containing details of a POSIX process. */
 typedef struct posix_process {
-	core_list_t header;		/**< Link to process list. */
-	handle_t handle;		/**< Handle to process. */
-	pid_t pid;			/**< ID of the process. */
+    core_list_t header;             /**< Link to process list. */
+    handle_t handle;                /**< Handle to process. */
+    pid_t pid;                      /**< ID of the process. */
 } posix_process_t;
 
 extern core_list_t __sys_hidden child_processes;

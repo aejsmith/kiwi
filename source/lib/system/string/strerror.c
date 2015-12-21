@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Error string function.
+ * @brief               Error string function.
  */
 
 #include <string.h>
@@ -24,11 +24,11 @@
 #include "libsystem.h"
 
 /** Get string representation of an error number.
- * @param err		Error number.
- * @return		Pointer to string (should NOT be modified). */
+ * @param err           Error number.
+ * @return              Pointer to string (should NOT be modified). */
 char *strerror(int err) {
-	if((size_t)err >= __errno_count || !__errno_list[err])
-		return (char *)"Unknown error";
+    if ((size_t)err >= __errno_count || !__errno_list[err])
+        return (char *)"Unknown error";
 
-	return (char *)__errno_list[err];
+    return (char *)__errno_list[err];
 }

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Directory handling functions.
+ * @brief               Directory handling functions.
  */
 
 #ifndef __DIRENT_H
@@ -30,9 +30,9 @@ extern "C" {
 
 /** Directory entry structure given by readdir(). */
 struct dirent {
-	ino_t d_ino;			/**< Inode number. */
-	unsigned short d_reclen;	/**< Size of this dirent. */
-	char d_name[];			/**< Name of dirent (null-terminated). */
+    ino_t d_ino;                    /**< Inode number. */
+    unsigned short d_reclen;        /**< Size of this dirent. */
+    char d_name[];                  /**< Name of dirent (null-terminated). */
 };
 
 struct __dstream_internal;
@@ -43,9 +43,10 @@ extern int closedir(DIR *dir);
 extern DIR *opendir(const char *path);
 extern struct dirent *readdir(DIR *dir);
 extern void rewinddir(DIR *dir);
-extern int scandir(const char *path, struct dirent ***namelist,
-	int (*filter)(const struct dirent *),
-	int (*compar)(const void *, const void *));
+extern int scandir(
+    const char *path, struct dirent ***namelist,
+    int (*filter)(const struct dirent *),
+    int (*compar)(const void *, const void *));
 
 /* void seekdir(DIR *, long); */
 /* long telldir(DIR *); */

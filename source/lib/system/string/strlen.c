@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		String length functions.
+ * @brief               String length functions.
  */
 
 #include <string.h>
@@ -27,15 +27,17 @@
  * Gets the length of the string specified. The length is the number of
  * characters found before a NULL byte.
  *
- * @param str		Pointer to the string.
+ * @param str           Pointer to the string.
  *
- * @return		Length of the string.
+ * @return              Length of the string.
  */
 size_t strlen(const char *str) {
-	size_t ret;
+    size_t ret;
 
-	for(ret = 0; *str != '\0'; ret++, str++);
-	return ret;
+    for (ret = 0; *str; str++, ret++)
+        ;
+
+    return ret;
 }
 
 /**
@@ -45,14 +47,16 @@ size_t strlen(const char *str) {
  * characters found either before a NULL byte or before the maximum length
  * specified.
  *
- * @param str		Pointer to the string.
- * @param count		Maximum length of the string.
+ * @param str           Pointer to the string.
+ * @param count         Maximum length of the string.
  *
- * @return		Length of the string.
+ * @return              Length of the string.
  */
 size_t strnlen(const char *str, size_t count) {
-	size_t ret;
+    size_t ret;
 
-	for(ret = 0; *str != '\0' && ret < count; ret++, str++);
-	return ret;
+    for (ret = 0; *str && ret < count; str++, ret++)
+        ;
+
+    return ret;
 }

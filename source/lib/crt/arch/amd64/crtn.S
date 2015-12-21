@@ -16,17 +16,17 @@
 
 /**
  * @file
- * @brief		AMD64 C runtime.
+ * @brief               AMD64 C runtime.
  */
 
 .section .init
 .global _init
 .type _init, @function
-	addq $8, %rsp
-	ret
+    addq    $8, %rsp
+    ret
 
 .section .fini
 .global _fini
 .type _fini, @function
-	addq $8, %rsp
-	ret
+    addq    $8, %rsp
+    ret

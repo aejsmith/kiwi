@@ -16,20 +16,20 @@
 
 /**
  * @file
- * @brief		Type definitions.
+ * @brief               Type definitions.
  */
 
 #ifndef __KERNEL_TYPES_H
 #define __KERNEL_TYPES_H
 
 #ifdef __KERNEL
-# include <types.h>
+#   include <types.h>
 #else
-# define __need_size_t
-# define __need_NULL
-# include <stddef.h>
-# include <stdbool.h>
-# include <stdint.h>
+#   define __need_size_t
+#   define __need_NULL
+#   include <stddef.h>
+#   include <stdbool.h>
+#   include <stdint.h>
 #endif
 
 /** Type used to store a kernel status code. */
@@ -39,17 +39,17 @@ typedef int32_t status_t;
 typedef int32_t handle_t;
 
 /** Other integer types used throughout the kernel. */
-typedef long ssize_t;			/**< Signed version of size_t. */
-typedef int64_t nstime_t;		/**< Type used to store a time value in nanoseconds. */
-typedef int64_t offset_t;		/**< Type used to store an offset into an object. */
+typedef long ssize_t;               /**< Signed version of size_t. */
+typedef int64_t nstime_t;           /**< Type used to store a time value in nanoseconds. */
+typedef int64_t offset_t;           /**< Type used to store an offset into an object. */
 
 /** Object identifier types. */
-typedef int32_t process_id_t;		/**< Type used to store a process ID. */
-typedef int32_t thread_id_t;		/**< Type used to store a thread ID. */
-typedef int16_t user_id_t;		/**< Type used to store a user ID. */
-typedef int16_t group_id_t;		/**< Type used to store a group ID. */
-typedef uint16_t mount_id_t;		/**< Type used to store a mount ID. */
-typedef uint64_t node_id_t;		/**< Type used to store a filesystem node ID. */
-typedef int16_t image_id_t;		/**< Type used to store a image ID. */
+typedef int32_t process_id_t;       /**< Type used to store a process ID. */
+typedef int32_t thread_id_t;        /**< Type used to store a thread ID. */
+typedef int16_t user_id_t;          /**< Type used to store a user ID. */
+typedef int16_t group_id_t;         /**< Type used to store a group ID. */
+typedef uint16_t mount_id_t;        /**< Type used to store a mount ID. */
+typedef uint64_t node_id_t;         /**< Type used to store a filesystem node ID. */
+typedef int16_t image_id_t;         /**< Type used to store a image ID. */
 
 #endif /* __KERNEL_TYPES_H */

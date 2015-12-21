@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX sleep function.
+ * @brief               POSIX sleep function.
  */
 
 #include <errno.h>
@@ -24,15 +24,16 @@
 #include <unistd.h>
 
 /** Sleep for a certain interval.
- * @param secs		Number of seconds to sleep for.
- * @return		0, or number of seconds remaining if interrupted. */
+ * @param secs          Number of seconds to sleep for.
+ * @return              0, or number of seconds remaining if interrupted. */
 unsigned int sleep(unsigned int secs) {
-	struct timespec ts;
+    struct timespec ts;
 
-	ts.tv_sec = secs;
-	ts.tv_nsec = 0;
-	if(nanosleep(&ts, &ts) == -1 && errno == EINTR) {
-		return ts.tv_sec;
-	}
-	return 0;
+    ts.tv_sec = secs;
+    ts.tv_nsec = 0;
+
+    if (nanosleep(&ts, &ts) == -1 && errno == EINTR)
+        return ts.tv_sec;
+
+    return 0;
 }

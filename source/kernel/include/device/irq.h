@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Interrupt handling code.
+ * @brief               Interrupt handling code.
  */
 
 #ifndef __DEVICE_IRQ_H
@@ -26,52 +26,52 @@
 
 /** IRQ handler return status. */
 typedef enum irq_status {
-	IRQ_UNHANDLED,		/**< Interrupt was not handled. */
-	IRQ_HANDLED,		/**< Interrupt was handled. */
-	IRQ_PREEMPT,		/**< Interrupt was handled, and the current thread should be preempted. */
-	IRQ_RUN_THREAD,		/**< Interrupt was handled, and the threaded handler should be run. */
+    IRQ_UNHANDLED,              /**< Interrupt was not handled. */
+    IRQ_HANDLED,                /**< Interrupt was handled. */
+    IRQ_PREEMPT,                /**< Interrupt was handled, current thread should be preempted. */
+    IRQ_RUN_THREAD,             /**< Interrupt was handled, threaded handler should be run. */
 } irq_status_t;
 
 /** IRQ trigger modes. */
 typedef enum irq_mode {
-	IRQ_MODE_LEVEL,		/**< Level-triggered. */
-	IRQ_MODE_EDGE,		/**< Edge-triggered. */
+    IRQ_MODE_LEVEL,             /**< Level-triggered. */
+    IRQ_MODE_EDGE,              /**< Edge-triggered. */
 } irq_mode_t;
 
 /** IRQ controller structure. */
 typedef struct irq_controller {
-	/** Pre-handling function.
-	 * @param num		IRQ number.
-	 * @return		True if IRQ should be handled. */
-	bool (*pre_handle)(unsigned num);
+    /** Pre-handling function.
+     * @param num           IRQ number.
+     * @return              True if IRQ should be handled. */
+    bool (*pre_handle)(unsigned num);
 
-	/** Post-handling function.
-	 * @param num		IRQ number. */
-	void (*post_handle)(unsigned num);
+    /** Post-handling function.
+     * @param num           IRQ number. */
+    void (*post_handle)(unsigned num);
 
-	/** Get IRQ trigger mode.
-	 * @param num		IRQ number.
-	 * @return		Trigger mode of the IRQ. */
-	irq_mode_t (*mode)(unsigned num);
+    /** Get IRQ trigger mode.
+     * @param num           IRQ number.
+     * @return              Trigger mode of the IRQ. */
+    irq_mode_t (*mode)(unsigned num);
 
-	/** Enable an IRQ.
-	 * @param num		IRQ number. */
-	void (*enable)(unsigned num);
+    /** Enable an IRQ.
+     * @param num           IRQ number. */
+    void (*enable)(unsigned num);
 
-	/** Disable an IRQ.
-	 * @param num		IRQ number. */
-	void (*disable)(unsigned num);
+    /** Disable an IRQ.
+     * @param num           IRQ number. */
+    void (*disable)(unsigned num);
 } irq_controller_t;
 
 /** IRQ top-half handler function type.
- * @param num		IRQ number.
- * @param data		Data pointer associated with the handler.
- * @return		IRQ status code. */
+ * @param num           IRQ number.
+ * @param data          Data pointer associated with the handler.
+ * @return              IRQ status code. */
 typedef irq_status_t (*irq_top_t)(unsigned num, void *data);
 
 /** IRQ bottom-half handler function type.
- * @param num		IRQ number.
- * @param data		Data pointer associated with the handler. */
+ * @param num           IRQ number.
+ * @param data          Data pointer associated with the handler. */
 typedef void (*irq_bottom_t)(unsigned num, void *data);
 
 extern status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *data);

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Password functions/definitions.
+ * @brief               Password functions/definitions.
  */
 
 #ifndef __PWD_H
@@ -30,13 +30,13 @@ extern "C" {
 
 /** User information structure. */
 struct passwd {
-	char *pw_name;			/**< User's login name. */
-	char *pw_passwd;		/**< Password. */
-	uid_t pw_uid;			/**< Numerical user ID. */
-	gid_t pw_gid;			/**< Numerical group ID. */
-	char *pw_dir;			/**< Initial working directory. */
-	char *pw_shell;			/**< Program to use as shell. */
-	char *pw_gecos;			/**< Real name. */
+    char *pw_name;                  /**< User's login name. */
+    char *pw_passwd;                /**< Password. */
+    uid_t pw_uid;                   /**< Numerical user ID. */
+    gid_t pw_gid;                   /**< Numerical group ID. */
+    char *pw_dir;                   /**< Initial working directory. */
+    char *pw_shell;                 /**< Program to use as shell. */
+    char *pw_gecos;                 /**< Real name. */
 };
 
 extern void endpwent(void);

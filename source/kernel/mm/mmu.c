@@ -16,11 +16,11 @@
 
 /**
  * @file
- * @brief		MMU interface.
+ * @brief               MMU interface.
  *
- * @todo		ASID support.
- * @todo		Maintain an active CPU set for multicast TLB
- *			invalidation.
+ * TODO:
+ *  - ASID support.
+ *  - Maintain an active CPU set for multicast TLB invalidation.
  */
 
 #include <mm/aspace.h>
@@ -39,16 +39,16 @@
 //#define DEBUG_MMU
 
 #ifdef DEBUG_MMU
-# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
+#   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
 #else
-# define dprintf(fmt...)	
+#   define dprintf(fmt...)
 #endif
 
 /** Kernel MMU context. */
 mmu_context_t kernel_mmu_context;
 
 /** Architecture defined MMU context operations. */
-mmu_ops_t *mmu_ops = NULL;
+mmu_ops_t *mmu_ops;
 
 /**
  * Lock an MMU context.
@@ -58,123 +58,123 @@ mmu_ops_t *mmu_ops = NULL;
  * after operations have been performed. Locks can be nested (implemented using
  * a recursive mutex).
  *
- * @param ctx		Context to lock.
+ * @param ctx           Context to lock.
  */
 void mmu_context_lock(mmu_context_t *ctx) {
-	mutex_lock(&ctx->lock);
-	preempt_disable();
+    mutex_lock(&ctx->lock);
+    preempt_disable();
 }
 
 /** Unlock an MMU context.
- * @param ctx		Context to unlock. */
+ * @param ctx           Context to unlock. */
 void mmu_context_unlock(mmu_context_t *ctx) {
-	/* If the lock is being released (recursion count currently 1), flush
-	 * changes to the context. */
-	if(mutex_recursion(&ctx->lock) == 1)
-		mmu_ops->flush(ctx);
+    /* If the lock is being released (recursion count currently 1), flush
+     * changes to the context. */
+    if (mutex_recursion(&ctx->lock) == 1)
+        mmu_ops->flush(ctx);
 
-	preempt_enable();
-	mutex_unlock(&ctx->lock);
+    preempt_enable();
+    mutex_unlock(&ctx->lock);
 }
 
 /** Create a mapping in an MMU context.
- * @param ctx		Context to map in.
- * @param virt		Virtual address to map.
- * @param phys		Physical address to map to.
- * @param access	Mapping access flags.
- * @param mmflag	Allocation behaviour flags.
- * @return		Status code describing the result of the operation. */
-status_t
-mmu_context_map(mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys,
-	uint32_t access, unsigned mmflag)
+ * @param ctx           Context to map in.
+ * @param virt          Virtual address to map.
+ * @param phys          Physical address to map to.
+ * @param access        Mapping access flags.
+ * @param mmflag        Allocation behaviour flags.
+ * @return              Status code describing the result of the operation. */
+status_t mmu_context_map(
+    mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t access,
+    unsigned mmflag)
 {
-	assert(mutex_held(&ctx->lock));
-	assert(!(virt % PAGE_SIZE));
-	assert(!(phys % PAGE_SIZE));
+    assert(mutex_held(&ctx->lock));
+    assert(!(virt % PAGE_SIZE));
+    assert(!(phys % PAGE_SIZE));
 
-	if(ctx == &kernel_mmu_context) {
-		assert(virt >= KERNEL_BASE);
-	} else {
-		assert(virt < USER_SIZE);
-	}
+    if (ctx == &kernel_mmu_context) {
+        assert(virt >= KERNEL_BASE);
+    } else {
+        assert(virt < USER_SIZE);
+    }
 
-	dprintf("mmu: mmu_context_map(%p, %p, 0x%" PRIxPHYS ", 0x%x, 0x%x)\n",
-		ctx, virt, phys, access, mmflag);
+    dprintf(
+        "mmu: mmu_context_map(%p, %p, 0x%" PRIxPHYS ", 0x%x, 0x%x)\n",
+        ctx, virt, phys, access, mmflag);
 
-	return mmu_ops->map(ctx, virt, phys, access, mmflag);
+    return mmu_ops->map(ctx, virt, phys, access, mmflag);
 }
 
 /** Remap a range with different access flags.
- * @param ctx		Context to modify.
- * @param virt		Start of range to update.
- * @param size		Size of range to update.
- * @param access	New access flags. */
+ * @param ctx           Context to modify.
+ * @param virt          Start of range to update.
+ * @param size          Size of range to update.
+ * @param access        New access flags. */
 void mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
-	assert(mutex_held(&ctx->lock));
-	assert(!(virt % PAGE_SIZE));
-	assert(!(size % PAGE_SIZE));
+    assert(mutex_held(&ctx->lock));
+    assert(!(virt % PAGE_SIZE));
+    assert(!(size % PAGE_SIZE));
 
-	if(ctx == &kernel_mmu_context) {
-		assert(virt >= KERNEL_BASE);
-	} else {
-		assert(virt < USER_SIZE);
-	}
+    if (ctx == &kernel_mmu_context) {
+        assert(virt >= KERNEL_BASE);
+    } else {
+        assert(virt < USER_SIZE);
+    }
 
-	dprintf("mmu: mmu_context_remap(%p, %p, 0x%zx, 0x%x)\n", ctx, virt,
-		size, access);
+    dprintf("mmu: mmu_context_remap(%p, %p, 0x%zx, 0x%x)\n", ctx, virt, size, access);
 
-	return mmu_ops->remap(ctx, virt, size, access);
+    return mmu_ops->remap(ctx, virt, size, access);
 }
 
 /** Unmap a page in an MMU context.
- * @param ctx		Context to unmap from.
- * @param virt		Virtual address to unmap.
- * @param shared	Whether the mapping was shared across multiple CPUs.
- *			Used as an optimisation to not perform remote TLB
- *			invalidations if not necessary.
- * @param pagep		Where to pointer to page that was unmapped. May be set
- *			to NULL if the address was mapped to memory that doesn't
- *			have a page_t (e.g. device memory).
- * @return		Whether a page was mapped at the virtual address. */
-bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **pagep) {
-	assert(mutex_held(&ctx->lock));
-	assert(!(virt % PAGE_SIZE));
+ * @param ctx           Context to unmap from.
+ * @param virt          Virtual address to unmap.
+ * @param shared        Whether the mapping was shared across multiple CPUs.
+ *                      Used as an optimisation to not perform remote TLB
+ *                      invalidations if not necessary.
+ * @param _page         Where to pointer to page that was unmapped. May be set
+ *                      to NULL if the address was mapped to memory that doesn't
+ *                      have a page_t (e.g. device memory).
+ * @return              Whether a page was mapped at the virtual address. */
+bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
+    assert(mutex_held(&ctx->lock));
+    assert(!(virt % PAGE_SIZE));
 
-	if(ctx == &kernel_mmu_context) {
-		assert(virt >= KERNEL_BASE);
-	} else {
-		assert(virt < USER_SIZE);
-	}
+    if (ctx == &kernel_mmu_context) {
+        assert(virt >= KERNEL_BASE);
+    } else {
+        assert(virt < USER_SIZE);
+    }
 
-	dprintf("mmu: mmu_context_unmap(%p, %p, %d)\n", ctx, virt, shared);
+    dprintf("mmu: mmu_context_unmap(%p, %p, %d)\n", ctx, virt, shared);
 
-	return mmu_ops->unmap(ctx, virt, shared, pagep);
+    return mmu_ops->unmap(ctx, virt, shared, _page);
 }
 
 /** Query details about a mapping.
- * @param ctx		Context to query.
- * @param virt		Virtual address to query.
- * @param physp		Where to store physical address the page is mapped to.
- * @param accessp	Where to store access flags for the mapping.
- * @return		Whether a page is mapped at the virtual address. */
-bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, uint32_t *accessp) {
-	bool ret;
+ * @param ctx           Context to query.
+ * @param virt          Virtual address to query.
+ * @param _phys         Where to store physical address the page is mapped to.
+ * @param _access       Where to store access flags for the mapping.
+ * @return              Whether a page is mapped at the virtual address. */
+bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
+    bool ret;
 
-	assert(mutex_held(&ctx->lock));
-	assert(!(virt % PAGE_SIZE));
+    assert(mutex_held(&ctx->lock));
+    assert(!(virt % PAGE_SIZE));
 
-	/* We allow checks on any address here, so that you can query a kernel
-	 * address even when you are on a user address space. However, we must
-	 * ensure the kernel context is locked if querying a kernel address. */
-	if(virt >= KERNEL_BASE && ctx != &kernel_mmu_context) {
-		mmu_context_lock(&kernel_mmu_context);
-		ret = mmu_ops->query(&kernel_mmu_context, virt, physp, accessp);
-		mmu_context_unlock(&kernel_mmu_context);
-	} else {
-		ret = mmu_ops->query(ctx, virt, physp, accessp);
-	}
+    /* We allow checks on any address here, so that you can query a kernel
+     * address even when you are on a user address space. However, we must
+     * ensure the kernel context is locked if querying a kernel address. */
+    if (virt >= KERNEL_BASE && ctx != &kernel_mmu_context) {
+        mmu_context_lock(&kernel_mmu_context);
+        ret = mmu_ops->query(&kernel_mmu_context, virt, _phys, _access);
+        mmu_context_unlock(&kernel_mmu_context);
+    } else {
+        ret = mmu_ops->query(ctx, virt, _phys, _access);
+    }
 
-	return ret;
+    return ret;
 }
 
 /**
@@ -184,91 +184,91 @@ bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, uint32
  * unloaded with mmu_context_unload(). This function must be called with
  * interrupts disabled.
  *
- * @param ctx		Context to load.
+ * @param ctx           Context to load.
  */
 void mmu_context_load(mmu_context_t *ctx) {
-	assert(!local_irq_state());
+    assert(!local_irq_state());
 
-	mmu_ops->load(ctx);
+    mmu_ops->load(ctx);
 }
 
 /** Unload an MMU context.
- * @param ctx		Context to unload. */
+ * @param ctx           Context to unload. */
 void mmu_context_unload(mmu_context_t *ctx) {
-	assert(!local_irq_state());
+    assert(!local_irq_state());
 
-	if(mmu_ops->unload)
-		mmu_ops->unload(ctx);
+    if (mmu_ops->unload)
+        mmu_ops->unload(ctx);
 }
 
 /** Create and initialize an MMU context.
- * @param mmflag	Allocation behaviour flags.
- * @return		Pointer to new context, NULL on allocation failure. */
+ * @param mmflag        Allocation behaviour flags.
+ * @return              Pointer to new context, NULL on allocation failure. */
 mmu_context_t *mmu_context_create(unsigned mmflag) {
-	mmu_context_t *ctx;
-	status_t ret;
+    mmu_context_t *ctx;
+    status_t ret;
 
-	ctx = kmalloc(sizeof(*ctx), mmflag);
-	if(!ctx)
-		return NULL;
+    ctx = kmalloc(sizeof(*ctx), mmflag);
+    if (!ctx)
+        return NULL;
 
-	mutex_init(&ctx->lock, "mmu_context_lock", MUTEX_RECURSIVE);
+    mutex_init(&ctx->lock, "mmu_context_lock", MUTEX_RECURSIVE);
 
-	ret = mmu_ops->init(ctx, mmflag);
-	if(ret != STATUS_SUCCESS) {
-		kfree(ctx);
-		return NULL;
-	}
+    ret = mmu_ops->init(ctx, mmflag);
+    if (ret != STATUS_SUCCESS) {
+        kfree(ctx);
+        return NULL;
+    }
 
-	return ctx;
+    return ctx;
 }
 
 /** Destroy an MMU context.
- * @param ctx		Context to destroy. */
+ * @param ctx           Context to destroy. */
 void mmu_context_destroy(mmu_context_t *ctx) {
-	mmu_ops->destroy(ctx);
-	kfree(ctx);
+    mmu_ops->destroy(ctx);
+    kfree(ctx);
 }
 
 /** Initialize the kernel MMU context. */
 __init_text void mmu_init(void) {
-	ptr_t end, i;
+    ptr_t end, i;
 
-	/* Initialize the kernel context. */
-	mutex_init(&kernel_mmu_context.lock, "mmu_context_lock", MUTEX_RECURSIVE);
-	arch_mmu_init();
+    /* Initialize the kernel context. */
+    mutex_init(&kernel_mmu_context.lock, "mmu_context_lock", MUTEX_RECURSIVE);
+    arch_mmu_init();
 
-	mmu_context_lock(&kernel_mmu_context);
+    mmu_context_lock(&kernel_mmu_context);
 
-	/* Duplicate all virtual memory mappings created by KBoot. */
-	KBOOT_ITERATE(KBOOT_TAG_VMEM, kboot_tag_vmem_t, range) {
-		end = range->start + range->size - 1;
+    /* Duplicate all virtual memory mappings created by KBoot. */
+    kboot_tag_foreach(KBOOT_TAG_VMEM, kboot_tag_vmem_t, range) {
+        end = range->start + range->size - 1;
 
-		/* Only want to map ranges in kmem space, and non-special
-		 * mappings. */
-		if(range->start < KERNEL_KMEM_BASE || end > KERNEL_KMEM_END) {
-			continue;
-		} else if(range->phys == ~((uint64_t)0)) {
-			continue;
-		}
+        /* Only want to map ranges in kmem space, and non-special mappings. */
+        if (range->start < KERNEL_KMEM_BASE || end > KERNEL_KMEM_END) {
+            continue;
+        } else if (range->phys == ~((uint64_t)0)) {
+            continue;
+        }
 
-		for(i = 0; i < range->size; i += PAGE_SIZE) {
-			mmu_context_map(&kernel_mmu_context, range->start + i,
-				range->phys + i, VM_ACCESS_READ | VM_ACCESS_WRITE,
-				MM_BOOT);
-		}
-	}
+        for (i = 0; i < range->size; i += PAGE_SIZE) {
+            mmu_context_map(
+                &kernel_mmu_context, range->start + i, range->phys + i,
+                VM_ACCESS_READ | VM_ACCESS_WRITE,
+                MM_BOOT);
+        }
+    }
 
-	mmu_context_unlock(&kernel_mmu_context);
+    mmu_context_unlock(&kernel_mmu_context);
 
-	/* Switch the boot CPU to the kernel context. */
-	mmu_init_percpu();
+    /* Switch the boot CPU to the kernel context. */
+    mmu_init_percpu();
 }
 
 /** Perform per-CPU MMU initialization. */
 __init_text void mmu_init_percpu(void) {
-	arch_mmu_init_percpu();
+    arch_mmu_init_percpu();
 
-	/* Switch to the kernel context. */
-	mmu_context_load(&kernel_mmu_context);
+    /* Switch to the kernel context. */
+    mmu_context_load(&kernel_mmu_context);
 }

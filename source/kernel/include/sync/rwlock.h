@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Readers-writer lock implementation.
+ * @brief               Readers-writer lock implementation.
  */
 
 #ifndef __SYNC_RWLOCK_H
@@ -28,26 +28,26 @@
 
 /** Structure containing a readers-writer lock. */
 typedef struct rwlock {
-	unsigned held;			/**< Whether the lock is held. */
-	size_t readers;			/**< Number of readers holding the lock. */
-	spinlock_t lock;		/**< Lock to protect the thread list. */
-	list_t threads;			/**< List of waiting threads. */
-	const char *name;		/**< Name of the lock. */
+    unsigned held;                  /**< Whether the lock is held. */
+    size_t readers;                 /**< Number of readers holding the lock. */
+    spinlock_t lock;                /**< Lock to protect the thread list. */
+    list_t threads;                 /**< List of waiting threads. */
+    const char *name;               /**< Name of the lock. */
 } rwlock_t;
 
 /** Initializes a statically defined readers-writer lock. */
 #define RWLOCK_INITIALIZER(_var, _name) \
-	{ \
-		.held = 0, \
-		.readers = 0, \
-		.lock = SPINLOCK_INITIALIZER("rwlock_lock"), \
-		.threads = LIST_INITIALIZER(_var.threads), \
-		.name = _name, \
-	}
+    { \
+        .held = 0, \
+        .readers = 0, \
+        .lock = SPINLOCK_INITIALIZER("rwlock_lock"), \
+        .threads = LIST_INITIALIZER(_var.threads), \
+        .name = _name, \
+    }
 
 /** Statically defines a new readers-writer lock. */
 #define RWLOCK_DEFINE(_var) \
-	rwlock_t _var = RWLOCK_INITIALIZER(_var, #_var)
+    rwlock_t _var = RWLOCK_INITIALIZER(_var, #_var)
 
 extern status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags);
 extern status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags);

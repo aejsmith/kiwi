@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX change owner function.
+ * @brief               POSIX change owner function.
  */
 
 #include <kernel/fs.h>
@@ -27,68 +27,68 @@
 #include "libsystem.h"
 
 /** Change the owner of a filesystem entry.
- * @param path		Path to entry.
- * @param uid		New user ID.
- * @param gid		New group ID.
- * @return		0 on success, -1 on failure. */
+ * @param path          Path to entry.
+ * @param uid           New user ID.
+ * @param gid           New group ID.
+ * @return              0 on success, -1 on failure. */
 int chown(const char *path, uid_t uid, gid_t gid) {
-	object_security_t security;
-	status_t ret;
+    object_security_t security;
+    status_t ret;
 
-	security.uid = uid;
-	security.gid = gid;
-	security.acl = NULL;
+    security.uid = uid;
+    security.gid = gid;
+    security.acl = NULL;
 
-	ret = kern_fs_set_security(path, true, &security);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_set_security(path, true, &security);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }
 
 /** Change the owner of a filesystem entry.
- * @param path		Path to entry. If this refers to a symbolic link, it
- *			will not be dereferenced.
- * @param uid		New user ID.
- * @param gid		New group ID.
- * @return		0 on success, -1 on failure. */
+ * @param path          Path to entry. If this refers to a symbolic link, it
+ *                      will not be dereferenced.
+ * @param uid           New user ID.
+ * @param gid           New group ID.
+ * @return              0 on success, -1 on failure. */
 int lchown(const char *path, uid_t uid, gid_t gid) {
-	object_security_t security;
-	status_t ret;
+    object_security_t security;
+    status_t ret;
 
-	security.uid = uid;
-	security.gid = gid;
-	security.acl = NULL;
+    security.uid = uid;
+    security.gid = gid;
+    security.acl = NULL;
 
-	ret = kern_fs_set_security(path, false, &security);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_set_security(path, false, &security);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }
 
 /** Change the owner of a filesystem entry.
- * @param fd		File descriptor to entry.
- * @param uid		New user ID.
- * @param gid		New group ID.
- * @return		0 on success, -1 on failure. */
+ * @param fd            File descriptor to entry.
+ * @param uid           New user ID.
+ * @param gid           New group ID.
+ * @return              0 on success, -1 on failure. */
 int fchown(int fd, uid_t uid, gid_t gid) {
-	object_security_t security;
-	status_t ret;
+    object_security_t security;
+    status_t ret;
 
-	security.uid = uid;
-	security.gid = gid;
-	security.acl = NULL;
+    security.uid = uid;
+    security.gid = gid;
+    security.acl = NULL;
 
-	ret = kern_object_set_security(fd, &security);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_object_set_security(fd, &security);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Kernel console functions.
+ * @brief               Kernel console functions.
  */
 
 #ifndef __CONSOLE_H
@@ -36,39 +36,38 @@ struct kboot_tag_video;
  * called without, so they should perform locking themselves.
  */
 typedef struct console_out_ops {
-	/** Properly initialize the console after memory management setup.
-	 * @param video		KBoot video tag. */
-	void (*init)(struct kboot_tag_video *video);
+    /** Properly initialize the console after memory management setup.
+     * @param video         KBoot video tag. */
+    void (*init)(struct kboot_tag_video *video);
 
-	/** Write a character to the console.
-	 * @param ch		Character to write. */
-	void (*putc)(char ch);
+    /** Write a character to the console.
+     * @param ch            Character to write. */
+    void (*putc)(char ch);
 } console_out_ops_t;
 
 /** Kernel console input operations structure. */
 typedef struct console_in_ops {
-	/** Check for a character from the console.
-	 * @note		This function must be safe to use from interrupt
-	 *			context.
-	 * @return		Character read, or 0 if none available. */
-	uint16_t (*poll)(void);
+    /** Check for a character from the console.
+     * @note                This function must be safe to use from interrupt
+     *                      context.
+     * @return              Character read, or 0 if none available. */
+    uint16_t (*poll)(void);
 
-	/** Read a character from the console, blocking until it can do so.
-	 * @param ch		Where to store character read.
-	 * @return		Status code describing the result of the
-	 *			operation. */
-	status_t (*getc)(uint16_t *chp);
+    /** Read a character from the console, blocking until it can do so.
+     * @param _ch           Where to store character read.
+     * @return              Status code describing the result of the operation. */
+    status_t (*getc)(uint16_t *_ch);
 } console_in_ops_t;
 
 /** Special console key definitions. */
-#define CONSOLE_KEY_UP		0x100
-#define CONSOLE_KEY_DOWN	0x101
-#define CONSOLE_KEY_LEFT	0x102
-#define CONSOLE_KEY_RIGHT	0x103
-#define CONSOLE_KEY_HOME	0x104
-#define CONSOLE_KEY_END		0x105
-#define CONSOLE_KEY_PGUP	0x106
-#define CONSOLE_KEY_PGDN	0x107
+#define CONSOLE_KEY_UP      0x100
+#define CONSOLE_KEY_DOWN    0x101
+#define CONSOLE_KEY_LEFT    0x102
+#define CONSOLE_KEY_RIGHT   0x103
+#define CONSOLE_KEY_HOME    0x104
+#define CONSOLE_KEY_END     0x105
+#define CONSOLE_KEY_PGUP    0x106
+#define CONSOLE_KEY_PGDN    0x107
 
 /**
  * Kernel console structure.
@@ -82,8 +81,8 @@ typedef struct console_in_ops {
  * while input is handled by the input driver.
  */
 typedef struct console {
-	console_out_ops_t *out;		/**< Output operations. */
-	console_in_ops_t *in;		/**< Input operations. */
+    console_out_ops_t *out;         /**< Output operations. */
+    console_in_ops_t *in;           /**< Input operations. */
 } console_t;
 
 extern console_t main_console;
@@ -96,17 +95,17 @@ extern void console_init(void);
 
 /** Framebuffer information structure. */
 typedef struct fb_info {
-	uint16_t width;			/**< Width of the framebuffer. */
-	uint16_t height;		/**< Height of the framebuffer. */
-	uint8_t depth;			/**< Colour depth of the framebuffer (bits per pixel). */
-	uint8_t bytes_per_pixel;	/**< Bytes per pixel. */
-	uint8_t red_position;		/**< Red field position. */
-	uint8_t red_size;		/**< Red field size. */
-	uint8_t green_position;		/**< Green field position. */
-	uint8_t green_size;		/**< Green field size. */
-	uint8_t blue_position;		/**< Blue field position. */
-	uint8_t blue_size;		/**< Blue field size. */
-	phys_ptr_t addr;		/**< Physical address of the framebuffer. */
+    uint16_t width;                 /**< Width of the framebuffer. */
+    uint16_t height;                /**< Height of the framebuffer. */
+    uint8_t depth;                  /**< Colour depth of the framebuffer (bits per pixel). */
+    uint8_t bytes_per_pixel;        /**< Bytes per pixel. */
+    uint8_t red_position;           /**< Red field position. */
+    uint8_t red_size;               /**< Red field size. */
+    uint8_t green_position;         /**< Green field position. */
+    uint8_t green_size;             /**< Green field size. */
+    uint8_t blue_position;          /**< Blue field position. */
+    uint8_t blue_size;              /**< Blue field size. */
+    phys_ptr_t addr;                /**< Physical address of the framebuffer. */
 } fb_info_t;
 
 extern void fb_console_info(fb_info_t *info);

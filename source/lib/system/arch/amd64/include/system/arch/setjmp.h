@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		AMD64 setjmp definitions.
+ * @brief               AMD64 setjmp definitions.
  */
 
 #ifndef __SYSTEM_ARCH_SETJMP_H
@@ -35,6 +35,6 @@
  *  jmp_buf[6] = r14
  *  jmp_buf[7] = r15
  */
-#define JMP_BUF_SIZE		8
+#define JMP_BUF_SIZE 8
 
 #endif /* __SYSTEM_ARCH_SETJMP_H */

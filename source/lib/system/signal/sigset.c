@@ -16,65 +16,65 @@
 
 /**
  * @file
- * @brief		Signal set manipulation functions.
+ * @brief               Signal set manipulation functions.
  */
 
 #include <errno.h>
 #include <signal.h>
 
 /** Add a signal to a signal set.
- * @param set		Set to add to.
- * @param num		Signal to add.
- * @return		0 on success, -1 on failure. */
+ * @param set           Set to add to.
+ * @param num           Signal to add.
+ * @return              0 on success, -1 on failure. */
 int sigaddset(sigset_t *set, int num) {
-	if(num < 1 || num >= NSIG) {
-		errno = EINVAL;
-		return -1;
-	}
+    if (num < 1 || num >= NSIG) {
+        errno = EINVAL;
+        return -1;
+    }
 
-	*set |= (1<<num);
-	return 0;
+    *set |= (1 << num);
+    return 0;
 }
 
 /** Remove a signal from a signal set.
- * @param set		Set to remove from.
- * @param num		Signal to remove.
- * @return		0 on success, -1 on failure. */
+ * @param set           Set to remove from.
+ * @param num           Signal to remove.
+ * @return              0 on success, -1 on failure. */
 int sigdelset(sigset_t *set, int num) {
-	if(num < 1 || num >= NSIG) {
-		errno = EINVAL;
-		return -1;
-	}
+    if (num < 1 || num >= NSIG) {
+        errno = EINVAL;
+        return -1;
+    }
 
-	*set &= ~(1<<num);
-	return 0;
+    *set &= ~(1 << num);
+    return 0;
 }
 
 /** Clear all signals in a signal set.
- * @param set		Set to clear.
- * @return		Always 0. */
+ * @param set           Set to clear.
+ * @return              Always 0. */
 int sigemptyset(sigset_t *set) {
-	*set = 0;
-	return 0;
+    *set = 0;
+    return 0;
 }
 
 /** Set all signals in a signal set.
- * @param set		Set to fill.
- * @return		Always 0. */
+ * @param set           Set to fill.
+ * @return              Always 0. */
 int sigfillset(sigset_t *set) {
-	*set = -1;
-	return 0;
+    *set = -1;
+    return 0;
 }
 
 /** Check if a signal is included in a set.
- * @param set		Set to check.
- * @param num		Signal number to check for.
- * @return		1 if member, 0 if not, -1 if signal number is invalid. */
+ * @param set           Set to check.
+ * @param num           Signal number to check for.
+ * @return              1 if member, 0 if not, -1 if signal number is invalid. */
 int sigismember(const sigset_t *set, int num) {
-	if(num < 1 || num >= NSIG) {
-		errno = EINVAL;
-		return -1;
-	}
+    if (num < 1 || num >= NSIG) {
+        errno = EINVAL;
+        return -1;
+    }
 
-	return (*set & (1<<num)) ? 1 : 0;
+    return (*set & (1 << num)) ? 1 : 0;
 }

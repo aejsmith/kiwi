@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		KBoot utility functions.
+ * @brief               KBoot utility functions.
  */
 
 #ifndef __KERNEL_KBOOT_H
@@ -32,17 +32,18 @@ extern size_t kboot_log_size;
 extern void *kboot_tag_iterate(uint32_t type, void *current);
 
 /** Iterate over the KBoot tag list. */
-#define KBOOT_ITERATE(_type, _vtype, _vname) \
-	for(_vtype *_vname = kboot_tag_iterate((_type), NULL); \
-		_vname; \
-		_vname = kboot_tag_iterate((_type), _vname))
+#define kboot_tag_foreach(_type, _vtype, _vname) \
+    for ( \
+        _vtype *_vname = kboot_tag_iterate((_type), NULL); \
+        _vname; \
+        _vname = kboot_tag_iterate((_type), _vname))
 
 /** Get additional data following a KBoot tag.
- * @param tag		Tag to get data from.
- * @param offset	Offset of the data to get.
- * @return		Pointer to data. */
-#define kboot_tag_data(tag, offset)	\
-	((void *)(round_up((ptr_t)tag + sizeof(*tag), 8) + offset))
+ * @param tag           Tag to get data from.
+ * @param offset        Offset of the data to get.
+ * @return              Pointer to data. */
+#define kboot_tag_data(tag, offset) \
+    ((void *)(round_up((ptr_t)tag + sizeof(*tag), 8) + offset))
 
 extern bool kboot_boolean_option(const char *name);
 extern uint64_t kboot_integer_option(const char *name);

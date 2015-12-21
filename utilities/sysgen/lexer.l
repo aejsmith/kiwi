@@ -25,17 +25,17 @@
 
 %%
 
-"type"			{ return TOK_TYPE; }
-"syscall"		{ return TOK_SYSCALL; }
+"type"                  { return TOK_TYPE; }
+"syscall"               { return TOK_SYSCALL; }
 
-[A-Za-z_][A-Za-z0-9_]*	{ yylval.str = strdup(yytext); return TOK_IDENTIFIER; }
-[0-9]+			{ yylval.num = strtoul(yytext, NULL, 10); return TOK_NUMBER; }
+[A-Za-z_][A-Za-z0-9_]*  { yylval.str = strdup(yytext); return TOK_IDENTIFIER; }
+[0-9]+                  { yylval.num = strtoul(yytext, NULL, 10); return TOK_NUMBER; }
 
-#.*$			{ /* Comment, do nothing. */ }
-[ \t]			{ /* Whitespace, do nothing. */ }
-\n			{ current_line++; }
-.			{ return *yytext; }
+#.*$                    { /* Comment, do nothing. */ }
+[ \t]                   { /* Whitespace, do nothing. */ }
+\n                      { current_line++; }
+.                       { return *yytext; }
 
-<<EOF>>			{ return EOF; }
+<<EOF>>                 { return EOF; }
 
 %%

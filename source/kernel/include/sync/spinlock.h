@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Spinlock implementation.
+ * @brief               Spinlock implementation.
  */
 
 #ifndef __SYNC_SPINLOCK_H
@@ -26,28 +26,28 @@
 
 /** Structure containing a spinlock. */
 typedef struct spinlock {
-	atomic_t value;			/**< Value of lock (1 == free, 0 == held, others == held with waiters). */
-	volatile bool state;		/**< Interrupt state prior to locking. */
-	const char *name;		/**< Name of the spinlock. */
+    atomic_t value;             /**< Value of lock (1 == free, 0 == held, others == held with waiters). */
+    volatile bool state;        /**< Interrupt state prior to locking. */
+    const char *name;           /**< Name of the spinlock. */
 } spinlock_t;
 
 /** Initializes a statically defined spinlock. */
 #define SPINLOCK_INITIALIZER(_name) \
-	{ \
-		.value = 1, \
-		.state = 0, \
-		.name = _name, \
-	}
+    { \
+        .value = 1, \
+        .state = 0, \
+        .name = _name, \
+    }
 
 /** Statically defines a new spinlock. */
 #define SPINLOCK_DEFINE(_var) \
-	spinlock_t _var = SPINLOCK_INITIALIZER(#_var)
+    spinlock_t _var = SPINLOCK_INITIALIZER(#_var)
 
 /** Check if a spinlock is held.
- * @param lock		Spinlock to check.
- * @return		True if lock is locked, false otherwise. */
+ * @param lock          Spinlock to check.
+ * @return              True if lock is locked, false otherwise. */
 static inline bool spinlock_held(spinlock_t *lock) {
-	return atomic_get(&lock->value) != 1;
+    return atomic_get(&lock->value) != 1;
 }
 
 extern void spinlock_lock(spinlock_t *lock);

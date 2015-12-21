@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		PC SMP detection code.
+ * @brief               PC SMP detection code.
  */
 
 #include <x86/lapic.h>
@@ -35,51 +35,51 @@
 
 /** Detect all secondary CPUs in the system. */
 void platform_smp_detect(void) {
-	acpi_madt_lapic_t *lapic;
-	acpi_madt_t *madt;
-	size_t i, length;
+    acpi_madt_lapic_t *lapic;
+    acpi_madt_t *madt;
+    size_t i, length;
 
-	/* If the LAPIC is disabled, we cannot use SMP. */
-	if(!lapic_enabled()) {
-		return;
-	} else if(!acpi_supported) {
-		return;
-	}
+    /* If the LAPIC is disabled, we cannot use SMP. */
+    if (!lapic_enabled()) {
+        return;
+    } else if (!acpi_supported) {
+        return;
+    }
 
-	madt = (acpi_madt_t *)acpi_table_find(ACPI_MADT_SIGNATURE);
-	if(!madt)
-		return;
+    madt = (acpi_madt_t *)acpi_table_find(ACPI_MADT_SIGNATURE);
+    if (!madt)
+        return;
 
-	length = madt->header.length - sizeof(acpi_madt_t);
-	for(i = 0; i < length; i += lapic->length) {
-		lapic = (acpi_madt_lapic_t *)(madt->apic_structures + i);
-		if(lapic->type != ACPI_MADT_LAPIC) {
-			continue;
-		} else if(!(lapic->flags & (1<<0))) {
-			/* Ignore disabled processors. */
-			continue;
-		} else if(lapic->lapic_id == curr_cpu->id) {
-			continue;
-		}
+    length = madt->header.length - sizeof(acpi_madt_t);
+    for (i = 0; i < length; i += lapic->length) {
+        lapic = (acpi_madt_lapic_t *)(madt->apic_structures + i);
+        if (lapic->type != ACPI_MADT_LAPIC) {
+            continue;
+        } else if (!(lapic->flags & (1<<0))) {
+            /* Ignore disabled processors. */
+            continue;
+        } else if (lapic->lapic_id == curr_cpu->id) {
+            continue;
+        }
 
-		cpu_register(lapic->lapic_id, CPU_OFFLINE);
-	}
-	
-	return;
+        cpu_register(lapic->lapic_id, CPU_OFFLINE);
+    }
+    
+    return;
 }
 
 /** Prepare the SMP boot process. */
 __init_text void platform_smp_boot_prepare(void) {
-	x86_smp_boot_prepare();
+    x86_smp_boot_prepare();
 }
 
 /** Boot a secondary CPU.
- * @param cpu		CPU to boot. */
+ * @param cpu           CPU to boot. */
 __init_text void platform_smp_boot(cpu_t *cpu) {
-	x86_smp_boot(cpu);
+    x86_smp_boot(cpu);
 }
 
 /** Clean up after secondary CPUs have been booted. */
 __init_text void platform_smp_boot_cleanup(void) {
-	x86_smp_boot_cleanup();
+    x86_smp_boot_cleanup();
 }

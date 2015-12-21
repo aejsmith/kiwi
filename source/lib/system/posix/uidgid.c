@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX user/group functions.
+ * @brief               POSIX user/group functions.
  */
 
 #include <kernel/process.h>
@@ -29,57 +29,55 @@
 #include "libsystem.h"
 
 /** Get the process' effective group ID.
- * @return		Effective group ID of the process. */
+ * @return              Effective group ID of the process. */
 gid_t getegid(void) {
-	security_context_t context;
-	status_t ret;
+    security_context_t context;
+    status_t ret;
 
-	ret = kern_process_control(-1, PROCESS_GET_SECTX, NULL, &context);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_fatal("failed to obtain security context: %d", ret);
-	}
+    ret = kern_process_control(-1, PROCESS_GET_SECTX, NULL, &context);
+    if (ret != STATUS_SUCCESS)
+        libsystem_fatal("failed to obtain security context: %d", ret);
 
-	return context.groups[0];
+    return context.groups[0];
 }
 
 /** Get the process' effective user ID.
- * @return		Effective user ID of the process. */
+ * @return              Effective user ID of the process. */
 uid_t geteuid(void) {
-	security_context_t context;
-	status_t ret;
+    security_context_t context;
+    status_t ret;
 
-	ret = kern_process_control(-1, PROCESS_GET_SECTX, NULL, &context);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_fatal("failed to obtain security context: %d", ret);
-	}
+    ret = kern_process_control(-1, PROCESS_GET_SECTX, NULL, &context);
+    if (ret != STATUS_SUCCESS)
+        libsystem_fatal("failed to obtain security context: %d", ret);
 
-	return context.uid;
+    return context.uid;
 }
 
 /** Get the process' group ID.
- * @return		Group ID of the process. */
+ * @return              Group ID of the process. */
 gid_t getgid(void) {
-	return getegid();
+    return getegid();
 }
 
 /** Get the process' user ID.
- * @return		User ID of the process. */
+ * @return              User ID of the process. */
 uid_t getuid(void) {
-	return geteuid();
+    return geteuid();
 }
 
 /** Set the group ID of the process.
- * @param gid		Group ID to set.
- * @return		0 on success, -1 on failure. */
+ * @param gid           Group ID to set.
+ * @return              0 on success, -1 on failure. */
 int setgid(gid_t gid) {
-	libsystem_stub("setgid", false);
-	return -1;
+    libsystem_stub("setgid", false);
+    return -1;
 }
 
 /** Set the user ID of the process.
- * @param uid		User ID to set.
- * @return		0 on success, -1 on failure. */
+ * @param uid           User ID to set.
+ * @return              0 on success, -1 on failure. */
 int setuid(uid_t uid) {
-	libsystem_stub("setuid", false);
-	return -1;
+    libsystem_stub("setuid", false);
+    return -1;
 }

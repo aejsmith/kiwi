@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		ANSI escape code parser.
+ * @brief               ANSI escape code parser.
  */
 
 #ifndef __LIB_ANSI_PARSER_H
@@ -25,14 +25,14 @@
 #include <types.h>
 
 /** Buffer length for ANSI escape code parser. */
-#define ANSI_PARSER_BUFFER_LEN	3
+#define ANSI_PARSER_BUFFER_LEN  3
 
 /** ANSI escape code parser structure. */
 typedef struct ansi_parser {
-	/** Buffer containing collected sequence. */
-	char buffer[ANSI_PARSER_BUFFER_LEN];
+    /** Buffer containing collected sequence. */
+    char buffer[ANSI_PARSER_BUFFER_LEN];
 
-	int length;			/**< Buffer length. */
+    int length;                     /**< Buffer length. */
 } ansi_parser_t;
 
 extern uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch);

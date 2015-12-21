@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Library image loader.
+ * @brief               Library image loader.
  */
 
 #ifndef __KERNEL_IMAGE_H

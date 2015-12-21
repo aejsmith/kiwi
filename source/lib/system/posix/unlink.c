@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX unlink function.
+ * @brief               POSIX unlink function.
  */
 
 #include <kernel/fs.h>
@@ -32,18 +32,18 @@
  * Removes an entry from a directory in the filesystem. If no more links remain
  * to the file the entry refers to, it will be removed.
  *
- * @param path		Path to unlink.
+ * @param path          Path to unlink.
  *
- * @return		0 on success, -1 on failure.
+ * @return              0 on success, -1 on failure.
  */
 int unlink(const char *path) {
-	status_t ret;
+    status_t ret;
 
-	ret = kern_fs_unlink(path);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_unlink(path);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX change directory function.
+ * @brief               POSIX change directory function.
  */
 
 #include <kernel/fs.h>
@@ -28,21 +28,21 @@
 #include "libsystem.h"
 
 /** Set the current working directory.
- * @param path		Path to change to.
- * @return		0 on success, -1 on failure with errno set accordingly. */
+ * @param path          Path to change to.
+ * @return              0 on success, -1 on failure with errno set accordingly. */
 int chdir(const char *path) {
-	status_t ret;
+    status_t ret;
 
-	if(!path || !path[0]) {
-		errno = ENOENT;
-		return -1;
-	}
+    if (!path || !path[0]) {
+        errno = ENOENT;
+        return -1;
+    }
 
-	ret = kern_fs_set_curr_dir(path);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_set_curr_dir(path);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return ret;
+    return ret;
 }

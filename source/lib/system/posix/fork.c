@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX process creation function.
+ * @brief               POSIX process creation function.
  */
 
 #include <kernel/object.h>
@@ -29,8 +29,8 @@
 
 /** Structure containing a fork handler. */
 typedef struct fork_handler {
-	core_list_t header;		/**< List link. */
-	void (*func)(void);		/**< Function to call. */
+    core_list_t header;         /**< List link. */
+    void (*func)(void);         /**< Function to call. */
 } fork_handler_t;
 
 /** List of fork handlers. */
@@ -54,76 +54,76 @@ int32_t child_processes_lock = MUTEX_INITIALIZER;
  * the calling thread will be duplicated, however. Other threads will not be
  * duplicated into the new process.
  *
- * @return		0 in the child process, process ID of the child in the
- *			parent, or -1 on failure, with errno set appropriately.
+ * @return              0 in the child process, process ID of the child in the
+ *                      parent, or -1 on failure, with errno set appropriately.
  */
 pid_t fork(void) {
-	posix_process_t *process;
-	fork_handler_t *handler;
-	status_t ret;
+    posix_process_t *process;
+    fork_handler_t *handler;
+    status_t ret;
 
-	/* Allocate a child process structure. Do this before creating the
-	 * process so we don't fail after creating the child. */
-	process = malloc(sizeof(*process));
-	if(!process)
-		return -1;
+    /* Allocate a child process structure. Do this before creating the process
+     * so we don't fail after creating the child. */
+    process = malloc(sizeof(*process));
+    if (!process)
+        return -1;
 
-	ret = kern_process_clone(&process->handle);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		free(process);
-		return -1;
-	}
+    ret = kern_process_clone(&process->handle);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        free(process);
+        return -1;
+    }
 
-	if(process->handle == INVALID_HANDLE) {
-		/* This is the child. Free the unneeded process structure. */
-		free(process);
+    if (process->handle == INVALID_HANDLE) {
+        /* This is the child. Free the unneeded process structure. */
+        free(process);
 
-		/* Empty the child processes list: anything in there is not our
-		 * child, but a child of our parent. */
-		CORE_LIST_FOREACH_SAFE(&child_processes, iter) {
-			process = core_list_entry(iter, posix_process_t, header);
+        /* Empty the child processes list: anything in there is not our child,
+         * but a child of our parent. */
+        core_list_foreach_safe(&child_processes, iter) {
+            process = core_list_entry(iter, posix_process_t, header);
 
-			/* Handles are all invalid as they should not be marked
-			 * as inheritable, but try to close them anyway just in
-			 * case the user is doing something daft. */
-			kern_handle_close(process->handle);
-			core_list_remove(&process->header);
-			free(process);
-		}
+            /* Handles are all invalid as they should not be marked as
+             * inheritable, but try to close them anyway just in case the user
+             * is doing something daft. */
+            kern_handle_close(process->handle);
+            core_list_remove(&process->header);
+            free(process);
+        }
 
-		/* Run post-fork handlers. */
-		CORE_LIST_FOREACH(&fork_handlers, iter) {
-			handler = core_list_entry(iter, fork_handler_t, header);
-			handler->func();
-		}
+        /* Run post-fork handlers. */
+        core_list_foreach(&fork_handlers, iter) {
+            handler = core_list_entry(iter, fork_handler_t, header);
+            handler->func();
+        }
 
-		return 0;
-	} else {
-		core_list_init(&process->header);
-		process->pid = kern_process_id(process->handle);
-		if(process->pid < 1)
-			libsystem_fatal("could not get ID of child");
+        return 0;
+    } else {
+        core_list_init(&process->header);
+        process->pid = kern_process_id(process->handle);
+        if (process->pid < 1)
+            libsystem_fatal("could not get ID of child");
 
-		/* Add it to the child list. */
-		kern_mutex_lock(&child_processes_lock, -1);
-		core_list_append(&child_processes, &process->header);
-		kern_mutex_unlock(&child_processes_lock);
+        /* Add it to the child list. */
+        kern_mutex_lock(&child_processes_lock, -1);
+        core_list_append(&child_processes, &process->header);
+        kern_mutex_unlock(&child_processes_lock);
 
-		return process->pid;
-	}
+        return process->pid;
+    }
 }
 
 /** Register a function to be called after a fork in the child.
- * @param func		Function to call. */
+ * @param func          Function to call. */
 void register_fork_handler(void (*func)(void)) {
-	fork_handler_t *handler;
+    fork_handler_t *handler;
 
-	handler = malloc(sizeof(*handler));
-	if(!handler)
-		libsystem_fatal("failed to register fork handler");
+    handler = malloc(sizeof(*handler));
+    if (!handler)
+        libsystem_fatal("failed to register fork handler");
 
-	handler->func = func;
-	core_list_init(&handler->header);
-	core_list_append(&fork_handlers, &handler->header);
+    handler->func = func;
+    core_list_init(&handler->header);
+    core_list_append(&fork_handlers, &handler->header);
 }

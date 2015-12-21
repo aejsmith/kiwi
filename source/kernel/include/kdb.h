@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Kernel debugger.
+ * @brief               Kernel debugger.
  */
 
 #ifndef __KDB_H
@@ -31,53 +31,52 @@
 
 /** KDB status codes. */
 typedef enum kdb_status {
-	KDB_SUCCESS,			/**< Command completed successfully. */
-	KDB_FAILURE,			/**< Command failed or did not exist. */
-	KDB_CONTINUE,			/**< Command should exit KDB. */
-	KDB_STEP,			/**< Command wants to single-step. */
+    KDB_SUCCESS,                    /**< Command completed successfully. */
+    KDB_FAILURE,                    /**< Command failed or did not exist. */
+    KDB_CONTINUE,                   /**< Command should exit KDB. */
+    KDB_STEP,                       /**< Command wants to single-step. */
 } kdb_status_t;
 
 /** KDB entry reasons. */
 typedef enum kdb_reason {
-	KDB_REASON_USER,		/**< Entry upon user request. */
-	KDB_REASON_FATAL,		/**< Entry due to fatal error. */
-	KDB_REASON_BREAK,		/**< Hit a breakpoint. */
-	KDB_REASON_WATCH,		/**< Hit a watchpoint. */
-	KDB_REASON_STEP,		/**< Single-stepped. */
+    KDB_REASON_USER,                /**< Entry upon user request. */
+    KDB_REASON_FATAL,               /**< Entry due to fatal error. */
+    KDB_REASON_BREAK,               /**< Hit a breakpoint. */
+    KDB_REASON_WATCH,               /**< Hit a watchpoint. */
+    KDB_REASON_STEP,                /**< Single-stepped. */
 } kdb_reason_t;
 
 /** KDB output filter structure. */
 typedef struct kdb_filter {
-	/** Function for the filter.
-	 * @param line		Line being output. The function is called a
-	 *			final time with a NULL line pointer once the
-	 *			command completes, and should free the data if
-	 *			necessary.
-	 * @param data		Data pointer set for the filter.
-	 * @return		Whether to output the line. */
-	bool (*func)(const char *line, void *data);
+    /** Function for the filter.
+     * @param line          Line being output. The function is called a final
+     *                      time with a NULL line pointer once the command
+     *                      completes, and should free the data if necessary.
+     * @param data          Data pointer set for the filter.
+     * @return              Whether to output the line. */
+    bool (*func)(const char *line, void *data);
 
-	void *data;			/**< Data for the filter. */
+    void *data;                     /**< Data for the filter. */
 } kdb_filter_t;
 
 /** Type of a KDB command.
- * @param argc		Number of arguments.
- * @param argv		Arguments passed to the command.
- * @param filter	If the command is being used as an output filter,
- *			points to the filter data structure to fill in.
- * @return		Status code describing what to do. */
+ * @param argc          Number of arguments.
+ * @param argv          Arguments passed to the command.
+ * @param filter        If the command is being used as an output filter,
+ *                      points to the filter data structure to fill in.
+ * @return              Status code describing what to do. */
 typedef kdb_status_t (*kdb_command_t)(int argc, char **argv, kdb_filter_t *filter);
 
 /** KDB backtrace callback type.
- * @param addr		Address of trace entry. */
+ * @param addr          Address of trace entry. */
 typedef void (*kdb_backtrace_cb_t)(ptr_t addr);
 
 /** Check if a help message is wanted.
- * @param argc		Number of arguments.
- * @param argv		Arguments passed to the command.
- * @return		Whether a help message is wanted. */
+ * @param argc          Number of arguments.
+ * @param argv          Arguments passed to the command.
+ * @return              Whether a help message is wanted. */
 static inline bool kdb_help(int argc, char **argv) {
-	return (argc > 1 && strcmp(argv[1], "--help") == 0);
+    return (argc > 1 && strcmp(argv[1], "--help") == 0);
 }
 
 struct frame;
@@ -92,10 +91,10 @@ extern int arch_kdb_install_breakpoint(ptr_t addr);
 extern int arch_kdb_install_watchpoint(ptr_t addr, size_t size, bool rw);
 extern bool arch_kdb_remove_breakpoint(unsigned index);
 extern bool arch_kdb_remove_watchpoint(unsigned index);
-extern bool arch_kdb_get_breakpoint(unsigned index, ptr_t *addrp);
-extern bool arch_kdb_get_watchpoint(unsigned index, ptr_t *addrp, size_t *sizep, bool *rwp);
+extern bool arch_kdb_get_breakpoint(unsigned index, ptr_t *_addr);
+extern bool arch_kdb_get_watchpoint(unsigned index, ptr_t *_addr, size_t *_size, bool *_rw);
 extern void arch_kdb_backtrace(struct thread *thread, kdb_backtrace_cb_t cb);
-extern bool arch_kdb_register_value(const char *name, size_t len, unsigned long *regp);
+extern bool arch_kdb_register_value(const char *name, size_t len, unsigned long *_reg);
 extern void arch_kdb_dump_registers(void);
 
 #if CONFIG_SMP
@@ -112,7 +111,7 @@ extern void kdb_printf(const char *fmt, ...) __printf(1, 2);
 extern uint16_t kdb_getc(void);
 extern void *kdb_malloc(size_t size);
 extern void kdb_free(void *addr);
-extern kdb_status_t kdb_parse_expression(char *exp, uint64_t *valp, char **strp);
+extern kdb_status_t kdb_parse_expression(char *exp, uint64_t *_val, char **_str);
 
 extern void kdb_enter(kdb_reason_t reason, struct frame *frame);
 

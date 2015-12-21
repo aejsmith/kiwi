@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		String separating function.
+ * @brief               String separating function.
  */
 
 #include <string.h>
@@ -30,34 +30,37 @@
  * is found *stringp is made NULL and the token is taken to be the entire
  * string.
  *
- * @param stringp	Pointer to a pointer to the string to separate.
- * @param delim		String containing all possible delimeters.
+ * @param stringp       Pointer to a pointer to the string to separate.
+ * @param delim         String containing all possible delimeters.
  *
- * @return		NULL if stringp is NULL, otherwise a pointer to the
- *			token found.
+ * @return              NULL if stringp is NULL, otherwise a pointer to the
+ *                      token found.
  */
 char *strsep(char **stringp, const char *delim) {
-	const char *spanp;
-	char *tok, *s;
-	int c, sc;
+    char *s;
+    const char *spanp;
+    int c, sc;
+    char *tok;
 
-	if(!(s = *stringp))
-		return s;
+    s = *stringp;
+    if (!s)
+        return NULL;
 
-	for(tok = s;;) {
-		c = *s++;
-		spanp = delim;
-		do {
-			if((sc = *spanp++) == c) {
-				if(c == 0) {
-					s = NULL;
-				} else {
-					s[-1] = 0;
-				}
+    for (tok = s;;) {
+        c = *s++;
+        spanp = delim;
+        do {
+            sc = *spanp++;
+            if (sc == c) {
+                if (c == 0) {
+                    s = NULL;
+                } else {
+                    s[-1] = 0;
+                }
 
-				*stringp = s;
-				return tok;
-			}
-		} while(sc != 0);
-	}
+                *stringp = s;
+                return tok;
+            }
+        } while (sc != 0);
+    }
 }

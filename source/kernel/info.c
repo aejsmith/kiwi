@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		System information functions.
+ * @brief               System information functions.
  */
 
 #include <arch/page.h>
@@ -35,20 +35,20 @@
  * information to get, which will be stored in the given buffer. The buffer
  * should be large enough to hold whatever information is being requested.
  *
- * @param what		Information to retrieve (see kernel/system.h).
- * @param buf		Buffer to store information in.
+ * @param what          Information to retrieve (see kernel/system.h).
+ * @param buf           Buffer to store information in.
  *
- * @return		STATUS_SUCCESS on success.
- *			STATUS_INVALID_ARG if what is unknown or buf is NULL.
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_INVALID_ARG if what is unknown or buf is NULL.
  */
 status_t kern_system_info(unsigned what, void *buf) {
-	if(!buf)
-		return STATUS_INVALID_ARG;
+    if (!buf)
+        return STATUS_INVALID_ARG;
 
-	switch(what) {
-	case SYSTEM_INFO_PAGE_SIZE:
-		return write_user((size_t *)buf, PAGE_SIZE);
-	default:
-		return STATUS_INVALID_ARG;
-	}
+    switch (what) {
+    case SYSTEM_INFO_PAGE_SIZE:
+        return write_user((size_t *)buf, PAGE_SIZE);
+    default:
+        return STATUS_INVALID_ARG;
+    }
 }

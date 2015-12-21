@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief               Automatically freed allocation function.
  */
 
 #ifndef __ALLOCA_H
@@ -27,7 +27,7 @@ extern "C" {
 #endif
 
 #undef alloca
-#define alloca(size)	__builtin_alloca(size)
+#define alloca(size)    __builtin_alloca(size)
 
 #ifdef __cplusplus
 }

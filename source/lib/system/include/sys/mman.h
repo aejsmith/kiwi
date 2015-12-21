@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Memory management functions.
+ * @brief               Memory management functions.
  */
 
 #ifndef __SYS_MMAN_H
@@ -29,19 +29,19 @@ extern "C" {
 #endif
 
 /** Protection flags for mmap(). */
-#define PROT_NONE		0	/**< No access is given to the region. */
-#define PROT_READ		(1<<0)	/**< Region is readable. */
-#define PROT_WRITE		(1<<1)	/**< Region is writeable. */
-#define PROT_EXEC		(1<<2)	/**< Region is executable. */
+#define PROT_NONE       0           /**< No access is given to the region. */
+#define PROT_READ       (1<<0)      /**< Region is readable. */
+#define PROT_WRITE      (1<<1)      /**< Region is writeable. */
+#define PROT_EXEC       (1<<2)      /**< Region is executable. */
 
 /** Mapping flags. */
-#define MAP_PRIVATE		(1<<0)	/**< Changes are not shared outside the process. */
-#define MAP_SHARED		(1<<1)	/**< Changes are shared. */
-#define MAP_FIXED		(1<<2)	/**< Use given start address exactly. */
-#define MAP_ANONYMOUS		(1<<3)	/**< Map anonymous memory. */
+#define MAP_PRIVATE     (1<<0)      /**< Changes are not shared outside the process. */
+#define MAP_SHARED      (1<<1)      /**< Changes are shared. */
+#define MAP_FIXED       (1<<2)      /**< Use given start address exactly. */
+#define MAP_ANONYMOUS   (1<<3)      /**< Map anonymous memory. */
 
 /** Value returned by mmap() on failure. */
-#define MAP_FAILED		((void *)-1l)
+#define MAP_FAILED      ((void *)-1l)
 
 /* int mlock(const void *, size_t); */
 /* int mlockall(int); */

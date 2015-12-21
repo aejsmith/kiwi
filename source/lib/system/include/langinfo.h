@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Locale functions/definitions.
+ * @brief               Locale functions/definitions.
  */
 
 #ifndef __LANGINFO_H

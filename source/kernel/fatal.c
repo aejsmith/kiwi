@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Error handling functions.
+ * @brief               Error handling functions.
  */
 
 #include <arch/frame.h>
@@ -41,18 +41,18 @@
 NOTIFIER_DEFINE(fatal_notifier, NULL);
 
 /** Atomic variable to protect against nested calls to fatal(). */
-static atomic_t in_fatal = 0;
+static atomic_t in_fatal;
 
 /** Helper for fatal_printf(). */
 static void fatal_printf_helper(char ch, void *data, int *total) {
-	if(debug_console.out)
-		debug_console.out->putc(ch);
-	if(main_console.out)
-		main_console.out->putc(ch);
+    if (debug_console.out)
+        debug_console.out->putc(ch);
+    if (main_console.out)
+        main_console.out->putc(ch);
 
-	kboot_log_write(ch);
+    kboot_log_write(ch);
 
-	*total = *total + 1;
+    *total = *total + 1;
 }
 
 /**
@@ -61,38 +61,38 @@ static void fatal_printf_helper(char ch, void *data, int *total) {
  * Halts all CPUs, prints a formatted error message to the console and enters
  * KDB. The function will never return.
  *
- * @param frame		Interrupt stack frame (if any).
- * @param fmt		Error message format string.
- * @param ...		Arguments to substitute into format string.
+ * @param frame         Interrupt stack frame (if any).
+ * @param fmt           Error message format string.
+ * @param ...           Arguments to substitute into format string.
  */
 void fatal_etc(frame_t *frame, const char *fmt, ...) {
-	va_list args;
+    va_list args;
 
-	local_irq_disable();
+    local_irq_disable();
 
-	if(atomic_inc(&in_fatal) == 0) {
-		/* Run callback functions registered. */
-		notifier_run_unsafe(&fatal_notifier, NULL, false);
+    if (atomic_inc(&in_fatal) == 0) {
+        /* Run callback functions registered. */
+        notifier_run_unsafe(&fatal_notifier, NULL, false);
 
-		do_printf(fatal_printf_helper, NULL, "\nFATAL: ");
-		va_start(args, fmt);
-		do_vprintf(fatal_printf_helper, NULL, fmt, args);
-		va_end(args);
-		do_printf(fatal_printf_helper, NULL, "\n");
+        do_printf(fatal_printf_helper, NULL, "\nFATAL: ");
+        va_start(args, fmt);
+        do_vprintf(fatal_printf_helper, NULL, fmt, args);
+        va_end(args);
+        do_printf(fatal_printf_helper, NULL, "\n");
 
-		kdb_enter(KDB_REASON_FATAL, frame);
-	}
+        kdb_enter(KDB_REASON_FATAL, frame);
+    }
 
-	/* Halt the current CPU. */
-	arch_cpu_halt();
+    /* Halt the current CPU. */
+    arch_cpu_halt();
 }
 
 /** Handle failure of an assertion.
- * @param cond		String of the condition that failed.
- * @param file		File name that contained the assertion.
- * @param line		Line number of the assertion. */
+ * @param cond          String of the condition that failed.
+ * @param file          File name that contained the assertion.
+ * @param line          Line number of the assertion. */
 void __assert_fail(const char *cond, const char *file, int line) {
-	fatal("Assertion `%s' failed\nat %s:%d", cond, file, line);
+    fatal("Assertion `%s' failed\nat %s:%d", cond, file, line);
 }
 
 /**
@@ -101,16 +101,16 @@ void __assert_fail(const char *cond, const char *file, int line) {
  * Prints a fatal error message and halts the system. The calling process must
  * have the PRIV_FATAL privilege.
  *
- * @param message	Message to print.
+ * @param message       Message to print.
  */
 void kern_system_fatal(const char *message) {
-	char *kmessage;
+    char *kmessage;
 
-	if(!security_check_priv(PRIV_FATAL))
-		return;
+    if (!security_check_priv(PRIV_FATAL))
+        return;
 
-	if(strdup_from_user(message, &kmessage) != STATUS_SUCCESS)
-		return;
+    if (strdup_from_user(message, &kmessage) != STATUS_SUCCESS)
+        return;
 
-	fatal("%s", message);
+    fatal("%s", message);
 }

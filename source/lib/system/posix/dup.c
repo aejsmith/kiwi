@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX file descriptor duplication functions.
+ * @brief               POSIX file descriptor duplication functions.
  */
 
 #include <kernel/object.h>
@@ -29,31 +29,31 @@
 #include "libsystem.h"
 
 /** Duplicate a file descriptor.
- * @param fd		File descriptor to duplicate.
- * @return		New FD, or -1 on failure. */
+ * @param fd            File descriptor to duplicate.
+ * @return              New FD, or -1 on failure. */
 int dup(int fd) {
-	return fcntl(fd, F_DUPFD, 0);
+    return fcntl(fd, F_DUPFD, 0);
 }
 
 /** Duplicate a file descriptor.
- * @param fd		File descriptor to duplicate.
- * @param newfd		New file descriptor (if a file descriptor exists with
- *			this number, it will be closed).
- * @return		New FD, or -1 on failure. */
+ * @param fd            File descriptor to duplicate.
+ * @param newfd         New file descriptor (if a file descriptor exists with
+ *                      this number, it will be closed).
+ * @return              New FD, or -1 on failure. */
 int dup2(int fd, int newfd) {
-	status_t ret;
-	handle_t new;
+    status_t ret;
+    handle_t new;
 
-	if(newfd < 0) {
-		errno = EBADF;
-		return -1;
-	}
+    if (newfd < 0) {
+        errno = EBADF;
+        return -1;
+    }
 
-	ret = kern_handle_duplicate(fd, newfd, &new);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_handle_duplicate(fd, newfd, &new);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return new;
+    return new;
 }

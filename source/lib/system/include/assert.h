@@ -16,17 +16,18 @@
 
 /**
  * @file
- * @brief		Assertion function.
+ * @brief               Assertion function.
  */
 
 #undef assert
+
 #ifdef NDEBUG
-# define assert(cond)	((void)0)
+#   define assert(cond)   ((void)0)
 #else
-# define assert(cond)	\
-	if(__builtin_expect(!!(!(cond)), 0)) { \
-		__assert_fail(#cond, __FILE__, __LINE__, __PRETTY_FUNCTION__); \
-	}
+#   define assert(cond)   \
+        if (__builtin_expect(!!(!(cond)), 0)) { \
+            __assert_fail(#cond, __FILE__, __LINE__, __PRETTY_FUNCTION__); \
+        }
 #endif
 
 #ifndef __ASSERT_H

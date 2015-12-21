@@ -16,9 +16,9 @@
 
 /**
  * @file
- * @brief		POSIX isatty() function.
+ * @brief               POSIX isatty() function.
  *
- * @todo		This is not implemented properly.
+ * @todo                This is not implemented properly.
  */
 
 #include <kernel/file.h>
@@ -30,31 +30,31 @@
 #include "libsystem.h"
 
 /** Check whether a file descriptor refers to a TTY.
- * @param fd		File descriptor to check.
- * @return		1 if a TTY, 0 if not. */
+ * @param fd            File descriptor to check.
+ * @return              1 if a TTY, 0 if not. */
 int isatty(int fd) {
-	file_info_t info;
-	unsigned type;
-	status_t ret;
+    file_info_t info;
+    unsigned type;
+    status_t ret;
 
-	ret = kern_object_type(fd, &type);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return 0;
-	}
+    ret = kern_object_type(fd, &type);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return 0;
+    }
 
-	switch(type) {
-	case OBJECT_TYPE_FILE:
-		ret = kern_file_info(fd, &info);
-		if(ret != STATUS_SUCCESS) {
-			libsystem_status_to_errno(ret);
-			return 0;
-		}
+    switch (type) {
+    case OBJECT_TYPE_FILE:
+        ret = kern_file_info(fd, &info);
+        if (ret != STATUS_SUCCESS) {
+            libsystem_status_to_errno(ret);
+            return 0;
+        }
 
-		if(info.type == FILE_TYPE_CHAR)
-			return 1;
-	default:
-		errno = ENOTTY;
-		return 0;
-	}
+        if (info.type == FILE_TYPE_CHAR)
+            return 1;
+    default:
+        errno = ENOTTY;
+        return 0;
+    }
 }

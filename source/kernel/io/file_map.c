@@ -16,13 +16,13 @@
 
 /**
  * @file
- * @brief		File map functions.
+ * @brief               File map functions.
  *
  * The functions in this file implement a cache for file block numbers to raw
  * (i.e. on-disk) block numbers. Also provided are VM cache helper functions
  * that can use data in a file map to handle reading and writing of data pages.
  *
- * @todo		Is an AVL tree the best thing to use here...?
+ * @todo                Is an AVL tree the best thing to use here...?
  */
 
 #include <io/file_map.h>
@@ -39,139 +39,141 @@
 
 /** Structure containing a single range in a file map. */
 typedef struct file_map_chunk {
-	uint64_t *blocks;		/**< Array of blocks in the chunk. */
-	unsigned long *bitmap;		/**< Bitmap indicating which blocks are cached. */
-	avl_tree_node_t link;		/**< Link to the map. */
+    uint64_t *blocks;               /**< Array of blocks in the chunk. */
+    unsigned long *bitmap;          /**< Bitmap indicating which blocks are cached. */
+    avl_tree_node_t link;           /**< Link to the map. */
 } file_map_chunk_t;
 
 /** Size we wish for each chunk to cover. */
-#define CHUNK_SIZE	262144
+#define CHUNK_SIZE 262144
 
 /** Slab cache for file map structures. */
 static slab_cache_t *file_map_cache;
 
 /** File map constructor.
- * @param obj		Object to construct.
- * @param data		Unused. */
+ * @param obj           Object to construct.
+ * @param data          Unused. */
 static void file_map_ctor(void *obj, void *data) {
-	file_map_t *map = obj;
+    file_map_t *map = obj;
 
-	mutex_init(&map->lock, "file_map_lock", 0);
-	avl_tree_init(&map->chunks);
+    mutex_init(&map->lock, "file_map_lock", 0);
+    avl_tree_init(&map->chunks);
 }
 
 /** Create a new file map.
- * @param blksize	Size of one block of the file the map is for.
- * @param ops		Operations structure.
- * @param data		Implementation-specific data pointer.
- * @return		Pointer to created file map structure. */
+ * @param blksize       Size of one block of the file the map is for.
+ * @param ops           Operations structure.
+ * @param data          Implementation-specific data pointer.
+ * @return              Pointer to created file map structure. */
 file_map_t *file_map_create(size_t blksize, file_map_ops_t *ops, void *data) {
-	file_map_t *map;
+    file_map_t *map;
 
-	if(blksize > PAGE_SIZE) {
-		fatal("Block size too big");
-	} else if(!is_pow2(blksize)) {
-		fatal("Block size is not a power of 2");
-	}
+    if (blksize > PAGE_SIZE) {
+        fatal("Block size too big");
+    } else if (!is_pow2(blksize)) {
+        fatal("Block size is not a power of 2");
+    }
 
-	map = slab_cache_alloc(file_map_cache, MM_KERNEL);
-	map->block_size = blksize;
-	map->blocks_per_chunk = CHUNK_SIZE / blksize;
-	map->ops = ops;
-	map->data = data;
-	return map;
+    map = slab_cache_alloc(file_map_cache, MM_KERNEL);
+    map->block_size = blksize;
+    map->blocks_per_chunk = CHUNK_SIZE / blksize;
+    map->ops = ops;
+    map->data = data;
+    return map;
 }
 
 /** Destroy a file map.
- * @param map		Map to destroy. */
+ * @param map           Map to destroy. */
 void file_map_destroy(file_map_t *map) {
-	file_map_chunk_t *chunk;
+    file_map_chunk_t *chunk;
 
-	AVL_TREE_FOREACH_SAFE(&map->chunks, iter) {
-		chunk = avl_tree_entry(iter, file_map_chunk_t, link);
+    avl_tree_foreach_safe(&map->chunks, iter) {
+        chunk = avl_tree_entry(iter, file_map_chunk_t, link);
 
-		avl_tree_remove(&map->chunks, &chunk->link);
-		kfree(chunk->bitmap);
-		kfree(chunk->blocks);
-		kfree(chunk);
-	}
+        avl_tree_remove(&map->chunks, &chunk->link);
+        kfree(chunk->bitmap);
+        kfree(chunk->blocks);
+        kfree(chunk);
+    }
 
-	slab_cache_free(file_map_cache, map);
+    slab_cache_free(file_map_cache, map);
 }
 
 /** Look up a block in a file map.
- * @param map		Map to look up in.
- * @param num		Block number to look up.
- * @param rawp		Where to store raw block number.
- * @return		Status code describing result of the operation. */
-status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
-	file_map_chunk_t *chunk;
-	size_t chunk_entry;
-	uint64_t chunk_num;
-	status_t ret;
+ * @param map           Map to look up in.
+ * @param num           Block number to look up.
+ * @param _raw          Where to store raw block number.
+ * @return              Status code describing result of the operation. */
+status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *_raw) {
+    file_map_chunk_t *chunk;
+    size_t chunk_entry;
+    uint64_t chunk_num;
+    status_t ret;
 
-	mutex_lock(&map->lock);
+    mutex_lock(&map->lock);
 
-	chunk_num = num / map->blocks_per_chunk;
-	chunk_entry = num % map->blocks_per_chunk;
+    chunk_num = num / map->blocks_per_chunk;
+    chunk_entry = num % map->blocks_per_chunk;
 
-	/* If the chunk is already allocated, see if the block is cached in it,
-	 * else allocate a new chunk. */
-	chunk = avl_tree_lookup(&map->chunks, chunk_num, file_map_chunk_t, link);
-	if(chunk) {
-		if(bitmap_test(chunk->bitmap, chunk_entry)) {
-			*rawp = chunk->blocks[chunk_entry];
-			mutex_unlock(&map->lock);
-			return STATUS_SUCCESS;
-		}
-	} else {
-		chunk = kmalloc(sizeof(file_map_chunk_t), MM_KERNEL);
-		chunk->blocks = kmalloc(sizeof(uint64_t) * map->blocks_per_chunk, MM_KERNEL);
-		chunk->bitmap = bitmap_alloc(map->blocks_per_chunk, MM_KERNEL);
-		avl_tree_insert(&map->chunks, chunk_num, &chunk->link);
-	}
+    /* If the chunk is already allocated, see if the block is cached in it,
+     * else allocate a new chunk. */
+    chunk = avl_tree_lookup(&map->chunks, chunk_num, file_map_chunk_t, link);
+    if (chunk) {
+        if (bitmap_test(chunk->bitmap, chunk_entry)) {
+            *_raw = chunk->blocks[chunk_entry];
+            mutex_unlock(&map->lock);
+            return STATUS_SUCCESS;
+        }
+    } else {
+        chunk = kmalloc(sizeof(file_map_chunk_t), MM_KERNEL);
+        chunk->blocks = kmalloc(sizeof(uint64_t) * map->blocks_per_chunk, MM_KERNEL);
+        chunk->bitmap = bitmap_alloc(map->blocks_per_chunk, MM_KERNEL);
+        avl_tree_insert(&map->chunks, chunk_num, &chunk->link);
+    }
 
-	/* Look up the block. */
-	ret = map->ops->lookup(map, num, &chunk->blocks[chunk_entry]);
-	if(ret != STATUS_SUCCESS) {
-		mutex_unlock(&map->lock);
-		return ret;
-	}
+    /* Look up the block. */
+    ret = map->ops->lookup(map, num, &chunk->blocks[chunk_entry]);
+    if (ret != STATUS_SUCCESS) {
+        mutex_unlock(&map->lock);
+        return ret;
+    }
 
-	bitmap_set(chunk->bitmap, chunk_entry);
-	*rawp = chunk->blocks[chunk_entry];
-	mutex_unlock(&map->lock);
-	return STATUS_SUCCESS;
+    bitmap_set(chunk->bitmap, chunk_entry);
+
+    *_raw = chunk->blocks[chunk_entry];
+
+    mutex_unlock(&map->lock);
+    return STATUS_SUCCESS;
 }
 
 /** Invalidate entries in a file map.
- * @param map		Map to invalidate in.
- * @param start		Start block to invalidate from.
- * @param count		Number of blocks to invalidate. */
+ * @param map           Map to invalidate in.
+ * @param start         Start block to invalidate from.
+ * @param count         Number of blocks to invalidate. */
 void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
-	file_map_chunk_t *chunk;
-	uint64_t i, chunk_num;
+    file_map_chunk_t *chunk;
+    uint64_t i, chunk_num;
 
-	mutex_lock(&map->lock);
+    mutex_lock(&map->lock);
 
-	for(i = start; i < (start + count); i++) {
-		chunk_num = i / map->blocks_per_chunk;
-		chunk = avl_tree_lookup(&map->chunks, chunk_num, file_map_chunk_t, link);
-		if(!chunk)
-			continue;
+    for (i = start; i < (start + count); i++) {
+        chunk_num = i / map->blocks_per_chunk;
+        chunk = avl_tree_lookup(&map->chunks, chunk_num, file_map_chunk_t, link);
+        if (!chunk)
+            continue;
 
-		bitmap_clear(chunk->bitmap, i % map->blocks_per_chunk);
+        bitmap_clear(chunk->bitmap, i % map->blocks_per_chunk);
 
-		/* Free the chunk if it is now empty. */
-		if(bitmap_ffs(chunk->bitmap, map->blocks_per_chunk) < 0) {
-			avl_tree_remove(&map->chunks, &chunk->link);
-			kfree(chunk->bitmap);
-			kfree(chunk->blocks);
-			kfree(chunk);
-		}
-	}
+        /* Free the chunk if it is now empty. */
+        if (bitmap_ffs(chunk->bitmap, map->blocks_per_chunk) < 0) {
+            avl_tree_remove(&map->chunks, &chunk->link);
+            kfree(chunk->bitmap);
+            kfree(chunk->blocks);
+            kfree(chunk);
+        }
+    }
 
-	mutex_unlock(&map->lock);
+    mutex_unlock(&map->lock);
 }
 
 /**
@@ -182,36 +184,36 @@ void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
  * operations structure for the map must have read_block set. The cache's data
  * pointer must be a pointer to the file map.
  *
- * @param cache		Cache being read into.
- * @param buf		Buffer to read into.
- * @param offset	Offset into the file to read from.
- * @param nonblock	Whether the operation is required to not block.
+ * @param cache         Cache being read into.
+ * @param buf           Buffer to read into.
+ * @param offset        Offset into the file to read from.
+ * @param nonblock      Whether the operation is required to not block.
  *
- * @return		Status code describing result of the operation.
+ * @return              Status code describing result of the operation.
  */
 status_t file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool nonblock) {
-	file_map_t *map = cache->data;
-	uint64_t start, raw;
-	size_t count, i;
-	status_t ret;
+    file_map_t *map = cache->data;
+    uint64_t start, raw;
+    size_t count, i;
+    status_t ret;
 
-	assert(map);
-	assert(map->ops->read_block);
+    assert(map);
+    assert(map->ops->read_block);
 
-	start = offset / map->block_size;
-	count = PAGE_SIZE / map->block_size;
+    start = offset / map->block_size;
+    count = PAGE_SIZE / map->block_size;
 
-	for(i = 0; i < count; i++, buf += map->block_size) {
-		ret = file_map_lookup(map, start + i, &raw);
-		if(ret != STATUS_SUCCESS)
-			return ret;
+    for (i = 0; i < count; i++, buf += map->block_size) {
+        ret = file_map_lookup(map, start + i, &raw);
+        if (ret != STATUS_SUCCESS)
+            return ret;
 
-		ret = map->ops->read_block(map, buf, raw, nonblock);
-		if(ret != STATUS_SUCCESS)
-			return ret;
-	}
+        ret = map->ops->read_block(map, buf, raw, nonblock);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
 
-	return STATUS_SUCCESS;
+    return STATUS_SUCCESS;
 }
 
 /**
@@ -222,50 +224,51 @@ status_t file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool 
  * operations structure for the map must have write_block set. The cache's data
  * pointer must be a pointer to the file map.
  *
- * @param cache		Cache being written from.
- * @param buf		Buffer containing data to write.
- * @param offset	Offset into the file to write to.
- * @param nonblock	Whether the operation is required to not block.
+ * @param cache         Cache being written from.
+ * @param buf           Buffer containing data to write.
+ * @param offset        Offset into the file to write to.
+ * @param nonblock      Whether the operation is required to not block.
  *
- * @return		Status code describing result of the operation.
+ * @return              Status code describing result of the operation.
  */
 status_t file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset, bool nonblock) {
-	file_map_t *map = cache->data;
-	uint64_t start, raw;
-	size_t count, i;
-	status_t ret;
+    file_map_t *map = cache->data;
+    uint64_t start, raw;
+    size_t count, i;
+    status_t ret;
 
-	assert(map);
-	assert(map->ops->write_block);
+    assert(map);
+    assert(map->ops->write_block);
 
-	start = offset / map->block_size;
-	count = PAGE_SIZE / map->block_size;
+    start = offset / map->block_size;
+    count = PAGE_SIZE / map->block_size;
 
-	for(i = 0; i < count; i++, buf += map->block_size) {
-		ret = file_map_lookup(map, start + i, &raw);
-		if(ret != STATUS_SUCCESS)
-			return ret;
+    for (i = 0; i < count; i++, buf += map->block_size) {
+        ret = file_map_lookup(map, start + i, &raw);
+        if (ret != STATUS_SUCCESS)
+            return ret;
 
-		ret = map->ops->write_block(map, buf, raw, nonblock);
-		if(ret != STATUS_SUCCESS)
-			return ret;
-	}
+        ret = map->ops->write_block(map, buf, raw, nonblock);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
 
-	return STATUS_SUCCESS;
+    return STATUS_SUCCESS;
 }
 
 /** VM cache operations using a file map to read/write blocks.
- * @note		Cache data pointer should be set to a pointer to the
- *			file map. */
+ * @note                Cache data pointer should be set to a pointer to the
+ *                      file map. */
 vm_cache_ops_t file_map_vm_cache_ops = {
-	.read_page = file_map_read_page,
-	.write_page = file_map_write_page,
+    .read_page = file_map_read_page,
+    .write_page = file_map_write_page,
 };
 
 /** Initialize the file map slab cache. */
 static __init_text void file_map_init(void) {
-	file_map_cache = object_cache_create("file_map_cache", file_map_t,
-		file_map_ctor, NULL, NULL, 0, MM_BOOT);
+    file_map_cache = object_cache_create(
+        "file_map_cache", file_map_t, file_map_ctor, NULL, NULL, 0,
+        MM_BOOT);
 }
 
 INITCALL(file_map_init);

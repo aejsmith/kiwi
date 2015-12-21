@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		AMD64 secondary CPU boot code.
+ * @brief               AMD64 secondary CPU boot code.
  *
  * The layout of this code has several special locations that the kernel stores
  * various bits of information for us at:
@@ -32,119 +32,119 @@
 .code16
 
 FUNCTION_START(_start)
-	jmp	ap_boot
+    jmp     ap_boot
 FUNCTION_END(_start)
 
 .align 16
 
-entry_addr:	.quad 0
-entry_arg:	.quad 0
-kernel_sp:	.quad 0
-kernel_cr3:	.long 0
+entry_addr: .quad 0
+entry_arg:  .quad 0
+kernel_sp:  .quad 0
+kernel_cr3: .long 0
 
 .align 8
 
 PRIVATE_FUNCTION_START(ap_boot)
-	xorl	%esi, %esi
+    xorl    %esi, %esi
 
-	/* Set the data segment and save the load location. */
-	mov	%cs, %si
-	mov	%si, %ds
-	shl	$4, %esi
+    /* Set the data segment and save the load location. */
+    mov     %cs, %si
+    mov     %si, %ds
+    shl     $4, %esi
 
-	/* Set the correct base address of the GDT and load it. */
-	leal	__gdt(%esi), %eax
-	movl	%eax, (__gdtp + 2)
-	lgdtl	(__gdtp)
+    /* Set the correct base address of the GDT and load it. */
+    leal    __gdt(%esi), %eax
+    movl    %eax, (__gdtp + 2)
+    lgdtl   (__gdtp)
 
-	/* Enable protected mode. */
-	movl	%cr0, %eax
-	orl	$X86_CR0_PE, %eax
-	movl	%eax, %cr0
+    /* Enable protected mode. */
+    movl    %cr0, %eax
+    orl     $X86_CR0_PE, %eax
+    movl    %eax, %cr0
 
-	/* Jump into the 32-bit code segment. */
-	leal	.Lpmode(%esi), %eax
-	movl	%eax, (1f + 2)
-1:	ljmpl	$0x08, $0
+    /* Jump into the 32-bit code segment. */
+    leal    .Lpmode(%esi), %eax
+    movl    %eax, (1f + 2)
+1:  ljmpl   $0x08, $0
 .align 8
 .Lpmode:
 .code32
-	/* Load data segment. */
-	movl	$0x10, %eax
-	mov	%ax, %ds
+    /* Load data segment. */
+    movl    $0x10, %eax
+    mov     %ax, %ds
 
-	/* Enable PAE/PGE. */
-	movl	%cr4, %eax
-	orl	$(X86_CR4_PAE | X86_CR4_PGE), %eax
-	movl	%eax, %cr4
+    /* Enable PAE/PGE. */
+    movl    %cr4, %eax
+    orl     $(X86_CR4_PAE | X86_CR4_PGE), %eax
+    movl    %eax, %cr4
 
-	/* Load the correct value for CR3. */
-	movl	kernel_cr3(%esi), %eax
-	movl	%eax, %cr3
+    /* Load the correct value for CR3. */
+    movl    kernel_cr3(%esi), %eax
+    movl    %eax, %cr3
 
-	/* Enable long mode by setting EFER.LME. */
-	movl	$X86_MSR_EFER, %ecx
-	rdmsr
-	orl	$X86_EFER_LME, %eax
-	wrmsr
+    /* Enable long mode by setting EFER.LME. */
+    movl    $X86_MSR_EFER, %ecx
+    rdmsr
+    orl     $X86_EFER_LME, %eax
+    wrmsr
 
-	/* Check for NX support and enable it if necessary. We must do this
-	 * here as if it is supported the page tables will have the NX bit set
-	 * on certain parts of the kernel. */
-	movl	$X86_CPUID_EXT_FEATURE, %eax
-	cpuid
-	bt	$20, %edx
-	jnc	2f
-	movl	$X86_MSR_EFER, %ecx
-	rdmsr
-	orl	$X86_EFER_NXE, %eax
-	wrmsr
+    /* Check for NX support and enable it if necessary. We must do this
+     * here as if it is supported the page tables will have the NX bit set
+     * on certain parts of the kernel. */
+    movl    $X86_CPUID_EXT_FEATURE, %eax
+    cpuid
+    bt      $20, %edx
+    jnc     2f
+    movl    $X86_MSR_EFER, %ecx
+    rdmsr
+    orl     $X86_EFER_NXE, %eax
+    wrmsr
 2:
-	/* Set PG (Paging Enable) to put us in compatibility mode. */
-	movl	%cr0, %eax
-	orl	$X86_CR0_PG, %eax
-	movl	%eax, %cr0
+    /* Set PG (Paging Enable) to put us in compatibility mode. */
+    movl    %cr0, %eax
+    orl     $X86_CR0_PG, %eax
+    movl    %eax, %cr0
 
-	/* Jump into the 64-bit code segment. */
-	leal	.Llmode(%esi), %eax
-	movl	%eax, (1f + 1)(%esi)
-1:	ljmpl	$0x18, $0
+    /* Jump into the 64-bit code segment. */
+    leal    .Llmode(%esi), %eax
+    movl    %eax, (1f + 1)(%esi)
+1:  ljmpl   $0x18, $0
 .align 8
 .code64
 .Llmode:
-	/* Set data segments. */
-	mov	$0x20, %ax
-	mov	%ax, %ss
-	xorl	%eax, %eax
-	mov	%ax, %ds
-	mov	%ax, %es
-	mov	%ax, %fs
-	mov	%ax, %gs
+    /* Set data segments. */
+    mov     $0x20, %ax
+    mov     %ax, %ss
+    xorl    %eax, %eax
+    mov     %ax, %ds
+    mov     %ax, %es
+    mov     %ax, %fs
+    mov     %ax, %gs
 
-	/* Clear top 32 bits of our load address. */
-	movq	%rsi, %rsi
+    /* Clear top 32 bits of our load address. */
+    movq    %rsi, %rsi
 
-	/* Load the stack address. */
-	movq	kernel_sp(%rsi), %rsp
+    /* Load the stack address. */
+    movq    kernel_sp(%rsi), %rsp
 
-	/* Clear the stack frame/RFLAGS. */
-	xorq	%rbp, %rbp
-	push	$0
-	popf
+    /* Clear the stack frame/RFLAGS. */
+    xorq    %rbp, %rbp
+    push    $0
+    popf
 
-	/* Call the kernel. */
-	movq	entry_arg(%rsi), %rdi
-	call	*entry_addr(%rsi)
+    /* Call the kernel. */
+    movq    entry_arg(%rsi), %rdi
+    call    *entry_addr(%rsi)
 FUNCTION_END(ap_boot)
 
 __gdt:
-	.quad 0x0000000000000000		/**< NULL descriptor (0x00). */
-	.quad 0x00CF9A000000FFFF		/**< 32-bit code     (0x08). */
-	.quad 0x00CF92000000FFFF		/**< 32-bit data     (0x10). */
-	.quad 0x00AF9A000000FFFF		/**< 64-bit code     (0x18). */
-	.quad 0x008F92000000FFFF		/**< 64-bit data     (0x20). */
+    .quad 0x0000000000000000        /**< NULL descriptor (0x00). */
+    .quad 0x00cf9a000000ffff        /**< 32-bit code     (0x08). */
+    .quad 0x00cf92000000ffff        /**< 32-bit data     (0x10). */
+    .quad 0x00af9a000000ffff        /**< 64-bit code     (0x18). */
+    .quad 0x008f92000000ffff        /**< 64-bit data     (0x20). */
 .L__gdt_end:
 
 __gdtp:
-	.word .L__gdt_end-__gdt-1
-	.long 0
+    .word .L__gdt_end-__gdt-1
+    .long 0

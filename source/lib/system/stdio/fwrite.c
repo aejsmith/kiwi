@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		File write function.
+ * @brief               File write function.
  */
 
 #include <unistd.h>
@@ -29,22 +29,22 @@
  * Writes nmemb elements of data, each size bytes long, from a buffer into
  * a file stream.
  *
- * @param ptr		Buffer to write from.
- * @param size		Size of each element.
- * @param nmemb		Number of elements to write.
- * @param stream	Stream to write to.
+ * @param ptr           Buffer to write from.
+ * @param size          Size of each element.
+ * @param nmemb         Number of elements to write.
+ * @param stream        Stream to write to.
  *
- * @return		Number of elements written successfully.
+ * @return              Number of elements written successfully.
  */
 size_t fwrite(const void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) {
-	ssize_t ret;
+    ssize_t ret;
 
-	if(!size || !nmemb)
-		return 0;
+    if (!size || !nmemb)
+        return 0;
 
-	ret = write(stream->fd, ptr, size * nmemb);
-	if(ret <= 0)
-		return 0;
+    ret = write(stream->fd, ptr, size * nmemb);
+    if (ret <= 0)
+        return 0;
 
-	return ret / size;
+    return ret / size;
 }

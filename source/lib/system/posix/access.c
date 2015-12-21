@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX file access check function.
+ * @brief               POSIX file access check function.
  */
 
 #include <kernel/fs.h>
@@ -28,38 +28,38 @@
 #include "libsystem.h"
 
 /** Check whether access to a file is allowed.
- * @param path		Path to file to check.
- * @param mode		Mode to check (F_OK, or any of the flags R_OK, W_OK and
- *			X_OK).
- * @return		0 if access is allowed, -1 if not with errno set
- *			accordingly. */
+ * @param path          Path to file to check.
+ * @param mode          Mode to check (F_OK, or any of the flags R_OK, W_OK and
+ *                      X_OK).
+ * @return              0 if access is allowed, -1 if not with errno set
+ *                      accordingly. */
 int access(const char *path, int mode) {
-	uint32_t access = 0;
-	file_info_t info;
-	handle_t handle;
-	status_t ret;
+    uint32_t access = 0;
+    file_info_t info;
+    handle_t handle;
+    status_t ret;
 
-	ret = kern_fs_info(path, true, &info);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_info(path, true, &info);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	if(mode != F_OK) {
-		if(mode & R_OK)
-			access |= FILE_ACCESS_READ;
-		if(mode & W_OK)
-			access |= FILE_ACCESS_WRITE;
-		if(mode & X_OK)
-			access |= FILE_ACCESS_EXECUTE;
-	}
+    if (mode != F_OK) {
+        if (mode & R_OK)
+            access |= FILE_ACCESS_READ;
+        if (mode & W_OK)
+            access |= FILE_ACCESS_WRITE;
+        if (mode & X_OK)
+            access |= FILE_ACCESS_EXECUTE;
+    }
 
-	ret = kern_fs_open(path, access, 0, 0, &handle);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_open(path, access, 0, 0, &handle);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	kern_handle_close(handle);
-	return 0;
+    kern_handle_close(handle);
+    return 0;
 }

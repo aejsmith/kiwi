@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Physical memory management.
+ * @brief               Physical memory management.
  */
 
 #ifndef __MM_PHYS_H
@@ -27,18 +27,19 @@
 #include <mm/mm.h>
 
 /** Memory range types. */
-#define MEMORY_TYPE_NORMAL	0	/**< Normal Memory. */
-#define MEMORY_TYPE_DEVICE	1	/**< Device Memory. */
-#define MEMORY_TYPE_UC		2	/**< Uncacheable. */
-#define MEMORY_TYPE_WC		3	/**< Write Combining. */
-#define MEMORY_TYPE_WT		4	/**< Write-through. */
-#define MEMORY_TYPE_WB		5	/**< Write-back. */
+#define MEMORY_TYPE_NORMAL      0   /**< Normal Memory. */
+#define MEMORY_TYPE_DEVICE      1   /**< Device Memory. */
+#define MEMORY_TYPE_UC          2   /**< Uncacheable. */
+#define MEMORY_TYPE_WC          3   /**< Write Combining. */
+#define MEMORY_TYPE_WT          4   /**< Write-through. */
+#define MEMORY_TYPE_WB          5   /**< Write-back. */
 
 extern void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag);
 extern void phys_unmap(void *addr, size_t size, bool shared);
 
-extern status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
-	phys_ptr_t minaddr, phys_ptr_t maxaddr, unsigned mmflag, phys_ptr_t *basep);
+extern status_t phys_alloc(
+    phys_size_t size, phys_ptr_t align, phys_ptr_t boundary, phys_ptr_t minaddr,
+    phys_ptr_t maxaddr, unsigned mmflag, phys_ptr_t *_base);
 extern void phys_free(phys_ptr_t base, phys_size_t size);
 extern bool phys_copy(phys_ptr_t dest, phys_ptr_t source, unsigned mmflag);
 

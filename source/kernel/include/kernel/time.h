@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Time functions.
+ * @brief               Time functions.
  */
 
 #ifndef __KERNEL_TIME_H
@@ -29,21 +29,21 @@ extern "C" {
 #endif
 
 /** Event for the timer firing. */
-#define TIMER_EVENT		1
+#define TIMER_EVENT         1
 
 /** Timer mode values. */
-#define TIMER_ONESHOT		1	/**< Fire the timer event only once. */
-#define TIMER_PERIODIC		2	/**< Fire the event at regular intervals until stopped. */
+#define TIMER_ONESHOT       1       /**< Fire the timer event only once. */
+#define TIMER_PERIODIC      2       /**< Fire the event at regular intervals until stopped. */
 
-extern status_t kern_timer_create(uint32_t flags, handle_t *handlep);
+extern status_t kern_timer_create(uint32_t flags, handle_t *_handle);
 extern status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode);
-extern status_t kern_timer_stop(handle_t handle, nstime_t *remp);
+extern status_t kern_timer_stop(handle_t handle, nstime_t *_rem);
 
 /** Time sources. */
-#define TIME_SYSTEM		1	/**< Monotonic system time. */
-#define TIME_REAL		2	/**< Real time (time since UNIX epoch). */
+#define TIME_SYSTEM         1       /**< Monotonic system time. */
+#define TIME_REAL           2       /**< Real time (time since UNIX epoch). */
 
-extern status_t kern_time_get(unsigned source, nstime_t *timep);
+extern status_t kern_time_get(unsigned source, nstime_t *_time);
 extern status_t kern_time_set(unsigned source, nstime_t time);
 
 #ifdef __cplusplus

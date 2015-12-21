@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Kernel virtual memory allocator.
+ * @brief               Kernel virtual memory allocator.
  */
 
 #ifndef __MM_KMEM_H

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		User context definition.
+ * @brief               User context definition.
  */
 
 #ifndef __UCONTEXT_H

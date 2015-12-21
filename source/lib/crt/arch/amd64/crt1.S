@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		AMD64 application startup code.
+ * @brief               AMD64 application startup code.
  */
 
 .section .text
@@ -25,8 +25,8 @@
 .global _start
 .type _start, @function
 _start:
-	/* Call the libsystem initialisation function. We're entered from
-	 * libkernel with a pointer to the process argument block as the first
-	 * argument, so this will be passed through. */
-	jmp	libsystem_init
+    /* Call the libsystem initialisation function. We're entered from libkernel
+     * with a pointer to the process argument block as the first argument, so
+     * this will be passed through. */
+    jmp     libsystem_init
 .size _start, .-_start

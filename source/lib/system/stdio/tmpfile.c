@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Temporary file creation function.
+ * @brief               Temporary file creation function.
  */
 
 #include <stdio.h>
@@ -24,11 +24,11 @@
 #include "libsystem.h"
 
 FILE *tmpfile(void) {
-	libsystem_stub("tmpfile", true);
-	return NULL;
+    libsystem_stub("tmpfile", true);
+    return NULL;
 }
 
 char *tmpnam(char *s) {
-	libsystem_stub("tmpnam", true);
-	return NULL;
+    libsystem_stub("tmpnam", true);
+    return NULL;
 }

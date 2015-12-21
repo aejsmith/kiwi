@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Kernel module loader.
+ * @brief               Kernel module loader.
  */
 
 #include <io/fs.h>
@@ -45,18 +45,18 @@
 //#define DEBUG_MODULE
 
 #ifdef DEBUG_MODULE
-# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
+#   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
 #else
-# define dprintf(fmt...)	
+#   define dprintf(fmt...)
 #endif
 
 /** Structure describing a boot module. */
 typedef struct boot_module {
-	list_t header;			/**< Link to modules list. */
-	void *mapping;			/**< Pointer to mapped module data. */
-	size_t size;			/**< Size of the module data. */
-	object_handle_t *handle;	/**< File handle for the module data. */
-	char *name;			/**< Name of the module. */
+    list_t header;                  /**< Link to modules list. */
+    void *mapping;                  /**< Pointer to mapped module data. */
+    size_t size;                    /**< Size of the module data. */
+    object_handle_t *handle;        /**< File handle for the module data. */
+    char *name;                     /**< Name of the module. */
 } boot_module_t;
 
 /** List of loaded modules. */
@@ -64,9 +64,11 @@ static LIST_DEFINE(module_list);
 static MUTEX_DEFINE(module_lock, 0);
 
 #ifdef KERNEL_MODULE_BASE
+
 /** Module memory allocation space. */
 static ptr_t next_module_addr = KERNEL_MODULE_BASE;
 static size_t remaining_module_size = KERNEL_MODULE_SIZE;
+
 #endif
 
 /** Kernel module structure. */
@@ -75,182 +77,183 @@ module_t kernel_module;
 #ifdef KERNEL_MODULE_BASE
 
 /** Allocate memory suitable to hold a kernel module.
- * @param size		Size of the allocation.
- * @return		Address allocated or 0 if no available memory. */
+ * @param size          Size of the allocation.
+ * @return              Address allocated or 0 if no available memory. */
 ptr_t module_mem_alloc(size_t size) {
-	page_t *page;
-	ptr_t addr;
-	size_t i;
+    page_t *page;
+    ptr_t addr;
+    size_t i;
 
-	size = round_up(size, PAGE_SIZE);
-	if(size > remaining_module_size)
-		return 0;
+    size = round_up(size, PAGE_SIZE);
+    if (size > remaining_module_size)
+        return 0;
 
-	addr = next_module_addr;
+    addr = next_module_addr;
 
-	mmu_context_lock(&kernel_mmu_context);
+    mmu_context_lock(&kernel_mmu_context);
 
-	for(i = 0; i < size; i += PAGE_SIZE) {
-		page = page_alloc(MM_BOOT);
-		mmu_context_map(&kernel_mmu_context, addr + i, page->addr,
-			VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
-			MM_BOOT);
-	}
+    for (i = 0; i < size; i += PAGE_SIZE) {
+        page = page_alloc(MM_BOOT);
+        mmu_context_map(
+            &kernel_mmu_context, addr + i, page->addr,
+            VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
+            MM_BOOT);
+    }
 
-	mmu_context_unlock(&kernel_mmu_context);
+    mmu_context_unlock(&kernel_mmu_context);
 
-	next_module_addr += size;
-	remaining_module_size -= size;
-	return addr;
+    next_module_addr += size;
+    remaining_module_size -= size;
+    return addr;
 }
 
 /** Free memory holding a module.
- * @param base		Base of the allocation.
- * @param size		Size of the allocation. */
+ * @param base          Base of the allocation.
+ * @param size          Size of the allocation. */
 void module_mem_free(ptr_t base, size_t size) {
-	/* TODO */
+    /* TODO */
 }
 
 #else /* KERNEL_MODULE_BASE */
 
 /** Allocate memory suitable to hold a kernel module.
- * @param size		Size of the allocation.
- * @return		Address allocated or 0 if no available memory. */
+ * @param size          Size of the allocation.
+ * @return              Address allocated or 0 if no available memory. */
 ptr_t module_mem_alloc(size_t size) {
-	return kmem_alloc(round_up(size, PAGE_SIZE), MM_NOWAIT);
+    return kmem_alloc(round_up(size, PAGE_SIZE), MM_NOWAIT);
 }
 
 /** Free memory holding a module.
- * @param base		Base of the allocation.
- * @param size		Size of the allocation. */
+ * @param base          Base of the allocation.
+ * @param size          Size of the allocation. */
 void module_mem_free(ptr_t base, size_t size) {
-	kmem_free((void *)base, round_up(size, PAGE_SIZE));
+    kmem_free((void *)base, round_up(size, PAGE_SIZE));
 }
 
 #endif /* KERNEL_MODULE_BASE */
 
 /** Find a module in the module list.
- * @param name		Name of module to find.
- * @return		Pointer to module structure, NULL if not found. */
+ * @param name          Name of module to find.
+ * @return              Pointer to module structure, NULL if not found. */
 static module_t *module_find(const char *name) {
-	module_t *module;
+    module_t *module;
 
-	LIST_FOREACH(&module_list, iter) {
-		module = list_entry(iter, module_t, header);
-		if(strcmp(module->name, name) == 0)
-			return module;
-	}
+    list_foreach(&module_list, iter) {
+        module = list_entry(iter, module_t, header);
+        if (strcmp(module->name, name) == 0)
+            return module;
+    }
 
-	return NULL;
+    return NULL;
 }
 
 /** Find and check a module's information.
- * @param module	Module being loaded.
- * @return		Status code describing result of the operation. */
+ * @param module        Module being loaded.
+ * @return              Status code describing result of the operation. */
 static status_t find_module_info(module_t *module) {
-	symbol_t sym;
-	bool found;
+    symbol_t sym;
+    bool found;
 
-	/* Retrieve the module information. */
-	found = elf_symbol_lookup(&module->image, "__module_name", false, false, &sym);
-	module->name = (found) ? (void *)sym.addr : NULL;
-	found = elf_symbol_lookup(&module->image, "__module_desc", false, false, &sym);
-	module->description = (found) ? (void *)sym.addr : NULL;
-	found = elf_symbol_lookup(&module->image, "__module_init", false, false, &sym);
-	module->init = (found) ? (void *)(*(ptr_t *)sym.addr) : NULL;
-	found = elf_symbol_lookup(&module->image, "__module_unload", false, false, &sym);
-	module->unload = (found) ? (void *)(*(ptr_t *)sym.addr) : NULL;
+    /* Retrieve the module information. */
+    found = elf_symbol_lookup(&module->image, "__module_name", false, false, &sym);
+    module->name = (found) ? (void *)sym.addr : NULL;
+    found = elf_symbol_lookup(&module->image, "__module_desc", false, false, &sym);
+    module->description = (found) ? (void *)sym.addr : NULL;
+    found = elf_symbol_lookup(&module->image, "__module_init", false, false, &sym);
+    module->init = (found) ? (void *)(*(ptr_t *)sym.addr) : NULL;
+    found = elf_symbol_lookup(&module->image, "__module_unload", false, false, &sym);
+    module->unload = (found) ? (void *)(*(ptr_t *)sym.addr) : NULL;
 
-	/* Check if it is valid. */
-	if(!module->name || !module->description || !module->init) {
-		kprintf(LOG_NOTICE, "module: information for module %s is invalid\n",
-			module->image.name);
-		return STATUS_MALFORMED_IMAGE;
-	} else if(strnlen(module->name, MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
-		kprintf(LOG_NOTICE, "module: name of module %s is too long\n",
-			module->image.name);
-		return STATUS_MALFORMED_IMAGE;
-	} else if(strnlen(module->description, MODULE_DESC_MAX + 1) == (MODULE_DESC_MAX + 1)) {
-		kprintf(LOG_NOTICE, "module: description of module %s is too long\n",
-			module->image.name);
-		return STATUS_MALFORMED_IMAGE;
-	}
+    /* Check if it is valid. */
+    if (!module->name || !module->description || !module->init) {
+        kprintf(LOG_NOTICE, "module: information for module %s is invalid\n", module->image.name);
+        return STATUS_MALFORMED_IMAGE;
+    } else if (strnlen(module->name, MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
+        kprintf(LOG_NOTICE, "module: name of module %s is too long\n", module->image.name);
+        return STATUS_MALFORMED_IMAGE;
+    } else if (strnlen(module->description, MODULE_DESC_MAX + 1) == (MODULE_DESC_MAX + 1)) {
+        kprintf(LOG_NOTICE, "module: description of module %s is too long\n", module->image.name);
+        return STATUS_MALFORMED_IMAGE;
+    }
 
-	/* Check if a module with this name already exists. */
-	if(module_find(module->name))
-		return STATUS_ALREADY_EXISTS;
+    /* Check if a module with this name already exists. */
+    if (module_find(module->name))
+        return STATUS_ALREADY_EXISTS;
 
-	return STATUS_SUCCESS;
+    return STATUS_SUCCESS;
 }
 
 /** Finish loading a module.
- * @param module	Module being loaded.
- * @param namep		Where to store name of unmet dependency.
- * @param depp		If a dependency is loaded but not ready, a pointer to
- *			it will be stored here.
- * @return		Status code describing result of the operation. */
-static status_t finish_module(module_t *module, const char **namep, module_t **depp) {
-	symbol_t sym;
-	size_t i;
-	module_t *dep;
-	status_t ret;
+ * @param module        Module being loaded.
+ * @param _name         Where to store name of unmet dependency.
+ * @param _dep          If a dependency is loaded but not ready, a pointer to
+ *                      it will be stored here.
+ * @return              Status code describing result of the operation. */
+static status_t finish_module(module_t *module, const char **_name, module_t **_dep) {
+    symbol_t sym;
+    size_t i;
+    module_t *dep;
+    status_t ret;
 
-	module->state = MODULE_DEPS;
+    module->state = MODULE_DEPS;
 
-	/* No dependencies symbol means no dependencies. */
-	if(elf_symbol_lookup(&module->image, "__module_deps", false, false, &sym)) {
-		module->deps = (const char **)sym.addr;
-	} else {
-		module->deps = NULL;
-	}
+    /* No dependencies symbol means no dependencies. */
+    if (elf_symbol_lookup(&module->image, "__module_deps", false, false, &sym)) {
+        module->deps = (const char **)sym.addr;
+    } else {
+        module->deps = NULL;
+    }
 
-	/* Loop through each dependency. The array is NULL-terminated. */
-	for(i = 0; module->deps && module->deps[i]; i++) {
-		if(strnlen(module->deps[i], MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
-			kprintf(LOG_WARN, "module: module %s has invalid dependency\n",
-				module->name);
-			return STATUS_MALFORMED_IMAGE;
-		}
+    /* Loop through each dependency. The array is NULL-terminated. */
+    for (i = 0; module->deps && module->deps[i]; i++) {
+        if (strnlen(module->deps[i], MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
+            kprintf(LOG_WARN, "module: module %s has invalid dependency\n", module->name);
+            return STATUS_MALFORMED_IMAGE;
+        }
 
-		dep = module_find(module->deps[i]);
-		if(!dep || dep->state != MODULE_READY) {
-			if(namep)
-				*namep = module->deps[i];
-			if(depp)
-				*depp = dep;
-			return STATUS_MISSING_LIBRARY;
-		}
-	}
+        dep = module_find(module->deps[i]);
+        if (!dep || dep->state != MODULE_READY) {
+            if (_name)
+                *_name = module->deps[i];
 
-	/* Perform remaining relocations on the module. At this point all
-	 * dependencies are loaded, so assuming the module's dependencies are
-	 * correct, external symbol lookups can be done. */
-	ret = elf_module_finish(&module->image);
-	if(ret != STATUS_SUCCESS)
-		return ret;
+            if (_dep)
+                *_dep = dep;
 
-	module->state = MODULE_INIT;
+            return STATUS_MISSING_LIBRARY;
+        }
+    }
 
-	/* Call the module initialization function. */
-	dprintf("module: calling init function %p for module %p (%s)...\n",
-		module->init, module, module->name);
-	ret = module->init();
-	if(ret != STATUS_SUCCESS)
-		return ret;
+    /* Perform remaining relocations on the module. At this point all
+     * dependencies are loaded, so assuming the module's dependencies are
+     * correct, external symbol lookups can be done. */
+    ret = elf_module_finish(&module->image);
+    if (ret != STATUS_SUCCESS)
+        return ret;
 
-	/* Reference all the dependencies. We leave this until now to avoid
-	 * having to go through and remove the reference if anything above
-	 * fails. */
-	for(i = 0; module->deps && module->deps[i] != NULL; i++) {
-		dep = module_find(module->deps[i]);
-		refcount_inc(&dep->count);
-	}
+    module->state = MODULE_INIT;
 
-	module->state = MODULE_READY;
+    /* Call the module initialization function. */
+    dprintf(
+        "module: calling init function %p for module %p (%s)...\n",
+        module->init, module, module->name);
+    ret = module->init();
+    if (ret != STATUS_SUCCESS)
+        return ret;
 
-	kprintf(LOG_NOTICE, "module: successfully loaded module %s (%s)\n",
-		module->name, module->description);
-	return STATUS_SUCCESS;
+    /* Reference all the dependencies. We leave this until now to avoid having
+     * to go through and remove the reference if anything above fails. */
+    for (i = 0; module->deps && module->deps[i]; i++) {
+        dep = module_find(module->deps[i]);
+        refcount_inc(&dep->count);
+    }
+
+    module->state = MODULE_READY;
+
+    kprintf(
+        LOG_NOTICE, "module: successfully loaded module %s (%s)\n",
+        module->name, module->description);
+
+    return STATUS_SUCCESS;
 }
 
 /**
@@ -262,68 +265,68 @@ static status_t finish_module(module_t *module, const char **namep, module_t **d
  * The intended usage of this function is to keep on calling it and loading
  * each unmet dependency it specifies until it succeeds.
  *
- * @param path		Path to module on filesystem.
- * @param depbuf	Where to store name of unmet dependency (should be
- *			MODULE_NAME_MAX + 1 bytes long).
+ * @param path          Path to module on filesystem.
+ * @param depbuf        Where to store name of unmet dependency (should be
+ *                      MODULE_NAME_MAX + 1 bytes long).
  *
- * @return		Status code describing result of the operation. If a
- *			required dependency is not loaded, the function will
- *			return STATUS_MISSING_LIBRARY.
+ * @return              Status code describing result of the operation. If a
+ *                      required dependency is not loaded, the function will
+ *                      return STATUS_MISSING_LIBRARY.
  */
 status_t module_load(const char *path, char *depbuf) {
-	object_handle_t *handle;
-	module_t *module;
-	const char *dep;
-	status_t ret;
+    object_handle_t *handle;
+    module_t *module;
+    const char *dep;
+    status_t ret;
 
-	assert(path);
+    assert(path);
 
-	/* Open a handle to the file. */
-	ret = fs_open(path, FILE_ACCESS_READ, 0, 0, &handle);
-	if(ret != STATUS_SUCCESS)
-		return ret;
+    /* Open a handle to the file. */
+    ret = fs_open(path, FILE_ACCESS_READ, 0, 0, &handle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
 
-	module = kmalloc(sizeof(module_t), MM_KERNEL);
-	list_init(&module->header);
-	refcount_set(&module->count, 0);
+    module = kmalloc(sizeof(module_t), MM_KERNEL);
+    list_init(&module->header);
+    refcount_set(&module->count, 0);
 
-	/* Take the module lock to serialise module loading. */
-	mutex_lock(&module_lock);
+    /* Take the module lock to serialise module loading. */
+    mutex_lock(&module_lock);
 
-	/* Perform first stage of loading the module. */
-	ret = elf_module_load(handle, path, &module->image);
-	object_handle_release(handle);
-	if(ret != STATUS_SUCCESS) {
-		mutex_unlock(&module_lock);
-		kfree(module);
-		return ret;
-	}
+    /* Perform first stage of loading the module. */
+    ret = elf_module_load(handle, path, &module->image);
+    object_handle_release(handle);
+    if (ret != STATUS_SUCCESS) {
+        mutex_unlock(&module_lock);
+        kfree(module);
+        return ret;
+    }
 
-	ret = find_module_info(module);
-	if(ret != STATUS_SUCCESS) {
-		elf_module_destroy(&module->image);
-		mutex_unlock(&module_lock);
-		kfree(module);
-		return ret;
-	}
+    ret = find_module_info(module);
+    if (ret != STATUS_SUCCESS) {
+        elf_module_destroy(&module->image);
+        mutex_unlock(&module_lock);
+        kfree(module);
+        return ret;
+    }
 
-	module->state = MODULE_LOADED;
-	list_append(&module_list, &module->header);
+    module->state = MODULE_LOADED;
+    list_append(&module_list, &module->header);
 
-	ret = finish_module(module, &dep, NULL);
-	if(ret != STATUS_SUCCESS) {
-		if(ret == STATUS_MISSING_LIBRARY && depbuf)
-			strncpy(depbuf, dep, MODULE_NAME_MAX + 1);
+    ret = finish_module(module, &dep, NULL);
+    if (ret != STATUS_SUCCESS) {
+        if (ret == STATUS_MISSING_LIBRARY && depbuf)
+            strncpy(depbuf, dep, MODULE_NAME_MAX + 1);
 
-		list_remove(&module->header);
-		elf_module_destroy(&module->image);
-		mutex_unlock(&module_lock);
-		kfree(module);
-		return ret;
-	}
+        list_remove(&module->header);
+        elf_module_destroy(&module->image);
+        mutex_unlock(&module_lock);
+        kfree(module);
+        return ret;
+    }
 
-	mutex_unlock(&module_lock);
-	return STATUS_SUCCESS;
+    mutex_unlock(&module_lock);
+    return STATUS_SUCCESS;
 }
 
 /**
@@ -339,33 +342,34 @@ status_t module_load(const char *path, char *depbuf) {
  * lies within a loaded image, the image pointer will be set to that image,
  * otherwise it will be set to NULL. Everything else will be set to 0.
  *
- * @param addr		Address to lookup.
- * @param symbol	Symbol structure to fill in.
- * @param offp		Where to store symbol offset (can be NULL).
+ * @param addr          Address to lookup.
+ * @param symbol        Symbol structure to fill in.
+ * @param _off          Where to store symbol offset (can be NULL).
  *
- * @return		Whether a symbol was found for the address.
+ * @return              Whether a symbol was found for the address.
  */
-bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *offp) {
-	module_t *module;
+bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *_off) {
+    module_t *module;
 
-	symbol->image = NULL;
+    symbol->image = NULL;
 
-	LIST_FOREACH(&module_list, iter) {
-		module = list_entry(iter, module_t, header);
+    list_foreach(&module_list, iter) {
+        module = list_entry(iter, module_t, header);
 
-		if(elf_symbol_from_addr(&module->image, addr, symbol, offp)) {
-			return true;
-		} else if(symbol->image) {
-			break;
-		}
-	}
+        if (elf_symbol_from_addr(&module->image, addr, symbol, _off)) {
+            return true;
+        } else if (symbol->image) {
+            break;
+        }
+    }
 
-	symbol->addr = symbol->size = symbol->global = symbol->exported = 0;
-	symbol->name = "<unknown>";
-	if(offp)
-		*offp = 0;
+    symbol->addr = symbol->size = symbol->global = symbol->exported = 0;
+    symbol->name = "<unknown>";
 
-	return false;
+    if (_off)
+        *_off = 0;
+
+    return false;
 }
 
 /**
@@ -376,169 +380,167 @@ bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *offp) {
  * symbol lookups should only be performed in KDB or by the module loader:
  * they do not take a lock and are therefore unsafe.
  *
- * @param name		Name to lookup.
- * @param global	Whether to only look up global symbols.
- * @param exported	Whether to only look up exported symbols.
- * @param symbol	Symbol structure to fill in.
+ * @param name          Name to lookup.
+ * @param global        Whether to only look up global symbols.
+ * @param exported      Whether to only look up exported symbols.
+ * @param symbol        Symbol structure to fill in.
  *
- * @return		Whether a symbol by this name was found.
+ * @return              Whether a symbol by this name was found.
  */
 bool symbol_lookup(const char *name, bool global, bool exported, symbol_t *symbol) {
-	module_t *module;
+    module_t *module;
 
-	LIST_FOREACH(&module_list, iter) {
-		module = list_entry(iter, module_t, header);
+    list_foreach(&module_list, iter) {
+        module = list_entry(iter, module_t, header);
 
-		if(elf_symbol_lookup(&module->image, name, global, exported, symbol))
-			return true;
-	}
+        if (elf_symbol_lookup(&module->image, name, global, exported, symbol))
+            return true;
+    }
 
-	return false;
+    return false;
 }
 
 /** Print a list of loaded kernel modules.
- * @param argc		Argument count.
- * @param argv		Argument array.
- * @return		KDB status code. */
+ * @param argc          Argument count.
+ * @param argv          Argument array.
+ * @return              KDB status code. */
 static kdb_status_t kdb_cmd_modules(int argc, char **argv, kdb_filter_t *filter) {
-	module_t *module;
+    module_t *module;
 
-	if(kdb_help(argc, argv)) {
-		kdb_printf("Usage: %s\n\n", argv[0]);
+    if (kdb_help(argc, argv)) {
+        kdb_printf("Usage: %s\n\n", argv[0]);
 
-		kdb_printf("Prints a list of all loaded kernel modules.\n");
-		return KDB_SUCCESS;
-	}
+        kdb_printf("Prints a list of all loaded kernel modules.\n");
+        return KDB_SUCCESS;
+    }
 
-	kdb_printf("Name             State  Count Image Description\n");
-	kdb_printf("====             =====  ===== ===== ===========\n");
+    kdb_printf("Name             State  Count Image Description\n");
+    kdb_printf("====             =====  ===== ===== ===========\n");
 
-	LIST_FOREACH(&module_list, iter) {
-		module = list_entry(iter, module_t, header);
+    list_foreach(&module_list, iter) {
+        module = list_entry(iter, module_t, header);
 
-		kdb_printf("%-16s ", module->name);
+        kdb_printf("%-16s ", module->name);
 
-		switch(module->state) {
-		case MODULE_LOADED:
-			kdb_printf("Loaded ");
-			break;
-		case MODULE_DEPS:
-			kdb_printf("Deps   ");
-			break;
-		case MODULE_INIT:
-			kdb_printf("Init   ");
-			break;
-		case MODULE_READY:
-			kdb_printf("Ready  ");
-			break;
-		case MODULE_UNLOAD:
-			kdb_printf("Unload ");
-			break;
-		}
+        switch (module->state) {
+        case MODULE_LOADED:
+            kdb_printf("Loaded ");
+            break;
+        case MODULE_DEPS:
+            kdb_printf("Deps   ");
+            break;
+        case MODULE_INIT:
+            kdb_printf("Init   ");
+            break;
+        case MODULE_READY:
+            kdb_printf("Ready  ");
+            break;
+        case MODULE_UNLOAD:
+            kdb_printf("Unload ");
+            break;
+        }
 
-		kdb_printf("%-5d %-5d %s\n", refcount_get(&module->count),
-			module->image.id, module->description);
-	}
+        kdb_printf(
+            "%-5d %-5d %s\n",
+            refcount_get(&module->count), module->image.id, module->description);
+    }
 
-	return KDB_SUCCESS;
+    return KDB_SUCCESS;
 }
 
 /** Initialize the module system.. */
 __init_text void module_early_init(void) {
-	/* Initialize the kernel module structure. */
-	list_init(&kernel_module.header);
-	refcount_set(&kernel_module.count, 1);
-	kernel_module.name = "kernel";
-	kernel_module.description = "Kiwi kernel";
-	kernel_module.state = MODULE_READY;
-	elf_init(&kernel_module.image);
-	list_append(&module_list, &kernel_module.header);
+    /* Initialize the kernel module structure. */
+    list_init(&kernel_module.header);
+    refcount_set(&kernel_module.count, 1);
+    kernel_module.name = "kernel";
+    kernel_module.description = "Kiwi kernel";
+    kernel_module.state = MODULE_READY;
+    elf_init(&kernel_module.image);
+    list_append(&module_list, &kernel_module.header);
 
-	/* Register the KDB command. */
-	kdb_register_command("modules", "Display information about loaded kernel modules.",
-		kdb_cmd_modules);
+    /* Register the KDB command. */
+    kdb_register_command(
+        "modules", "Display information about loaded kernel modules.",
+        kdb_cmd_modules);
 }
 
 /** Finish loading a boot module.
- * @param module	Module to finish. */
+ * @param module        Module to finish. */
 static __init_text void finish_boot_module(module_t *module) {
-	const char *name;
-	module_t *dep;
-	status_t ret;
+    const char *name;
+    module_t *dep;
+    status_t ret;
 
-	while(true) {
-		ret = finish_module(module, &name, &dep);
-		if(ret == STATUS_MISSING_LIBRARY) {
-			if(!dep) {
-				fatal("Boot module %s depends on %s which is not available",
-					module->name, name);
-			} else if(dep->state != MODULE_LOADED) {
-				fatal("Circular module dependency detected for %s",
-					dep->name);
-			}
+    while (true) {
+        ret = finish_module(module, &name, &dep);
+        if (ret == STATUS_MISSING_LIBRARY) {
+            if (!dep) {
+                fatal("Boot module %s depends on %s which is not available", module->name, name);
+            } else if (dep->state != MODULE_LOADED) {
+                fatal("Circular module dependency detected for %s", dep->name);
+            }
 
-			finish_boot_module(dep);
-		} else if(ret != STATUS_SUCCESS) {
-			fatal("Failed to load boot module %s (%d)", module->name, ret);
-		} else {
-			break;
-		}
-	}
+            finish_boot_module(dep);
+        } else if (ret != STATUS_SUCCESS) {
+            fatal("Failed to load boot module %s (%d)", module->name, ret);
+        } else {
+            break;
+        }
+    }
 }
 
 /** Load boot kernel modules. */
 __init_text void module_init(void) {
-	const char *name;
-	void *mapping;
-	object_handle_t *handle;
-	module_t *module;
-	status_t ret;
+    const char *name;
+    void *mapping;
+    object_handle_t *handle;
+    module_t *module;
+    status_t ret;
 
-	/* Perform the first stage of loading all the modules to find out their
-	 * names and dependencies. */
-	KBOOT_ITERATE(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
-		name = kboot_tag_data(tag, 0);
-		mapping = phys_map(tag->addr, tag->size, MM_BOOT);
-		handle = memory_file_create(mapping, tag->size);
+    /* Perform the first stage of loading all the modules to find out their
+     * names and dependencies. */
+    kboot_tag_foreach(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
+        name = kboot_tag_data(tag, 0);
+        mapping = phys_map(tag->addr, tag->size, MM_BOOT);
+        handle = memory_file_create(mapping, tag->size);
 
-		module = kmalloc(sizeof(module_t), MM_BOOT);
-		list_init(&module->header);
-		refcount_set(&module->count, 0);
+        module = kmalloc(sizeof(module_t), MM_BOOT);
+        list_init(&module->header);
+        refcount_set(&module->count, 0);
 
-		ret = elf_module_load(handle, name, &module->image);
-		object_handle_release(handle);
-		phys_unmap(mapping, tag->size, true);
-		if(ret != STATUS_SUCCESS) {
-			if(ret == STATUS_UNKNOWN_IMAGE) {
-				/* Assume that it is a filesystem image rather
-				 * than a module. */
-				kfree(module);
-				continue;
-			}
+        ret = elf_module_load(handle, name, &module->image);
+        object_handle_release(handle);
+        phys_unmap(mapping, tag->size, true);
+        if (ret != STATUS_SUCCESS) {
+            if (ret == STATUS_UNKNOWN_IMAGE) {
+                /* Assume that it is a filesystem image rather than a module. */
+                kfree(module);
+                continue;
+            }
 
-			fatal("Failed to load boot module %s (%d)", name, ret);
-		}
+            fatal("Failed to load boot module %s (%d)", name, ret);
+        }
 
-		ret = find_module_info(module);
-		if(ret != STATUS_SUCCESS)
-			fatal("Boot module %s has invalid information", name);
+        ret = find_module_info(module);
+        if (ret != STATUS_SUCCESS)
+            fatal("Boot module %s has invalid information", name);
 
-		module->state = MODULE_LOADED;
-		list_append(&module_list, &module->header);
-	}
+        module->state = MODULE_LOADED;
+        list_append(&module_list, &module->header);
+    }
 
-	/* Now all of the modules are partially loaded, we can resolve
-	 * dependencies and load them all in the correct order. */
-	LIST_FOREACH(&module_list, iter) {
-		module = list_entry(iter, module_t, header);
+    /* Now all of the modules are partially loaded, we can resolve dependencies
+     * and load them all in the correct order. */
+    list_foreach(&module_list, iter) {
+        module = list_entry(iter, module_t, header);
 
-		/* May already be loaded due to a dependency from another
-		 * module. */
-		if(module->state == MODULE_READY)
-			continue;
+        /* May already be loaded due to a dependency from another module. */
+        if (module->state == MODULE_READY)
+            continue;
 
-		finish_boot_module(module);
-	}
+        finish_boot_module(module);
+    }
 }
 
 /**
@@ -550,85 +552,85 @@ __init_text void module_init(void) {
  * keep on calling it and loading each unmet dependency it specifies until it
  * succeeds.
  *
- * @param path		Path to module on filesystem.
- * @param depbuf	Where to store name of unmet dependency (should be
- *			MODULE_NAME_MAX + 1 bytes long).
+ * @param path          Path to module on filesystem.
+ * @param depbuf        Where to store name of unmet dependency (should be
+ *                      MODULE_NAME_MAX + 1 bytes long).
  *
- * @return		Status code describing result of the operation. If a
- *			required dependency is not loaded, the function will
- *			return STATUS_MISSING_LIBRARY.
+ * @return              Status code describing result of the operation. If a
+ *                      required dependency is not loaded, the function will
+ *                      return STATUS_MISSING_LIBRARY.
  */
 status_t kern_module_load(const char *path, char *depbuf) {
-	char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
-	status_t ret, err;
+    char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
+    status_t ret, err;
 
-	/* Copy the path across. */
-	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
-	if(ret != STATUS_SUCCESS)
-		return ret;
+    /* Copy the path across. */
+    ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+    if (ret != STATUS_SUCCESS)
+        return ret;
 
-	ret = module_load(kpath, kdepbuf);
-	if(ret == STATUS_MISSING_LIBRARY && depbuf) {
-		err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1);
-		if(err != STATUS_SUCCESS)
-			ret = err;
-	}
+    ret = module_load(kpath, kdepbuf);
+    if (ret == STATUS_MISSING_LIBRARY && depbuf) {
+        err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1);
+        if (err != STATUS_SUCCESS)
+            ret = err;
+    }
 
-	kfree(kpath);
-	return ret;
+    kfree(kpath);
+    return ret;
 }
 
 #if 0
 /** Get information on loaded kernel modules.
- * @param infop		Array of module information structures to fill in. If
- *			NULL, the function will only return the number of
- *			loaded modules.
- * @param countp	If infop is not NULL, this should point to a value
- *			containing the size of the provided array. Upon
- *			successful completion, the value will be updated to
- *			be the number of structures filled in. If infop is NULL,
- *			the number of loaded modules will be stored here.
- * @return		Status code describing result of the operation. */
-status_t kern_module_info(module_info_t *infop, size_t *countp) {
-	size_t i = 0, count = 0;
-	module_info_t info;
-	module_t *module;
-	status_t ret;
+ * @param _info         Array of module information structures to fill in. If
+ *                      NULL, the function will only return the number of
+ *                      loaded modules.
+ * @param _count        If _info is not NULL, this should point to a value
+ *                      containing the size of the provided array. Upon
+ *                      successful completion, the value will be updated to
+ *                      be the number of structures filled in. If _info is NULL,
+ *                      the number of loaded modules will be stored here.
+ * @return              Status code describing result of the operation. */
+status_t kern_module_info(module_info_t *_info, size_t *_count) {
+    size_t i = 0, count = 0;
+    module_info_t info;
+    module_t *module;
+    status_t ret;
 
-	if(infop) {
-		ret = read_user(countp, &count);
-		if(ret != STATUS_SUCCESS) {
-			return ret;
-		} else if(!count) {
-			return STATUS_SUCCESS;
-		}
-	}
+    if (_info) {
+        ret = read_user(_count, &count);
+        if (ret != STATUS_SUCCESS) {
+            return ret;
+        } else if (!count) {
+            return STATUS_SUCCESS;
+        }
+    }
 
-	mutex_lock(&module_lock);
+    mutex_lock(&module_lock);
 
-	LIST_FOREACH(&module_list, iter) {
-		if(infop) {
-			module = list_entry(iter, module_t, header);
+    list_foreach(&module_list, iter) {
+        if (_info) {
+            module = list_entry(iter, module_t, header);
 
-			strcpy(info.name, module->name);
-			strcpy(info.desc, module->description);
-			info.count = refcount_get(&module->count);
-			info.load_size = module->load_size;
+            strcpy(info.name, module->name);
+            strcpy(info.desc, module->description);
+            info.count = refcount_get(&module->count);
+            info.load_size = module->load_size;
 
-			ret = memcpy_to_user(&infop[i], &info, sizeof(info));
-			if(ret != STATUS_SUCCESS) {
-				mutex_unlock(&module_lock);
-				return ret;
-			}
+            ret = memcpy_to_user(&_info[i], &info, sizeof(info));
+            if (ret != STATUS_SUCCESS) {
+                mutex_unlock(&module_lock);
+                return ret;
+            }
 
-			if(++i >= count)
-				break;
-		} else {
-			i++;
-		}
-	}
+            if (++i >= count)
+                break;
+        } else {
+            i++;
+        }
+    }
 
-	mutex_unlock(&module_lock);
-	return write_user(countp, i);
+    mutex_unlock(&module_lock);
+    return write_user(_count, i);
 }
 #endif

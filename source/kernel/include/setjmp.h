@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Non-local jump functions.
+ * @brief               Non-local jump functions.
  */
 
 #ifndef __SETJMP_H
@@ -26,20 +26,20 @@
 #include <types.h>
 
 /** Initialize a jump buffer.
- * @param buf		Buffer to initialize.
- * @param func		Function that should be called.
- * @param stack		Base of stack to use.
- * @param size		Size of stack. */
+ * @param buf           Buffer to initialize.
+ * @param func          Function that should be called.
+ * @param stack         Base of stack to use.
+ * @param size          Size of stack. */
 extern void initjmp(jmp_buf buf, void (*func)(void), void *stack, size_t size);
 
 /** Save the current execution state.
- * @param buf		Buffer to save to.
- * @return		Non-zero if returning through longjmp(), 0 otherwise. */
+ * @param buf           Buffer to save to.
+ * @return              Non-zero if returning through longjmp(), 0 otherwise. */
 extern int setjmp(jmp_buf buf);
 
 /** Restore a saved execution state.
- * @param buf		Buffer to restore.
- * @param val		Value to return from setjmp(). */
+ * @param buf           Buffer to restore.
+ * @param val           Value to return from setjmp(). */
 extern void longjmp(jmp_buf buf, int val) __noreturn;
 
 #endif /* __SETJMP_H */

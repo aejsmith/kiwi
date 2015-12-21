@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		String copying functions.
+ * @brief               String copying functions.
  */
 
 #include <string.h>
@@ -27,16 +27,18 @@
  * Copies a string from one place to another. Assumes that the destination
  * is big enough to hold the string.
  *
- * @param dest		Pointer to the destination buffer.
- * @param src		Pointer to the source buffer.
+ * @param dest          Pointer to the destination buffer.
+ * @param src           Pointer to the source buffer.
  *
- * @return		The value specified for dest.
+ * @return              The value specified for dest.
  */
-char *strcpy(char *restrict dest, const char *restrict src) {
-	char *d = dest;
+char *strcpy(char *__restrict dest, const char *__restrict src) {
+    char *d = dest;
 
-	while((*d++ = *src++));
-	return dest;
+    while ((*d++ = *src++))
+        ;
+
+    return dest;
 }
 
 /**
@@ -45,22 +47,22 @@ char *strcpy(char *restrict dest, const char *restrict src) {
  * Copies a string from one place to another. Will copy at most the number
  * of bytes specified.
  *
- * @param dest		Pointer to the destination buffer.
- * @param src		Pointer to the source buffer.
- * @param count		Maximum number of bytes to copy.
+ * @param dest          Pointer to the destination buffer.
+ * @param src           Pointer to the source buffer.
+ * @param count         Maximum number of bytes to copy.
  *
- * @return		The value specified for dest.
+ * @return              The value specified for dest.
  */
-char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
-	size_t i;
+char *strncpy(char *__restrict dest, const char *__restrict src, size_t count) {
+    size_t i;
 
-	for(i = 0; i < count; i++) {
-		dest[i] = src[i];
-		if(!src[i])
-			break;
-	}
+    for (i = 0; i < count; i++) {
+        dest[i] = src[i];
+        if (!src[i])
+            break;
+    }
 
-	return dest;
+    return dest;
 }
 
 /**
@@ -69,23 +71,22 @@ char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
  * Transforms a string so that the result of strcmp() on the transformed string
  * is the same as the result of strcoll() on the string.
  *
- * @todo		Proper implementation.
- *
- * @param dest		Pointer to the destination buffer.
- * @param src		Pointer to the source buffer.
- * @param count		Size of destination buffer in bytes.
+ * @param dest          Pointer to the destination buffer.
+ * @param src           Pointer to the source buffer.
+ * @param count         Size of destination buffer in bytes.
  * 
- * @return		Number of bytes required in dest excluding NULL
- *			terminator.
+ * @return              Number of bytes required in dest excluding NULL
+ *                      terminator.
  */
 size_t strxfrm(char *restrict dest, const char *restrict src, size_t count) {
-	size_t i;
+    size_t i;
 
-	for(i = 0; i < count; i++) {
-		dest[i] = src[i];
-		if(!src[i])
-			break;
-	}
+    // TODO: Proper implementation.
+    for (i = 0; i < count; i++) {
+        dest[i] = src[i];
+        if (!src[i])
+            break;
+    }
 
-	return i;
+    return i;
 }

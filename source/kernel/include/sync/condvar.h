@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Condition variable implementation.
+ * @brief               Condition variable implementation.
  */
 
 #ifndef __SYNC_CONDVAR_H
@@ -27,25 +27,24 @@
 
 /** Structure containing a condition variable. */
 typedef struct condvar {
-	spinlock_t lock;		/**< Lock to protect the thread list. */
-	list_t threads;			/**< List of waiting threads. */
-	const char *name;		/**< Name of the condition variable. */
+    spinlock_t lock;                /**< Lock to protect the thread list. */
+    list_t threads;                 /**< List of waiting threads. */
+    const char *name;               /**< Name of the condition variable. */
 } condvar_t;
 
 /** Initializes a statically defined condition variable. */
 #define CONDVAR_INITIALIZER(_var, _name) \
-	{ \
-		.lock = SPINLOCK_INITIALIZER("condvar_lock"), \
-		.threads = LIST_INITIALIZER(_var.threads), \
-		.name = _name, \
-	}
+    { \
+        .lock = SPINLOCK_INITIALIZER("condvar_lock"), \
+        .threads = LIST_INITIALIZER(_var.threads), \
+        .name = _name, \
+    }
 
 /** Statically defines a new condition variable. */
 #define CONDVAR_DEFINE(_var) \
-	condvar_t _var = CONDVAR_INITIALIZER(_var, #_var)
+    condvar_t _var = CONDVAR_INITIALIZER(_var, #_var)
 
-extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *lock, nstime_t timeout,
-	unsigned flags);
+extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *lock, nstime_t timeout, unsigned flags);
 extern void condvar_wait(condvar_t *cv, mutex_t *mutex);
 extern bool condvar_signal(condvar_t *cv);
 extern bool condvar_broadcast(condvar_t *cv);

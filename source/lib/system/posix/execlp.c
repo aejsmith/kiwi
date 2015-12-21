@@ -16,13 +16,13 @@
 
 /**
  * @file
- * @brief		POSIX program execution function.
+ * @brief               POSIX program execution function.
  */
 
 #include <stdarg.h>
 #include <unistd.h>
 
-#define ARGV_MAX	512
+#define ARGV_MAX        512
 
 /**
  * Execute a binary in the PATH.
@@ -32,27 +32,27 @@
  * Otherwise, it will search the PATH for the name given and execute it
  * if found.
  *
- * @param file		Name of binary to execute.
- * @param arg		Arguments for process (NULL-terminated argument list).
+ * @param file          Name of binary to execute.
+ * @param arg           Arguments for process (NULL-terminated argument list).
  *
- * @return		Does not return on success, -1 on failure.
+ * @return              Does not return on success, -1 on failure.
  */
 int execlp(const char *file, const char *arg, ...) {
-	int i;
-	va_list ap;
-	const char *argv[ARGV_MAX];
+    int i;
+    va_list ap;
+    const char *argv[ARGV_MAX];
 
-	argv[0] = arg;
-	va_start(ap, arg);
+    argv[0] = arg;
+    va_start(ap, arg);
 
-	for(i = 1; i < ARGV_MAX; i++) {
-		argv[i] = va_arg(ap, const char *);
-		if(!argv[i])
-			break;
-	}
+    for (i = 1; i < ARGV_MAX; i++) {
+        argv[i] = va_arg(ap, const char *);
+        if (!argv[i])
+            break;
+    }
 
-	va_end(ap);
-	return execvp(file, (char *const *)argv);
+    va_end(ap);
+    return execvp(file, (char *const *)argv);
 }
 
 /**
@@ -61,25 +61,25 @@ int execlp(const char *file, const char *arg, ...) {
  * Executes a binary with the given arguments and the current process'
  * environment.
  *
- * @param path		Path to binary to execute.
- * @param arg		Arguments for process (NULL-terminated argument list).
+ * @param path          Path to binary to execute.
+ * @param arg           Arguments for process (NULL-terminated argument list).
  *
- * @return		Does not return on success, -1 on failure.
+ * @return              Does not return on success, -1 on failure.
  */
 int execl(const char *path, const char *arg, ...) {
-	int i;
-	va_list ap;
-	const char *argv[ARGV_MAX];
+    int i;
+    va_list ap;
+    const char *argv[ARGV_MAX];
 
-	argv[0] = arg;
-	va_start(ap, arg);
+    argv[0] = arg;
+    va_start(ap, arg);
 
-	for(i = 1; i < ARGV_MAX; i++) {
-		argv[i] = va_arg(ap, const char *);
-		if(!argv[i])
-			break;
-	}
+    for (i = 1; i < ARGV_MAX; i++) {
+        argv[i] = va_arg(ap, const char *);
+        if (!argv[i])
+            break;
+    }
 
-	va_end(ap);
-	return execv(path, (char *const *)argv);
+    va_end(ap);
+    return execv(path, (char *const *)argv);
 }

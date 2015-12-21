@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Dynamic linker interface.
+ * @brief               Dynamic linker interface.
  */
 
 #ifndef __LINK_H
@@ -34,20 +34,21 @@ extern "C" {
 
 #ifdef _GNU_SOURCE
 
-#define ElfW(type)		_ElfW(Elf, __WORDSIZE, type)
-#define _ElfW(e,w,t)		_ElfW_1(e, w, _##t)
-#define _ElfW_1(e,w,t)		e##w##t
+#define ElfW(type)          _ElfW(Elf, __WORDSIZE, type)
+#define _ElfW(e,w,t)        _ElfW_1(e, w, _##t)
+#define _ElfW_1(e,w,t)      e##w##t
 
 /** Structure containing information about a loaded shared object. */
 struct dl_phdr_info {
-	ElfW(Addr) dlpi_addr;		/**< Base address of object. */
-	const char *dlpi_name;		/**< Name of object. */
-	const ElfW(Phdr) *dlpi_phdr;	/**< Pointer to array of program headers. */
-	ElfW(Half) dlpi_phnum;		/**< Number of program headers. */
+    ElfW(Addr) dlpi_addr;           /**< Base address of object. */
+    const char *dlpi_name;          /**< Name of object. */
+    const ElfW(Phdr) *dlpi_phdr;    /**< Pointer to array of program headers. */
+    ElfW(Half) dlpi_phnum;          /**< Number of program headers. */
 };
 
-extern int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *),
-	void *data);
+extern int dl_iterate_phdr(
+    int (*callback)(struct dl_phdr_info *, size_t, void *),
+    void *data);
 
 #endif /* _GNU_SOURCE */
 

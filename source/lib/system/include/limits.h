@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Implementation-defined constants.
+ * @brief               Implementation-defined constants.
  */
 
 #ifndef __LIMITS_H
@@ -25,16 +25,16 @@
 #include <kernel/limits.h>
 
 /** Maximum length of a path string. */
-#define PATH_MAX		FS_PATH_MAX
+#define PATH_MAX            FS_PATH_MAX
 
 /** Maximum length of a symbolic link destination. */
-#define SYMLINK_MAX		FS_PATH_MAX
+#define SYMLINK_MAX         FS_PATH_MAX
 
 /** POSIX thread limitations. */
-#define PTHREAD_KEYS_MAX	1024	/**< Maximum number of thread-specific data keys. */
+#define PTHREAD_KEYS_MAX    1024    /**< Maximum number of thread-specific data keys. */
 
 #ifndef _GCC_LIMITS_H_
-# include_next <limits.h>
+#   include_next <limits.h>
 #endif
 
 #endif /* __LIMITS_H */

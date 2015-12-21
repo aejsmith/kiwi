@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		String parsing functions.
+ * @brief               String parsing functions.
  */
 
 #include <string.h>
@@ -29,29 +29,29 @@
  * in str, subsequent calls operating on the same string should pass NULL
  * for str.
  *
- * @param str		String to parse (NULL to continue last string).
- * @param delim		Set of delimiters.
- * @param saveptr	Where to save state across calls.
+ * @param str           String to parse (NULL to continue last string).
+ * @param delim         Set of delimiters.
+ * @param saveptr       Where to save state across calls.
  *
- * @return		Pointer to next token, or NULL if no more found.
+ * @return              Pointer to next token, or NULL if no more found.
  */
 char *strtok_r(char *restrict str, const char *restrict delim, char **restrict saveptr) {
-	char *ret = NULL;
+    char *ret = NULL;
 
-	/* If string is NULL, continue with last operation. */
-	if(!str)
-		str = *saveptr;
+    /* If string is NULL, continue with last operation. */
+    if (!str)
+        str = *saveptr;
 
-	str += strspn(str, delim);
-	if(*str) {
-		ret = str;
-		str += strcspn(str, delim);
-		if(*str)
-			*str++ = 0;
-	}
+    str += strspn(str, delim);
+    if (*str) {
+        ret = str;
+        str += strcspn(str, delim);
+        if (*str)
+            *str++ = 0;
+    }
 
-	*saveptr = str;
-	return ret;
+    *saveptr = str;
+    return ret;
 }
 
 /**
@@ -62,13 +62,13 @@ char *strtok_r(char *restrict str, const char *restrict delim, char **restrict s
  * in str, subsequent calls operating on the same string should pass NULL
  * for str.
  *
- * @param str		String to parse (NULL to continue last string).
- * @param delim		Set of delimiters.
+ * @param str           String to parse (NULL to continue last string).
+ * @param delim         Set of delimiters.
  *
- * @return		Pointer to next token, or NULL if no more found.
+ * @return              Pointer to next token, or NULL if no more found.
  */
 char *strtok(char *restrict str, const char *restrict delim) {
-	static char *strtok_state = NULL;
+    static char *strtok_state = NULL;
 
-	return strtok_r(str, delim, &strtok_state);
+    return strtok_r(str, delim, &strtok_state);
 }

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		File open function.
+ * @brief               File open function.
  */
 
 #include <kernel/object.h>
@@ -36,31 +36,30 @@ FILE *stdout = NULL;
 FILE *stderr = NULL;
 
 /** Internal part of fopen() and freopen().
- * @param path		Path to open.
- * @param mode		Mode string.
- * @param handlep	Where to store handle to file.
- * @return		New file descriptor or -1 on failure. */
+ * @param path          Path to open.
+ * @param mode          Mode string.
+ * @return              New file descriptor or -1 on failure. */
 static int fopen_internal(const char *restrict path, const char *restrict mode) {
-	int flags;
+    int flags;
 
-	if(strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0) {
-		flags = O_RDONLY;
-	} else if(strcmp(mode, "w") == 0 || strcmp(mode, "wb") == 0) {
-		flags = O_WRONLY | O_CREAT | O_TRUNC;
-	} else if(strcmp(mode, "a") == 0 || strcmp(mode, "ab") == 0) {
-		flags = O_WRONLY | O_CREAT | O_APPEND;
-	} else if(strcmp(mode, "r+") == 0 || strcmp(mode, "r+b") == 0 || strcmp(mode, "rb+") == 0) {
-		flags = O_RDWR;
-	} else if(strcmp(mode, "w+") == 0 || strcmp(mode, "w+b") == 0 || strcmp(mode, "rb+") == 0) {
-		flags = O_RDWR | O_CREAT | O_TRUNC;
-	} else if(strcmp(mode, "a+") == 0 || strcmp(mode, "a+b") == 0 || strcmp(mode, "ab+") == 0) {
-		flags = O_RDWR | O_CREAT | O_APPEND;
-	} else {
-		errno = EINVAL;
-		return -1;
-	}
+    if (strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0) {
+        flags = O_RDONLY;
+    } else if (strcmp(mode, "w") == 0 || strcmp(mode, "wb") == 0) {
+        flags = O_WRONLY | O_CREAT | O_TRUNC;
+    } else if (strcmp(mode, "a") == 0 || strcmp(mode, "ab") == 0) {
+        flags = O_WRONLY | O_CREAT | O_APPEND;
+    } else if (strcmp(mode, "r+") == 0 || strcmp(mode, "r+b") == 0 || strcmp(mode, "rb+") == 0) {
+        flags = O_RDWR;
+    } else if (strcmp(mode, "w+") == 0 || strcmp(mode, "w+b") == 0 || strcmp(mode, "rb+") == 0) {
+        flags = O_RDWR | O_CREAT | O_TRUNC;
+    } else if (strcmp(mode, "a+") == 0 || strcmp(mode, "a+b") == 0 || strcmp(mode, "ab+") == 0) {
+        flags = O_RDWR | O_CREAT | O_APPEND;
+    } else {
+        errno = EINVAL;
+        return -1;
+    }
 
-	return open(path, flags, 0644);
+    return open(path, flags, 0644);
 }
 
 /**
@@ -83,28 +82,28 @@ static int fopen_internal(const char *restrict path, const char *restrict mode) 
  * The mode string can also contain the character 'b', but this is ignored
  * and only retained for compatibility reasons.
  *
- * @param path		Path of file to open.
- * @param mode		Access mode string as described above.
+ * @param path          Path of file to open.
+ * @param mode          Access mode string as described above.
  *
- * @return		Pointer to stream on success, NULL on failure.
+ * @return              Pointer to stream on success, NULL on failure.
  */
 FILE *fopen(const char *restrict path, const char *restrict mode) {
-	FILE *stream;
+    FILE *stream;
 
-	stream = malloc(sizeof(FILE));
-	if(!stream)
-		return NULL;
+    stream = malloc(sizeof(FILE));
+    if (!stream)
+        return NULL;
 
-	stream->fd = fopen_internal(path, mode);
-	if(stream->fd < 0) {
-		free(stream);
-		return NULL;
-	}
+    stream->fd = fopen_internal(path, mode);
+    if (stream->fd < 0) {
+        free(stream);
+        return NULL;
+    }
 
-	stream->err = false;
-	stream->eof = false;
-	stream->have_pushback = false;
-	return stream;
+    stream->err = false;
+    stream->eof = false;
+    stream->have_pushback = false;
+    return stream;
 }
 
 /**
@@ -113,32 +112,32 @@ FILE *fopen(const char *restrict path, const char *restrict mode) {
  * Creates a new file stream referring to an existing file descriptor. The
  * given mode string should match the access flags of the file descriptor.
  *
- * @param fd		File descriptor to create for.
- * @param mode		Access mode string as described for fopen().
+ * @param fd            File descriptor to create for.
+ * @param mode          Access mode string as described for fopen().
  *
- * @return		Pointer to stream on success, NULL on failure.
+ * @return              Pointer to stream on success, NULL on failure.
  */
 FILE *fdopen(int fd, const char *mode) {
-	unsigned type;
-	FILE *stream;
-	status_t ret;
+    unsigned type;
+    FILE *stream;
+    status_t ret;
 
-	/* Check if the file descriptor is valid. */
-	ret = kern_object_type(fd, &type);
-	if(ret != STATUS_SUCCESS || type != OBJECT_TYPE_FILE) {
-		errno = EBADF;
-		return NULL;
-	}
+    /* Check if the file descriptor is valid. */
+    ret = kern_object_type(fd, &type);
+    if (ret != STATUS_SUCCESS || type != OBJECT_TYPE_FILE) {
+        errno = EBADF;
+        return NULL;
+    }
 
-	stream = malloc(sizeof(FILE));
-	if(!stream)
-		return NULL;
+    stream = malloc(sizeof(FILE));
+    if (!stream)
+        return NULL;
 
-	stream->fd = fd;
-	stream->err = false;
-	stream->eof = false;
-	stream->have_pushback = false;
-	return stream;
+    stream->fd = fd;
+    stream->err = false;
+    stream->eof = false;
+    stream->have_pushback = false;
+    return stream;
 }
 
 /**
@@ -163,26 +162,26 @@ FILE *fdopen(int fd, const char *mode) {
  * being created, the given existing stream will be used (and any existing
  * stream closed if required).
  *
- * @param path		Path of file to open.
- * @param mode		Access mode string as described above.
- * @param stream	Pointer to stream structure to reuse.
+ * @param path          Path of file to open.
+ * @param mode          Access mode string as described above.
+ * @param stream        Pointer to stream structure to reuse.
  *
- * @return		Pointer to stream on success, NULL on failure. The
- *			original stream will not be changed on failure.
+ * @return              Pointer to stream on success, NULL on failure. The
+ *                      original stream will not be changed on failure.
  */
 FILE *freopen(const char *restrict path, const char *restrict mode, FILE *stream) {
-	int fd;
+    int fd;
 
-	fd = fopen_internal(path, mode);
-	if(fd < 0) {
-		free(stream);
-		return NULL;
-	}
+    fd = fopen_internal(path, mode);
+    if (fd < 0) {
+        free(stream);
+        return NULL;
+    }
 
-	close(stream->fd);
-	stream->fd = fd;
-	stream->err = false;
-	stream->eof = false;
-	stream->have_pushback = false;
-	return stream;
+    close(stream->fd);
+    stream->fd = fd;
+    stream->err = false;
+    stream->eof = false;
+    stream->have_pushback = false;
+    return stream;
 }

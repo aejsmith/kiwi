@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Parameter definitions.
+ * @brief               Parameter definitions.
  */
 
 #ifndef __SYS_PARAM_H
@@ -24,6 +24,6 @@
 
 #include <limits.h>
 
-#define MAXPATHLEN	PATH_MAX
+#define MAXPATHLEN  PATH_MAX
 
 #endif /* __SYS_PARAM_H */

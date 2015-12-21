@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Pipe functions.
+ * @brief               Pipe functions.
  */
 
 #ifndef __KERNEL_PIPE_H

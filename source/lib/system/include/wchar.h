@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Wide-character handling.
+ * @brief               Wide-character handling.
  */
 
 #ifndef __WCHAR_H
@@ -35,11 +35,11 @@ extern "C" {
 struct tm;
 
 /** Value used to indicate EOF. */
-#define WEOF		(0xffffffffu)
+#define WEOF        (0xffffffffu)
 
 /** Structure holding multi-byte conversion state. */
 typedef struct {
-	int dummy;
+    int dummy;
 } mbstate_t;
 
 /** Scalar type that can hold locale-specific character classifications. */

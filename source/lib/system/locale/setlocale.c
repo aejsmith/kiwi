@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Set locale function.
+ * @brief               Set locale function.
  */
 
 #include <locale.h>
@@ -28,16 +28,16 @@
  * Sets the current locale for the given category to the locale corresponding
  * to the given string.
  *
- * @param category	Category to set locale for.
- * @param name		Name of locale to set.
+ * @param category      Category to set locale for.
+ * @param name          Name of locale to set.
  *
- * @return		Name of new locale.
+ * @return              Name of new locale.
  */
 char *setlocale(int category, const char *name) {
-	if(name != NULL) {
-		if(strcmp(name, "C") && strcmp(name, "POSIX") && strcmp(name, ""))
-			return NULL;
-	}
+    if (name) {
+        if (strcmp(name, "C") && strcmp(name, "POSIX") && strcmp(name, ""))
+            return NULL;
+    }
 
-	return (char *)"C";
+    return (char *)"C";
 }

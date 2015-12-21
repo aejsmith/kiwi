@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Rewind directory function.
+ * @brief               Rewind directory function.
  */
 
 #include <stdlib.h>
@@ -25,7 +25,7 @@
 #include "dirent/dirent.h"
 
 /** Reset a directory stream's position to the beginning.
- * @param dir		Directory stream to rewind. */
+ * @param dir           Directory stream to rewind. */
 void rewinddir(DIR *dir) {
-	kern_file_rewind_dir(dir->handle);
+    kern_file_rewind_dir(dir->handle);
 }

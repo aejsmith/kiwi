@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		File stream flush function.
+ * @brief               File stream flush function.
  */
 
 #include <stdio.h>
@@ -24,9 +24,9 @@
 #include "stdio/stdio.h"
 
 /** Flush a file stream's buffer.
- * @param stream	File stream to flush.
- * @return		0 on success, EOF on failure. */
+ * @param stream        File stream to flush.
+ * @return              0 on success, EOF on failure. */
 int fflush(FILE *stream) {
-	/* TODO */
-	return 0;
+    /* TODO */
+    return 0;
 }

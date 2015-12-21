@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Directory handling functions.
+ * @brief               Directory handling functions.
  */
 
 #ifndef __SYSTEM_DIRENT_H
@@ -31,11 +31,11 @@
 #include "libsystem.h"
 
 /** Size of the internal directory entry buffer. */
-#define DIRSTREAM_BUF_SIZE	0x1000
+#define DIRSTREAM_BUF_SIZE 0x1000
 
 struct __dstream_internal {
-	handle_t handle;		/**< Handle to the directory. */
-	char buf[DIRSTREAM_BUF_SIZE];	/**< Buffer for entry structures. */
+    handle_t handle;                /**< Handle to the directory. */
+    char buf[DIRSTREAM_BUF_SIZE];   /**< Buffer for entry structures. */
 };
 
 #endif /* __SYSTEM_DIRENT_H */

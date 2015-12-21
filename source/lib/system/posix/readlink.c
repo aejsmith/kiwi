@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX read symbolic link function.
+ * @brief               POSIX read symbolic link function.
  */
 
 #include <kernel/fs.h>
@@ -29,41 +29,40 @@
 #include "libsystem.h"
 
 /** Read the destination of a symbolic link.
- * @param path		Path to symbolc link.
- * @param buf		Buffer to read into.
- * @param size		Size of buffer.
- * @return		Number of bytes written to the buffer on success, or -1
- *			on failure. */
+ * @param path          Path to symbolc link.
+ * @param buf           Buffer to read into.
+ * @param size          Size of buffer.
+ * @return              Number of bytes written to the buffer on success, or -1
+ *                      on failure. */
 ssize_t readlink(const char *path, char *buf, size_t size) {
-	file_info_t info;
-	char *tmp = NULL;
-	status_t ret;
+    file_info_t info;
+    char *tmp = NULL;
+    status_t ret;
 
-	/* The kernel will not do anything if the buffer provided is too small,
-	 * but we must return the truncated string if it is too small. Find out
-	 * the link size, and allocate a large enough buffer if the given one
-	 * is too small. */
-	ret = kern_fs_info(path, false, &info);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	} else if(info.size >= (offset_t)size) {
-		tmp = malloc(info.size + 1);
-		if(!tmp)
-			return -1;
-	}
+    /* The kernel will not do anything if the buffer provided is too small, but
+     * we must return the truncated string if it is too small. Find out the link
+     * size, and allocate a large enough buffer if the given one is too small. */
+    ret = kern_fs_info(path, false, &info);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    } else if (info.size >= (offset_t)size) {
+        tmp = malloc(info.size + 1);
+        if (!tmp)
+            return -1;
+    }
 
-	ret = kern_fs_read_symlink(path, (tmp) ? tmp : buf, info.size + 1);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_read_symlink(path, (tmp) ? tmp : buf, info.size + 1);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	if(tmp) {
-		memcpy(buf, tmp, size);
-		free(buf);
-		return size;
-	} else {
-		return info.size;
-	}
+    if (tmp) {
+        memcpy(buf, tmp, size);
+        free(buf);
+        return size;
+    } else {
+        return info.size;
+    }
 }

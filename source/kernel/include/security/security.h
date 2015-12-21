@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Security helper functions.
+ * @brief               Security helper functions.
  */
 
 #ifndef __SECURITY_SECURITY_H
@@ -25,36 +25,36 @@
 #include <security/token.h>
 
 /** Get the current security context.
- * @return		Pointer to current security context. */
+ * @return              Pointer to current security context. */
 static inline security_context_t *security_current_context(void) {
-	token_t *token = token_current();
+    token_t *token = token_current();
 
-	return &token->ctx;
+    return &token->ctx;
 }
 
 /** Get the current user ID.
- * @return		Current user ID. */
+ * @return              Current user ID. */
 static inline user_id_t security_current_uid(void) {
-	token_t *token = token_current();
+    token_t *token = token_current();
 
-	return token->ctx.uid;
+    return token->ctx.uid;
 }
 
 /** Get the current group ID.
- * @return		Current group ID. */
+ * @return              Current group ID. */
 static inline group_id_t security_current_gid(void) {
-	token_t *token = token_current();
+    token_t *token = token_current();
 
-	return token->ctx.gid;
+    return token->ctx.gid;
 }
 
 /** Check whether the current thread has a privilege.
- * @param priv		Privilege to check for.
- * @return		Whether the current thread has the privilege. */
+ * @param priv          Privilege to check for.
+ * @return              Whether the current thread has the privilege. */
 static inline bool security_check_priv(unsigned priv) {
-	token_t *token = token_current();
+    token_t *token = token_current();
 
-	return security_context_has_priv(&token->ctx, priv);
+    return security_context_has_priv(&token->ctx, priv);
 }
 
 #endif /* __SECURITY_SECURITY_H */

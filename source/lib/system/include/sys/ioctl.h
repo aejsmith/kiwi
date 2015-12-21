@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Device control function.
+ * @brief               Device control function.
  */
 
 #ifndef __SYS_IOCTL_H

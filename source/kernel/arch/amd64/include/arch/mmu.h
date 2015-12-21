@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		AMD64 MMU context definitions.
+ * @brief               AMD64 MMU context definitions.
  */
 
 #ifndef __ARCH_MMU_H
@@ -25,17 +25,20 @@
 #include <types.h>
 
 /** Size of TLB flush array. */
-#define INVALIDATE_ARRAY_SIZE	128
+#define INVALIDATE_ARRAY_SIZE   128
 
 /** AMD64 MMU context structure. */
 typedef struct arch_mmu_context {
-	phys_ptr_t pml4;		/**< Physical address of the PML4. */
+    phys_ptr_t pml4;                /**< Physical address of the PML4. */
 
-	/** Array of TLB entries to flush when unlocking context.
-	 * @note		If the count becomes greater than the array
-	 *			size, then the entire TLB will be flushed. */
-	ptr_t pages_to_invalidate[INVALIDATE_ARRAY_SIZE];
-	size_t invalidate_count;
+    /**
+     * Array of TLB entries to flush when unlocking context.
+     *
+     * If the count becomes greater than the array size, then the entire TLB
+     * will be flushed.
+     */
+    ptr_t pages_to_invalidate[INVALIDATE_ARRAY_SIZE];
+    size_t invalidate_count;
 } arch_mmu_context_t;
 
 #endif /* __ARCH_MMU_H */

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Process/thread exit code definitions.
+ * @brief               Process/thread exit code definitions.
  */
 
 #ifndef __KERNEL_EXIT_H
@@ -29,9 +29,9 @@ extern "C" {
 #endif
 
 /** Process/thread exit reasons. */
-#define EXIT_REASON_NORMAL	0	/**< Normal exit. */
-#define EXIT_REASON_KILLED	1	/**< Process/thread was killed. */
-#define EXIT_REASON_EXCEPTION	2	/**< Unhandled exception. */
+#define EXIT_REASON_NORMAL      0   /**< Normal exit. */
+#define EXIT_REASON_KILLED      1   /**< Process/thread was killed. */
+#define EXIT_REASON_EXCEPTION   2   /**< Unhandled exception. */
 
 #ifdef __cplusplus
 }

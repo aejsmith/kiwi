@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		AMD64 setjmp() definitions.
+ * @brief               AMD64 setjmp() definitions.
  */
 
 #ifndef __ARCH_SETJMP_H

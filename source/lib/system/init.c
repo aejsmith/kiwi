@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		C library startup code.
+ * @brief               C library startup code.
  */
 
 #define __KERNEL_PRIVATE
@@ -30,24 +30,24 @@
 
 /** Early system library initialisation (run in .init). */
 static __sys_init void libsystem_early_init(void) {
-	/* Attempt to open standard I/O streams from existing handles. */
-	stdin = fdopen(STDIN_FILENO, "r");
-	stdout = fdopen(STDOUT_FILENO, "a");
-	stderr = fdopen(STDERR_FILENO, "a");
+    /* Attempt to open standard I/O streams from existing handles. */
+    stdin = fdopen(STDIN_FILENO, "r");
+    stdout = fdopen(STDOUT_FILENO, "a");
+    stderr = fdopen(STDERR_FILENO, "a");
 }
 
 /** System library initialisation function.
- * @param args		Process arguments structure. */
+ * @param args          Process arguments structure. */
 void libsystem_init(process_args_t *args) {
-	/* Save the environment pointer. */
-	environ = args->env;
+    /* Save the environment pointer. */
+    environ = args->env;
 
-	/* If we're process 1, set default environment variables. */
-	if(kern_process_id(-1) == 1) {
-		setenv("PATH", "/system/bin", 1);
-		setenv("HOME", "/users/admin", 1);
-	}
+    /* If we're process 1, set default environment variables. */
+    if (kern_process_id(-1) == 1) {
+        setenv("PATH", "/system/bin", 1);
+        setenv("HOME", "/users/admin", 1);
+    }
 
-	/* Call the main function. */
-	exit(main(args->arg_count, args->args, args->env));
+    /* Call the main function. */
+    exit(main(args->arg_count, args->args, args->env));
 }

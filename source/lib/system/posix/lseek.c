@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX seek function.
+ * @brief               POSIX seek function.
  */
 
 #include <kernel/fs.h>
@@ -36,31 +36,37 @@
  * value given. If it is SEEK_END, the offset will be set to the end of the
  * file plus the specified number of bytes.
  *
- * @param fd		File descriptor to change offset of.
- * @param off		Offset value (used according to action).
- * @param act		Action to perform.
+ * @param fd            File descriptor to change offset of.
+ * @param off           Offset value (used according to action).
+ * @param act           Action to perform.
  *
- * @return		New file offset, or -1 on failure.
+ * @return              New file offset, or -1 on failure.
  */
 off_t lseek(int fd, off_t off, int act) {
-	offset_t new;
-	status_t ret;
-	int kact;
+    offset_t new;
+    status_t ret;
+    int kact;
 
-	switch(act) {
-	case SEEK_SET: kact = FILE_SEEK_SET; break;
-	case SEEK_CUR: kact = FILE_SEEK_ADD; break;
-	case SEEK_END: kact = FILE_SEEK_END; break;
-	default:
-		errno = EINVAL;
-		return -1;
-	}
+    switch (act) {
+    case SEEK_SET:
+        kact = FILE_SEEK_SET;
+        break;
+    case SEEK_CUR:
+        kact = FILE_SEEK_ADD;
+        break;
+    case SEEK_END:
+        kact = FILE_SEEK_END;
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
 
-	ret = kern_file_seek(fd, kact, off, &new);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_file_seek(fd, kact, off, &new);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return new;
+    return new;
 }

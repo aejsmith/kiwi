@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Reference counting functions.
+ * @brief               Reference counting functions.
  *
  * This file provides a reference count type and functions to modify the type.
  * The reference count is implemented using an atomic variable, and therefore
@@ -34,17 +34,17 @@ typedef atomic_t refcount_t;
 
 /** Initializes a statically defined reference count. */
 #define REFCOUNT_INITIALIZER(_initial) \
-	_initial
+    _initial
 
 /** Statically defines a new reference count. */
 #define REFCOUNT_DEFINE(_var, _initial) \
-	refcount_t _var = REFCOUNT_INITIALIZER(_initial)
+    refcount_t _var = REFCOUNT_INITIALIZER(_initial)
 
 /** Increase a reference count.
- * @param ref		Reference count to increase.
- * @return		The new value of the count. */
+ * @param ref           Reference count to increase.
+ * @return              The new value of the count. */
 static inline int refcount_inc(refcount_t *ref) {
-	return atomic_inc(ref) + 1;
+    return atomic_inc(ref) + 1;
 }
 
 /**
@@ -53,17 +53,17 @@ static inline int refcount_inc(refcount_t *ref) {
  * Atomically decreases the value of a reference count. If it goes below 0
  * then a fatal() call will be made.
  *
- * @param ref		Reference count to decrease.
+ * @param ref           Reference count to decrease.
  *
- * @return		The new value of the count.
+ * @return              The new value of the count.
  */
 static inline int refcount_dec(refcount_t *ref) {
-	int val = atomic_dec(ref) - 1;
+    int val = atomic_dec(ref) - 1;
 
-	if(unlikely(val < 0))
-		fatal("Reference count %p went negative", ref);
+    if (unlikely(val < 0))
+        fatal("Reference count %p went negative", ref);
 
-	return val;
+    return val;
 }
 
 /**
@@ -73,32 +73,32 @@ static inline int refcount_dec(refcount_t *ref) {
  * then the specified function will be called with a pointer to the reference
  * count as a parameter.
  *
- * @param ref		Reference count to decrease.
- * @param func		Function to call if count goes negative.
+ * @param ref           Reference count to decrease.
+ * @param func          Function to call if count goes negative.
  *
- * @return		The new value of the count.
+ * @return              The new value of the count.
  */
 static inline int refcount_dec_func(refcount_t *ref, void (*func)(refcount_t *)) {
-	int val = atomic_dec(ref) - 1;
+    int val = atomic_dec(ref) - 1;
 
-	if(unlikely(val < 0))
-		func(ref);
+    if (unlikely(val < 0))
+        func(ref);
 
-	return val;
+    return val;
 }
 
 /** Get the value of a reference count.
- * @param ref		Reference count to get value of.
- * @return		The value of the count. */
+ * @param ref           Reference count to get value of.
+ * @return              The value of the count. */
 static inline int refcount_get(refcount_t *ref) {
-	return atomic_get(ref);
+    return atomic_get(ref);
 }
 
 /** Set the value of a reference count.
- * @param ref		Reference count to set.
- * @param val		Value to set to. */
+ * @param ref           Reference count to set.
+ * @param val           Value to set to. */
 static inline void refcount_set(refcount_t *ref, int val) {
-	atomic_set(ref, val);
+    atomic_set(ref, val);
 }
 
 #endif /* __LIB_REFCOUNT_H */

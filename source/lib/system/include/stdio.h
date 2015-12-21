@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Standard I/O functions.
+ * @brief               Standard I/O functions.
  */
 
 #ifndef __STDIO_H
@@ -35,32 +35,32 @@ extern "C" {
 struct __fstream_internal;
 
 /** End of file return value. */
-#define EOF		(-1)
+#define EOF             (-1)
 
 /** Size of buffers for IO streams. */
-#define BUFSIZ		2048
+#define BUFSIZ          2048
 
 /** Buffer flags for an IO stream. */
-#define _IOFBF		0		/**< Input/output fully buffered. */
-#define _IOLBF		1		/**< Input/output line buffered. */
-#define _IONBF		2		/**< Input/output unbuffered. */
+#define _IOFBF          0           /**< Input/output fully buffered. */
+#define _IOLBF          1           /**< Input/output line buffered. */
+#define _IONBF          2           /**< Input/output unbuffered. */
 
 /** Minimum number of unique files from tmpnam() and friends. */
-#define TMP_MAX		10000
+#define TMP_MAX         10000
 
 /** Maximum number of streams that can be open simultaneously. */
-#define FOPEN_MAX	32
+#define FOPEN_MAX       32
 
 /** Maximum length of a filename string. */
-#define FILENAME_MAX	4096
+#define FILENAME_MAX    4096
 
 /** Directory usable for creating temporary files. */
-#define P_tmpdir	"/tmp"
+#define P_tmpdir        "/tmp"
 
 /** Actions for fseek(). */
-#define SEEK_SET	1		/**< Set the offset to the exact position specified. */
-#define SEEK_CUR	2		/**< Add the supplied value to the current offset. */
-#define SEEK_END	3		/**< Set the offset to the end of the file plus the supplied value. */
+#define SEEK_SET        1           /**< Set the offset to the exact position specified. */
+#define SEEK_CUR        2           /**< Add the supplied value to the current offset. */
+#define SEEK_END        3           /**< Set the offset to the end of the file plus the supplied value. */
 
 /** Type describing an open file stream. */
 typedef struct __fstream_internal FILE;
@@ -90,10 +90,10 @@ extern FILE *fopen(const char *__restrict path, const char *__restrict mode);
 extern int fprintf(FILE *__restrict stream, const char *__restrict fmt, ...);
 extern int fputc(int ch, FILE *stream);
 extern int fputs(const char *__restrict s, FILE *__restrict stream);
-extern size_t fread(void *__restrict ptr, size_t size, size_t nmemb,
-	FILE *__restrict stream);
-extern FILE *freopen(const char *__restrict path, const char *__restrict mode,
-	FILE *__restrict stream);
+extern size_t fread(void *__restrict ptr, size_t size, size_t nmemb, FILE *__restrict stream);
+extern FILE *freopen(
+    const char *__restrict path, const char *__restrict mode,
+    FILE *__restrict stream);
 extern int fscanf(FILE *__restrict stream, const char *__restrict fmt, ...);
 extern int fseek(FILE *stream, long off, int act);
 extern int fseeko(FILE *stream, off_t off, int act);
@@ -102,8 +102,9 @@ extern long ftell(FILE *stream);
 extern off_t ftello(FILE *stream);
 /* int ftrylockfile(FILE *); */
 /* void funlockfile(FILE *); */
-extern size_t fwrite(const void *__restrict ptr, size_t size, size_t nmemb,
-	FILE *__restrict stream);
+extern size_t fwrite(
+    const void *__restrict ptr, size_t size, size_t nmemb,
+    FILE *__restrict stream);
 extern int getc(FILE *stream);
 extern int getchar(void);
 /* int getc_unlocked(FILE *); */

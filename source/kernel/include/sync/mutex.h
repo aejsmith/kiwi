@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Mutex implementation.
+ * @brief               Mutex implementation.
  */
 
 #ifndef __SYNC_MUTEX_H
@@ -31,47 +31,47 @@ struct thread;
 
 /** Structure containing a mutex. */
 typedef struct mutex {
-	atomic_t value;			/**< Lock count. */
-	unsigned flags;			/**< Behaviour flags for the mutex. */
-	spinlock_t lock;		/**< Lock to protect the thread list. */
-	list_t threads;			/**< List of waiting threads. */
-	struct thread *holder;		/**< Thread holding the lock. */
-	const char *name;		/**< Name of the lock. */
-	#if CONFIG_DEBUG
-	void *caller;			/**< Return address of lock call. */
-	#endif
+    atomic_t value;                 /**< Lock count. */
+    unsigned flags;                 /**< Behaviour flags for the mutex. */
+    spinlock_t lock;                /**< Lock to protect the thread list. */
+    list_t threads;                 /**< List of waiting threads. */
+    struct thread *holder;          /**< Thread holding the lock. */
+    const char *name;               /**< Name of the lock. */
+    #if CONFIG_DEBUG
+        void *caller;               /**< Return address of lock call. */
+    #endif
 } mutex_t;
 
 /** Initializes a statically defined mutex. */
 #define MUTEX_INITIALIZER(_var, _name, _flags) \
-	{ \
-		.value = 0, \
-		.flags = _flags, \
-		.lock = SPINLOCK_INITIALIZER("mutex_lock"), \
-		.threads = LIST_INITIALIZER(_var.threads), \
-		.holder = NULL, \
-		.name = _name, \
-	}
+    { \
+        .value = 0, \
+        .flags = _flags, \
+        .lock = SPINLOCK_INITIALIZER("mutex_lock"), \
+        .threads = LIST_INITIALIZER(_var.threads), \
+        .holder = NULL, \
+        .name = _name, \
+    }
 
 /** Statically defines a new mutex. */
 #define MUTEX_DEFINE(_var, _flags) \
-	mutex_t _var = MUTEX_INITIALIZER(_var, #_var, _flags)
+    mutex_t _var = MUTEX_INITIALIZER(_var, #_var, _flags)
 
 /** Mutex behaviour flags. */
-#define MUTEX_RECURSIVE		(1<<0)	/**< Allow recursive locking by a thread. */
+#define MUTEX_RECURSIVE     (1<<0)  /**< Allow recursive locking by a thread. */
 
 /** Check if a mutex is held.
- * @param lock		Mutex to check.
- * @return		Whether the mutex is held. */
+ * @param lock          Mutex to check.
+ * @return              Whether the mutex is held. */
 static inline bool mutex_held(mutex_t *lock) {
-	return atomic_get(&lock->value) != 0;
+    return atomic_get(&lock->value) != 0;
 }
 
 /** Get the current recursion count of a mutex.
- * @param lock		Mutex to check.
- * @return		Current recursion count of mutex. */
+ * @param lock          Mutex to check.
+ * @return              Current recursion count of mutex. */
 static inline int mutex_recursion(mutex_t *lock) {
-	return atomic_get(&lock->value);
+    return atomic_get(&lock->value);
 }
 
 extern status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, unsigned flags);

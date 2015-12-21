@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Option parsing function.
+ * @brief               Option parsing function.
  */
 
 #include <stdarg.h>
@@ -35,62 +35,63 @@ int optind = 1, opterr = 1, optopt;
  * option requires an argument, the character should be followed by a :
  * character in the string.
  *
- * @param argc		Argument count.
- * @param argv		Argument array.
- * @param opts		Argument string.
+ * @param argc          Argument count.
+ * @param argv          Argument array.
+ * @param opts          Argument string.
  *
- * @return		Option character found, '?' if unknown character,
- *			':' if missing an argument and the first character
- *			of opts was a colon ('?' if missing and first
- *			character was not a colon), and -1 when option
- *			parsing is finished.
+ * @return              Option character found, '?' if unknown character,
+ *                      ':' if missing an argument and the first character
+ *                      of opts was a colon ('?' if missing and first
+ *                      character was not a colon), and -1 when option
+ *                      parsing is finished.
  */
 int getopt(int argc, char *const argv[], const char *opts) {
-	static int offset = 1;
-	char *ptr, *tmp;
-	int ret;
+    static int offset = 1;
+    char *ptr, *tmp;
+    int ret;
 
-	if(optind >= argc || !argv[optind] || *argv[optind] != '-' || strcmp(argv[optind], "-") == 0) {
-		return -1;
-	} else if(strcmp(argv[optind], "--") == 0) {
-		optind++;
-		return -1;
-	}
+    if (optind >= argc || !argv[optind] || *argv[optind] != '-' || strcmp(argv[optind], "-") == 0) {
+        return -1;
+    } else if (strcmp(argv[optind], "--") == 0) {
+        optind++;
+        return -1;
+    }
 
-	tmp = argv[optind] + offset++;
-	ret = *tmp++;
-	ptr = strchr(opts, ret);
-	if(ptr == NULL) {
-		optopt = ret;
-		if(opterr != 0)
-			fprintf(stderr, "%s: illegal option -- %c\n", argv[0], ret);
-		ret = '?';
-		goto out;
-	}
+    tmp = argv[optind] + offset++;
+    ret = *tmp++;
+    ptr = strchr(opts, ret);
+    if (!ptr) {
+        optopt = ret;
+        if (opterr != 0)
+            fprintf(stderr, "%s: illegal option -- %c\n", argv[0], ret);
+        ret = '?';
+        goto out;
+    }
 
-	if(ptr[1] == ':') {
-		if(*tmp) {
-			optarg = tmp;
-			optind++;
-			offset = 1;
-			return ret;
-		} else {
-			if(optind + 1 >= argc) {
-				fprintf(stderr, "%s: option requires an argument -- %c\n", argv[0], ret);
-				ret = (*opts == ':') ? ':' : '?';
-			} else {
-				optarg = argv[++optind];
-				optind++;
-				offset = 1;
-				return ret;
-			}
-		}
-	}
+    if (ptr[1] == ':') {
+        if (*tmp) {
+            optarg = tmp;
+            optind++;
+            offset = 1;
+            return ret;
+        } else {
+            if (optind + 1 >= argc) {
+                fprintf(stderr, "%s: option requires an argument -- %c\n", argv[0], ret);
+                ret = (*opts == ':') ? ':' : '?';
+            } else {
+                optarg = argv[++optind];
+                optind++;
+                offset = 1;
+                return ret;
+            }
+        }
+    }
+
 out:
-	if(!*(argv[optind] + offset)) {
-		offset = 1;
-		optind++;
-	}
+    if (!*(argv[optind] + offset)) {
+        offset = 1;
+        optind++;
+    }
 
-	return ret;
+    return ret;
 }

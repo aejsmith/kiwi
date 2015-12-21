@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Mutex implementation.
+ * @brief               Mutex implementation.
  */
 
 #ifndef __KERNEL_MUTEX_H
@@ -31,7 +31,7 @@ extern "C" {
 #ifndef __KERNEL
 
 /** Initializer for a mutex. */
-#define MUTEX_INITIALIZER		0
+#define MUTEX_INITIALIZER       0
 
 extern bool kern_mutex_held(int32_t *mutex);
 extern status_t kern_mutex_lock(int32_t *lock, nstime_t timeout);

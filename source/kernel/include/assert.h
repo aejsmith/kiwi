@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Assertion function.
+ * @brief               Assertion function.
  */
 
 #ifndef __ASSERT_H
@@ -27,18 +27,21 @@
 #if CONFIG_DEBUG
 
 /** Raise a fatal error if the given condition is not met.
- * @param cond		Condition to test. */
-#define assert(cond)	\
-	if(unlikely(!(cond))) { __assert_fail(#cond, __FILE__, __LINE__); }
+ * @param cond          Condition to test. */
+#define assert(cond)    \
+    if (unlikely(!(cond))) \
+        __assert_fail(#cond, __FILE__, __LINE__);
 
 #else
-#define assert(cond)	((void)0)
+
+#define assert(cond)    ((void)0)
+
 #endif
 
 extern void __assert_fail(const char *cond, const char *file, int line) __noreturn;
 
 #ifndef __cplusplus
-#define static_assert(cond, err)	_Static_assert(cond, err)
+#   define static_assert(cond, err)    _Static_assert(cond, err)
 #endif
 
 #endif /* __ASSERT_H */

@@ -49,10 +49,13 @@ env['LDSCRIPT'] = env.LDScript('link.ld', 'link.ld.in')
 
 # Generate the AP boot code.
 if config['SMP']:
-    env.Command('ap_boot.bin', env.Object('ap_boot.S'),
+    env.Command(
+        'ap_boot.bin',
+        env.Object('ap_boot.S'),
         Action('$LD -Ttext=0 --oformat binary --strip-all -o $TARGET $SOURCE', None))
-    env.Command('ap_boot.bin.c', ['ap_boot.bin'],
-        Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET',
-            '$GENCOMSTR'))
+    env.Command(
+        'ap_boot.bin.c',
+        ['ap_boot.bin'],
+        Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET', '$GENCOMSTR'))
 
 Return('sources')

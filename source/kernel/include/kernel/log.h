@@ -16,16 +16,16 @@
 
 /**
  * @file
- * @brief		Kernel log definitions.
+ * @brief               Kernel log definitions.
  */
 
 #ifndef __KERNEL_LOG_H
 #define __KERNEL_LOG_H
 
 /** Kernel log level definitions. */
-#define LOG_DEBUG		1	/**< Debug message. */
-#define LOG_NOTICE		2	/**< Normal message. */
-#define LOG_WARN		3	/**< Warning message. */
-#define LOG_ERROR		4	/**< Error message. */
+#define LOG_DEBUG           1       /**< Debug message. */
+#define LOG_NOTICE          2       /**< Normal message. */
+#define LOG_WARN            3       /**< Warning message. */
+#define LOG_ERROR           4       /**< Error message. */
 
 #endif /* __KERNEL_LOG_H */

@@ -16,23 +16,23 @@
 
 /**
  * @file
- * @brief		PC Programmable Interval Timer code.
+ * @brief               PC Programmable Interval Timer code.
  */
 
 #ifndef __PC_PIT_H
 #define __PC_PIT_H
 
 /** Base frequency of the PIT. */
-#define PIT_BASE_FREQUENCY	1193182L
+#define PIT_BASE_FREQUENCY      1193182
 
 /** Frequency that we run the PIT periodic timer at. */
-#define PIT_TIMER_FREQUENCY	1000
+#define PIT_TIMER_FREQUENCY     1000
 
 /** PIT port definitions. */
-#define PIT_MODE		0x43
-#define PIT_CHAN0		0x40
-#define PIT_CHAN1		0x41
-#define PIT_CHAN2		0x42
+#define PIT_MODE                0x43
+#define PIT_CHAN0               0x40
+#define PIT_CHAN1               0x41
+#define PIT_CHAN2               0x42
 
 extern void pit_init(void);
 

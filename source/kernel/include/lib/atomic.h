@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Atomic operations.
+ * @brief               Atomic operations.
  */
 
 #ifndef __LIB_ATOMIC_H
@@ -25,63 +25,63 @@
 #include <arch/atomic.h>
 
 /** Atomically increment an atomic variable.
- * @param var		Pointer to atomic variable.
- * @return		Previous value of variable. */
+ * @param var           Pointer to atomic variable.
+ * @return              Previous value of variable. */
 static inline int32_t atomic_inc(atomic_t *var) {
-	return atomic_add(var, 1);
+    return atomic_add(var, 1);
 }
 
 /** Atomically decrement an atomic variable.
- * @param var		Pointer to atomic variable.
- * @return		Previous value of variable. */
+ * @param var           Pointer to atomic variable.
+ * @return              Previous value of variable. */
 static inline int32_t atomic_dec(atomic_t *var) {
-	return atomic_sub(var, 1);
+    return atomic_sub(var, 1);
 }
 
 /** Atomically OR a value with an atomic variable.
- * @param var		Pointer to atomic variable.
- * @param val		Value to OR.
- * @return		Previous value of variable. */
+ * @param var           Pointer to atomic variable.
+ * @param val           Value to OR.
+ * @return              Previous value of variable. */
 static inline int32_t atomic_or(atomic_t *var, int32_t val) {
-	int32_t old, new;
+    int32_t old, new;
 
-	do {
-		old = atomic_get(var);
-		new = old | val;
-	} while(atomic_cas(var, old, new) != old);
+    do {
+        old = atomic_get(var);
+        new = old | val;
+    } while (atomic_cas(var, old, new) != old);
 
-	return old;
+    return old;
 }
 
 /** Atomically AND a value with an atomic variable.
- * @param var		Pointer to atomic variable.
- * @param val		Value to AND.
- * @return		Previous value of variable. */
+ * @param var           Pointer to atomic variable.
+ * @param val           Value to AND.
+ * @return              Previous value of variable. */
 static inline int32_t atomic_and(atomic_t *var, int32_t val) {
-	int32_t old, new;
+    int32_t old, new;
 
-	do {
-		old = atomic_get(var);
-		new = old & val;
-	} while(atomic_cas(var, old, new) != old);
+    do {
+        old = atomic_get(var);
+        new = old & val;
+    } while (atomic_cas(var, old, new) != old);
 
-	return old;
+    return old;
 }
 
 #if CONFIG_64BIT
 
 /** Atomically increment an atomic variable (64-bit).
- * @param var		Pointer to atomic variable.
- * @return		Previous value of variable. */
+ * @param var           Pointer to atomic variable.
+ * @return              Previous value of variable. */
 static inline int64_t atomic_inc64(atomic64_t *var) {
-	return atomic_add64(var, 1);
+    return atomic_add64(var, 1);
 }
 
 /** Atomically decrement an atomic variable (64-bit).
- * @param var		Pointer to atomic variable.
- * @return		Previous value of variable. */
+ * @param var           Pointer to atomic variable.
+ * @return              Previous value of variable. */
 static inline int64_t atomic_dec64(atomic64_t *var) {
-	return atomic_sub64(var, 1);
+    return atomic_sub64(var, 1);
 }
 
 #endif /* CONFIG_64BIT */

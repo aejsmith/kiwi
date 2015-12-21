@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX signal send functions.
+ * @brief               POSIX signal send functions.
  */
 
 #include <errno.h>
@@ -25,18 +25,18 @@
 #include "libsystem.h"
 
 /** Send a signal to a process.
- * @param pid		ID of process.
- * @param num		Signal number.
- * @return		0 on success, -1 on failure. */
+ * @param pid           ID of process.
+ * @param num           Signal number.
+ * @return              0 on success, -1 on failure. */
 int kill(pid_t pid, int num) {
-	libsystem_stub("raise", true);
-	return -1;
+    libsystem_stub("raise", true);
+    return -1;
 }
 
 /** Send a signal to the current process.
- * @param num		Signal number.
- * @return		0 on success, -1 on failure. */
+ * @param num           Signal number.
+ * @return              0 on success, -1 on failure. */
 int raise(int num) {
-	libsystem_stub("raise", true);
-	return -1;
+    libsystem_stub("raise", true);
+    return -1;
 }

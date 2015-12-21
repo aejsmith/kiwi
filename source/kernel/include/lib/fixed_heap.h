@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Fixed heap allocator.
+ * @brief               Fixed heap allocator.
  */
 
 #ifndef __LIB_FIXED_HEAP_H
@@ -28,7 +28,7 @@ struct fixed_heap_tag;
 
 /** Structure containing a fixed heap allocator. */
 typedef struct fixed_heap {
-	struct fixed_heap_tag *tags;	/**< List of tags. */
+    struct fixed_heap_tag *tags;        /**< List of tags. */
 } fixed_heap_t;
 
 extern void *fixed_heap_alloc(fixed_heap_t *heap, size_t size);

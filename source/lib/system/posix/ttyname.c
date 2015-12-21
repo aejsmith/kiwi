@@ -16,16 +16,16 @@
 
 /**
  * @file
- * @brief		Terminal name function.
+ * @brief               Terminal name function.
  */
 
 #include <errno.h>
 #include <unistd.h>
 
 /** Get the path to the terminal device.
- * @param fd		File descriptor to terminal device to get path to.
- * @return		Pointer to path string, or NULL on failure. */
+ * @param fd            File descriptor to terminal device to get path to.
+ * @return              Pointer to path string, or NULL on failure. */
 char *ttyname(int fd) {
-	errno = ENOSYS;
-	return NULL;
+    errno = ENOSYS;
+    return NULL;
 }

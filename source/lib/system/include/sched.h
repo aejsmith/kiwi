@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Scheduling definitions.
+ * @brief               Scheduling definitions.
  */
 
 #ifndef __SCHED_H

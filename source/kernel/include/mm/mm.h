@@ -23,11 +23,11 @@
 #define __MM_MM_H
 
 /** Memory allocation behaviour flags. */
-#define MM_NOWAIT		0	/**< Attempt to reclaim memory, but don't wait if none available. */
-#define MM_WAIT			(1<<0)	/**< Block until memory is available, guarantees success. */
-#define MM_ATOMIC		(1<<1)	/**< Does not wait for memory, does not attempt reclaim. */
-#define MM_BOOT			(1<<2)	/**< Allocation required for boot, must succeed. */
-#define MM_ZERO			(1<<3)	/**< Zero the allocated memory. */
+#define MM_NOWAIT       0       /**< Attempt to reclaim memory, but don't wait if none available. */
+#define MM_WAIT         (1<<0)  /**< Block until memory is available, guarantees success. */
+#define MM_ATOMIC       (1<<1)  /**< Does not wait for memory, does not attempt reclaim. */
+#define MM_BOOT         (1<<2)  /**< Allocation required for boot, must succeed. */
+#define MM_ZERO         (1<<3)  /**< Zero the allocated memory. */
 
 /**
  * Default allocation flags for kernel allocations.
@@ -39,7 +39,7 @@
  * allocations, consider removing MM_WAIT. Furthermore, see the documentation
  * for MM_USER.
  */
-#define MM_KERNEL		(MM_WAIT)
+#define MM_KERNEL       (MM_WAIT)
 
 /**
  * Default allocation flags for userspace-related allocations.
@@ -51,9 +51,9 @@
  * unreasonable allocation size and hanging itself in uninterruptible sleep
  * waiting for memory that it won't ever be able to get.
  */
-#define MM_USER			(MM_NOWAIT)
+#define MM_USER         (MM_NOWAIT)
 
 /** Mask to select only generic allocation flags. */
-#define MM_FLAG_MASK		(MM_WAIT | MM_ATOMIC | MM_BOOT)
+#define MM_FLAG_MASK    (MM_WAIT | MM_ATOMIC | MM_BOOT)
 
 #endif /* __MM_MM_H */

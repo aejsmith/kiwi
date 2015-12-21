@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Access/modification time functions.
+ * @brief               Access/modification time functions.
  */
 
 #ifndef __UTIME_H
@@ -30,8 +30,8 @@ extern "C" {
 
 /** POSIX utimbuf structure. */
 struct utimbuf {
-	time_t actime;			/**< Access time. */
-	time_t modtime;			/**< Modification time. */
+    time_t actime;                  /**< Access time. */
+    time_t modtime;                 /**< Modification time. */
 };
 
 extern int utime(const char *path, const struct utimbuf *times);

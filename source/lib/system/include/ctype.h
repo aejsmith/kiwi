@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Character type functions.
+ * @brief               Character type functions.
  */
 
 #ifndef __CTYPE_H
@@ -45,8 +45,8 @@ extern int toascii(int ch);
 extern int tolower(int ch);
 extern int toupper(int ch);
 
-#define _tolower(ch)	((ch) | 0x20)
-#define _toupper(ch)	((ch) & ~0x20)
+#define _tolower(ch)    ((ch) | 0x20)
+#define _toupper(ch)    ((ch) & ~0x20)
 
 // Needed for libcxx build.
 #ifdef __cplusplus

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Filesystem functions.
+ * @brief               Filesystem functions.
  */
 
 #include <kernel/fs.h>
@@ -24,10 +24,10 @@
 #include "libkernel.h"
 
 /** Get the current working directory path.
- * @param buf		Buffer to write path string to.
- * @param size		Size of buffer. If this is too small, STATUS_TOO_SMALL
- *			will be returned.
- * @return		Status code describing result of the operation. */
-status_t __export kern_fs_curr_dir(char *buf, size_t size) {
-	return kern_fs_path(INVALID_HANDLE, buf, size);
+ * @param buf           Buffer to write path string to.
+ * @param size          Size of buffer. If this is too small, STATUS_TOO_SMALL
+ *                      will be returned.
+ * @return              Status code describing result of the operation. */
+__export status_t kern_fs_curr_dir(char *buf, size_t size) {
+    return kern_fs_path(INVALID_HANDLE, buf, size);
 }

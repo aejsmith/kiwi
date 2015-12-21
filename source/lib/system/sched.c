@@ -16,14 +16,14 @@
 
 /**
  * @file
- * @brief		Scheduling functions.
+ * @brief               Scheduling functions.
  */
 
 #include <sched.h>
 
 /** Yield the processor.
- * @return		Always returns 0. */
+ * @return              Always returns 0. */
 int sched_yield(void) {
-	/* TODO */
-	return 0;
+    /* TODO */
+    return 0;
 }

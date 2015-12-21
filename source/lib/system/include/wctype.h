@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Wide-character classification and mapping utilities.
+ * @brief               Wide-character classification and mapping utilities.
  */
 
 #ifndef __WCTYPE_H

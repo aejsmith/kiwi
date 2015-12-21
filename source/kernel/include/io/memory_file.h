@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Memory file functions.
+ * @brief               Memory file functions.
  */
 
 #ifndef __IO_MEMORY_FILE_H

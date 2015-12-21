@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Non-local jump functions.
+ * @brief               Non-local jump functions.
  */
 
 #ifndef __SETJMP_H
@@ -36,9 +36,9 @@ typedef unsigned long jmp_buf[JMP_BUF_SIZE];
 
 /** Buffer for sigsetjmp()/siglongjmp(). */
 typedef struct _sigjmp_buf {
-        jmp_buf buf;
-        int restore_mask;
-       	sigset_t mask;
+    jmp_buf buf;
+    int restore_mask;
+    sigset_t mask;
 } sigjmp_buf[1];
 
 extern void longjmp(jmp_buf env, int val) __sys_noreturn;

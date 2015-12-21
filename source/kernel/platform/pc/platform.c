@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		PC platform core code.
+ * @brief               PC platform core code.
  */
 
 #include <arch/cpu.h>
@@ -36,38 +36,38 @@
 
 /** PC platform initialization. */
 __init_text void platform_init(void) {
-	pic_init();
-	acpi_init();
+    pic_init();
+    acpi_init();
 
-	/* If the LAPIC is not available, we must use the PIT as the timer. */
-	if(!lapic_enabled())
-		pit_init();
+    /* If the LAPIC is not available, we must use the PIT as the timer. */
+    if (!lapic_enabled())
+        pit_init();
 
-	i8042_init();
+    i8042_init();
 }
 
 /** Reboot the system. */
 void platform_reboot(void) {
-	uint8_t val;
+    uint8_t val;
 
-	arch_cpu_invalidate_caches();
+    arch_cpu_invalidate_caches();
 
-	/* Try the keyboard controller. */
-	do {
-		val = in8(0x64);
-		if(val & (1<<0))
-			in8(0x60);
-	} while(val & (1<<1));
-	out8(0x64, 0xfe);
-	spin(MSECS2NSECS(5));
+    /* Try the keyboard controller. */
+    do {
+        val = in8(0x64);
+        if (val & (1 << 0))
+            in8(0x60);
+    } while (val & (1 << 1));
+    out8(0x64, 0xfe);
+    spin(msecs_to_nsecs(5));
 
-	/* Fall back on a triple fault. */
-	x86_lidt(NULL, 0);
-	__asm__ volatile("ud2");
+    /* Fall back on a triple fault. */
+    x86_lidt(NULL, 0);
+    __asm__ volatile("ud2");
 }
 
 /** Power off the system. */
 void platform_poweroff(void) {
-	/* TODO. */
-	arch_cpu_halt();
+    /* TODO. */
+    arch_cpu_halt();
 }

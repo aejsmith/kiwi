@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX filesystem flush functions.
+ * @brief               POSIX filesystem flush functions.
  */
 
 #include <kernel/fs.h>
@@ -29,32 +29,33 @@
 #include "libsystem.h"
 
 /** Flush changes to a file to disk.
- * @param fd		Descriptor for file to flush. */
+ * @param fd            Descriptor for file to flush. */
 int fsync(int fd) {
-	unsigned type;
-	status_t ret;
+    unsigned type;
+    status_t ret;
 
-	ret = kern_object_type(fd, &type);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_object_type(fd, &type);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	switch(type) {
-	case OBJECT_TYPE_FILE:
-		ret = kern_file_sync(fd);
-		if(ret != STATUS_SUCCESS) {
-			libsystem_status_to_errno(ret);
-			return -1;
-		}
-		return 0;
-	default:
-		errno = EINVAL;
-		return -1;
-	}
+    switch (type) {
+    case OBJECT_TYPE_FILE:
+        ret = kern_file_sync(fd);
+        if (ret != STATUS_SUCCESS) {
+            libsystem_status_to_errno(ret);
+            return -1;
+        }
+
+        return 0;
+    default:
+        errno = EINVAL;
+        return -1;
+    }
 }
 
 /** Flush filesystem caches. */
 void sync(void) {
-	kern_fs_sync();
+    kern_fs_sync();
 }

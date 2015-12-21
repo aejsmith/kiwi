@@ -16,13 +16,13 @@
 
 /**
  * @file
- * @brief		Signal wait functions.
+ * @brief               Signal wait functions.
  */
 
 #include <signal.h>
 #include "libsystem.h"
 
 int sigsuspend(const sigset_t *mask) {
-	libsystem_stub("sigsuspend", true);
-	return -1;
+    libsystem_stub("sigsuspend", true);
+    return -1;
 }

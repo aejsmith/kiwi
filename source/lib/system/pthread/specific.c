@@ -16,11 +16,11 @@
 
 /**
  * @file
- * @brief		POSIX thread-specific storage.
+ * @brief               POSIX thread-specific storage.
  *
- * @todo		Key reuse. This would need to make sure the values are
- *			all set to NULL.
- * @todo		Call destructors when threads are actually implemented.
+ * TODO:
+ *  - Key reuse. This would need to make sure the values are all set to NULL.
+ *  - Call destructors when threads are actually implemented.
  */
 
 #include <kernel/mutex.h>
@@ -32,12 +32,12 @@
 
 /** Structure containing global data slot information. */
 typedef struct pthread_specific {
-	bool allocated;			/**< Whether this data slot is allocated. */
-	void (*dtor)(void *);		/**< Destructor function. */
+    bool allocated;                 /**< Whether this data slot is allocated. */
+    void (*dtor)(void *);           /**< Destructor function. */
 } pthread_specific_t;
 
 /** Next available thread-specific data key. */
-static volatile int32_t next_pthread_key = 0;
+static volatile int32_t next_pthread_key;
 
 /** Global data slot information. */
 static pthread_specific_t pthread_specific[PTHREAD_KEYS_MAX];
@@ -57,30 +57,32 @@ static __thread void *pthread_specific_values[PTHREAD_KEYS_MAX];
  * destructor function (if any) will be called on it. The order of destructor
  * calls is unspecified.
  *
- * @param keyp		Where to store created key.
- * @param dtor		Destructor function (can be NULL).
+ * @param _key          Where to store created key.
+ * @param dtor          Destructor function (can be NULL).
  *
- * @return		0 on success, or EAGAIN if the maximum number of keys
- *			per process has been exceeded.
+ * @return              0 on success, or EAGAIN if the maximum number of keys
+ *                      per process has been exceeded.
  */
-int pthread_key_create(pthread_key_t *keyp, void (*dtor)(void *val)) {
-	pthread_key_t key;
+int pthread_key_create(pthread_key_t *_key, void (*dtor)(void *val)) {
+    pthread_key_t key;
 
-	/* Try to allocate a new key. */
-	while(true) {
-		key = next_pthread_key;
+    /* Try to allocate a new key. */
+    while (true) {
+        key = next_pthread_key;
 
-		if(key >= PTHREAD_KEYS_MAX)
-			return EAGAIN;
+        if (key >= PTHREAD_KEYS_MAX)
+            return EAGAIN;
 
-		if(__sync_bool_compare_and_swap(&next_pthread_key, key, key + 1))
-			break;
-	}
+        if (__sync_bool_compare_and_swap(&next_pthread_key, key, key + 1))
+            break;
+    }
 
-	assert(!pthread_specific[key].allocated);
-	pthread_specific[key].allocated = true;
-	pthread_specific[key].dtor = dtor;
-	return 0;
+    assert(!pthread_specific[key].allocated);
+    pthread_specific[key].allocated = true;
+    pthread_specific[key].dtor = dtor;
+
+    *_key = key;
+    return 0;
 }
 
 /**
@@ -91,37 +93,37 @@ int pthread_key_create(pthread_key_t *keyp, void (*dtor)(void *val)) {
  * will not be called: it is the responsibility of the application to ensure
  * that data is freed.
  *
- * @param key		Key to delete.
+ * @param key           Key to delete.
  *
- * @return		Always returns 0.
+ * @return              Always returns 0.
  */
 int pthread_key_delete(pthread_key_t key) {
-	if(!pthread_specific[key].allocated)
-		return EINVAL;
+    if (!pthread_specific[key].allocated)
+        return EINVAL;
 
-	pthread_specific[key].allocated = false;
-	return 0;
+    pthread_specific[key].allocated = false;
+    return 0;
 }
 
 /** Get an item of thread-specific data.
- * @param key		Key for item to get.
- * @return		Value retrieved. If the key is invalid, NULL will be
- *			returned. */
+ * @param key           Key for item to get.
+ * @return              Value retrieved. If the key is invalid, NULL will be
+ *                      returned. */
 void *pthread_getspecific(pthread_key_t key) {
-	if(!pthread_specific[key].allocated)
-		return NULL;
+    if (!pthread_specific[key].allocated)
+        return NULL;
 
-	return pthread_specific_values[key];
+    return pthread_specific_values[key];
 }
 
 /** Set an item of thread-specific data.
- * @param key		Key for item to set.
- * @param val		Value to set.
- * @return		0 if value set successfully, EINVAL if key is invalid. */
+ * @param key           Key for item to set.
+ * @param val           Value to set.
+ * @return              0 if value set successfully, EINVAL if key is invalid. */
 int pthread_setspecific(pthread_key_t key, const void *val) {
-	if(!pthread_specific[key].allocated)
-		return EINVAL;
+    if (!pthread_specific[key].allocated)
+        return EINVAL;
 
-	pthread_specific_values[key] = (void *)val;
-	return 0;
+    pthread_specific_values[key] = (void *)val;
+    return 0;
 }

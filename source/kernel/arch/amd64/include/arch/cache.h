@@ -16,14 +16,14 @@
 
 /**
  * @file
- * @brief		AMD64 CPU cache definitions.
+ * @brief               AMD64 CPU cache definitions.
  */
 
 #ifndef __ARCH_CACHE_H
 #define __ARCH_CACHE_H
 
 /** CPU cache line shift/size. */
-#define CPU_CACHE_SHIFT		6
-#define CPU_CACHE_SIZE		(1 << CPU_CACHE_SHIFT)
+#define CPU_CACHE_SHIFT     6
+#define CPU_CACHE_SIZE      (1 << CPU_CACHE_SHIFT)
 
 #endif /* __ARCH_CACHE_H */

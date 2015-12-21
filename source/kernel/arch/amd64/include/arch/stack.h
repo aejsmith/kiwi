@@ -16,17 +16,17 @@
 
 /**
  * @file
- * @brief		AMD64 stack size definitions.
+ * @brief               AMD64 stack size definitions.
  */
 
 #ifndef __ARCH_STACK_H
 #define __ARCH_STACK_H
 
 /** Stack size definitions. */
-#define KSTACK_SIZE		0x2000		/**< Kernel stack size (8KB). */
-#define USTACK_SIZE		0x200000	/**< User stack size (2MB). */
+#define KSTACK_SIZE         0x2000      /**< Kernel stack size (8KB). */
+#define USTACK_SIZE         0x200000    /**< User stack size (2MB). */
 
 /** Stack direction definition. */
-#define STACK_GROWS_DOWN	1
+#define STACK_GROWS_DOWN    1
 
 #endif /* __ARCH_STACK_H */

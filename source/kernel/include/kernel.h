@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Core kernel functions/definitions.
+ * @brief               Core kernel functions/definitions.
  */
 
 #ifndef __KERNEL_H
@@ -37,20 +37,23 @@ extern notifier_t fatal_notifier;
 extern bool shutdown_in_progress;
 
 /** Version information for the kernel, defined in a build-generated file. */
-extern int kiwi_ver_release;		/**< Kiwi release number. */
-extern int kiwi_ver_update;		/**< Release update number. */
-extern int kiwi_ver_revision;		/**< Release revision number. */
-extern const char *kiwi_ver_string;	/**< String of version number. */
+extern int kiwi_ver_release;        /**< Kiwi release number. */
+extern int kiwi_ver_update;         /**< Release update number. */
+extern int kiwi_ver_revision;       /**< Release revision number. */
+extern const char *kiwi_ver_string; /**< String of version number. */
 
 /** Type of an initcall function. */
 typedef void (*initcall_t)(void);
 
-/** Macro to declare an initialization function.
- * @note		Initcalls are called in the initialization thread,
- *			after other CPUs have been booted. They are called in
- *			the order that they are in the initcall section. */
-#define INITCALL(func)	\
-	static ptr_t __initcall_##func __section(".init.initcalls") __used = (ptr_t)func
+/**
+ * Macro to declare an initialization function.
+ *
+ * Initcalls are called in the initialization thread, after other CPUs have
+ * been booted. They are called in the order that they are in the initcall
+ * section.
+ */
+#define INITCALL(func)  \
+    static ptr_t __initcall_##func __section(".init.initcalls") __used = (ptr_t)func
 
 extern initcall_t __initcall_start[], __initcall_end[];
 
@@ -65,9 +68,9 @@ extern void system_shutdown(unsigned action);
 extern void fatal_etc(struct frame *frame, const char *fmt, ...) __noreturn __printf(2, 3);
 
 /** Handle an unrecoverable kernel error.
- * @param fmt		Error message format string.
- * @param ...		Arguments to substitute into format string. */
-#define fatal(fmt...)	fatal_etc(NULL, fmt)
+ * @param fmt           Error message format string.
+ * @param ...           Arguments to substitute into format string. */
+#define fatal(fmt...)   fatal_etc(NULL, fmt)
 
 extern int kvprintf(int level, const char *fmt, va_list args);
 extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);
@@ -78,6 +81,7 @@ extern void preempt_disable(void);
 extern void preempt_enable(void);
 
 extern void kmain(uint32_t magic, struct kboot_tag *tags);
+
 #if CONFIG_SMP
 extern void kmain_secondary(struct cpu *cpu);
 #endif

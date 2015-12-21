@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Security tokens.
+ * @brief               Security tokens.
  */
 
 #ifndef __SECURITY_TOKEN_H
@@ -28,17 +28,17 @@
 
 /** Structure of a security token. */
 typedef struct token {
-	security_context_t ctx;		/**< Context that the token holds. */
-	refcount_t count;		/**< Reference count for the token. */
+    security_context_t ctx;         /**< Context that the token holds. */
+    refcount_t count;               /**< Reference count for the token. */
 
-	/**
-	 * Whether the token needs to be copied when inheriting.
-	 *
-	 * This is set when the effective and inheritable privilege sets differ,
-	 * as in this case the token must be copied when inheriting. If they
-	 * are the same, the same token can be shared.
-	 */
-	bool copy_on_inherit;
+    /**
+     * Whether the token needs to be copied when inheriting.
+     *
+     * This is set when the effective and inheritable privilege sets differ, as
+     * in this case the token must be copied when inheriting. If they are the
+     * same, the same token can be shared.
+     */
+    bool copy_on_inherit;
 } token_t;
 
 extern token_t *system_token;

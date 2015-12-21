@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX symbolic link function.
+ * @brief               POSIX symbolic link function.
  */
 
 #include <kernel/fs.h>
@@ -27,17 +27,17 @@
 #include "libsystem.h"
 
 /** Create a symbolic link.
- * @param dest		Destination of the link.
- * @param path		Path name for the link.
- * @return		0 on success, -1 on failure. */
+ * @param dest          Destination of the link.
+ * @param path          Path name for the link.
+ * @return              0 on success, -1 on failure. */
 int symlink(const char *dest, const char *path) {
-	status_t ret;
+    status_t ret;
 
-	ret = kern_fs_create_symlink(path, dest);
-	if(ret != STATUS_SUCCESS) {
-		libsystem_status_to_errno(ret);
-		return -1;
-	}
+    ret = kern_fs_create_symlink(path, dest);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Process functions.
+ * @brief               Process functions.
  */
 
 #include <kernel/private/process.h>
@@ -43,38 +43,38 @@ process_id_t curr_process_id = -1;
  * have a single thread which will resume execution after the call to
  * kern_process_clone().
  *
- * @param handlep	In the parent process, the location pointed to will be
- *			set to a handle to the child process upon success. In
- *			the child process, it will be set to INVALID_HANDLE.
+ * @param _handle       In the parent process, the location pointed to will be
+ *                      set to a handle to the child process upon success. In
+ *                      the child process, it will be set to INVALID_HANDLE.
  *
- * @return		Status code describing result of the operation.
+ * @return              Status code describing result of the operation.
  */
-status_t __export kern_process_clone(handle_t *handlep) {
-	status_t ret;
+__export status_t kern_process_clone(handle_t *_handle) {
+    status_t ret;
 
-	ret = _kern_process_clone(handlep);
-	if(ret != STATUS_SUCCESS)
-		return ret;
+    ret = _kern_process_clone(_handle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
 
-	/* In the child, we must update the saved process and thread IDs. */
-	if(*handlep == INVALID_HANDLE) {
-		curr_process_id = _kern_process_id(PROCESS_SELF);
-		curr_thread_id = _kern_thread_id(THREAD_SELF);
-	}
+    /* In the child, we must update the saved process and thread IDs. */
+    if (*_handle == INVALID_HANDLE) {
+        curr_process_id = _kern_process_id(PROCESS_SELF);
+        curr_thread_id = _kern_thread_id(THREAD_SELF);
+    }
 
-	return STATUS_SUCCESS;
+    return STATUS_SUCCESS;
 }
 
 /** Get the ID of a process.
- * @param handle	Handle for process to get ID of, or PROCESS_SELF to get
- *			ID of the calling process.
- * @return		Process ID on success, -1 if handle is invalid. */
-process_id_t __export kern_process_id(handle_t handle) {
-	/* We save the current process ID to avoid having to perform a kernel
-	 * call just to get our own ID. */
-	if(handle < 0) {
-		return curr_process_id;
-	} else {
-		return _kern_process_id(handle);
-	}
+ * @param handle        Handle for process to get ID of, or PROCESS_SELF to get
+ *                      ID of the calling process.
+ * @return              Process ID on success, -1 if handle is invalid. */
+__export process_id_t kern_process_id(handle_t handle) {
+    /* We save the current process ID to avoid having to perform a kernel call
+     * just to get our own ID. */
+    if (handle < 0) {
+        return curr_process_id;
+    } else {
+        return _kern_process_id(handle);
+    }
 }

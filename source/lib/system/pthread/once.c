@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Single execution function.
+ * @brief               Single execution function.
  */
 
 #include <pthread.h>
@@ -31,15 +31,15 @@
  * If func is a cancellation point and it is cancelled, the effect on the
  * control variable will be as if pthread_once() was never called.
  *
- * @param once		Pointer to control variable.
- * @param func		Function to call.
+ * @param once          Pointer to control variable.
+ * @param func          Function to call.
  *
- * @return		0 on success, error number on failure.
+ * @return              0 on success, error number on failure.
  */
 int pthread_once(pthread_once_t *once, void (*func)(void)) {
-	/* FIXME: Implement cancellation semantics - use cleanup functions. */
-	if(__sync_bool_compare_and_swap((volatile int32_t *)once, 0, 1))
-		func();
+    /* FIXME: Implement cancellation semantics - use cleanup functions. */
+    if (__sync_bool_compare_and_swap((volatile int32_t *)once, 0, 1))
+        func();
 
-	return 0;
+    return 0;
 }
