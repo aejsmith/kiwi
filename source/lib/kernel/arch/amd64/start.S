@@ -33,6 +33,5 @@ FUNCTION_START(libkernel_start)
 
     /* Call the main function. */
     popq    %rdi
-    call    libkernel_init
-    ret
+    jmp     libkernel_init
 FUNCTION_END(libkernel_start)
