@@ -4,10 +4,9 @@ Authors
 Kiwi is primarily written by the following people:
 
  * Alex Smith <alex@alex-smith.me.uk>
- * Philip Kent <kentphilip@googlemail.com>
 
-A full list of contributors can be obtained by looking through the
-Mercurial repository history.
+A full list of contributors can be obtained by looking through the git
+repository history.
 
 Different parts of Kiwi's design have been inspired by other OSes,
 and these deserve credit:
@@ -17,4 +16,4 @@ and these deserve credit:
  * Haiku (http://www.haiku-os.org)
    - Some memory management code.
  * Meander (written by froggey on IRC)
-   - Helped me get started with writing my first os, Exclaim.
+   - Helped me get started with writing my first OS, Exclaim.

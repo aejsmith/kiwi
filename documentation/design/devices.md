@@ -1,16 +1,6 @@
 Kiwi Device Architecture
 ========================
 
-License
--------
-
-This document is distributed under the terms of the [Creative Commons
-Attribution-Noncommercial-Share Alike 3.0 Unported](http://creativecommons.org/
-licenses/by-nc-sa/3.0/) license.
-
-Introduction
-------------
-
 The purpose of this document is to describe the Kiwi device architecture. There
 are three main parts to the device system:
 
