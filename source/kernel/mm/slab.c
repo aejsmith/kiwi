@@ -864,16 +864,13 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
         return KDB_SUCCESS;
     }
 
-    kdb_printf("Name                      Align  Obj Size Slab Size Flags Slab Count");
-    kdb_printf("====                      =====  ======== ========= ===== ==========");
-
     #if CONFIG_SLAB_STATS
-        kdb_printf(" Current Total");
-        kdb_printf(" ======= =====");
+        kdb_printf("Name                      Align  Obj Size Slab Size Flags Slab Count Current Total\n");
+        kdb_printf("====                      =====  ======== ========= ===== ========== ======= =====\n");
+    #else
+        kdb_printf("Name                      Align  Obj Size Slab Size Flags Slab Count\n");
+        kdb_printf("====                      =====  ======== ========= ===== ==========\n");
     #endif
-
-    kdb_printf("\n");
-    kdb_printf("\n");
 
     list_foreach(&slab_caches, iter) {
         cache = list_entry(iter, slab_cache_t, header);
@@ -884,7 +881,7 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
             cache->slab_size, cache->flags, cache->slab_count);
 
         #if CONFIG_SLAB_STATS
-            kdb_printf("%-7d %d", atomic_get(&cache->alloc_current), atomic_get(&cache->alloc_total));
+            kdb_printf(" %-7d %d", atomic_get(&cache->alloc_current), atomic_get(&cache->alloc_total));
         #endif
 
         kdb_printf("\n");
