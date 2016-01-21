@@ -427,7 +427,7 @@ static status_t process_load(process_load_t *load, process_t *parent) {
     status_t ret;
 
     semaphore_init(&load->sem, "process_load_sem", 0);
-    load->aspace = vm_aspace_create((parent) ? parent->aspace : NULL);
+    load->aspace = vm_aspace_create();
 
     /* Reserve space for the binary being loaded in the address space. The
      * actual loading of it is done by the kernel library's loader, however we

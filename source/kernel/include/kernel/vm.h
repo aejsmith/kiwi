@@ -41,7 +41,6 @@ extern "C" {
 #define VM_MAP_PRIVATE      (1<<0)  /**< Modifications should not be visible to other processes. */
 #define VM_MAP_STACK        (1<<1)  /**< Mapping contains a stack and should have a guard page. */
 #define VM_MAP_OVERCOMMIT   (1<<2)  /**< Allow overcommitting of memory. */
-#define VM_MAP_INHERIT      (1<<3)  /**< Region will be duplicated to child processes. */
 
 extern status_t kern_vm_map(
     void **_addr, size_t size, unsigned spec, uint32_t access, uint32_t flags,

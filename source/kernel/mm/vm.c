@@ -1406,11 +1406,6 @@ static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
  *    it can be made larger than the total memory available (memory is only
  *    allocated when it is actually accessed). The default behaviour is to only
  *    allow mappings if the memory requirement can be satisfied.
- *  - VM_MAP_INHERIT: When a child process is created via kern_process_create()
- *    or the current process is replaced via kern_process_replace(), the
- *    mapping will be duplicated into the new address space, using the semantics
- *    specified above for VM_MAP_PRIVATE. This can be used to pass data to
- *    child processes.
  *
  * When mapping an object, the calling process must have the correct access
  * rights to the object for the mapping permissions requested.
@@ -1644,12 +1639,10 @@ void vm_aspace_switch(vm_aspace_t *as) {
 }
 
 /** Create a new address space.
- * @param parent        Parent process' address space, used to inherit regions.
- *                      Can be NULL.
  * @return              Pointer to address space structure. */
-vm_aspace_t *vm_aspace_create(vm_aspace_t *parent) {
+vm_aspace_t *vm_aspace_create(void) {
     vm_aspace_t *as;
-    vm_region_t *region, *parent_region;
+    vm_region_t *region;
     status_t ret;
 
     as = slab_cache_alloc(vm_aspace_cache, MM_KERNEL);
@@ -1682,26 +1675,6 @@ vm_aspace_t *vm_aspace_create(vm_aspace_t *parent) {
     assert(ret == STATUS_SUCCESS);
     ret = vm_reserve(as, LIBKERNEL_BASE, LIBKERNEL_SIZE);
     assert(ret == STATUS_SUCCESS);
-
-    if (parent) {
-        mutex_lock(&parent->lock);
-
-        /* Find all inheritable regions in the parent's address space and clone
-         * them. */
-        list_foreach(&parent->regions, iter) {
-            parent_region = list_entry(iter, vm_region_t, header);
-
-            if (!(parent_region->flags & VM_MAP_INHERIT))
-                continue;
-
-            assert(parent_region->state == VM_REGION_ALLOCATED);
-
-            region = vm_region_clone(parent_region, as);
-            insert_region(as, region);
-        }
-
-        mutex_unlock(&parent->lock);
-    }
 
     return as;
 }
