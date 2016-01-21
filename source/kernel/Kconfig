@@ -55,32 +55,6 @@ config SLAB_TRACING
 	  useful to run through the allocation statistics script in the
 	  utilities directory.
 
-config PAGE_DEBUG
-	bool "Physical memory debug output"
-	default n
-	help
-	  Enable extra debug output in the physical memory manager. Be warned
-	  that this will write a debug message on every page allocation and
-	  deallocation.
-
-config KMEM_DEBUG
-	bool "Kernel memory allocator debug output"
-	default n
-	help
-	  Enable extra debug output from the kernel virtual memory allocator.
-
-config CACHE_DEBUG
-	bool "Page cache debug output"
-	default n
-	help
-	  Enable debug output from the page cache.
-
-config IPC_DEBUG
-	bool "IPC debug output"
-	default n
-	help
-	  Enable debug output from the IPC code.
-
 #######
 endmenu
 #######

@@ -43,7 +43,10 @@
 #include <kernel.h>
 #include <status.h>
 
-#if CONFIG_KMEM_DEBUG
+/** Define to enable debug output. */
+//#define DEBUG_KMEM
+
+#ifdef DEBUG_KMEM
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
 #else
 #   define dprintf(fmt...)

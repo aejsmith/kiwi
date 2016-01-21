@@ -93,7 +93,10 @@
 #include <status.h>
 #include <time.h>
 
-#if CONFIG_PAGE_DEBUG
+/** Define to enable debug output. */
+//#define DEBUG_PAGE
+
+#ifdef DEBUG_PAGE
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
 #else
 #   define dprintf(fmt...)

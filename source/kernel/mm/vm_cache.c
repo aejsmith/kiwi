@@ -38,7 +38,10 @@
 #include <kdb.h>
 #include <status.h>
 
-#if CONFIG_CACHE_DEBUG
+/** Define to enable debug output. */
+//#define DEBUG_CACHE
+
+#ifdef DEBUG_CACHE
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
 #else
 #   define dprintf(fmt...)
