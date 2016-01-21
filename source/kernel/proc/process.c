@@ -1556,21 +1556,15 @@ status_t kern_process_kill(handle_t handle) {
  * @param _handle       Where to store handle to token.
  * @return              Status code describing the result of the operation. */
 status_t kern_process_token(handle_t *_handle) {
-    token_t *token;
-    object_handle_t *handle;
     status_t ret;
 
     if (!_handle)
         return STATUS_INVALID_ARG;
 
     mutex_lock(&curr_proc->lock);
-    token = curr_proc->token;
-    token_retain(token);
+    ret = token_publish(curr_proc->token, NULL, _handle);
     mutex_unlock(&curr_proc->lock);
 
-    handle = object_handle_create(&token_object_type, token);
-    ret = object_handle_attach(handle, NULL, _handle);
-    object_handle_release(handle);
     return ret;
 }
 

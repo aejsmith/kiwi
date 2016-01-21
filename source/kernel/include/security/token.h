@@ -42,13 +42,14 @@ typedef struct token {
 } token_t;
 
 extern token_t *system_token;
-extern object_type_t token_object_type;
 
 extern void token_retain(token_t *token);
 extern void token_release(token_t *token);
 extern token_t *token_inherit(token_t *source);
 
 extern token_t *token_current(void);
+
+extern status_t token_publish(token_t *token, handle_t *_id, handle_t *_uid);
 
 extern void token_init(void);
 

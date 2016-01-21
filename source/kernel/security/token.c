@@ -47,7 +47,7 @@ static void token_object_close(object_handle_t *handle) {
 }
 
 /** Token object type. */
-object_type_t token_object_type = {
+static object_type_t token_object_type = {
     .id = OBJECT_TYPE_TOKEN,
     .flags = OBJECT_TRANSFERRABLE,
     .close = token_object_close,
@@ -140,6 +140,28 @@ token_t *token_current(void) {
     return token;
 }
 
+/**
+ * Publish a token to userspace.
+ *
+ * Creates a handle to a token and publishes it in the current process' handle
+ * table.
+ *
+ * @param token         Token to publish.
+ * @param _id           If not NULL, a kernel location to store handle ID in.
+ * @param _uid          If not NULL, a user location to store handle ID in.
+ */
+status_t token_publish(token_t *token, handle_t *_id, handle_t *_uid) {
+    object_handle_t *handle;
+    status_t ret;
+
+    token_retain(token);
+
+    handle = object_handle_create(&token_object_type, token);
+    ret = object_handle_attach(handle, _id, _uid);
+    object_handle_release(handle);
+    return ret;
+}
+
 /** Initialize the security token allocator. */
 __init_text void token_init(void) {
     size_t i;
@@ -191,13 +213,12 @@ static int compare_group(const void *a, const void *b) {
 status_t kern_token_create(const security_context_t *ctx, handle_t *_handle) {
     token_t *token, *creator;
     size_t i;
-    object_handle_t *khandle;
     status_t ret;
 
     creator = token_current();
 
     token = slab_cache_alloc(token_cache, MM_KERNEL);
-    refcount_set(&token->count, 1);
+    refcount_set(&token->count, 0);
     token->copy_on_inherit = false;
 
     ret = memcpy_from_user(&token->ctx, ctx, sizeof(token->ctx));
@@ -254,10 +275,8 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *_handle) {
         }
     }
 
-    khandle = object_handle_create(&token_object_type, token);
-    ret = object_handle_attach(khandle, NULL, _handle);
-    object_handle_release(khandle);
-    return ret;
+    /* Will free the token on failure. */
+    return token_publish(token, NULL, _handle);
 
 err_free_token:
     slab_cache_free(token_cache, token);

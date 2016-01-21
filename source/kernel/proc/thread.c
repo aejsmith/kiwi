@@ -1494,8 +1494,6 @@ status_t kern_thread_set_ipl(unsigned ipl) {
  * @return              Status code describing the result of the operation.
  */
 status_t kern_thread_token(handle_t *_handle) {
-    token_t *token;
-    object_handle_t *handle;
     status_t ret;
 
     if (!_handle)
@@ -1503,19 +1501,13 @@ status_t kern_thread_token(handle_t *_handle) {
 
     mutex_lock(&curr_proc->lock);
 
-    token = curr_thread->token;
-    if (token)
-        token_retain(token);
-
-    mutex_unlock(&curr_proc->lock);
-
-    if (token) {
-        handle = object_handle_create(&token_object_type, token);
-        ret = object_handle_attach(handle, NULL, _handle);
-        object_handle_release(handle);
+    if (curr_thread->token) {
+        ret = token_publish(curr_thread->token, NULL, _handle);
     } else {
         ret = write_user(_handle, INVALID_HANDLE);
     }
+
+    mutex_unlock(&curr_proc->lock);
 
     return ret;
 }
