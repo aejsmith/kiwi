@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2016 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1792,42 +1792,51 @@ void vm_aspace_destroy(vm_aspace_t *as) {
  * @return              KDB status code. */
 static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) {
     uint64_t val;
-    process_t *process;
     vm_aspace_t *as;
     vm_region_t *region;
 
     if (kdb_help(argc, argv)) {
-        kdb_printf("Usage: %s <process ID|addr> <addr>\n\n", argv[0]);
+        kdb_printf("Usage: %s [<process ID|addr>] <addr>\n\n", argv[0]);
 
         kdb_printf("Prints details about the region containing the given address in the address\n");
-        kdb_printf("space specified by the first argument.\n");
+        kdb_printf("space specified. If only one argument is given, the current process' address\n");
+        kdb_printf("space will be used.\n");
         return KDB_SUCCESS;
-    } else if (argc != 3) {
-        kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-        return KDB_FAILURE;
     }
 
-    if (kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS)
-        return KDB_FAILURE;
-
-    if (val >= KERNEL_BASE) {
-        as = (vm_aspace_t *)((ptr_t)val);
-    } else {
-        process = process_lookup_unsafe(val);
-        if (!process) {
-            kdb_printf("Invalid process ID.\n");
+    if (argc == 3) {
+        if (kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS)
             return KDB_FAILURE;
-        }
 
-        as = process->aspace;
+        if (val >= KERNEL_BASE) {
+            as = (vm_aspace_t *)((ptr_t)val);
+        } else {
+            process_t *process = process_lookup_unsafe(val);
+            if (!process) {
+                kdb_printf("Invalid process ID\n");
+                return KDB_FAILURE;
+            }
+
+            as = process->aspace;
+        }
+    } else if (argc == 2) {
+        as = curr_proc->aspace;
+    } else {
+        kdb_printf("Incorrect number of arguments. See 'help %s' for help\n", argv[0]);
+        return KDB_FAILURE;
     }
 
-    if (kdb_parse_expression(argv[2], &val, NULL) != KDB_SUCCESS)
+    if (!as) {
+        kdb_printf("Invalid address space\n");
+        return KDB_FAILURE;
+    }
+
+    if (kdb_parse_expression(argv[argc - 1], &val, NULL) != KDB_SUCCESS)
         return KDB_FAILURE;
 
     region = vm_region_find(as, val, true);
     if (!region) {
-        kdb_printf("Region not found.\n");
+        kdb_printf("Region not found\n");
         return KDB_FAILURE;
     }
 
@@ -1843,6 +1852,7 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
         (region->access & VM_ACCESS_EXECUTE) ? 'X' : '-',
         region->access);
     kdb_printf("flags:       0x%" PRIx32 "\n", region->flags);
+
     switch (region->state) {
     case VM_REGION_FREE:
         kdb_printf("state:       %d (free)\n", region->state);
@@ -1857,6 +1867,7 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
         kdb_printf("state:       %d (invalid)\n", region->state);
         break;
     }
+
     kdb_printf("handle:      %p\n", region->handle);
     kdb_printf("obj_offset:  0x%" PRIx64 "\n", region->obj_offset);
     kdb_printf("amap:        %p\n", region->amap);
@@ -1907,58 +1918,85 @@ static void dump_region(vm_region_t *region) {
         region->obj_offset, (region->name) ? region->name : "<unnamed>");
 }
 
+/** Modes for address space dumping. */
+enum {
+    DUMP_ALL,
+    DUMP_ALLOCATED,
+    DUMP_FREE,
+};
+
 /** Dump an address space.
  * @param argc          Argument count.
  * @param argv          Argument array.
  * @return              KDB status code. */
 static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) {
-    enum { DUMP_ALL, DUMP_ALLOCATED, DUMP_FREE } mode;
-    uint64_t val;
-    process_t *process = NULL;
+    int pos, mode;
+    process_t *process;
     vm_aspace_t *as;
     unsigned i;
 
     if (kdb_help(argc, argv)) {
-        kdb_printf("Usage: %s <process ID|addr>\n", argv[0]);
-        kdb_printf("       %s --allocated <process ID|addr>\n", argv[0]);
-        kdb_printf("       %s --free <process ID|addr>\n\n", argv[0]);
+        kdb_printf("Usage: %s [<process ID|addr>]\n", argv[0]);
+        kdb_printf("       %s --allocated [<process ID|addr>]\n", argv[0]);
+        kdb_printf("       %s --free [<process ID|addr>]\n\n", argv[0]);
 
         kdb_printf("The first form prints some details about an address space and a list of all\n");
         kdb_printf("regions (free, reserved and allocated) from the sorted region list. The second\n");
         kdb_printf("form prints the content of the allocated region tree. The final form prints the\n");
-        kdb_printf("content of the address space's free lists.\n");
+        kdb_printf("content of the address space's free lists.\n\n");
+
+        kdb_printf("If no address space is specified, the current process' address space will be\n");
+        kdb_printf("used.\n");
         return KDB_SUCCESS;
-    } else if (argc < 2 || argc > 3) {
-        kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-        return KDB_FAILURE;
     }
 
+    pos = 1;
     mode = DUMP_ALL;
 
-    if (argc > 2) {
+    if (argc > 1 && argv[1][0] == '-' && argv[1][1] == '-') {
         if (strcmp(argv[1], "--free") == 0) {
             mode = DUMP_FREE;
         } else if (strcmp(argv[1], "--allocated") == 0) {
             mode = DUMP_ALLOCATED;
         } else {
-            kdb_printf("Unrecognized option. See 'help %s' for help.\n", argv[0]);
+            kdb_printf("Unrecognized option. See 'help %s' for help\n", argv[0]);
             return KDB_FAILURE;
         }
+
+        pos++;
     }
 
-    if (kdb_parse_expression(argv[argc - 1], &val, NULL) != KDB_SUCCESS)
+    if (pos != argc && pos != argc - 1) {
+        kdb_printf("Incorrect number of arguments. See 'help %s' for help\n", argv[0]);
         return KDB_FAILURE;
+    }
 
-    if (val >= KERNEL_BASE) {
-        as = (vm_aspace_t *)((ptr_t)val);
-    } else {
-        process = process_lookup_unsafe(val);
-        if (!process) {
-            kdb_printf("Invalid process ID.\n");
+    if (pos != argc) {
+        uint64_t val;
+
+        if (kdb_parse_expression(argv[pos], &val, NULL) != KDB_SUCCESS)
             return KDB_FAILURE;
-        }
 
+        if (val >= KERNEL_BASE) {
+            process = NULL;
+            as = (vm_aspace_t *)((ptr_t)val);
+        } else {
+            process = process_lookup_unsafe(val);
+            if (!process) {
+                kdb_printf("Invalid process ID\n");
+                return KDB_FAILURE;
+            }
+
+            as = process->aspace;
+        }
+    } else {
+        process = curr_proc;
         as = process->aspace;
+    }
+
+    if (!as) {
+        kdb_printf("Invalid address space\n");
+        return KDB_FAILURE;
     }
 
     if (mode == DUMP_ALL) {
@@ -1967,6 +2005,7 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
         } else {
             kdb_printf("Aspace %p\n", as);
         }
+
         kdb_printf("=================================================\n");
 
         kdb_printf(
