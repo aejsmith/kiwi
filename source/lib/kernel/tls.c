@@ -193,7 +193,7 @@ status_t tls_alloc(tls_tcb_t **_tcb) {
     /* Allocate the TLS block. */
     size = round_up(initial_block_size(), page_size);
     ret = kern_vm_map(
-        &alloc, size, VM_ADDRESS_ANY, VM_ACCESS_READ | VM_ACCESS_WRITE,
+        &alloc, size, 0, VM_ADDRESS_ANY, VM_ACCESS_READ | VM_ACCESS_WRITE,
         VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
     if (ret != STATUS_SUCCESS) {
         free(dtv);

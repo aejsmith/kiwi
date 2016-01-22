@@ -36,6 +36,7 @@
 #define USER_SIZE           0x0000800000000000  /**< User address space size (128TB). */
 #define LIBKERNEL_BASE      0x00007ffff0000000  /**< Location of kernel library. */
 #define LIBKERNEL_SIZE      0x0000000010000000  /**< Maximum size of kernel library. */
+#define USER_ANY_BASE       0x0000000100000000  /**< Search base for VM_ADDRESS_ANY. */
 #define KERNEL_BASE         0xffff800000000000  /**< Kernel address space base. */
 #define KERNEL_SIZE         0x0000800000000000  /**< Kernel address space size (128TB). */
 #define KERNEL_PMAP_BASE    0xffff800000000000  /**< Physical map area base. */

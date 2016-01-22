@@ -47,6 +47,29 @@
         __n; \
     })
 
+/**
+ * Round a value up to a power of 2.
+ *
+ * Rounds a value up to a power of 2. Note that when the round_up() macro is
+ * used with a constant the compiler will most likely optimise that itself.
+ * This is useful for rounding to a variable which is known to be a power of 2.
+ *
+ * @param val           Value to round.
+ * @param nearest       Boundary to round up to.
+ *
+ * @return              Rounded value.
+ */
+#define round_up_pow2(val, nearest) \
+    __extension__ \
+    ({ \
+        typeof(val) __n = val; \
+        if (__n & ((nearest) - 1)) { \
+            __n -= __n & ((nearest) - 1); \
+            __n += nearest; \
+        } \
+        __n; \
+    })
+
 /** Round a value down.
  * @param val           Value to round.
  * @param nearest       Boundary to round up to.

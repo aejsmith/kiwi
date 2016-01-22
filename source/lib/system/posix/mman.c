@@ -84,7 +84,7 @@ void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) 
         return MAP_FAILED;
     }
 
-    ret = kern_vm_map(&start, size, kspec, kaccess, kflags, fd, offset, NULL);
+    ret = kern_vm_map(&start, size, 0, kspec, kaccess, kflags, fd, offset, NULL);
     if (ret != STATUS_SUCCESS) {
         libsystem_status_to_errno(ret);
         return MAP_FAILED;

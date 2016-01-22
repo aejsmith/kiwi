@@ -187,20 +187,6 @@ static inline void vm_freelist_remove(vm_region_t *region) {
         region->as->free_map &= ~((ptr_t)1 << list);
 }
 
-/** Check if a freelist is empty.
- * @param as            Address space to check in.
- * @param list          List number.
- * @return              Whether the list is empty. */
-static inline bool vm_freelist_empty(vm_aspace_t *as, unsigned list) {
-    if (as->free_map & ((ptr_t)1 << list)) {
-        assert(!list_empty(&as->free[list]));
-        return false;
-    } else {
-        assert(list_empty(&as->free[list]));
-        return true;
-    }
-}
-
 /** Get the region before another region in the region list.
  * @param region        Region to get region before from.
  * @return              Pointer to previous region, or NULL if start of list. */
@@ -1271,100 +1257,15 @@ static void insert_region(vm_aspace_t *as, vm_region_t *region) {
     }
 }
 
-/** Allocate space in an address space.
- * @param as            Address space to allocate in (should be locked).
- * @param size          Size of space required.
- * @param access        Access flags for the region.
- * @param flags         Flags for the region.
- * @param name          Name of the region (will not be copied).
- * @return              Pointer to region if allocated, NULL if not. */
-static vm_region_t *alloc_region(
-    vm_aspace_t *as, size_t size, uint32_t access, uint32_t flags,
-    char *name)
-{
-    vm_region_t *region, *split;
-    unsigned list, i;
+/** Create a free region structure.
+ * @param as            Address space that will own the region.
+ * @param start         Start of region.
+ * @param size          Size of region.
+ * @param state         State for the region (free or reserved).
+ * @return              Created region structure. */
+static vm_region_t *create_free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
+    vm_region_t *region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
 
-    assert(size);
-
-    /* Get the list to search on. If the size is exactly a power of 2, then
-     * regions on freelist[n] are guaranteed to be big enough. Otherwise, use
-     * freelist[n + 1] so that we ensure that all regions we find are large
-     * enough. However, only do this if there are available regions in higher
-     * lists. */
-    list = highbit(size) - PAGE_WIDTH - 1;
-    if ((size & (size - 1)) != 0 && as->free_map >> (list + 1))
-        list++;
-
-    /* Find a free region. */
-    for (i = list; i < VM_FREELISTS; i++) {
-        if (vm_freelist_empty(as, i))
-            continue;
-
-        list_foreach(&as->free[i], iter) {
-            region = list_entry(iter, vm_region_t, free_link);
-
-            assert(region->state == VM_REGION_FREE);
-
-            if (region->size < size)
-                continue;
-
-            vm_freelist_remove(region);
-
-            /* If the region is too big we need to split it. This is simple: the
-             * region is free, so we don't need to deal with copying object
-             * details. */
-            if (region->size > size) {
-                split = slab_cache_alloc(vm_region_cache, MM_KERNEL);
-                split->name = NULL;
-                split->as = as;
-                split->start = region->start + size;
-                split->size = region->size - size;
-                split->access = 0;
-                split->flags = 0;
-                split->state = VM_REGION_FREE;
-                split->handle = NULL;
-                split->obj_offset = 0;
-                split->amap = NULL;
-                split->amap_offset = 0;
-                split->ops = NULL;
-                split->private = NULL;
-
-                /* Add the split to the lists. */
-                vm_freelist_insert(split, split->size);
-                list_add_after(&region->header, &split->header);
-
-                /* Change the size of the old region. */
-                region->size = size;
-            }
-
-            /* Set region state and add to the tree. */
-            region->access = access;
-            region->flags = flags;
-            region->state = VM_REGION_ALLOCATED;
-            region->name = name;
-            avl_tree_insert(&as->tree, region->start, &region->tree_link);
-
-            dprintf(
-                "vm: allocated region [%p,%p) from list %u in %p\n",
-                region->start, region->start + region->size, i, as);
-
-            return region;
-        }
-    }
-
-    return NULL;
-}
-
-/** Mark a region as free.
- * @param as            Address space to free in.
- * @param start         Start of region to free.
- * @param size          Size of region to free.
- * @param state         State for the region (free or reserved). */
-static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
-    vm_region_t *region;
-
-    region = slab_cache_alloc(vm_region_cache, MM_KERNEL);
     region->as = as;
     region->start = start;
     region->size = size;
@@ -1379,7 +1280,117 @@ static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
     region->private = NULL;
     region->name = NULL;
 
-    insert_region(as, region);
+    return region;
+}
+
+/** Allocate space in an address space.
+ * @param as            Address space to allocate in (should be locked).
+ * @param base          Base to start searching from.
+ * @param size          Size of space required.
+ * @param align         Alignment of space required.
+ * @param access        Access flags for the region.
+ * @param flags         Flags for the region.
+ * @param name          Name of the region (will not be copied).
+ * @return              Pointer to region if allocated, NULL if not. */
+static vm_region_t *alloc_region(
+    vm_aspace_t *as, ptr_t base, size_t size, size_t align, uint32_t access,
+    uint32_t flags, char *name)
+{
+    unsigned list;
+    vm_region_t *candidate = NULL;
+    ptr_t candidate_start;
+
+    /* Get the list to search on. If the size is exactly a power of 2, then
+     * regions on freelist[n] are guaranteed to be big enough. Otherwise, use
+     * freelist[n + 1] so that we ensure that all regions we find are large
+     * enough. However, only do this if there are available regions in higher
+     * lists. */
+    list = highbit(size) - PAGE_WIDTH - 1;
+    if ((size & (size - 1)) != 0 && as->free_map >> (list + 1))
+        list++;
+
+    /* Find a free region. */
+    for (unsigned i = list; i < VM_FREELISTS; i++) {
+        list_foreach(&as->free[i], iter) {
+            vm_region_t *region = list_entry(iter, vm_region_t, free_link);
+            ptr_t align_start, base_start;
+            size_t offset;
+
+            assert(region->state == VM_REGION_FREE);
+
+            /* See if this region can satisfy the alignment constraints. */
+            align_start = round_up_pow2(region->start, align);
+            offset = align_start - region->start;
+
+            if (offset > region->size || region->size - offset < size)
+                continue;
+
+            /* See if this region is above the requested search base. */
+            base_start = max(align_start, base);
+            offset = base_start - region->start;
+
+            if (offset > region->size || region->size - offset < size) {
+                /* Save as a candidate for if we can't find a region above the
+                 * base. */
+                if (!candidate) {
+                    candidate = region;
+                    candidate_start = align_start;
+                }
+
+                continue;
+            }
+
+            /* This region is acceptable immediately. */
+            candidate = region;
+            candidate_start = base_start;
+
+            i = VM_FREELISTS;
+            break;
+        }
+    }
+
+    if (!candidate)
+        return NULL;
+
+    vm_freelist_remove(candidate);
+
+    /* If the start point is within the region, split it. */
+    if (candidate_start != candidate->start) {
+        vm_region_t *split = create_free_region(
+            as, candidate->start, candidate_start - candidate->start,
+            VM_REGION_FREE);
+
+        vm_freelist_insert(split, split->size);
+        list_add_before(&candidate->header, &split->header);
+
+        candidate->start = candidate_start;
+        candidate->size -= split->size;
+    }
+
+    /* If the region is still too big, split it. */
+    if (candidate->size > size) {
+        vm_region_t *split = create_free_region(
+            as, candidate->start + size, candidate->size - size,
+            VM_REGION_FREE);
+
+        vm_freelist_insert(split, split->size);
+        list_add_after(&candidate->header, &split->header);
+
+        candidate->size = size;
+    }
+
+    /* Set region state and add to the tree. */
+    candidate->access = access;
+    candidate->flags = flags;
+    candidate->state = VM_REGION_ALLOCATED;
+    candidate->name = name;
+    avl_tree_insert(&as->tree, candidate->start, &candidate->tree_link);
+
+    dprintf(
+        "vm: allocated region [%p,%p) in %p\n",
+        candidate->start, candidate->start + candidate->size, as);
+
+    return candidate;
 }
 
 /**
@@ -1393,6 +1404,8 @@ static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
  *    address space, an unused space will be allocated to fit it in.
  *  - VM_ADDRESS_EXACT: The mapping will be placed at exactly the address
  *    specified, and any existing mappings in the same region will be replaced.
+ *  - VM_ADDRESS_HINT: Try to allocate unused space near to the specified
+ *    address.
  *
  * The flags argument controls the behaviour of the mapping. The following flags
  * are currently defined:
@@ -1416,6 +1429,9 @@ static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
  *                      points to a variable containing the address to place
  *                      the mapping at.
  * @param size          Size of mapping (multiple of page size).
+ * @param align         Alignment of the mapping (power-of-2 greater than or
+ *                      equal to the page size, or 0 for any alignment). Ignored
+ *                      for VM_ADDRESS_EXACT.
  * @param spec          Address specification (VM_ADDRESS_*).
  * @param access        Allowed access flags (VM_ACCESS_*).
  * @param flags         Mapping behaviour flags (VM_MAP_*).
@@ -1428,8 +1444,9 @@ static void free_region(vm_aspace_t *as, ptr_t start, size_t size, int state) {
  * @return              Status code describing result of the operation.
  */
 status_t vm_map(
-    vm_aspace_t *as, ptr_t *_addr, size_t size, unsigned spec, uint32_t access,
-    uint32_t flags, object_handle_t *handle, offset_t offset, const char *name)
+    vm_aspace_t *as, ptr_t *_addr, size_t size, size_t align, unsigned spec,
+    uint32_t access, uint32_t flags, object_handle_t *handle, offset_t offset,
+    const char *name)
 {
     vm_region_t *region = NULL;
     ptr_t addr;
@@ -1444,17 +1461,31 @@ status_t vm_map(
         return STATUS_INVALID_ARG;
     }
 
-    addr = *_addr;
-
+    /* Check that the address specification is valid. */
     switch (spec) {
     case VM_ADDRESS_ANY:
-        break;
     case VM_ADDRESS_EXACT:
-        if (addr % PAGE_SIZE || addr + size < addr)
-            return STATUS_INVALID_ARG;
+    case VM_ADDRESS_HINT:
         break;
     default:
         return STATUS_INVALID_ARG;
+    }
+
+    /* Get address argument if necessary. */
+    if (spec == VM_ADDRESS_EXACT || spec == VM_ADDRESS_HINT) {
+        addr = *_addr;
+
+        if (addr % PAGE_SIZE || addr + size < addr)
+            return STATUS_INVALID_ARG;
+    }
+
+    /* Check alignment. */
+    if (spec != VM_ADDRESS_EXACT) {
+        if (!align) {
+            align = PAGE_SIZE;
+        } else if (align < PAGE_SIZE || !is_pow2(align)) {
+            return STATUS_INVALID_ARG;
+        }
     }
 
     if (handle) {
@@ -1481,8 +1512,10 @@ status_t vm_map(
     /* Create the region according to the address specification. */
     switch (spec) {
     case VM_ADDRESS_ANY:
+        addr = USER_ANY_BASE;
+    case VM_ADDRESS_HINT:
         /* Allocate some space. */
-        region = alloc_region(as, size, access, flags, dup);
+        region = alloc_region(as, addr, size, align, access, flags, dup);
         if (!region) {
             mutex_unlock(&as->lock);
             kfree(dup);
@@ -1519,7 +1552,7 @@ status_t vm_map(
         ret = handle->type->map(handle, region);
         if (ret != STATUS_SUCCESS) {
             /* Free up the region again. */
-            free_region(as, region->start, region->size, VM_REGION_FREE);
+            insert_region(as, create_free_region(as, region->start, region->size, VM_REGION_FREE));
             mutex_unlock(&as->lock);
             return ret;
         }
@@ -1574,7 +1607,7 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
         return STATUS_NO_MEMORY;
     }
 
-    free_region(as, start, size, VM_REGION_FREE);
+    insert_region(as, create_free_region(as, start, size, VM_REGION_FREE));
 
     dprintf("vm: unmapped region [%p,%p) in %p\n", start, start + size, as);
     mutex_unlock(&as->lock);
@@ -1605,7 +1638,7 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
         return STATUS_NO_MEMORY;
     }
 
-    free_region(as, start, size, VM_REGION_RESERVED);
+    insert_region(as, create_free_region(as, start, size, VM_REGION_RESERVED));
 
     dprintf("vm: reserved region [%p,%p) in %p\n", start, start + size, as);
     mutex_unlock(&as->lock);
@@ -2095,6 +2128,8 @@ __init_text void vm_init(void) {
  *    address space, an unused space will be allocated to fit it in.
  *  - VM_ADDRESS_EXACT: The mapping will be placed at exactly the address
  *    specified, and any existing mappings in the same region will be replaced.
+ *  - VM_ADDRESS_HINT: Try to allocate unused space near to the specified
+ *    address.
  *
  * The flags argument controls the behaviour of the mapping. The following flags
  * are currently defined:
@@ -2122,6 +2157,8 @@ __init_text void vm_init(void) {
  *                      points to a variable containing the address to place
  *                      the mapping at.
  * @param size          Size of mapping (multiple of page size).
+ * @param align         Alignment of the mapping (power-of-2 greater than or
+ *                      equal to the page size, or 0 for any alignment).
  * @param spec          Address specification (VM_ADDRESS_*).
  * @param access        Allowed access flags (VM_ACCESS_*).
  * @param flags         Mapping behaviour flags (VM_MAP_*).
@@ -2134,8 +2171,8 @@ __init_text void vm_init(void) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_vm_map(
-    void **_addr, size_t size, unsigned spec, uint32_t access, uint32_t flags,
-    handle_t handle, offset_t offset, const char *name)
+    void **_addr, size_t size, size_t align, unsigned spec, uint32_t access,
+    uint32_t flags, handle_t handle, offset_t offset, const char *name)
 {
     object_handle_t *khandle = NULL;
     ptr_t addr;
@@ -2163,7 +2200,9 @@ status_t kern_vm_map(
         }
     }
 
-    ret = vm_map(curr_proc->aspace, &addr, size, spec, access, flags, khandle, offset, kname);
+    ret = vm_map(
+        curr_proc->aspace, &addr, size, align, spec, access, flags, khandle,
+        offset, kname);
     if (ret == STATUS_SUCCESS) {
         ret = write_user((ptr_t *)_addr, addr);
         if (ret != STATUS_SUCCESS)

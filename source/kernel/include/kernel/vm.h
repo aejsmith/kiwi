@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2016 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,6 +31,7 @@ extern "C" {
 /** Address specification for kern_vm_map(). */
 #define VM_ADDRESS_ANY      1       /**< Place at any address. */
 #define VM_ADDRESS_EXACT    2       /**< Place at exactly the address specified. */
+#define VM_ADDRESS_HINT     3       /**< Start searching from the address specified. */
 
 /** Mapping access flags. */
 #define VM_ACCESS_READ      (1<<0)  /**< Mapping should be readable. */
@@ -43,8 +44,8 @@ extern "C" {
 #define VM_MAP_OVERCOMMIT   (1<<2)  /**< Allow overcommitting of memory. */
 
 extern status_t kern_vm_map(
-    void **_addr, size_t size, unsigned spec, uint32_t access, uint32_t flags,
-    handle_t handle, offset_t offset, const char *name);
+    void **_addr, size_t size, size_t align, unsigned spec, uint32_t access,
+    uint32_t flags, handle_t handle, offset_t offset, const char *name);
 extern status_t kern_vm_unmap(void *start, size_t size);
 
 #ifdef __cplusplus

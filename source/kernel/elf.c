@@ -193,7 +193,7 @@ static status_t do_load_phdr(elf_image_t *image, size_t i, object_handle_t *hand
         }
 
         /* Create an anonymous memory region for it. */
-        ret = vm_map(as, &start, size, VM_ADDRESS_EXACT, access, VM_MAP_PRIVATE, NULL, 0, NULL);
+        ret = vm_map(as, &start, size, 0, VM_ADDRESS_EXACT, access, VM_MAP_PRIVATE, NULL, 0, NULL);
         if (ret != STATUS_SUCCESS)
             return ret;
     }
@@ -214,7 +214,7 @@ static status_t do_load_phdr(elf_image_t *image, size_t i, object_handle_t *hand
      * need to check whether the supplied addresses are valid - vm_map() will
      * reject them if they aren't. */
     return vm_map(
-        as, &start, size, VM_ADDRESS_EXACT, access,
+        as, &start, size, 0, VM_ADDRESS_EXACT, access,
         (access & VM_ACCESS_WRITE) ? VM_MAP_PRIVATE : 0,
         handle, offset, NULL);
 }
@@ -292,7 +292,7 @@ status_t elf_binary_load(
         /* If a location is specified, force the binary to be there. */
         image->load_base = dest;
         ret = vm_map(
-            as, &image->load_base, image->load_size,
+            as, &image->load_base, image->load_size, 0,
             (dest) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY, VM_ACCESS_READ,
             VM_MAP_PRIVATE, NULL, 0, NULL);
         if (ret != STATUS_SUCCESS)

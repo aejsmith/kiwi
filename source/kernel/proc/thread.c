@@ -1234,7 +1234,7 @@ status_t kern_thread_create(
         snprintf(str, sizeof(str), "%s_stack", kname);
 
         ret = vm_map(
-            curr_proc->aspace, &thread->ustack, kstack.size, VM_ADDRESS_ANY,
+            curr_proc->aspace, &thread->ustack, kstack.size, 0, VM_ADDRESS_ANY,
             VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE | VM_MAP_STACK,
             NULL, 0, str);
         if (ret != STATUS_SUCCESS)

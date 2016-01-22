@@ -121,7 +121,7 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 
         /* Create an anonymous region for it. */
         ret = kern_vm_map(
-            (void **)&start, size, VM_ADDRESS_EXACT, access, VM_MAP_PRIVATE,
+            (void **)&start, size, 0, VM_ADDRESS_EXACT, access, VM_MAP_PRIVATE,
             INVALID_HANDLE, 0, NULL);
         if (ret != STATUS_SUCCESS) {
             dprintf("rtld: %s: unable to create anonymous BSS region: %d\n", image->path, ret);
@@ -143,7 +143,7 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 
     /* Map the data in. Set the private flag if mapping as writeable. */
     ret = kern_vm_map(
-        (void **)&start, size, VM_ADDRESS_EXACT, access,
+        (void **)&start, size, 0, VM_ADDRESS_EXACT, access,
         (access & VM_ACCESS_WRITE) ? VM_MAP_PRIVATE : 0, handle, offset, NULL);
     if (ret != STATUS_SUCCESS) {
         dprintf("rtld: %s: unable to map file data into memory: %d\n", image->path, ret);
@@ -299,8 +299,8 @@ static status_t load_image(
 
         /* Allocate a chunk of address space for it. */
         ret = kern_vm_map(
-            &image->load_base, image->load_size, VM_ADDRESS_ANY, VM_ACCESS_READ,
-            VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
+            &image->load_base, image->load_size, 0, VM_ADDRESS_ANY,
+            VM_ACCESS_READ, VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
         if (ret != STATUS_SUCCESS) {
             dprintf("rtld: %s: unable to allocate address space: %d\n", path, ret);
             goto fail;

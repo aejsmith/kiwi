@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2009-2016 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -141,8 +141,9 @@ extern void vm_unlock_page(vm_aspace_t *as, ptr_t addr);
 extern bool vm_fault(struct frame *frame, ptr_t addr, int reason, uint32_t access);
 
 extern status_t vm_map(
-    vm_aspace_t *as, ptr_t *_addr, size_t size, unsigned spec, uint32_t access,
-    uint32_t flags, object_handle_t *handle, offset_t offset, const char *name);
+    vm_aspace_t *as, ptr_t *_addr, size_t size, size_t align, unsigned spec,
+    uint32_t access, uint32_t flags, object_handle_t *handle, offset_t offset,
+    const char *name);
 extern status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
 extern status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
 
