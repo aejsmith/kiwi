@@ -223,12 +223,10 @@ static status_t do_load_phdr(elf_image_t *image, size_t i, object_handle_t *hand
  * @param handle        Handle to file being loaded.
  * @param path          Path to binary (used to name regions).
  * @param as            Address space to load into.
- * @param dest          If not 0, an address to load the binary to. This
- *                      requires the binary to be ELF_ET_DYN.
  * @param _image        Where to store image to pass to elf_binary_finish().
  * @return              Status code describing result of the operation. */
 status_t elf_binary_load(
-    object_handle_t *handle, const char *path, vm_aspace_t *as, ptr_t dest,
+    object_handle_t *handle, const char *path, vm_aspace_t *as,
     elf_image_t **_image)
 {
     elf_image_t *image;
@@ -251,9 +249,8 @@ status_t elf_binary_load(
         goto fail;
     }
 
-    /* Ensure that it is a type that we can load. If loading to a specific
-     * address, it must be ELF_ET_DYN. */
-    if ((dest || image->ehdr->e_type != ELF_ET_EXEC) && image->ehdr->e_type != ELF_ET_DYN) {
+    /* Ensure that it is a type that we can load. */
+    if (image->ehdr->e_type != ELF_ET_EXEC && image->ehdr->e_type != ELF_ET_DYN) {
         ret = STATUS_UNKNOWN_IMAGE;
         goto fail;
     }
@@ -290,11 +287,9 @@ status_t elf_binary_load(
         }
 
         /* If a location is specified, force the binary to be there. */
-        image->load_base = dest;
         ret = vm_map(
-            as, &image->load_base, image->load_size, 0,
-            (dest) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY, VM_ACCESS_READ,
-            VM_MAP_PRIVATE, NULL, 0, NULL);
+            as, &image->load_base, image->load_size, 0, VM_ADDRESS_ANY,
+            VM_ACCESS_READ, VM_MAP_PRIVATE, NULL, 0, NULL);
         if (ret != STATUS_SUCCESS)
             goto fail;
     } else {

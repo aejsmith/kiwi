@@ -1702,11 +1702,8 @@ vm_aspace_t *vm_aspace_create(void) {
     vm_freelist_insert(region, USER_SIZE);
 
     /* Mark the first page of the address space as reserved to catch NULL
-     * pointer accesses. Also mark the libkernel area as reserved. This should
-     * not fail. */
+     * pointer accesses. This should not fail. */
     ret = vm_reserve(as, 0x0, PAGE_SIZE);
-    assert(ret == STATUS_SUCCESS);
-    ret = vm_reserve(as, LIBKERNEL_BASE, LIBKERNEL_SIZE);
     assert(ret == STATUS_SUCCESS);
 
     return as;

@@ -54,7 +54,7 @@ typedef struct elf_image {
 
 extern status_t elf_binary_reserve(object_handle_t *handle, struct vm_aspace *as);
 extern status_t elf_binary_load(
-    object_handle_t *handle, const char *path, struct vm_aspace *as, ptr_t dest,
+    object_handle_t *handle, const char *path, struct vm_aspace *as,
     elf_image_t **_image);
 extern ptr_t elf_binary_finish(elf_image_t *image);
 

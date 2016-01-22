@@ -456,7 +456,7 @@ static status_t process_load(process_load_t *load, process_t *parent) {
     }
 
     /* Map the kernel library. */
-    ret = elf_binary_load(kernel_library, LIBKERNEL_PATH, load->aspace, LIBKERNEL_BASE, &load->image);
+    ret = elf_binary_load(kernel_library, LIBKERNEL_PATH, load->aspace, &load->image);
     if (ret != STATUS_SUCCESS)
         goto fail;
 
@@ -544,7 +544,7 @@ static void process_entry_trampoline(void *arg1, void *arg2) {
     addr += (load->env_count + 1) * sizeof(char *);
     uargs->arg_count = load->arg_count;
     uargs->env_count = load->env_count;
-    uargs->load_base = (void *)LIBKERNEL_BASE;
+    uargs->load_base = (void *)load->image->load_base;
 
     /* Copy path string, arguments and environment variables. */
     strcpy(uargs->path, load->path);
