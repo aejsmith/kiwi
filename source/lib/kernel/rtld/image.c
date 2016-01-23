@@ -290,7 +290,7 @@ static status_t load_image(
      * executables, just put the load base as NULL. */
     if (ehdr.e_type == ELF_ET_DYN) {
         for (i = 0, image->load_size = 0; i < ehdr.e_phnum; i++) {
-            if (phdrs[i].p_type == ELF_PT_LOAD)
+            if (phdrs[i].p_type != ELF_PT_LOAD)
                 continue;
 
             if ((phdrs[i].p_vaddr + phdrs[i].p_memsz) > image->load_size)
