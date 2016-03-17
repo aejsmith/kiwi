@@ -37,6 +37,7 @@ int kill(pid_t pid, int num) {
  * @param num           Signal number.
  * @return              0 on success, -1 on failure. */
 int raise(int num) {
+    __asm__ volatile("ud2a");
     libsystem_stub("raise", true);
     return -1;
 }
