@@ -106,7 +106,6 @@ static int ls_command(std::vector<std::string> args) {
         dir_entry_t *entry = reinterpret_cast<dir_entry_t *>(buf);
         ret = kern_file_read_dir(handle, entry, FS_PATH_MAX);
         if (ret != STATUS_SUCCESS) {
-            free(entry);
             kern_handle_close(handle);
             if (ret != STATUS_NOT_FOUND) {
                 printf("Failed to read directory: %d (%s)\n", ret, __kernel_status_strings[ret]);
@@ -123,7 +122,6 @@ static int ls_command(std::vector<std::string> args) {
         ret = kern_fs_info(path.c_str(), false, &info);
         if (ret != STATUS_SUCCESS) {
             printf("Failed to get entry information: %d (%s)\n", ret, __kernel_status_strings[ret]);
-            free(entry);
             kern_handle_close(handle);
             return ret;
         }
