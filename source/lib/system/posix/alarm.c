@@ -19,7 +19,8 @@
  * @brief               POSIX alarm function.
  */
 
-#include <kernel/mutex.h>
+#include <core/mutex.h>
+
 #include <kernel/time.h>
 #include <kernel/status.h>
 
@@ -29,7 +30,7 @@
 
 /** Alarm timer handle. */
 static handle_t alarm_handle = INVALID_HANDLE;
-static int32_t alarm_lock = MUTEX_INITIALIZER;
+static CORE_MUTEX_DEFINE(alarm_lock);
 
 /** Fork handler to reset the alarm handle. */
 static void reset_alarm(void) {
@@ -53,7 +54,7 @@ unsigned int alarm(unsigned int seconds) {
     nstime_t rem;
     status_t ret;
 
-    kern_mutex_lock(&alarm_lock, -1);
+    core_mutex_lock(&alarm_lock, -1);
 
     /* Create the alarm timer if it has not already been created. */
     if (alarm_handle < 0) {
@@ -66,6 +67,7 @@ unsigned int alarm(unsigned int seconds) {
 
     kern_timer_stop(alarm_handle, &rem);
     kern_timer_start(alarm_handle, seconds * 1000000000, TIMER_ONESHOT);
-    kern_mutex_unlock(&alarm_lock);
+
+    core_mutex_unlock(&alarm_lock);
     return rem / 1000000000;
 }

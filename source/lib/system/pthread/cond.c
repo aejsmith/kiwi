@@ -23,7 +23,6 @@
  */
 
 #include <kernel/futex.h>
-#include <kernel/mutex.h>
 #include <kernel/status.h>
 #include <kernel/thread.h>
 
@@ -41,7 +40,7 @@
  *                      attributes will be used.
  * @return              0 on success, error number on failure. */
 int pthread_cond_init(pthread_cond_t *__restrict cond, const pthread_condattr_t *__restrict attr) {
-    cond->lock = MUTEX_INITIALIZER;
+    cond->lock = CORE_MUTEX_INITIALIZER;
     cond->futex = 0;
     cond->mutex = NULL;
     cond->waiters = 0;
@@ -56,9 +55,9 @@ int pthread_cond_init(pthread_cond_t *__restrict cond, const pthread_condattr_t 
 }
 
 /** Destroy a condition variable.
- * @param mutex         Mutex to destroy. Attempting to destroy a condition
- *                      variable upon which other threads are blocked results
- *                      in undefined behaviour.
+ * @param cond          Condition variable to destroy. Attempting to destroy a
+ *                      condition variable upon which other threads are blocked
+ *                      results in undefined behaviour.
  * @return              Always returns 0. */
 int pthread_cond_destroy(pthread_cond_t *cond) {
     if (cond->waiters != 0)
@@ -116,7 +115,7 @@ int pthread_cond_wait(pthread_cond_t *__restrict cond, pthread_mutex_t *__restri
         libsystem_fatal("using unheld mutex %p with condition %p", mutex, cond);
     }
 
-    kern_mutex_lock(&cond->lock, -1);
+    core_mutex_lock(&cond->lock, -1);
 
     /* Can't do mutex checking if this is a process-shared condition variable,
      * as the mutex address may be different. */
@@ -146,9 +145,9 @@ int pthread_cond_wait(pthread_cond_t *__restrict cond, pthread_mutex_t *__restri
      * Applications should be waiting within a loop testing the condition
      * predicate. */
     val = cond->futex;
-    kern_mutex_unlock(&cond->lock);
+    core_mutex_unlock(&cond->lock);
     kern_futex_wait((int32_t *)&cond->futex, val, -1);
-    kern_mutex_lock(&cond->lock, -1);
+    core_mutex_lock(&cond->lock, -1);
 
     /* If there are no more waiters, set mutex to NULL. */
     if (--cond->waiters == 0) {
@@ -156,7 +155,7 @@ int pthread_cond_wait(pthread_cond_t *__restrict cond, pthread_mutex_t *__restri
             cond->mutex = NULL;
     }
 
-    kern_mutex_unlock(&cond->lock);
+    core_mutex_unlock(&cond->lock);
 
     /* Relock the mutex. */
     while (__sync_lock_test_and_set(&mutex->futex, 2) != 0) {
@@ -226,7 +225,7 @@ int pthread_cond_timedwait(
 int pthread_cond_broadcast(pthread_cond_t *cond) {
     status_t ret;
 
-    kern_mutex_lock(&cond->lock, -1);
+    core_mutex_lock(&cond->lock, -1);
 
     /* Increment the futex to signal that there's a wakeup event. Note that the
      * actual futex value is irrelevant. It can wrap around without issue. It is
@@ -247,11 +246,11 @@ int pthread_cond_broadcast(pthread_cond_t *cond) {
 
     if (ret != STATUS_SUCCESS) {
         libsystem_status_to_errno(ret);
-        kern_mutex_unlock(&cond->lock);
+        core_mutex_unlock(&cond->lock);
         return errno;
     }
 
-    kern_mutex_unlock(&cond->lock);
+    core_mutex_unlock(&cond->lock);
     return 0;
 }
 
@@ -261,7 +260,7 @@ int pthread_cond_broadcast(pthread_cond_t *cond) {
 int pthread_cond_signal(pthread_cond_t *cond) {
     status_t ret;
 
-    kern_mutex_lock(&cond->lock, -1);
+    core_mutex_lock(&cond->lock, -1);
 
     /* Same as above. */
     cond->futex++;
@@ -270,11 +269,11 @@ int pthread_cond_signal(pthread_cond_t *cond) {
     ret = kern_futex_wake((int32_t *)&cond->futex, 1, NULL);
     if (ret != STATUS_SUCCESS) {
         libsystem_status_to_errno(ret);
-        kern_mutex_unlock(&cond->lock);
+        core_mutex_unlock(&cond->lock);
         return errno;
     }
 
-    kern_mutex_unlock(&cond->lock);
+    core_mutex_unlock(&cond->lock);
     return 0;
 }
 

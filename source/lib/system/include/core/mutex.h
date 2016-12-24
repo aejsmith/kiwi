@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2014 Alex Smith
+ * Copyright (C) 2010-2016 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,8 +19,8 @@
  * @brief               Mutex implementation.
  */
 
-#ifndef __KERNEL_MUTEX_H
-#define __KERNEL_MUTEX_H
+#ifndef __CORE_MUTEX_H
+#define __CORE_MUTEX_H
 
 #include <kernel/types.h>
 
@@ -28,19 +28,22 @@
 extern "C" {
 #endif
 
-#ifndef __KERNEL
+/** Type of a mutex. */
+typedef int32_t core_mutex_t;
 
 /** Initializer for a mutex. */
-#define MUTEX_INITIALIZER       0
+#define CORE_MUTEX_INITIALIZER       0
 
-extern bool kern_mutex_held(int32_t *mutex);
-extern status_t kern_mutex_lock(int32_t *lock, nstime_t timeout);
-extern void kern_mutex_unlock(int32_t *lock);
+/** Statically defines a new mutex. */
+#define CORE_MUTEX_DEFINE(_var) \
+    core_mutex_t _var = CORE_MUTEX_INITIALIZER
 
-#endif /* __KERNEL */
+extern bool core_mutex_held(core_mutex_t *mutex);
+extern status_t core_mutex_lock(core_mutex_t *mutex, nstime_t timeout);
+extern void core_mutex_unlock(core_mutex_t *mutex);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __KERNEL_MUTEX_H */
+#endif /* __CORE_MUTEX_H */

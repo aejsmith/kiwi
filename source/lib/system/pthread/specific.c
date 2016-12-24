@@ -23,8 +23,6 @@
  *  - Call destructors when threads are actually implemented.
  */
 
-#include <kernel/mutex.h>
-
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>

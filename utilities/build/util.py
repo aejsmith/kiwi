@@ -14,6 +14,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+import SCons.Defaults
 from SCons.Script import *
 
 # Helper for creating source lists with certain files only enabled by config
@@ -33,3 +34,10 @@ def RequireTarget(target, error):
     if GetOption('help') or target in COMMAND_LINE_TARGETS:
         return
     raise SCons.Errors.StopError(error)
+
+# Copy a file.
+def Copy(env, dest, src):
+    # This silences the output of the command as opposed to using Copy directly.
+    return env.Command(
+        dest, src,
+        Action(lambda target, source, env: SCons.Defaults.copy_func(target[0], source[0]), None))

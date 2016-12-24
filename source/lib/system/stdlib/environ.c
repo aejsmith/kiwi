@@ -22,7 +22,7 @@
  *  - Use an rwlock.
  */
 
-#include <kernel/mutex.h>
+#include <core/mutex.h>
 
 #include <errno.h>
 #include <stdbool.h>
@@ -40,7 +40,7 @@ char **environ;
 static bool environ_alloced;
 
 /** Environment lock. */
-static int32_t environ_lock = MUTEX_INITIALIZER;
+static CORE_MUTEX_DEFINE(environ_lock);
 
 /** Reallocate the contents of the environment if necessary.
  * @return              Whether succesful. */
@@ -107,9 +107,9 @@ char *getenv(const char *name) {
     if (!name)
         return NULL;
 
-    kern_mutex_lock(&environ_lock, -1);
+    core_mutex_lock(&environ_lock, -1);
     ret = getenv_unsafe(name);
-    kern_mutex_unlock(&environ_lock);
+    core_mutex_unlock(&environ_lock);
 
     return ret;
 }
@@ -137,11 +137,11 @@ int putenv(char *str) {
         return -1;
     }
 
-    kern_mutex_lock(&environ_lock, -1);
+    core_mutex_lock(&environ_lock, -1);
 
     /* Ensure the environment array can be modified. */
     if (!ensure_environ_alloced()) {
-        kern_mutex_unlock(&environ_lock);
+        core_mutex_unlock(&environ_lock);
         return -1;
     }
 
@@ -153,7 +153,8 @@ int putenv(char *str) {
             continue;
         } else if (strncmp(environ[i], str, len) == 0) {
             environ[i] = str;
-            kern_mutex_unlock(&environ_lock);
+
+            core_mutex_unlock(&environ_lock);
             return 0;
         }
     }
@@ -162,7 +163,7 @@ int putenv(char *str) {
     for (count = 0; environ[count]; count++);
     new = realloc(environ, (count + 2) * sizeof(char *));
     if (!new) {
-        kern_mutex_unlock(&environ_lock);
+        core_mutex_unlock(&environ_lock);
         return -1;
     }
 
@@ -171,7 +172,8 @@ int putenv(char *str) {
     /* Set new entry. */
     environ[count] = str;
     environ[count + 1] = NULL;
-    kern_mutex_unlock(&environ_lock);
+
+    core_mutex_unlock(&environ_lock);
     return 0;
 }
 
@@ -196,11 +198,11 @@ int setenv(const char *name, const char *value, int overwrite) {
         return -1;
     }
 
-    kern_mutex_lock(&environ_lock, -1);
+    core_mutex_lock(&environ_lock, -1);
 
     /* Ensure the environment array can be modified. */
     if (!ensure_environ_alloced()) {
-        kern_mutex_unlock(&environ_lock);
+        core_mutex_unlock(&environ_lock);
         return -1;
     }
 
@@ -212,13 +214,14 @@ int setenv(const char *name, const char *value, int overwrite) {
     exist = getenv_unsafe(name);
     if (exist) {
         if (!overwrite) {
-            kern_mutex_unlock(&environ_lock);
+            core_mutex_unlock(&environ_lock);
             return 0;
         }
 
         if (strlen(exist) >= strlen(value)) {
             strcpy(exist, value);
-            kern_mutex_unlock(&environ_lock);
+
+            core_mutex_unlock(&environ_lock);
             return 0;
         }
 
@@ -229,13 +232,14 @@ int setenv(const char *name, const char *value, int overwrite) {
 
             val = malloc(len);
             if (!val) {
-                kern_mutex_unlock(&environ_lock);
+                core_mutex_unlock(&environ_lock);
                 return -1;
             }
 
             sprintf(val, "%s=%s", name, value);
             environ[count] = val;
-            kern_mutex_unlock(&environ_lock);
+
+            core_mutex_unlock(&environ_lock);
             return 0;
         }
 
@@ -245,7 +249,7 @@ int setenv(const char *name, const char *value, int overwrite) {
     /* Fill out the new entry. */
     val = malloc(len);
     if (!val) {
-        kern_mutex_unlock(&environ_lock);
+        core_mutex_unlock(&environ_lock);
         return -1;
     }
 
@@ -258,7 +262,7 @@ int setenv(const char *name, const char *value, int overwrite) {
     new = realloc(environ, (count + 2) * sizeof(char *));
     if (!new) {
         free(val);
-        kern_mutex_unlock(&environ_lock);
+        core_mutex_unlock(&environ_lock);
         return -1;
     }
 
@@ -267,7 +271,8 @@ int setenv(const char *name, const char *value, int overwrite) {
     /* Set new entry. */
     environ[count] = val;
     environ[count + 1] = NULL;
-    kern_mutex_unlock(&environ_lock);
+
+    core_mutex_unlock(&environ_lock);
     return 0;
 }
 
@@ -283,11 +288,11 @@ int unsetenv(const char *name) {
         return -1;
     }
 
-    kern_mutex_lock(&environ_lock, -1);
+    core_mutex_lock(&environ_lock, -1);
 
     /* Ensure the environment array can be modified. */
     if (!ensure_environ_alloced()) {
-        kern_mutex_unlock(&environ_lock);
+        core_mutex_unlock(&environ_lock);
         return -1;
     }
 
@@ -308,11 +313,11 @@ int unsetenv(const char *name) {
             if (new)
                 environ = new;
 
-            kern_mutex_unlock(&environ_lock);
+            core_mutex_unlock(&environ_lock);
             return 0;
         }
     }
 
-    kern_mutex_unlock(&environ_lock);
+    core_mutex_unlock(&environ_lock);
     return 0;
 }

@@ -23,8 +23,8 @@
 #define __SYSTEM_POSIX_H
 
 #include <core/list.h>
+#include <core/mutex.h>
 
-#include <kernel/mutex.h>
 #include <kernel/object.h>
 
 #include <unistd.h>
@@ -39,7 +39,7 @@ typedef struct posix_process {
 } posix_process_t;
 
 extern core_list_t __sys_hidden child_processes;
-extern int32_t __sys_hidden child_processes_lock;
+extern core_mutex_t __sys_hidden child_processes_lock;
 
 extern mode_t __sys_hidden current_umask;
 

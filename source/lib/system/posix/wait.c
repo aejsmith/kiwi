@@ -75,7 +75,7 @@ pid_t waitpid(pid_t pid, int *_status, int flags) {
         return -1;
     }
 
-    kern_mutex_lock(&child_processes_lock, -1);
+    core_mutex_lock(&child_processes_lock, -1);
 
     /* Build an array of handles to wait for. */
     core_list_foreach(&child_processes, iter) {
@@ -99,7 +99,7 @@ pid_t waitpid(pid_t pid, int *_status, int flags) {
         goto fail;
     }
 
-    kern_mutex_unlock(&child_processes_lock);
+    core_mutex_unlock(&child_processes_lock);
 
     /* Wait for any of them to exit. */
     ret = kern_object_wait(events, count, 0, (flags & WNOHANG) ? 0 : -1);
@@ -113,7 +113,7 @@ pid_t waitpid(pid_t pid, int *_status, int flags) {
         return -1;
     }
 
-    kern_mutex_lock(&child_processes_lock, -1);
+    core_mutex_lock(&child_processes_lock, -1);
 
     /* Only take the first exited process. */
     for (i = 0; i < count; i++) {
@@ -146,6 +146,6 @@ fail:
 
 out:
     free(events);
-    kern_mutex_unlock(&child_processes_lock);
+    core_mutex_unlock(&child_processes_lock);
     return ret;
 }

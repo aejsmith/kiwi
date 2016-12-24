@@ -25,6 +25,8 @@
 #ifndef __SYSTEM_PTHREAD_H
 #define __SYSTEM_PTHREAD_H
 
+#include <core/mutex.h>
+
 #include <kernel/types.h>
 
 #ifdef __cplusplus
@@ -60,7 +62,7 @@ typedef struct {
 
 /** Structure containing a condition variable. */
 typedef struct {
-    int32_t lock;                   /**< Internal structure lock. */
+    core_mutex_t lock;              /**< Internal structure lock. */
     uint32_t futex;                 /**< Futex to wait on. */
     uint32_t waiters;               /**< Number of waiters. */
     pthread_mutex_t *mutex;         /**< Mutex being used with the condition. */

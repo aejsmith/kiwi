@@ -26,6 +26,8 @@ env = manager.Create(libraries = ['kernel'], flags = {
 })
 
 sources = map(File, [
+    'core/mutex.c',
+
     'dirent/alphasort.c',
     'dirent/closedir.c',
     'dirent/opendir.c',

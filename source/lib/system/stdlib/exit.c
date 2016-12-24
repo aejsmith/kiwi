@@ -20,8 +20,8 @@
  */
 
 #include <core/list.h>
+#include <core/mutex.h>
 
-#include <kernel/mutex.h>
 #include <kernel/process.h>
 
 #include <stddef.h>
@@ -57,7 +57,7 @@ static CORE_LIST_DEFINE(atexit_funcs);
 static size_t atexit_count;
 
 /** Locking to protect at-exit lists. */
-static int32_t atexit_lock = MUTEX_INITIALIZER;
+static CORE_MUTEX_DEFINE(atexit_lock);
 
 /** Allocate an at-exit function structure.
  * @return              Function structure pointer, or NULL if none free. */
@@ -101,10 +101,10 @@ static void atexit_free(atexit_func_t *func) {
 int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
     atexit_func_t *func;
 
-    kern_mutex_lock(&atexit_lock, -1);
+    core_mutex_lock(&atexit_lock, -1);
 
     if (!(func = atexit_alloc())) {
-        kern_mutex_unlock(&atexit_lock);
+        core_mutex_unlock(&atexit_lock);
         return -1;
     }
 
@@ -114,7 +114,8 @@ int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
 
     core_list_prepend(&atexit_funcs, &func->header);
     atexit_count++;
-    kern_mutex_unlock(&atexit_lock);
+
+    core_mutex_unlock(&atexit_lock);
     return 0;
 }
 

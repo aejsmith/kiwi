@@ -14,6 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+import os
+import util
+
 Import('manager', 'config')
 
 env = manager.Create(flags = {
@@ -47,12 +50,19 @@ sources = map(File, [
 
     'fs.c',
     'init.c',
-    'mutex.c',
     'process.c',
     'status_list.c',
     'syscalls.S',
     'thread.c',
     'tls.c',
+])
+
+# Required libsystem sources. libkernel cannot depend on libsystem but we want
+# a few utility functions from it. Unlike libsystem, we default to all symbols
+# being hidden, therefore these functions will not actually be exported from
+# libkernel.
+libsystem_objects = map(lambda f: util.Copy(env, 'lib/%s' % (os.path.basename(f)), f), [
+    '../system/core/mutex.c',
 ])
 
 # Generate the system call functions.
@@ -68,6 +78,6 @@ env.Command(
 arch_sources = SConscript(dirs = ['arch/%s' % (config['ARCH'])], exports = ['env'])
 
 env.KiwiLibrary('kernel',
-    sources = arch_sources + sources,
+    sources = arch_sources + sources + libsystem_objects,
     include_paths = [Dir('include')],
 )

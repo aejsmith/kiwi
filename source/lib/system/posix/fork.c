@@ -40,7 +40,7 @@ static CORE_LIST_DEFINE(fork_handlers);
 CORE_LIST_DEFINE(child_processes);
 
 /** Lock for child process list. */
-int32_t child_processes_lock = MUTEX_INITIALIZER;
+CORE_MUTEX_DEFINE(child_processes_lock);
 
 /**
  * Create a clone of the calling process.
@@ -106,9 +106,9 @@ pid_t fork(void) {
             libsystem_fatal("could not get ID of child");
 
         /* Add it to the child list. */
-        kern_mutex_lock(&child_processes_lock, -1);
+        core_mutex_lock(&child_processes_lock, -1);
         core_list_append(&child_processes, &process->header);
-        kern_mutex_unlock(&child_processes_lock);
+        core_mutex_unlock(&child_processes_lock);
 
         return process->pid;
     }

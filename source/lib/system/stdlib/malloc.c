@@ -19,7 +19,8 @@
  * @brief               Memory allocation functions.
  */
 
-#include <kernel/mutex.h>
+#include <core/mutex.h>
+
 #include <kernel/object.h>
 #include <kernel/status.h>
 #include <kernel/system.h>
@@ -84,11 +85,11 @@ static inline int munmap_wrapper(void *start, size_t length) {
 #define MAP_ANONYMOUS       0
 
 #define USE_LOCKS           2
-#define MLOCK_T             int32_t
-#define INITIAL_LOCK(sl)    do { *(sl) = MUTEX_INITIALIZER; } while (0)
-#define ACQUIRE_LOCK(sl)    kern_mutex_lock((sl), -1)
-#define RELEASE_LOCK(sl)    kern_mutex_unlock((sl))
+#define MLOCK_T             core_mutex_t
+#define INITIAL_LOCK(sl)    do { *(sl) = CORE_MUTEX_INITIALIZER; } while (0)
+#define ACQUIRE_LOCK(sl)    core_mutex_lock((sl), -1)
+#define RELEASE_LOCK(sl)    core_mutex_unlock((sl))
 
-static MLOCK_T malloc_global_mutex = MUTEX_INITIALIZER;
+static MLOCK_T malloc_global_mutex = CORE_MUTEX_INITIALIZER;
 
 #include "dlmalloc.c"
