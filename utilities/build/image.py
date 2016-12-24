@@ -102,7 +102,7 @@ def iso_image_func(target, source, env):
     f.close()
 
     # Create the ISO.
-    verbose = (ARGUMENTS.get('V') == '1') and '' or '>> /dev/null 2>&1'
+    verbose = '' if (ARGUMENTS.get('V') == '1') else '>> /dev/null 2>&1'
     config = env['_CONFIG']
     ret = os.system(
         '%s --bin-dir=build/%s-%s/boot/bin --targets="%s" --label="Kiwi CDROM" %s %s %s' %
