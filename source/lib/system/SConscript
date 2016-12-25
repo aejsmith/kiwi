@@ -26,6 +26,7 @@ env = manager.Create(libraries = ['kernel'], flags = {
 })
 
 sources = map(File, [
+    'core/log.c',
     'core/mutex.c',
     'core/path.c',
 

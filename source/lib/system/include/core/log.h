@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2013 Alex Smith
+ * Copyright (C) 2016 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,30 +16,25 @@
 
 /**
  * @file
- * @brief               Internal libsystem definitions.
+ * @brief               Logging functions.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
-
-#include <kernel/types.h>
+#ifndef __CORE_LOG_H
+#define __CORE_LOG_H
 
 #include <system/defs.h>
 
-struct process_args;
+#include <stdarg.h>
 
-extern char **environ;
-extern const char *__errno_list[];
-extern size_t __errno_count;
+/** Log levels. */
+typedef enum core_log_level {
+    CORE_LOG_DEBUG,                     /**< Debugging information. */
+    CORE_LOG_NOTICE,                    /**< Informational messages. */
+    CORE_LOG_WARN,                      /**< Warning messages. */
+    CORE_LOG_ERROR,                     /**< Error messages. */
+} core_log_level_t;
 
-extern const char *__program_name;
+extern void core_log_args(core_log_level_t level, const char *fmt, va_list args);
+extern void core_log(core_log_level_t level, const char *fmt, ...) __sys_printf(2, 3);
 
-extern void libsystem_init(struct process_args *args);
-extern void libsystem_fatal(const char *fmt, ...) __sys_noreturn __sys_hidden;
-extern void libsystem_stub(const char *name, bool fatal) __sys_hidden;
-
-extern void libsystem_status_to_errno(status_t status) __sys_hidden;
-
-extern int main(int argc, char **argv, char **envp);
-
-#endif /* __LIBSYSTEM_H */
+#endif /* __CORE_LOG_H */

@@ -19,6 +19,8 @@
  * @brief               C library startup code.
  */
 
+#include <core/path.h>
+
 #define __KERNEL_PRIVATE
 #include <kernel/private/process.h>
 
@@ -27,6 +29,9 @@
 #include <unistd.h>
 
 #include "libsystem.h"
+
+/** Name of the current program. */
+const char *__program_name;
 
 /** Early system library initialisation (run in .init). */
 static __sys_init void libsystem_early_init(void) {
@@ -41,6 +46,9 @@ static __sys_init void libsystem_early_init(void) {
 void libsystem_init(process_args_t *args) {
     /* Save the environment pointer. */
     environ = args->env;
+
+    /* Save the program name. */
+    __program_name = core_path_basename(args->path);
 
     /* If we're process 1, set default environment variables. */
     if (kern_process_id(-1) == 1) {
