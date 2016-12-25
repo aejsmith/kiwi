@@ -28,6 +28,6 @@
  * @param size          Size of buffer. If this is too small, STATUS_TOO_SMALL
  *                      will be returned.
  * @return              Status code describing result of the operation. */
-__export status_t kern_fs_curr_dir(char *buf, size_t size) {
+__sys_export status_t kern_fs_curr_dir(char *buf, size_t size) {
     return kern_fs_path(INVALID_HANDLE, buf, size);
 }

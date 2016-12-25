@@ -23,55 +23,16 @@
 #define __LIBKERNEL_H
 
 #include <core/list.h>
+#include <core/utility.h>
 
 #include <kernel/private/process.h>
 #include <kernel/private/thread.h>
 #include <kernel/status.h>
 
+#include <system/defs.h>
+
 #include <elf.h>
 #include <stdio.h>
-
-/** Compiler attribute/builtin macros. */
-#define __export        __attribute__((visibility("default")))
-#define __noreturn      __attribute__((noreturn))
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
-
-/** Round a value up.
- * @param val           Value to round.
- * @param nearest       Boundary to round up to.
- * @return              Rounded value. */
-#define round_up(val, nearest) \
-    __extension__ \
-    ({ \
-        typeof(val) __n = val; \
-        if (__n % (nearest)) { \
-            __n -= __n % (nearest); \
-            __n += nearest; \
-        } \
-        __n; \
-    })
-
-/** Round a value down.
- * @param val           Value to round.
- * @param nearest       Boundary to round up to.
- * @return              Rounded value. */
-#define round_down(val, nearest) \
-    __extension__ \
-    ({ \
-        typeof(val) __n = val; \
-        if (__n % (nearest)) \
-            __n -= __n % (nearest); \
-        __n; \
-    })
-
-/** Get the lowest value out of a pair of values. */
-#define min(a, b) \
-    ((a) < (b) ? (a) : (b))
-
-/** Get the highest value out of a pair of values. */
-#define max(a, b) \
-    ((a) < (b) ? (b) : (a))
 
 #include "arch.h"
 
@@ -162,7 +123,7 @@ extern void *tls_get_addr(size_t module, size_t offset);
 extern status_t tls_alloc(tls_tcb_t **_tcb);
 extern void tls_destroy(tls_tcb_t *tcb);
 
-extern void libkernel_init(process_args_t *args) __noreturn;
-extern void libkernel_abort(void) __noreturn;
+extern void libkernel_init(process_args_t *args) __sys_noreturn;
+extern void libkernel_abort(void) __sys_noreturn;
 
 #endif /* __LIBKERNEL_H */

@@ -19,6 +19,8 @@
  * @brief               POSIX error number handling.
  */
 
+#include <core/utility.h>
+
 #include <kernel/status.h>
 
 #include <errno.h>
@@ -99,7 +101,7 @@ int *__errno_location(void) {
  * @param status        Status to set.
  */
 void libsystem_status_to_errno(status_t status) {
-    if (status < 0 || (size_t)status >= ARRAY_SIZE(status_to_errno_table))
+    if (status < 0 || (size_t)status >= core_array_size(status_to_errno_table))
         libsystem_fatal("unknown status code passed to status_to_errno()");
 
     __errno = status_to_errno_table[status];

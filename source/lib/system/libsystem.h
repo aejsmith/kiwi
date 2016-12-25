@@ -26,13 +26,6 @@
 
 #include <system/defs.h>
 
-/** Compiler attribute/builtin macros. */
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
-
-/** Get the number of elements in an array. */
-#define ARRAY_SIZE(a)   (sizeof((a)) / sizeof((a)[0]))
-
 struct process_args;
 
 extern char **environ;

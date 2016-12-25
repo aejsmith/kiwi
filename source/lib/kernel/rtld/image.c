@@ -109,8 +109,8 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 
     /* Map the BSS if required. */
     if (phdr->p_memsz > phdr->p_filesz) {
-        start = load_base + round_down(phdr->p_vaddr + phdr->p_filesz, page_size);
-        end = load_base + round_up(phdr->p_vaddr + phdr->p_memsz, page_size);
+        start = load_base + core_round_down(phdr->p_vaddr + phdr->p_filesz, page_size);
+        end = load_base + core_round_up(phdr->p_vaddr + phdr->p_memsz, page_size);
         size = end - start;
 
         /* Must be writable to be able to clear later. */
@@ -134,10 +134,10 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
     if (phdr->p_filesz == 0)
         return STATUS_SUCCESS;
 
-    start = load_base + round_down(phdr->p_vaddr, page_size);
-    end = load_base + round_up(phdr->p_vaddr + phdr->p_filesz, page_size);
+    start = load_base + core_round_down(phdr->p_vaddr, page_size);
+    end = load_base + core_round_up(phdr->p_vaddr + phdr->p_filesz, page_size);
     size = end - start;
-    offset = round_down(phdr->p_offset, page_size);
+    offset = core_round_down(phdr->p_offset, page_size);
 
     dprintf("rtld: %s: loading header %zu to [%p,%p)\n", image->path, i, start, start + size);
 
@@ -294,7 +294,7 @@ static status_t load_image(
                 continue;
 
             if ((phdrs[i].p_vaddr + phdrs[i].p_memsz) > image->load_size)
-                image->load_size = round_up(phdrs[i].p_vaddr + phdrs[i].p_memsz, page_size);
+                image->load_size = core_round_up(phdrs[i].p_vaddr + phdrs[i].p_memsz, page_size);
         }
 
         /* Allocate a chunk of address space for it. */
@@ -322,7 +322,7 @@ static status_t load_image(
             /* Assume the first LOAD header in the image covers the EHDR and the
              * PHDRs. */
             if (!image->ehdr && !image->phdrs) {
-                image->ehdr = image->load_base + round_down(phdrs[i].p_vaddr, page_size);
+                image->ehdr = image->load_base + core_round_down(phdrs[i].p_vaddr, page_size);
                 image->phdrs = (void *)image->ehdr + ehdr.e_phoff;
                 image->num_phdrs = ehdr.e_phnum;
             }
@@ -587,7 +587,7 @@ status_t rtld_init(process_args_t *args, void **_entry) {
     /* Fill in the libkernel image structure with information we have. */
     image = &libkernel_image;
     image->load_base = args->load_base;
-    image->load_size = round_up((elf_addr_t)_end - (elf_addr_t)args->load_base, page_size);
+    image->load_size = core_round_up((elf_addr_t)_end - (elf_addr_t)args->load_base, page_size);
     image->dyntab = _DYNAMIC;
 
     ret = kern_fs_info(LIBKERNEL_PATH, true, &file);
@@ -690,7 +690,7 @@ status_t rtld_init(process_args_t *args, void **_entry) {
 }
 
 /* TODO: Move this out of here. */
-__export int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data) {
+__sys_export int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data) {
     rtld_image_t *image;
     struct dl_phdr_info info;
     int ret;

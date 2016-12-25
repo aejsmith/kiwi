@@ -27,7 +27,7 @@ typedef struct tls_index {
     unsigned long ti_offset;
 } tls_index_t;
 
-extern void *__tls_get_addr(tls_index_t *index) __export;
+extern void *__tls_get_addr(tls_index_t *index) __sys_export;
 
 /** AMD64-specific TLS address lookup function.
  * @param index         Pointer to argument structure. */

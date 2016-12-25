@@ -48,7 +48,8 @@ static heap_chunk_t *map_chunk(size_t size) {
     heap_chunk_t *chunk;
     status_t ret;
 
-    size = round_up(size, page_size);
+    size = core_round_up(size, page_size);
+
     ret = kern_vm_map(
         (void **)&chunk, size, 0, VM_ADDRESS_ANY, VM_ACCESS_READ | VM_ACCESS_WRITE,
         VM_MAP_PRIVATE, INVALID_HANDLE, 0, "libkernel_heap");
@@ -73,7 +74,7 @@ void *malloc(size_t size) {
         return 0;
 
     /* Align all allocations to 8 bytes. */
-    size = round_up(size, 8);
+    size = core_round_up(size, 8);
     total = size + sizeof(heap_chunk_t);
 
     core_mutex_lock(&heap_lock, -1);
@@ -128,7 +129,7 @@ void *realloc(void *addr, size_t size) {
         new = malloc(size);
         if (addr) {
             chunk = (heap_chunk_t *)((char *)addr - sizeof(heap_chunk_t));
-            memcpy(new, addr, min(chunk->size - sizeof(heap_chunk_t), size));
+            memcpy(new, addr, core_min(chunk->size - sizeof(heap_chunk_t), size));
             free(addr);
         }
 

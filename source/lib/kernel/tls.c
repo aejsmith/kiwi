@@ -82,7 +82,7 @@ static size_t initial_block_size(void) {
     for (i = 1; i < static_dtv_size; i++) {
         image = rtld_image_lookup(i);
         if (image && image->tls_memsz)
-            size = round_up(size + image->tls_memsz, image->tls_align);
+            size = core_round_up(size + image->tls_memsz, image->tls_align);
     }
 
     /* Add on the TCB size. */
@@ -105,7 +105,7 @@ static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
 
         /* Handle alignment requirements. */
         if (image->tls_align)
-            base = round_up(base, image->tls_align);
+            base = core_round_up(base, image->tls_align);
 
         dprintf(
             "tls: loading image for module %s (%" PRId16 ") to %p (offset %p)\n",
@@ -142,10 +142,10 @@ ptrdiff_t tls_tp_offset(rtld_image_t *image) {
     for (i = 1; i < image->id; i++) {
         exist = rtld_image_lookup(i);
         if (exist && exist->tls_memsz)
-            offset = round_up(offset + exist->tls_memsz, exist->tls_align);
+            offset = core_round_up(offset + exist->tls_memsz, exist->tls_align);
     }
 
-    offset = round_up(offset + image->tls_memsz, image->tls_align);
+    offset = core_round_up(offset + image->tls_memsz, image->tls_align);
 
     /* Want the negative of what we've worked out, the data is behind the thread
      * pointer. */
@@ -191,7 +191,8 @@ status_t tls_alloc(tls_tcb_t **_tcb) {
     dtv[0] = static_dtv_size;
 
     /* Allocate the TLS block. */
-    size = round_up(initial_block_size(), page_size);
+    size = core_round_up(initial_block_size(), page_size);
+
     ret = kern_vm_map(
         &alloc, size, 0, VM_ADDRESS_ANY, VM_ACCESS_READ | VM_ACCESS_WRITE,
         VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
@@ -214,5 +215,5 @@ status_t tls_alloc(tls_tcb_t **_tcb) {
 void tls_destroy(tls_tcb_t *tcb) {
     /* TODO: Will need to free dynamically allocated blocks here. */
     free(tcb->dtv);
-    kern_vm_unmap(tcb->base, round_up(initial_block_size(), page_size));
+    kern_vm_unmap(tcb->base, core_round_up(initial_block_size(), page_size));
 }
