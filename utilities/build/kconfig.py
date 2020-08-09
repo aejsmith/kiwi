@@ -60,7 +60,7 @@ class ConfigParser(dict):
             elif value.isdigit():
                 value = int(value)
             else:
-                print "Unrecognised value type: %s" % (value)
+                print("Unrecognised value type: %s" % (value))
                 return
 
             # Add it to the dictionary.

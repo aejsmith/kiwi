@@ -225,11 +225,11 @@ class BuildManager:
         merge = {}
         for (k, v) in flags.items():
             if type(v) == list:
-                if env.has_key(k):
+                if k in env:
                     merge[k] = v
                 else:
                     env[k] = v
-            elif type(v) == dict and env.has_key(k) and type(env[k]) == dict:
+            elif type(v) == dict and k in env and type(env[k]) == dict:
                 env[k].update(v)
             else:
                 env[k] = v

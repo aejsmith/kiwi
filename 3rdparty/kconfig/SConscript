@@ -16,7 +16,7 @@
 
 Import('env', 'manager')
 
-mconf_sources = map(File, [
+mconf_sources = list(map(File, [
     'mconf.c',
     'zconf.tab.c',
     'lxdialog/checklist.c',
@@ -25,7 +25,7 @@ mconf_sources = map(File, [
     'lxdialog/textbox.c',
     'lxdialog/yesno.c',
     'lxdialog/menubox.c',
-])
+]))
 
 # Build the menu configuration utility.
 env['MCONF'] = env.Program('mconf', mconf_sources,

@@ -17,7 +17,7 @@
 import os, sys, shutil
 from subprocess import Popen, PIPE
 from time import time
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 def which(program):
     import os
@@ -38,7 +38,7 @@ def which(program):
     return None
 
 def msg(msg):
-    print '\033[0;32m>>>\033[0;1m %s\033[0m' % (msg)
+    print('\033[0;32m>>>\033[0;1m %s\033[0m' % (msg))
 
 def remove(path):
     if not os.path.lexists(path):
@@ -101,7 +101,7 @@ class ToolchainComponent:
     # Helper function to execute a command and throw an exception if required
     # status not returned.
     def execute(self, cmd, directory = '.', expected = 0):
-        print "+ %s" % (cmd)
+        print("+ %s" % (cmd))
         oldcwd = os.getcwd()
         os.chdir(directory)
         if os.system(cmd) != expected:
@@ -298,7 +298,7 @@ class LLVMToolchain(Toolchain):
             f.write('#!/bin/bash\n\n')
             f.write('exec -a $0 %s --sysroot=%s/sysroot $*\n' % (path, manager.targetdir))
             f.close()
-            os.chmod(wrapper, 0755)
+            os.chmod(wrapper, 0o755)
         try:
             os.symlink('%s-clang' % (manager.target),
                 os.path.join(manager.targetdir, 'bin', '%s-cc' % (manager.target)))
@@ -425,7 +425,7 @@ class ToolchainManager:
             for c in self.toolchain.components:
                 if c.check():
                     self.build_component(c)
-        except Exception, e:
+        except Exception as e:
             msg('Exception during toolchain build: \033[0;0m%s' % (str(e)))
             return 1
 

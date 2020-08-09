@@ -47,9 +47,9 @@ target_flags = {
 host_flags = {
     'CCFLAGS': ['-pipe'],
     'CFLAGS': ['-std=gnu99'],
-    'CXXFLAGS': filter(lambda f: f not in [
+    'CXXFLAGS': [f for f in cc_warning_flags if f not in [
         '-Wmissing-declarations', '-Wno-variadic-macros',
-        '-Wno-unused-but-set-variable'], cc_warning_flags),
+        '-Wno-unused-but-set-variable']],
     'YACCFLAGS': ['-d'],
 }
 
@@ -152,20 +152,20 @@ static_obj, shared_obj = createObjBuilders(target_env)
 shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
 
 # Add in extra compilation flags from the configuration.
-if config.has_key('ARCH_ASFLAGS'):
+if 'ARCH_ASFLAGS' in config:
     target_env['ASFLAGS'] += config['ARCH_ASFLAGS'].split()
-if config.has_key('ARCH_CCFLAGS'):
+if 'ARCH_CCFLAGS' in config:
     target_env['CCFLAGS'] += config['ARCH_CCFLAGS'].split()
-if config.has_key('PLATFORM_ASFLAGS'):
+if 'PLATFORM_ASFLAGS' in config:
     target_env['CCFLAGS'] += config['PLATFORM_ASFLAGS'].split()
-if config.has_key('PLATFORM_CCFLAGS'):
+if 'PLATFORM_CCFLAGS' in config:
     target_env['CCFLAGS'] += config['PLATFORM_CCFLAGS'].split()
 target_env['CCFLAGS'] += config['EXTRA_CCFLAGS'].split()
 target_env['CFLAGS'] += config['EXTRA_CFLAGS'].split()
 target_env['CXXFLAGS'] += config['EXTRA_CXXFLAGS'].split()
 
 # Set paths to toolchain components.
-if os.environ.has_key('CC') and os.path.basename(os.environ['CC']) == 'ccc-analyzer':
+if 'CC' in os.environ and os.path.basename(os.environ['CC']) == 'ccc-analyzer':
     target_env['CC'] = os.environ['CC']
     target_env['ENV']['CCC_CC'] = toolchain.tool_path('clang')
 
@@ -175,7 +175,7 @@ if os.environ.has_key('CC') and os.path.basename(os.environ['CC']) == 'ccc-analy
     target_env.Decider(decide_if_changed)
 else:
     target_env['CC'] = toolchain.tool_path('clang')
-if os.environ.has_key('CXX') and os.path.basename(os.environ['CXX']) == 'c++-analyzer':
+if 'CXX' in os.environ and os.path.basename(os.environ['CXX']) == 'c++-analyzer':
     target_env['CXX'] = os.environ['CXX']
     target_env['ENV']['CCC_CXX'] = toolchain.tool_path('clang++')
 else:
