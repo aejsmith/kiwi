@@ -26,17 +26,10 @@ config SYS_SUPPORTS_LITTLE_ENDIAN
 config SYS_SUPPORTS_BIG_ENDIAN
 	bool
 
-config TOOLCHAIN_LLVM
-	bool
-
-config TOOLCHAIN_GCC
-	bool
-
 # For KBoot compatibility.
 config ARCH_X86
 	bool
 	select SYS_SUPPORTS_LITTLE_ENDIAN
-	select TOOLCHAIN_LLVM
 
 choice
 	prompt "Architecture"
@@ -49,26 +42,15 @@ config ARCH_AMD64
 	help
 	  Target the built system to 64-bit x86 processors.
 
-config ARCH_MIPS
-	bool "MIPS"
-	select 32BIT
-	select TOOLCHAIN_GCC
-	help
-	  Target the built system to MIPS processors. Endianness is determined
-	  by the platform type selected.
-
 endchoice
 
 config ARCH
 	string
 	default "amd64" if ARCH_AMD64
-	default "mips" if ARCH_MIPS
 
 config TOOLCHAIN_TARGET
 	string
 	default "x86_64-kiwi" if ARCH_AMD64
-	default "mips-kiwi" if ARCH_MIPS && BIG_ENDIAN
-	default "mipsel-kiwi" if ARCH_MIPS && LITTLE_ENDIAN
 
 config ARCH_ASFLAGS
 	string

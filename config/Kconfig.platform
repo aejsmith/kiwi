@@ -17,7 +17,6 @@
 choice
 	prompt "Platform"
 	default PLATFORM_PC if ARCH_X86
-	default PLATFORM_MALTA if ARCH_MIPS
 
 config PLATFORM_PC
 	bool "Standard PC"
@@ -25,20 +24,11 @@ config PLATFORM_PC
 	help
 	  Target the built system to standard PCs (nearly all x86 computers).
 
-config PLATFORM_MALTA
-	bool "MIPS Malta"
-	depends on ARCH_MIPS
-	select SYS_SUPPORTS_BIG_ENDIAN
-	select SYS_SUPPORTS_LITTLE_ENDIAN
-	help
-	  Target the built system to the MIPS Malta evaluation board.
-
 endchoice
 
 config PLATFORM
 	string
 	default "pc" if PLATFORM_PC
-	default "malta" if PLATFORM_MALTA
 
 config KBOOT_TARGETS
         string
