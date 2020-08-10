@@ -26,6 +26,7 @@ env = manager.Create(flags = {
         '-Wno-parentheses',
         '-Wno-uninitialized',
         '-Wno-absolute-value',
+        '-Wno-misleading-indentation',
     ],
 })
 

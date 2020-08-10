@@ -92,4 +92,6 @@ static inline int munmap_wrapper(void *start, size_t length) {
 
 static MLOCK_T malloc_global_mutex = CORE_MUTEX_INITIALIZER;
 
+#pragma clang diagnostic ignored "-Wnull-pointer-arithmetic"
+
 #include "dlmalloc.c"
