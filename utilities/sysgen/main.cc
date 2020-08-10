@@ -197,7 +197,7 @@ static void usage(ostream &stream, const char *progname) {
     stream << " <arch>      - Architecture to generate code for." << endl;
     stream << " <input>     - System call definition file." << endl;
 
-    exit((stream == cerr) ? 1 : 0);
+    exit((&stream == &cerr) ? 1 : 0);
 }
 
 /** Main entry point for the program.
