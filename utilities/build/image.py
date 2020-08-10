@@ -34,6 +34,11 @@ def fs_image_func(target, source, env):
             tarinfo = tarfile.TarInfo(name)
             tarinfo.type = tarfile.DIRTYPE
             tarinfo.mtime = int(time.time())
+            tarinfo.mode = 0o755
+            tarinfo.uid = 0
+            tarinfo.gid = 0
+            tarinfo.uname = "root"
+            tarinfo.gname = "root"
             tar.addfile(tarinfo)
 
     # Copy everything into it.
@@ -41,12 +46,13 @@ def fs_image_func(target, source, env):
         while path[0] == '/':
             path = path[1:]
         make_dir(os.path.dirname(path))
-        tarinfo = tar.gettarinfo(str(target), path)
-        tarinfo.uid = 0
-        tarinfo.gid = 0
-        tarinfo.uname = "root"
-        tarinfo.gname = "root"
-        tar.addfile(tarinfo, file(str(target)))
+        with open(str(target), 'rb') as file:
+            tarinfo = tar.gettarinfo(None, path, file)
+            tarinfo.uid = 0
+            tarinfo.gid = 0
+            tarinfo.uname = "root"
+            tarinfo.gname = "root"
+            tar.addfile(tarinfo, file)
     for (path, target) in env['LINKS']:
         while path[0] == '/':
             path = path[1:]
@@ -55,6 +61,11 @@ def fs_image_func(target, source, env):
         tarinfo.type = tarfile.SYMTYPE
         tarinfo.linkname = target
         tarinfo.mtime = int(time.time())
+        tarinfo.mode = 0o644
+        tarinfo.uid = 0
+        tarinfo.gid = 0
+        tarinfo.uname = "root"
+        tarinfo.gname = "root"
         tar.addfile(tarinfo)
 
     # Add in extra stuff from the directory specified in the configuration.
