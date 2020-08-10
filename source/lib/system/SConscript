@@ -25,7 +25,7 @@ env = manager.Create(libraries = ['kernel'], flags = {
     ],
 })
 
-sources = map(File, [
+sources = [File(f) for f in [
     'core/log.c',
     'core/mutex.c',
     'core/path.c',
@@ -169,7 +169,7 @@ sources = map(File, [
     'fatal.c',
     'init.c',
     'sched.c',
-])
+]]
 
 # Generate the error string list.
 env.Command(

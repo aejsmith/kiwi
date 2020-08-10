@@ -14,11 +14,11 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-sources = map(File, [
+sources = [File(f) for f in [
     'relocate.c',
     'rtld.c',
     'start.S',
     'tls.c',
-])
+]]
 
 Return('sources')

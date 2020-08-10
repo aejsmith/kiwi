@@ -89,6 +89,6 @@ flags = {
     },
 }
 
-targets = map(lambda x: env.SharedObject(x, **flags), sources)
+targets = [env.SharedObject(f, **flags) for f in sources]
 
 Return('targets')

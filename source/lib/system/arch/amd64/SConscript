@@ -16,8 +16,8 @@
 
 Import('env')
 
-sources = map(File, [
+sources = [File(f) for f in [
     'setjmp.S',
-])
+]]
 
 Return('sources')

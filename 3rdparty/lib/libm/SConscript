@@ -37,10 +37,10 @@ class SourceList:
 	def __add__(self, sources):
 		for s in sources:
 			base = s.name.rsplit('.', 1)[0]
-			if not self.sources.has_key(base):
+			if base not in self.sources:
 				self.sources[base] = s
 	def files(self):
-		return self.sources.values()
+		return list(self.sources.values())
 
 # Get a list of source files. Architecture sources must be first because of the
 # way the above class works.

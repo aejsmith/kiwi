@@ -123,7 +123,7 @@ env = manager.CreateBare(name = 'kernel', flags = {
 
 # Add the compiler include directory for some standard headers.
 from subprocess import Popen, PIPE
-incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip()
+incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip().decode('utf-8')
 env['CCFLAGS'] += ['-isystem', incdir]
 env['ASFLAGS'] += ['-isystem', incdir]
 
@@ -152,7 +152,9 @@ platform_sources = SConscript(dirs = ['platform/' + config['PLATFORM']], exports
 sources = arch_sources + platform_sources + sources
 
 # Link the kernel image.
-env.Program('kernel-unstripped', map(env.Object, sources),
+env.Program(
+    'kernel-unstripped',
+    [env.Object(f) for f in sources],
     LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
 Depends('kernel-unstripped', env['LDSCRIPT'])
 

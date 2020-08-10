@@ -40,7 +40,7 @@ env = manager.Create(flags = {
     ],
 })
 
-sources = map(File, [
+sources = [File(f) for f in [
     'rtld/image.c',
     'rtld/symbol.c',
 
@@ -55,15 +55,15 @@ sources = map(File, [
     'syscalls.S',
     'thread.c',
     'tls.c',
-])
+]]
 
 # Required libsystem sources. libkernel cannot depend on libsystem but we want
 # a few utility functions from it. Unlike libsystem, we default to all symbols
 # being hidden, therefore these functions will not actually be exported from
 # libkernel.
-libsystem_objects = map(lambda f: util.Copy(env, 'lib/%s' % (os.path.basename(f)), f), [
+libsystem_objects = [util.Copy(env, 'lib/%s' % (os.path.basename(f)), f) for f in [
     '../system/core/mutex.c',
-])
+]]
 
 # Generate the system call functions.
 env.Syscalls('syscalls.S', manager['kernel']['SYSCALLS'])
