@@ -19,7 +19,6 @@
  * @brief               Kiwi system call code generator.
  */
 
-#include <boost/foreach.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -156,13 +155,13 @@ static void generate_kernel_table(ostream &stream, const string &name) {
     stream << "#include <lib/utility.h>" << endl;
     stream << "#include <syscall.h>" << endl;
 
-    BOOST_FOREACH(const Syscall *call, syscall_list) {
+    for (const Syscall *call : syscall_list) {
         stream << "extern void " << call->name() << "(void);" << endl;
     }
 
     stream << "syscall_t " << name << "[] = {" << endl;
 
-    BOOST_FOREACH(const Syscall *call, syscall_list) {
+    for (const Syscall *call : syscall_list) {
         stream << "     [" << call->id() << "] = { .addr = (ptr_t)" << call->name();
         stream << ", .count = " << call->num_params() << " }," << endl;
     }
@@ -179,7 +178,7 @@ static void generate_header(ostream &stream, const string &name) {
     stream << "#ifndef " << name << endl;
     stream << "#define " << name << endl << endl;
 
-    BOOST_FOREACH(const Syscall *call, syscall_list) {
+    for (const Syscall *call : syscall_list) {
         stream << "#define __NR_" << call->name() << ' ' << call->id() << endl;
     }
 
