@@ -134,7 +134,7 @@ class ToolchainComponent:
 # Component definition for binutils.
 class BinutilsComponent(ToolchainComponent):
     name = 'binutils'
-    version = '2.24'
+    version = '2.35'
     generic = False
     source = [
         'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
@@ -147,10 +147,10 @@ class BinutilsComponent(ToolchainComponent):
         self.patch()
 
         # Work out configure options to use.
-        confopts  = '--prefix=%s ' % (self.destdir)
+        confopts  = '--prefix="%s" ' % (self.destdir)
         confopts += '--target=%s ' % (self.manager.target)
         confopts += '--disable-werror '
-        confopts += '--with-sysroot=%s ' % (os.path.join(self.destdir, 'sysroot'))
+        confopts += '--with-sysroot="%s" ' % (os.path.join(self.destdir, 'sysroot'))
         confopts += '--with-lib-path="=/system/lib:=/lib"'
 
         # gold has bugs which cause the generated kernel image to be huge.
@@ -165,11 +165,11 @@ class BinutilsComponent(ToolchainComponent):
 # Component definition for LLVM/Clang.
 class LLVMComponent(ToolchainComponent):
     name = 'llvm'
-    version = '3.5.1'
+    version = '10.0.1'
     generic = True
     source = [
-        'http://llvm.org/releases/' + version + '/llvm-' + version + '.src.tar.xz',
-        'http://llvm.org/releases/' + version + '/cfe-' + version + '.src.tar.xz',
+        'https://github.com/llvm/llvm-project/releases/download/llvmorg-' + version + '/llvm-' + version + '.src.tar.xz',
+        'https://github.com/llvm/llvm-project/releases/download/llvmorg-' + version + '/clang-' + version + '.src.tar.xz',
     ]
     patches = [
         ('llvm-' + version + '-kiwi.patch', 'llvm-' + version + '.src', 1),
@@ -177,59 +177,21 @@ class LLVMComponent(ToolchainComponent):
 
     def build(self):
         # Move clang sources to the right place.
-        os.rename('cfe-%s.src' % (self.version), 'llvm-%s.src/tools/clang' % (self.version))
+        os.rename('clang-%s.src' % (self.version), 'llvm-%s.src/tools/clang' % (self.version))
 
         self.patch()
 
-        # Work out configure options to use.
-        confopts  = '--prefix=%s ' % (self.destdir)
-        confopts += '--enable-optimized '
-        confopts += '--enable-targets=x86,x86_64,arm '
-
-        # LLVM needs Python 2 to build.
-        pythons = ['python2', 'python2.7', 'python']
-        for python in pythons:
-            path = which(python)
-            if path:
-                confopts += '--with-python=%s' % (path)
-                break
+        # Work out CMake options to use.
+        cmakeopts  = '-G "Unix Makefiles" '
+        cmakeopts += '-DCMAKE_BUILD_TYPE=Release '
+        cmakeopts += '-DLLVM_TARGETS_TO_BUILD=X86 '
+        cmakeopts += '-DCMAKE_INSTALL_PREFIX="%s" ' % (self.destdir)
 
         # Build and install it.
         os.mkdir('llvm-build')
-        self.execute('../llvm-%s.src/configure %s' % (self.version, confopts), 'llvm-build')
+        self.execute('cmake %s ../llvm-%s.src' % (cmakeopts, self.version), 'llvm-build')
         self.execute('make -j%d' % (self.manager.makejobs), 'llvm-build')
         self.execute('make install', 'llvm-build')
-
-# Component definition for Compiler-RT.
-class CompilerRTComponent(ToolchainComponent):
-    name = 'compiler-rt'
-    version = '3.4'
-    # change back version below when updating
-    generic = False
-    source = [
-        'http://llvm.org/releases/' + version + '/compiler-rt-' + version + '.src.tar.gz',
-    ]
-    patches = [
-        ('compiler-rt-' + version + '-kiwi.patch', 'compiler-rt-' + version, 1),
-    ]
-
-    def build(self):
-        self.patch()
-
-        # Build it.
-        self.execute('make CC=%s AR=%s RANLIB=%s clang_kiwi' % (
-            self.manager.tool_path('clang'),
-            self.manager.tool_path('ar'),
-            self.manager.tool_path('ranlib')), 'compiler-rt-%s' % self.version)
-
-        # Install it. Iterate directories because some targets build multiple
-        # libraries (e.g. i386 and x86_64).
-        archs = os.listdir(os.path.join('compiler-rt-%s' % self.version, 'clang_kiwi'))
-        for arch in archs:
-            shutil.copyfile(os.path.join('compiler-rt-%s' % self.version, 'clang_kiwi',
-                    arch, 'libcompiler_rt.a'),
-                os.path.join(self.manager.genericdir, 'lib', 'clang', '3.5.1',
-                    'libclang_rt.%s.a' % arch))
 
 # Base class for a toolchain.
 class Toolchain:
@@ -245,22 +207,19 @@ class LLVMToolchain(Toolchain):
         self.components = [
             BinutilsComponent(manager),
             LLVMComponent(manager),
-            CompilerRTComponent(manager),
         ]
 
     def pre_update(self, manager):
         # Create clang wrapper scripts. The wrapper script is needed to pass
         # the correct sysroot path for the target. The exec sets the executable
         # name for clang to the wrapper script path - this allows clang to
-        # determine the target and the tool directory properly. This needs to
-        # be done before building the toolchain as compiler-rt needs the wrapper
-        # in place to build.
+        # determine the target and the tool directory properly.
         for name in ['clang', 'clang++']:
             path = os.path.join(manager.genericdir, 'bin', name)
             wrapper = os.path.join(manager.targetdir, 'bin', '%s-%s' % (manager.target, name))
             f = open(wrapper, 'w')
             f.write('#!/bin/bash\n\n')
-            f.write('exec -a $0 %s --sysroot=%s/sysroot $*\n' % (path, manager.targetdir))
+            f.write('exec -a "$0" "%s" --sysroot="%s/sysroot" "$@"\n' % (path, manager.targetdir))
             f.close()
             os.chmod(wrapper, 0o755)
         try:

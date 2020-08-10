@@ -1,0 +1,308 @@
+diff -urN llvm-10.0.1.src.orig/include/llvm/ADT/Triple.h llvm-10.0.1.src/include/llvm/ADT/Triple.h
+--- llvm-10.0.1.src.orig/include/llvm/ADT/Triple.h	2020-07-07 17:21:37.000000000 +0100
++++ llvm-10.0.1.src/include/llvm/ADT/Triple.h	2020-08-09 11:42:57.460626067 +0100
+@@ -192,7 +192,8 @@
+     Hurd,       // GNU/Hurd
+     WASI,       // Experimental WebAssembly OS
+     Emscripten,
+-    LastOSType = Emscripten
++    Kiwi,
++    LastOSType = Kiwi
+   };
+   enum EnvironmentType {
+     UnknownEnvironment,
+@@ -535,6 +536,11 @@
+     return getOS() == Triple::Haiku;
+   }
+ 
++  /// Tests whether the OS is Kiwi.
++  bool isOSKiwi() const {
++    return getOS() == Triple::Kiwi;
++  }
++
+   /// Tests whether the OS is Windows.
+   bool isOSWindows() const {
+     return getOS() == Triple::Win32;
+diff -urN llvm-10.0.1.src.orig/lib/Support/Triple.cpp llvm-10.0.1.src/lib/Support/Triple.cpp
+--- llvm-10.0.1.src.orig/lib/Support/Triple.cpp	2020-07-07 17:21:37.000000000 +0100
++++ llvm-10.0.1.src/lib/Support/Triple.cpp	2020-08-09 11:43:52.192215549 +0100
+@@ -198,6 +198,7 @@
+   case Hurd: return "hurd";
+   case IOS: return "ios";
+   case KFreeBSD: return "kfreebsd";
++  case Kiwi: return "kiwi";
+   case Linux: return "linux";
+   case Lv2: return "lv2";
+   case MacOSX: return "macosx";
+@@ -520,6 +521,7 @@
+     .StartsWith("hurd", Triple::Hurd)
+     .StartsWith("wasi", Triple::WASI)
+     .StartsWith("emscripten", Triple::Emscripten)
++    .StartsWith("kiwi", Triple::Kiwi)
+     .Default(Triple::UnknownOS);
+ }
+ 
+diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Basic/Targets/OSTargets.h llvm-10.0.1.src/tools/clang/lib/Basic/Targets/OSTargets.h
+--- llvm-10.0.1.src.orig/tools/clang/lib/Basic/Targets/OSTargets.h	2020-07-07 17:21:37.000000000 +0100
++++ llvm-10.0.1.src/tools/clang/lib/Basic/Targets/OSTargets.h	2020-08-09 12:16:12.221342852 +0100
+@@ -319,6 +319,22 @@
+   }
+ };
+ 
++// Kiwi Target
++template <typename Target>
++class LLVM_LIBRARY_VISIBILITY KiwiTargetInfo : public OSTargetInfo<Target> {
++protected:
++  void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
++                    MacroBuilder &Builder) const override {
++    Builder.defineMacro("__Kiwi__");
++    Builder.defineMacro("__ELF__");
++    DefineStd(Builder, "unix", Opts);
++  }
++
++public:
++  KiwiTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
++      : OSTargetInfo<Target>(Triple, Opts) {}
++};
++
+ // Hurd target
+ template <typename Target>
+ class LLVM_LIBRARY_VISIBILITY HurdTargetInfo : public OSTargetInfo<Target> {
+diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-10.0.1.src/tools/clang/lib/Basic/Targets.cpp
+--- llvm-10.0.1.src.orig/tools/clang/lib/Basic/Targets.cpp	2020-07-07 17:21:37.000000000 +0100
++++ llvm-10.0.1.src/tools/clang/lib/Basic/Targets.cpp	2020-08-09 12:17:49.265667828 +0100
+@@ -553,6 +553,8 @@
+     }
+     case llvm::Triple::Haiku:
+       return new HaikuTargetInfo<X86_64TargetInfo>(Triple, Opts);
++    case llvm::Triple::Kiwi:
++      return new KiwiTargetInfo<X86_64TargetInfo>(Triple, Opts);
+     case llvm::Triple::NaCl:
+       return new NaClTargetInfo<X86_64TargetInfo>(Triple, Opts);
+     case llvm::Triple::PS4:
+diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Driver/CMakeLists.txt llvm-10.0.1.src/tools/clang/lib/Driver/CMakeLists.txt
+--- llvm-10.0.1.src.orig/tools/clang/lib/Driver/CMakeLists.txt	2020-07-07 17:21:37.000000000 +0100
++++ llvm-10.0.1.src/tools/clang/lib/Driver/CMakeLists.txt	2020-08-09 12:02:48.113627541 +0100
+@@ -53,6 +53,7 @@
+   ToolChains/HIP.cpp
+   ToolChains/Hexagon.cpp
+   ToolChains/Hurd.cpp
++  ToolChains/Kiwi.cpp
+   ToolChains/Linux.cpp
+   ToolChains/MipsLinux.cpp
+   ToolChains/MinGW.cpp
+diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-10.0.1.src/tools/clang/lib/Driver/Driver.cpp
+--- llvm-10.0.1.src.orig/tools/clang/lib/Driver/Driver.cpp	2020-07-07 17:21:37.000000000 +0100
++++ llvm-10.0.1.src/tools/clang/lib/Driver/Driver.cpp	2020-08-09 19:28:33.132805765 +0100
+@@ -27,6 +27,7 @@
+ #include "ToolChains/Haiku.h"
+ #include "ToolChains/Hexagon.h"
+ #include "ToolChains/Hurd.h"
++#include "ToolChains/Kiwi.h"
+ #include "ToolChains/Lanai.h"
+ #include "ToolChains/Linux.h"
+ #include "ToolChains/MSP430.h"
+@@ -4802,6 +4803,9 @@
+     case llvm::Triple::Haiku:
+       TC = std::make_unique<toolchains::Haiku>(*this, Target, Args);
+       break;
++    case llvm::Triple::Kiwi:
++      TC = std::make_unique<toolchains::Kiwi>(*this, Target, Args);
++      break;
+     case llvm::Triple::Ananas:
+       TC = std::make_unique<toolchains::Ananas>(*this, Target, Args);
+       break;
+diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.cpp llvm-10.0.1.src/tools/clang/lib/Driver/ToolChains/Kiwi.cpp
+--- llvm-10.0.1.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.cpp	1970-01-01 01:00:00.000000000 +0100
++++ llvm-10.0.1.src/tools/clang/lib/Driver/ToolChains/Kiwi.cpp	2020-08-10 11:42:10.961586634 +0100
+@@ -0,0 +1,110 @@
++//===--- Kiwi.h - Kiwi ToolChain Implementations ----------------*- C++ -*-===//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++//===----------------------------------------------------------------------===//
++
++#include "Kiwi.h"
++#include "CommonArgs.h"
++#include "clang/Config/config.h"
++#include "clang/Driver/Distro.h"
++#include "clang/Driver/Driver.h"
++#include "clang/Driver/DriverDiagnostic.h"
++#include "clang/Driver/Options.h"
++#include "clang/Driver/SanitizerArgs.h"
++#include "llvm/Option/ArgList.h"
++#include "llvm/ProfileData/InstrProf.h"
++#include "llvm/Support/Path.h"
++#include "llvm/Support/ScopedPrinter.h"
++#include "llvm/Support/VirtualFileSystem.h"
++#include <system_error>
++
++using namespace clang::driver;
++using namespace clang::driver::toolchains;
++using namespace clang;
++using namespace llvm::opt;
++
++Kiwi::Kiwi(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
++  : Generic_ELF(D, Triple, Args) {
++  getFilePaths().push_back(getDriver().Dir + "/../lib");
++
++  // When using a sysroot, add '/lib' to allow '/system' to be omitted in the
++  // sysroot.
++  if(!getDriver().SysRoot.empty())
++    getFilePaths().push_back(getDriver().SysRoot + "/lib");
++  getFilePaths().push_back(getDriver().SysRoot + "/system/lib");
++}
++
++bool Kiwi::HasNativeLLVMSupport() const {
++  return true;
++}
++
++ToolChain::RuntimeLibType Kiwi::GetDefaultRuntimeLibType() const {
++  return ToolChain::RLT_CompilerRT;
++}
++
++ToolChain::CXXStdlibType Kiwi::GetDefaultCXXStdlibType() const {
++  return ToolChain::CST_Libcxx;
++}
++
++ToolChain::CXXStdlibType Kiwi::GetCXXStdlibType(const ArgList &Args) const {
++  if (Arg *A = Args.getLastArg(options::OPT_stdlib_EQ)) {
++    StringRef Value = A->getValue();
++    if (Value != "libc++") {
++      getDriver().Diag(diag::err_drv_invalid_stdlib_name)
++        << A->getAsString(Args);
++    }
++  } 
++
++  return ToolChain::CST_Libcxx;
++}
++
++void Kiwi::AddCXXStdlibLibArgs(const ArgList &Args,
++                               ArgStringList &CmdArgs) const {
++  CmdArgs.push_back("-lc++");
++  CmdArgs.push_back("-lcxxrt");
++}
++
++Tool *Kiwi::buildLinker() const {
++  return new tools::gnutools::Linker(*this);
++}
++
++Tool *Kiwi::buildAssembler() const {
++  return new tools::gnutools::Assembler(*this);
++}
++
++std::string Kiwi::getDynamicLinker(const ArgList &Args) const {
++  return "/system/lib/libkernel.so";
++}
++
++void Kiwi::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
++                                     ArgStringList &CC1Args) const {
++  const Driver &D = getDriver();
++
++  if (DriverArgs.hasArg(options::OPT_nostdinc))
++    return;
++
++  if (!DriverArgs.hasArg(options::OPT_nobuiltininc)) {
++    SmallString<128> P(D.ResourceDir);
++    llvm::sys::path::append(P, "include");
++    addSystemInclude(DriverArgs, CC1Args, P.str());
++  }
++
++  if (DriverArgs.hasArg(options::OPT_nostdlibinc))
++    return;
++
++  if (!D.SysRoot.empty())
++    addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include");
++  addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/system/include");
++}
++
++void Kiwi::addLibCxxIncludePaths(const llvm::opt::ArgList &DriverArgs,
++                                 llvm::opt::ArgStringList &CC1Args) const {
++  const Driver &D = getDriver();
++
++  if (!D.SysRoot.empty())
++    addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include/c++/v1");
++  addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/system/include/c++/v1");
++}
+diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.h llvm-10.0.1.src/tools/clang/lib/Driver/ToolChains/Kiwi.h
+--- llvm-10.0.1.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.h	1970-01-01 01:00:00.000000000 +0100
++++ llvm-10.0.1.src/tools/clang/lib/Driver/ToolChains/Kiwi.h	2020-08-10 11:42:34.473883573 +0100
+@@ -0,0 +1,49 @@
++//===--- Kiwi.h - Kiwi ToolChain Implementations ----------------*- C++ -*-===//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++//===----------------------------------------------------------------------===//
++
++#ifndef LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_KIWI_H
++#define LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_KIWI_H
++
++#include "Gnu.h"
++#include "clang/Driver/ToolChain.h"
++
++namespace clang {
++namespace driver {
++namespace toolchains {
++
++class LLVM_LIBRARY_VISIBILITY Kiwi : public Generic_ELF {
++public:
++  Kiwi(const Driver &D, const llvm::Triple &Triple,
++       const llvm::opt::ArgList &Args);
++
++  bool HasNativeLLVMSupport() const override;
++  RuntimeLibType GetDefaultRuntimeLibType() const override;
++  CXXStdlibType GetDefaultCXXStdlibType() const override;
++  CXXStdlibType GetCXXStdlibType(const llvm::opt::ArgList &Args) const override;
++  void AddCXXStdlibLibArgs(const llvm::opt::ArgList &Args,
++                           llvm::opt::ArgStringList &CmdArgs) const override;
++
++  std::string getDynamicLinker(const llvm::opt::ArgList &Args) const override;
++
++  void
++  AddClangSystemIncludeArgs(const llvm::opt::ArgList &DriverArgs,
++                            llvm::opt::ArgStringList &CC1Args) const override;
++  void addLibCxxIncludePaths(
++      const llvm::opt::ArgList &DriverArgs,
++      llvm::opt::ArgStringList &CC1Args) const override;
++
++protected:
++  Tool *buildAssembler() const override;
++  Tool *buildLinker() const override;
++};
++
++} // end namespace toolchains
++} // end namespace driver
++} // end namespace clang
++
++#endif // LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_KIWI_H
+diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Frontend/InitHeaderSearch.cpp llvm-10.0.1.src/tools/clang/lib/Frontend/InitHeaderSearch.cpp
+--- llvm-10.0.1.src.orig/tools/clang/lib/Frontend/InitHeaderSearch.cpp	2020-07-07 17:21:37.000000000 +0100
++++ llvm-10.0.1.src/tools/clang/lib/Frontend/InitHeaderSearch.cpp	2020-08-09 19:03:08.785282868 +0100
+@@ -271,6 +271,7 @@
+   switch (os) {
+   case llvm::Triple::Linux:
+   case llvm::Triple::Hurd:
++  case llvm::Triple::Kiwi:
+   case llvm::Triple::Solaris:
+     llvm_unreachable("Include management is handled in the driver.");
+ 
+@@ -382,6 +383,7 @@
+   switch (os) {
+   case llvm::Triple::Linux:
+   case llvm::Triple::Hurd:
++  case llvm::Triple::Kiwi:
+   case llvm::Triple::Solaris:
+     llvm_unreachable("Include management is handled in the driver.");
+     break;
+@@ -424,6 +426,7 @@
+   case llvm::Triple::Emscripten:
+   case llvm::Triple::Linux:
+   case llvm::Triple::Hurd:
++  case llvm::Triple::Kiwi:
+   case llvm::Triple::Solaris:
+   case llvm::Triple::WASI:
+     return;

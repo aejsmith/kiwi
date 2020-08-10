@@ -12,7 +12,8 @@ Building
 
 To build Kiwi you need the following prerequisites:
 
- * SCons
+ * SCons 3.x
+ * CMake
  * Boost
  * ncurses
  * xorriso
