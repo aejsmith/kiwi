@@ -154,7 +154,7 @@ class BuildManager:
         # Get the compiler include directory which contains some standard
         # headers.
         from subprocess import Popen, PIPE
-        incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip()
+        incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip().decode('utf-8')
 
         # Specify -nostdinc to prevent the compiler from using the automatically
         # generated sysroot. That only needs to be used when compiling outside

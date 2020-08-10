@@ -24,7 +24,7 @@ env = manager.Create(flags = {
 
     # The default visibility is set to hidden, as the majority of functions in
     # this library should not be exported.
-    'CCFLAGS': ['-ffreestanding', '-fvisibility=hidden', '-nostdinc'],
+    'CCFLAGS': ['-ffreestanding', '-fvisibility=hidden'],
 
     'CPPDEFINES': {
         '__LIBKERNEL': None,
