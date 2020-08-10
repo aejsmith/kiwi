@@ -18,7 +18,7 @@
 def revision_id():
     from subprocess import Popen, PIPE
     git = Popen(['git', 'rev-parse', '--short', 'HEAD'], stdout = PIPE, stderr = PIPE)
-    revision = git.communicate()[0].strip()
+    revision = git.communicate()[0].strip().decode('utf-8')
     if git.returncode != 0:
         return None
     return revision
@@ -30,7 +30,7 @@ def check_submodules():
     try:
         from subprocess import Popen, PIPE
         git = Popen(['git', 'submodule', 'status'], stdout = PIPE, stderr = PIPE)
-        modules = git.communicate()[0].split('\n')
+        modules = git.communicate()[0].split('\n').decode('utf-8')
         for module in modules:
             if len(module) and module[0] != ' ':
                 return False
