@@ -23,6 +23,7 @@ dirs = [
     'crt',
     'kernel',
     'system',
+    'compiler-rt',
     'libm',
     'cxxrt',
     'cxx',

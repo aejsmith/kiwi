@@ -191,6 +191,8 @@ class BuildManager:
 
         # Set up emitters to set dependencies on default libraries.
         def add_library_deps(target, source, env):
+            if not '-nostdlib' in env['LINKFLAGS']:
+                Depends(target[0], env['_LIBOUTDIR'].File('libclang_rt.builtins-%s.a' % (env['_CONFIG']['TOOLCHAIN_ARCH'])))
             if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
                 Depends(target[0], env['_LIBOUTDIR'].glob('*crt*.o'))
             if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):

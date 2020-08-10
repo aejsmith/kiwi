@@ -19,6 +19,8 @@ from subprocess import Popen, PIPE
 from time import time
 from urllib.parse import urlparse
 
+llvm_version = '10.0.1'
+
 def which(program):
     import os
     def is_exe(fpath):
@@ -165,7 +167,7 @@ class BinutilsComponent(ToolchainComponent):
 # Component definition for LLVM/Clang.
 class LLVMComponent(ToolchainComponent):
     name = 'llvm'
-    version = '10.0.1'
+    version = llvm_version
     generic = True
     source = [
         'https://github.com/llvm/llvm-project/releases/download/llvmorg-' + version + '/llvm-' + version + '.src.tar.xz',
@@ -241,6 +243,7 @@ class ToolchainManager:
         self.platform = config['PLATFORM']
         self.destdir = config['TOOLCHAIN_DIR']
         self.target = config['TOOLCHAIN_TARGET']
+        self.toolchain_arch = config['TOOLCHAIN_ARCH']
         self.makejobs = config['TOOLCHAIN_MAKE_JOBS']
 
         self.srcdir = os.path.join(os.getcwd(), 'utilities', 'toolchain')
@@ -290,6 +293,14 @@ class ToolchainManager:
                     # root of the sysroot.
                     target = os.path.join(os.getcwd(), str(dir.srcnode()))
                     link_tree(target, includedir)
+
+        # Create a symlink to the compiler-rt builtins library in the build tree.
+        runtime_dir = os.path.join(self.genericdir, 'lib', 'clang', llvm_version, 'lib', 'kiwi')
+        makedirs(runtime_dir)
+        runtime_name = 'libclang_rt.builtins-%s.a' % (self.toolchain_arch)
+        runtime_lib = os.path.join(runtime_dir, runtime_name)
+        remove(runtime_lib)
+        os.symlink(os.path.join(builddir, 'lib', runtime_name), runtime_lib)
 
     # Build a component.
     def build_component(self, c):
