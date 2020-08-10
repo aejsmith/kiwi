@@ -112,6 +112,44 @@ diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-10.0.1.src
      case llvm::Triple::Ananas:
        TC = std::make_unique<toolchains::Ananas>(*this, Target, Args);
        break;
+diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Driver/ToolChains/Gnu.cpp llvm-10.0.1.src/tools/clang/lib/Driver/ToolChains/Gnu.cpp
+--- llvm-10.0.1.src.orig/tools/clang/lib/Driver/ToolChains/Gnu.cpp	2020-07-07 17:21:37.000000000 +0100
++++ llvm-10.0.1.src/tools/clang/lib/Driver/ToolChains/Gnu.cpp	2020-08-10 15:49:05.797596396 +0100
+@@ -572,18 +572,22 @@
+ 
+       AddRunTimeLibs(ToolChain, D, CmdArgs, Args);
+ 
+-      if (WantPthread && !isAndroid)
+-        CmdArgs.push_back("-lpthread");
+-
+-      if (Args.hasArg(options::OPT_fsplit_stack))
+-        CmdArgs.push_back("--wrap=pthread_create");
+-
+-      if (!Args.hasArg(options::OPT_nolibc))
+-        CmdArgs.push_back("-lc");
+-
+-      // Add IAMCU specific libs, if needed.
+-      if (IsIAMCU)
+-        CmdArgs.push_back("-lgloss");
++      if (Triple.isOSKiwi()) {
++        CmdArgs.push_back("-lsystem");
++      } else {
++        if (WantPthread && !isAndroid)
++          CmdArgs.push_back("-lpthread");
++
++        if (Args.hasArg(options::OPT_fsplit_stack))
++          CmdArgs.push_back("--wrap=pthread_create");
++
++        if (!Args.hasArg(options::OPT_nolibc))
++          CmdArgs.push_back("-lc");
++
++        // Add IAMCU specific libs, if needed.
++        if (IsIAMCU)
++          CmdArgs.push_back("-lgloss");
++      }
+ 
+       if (IsStatic || IsStaticPIE)
+         CmdArgs.push_back("--end-group");
 diff -urN llvm-10.0.1.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.cpp llvm-10.0.1.src/tools/clang/lib/Driver/ToolChains/Kiwi.cpp
 --- llvm-10.0.1.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.cpp	1970-01-01 01:00:00.000000000 +0100
 +++ llvm-10.0.1.src/tools/clang/lib/Driver/ToolChains/Kiwi.cpp	2020-08-10 11:42:10.961586634 +0100
