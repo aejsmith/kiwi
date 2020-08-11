@@ -62,7 +62,7 @@ config QEMU_BINARY
 
 config QEMU_OPTS
 	string "Extra QEMU options"
-	default "-monitor vc:1024x768 -serial stdio -vga std -s -rtc base=localtime -m 256"
+	default "-monitor vc:1024x768 -serial stdio -vga std -s -rtc base=localtime -m 1024 -enable-kvm -smp cpus=4,cores=4"
 	help
 	  Extra options to pass to QEMU.
 
