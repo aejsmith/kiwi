@@ -153,51 +153,18 @@ extern char __nan[];
 #define FP_ILOGB0	(-INT_MAX)
 #define FP_ILOGBNAN	INT_MAX
 
-#define fpclassify(x) \
-	((sizeof (x) == sizeof (float)) ? \
-		__fpclassifyf(x) \
-	: (sizeof (x) == sizeof (double)) ? \
-		__fpclassify(x) \
-	:	__fpclassifyl(x))
-#define isfinite(x) \
-	((sizeof (x) == sizeof (float)) ? \
-		__isfinitef(x) \
-	: (sizeof (x) == sizeof (double)) ? \
-		__isfinite(x) \
-	:	__isfinitel(x))
-#define isnormal(x) \
-	((sizeof (x) == sizeof (float)) ? \
-		__isnormalf(x) \
-	: (sizeof (x) == sizeof (double)) ? \
-		__isnormal(x) \
-	:	__isnormall(x))
-#define signbit(x) \
-	((sizeof (x) == sizeof (float)) ? \
-		__signbitf(x) \
-	: (sizeof (x) == sizeof (double)) ? \
-		__signbit(x) \
-	:	__signbitl(x))
-
-#define	isgreater(x, y)		(!isunordered((x), (y)) && (x) > (y))
-#define	isgreaterequal(x, y)	(!isunordered((x), (y)) && (x) >= (y))
-#define	isless(x, y)		(!isunordered((x), (y)) && (x) < (y))
-#define	islessequal(x, y)	(!isunordered((x), (y)) && (x) <= (y))
-#define	islessgreater(x, y)	(!isunordered((x), (y)) && \
-					((x) > (y) || (y) > (x)))
-#define	isunordered(x, y)	(isnan(x) || isnan(y))
-
-#define isinf(x) \
-	((sizeof (x) == sizeof (float)) ? \
-		__isinff(x) \
-	: (sizeof (x) == sizeof (double)) ? \
-		__isinf(x) \
-	:	__isinfl(x))
-#define isnan(x) \
-	((sizeof (x) == sizeof (float)) ? \
-		__isnanf(x) \
-	: (sizeof (x) == sizeof (double)) ? \
-		__isnan(x) \
-	:	__isnanl(x))
+#define fpclassify(x)           __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, x)
+#define isfinite(x)             __builtin_isfinite(x)
+#define isnormal(x)             __builtin_isnormal(x)
+#define signbit(x)              __builtin_signbit(x)
+#define	isgreater(x, y)		    __builtin_isgreater(x, y)
+#define	isgreaterequal(x, y)	__builtin_isgreaterequal(x, y)
+#define	isless(x, y)		    __builtin_isless(x, y)
+#define	islessequal(x, y)	    __builtin_islessequal(x, y)
+#define	islessgreater(x, y)     __builtin_islessgreater(x, y)
+#define	isunordered(x, y)	    __builtin_isunordered(x, y)
+#define isinf(x)                __builtin_isinf(x)
+#define isnan(x)                __builtin_isnan(x)
 
 /*
  * XOPEN/SVID
@@ -428,8 +395,6 @@ extern float gammaf(float);
  */
 extern float dremf(float, float);
 extern int finitef(float);
-extern int isinff(float);
-extern int isnanf(float);
 
 /*
  * Float versions of reentrant version of gamma & lgamma; passes
@@ -546,21 +511,6 @@ long double fmal(long double, long double, long double);
 extern int __fpclassify(double);
 extern int __fpclassifyf(float);
 extern int __fpclassifyl(long double);
-extern int __isfinite(double);
-extern int __isfinitef(float);
-extern int __isfinitel(long double);
-extern int __isinf(double);
-extern int __isinff(float);
-extern int __isinfl(long double);
-extern int __isnan(double);
-extern int __isnanf(float);
-extern int __isnanl(long double);
-extern int __isnormal(double);
-extern int __isnormalf(float);
-extern int __isnormall(long double);
-extern int __signbit(double);
-extern int __signbitf(float);
-extern int __signbitl(long double);
 
 #if defined(__vax__)
 extern double infnan(int);

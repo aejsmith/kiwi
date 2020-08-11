@@ -75,8 +75,6 @@ sources += map(File, [
 	'e_sqrt.c',
 	'e_sqrtf.c',
 	'e_sqrtl.c',
-	'isinf.c',
-	'isnan.c',
 	'k_cos.c',
 	'k_cosf.c',
 	'k_rem_pio2.c',

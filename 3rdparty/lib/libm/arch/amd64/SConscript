@@ -31,7 +31,6 @@ sources += map(File, [
 	'e_sqrtf.S',
 	'e_sqrtl.S',
 	'invtrig.c',
-	'isnanl.c',
 	'ldexp.c',
 	's_atan.S',
 	's_atanf.S',
@@ -63,5 +62,4 @@ sources += map(File, [
 	's_sinf.S',
 	's_tan.S',
 	's_tanf.S',
-	'signbitl.c',
 ])

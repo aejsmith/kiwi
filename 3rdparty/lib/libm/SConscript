@@ -46,7 +46,7 @@ class SourceList:
 # Get a list of source files. Architecture sources must be first because of the
 # way the above class works.
 sources = SourceList()
-SConscript(dirs = ['arch/%s' % (config['ARCH']), 'generic', 'support'], exports = ['env', 'sources'])
+SConscript(dirs = ['arch/%s' % (config['ARCH']), 'generic'], exports = ['env', 'sources'])
 
 # Build the library.
 env.KiwiLibrary('m',
