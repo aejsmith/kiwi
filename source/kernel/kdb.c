@@ -151,9 +151,9 @@ static kdb_command_desc_t *lookup_command(const char *name) {
  * @param ch            Character to print. */
 static void kdb_putc(char ch) {
     if (debug_console.out)
-        debug_console.out->putc(ch);
+        debug_console.out->putc_unsafe(ch);
     if (main_console.out)
-        main_console.out->putc(ch);
+        main_console.out->putc_unsafe(ch);
     if (use_kboot_log)
         kboot_log_write(ch);
 }

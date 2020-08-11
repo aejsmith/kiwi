@@ -272,13 +272,11 @@ static void fb_console_disable_cursor(void) {
     }
 }
 
-/** Write a character to the framebuffer console.
+/** Write to the console without taking any locks (for fatal/KDB).
  * @param ch            Character to write. */
-static void fb_console_putc(char ch) {
+static void fb_console_putc_unsafe(char ch) {
     if (fb_console_acquired)
         return;
-
-    spinlock_lock(&fb_lock);
 
     fb_console_disable_cursor();
 
@@ -346,6 +344,13 @@ static void fb_console_putc(char ch) {
     }
 
     fb_console_enable_cursor();
+}
+
+/** Write a character to the framebuffer console.
+ * @param ch            Character to write. */
+static void fb_console_putc(char ch) {
+    spinlock_lock(&fb_lock);
+    fb_console_putc_unsafe(ch);
     spinlock_unlock(&fb_lock);
 }
 
@@ -359,6 +364,7 @@ static void fb_console_init(kboot_tag_video_t *video) {
 static console_out_ops_t fb_console_out_ops = {
     .init = fb_console_init,
     .putc = fb_console_putc,
+    .putc_unsafe = fb_console_putc_unsafe,
 };
 
 /** Reset the framebuffer console. */

@@ -43,6 +43,10 @@ typedef struct console_out_ops {
     /** Write a character to the console.
      * @param ch            Character to write. */
     void (*putc)(char ch);
+
+    /** Write to the console without taking any locks (for fatal/KDB).
+     * @param ch            Character to write. */
+    void (*putc_unsafe)(char ch);
 } console_out_ops_t;
 
 /** Kernel console input operations structure. */

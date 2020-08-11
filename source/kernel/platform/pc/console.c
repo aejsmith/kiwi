@@ -298,12 +298,10 @@ static inline void vga_write(size_t idx, uint16_t ch) {
     vga_mapping[idx] = ch | VGA_ATTRIB;
 }
 
-/** Write a character to the VGA console.
+/** Write to the console without taking any locks (for fatal/KDB).
  * @param ch            Character to print. */
-static void vga_console_putc(char ch) {
+static void vga_console_putc_unsafe(char ch) {
     uint16_t i;
-
-    spinlock_lock(&vga_lock);
 
     switch (ch) {
     case '\b':
@@ -359,7 +357,13 @@ static void vga_console_putc(char ch) {
     out8(VGA_CRTC_DATA, ((vga_cursor_y * vga_cols) + vga_cursor_x) >> 8);
     out8(VGA_CRTC_INDEX, 15);
     out8(VGA_CRTC_DATA, (vga_cursor_y * vga_cols) + vga_cursor_x);
+}
 
+/** Write a character to the VGA console.
+ * @param ch            Character to print. */
+static void vga_console_putc(char ch) {
+    spinlock_lock(&vga_lock);
+    vga_console_putc_unsafe(ch);
     spinlock_unlock(&vga_lock);
 }
 
@@ -386,6 +390,7 @@ static void vga_console_init(kboot_tag_video_t *video) {
 static console_out_ops_t vga_console_out_ops = {
     .init = vga_console_init,
     .putc = vga_console_putc,
+    .putc_unsafe = vga_console_putc_unsafe,
 };
 
 /**
@@ -462,6 +467,7 @@ static bool serial_console_early_init(void) {
 /** Serial port console output operations. */
 static console_out_ops_t serial_console_out_ops = {
     .putc = serial_console_putc,
+    .putc_unsafe = serial_console_putc,
 };
 
 /** Serial console input operations. */
