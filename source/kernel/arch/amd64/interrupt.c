@@ -136,8 +136,8 @@ static void de_exception(frame_t *frame) {
 /** Handler for NMIs.
  * @param frame         Interrupt stack frame. */
 static void nmi_interrupt(frame_t *frame) {
-    if (atomic_get(&kdb_running) > 0) {
-        while (atomic_get(&kdb_running) > 0)
+    if (atomic_get(&kdb_running) > 0 || atomic_get(&in_fatal) > 0) {
+        while (atomic_get(&kdb_running) > 0 || atomic_get(&in_fatal) > 0)
             arch_cpu_spin_hint();
     } else {
         fatal_etc(frame, "Received unexpected NMI");

@@ -41,14 +41,14 @@
 NOTIFIER_DEFINE(fatal_notifier, NULL);
 
 /** Atomic variable to protect against nested calls to fatal(). */
-static atomic_t in_fatal;
+atomic_t in_fatal;
 
 /** Helper for fatal_printf(). */
 static void fatal_printf_helper(char ch, void *data, int *total) {
     if (debug_console.out)
-        debug_console.out->putc(ch);
+        debug_console.out->putc_unsafe(ch);
     if (main_console.out)
-        main_console.out->putc(ch);
+        main_console.out->putc_unsafe(ch);
 
     kboot_log_write(ch);
 
@@ -73,6 +73,8 @@ void fatal_etc(frame_t *frame, const char *fmt, ...) {
     if (atomic_inc(&in_fatal) == 0) {
         /* Run callback functions registered. */
         notifier_run_unsafe(&fatal_notifier, NULL, false);
+
+        arch_kdb_trap_cpus();
 
         do_printf(fatal_printf_helper, NULL, "\nFATAL: ");
         va_start(args, fmt);
