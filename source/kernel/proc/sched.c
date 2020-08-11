@@ -324,7 +324,10 @@ void sched_reschedule(bool state) {
 
 /** Perform post-thread-switch tasks.
  * @param state         Interrupt state to restore. */
-void sched_post_switch(bool state) {
+__noinline void sched_post_switch(bool state) {
+    /* This function must not be inlined to prevent the compiler from making
+     * incorrect optimisations across a thread switch (e.g. assuming that the
+     * value of curr_thread has not changed). */
     spinlock_unlock_noirq(&curr_thread->lock);
 
     /* The prev_thread pointer is set to NULL during sched_init(). It will only
