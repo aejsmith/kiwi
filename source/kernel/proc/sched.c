@@ -235,8 +235,6 @@ void sched_reschedule(bool state) {
     sched_cpu_t *cpu = curr_cpu->sched;
     thread_t *next;
 
-    assert(!atomic_get(&kdb_running));
-
     spinlock_lock_noirq(&cpu->lock);
 
     /* Stop the preemption timer if it is running. */
