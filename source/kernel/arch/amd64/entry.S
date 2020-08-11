@@ -142,6 +142,8 @@ FUNCTION_END(isr_array)
 
 /** Common ISR handling code. */
 PRIVATE_FUNCTION_START(isr_common)
+    .cfi_startproc
+
     /* If coming from user-mode, need to load the kernel GS segment base. */
     testl   $3, 24(%rsp)
     jz      1f
@@ -149,16 +151,35 @@ PRIVATE_FUNCTION_START(isr_common)
 1:
     /* Create the interrupt frame structure on the stack. */
     PUSH_REGS
+    .cfi_adjust_cfa_offset FRAME_SIZE
+    .cfi_rel_offset rip, FRAME_OFF_IP
 
     /* Clear direction flag. */
     cld
 
-    /* Call the interrupt handler. */
+    /* Set up a standard stack frame so we can backtrace over this. */
+    .cfi_rel_offset rdi, FRAME_OFF_DI
+    .cfi_rel_offset rax, FRAME_OFF_AX
+    .cfi_rel_offset rbp, FRAME_OFF_BP
     movq    %rsp, %rdi
+    movq    FRAME_OFF_IP(%rsp), %rax
+    pushq   %rax
+    pushq   %rbp
+    .cfi_adjust_cfa_offset 16
+    movq    %rsp, %rbp
+
+    /* Call the interrupt handler. */
     call    interrupt_handler
 
     /* Restore the saved registers. */
+    addq    $16, %rsp
+    .cfi_adjust_cfa_offset -16
     POP_REGS
+    .cfi_restore rbp
+    .cfi_restore rax
+    .cfi_restore rdi
+    .cfi_restore rip
+    .cfi_adjust_cfa_offset -FRAME_SIZE
 
     /* Get rid of the error code and interrupt number, restore the previous GS
      * base if returning to user-mode, and return. */
@@ -167,6 +188,7 @@ PRIVATE_FUNCTION_START(isr_common)
     jz      2f
     swapgs
 2:  iretq
+    .cfi_endproc
 FUNCTION_END(isr_common)
 
 /** SYSCALL entry point. */

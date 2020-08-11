@@ -46,6 +46,8 @@
 #define FRAME_OFF_SP        0xa0
 #define FRAME_OFF_SS        0xa8
 
+#define FRAME_SIZE          0xb0
+
 #ifndef __ASM__
 
 #include <types.h>
