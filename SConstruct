@@ -58,6 +58,12 @@ host_flags = {
 #########################
 
 import os, sys, SCons.Errors
+import multiprocessing
+
+# Option to set -j option automatically for the VS project, since SCons doesn't
+# have this itself.
+if ARGUMENTS.get('PARALLEL') == '1':
+    SetOption('num_jobs', multiprocessing.cpu_count())
 
 # Add the path to our build utilities to the path.
 sys.path = [os.path.abspath(os.path.join('utilities', 'build'))] + sys.path
@@ -87,6 +93,10 @@ Decider('MD5-timestamp')
 
 host_env = Environment(ENV = os.environ, tools = ['default', 'textfile'])
 target_env = Environment(platform = 'posix', ENV = os.environ, tools = ['default', 'textfile'])
+
+host_env.Tool('compilation_db', toolpath = ['utilities/build'])
+target_env.Tool('compilation_db', toolpath = ['utilities/build'])
+
 manager = BuildManager(host_env, target_env)
 
 # Load the build configuration (if it exists yet).
@@ -190,9 +200,15 @@ target_env['RANLIB']  = toolchain.tool_path('ranlib')
 target_env['OBJCOPY'] = toolchain.tool_path('objcopy')
 target_env['LD']      = toolchain.tool_path('ld')
 
+build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM']))
+
 # Build the target system.
-SConscript('source/SConscript', variant_dir = os.path.join('build',
-    '%s-%s' % (config['ARCH'], config['PLATFORM'])))
+SConscript('source/SConscript', variant_dir = build_dir)
 
 # Now that we have information of all libraries, update the toolchain sysroot.
 toolchain.update_sysroot(manager)
+
+# Generation compilation database.
+compile_commands = env.CompilationDatabase(os.path.join(build_dir, 'compile_commands.json'))
+env.Default(compile_commands)
+env.Alias("compiledb", compile_commands)
