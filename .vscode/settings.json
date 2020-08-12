@@ -2,5 +2,9 @@
     "files.associations": {
         "SConscript": "python",
         "SConstruct": "python"
-    }
+    },
+    "files.exclude": {
+        ".sconsign.dblite": true
+    },
+    "search.followSymlinks": false,
 }
