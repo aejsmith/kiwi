@@ -60,6 +60,8 @@ host_flags = {
 import os, sys, SCons.Errors
 import multiprocessing
 
+SetOption('duplicate', 'soft-hard-copy')
+
 # Option to set -j option automatically for the VS project, since SCons doesn't
 # have this itself.
 if ARGUMENTS.get('PARALLEL') == '1':
