@@ -18,10 +18,10 @@ Import('config', 'env', 'manager')
 
 # Add sysgen to the build environments.
 manager.AddVariable('SYSGEN', env.Program('sysgen', [
-    'amd64_target.cc',
+    'amd64_target.cpp',
     'parser.y',
     'lexer.l',
-    'main.cc',
+    'main.cpp',
 ]))
 manager.AddVariable('SYSGENFLAGS', [])
 
