@@ -216,19 +216,15 @@ static void gp_exception(frame_t *frame) {
 /** Handler for page faults.
  * @param frame         Interrupt stack frame. */
 static void pf_exception(frame_t *frame) {
-    ptr_t addr;
-    int reason;
-    uint32_t access;
-
     /* We can't service a page fault while running KDB. */
     if (unlikely(atomic_get(&kdb_running) == 2)) {
         kdb_exception(except_strings[frame->num], frame);
         return;
     }
 
-    addr = x86_read_cr2();
-    reason = (frame->err_code & (1 << 0)) ? VM_FAULT_ACCESS : VM_FAULT_UNMAPPED;
-    access = (cpu_features.xd && frame->err_code & (1<<4))
+    ptr_t addr = x86_read_cr2();
+    int reason = (frame->err_code & (1 << 0)) ? VM_FAULT_ACCESS : VM_FAULT_UNMAPPED;
+    uint32_t access = (cpu_features.xd && frame->err_code & (1<<4))
         ? VM_ACCESS_EXECUTE
         : ((frame->err_code & (1 << 1)) ? VM_ACCESS_WRITE : VM_ACCESS_READ);
 
@@ -244,10 +240,11 @@ static void pf_exception(frame_t *frame) {
  * @param frame         Interrupt stack frame. */
 static void fpu_exception(frame_t *frame) {
     unsigned code = EXCEPTION_FLOAT_INVALID;
-    uint16_t err, swd, cwd;
-    uint32_t mxcsr;
 
     if (frame_from_user(frame) && x86_fpu_state()) {
+        uint16_t err, swd, cwd;
+        uint32_t mxcsr;
+
         if (frame->num == X86_EXCEPTION_XM) {
             /* SSE exceptions are reported via the MXCSR register. Mask bits are
              * at bits 7 through 12. */
@@ -287,12 +284,10 @@ static void ac_exception(frame_t *frame) {
 /** Interrupt handler.
  * @param frame         Interrupt frame. */
 void interrupt_handler(frame_t *frame) {
-    bool user;
-
     // TODO: Move this into entry.S, call the handler directly from the entry
     // code.
 
-    user = frame->cs & 3;
+    bool user = frame->cs & 3;
     if (user) {
         /* Save the user-mode interrupt frame pointer, used by the signal frame
          * setup/restore code. */
@@ -320,15 +315,13 @@ void interrupt_handler(frame_t *frame) {
 
 /** Initialize the interrupt handler table. */
 __init_text void interrupt_init(void) {
-    size_t i;
-
     /* Install default handlers. 0-31 are exceptions, 32-47 are IRQs, the rest
      * should be pointed to the unhandled interrupt function. */
-    for (i = 0; i < 32; i++)
+    for (size_t i = 0; i < 32; i++)
         interrupt_table[i] = unknown_exception;
-    for (i = 32; i < 48; i++)
+    for (size_t i = 32; i < 48; i++)
         interrupt_table[i] = hardware_interrupt;
-    for (i = 48; i < array_size(interrupt_table); i++)
+    for (size_t i = 48; i < array_size(interrupt_table); i++)
         interrupt_table[i] = unknown_interrupt;
 
     /* Set handlers for faults that require specific handling. */

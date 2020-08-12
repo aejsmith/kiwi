@@ -51,9 +51,6 @@ extern void amd64_context_restore(ptr_t new_rsp);
 /** Initialize AMD64-specific thread data.
  * @param thread        Thread to initialize. */
 void arch_thread_init(thread_t *thread) {
-    unsigned long *sp;
-    ptr_t entry;
-
     thread->arch.parent = thread;
     thread->arch.flags = 0;
     thread->arch.tls_base = 0;
@@ -65,8 +62,8 @@ void arch_thread_init(thread_t *thread) {
     /* Initialize the kernel stack. First value is a fake return address to
      * make the backtrace end correctly and maintain ABI alignment requirements:
      * ((RSP - 8) % 16) == 0 on entry to a function. */
-    entry = (ptr_t)thread_trampoline;
-    sp = (unsigned long *)thread->arch.kernel_rsp;
+    ptr_t entry = (ptr_t)thread_trampoline;
+    unsigned long *sp = (unsigned long *)thread->arch.kernel_rsp;
     *--sp = 0;              /* Fake return address for backtrace. */
     *--sp = entry;          /* RIP/Return address. */
     *--sp = 0;              /* RBP. */
@@ -94,10 +91,11 @@ void arch_thread_clone(thread_t *thread, frame_t *frame) {
     thread->arch.flags = curr_thread->arch.flags & ARCH_THREAD_HAVE_FPU;
     thread->arch.tls_base = curr_thread->arch.tls_base;
 
-    if (x86_fpu_state()) {
+    bool fpu_enabled = x86_fpu_state();
+    if (fpu_enabled) {
         /* FPU is currently enabled so the latest state may not have been saved. */
         x86_fpu_save(thread->arch.fpu);
-    } else if (curr_thread->flags & ARCH_THREAD_HAVE_FPU) {
+    } else if (curr_thread->arch.flags & ARCH_THREAD_HAVE_FPU) {
         memcpy(thread->arch.fpu, curr_thread->arch.fpu, sizeof(thread->arch.fpu));
     }
 
@@ -113,12 +111,11 @@ void arch_thread_clone(thread_t *thread, frame_t *frame) {
  * @param thread        Thread to switch to.
  * @param prev          Thread that was previously running. */
 void arch_thread_switch(thread_t *thread, thread_t *prev) {
-    bool fpu_enabled;
-
     /* Save the current FPU state, if any. */
-    fpu_enabled = x86_fpu_state();
+    bool fpu_enabled = x86_fpu_state();
     if (likely(prev)) {
         if (fpu_enabled) {
+            assert(prev->arch.flags & ARCH_THREAD_HAVE_FPU);
             x86_fpu_save(prev->arch.fpu);
         } else {
             prev->arch.fpu_count = 0;
@@ -197,14 +194,12 @@ void arch_thread_user_setup(frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
  * @param ipl           Previous IPL.
  * @return              Status code describing result of the operation. */
 status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl) {
-    frame_t *frame;
-    ptr_t sp, data_addr, context_addr, ret_addr;
-    thread_context_t context;
     status_t ret;
 
-    frame = curr_thread->arch.user_frame;
+    frame_t *frame = curr_thread->arch.user_frame;
     assert(frame->cs & 3);
 
+    ptr_t sp;
     if (interrupt->stack.base) {
         sp = (ptr_t)interrupt->stack.base + interrupt->stack.size;
     } else {
@@ -214,9 +209,9 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
 
     /* Work out where to place stuff on the user stack. Ensure that we satisfy
      * ABI constraints: ((RSP + 8) % 16) == 0 upon entry to the handler. */
-    data_addr = round_down(sp - interrupt->size, 16);
-    context_addr = round_down(data_addr - sizeof(context), 16);
-    ret_addr = context_addr - 8;
+    ptr_t data_addr = round_down(sp - interrupt->size, 16);
+    ptr_t context_addr = round_down(data_addr - sizeof(thread_context_t), 16);
+    ptr_t ret_addr = context_addr - 8;
 
     if (interrupt->size) {
         /* Copy interrupt data. */
@@ -226,6 +221,7 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
     }
 
     /* Save the thread context. TODO: FPU context. */
+    thread_context_t context;
     context.cpu.rax = frame->ax;
     context.cpu.rbx = frame->bx;
     context.cpu.rcx = frame->cx;
@@ -271,16 +267,13 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
  * @param _ipl          Where to store previous IPL.
  * @return              Status code describing result of the operation. */
 status_t arch_thread_interrupt_restore(unsigned *_ipl) {
-    frame_t *frame;
-    thread_context_t context;
-    status_t ret;
-
-    frame = curr_thread->arch.user_frame;
+    frame_t *frame = curr_thread->arch.user_frame;
     assert(frame->cs & 3);
 
     /* The stack pointer should point at the context structure due to the
      * return address being popped. Copy it back. */
-    ret = memcpy_from_user(&context, (void *)frame->sp, sizeof(context));
+    thread_context_t context;
+    status_t ret = memcpy_from_user(&context, (void *)frame->sp, sizeof(context));
     if (ret != STATUS_SUCCESS)
         return ret;
 
