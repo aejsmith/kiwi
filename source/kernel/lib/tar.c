@@ -75,6 +75,9 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 
     /* Handle the entry based on its type flag. */
     switch (header->typeflag) {
+    case 'x':
+        /* PAX extended header. Ignore for now. */
+        break;
     case REGTYPE:
     case AREGTYPE:
         ret = fs_open(path, FILE_ACCESS_WRITE, 0, FS_MUST_CREATE, &handle);
