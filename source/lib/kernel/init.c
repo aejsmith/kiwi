@@ -40,12 +40,6 @@ size_t page_size;
 /** Kernel library main function.
  * @param args          Process argument block. */
 void libkernel_init(process_args_t *args) {
-    handle_t handle;
-    size_t i;
-    rtld_image_t *image;
-    void (*entry)(process_args_t *);
-    tls_tcb_t *tcb;
-    void (*func)(void);
     status_t ret;
 
     /* Get the system page size. */
@@ -56,6 +50,7 @@ void libkernel_init(process_args_t *args) {
 
     /* If we're the first process, open handles to the kernel console. */
     if (curr_process_id == 1) {
+        handle_t handle;
         kern_device_open("/kconsole", FILE_ACCESS_READ, 0, &handle);
         kern_handle_set_flags(handle, HANDLE_INHERITABLE);
         kern_device_open("/kconsole", FILE_ACCESS_WRITE, 0, &handle);
@@ -65,7 +60,7 @@ void libkernel_init(process_args_t *args) {
     }
 
     /* Check if any of our options are set. */
-    for (i = 0; i < args->env_count; i++) {
+    for (size_t i = 0; i < args->env_count; i++) {
         if (strncmp(args->env[i], "LIBKERNEL_DRY_RUN=", 18) == 0) {
             libkernel_dry_run = true;
         } else if (strncmp(args->env[i], "LIBKERNEL_DEBUG=", 16) == 0) {
@@ -74,11 +69,13 @@ void libkernel_init(process_args_t *args) {
     }
 
     /* Initialise the runtime loader and load the program. */
+    void (*entry)(process_args_t *);
     ret = rtld_init(args, (void **)&entry);
     if (ret != STATUS_SUCCESS || libkernel_dry_run)
         kern_process_exit(ret);
 
     /* Set up TLS for the current thread. */
+    tls_tcb_t *tcb;
     ret = tls_alloc(&tcb);
     if (ret != STATUS_SUCCESS)
         kern_process_exit(ret);
@@ -95,12 +92,24 @@ void libkernel_init(process_args_t *args) {
 
     /* Run INIT functions for loaded images. */
     core_list_foreach(&loaded_images, iter) {
-        image = core_list_entry(iter, rtld_image_t, header);
+        rtld_image_t *image = core_list_entry(iter, rtld_image_t, header);
+        void (*func)(void);
 
         if (image->dynamic[ELF_DT_INIT]) {
             func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_INIT]);
             dprintf("rtld: %s: calling INIT function %p...\n", image->name, func);
             func();
+        }
+
+        if (image->dynamic[ELF_DT_INIT_ARRAY]) {
+            size_t count = image->dynamic[ELF_DT_INIT_ARRAYSZ] / sizeof(ptr_t);
+            ptr_t *array = (ptr_t *)(image->load_base + image->dynamic[ELF_DT_INIT_ARRAY]);
+
+            while (count--) {
+                func = (void (*)(void))*array++;
+                dprintf("rtld: %s: calling INIT_ARRAY function %p...\n", image->name, func);
+                func();
+            }
         }
     }
 
