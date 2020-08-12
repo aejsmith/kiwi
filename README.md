@@ -2,10 +2,10 @@ Kiwi
 ====
 
 Kiwi is an open source operating system currently supporting 64-bit x86 PCs.
-The current (redesign) branch is undergoing a pretty major redesign and does
-not do much interesting on the face of it, but it aims to have a better
-underlying design. The old (master) branch has a GUI and is capable of
-running various bits of UNIX sofware.
+The main branch is undergoing a pretty major redesign and does not do much
+interesting on the face of it, but it aims to have a better underlying design.
+The old branch has a GUI and is capable of running various bits of UNIX
+software.
 
 Building
 --------
