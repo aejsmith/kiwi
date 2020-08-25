@@ -999,9 +999,6 @@ err:
  * effective and inheritable privilege set will be set to the calling process'
  * inheritable privilege set.
  *
- * The new process' address space will inherit all mappings in the calling
- * process' address space with the VM_MAP_INHERIT flag set.
- *
  * If no handle map is specified in the attributes structure, then all
  * inheritable handle table entries in the calling process will be duplicated
  * into the child process with the same IDs. Otherwise, handles will be
@@ -1116,9 +1113,6 @@ out_free_args:
  * process will be set to the context contained in that token. Otherwise, the
  * process will keep the same identity, and its effective privilege set will be
  * set to its inheritable privilege set.
- *
- * The new program's address space will keep all mappings in the original
- * address space with the VM_MAP_INHERIT flag set.
  *
  * If no handle map is specified in the attributes structure, then all
  * inheritable handle table entries in the process will remain open with the

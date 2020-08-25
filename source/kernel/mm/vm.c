@@ -2140,11 +2140,6 @@ __init_text void vm_init(void) {
  *    it can be made larger than the total memory available (memory is only
  *    allocated when it is actually accessed). The default behaviour is to only
  *    allow mappings if the memory requirement can be satisfied.
- *  - VM_MAP_INHERIT: When a child process is created via kern_process_create()
- *    or the current process is replaced via kern_process_replace(), the
- *    mapping will be duplicated into the new address space, using the semantics
- *    specified above for VM_MAP_PRIVATE. This can be used to pass data to
- *    child processes.
  *
  * When mapping an object, the calling process must have the correct access
  * rights to the object for the mapping permissions requested.

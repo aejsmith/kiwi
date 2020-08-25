@@ -1035,12 +1035,11 @@ out_unlock_port:
  * the connection, or until the given timeout expires.
  *
  * A number of per-process/per-thread special ports are defined, which can be
- * given as the port argument to this function. PROCESS_ROOT_PORT connects to
- * the current process' root port, which is typically a port owned by a service
- * manager process that can be used by processes to reach other system services.
- * THREAD_EXCEPTION_PORT connects to the current thread's exception port, which
- * is a port managed by the kernel and used to deliver notifications of thread
- * exceptions.
+ * given as the port argument to this function:
+ *
+ *  - PROCESS_ROOT_PORT connects to the current process' root port, which is
+ *    typically a port owned by a service manager process that can be used by
+ *    processes to reach other system services.
  *
  * @param port          Handle to port or special port ID to connect to.
  * @param timeout       Timeout in nanoseconds. A negative value will block
