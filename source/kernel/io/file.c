@@ -698,6 +698,35 @@ status_t file_sync(object_handle_t *handle) {
     return fhandle->file->ops->sync(fhandle);
 }
 
+/** Perform a file-specific operation.
+ * @param handle        Handle to device to perform operation on.
+ * @param request       Operation number to perform.
+ * @param in            Optional input buffer containing data to pass to the
+ *                      operation handler.
+ * @param in_size       Size of input buffer.
+ * @param _out          Where to store pointer to data returned by the
+ *                      operation handler (optional).
+ * @param _out_size     Where to store size of data returned.
+ * @return              Status code describing result of the operation. */
+status_t file_request(
+    object_handle_t *handle, unsigned request, const void *in, size_t in_size,
+    void **_out, size_t *_out_size)
+{
+    file_handle_t *fhandle;
+
+    assert(handle);
+
+    if (handle->type->id != OBJECT_TYPE_FILE)
+        return STATUS_INVALID_HANDLE;
+
+    fhandle = handle->private;
+
+    if (!fhandle->file->ops->request)
+        return STATUS_INVALID_REQUEST;
+
+    return fhandle->file->ops->request(fhandle, request, in, in_size, _out, _out_size);
+}
+
 /**
  * System calls.
  */
@@ -1208,6 +1237,77 @@ status_t kern_file_sync(handle_t handle) {
         return ret;
 
     ret = file_sync(khandle);
+    object_handle_release(khandle);
+    return ret;
+}
+
+/** Perform a file-specific operation.
+ * @param handle        Handle to device to perform operation on.
+ * @param request       Operation number to perform.
+ * @param in            Optional input buffer containing data to pass to the
+ *                      operation handler.
+ * @param in_size       Size of input buffer.
+ * @param out           Optional output buffer.
+ * @param out_size      Size of output buffer.
+ * @param _bytes        Where to store number of bytes copied into output buffer.
+ * @return              Status code describing result of the operation. */
+status_t kern_file_request(
+    handle_t handle, unsigned request, const void *in, size_t in_size,
+    void *out, size_t out_size, size_t *_bytes)
+{
+    void *kin = NULL, *kout = NULL;
+    object_handle_t *khandle;
+    status_t ret, err;
+    size_t kout_size;
+
+    if (in_size && !in)
+        return STATUS_INVALID_ARG;
+    if (out_size && !out)
+        return STATUS_INVALID_ARG;
+
+    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+    if (ret != STATUS_SUCCESS)
+        goto out;
+
+    if (in_size) {
+        kin = kmalloc(in_size, MM_USER);
+        if (!kin) {
+            ret = STATUS_NO_MEMORY;
+            goto out;
+        }
+
+        ret = memcpy_from_user(kin, in, in_size);
+        if (ret != STATUS_SUCCESS)
+            goto out;
+    }
+
+    ret = file_request(khandle, request, kin, in_size, (out) ? &kout : NULL, (out) ? &kout_size : NULL);
+
+    if (kout) {
+        if (kout_size > out_size) {
+            ret = STATUS_TOO_SMALL;
+            goto out;
+        }
+
+        err = memcpy_to_user(out, kout, kout_size);
+        if (err != STATUS_SUCCESS) {
+            ret = err;
+            goto out;
+        }
+
+        if (_bytes) {
+            err = write_user(_bytes, kout_size);
+            if (err != STATUS_SUCCESS)
+                ret = err;
+        }
+    }
+
+out:
+    if (kin)
+        kfree(kin);
+    if (kout)
+        kfree(kout);
+
     object_handle_release(khandle);
     return ret;
 }

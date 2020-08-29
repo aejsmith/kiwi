@@ -31,10 +31,6 @@ extern "C" {
 
 extern status_t kern_device_open(const char *path, uint32_t rights, uint32_t flags, handle_t *_handle);
 
-extern status_t kern_device_request(
-    handle_t handle, unsigned request, const void *in, size_t in_size,
-    void *out, size_t out_size, size_t *_bytes);
-
 #ifdef __cplusplus
 }
 #endif

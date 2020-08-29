@@ -106,6 +106,26 @@ static void device_file_info(file_handle_t *handle, file_info_t *info) {
     info->created = info->accessed = info->modified = boot_time();
 }
 
+/** Handler for device-specific requests.
+ * @param handle        File handle structure.
+ * @param request       Request number.
+ * @param in            Input buffer.
+ * @param in_size       Input buffer size.
+ * @param _out          Where to store pointer to output buffer.
+ * @param _out_size     Where to store output buffer size.
+ * @return              Status code describing result of operation. */
+static status_t device_file_request(
+    file_handle_t *handle, unsigned request, const void *in, size_t in_size,
+    void **_out, size_t *_out_size)
+{
+    device_t *device = handle->device;
+
+    if (!device->ops || !device->ops->request)
+        return STATUS_INVALID_REQUEST;
+
+    return device->ops->request(device, handle, request, in, in_size, _out, _out_size);
+}
+
 /** Device file operations structure. */
 static file_ops_t device_file_ops = {
     .close = device_file_close,
@@ -114,6 +134,7 @@ static file_ops_t device_file_ops = {
     .io = device_file_io,
     .map = device_file_map,
     .info = device_file_info,
+    .request = device_file_request,
 };
 
 /**
@@ -579,40 +600,6 @@ status_t device_open(const char *path, uint32_t rights, uint32_t flags, object_h
     return STATUS_SUCCESS;
 }
 
-/** Perform a device-specific operation.
- * @param handle        Handle to device to perform operation on.
- * @param request       Operation number to perform.
- * @param in            Optional input buffer containing data to pass to the
- *                      operation handler.
- * @param in_size       Size of input buffer.
- * @param _out          Where to store pointer to data returned by the
- *                      operation handler (optional).
- * @param _out_size     Where to store size of data returned.
- * @return              Status code describing result of the operation. */
-status_t device_request(
-    object_handle_t *handle, unsigned request, const void *in, size_t in_size,
-    void **_out, size_t *_out_size)
-{
-    file_handle_t *data;
-    device_t *device;
-
-    assert(handle);
-
-    if (handle->type->id != OBJECT_TYPE_FILE)
-        return STATUS_INVALID_HANDLE;
-
-    data = (file_handle_t *)handle->private;
-    device = (device_t *)data->file;
-
-    if (device->file.ops != &device_file_ops) {
-        return STATUS_INVALID_HANDLE;
-    } else if (!device->ops || !device->ops->request) {
-        return STATUS_INVALID_REQUEST;
-    }
-
-    return device->ops->request(device, data, request, in, in_size, _out, _out_size);
-}
-
 /** Print out a device's children.
  * @param tree          Radix tree to print.
  * @param indent        Indentation level. */
@@ -764,76 +751,5 @@ status_t kern_device_open(const char *path, uint32_t rights, uint32_t flags, han
     ret = object_handle_attach(handle, NULL, _handle);
     object_handle_release(handle);
     kfree(kpath);
-    return ret;
-}
-
-/** Perform a device-specific operation.
- * @param handle        Handle to device to perform operation on.
- * @param request       Operation number to perform.
- * @param in            Optional input buffer containing data to pass to the
- *                      operation handler.
- * @param in_size       Size of input buffer.
- * @param out           Optional output buffer.
- * @param out_size      Size of output buffer.
- * @param _bytes        Where to store number of bytes copied into output buffer.
- * @return              Status code describing result of the operation. */
-status_t kern_device_request(
-    handle_t handle, unsigned request, const void *in, size_t in_size,
-    void *out, size_t out_size, size_t *_bytes)
-{
-    void *kin = NULL, *kout = NULL;
-    object_handle_t *khandle;
-    status_t ret, err;
-    size_t koutsz;
-
-    if (in_size && !in)
-        return STATUS_INVALID_ARG;
-    if (out_size && !out)
-        return STATUS_INVALID_ARG;
-
-    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
-    if (ret != STATUS_SUCCESS)
-        goto out;
-
-    if (in_size) {
-        kin = kmalloc(in_size, MM_USER);
-        if (!kin) {
-            ret = STATUS_NO_MEMORY;
-            goto out;
-        }
-
-        ret = memcpy_from_user(kin, in, in_size);
-        if (ret != STATUS_SUCCESS)
-            goto out;
-    }
-
-    ret = device_request(khandle, request, kin, in_size, (out) ? &kout : NULL, (out) ? &koutsz : NULL);
-
-    if (kout) {
-        if (koutsz > out_size) {
-            ret = STATUS_TOO_SMALL;
-            goto out;
-        }
-
-        err = memcpy_to_user(out, kout, koutsz);
-        if (err != STATUS_SUCCESS) {
-            ret = err;
-            goto out;
-        }
-
-        if (_bytes) {
-            err = write_user(_bytes, koutsz);
-            if (err != STATUS_SUCCESS)
-                ret = err;
-        }
-    }
-
-out:
-    if (kin)
-        kfree(kin);
-    if (kout)
-        kfree(kout);
-
-    object_handle_release(khandle);
     return ret;
 }

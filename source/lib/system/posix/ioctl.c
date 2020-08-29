@@ -97,7 +97,7 @@ int ioctl(int fd, int request, ...) {
     va_end(args);
 
     /* Perform the request. */
-    ret = kern_device_request(fd, request, in, in_size, out, out_size, NULL);
+    ret = kern_file_request(fd, request, in, in_size, out, out_size, NULL);
     if (ret != STATUS_SUCCESS) {
         if (ret == STATUS_INVALID_REQUEST) {
             errno = ENOTTY;

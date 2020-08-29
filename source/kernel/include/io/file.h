@@ -100,6 +100,18 @@ typedef struct file_ops {
      * @param handle        File handle structure.
      * @return              Status code describing result of the operation. */
     status_t (*sync)(struct file_handle *handle);
+
+    /** Handler for file-specific requests.
+     * @param handle        File handle structure.
+     * @param request       Request number.
+     * @param in            Input buffer.
+     * @param in_size       Input buffer size.
+     * @param _out          Where to store pointer to output buffer.
+     * @param _out_size     Where to store output buffer size.
+     * @return              Status code describing result of operation. */
+    status_t (*request)(
+        struct file_handle *handle, unsigned request, const void *in,
+        size_t in_size, void **_out, size_t *_out_size);
 } file_ops_t;
 
 /** Header for a file object. */
@@ -166,5 +178,9 @@ extern status_t file_seek(
 extern status_t file_resize(object_handle_t *handle, offset_t size);
 extern status_t file_info(object_handle_t *handle, file_info_t *info);
 extern status_t file_sync(object_handle_t *handle);
+
+extern status_t file_request(
+    object_handle_t *handle, unsigned request, const void *in, size_t in_size,
+    void **_out, size_t *_out_size);
 
 #endif /* __IO_FILE_H */

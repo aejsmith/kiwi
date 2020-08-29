@@ -118,6 +118,10 @@ extern status_t kern_file_resize(handle_t handle, offset_t size);
 extern status_t kern_file_info(handle_t handle, file_info_t *info);
 extern status_t kern_file_sync(handle_t handle);
 
+extern status_t kern_file_request(
+    handle_t handle, unsigned request, const void *in, size_t in_size,
+    void *out, size_t out_size, size_t *_bytes);
+
 #ifdef __cplusplus
 }
 #endif

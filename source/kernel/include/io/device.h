@@ -198,10 +198,6 @@ extern status_t device_open(
     const char *path, uint32_t rights, uint32_t flags,
     object_handle_t **_handle);
 
-extern status_t device_request(
-    object_handle_t *handle, unsigned request, const void *in, size_t in_size,
-    void **_out, size_t *_out_size);
-
 extern void device_init(void);
 
 #endif /* __IO_DEVICE_H */
