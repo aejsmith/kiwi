@@ -58,7 +58,7 @@ static bool spawn_client(handle_t port) {
     attrib.token = INVALID_HANDLE;
     attrib.root_port = port;
     attrib.map = map;
-    attrib.count = 3;
+    attrib.map_count = 3;
 
     ret = kern_process_create(args[0], args, (const char *const *)environ, 0, &attrib, NULL);
     if (ret != STATUS_SUCCESS) {

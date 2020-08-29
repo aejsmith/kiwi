@@ -73,7 +73,7 @@ typedef struct process_attrib {
      * handles will be duplicated into the new process according to the
      * inheritable flag on each handle table entry.
      */
-    ssize_t count;
+    ssize_t map_count;
 } process_attrib_t;
 
 /** Handle value used to refer to the current process. */

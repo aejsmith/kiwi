@@ -925,12 +925,12 @@ static status_t copy_process_args(
         if (ret != STATUS_SUCCESS)
             goto err;
 
-        if (kattrib.count > 0 && !kattrib.map) {
+        if (kattrib.map_count > 0 && !kattrib.map) {
             ret = STATUS_INVALID_ARG;
             goto err;
         }
 
-        load->map_count = kattrib.count;
+        load->map_count = kattrib.map_count;
         if (load->map_count > 0) {
             size = sizeof(handle_t) * 2 * load->map_count;
             load->map = kmalloc(size, MM_USER);
