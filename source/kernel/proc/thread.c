@@ -1673,7 +1673,11 @@ status_t kern_thread_sleep(nstime_t nsecs, nstime_t *_rem) {
 
     /* FIXME: The method getting remaining time isn't quite accurate. */
     begin = system_time();
-    ret = delay_etc(nsecs, SLEEP_INTERRUPTIBLE);
+
+    ret = thread_sleep(NULL, nsecs, "kern_thread_sleep", SLEEP_INTERRUPTIBLE);
+    if (likely(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK))
+        ret = STATUS_SUCCESS;
+
     if (ret == STATUS_INTERRUPTED && _rem) {
         elapsed = system_time() - begin;
         if (elapsed < nsecs) {

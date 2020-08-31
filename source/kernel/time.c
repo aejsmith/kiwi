@@ -381,7 +381,7 @@ status_t delay_etc(nstime_t nsecs, int flags) {
 
     assert(nsecs >= 0);
 
-    ret = thread_sleep(NULL, nsecs, "usleep", flags);
+    ret = thread_sleep(NULL, nsecs, "delay", flags);
     if (likely(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK))
         ret = STATUS_SUCCESS;
 
