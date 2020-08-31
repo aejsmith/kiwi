@@ -61,7 +61,7 @@ typedef struct ipc_client {
 #define CONNECTION_EVENT_MESSAGE    1       /**< A message is received. */
 
 /** Special process port IDs (negative values to distinguish from handles). */
-#define PROCESS_ROOT_PORT           (-1)
+#define PROCESS_ROOT_PORT           (-2)
 
 extern status_t kern_port_create(handle_t *_handle);
 extern status_t kern_port_listen(
