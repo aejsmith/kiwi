@@ -41,7 +41,7 @@ typedef struct ipc_message {
     uint16_t flags;                         /**< Message flags. */
     uint16_t size;                          /**< Size of attached data. */
     nstime_t timestamp;                     /**< System time at which message was sent. */
-    unsigned long args[6];                  /**< Inline message arguments. */
+    uint64_t args[6];                       /**< Inline message arguments. */
 } ipc_message_t;
 
 /** IPC message flags. */
