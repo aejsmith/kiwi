@@ -74,6 +74,15 @@ void libsystem_stub(const char *name, bool fatal) {
  * @param file          File it occurred in.
  * @param line          Line number.
  * @param func          Function name. */
+void libsystem_assert_fail(const char *cond, const char *file, unsigned int line, const char *func) {
+    libsystem_fatal("assertion '%s' failed at %s:%d (%s)\n", cond, file, line, func);
+}
+
+/** Print out an assertion fail message.
+ * @param cond          Condition.
+ * @param file          File it occurred in.
+ * @param line          Line number.
+ * @param func          Function name. */
 void __assert_fail(const char *cond, const char *file, unsigned int line, const char *func) {
     if (!func) {
         fprintf(stderr, "Assertion '%s' failed at %s:%d\n", cond, file, line);

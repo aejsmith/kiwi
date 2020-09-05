@@ -38,6 +38,13 @@ extern void libsystem_init(struct process_args *args);
 extern void libsystem_fatal(const char *fmt, ...) __sys_noreturn __sys_hidden;
 extern void libsystem_stub(const char *name, bool fatal) __sys_hidden;
 
+#define libsystem_assert(cond) \
+    if (__builtin_expect(!!(!(cond)), 0)) { \
+        libsystem_assert_fail(#cond, __FILE__, __LINE__, __PRETTY_FUNCTION__); \
+    }
+
+extern void libsystem_assert_fail(const char *cond, const char *file, unsigned int line, const char *func) __sys_noreturn;
+
 extern void libsystem_status_to_errno(status_t status) __sys_hidden;
 
 extern int main(int argc, char **argv, char **envp);

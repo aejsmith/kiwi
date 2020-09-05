@@ -19,48 +19,43 @@
  * @brief               IPC test application.
  */
 
-#include <kernel/ipc.h>
+#include <core/ipc.h>
+#include <core/time.h>
+
 #include <kernel/object.h>
 #include <kernel/process.h>
 #include <kernel/status.h>
 #include <kernel/thread.h>
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_MESSAGE_PING       1
-#define TEST_MESSAGE_PONG       2
+#define TEST_SIGNAL_START       1
+#define TEST_REQUEST_PING       2
 
-#define TEST_DATA_LEN           128
+#define TEST_PING_COUNT         15
 
-#define TEST_PING_COUNT         10
+#define TEST_STRING_LEN         16
 
 extern char **environ;
 
-static void dump_message(ipc_message_t *msg) {
-    int i;
-
-    printf(" flags     = 0x%x\n", msg->flags);
-    printf(" id        = %u\n", msg->id);
-    printf(" size      = %u\n", msg->size);
-    printf(" timestamp = %llu\n", msg->timestamp);
-    for (i = 0; i < 6; i++)
-        printf(" args[%d]   = 0x%lx\n", i, msg->args[i]);
-}
+typedef struct test_request_ping {
+    uint32_t index;
+    char string[TEST_STRING_LEN];
+} test_request_ping_t;
 
 static bool spawn_client(handle_t port) {
-    const char *args[] = { "/system/bin/test-ipc", "--client", NULL };
     handle_t map[3][2] = { { 0, 0 }, { 1, 1 }, { 2, 2 } };
     process_attrib_t attrib;
-    status_t ret;
-
-    attrib.token = INVALID_HANDLE;
+    attrib.token     = INVALID_HANDLE;
     attrib.root_port = port;
-    attrib.map = map;
+    attrib.map       = map;
     attrib.map_count = 3;
 
-    ret = kern_process_create(args[0], args, (const char *const *)environ, 0, &attrib, NULL);
+    const char *args[] = { "/system/bin/test-ipc", "--client", NULL };
+    status_t ret = kern_process_create(args[0], args, (const char *const *)environ, 0, &attrib, NULL);
     if (ret != STATUS_SUCCESS) {
         fprintf(stderr, "Failed to create process: %d\n", ret);
         return false;
@@ -70,12 +65,9 @@ static bool spawn_client(handle_t port) {
 }
 
 static int test_server(void) {
-    ipc_message_t msg;
-    ipc_client_t client;
-    char data[TEST_DATA_LEN];
-    handle_t port, conn;
     status_t ret;
 
+    handle_t port;
     ret = kern_port_create(&port);
     if (ret != STATUS_SUCCESS) {
         fprintf(stderr, "Failed to create port: %d\n", ret);
@@ -87,112 +79,147 @@ static int test_server(void) {
     if (!spawn_client(port))
         return EXIT_FAILURE;
 
-    ret = kern_port_listen(port, &client, -1, &conn);
+    ipc_client_t client;
+    handle_t handle;
+    ret = kern_port_listen(port, &client, -1, &handle);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "Failed to listen for connection: %d\n", ret);
+        fprintf(stderr, "Server failed to listen for connection: %d\n", ret);
         return EXIT_FAILURE;
     }
 
-    printf("Server got connection (handle: %d)\n", conn);
+    printf("Server got connection (handle: %d)\n", handle);
     printf("Client PID: %d\n", client.pid);
 
-    while (true) {
-        ret = kern_connection_receive(conn, &msg, NULL, -1);
-        if (ret != STATUS_SUCCESS) {
-            if (ret != STATUS_CONN_HUNGUP)
-                fprintf(stderr, "Server failed to receive message: %d\n", ret);
+    core_connection_t *conn = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
+    if (!conn)
+        return EXIT_FAILURE;
 
-            return EXIT_FAILURE;
+    core_message_t *signal = core_message_create_signal(TEST_SIGNAL_START, 0);
+    ret = core_connection_signal(conn, signal);
+    if (ret != STATUS_SUCCESS) {
+        fprintf(stderr, "Server failed to send signal: %d\n", ret);
+        return EXIT_FAILURE;
+    }
+
+    core_message_destroy(signal);
+
+    while (true) {
+        core_message_t *request;
+
+        ret = core_connection_receive(conn, -1, &request);
+        if (ret != STATUS_SUCCESS) {
+            if (ret == STATUS_CONN_HUNGUP) {
+                break;
+            } else {
+                fprintf(stderr, "Server failed to receive message: %d\n", ret);
+                return EXIT_FAILURE;
+            }
         }
 
-        if (msg.id != TEST_MESSAGE_PING || msg.size != sizeof(data)) {
+        core_message_type_t type = core_message_get_type(request);
+        uint32_t id              = core_message_get_id(request);
+        size_t size              = core_message_get_size(request);
+        nstime_t timestamp       = core_message_get_timestamp(request);
+
+        if (type != CORE_MESSAGE_REQUEST || id != TEST_REQUEST_PING || size != sizeof(test_request_ping_t)) {
             fprintf(stderr, "Server received invalid message\n");
             return EXIT_FAILURE;
         }
 
-        ret = kern_connection_receive_data(conn, data);
+        test_request_ping_t *ping = (test_request_ping_t *)core_message_get_data(request);
+        ping->string[sizeof(ping->string) - 1] = 0;
+
+        printf("Server received: %u '%s' (timestamp: %" PRIu64 ")\n", ping->index, ping->string, timestamp);
+
+        core_message_t *reply = core_message_create_reply(request, sizeof(test_request_ping_t));
+
+        test_request_ping_t *pong = (test_request_ping_t *)core_message_get_data(reply);
+        pong->index = ping->index;
+        snprintf(pong->string, sizeof(pong->string), "PONG %" PRIu64, ping->index);
+
+        ret = core_connection_reply(conn, reply);
         if (ret != STATUS_SUCCESS) {
-            fprintf(stderr, "Server failed to receive data: %d\n", ret);
+            fprintf(stderr, "Server failed to send reply: %d\n", ret);
             return EXIT_FAILURE;
         }
 
-        data[sizeof(data) - 1] = 0;
-        printf("%s\n", data);
-        dump_message(&msg);
-
-        snprintf(data, sizeof(data), "PONG %lu", msg.args[0]);
-        msg.id = TEST_MESSAGE_PONG;
-        msg.size = sizeof(data);
-
-        ret = kern_connection_send(conn, &msg, data, INVALID_HANDLE, -1);
-        if (ret != STATUS_SUCCESS) {
-            fprintf(stderr, "Server failed to send message: %d\n", ret);
-            return EXIT_FAILURE;
-        }
+        core_message_destroy(reply);
+        core_message_destroy(request);
     }
+
+    core_connection_close(conn);
+
+    return EXIT_SUCCESS;
 }
 
 static int test_client(void) {
-    ipc_message_t msg;
-    unsigned long count = 1;
-    char data[TEST_DATA_LEN];
-    handle_t conn;
     status_t ret;
 
-    ret = kern_connection_open(PROCESS_ROOT_PORT, -1, &conn);
+    core_connection_t *conn;
+    ret = core_connection_open(PROCESS_ROOT_PORT, -1, CORE_CONNECTION_RECEIVE_SIGNALS, &conn);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "Failed to open connection: %d\n", ret);
+        fprintf(stderr, "Client failed to open connection: %d\n", ret);
         return EXIT_FAILURE;
     }
 
-    printf("Client got connection (handle: %d)\n", conn);
-
-    while (count <= TEST_PING_COUNT) {
-        snprintf(data, sizeof(data), "PING %lu", count);
-        msg.id = TEST_MESSAGE_PING;
-        msg.size = sizeof(data);
-        msg.args[0] = count;
-        msg.args[1] = 0xdeadcafe;
-        msg.args[2] = 0xdeadc0de;
-        msg.args[3] = 0xcafebeef;
-        msg.args[4] = 0xcafebabe;
-        msg.args[5] = 0x1337cafe;
-
-        ret = kern_connection_send(conn, &msg, data, INVALID_HANDLE, -1);
-        if (ret != STATUS_SUCCESS) {
-            fprintf(stderr, "Client failed to send message: %d\n", ret);
-            return EXIT_FAILURE;
-        }
-
-        ret = kern_connection_receive(conn, &msg, NULL, -1);
-        if (ret != STATUS_SUCCESS) {
-            fprintf(stderr, "Client failed to receive message: %d\n", ret);
-            return EXIT_FAILURE;
-        }
-
-        if (msg.id != TEST_MESSAGE_PONG || msg.size != sizeof(data)) {
-            fprintf(stderr, "Client received invalid message\n");
-            return EXIT_FAILURE;
-        } else if (msg.args[0] != count) {
-            fprintf(stderr, "Client received message with incorrect count\n");
-            return EXIT_FAILURE;
-        }
-
-        ret = kern_connection_receive_data(conn, data);
-        if (ret != STATUS_SUCCESS) {
-            fprintf(stderr, "Client failed to receive data: %d\n", ret);
-            return EXIT_FAILURE;
-        }
-
-        data[sizeof(data) - 1] = 0;
-        printf("%s\n", data);
-        dump_message(&msg);
-
-        if (count++ != TEST_PING_COUNT)
-            kern_thread_sleep(1000000000, NULL);
+    /* Wait until told to start. */
+    core_message_t *signal;
+    ret = core_connection_receive(conn, -1, &signal);
+    if (ret != STATUS_SUCCESS) {
+        fprintf(stderr, "Client failed to receive message: %d\n", ret);
+        return EXIT_FAILURE;
     }
 
-    return EXIT_FAILURE;
+    core_message_type_t type = core_message_get_type(signal);
+    uint32_t id              = core_message_get_id(signal);
+
+    if (type != CORE_MESSAGE_SIGNAL || id != TEST_SIGNAL_START) {
+        fprintf(stderr, "Client received invalid message\n");
+        return EXIT_FAILURE;
+    }
+
+    core_message_destroy(signal);
+
+    printf("Client received start signal (handle: %d)\n", conn);
+
+    unsigned int count = 0;
+    while (count < TEST_PING_COUNT) {
+        core_message_t *request = core_message_create_request(TEST_REQUEST_PING, sizeof(test_request_ping_t));
+
+        test_request_ping_t *ping = (test_request_ping_t *)core_message_get_data(request);
+        ping->index = count;
+        snprintf(ping->string, sizeof(ping->string), "PING %" PRIu64, ping->index);
+
+        core_message_t *reply;
+        ret = core_connection_request(conn, request, &reply);
+        if (ret != STATUS_SUCCESS) {
+            fprintf(stderr, "Client failed to send request: %d\n", ret);
+            return EXIT_FAILURE;
+        }
+
+        type               = core_message_get_type(reply);
+        id                 = core_message_get_id(reply);
+        size_t size        = core_message_get_size(reply);
+        nstime_t timestamp = core_message_get_timestamp(reply);
+
+        if (type != CORE_MESSAGE_REPLY || id != TEST_REQUEST_PING || size != sizeof(test_request_ping_t)) {
+            fprintf(stderr, "Client received invalid message\n");
+            return EXIT_FAILURE;
+        }
+
+        test_request_ping_t *pong = (test_request_ping_t *)core_message_get_data(reply);
+        pong->string[sizeof(pong->string) - 1] = 0;
+
+        printf("Client received: %u '%s' (timestamp: %" PRIu64 ")\n", pong->index, pong->string, timestamp);
+
+        core_message_destroy(request);
+        core_message_destroy(reply);
+
+        if (++count != TEST_PING_COUNT)
+            kern_thread_sleep(core_msecs_to_nsecs(500), NULL);
+    }
+
+    return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv) {
