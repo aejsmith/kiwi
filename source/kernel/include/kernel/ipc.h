@@ -35,13 +35,16 @@ extern "C" {
 /** Maximum number of messages that can be queued at a time. */
 #define IPC_QUEUE_MAX               256
 
+/** Number of inline message arguments. */
+#define IPC_MESSAGE_ARGS_COUNT      6
+
 /** Structure describing an IPC message. */
 typedef struct ipc_message {
     uint32_t id;                            /**< Message identifier. */
     uint16_t flags;                         /**< Message flags. */
     uint16_t size;                          /**< Size of attached data. */
     nstime_t timestamp;                     /**< System time at which message was sent. */
-    uint64_t args[6];                       /**< Inline message arguments. */
+    uint64_t args[IPC_MESSAGE_ARGS_COUNT];  /**< Inline message arguments. */
 } ipc_message_t;
 
 /** IPC message flags. */

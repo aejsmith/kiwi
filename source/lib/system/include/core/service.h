@@ -16,33 +16,24 @@
 
 /**
  * @file
- * @brief               Logging functions.
+ * @brief               IPC service functions.
  */
 
-#ifndef __CORE_LOG_H
-#define __CORE_LOG_H
+#ifndef __CORE_SERVICE_H
+#define __CORE_SERVICE_H
 
-#include <system/defs.h>
-
-#include <stdarg.h>
+#include <core/ipc.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Log levels. */
-typedef enum core_log_level {
-    CORE_LOG_DEBUG,                     /**< Debugging information. */
-    CORE_LOG_NOTICE,                    /**< Informational messages. */
-    CORE_LOG_WARN,                      /**< Warning messages. */
-    CORE_LOG_ERROR,                     /**< Error messages. */
-} core_log_level_t;
-
-extern void core_log_args(core_log_level_t level, const char *fmt, va_list args);
-extern void core_log(core_log_level_t level, const char *fmt, ...) __sys_printf(2, 3);
+extern status_t core_service_connect(
+    const char *name, uint32_t service_flags, uint32_t conn_flags,
+    core_connection_t **_conn);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __CORE_LOG_H */
+#endif /* __CORE_SERVICE_H */

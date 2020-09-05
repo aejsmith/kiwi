@@ -26,9 +26,11 @@ env = manager.Create(libraries = ['kernel'], flags = {
 })
 
 sources = [File(f) for f in [
+    'core/ipc.c',
     'core/log.c',
     'core/mutex.c',
     'core/path.c',
+    'core/service.c',
 
     'dirent/alphasort.c',
     'dirent/closedir.c',

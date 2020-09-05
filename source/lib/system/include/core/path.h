@@ -22,7 +22,15 @@
 #ifndef __CORE_PATH_H
 #define __CORE_PATH_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern char *core_path_basename(const char *path);
 extern char *core_path_dirname(const char *path);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __CORE_PATH_H */

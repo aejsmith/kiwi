@@ -204,9 +204,10 @@ class BuildManager:
         env.Append(SHLIBEMITTER = [add_library_deps])
         env.Append(PROGEMITTER = [add_library_deps])
 
-        # Add the application/library builders.
+        # Add the userspace builders.
         env.AddMethod(builders.kiwi_application_method, 'KiwiApplication')
         env.AddMethod(builders.kiwi_library_method, 'KiwiLibrary')
+        env.AddMethod(builders.kiwi_service_method, 'KiwiService')
 
         self.envs.append((name, env))
         return env

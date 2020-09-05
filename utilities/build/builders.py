@@ -35,6 +35,19 @@ def kiwi_application_method(env, name, sources, **kwargs):
     # Build the application.
     return env.Program(target, sources, **flags)
 
+# Custom method to build a Kiwi service.
+def kiwi_service_method(env, name, sources, **kwargs):
+    flags = kwargs['flags'] if 'flags' in kwargs else {}
+
+    target = File(name)
+
+    # Add the application to the image.
+    dist = env['_MANAGER']['dist']
+    dist.AddFile(target, 'system/services/%s' % (name))
+
+    # Build the application.
+    return env.Program(target, sources, **flags)
+
 # Custom method to build a Kiwi library.
 def kiwi_library_method(env, name, sources, **kwargs):
     manager = env['_MANAGER']

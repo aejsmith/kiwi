@@ -16,33 +16,14 @@
 
 /**
  * @file
- * @brief               Logging functions.
+ * @brief               Service manager IPC protocol.
  */
 
-#ifndef __CORE_LOG_H
-#define __CORE_LOG_H
+#ifndef SERVICE_MANAGER_PROTOCOL_H
+#define SERVICE_MANAGER_PROTOCOL_H
 
-#include <system/defs.h>
+/**
+ * Get a port handle for a named service.
+ */
 
-#include <stdarg.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/** Log levels. */
-typedef enum core_log_level {
-    CORE_LOG_DEBUG,                     /**< Debugging information. */
-    CORE_LOG_NOTICE,                    /**< Informational messages. */
-    CORE_LOG_WARN,                      /**< Warning messages. */
-    CORE_LOG_ERROR,                     /**< Error messages. */
-} core_log_level_t;
-
-extern void core_log_args(core_log_level_t level, const char *fmt, va_list args);
-extern void core_log(core_log_level_t level, const char *fmt, ...) __sys_printf(2, 3);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __CORE_LOG_H */
+#endif /* SERVICE_MANAGER_PROTOCOL_H */
