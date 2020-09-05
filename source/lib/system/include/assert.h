@@ -33,11 +33,13 @@
 #ifndef __ASSERT_H
 #define __ASSERT_H
 
+#include <system/defs.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern void __assert_fail(const char *cond, const char *file, unsigned int line, const char *func);
+extern void __assert_fail(const char *cond, const char *file, unsigned int line, const char *func) __sys_noreturn;
 
 #ifdef __cplusplus
 }
