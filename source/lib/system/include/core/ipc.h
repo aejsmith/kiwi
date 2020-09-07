@@ -132,7 +132,6 @@ extern nstime_t core_message_get_timestamp(const core_message_t *message);
 extern const security_context_t *core_message_get_security(const core_message_t *message);
 extern void *core_message_get_data(core_message_t *message);
 
-// need to distinguish owned vs non-owned handle (don't want to close handles that were attached for a sent message, probably)
 extern void core_message_attach_handle(core_message_t *message, handle_t handle, bool own);
 extern handle_t core_message_detach_handle(core_message_t *message);
 
