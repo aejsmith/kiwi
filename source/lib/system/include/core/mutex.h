@@ -61,7 +61,7 @@ static inline void __core_mutex_unlockp(void *p) {
  */
 #define CORE_MUTEX_SCOPED_LOCK(name, mutex) \
     core_mutex_lock(mutex, -1); \
-    core_mutex_t *name __sys_cleanup(__core_mutex_unlockp) = mutex;
+    core_mutex_t *name __sys_unused __sys_cleanup(__core_mutex_unlockp) = mutex;
 
 /**
  * Explicit unlock for CORE_MUTEX_SCOPED_LOCK. If used, the lock will not be
