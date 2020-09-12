@@ -1471,11 +1471,24 @@ out:
     return ret;
 }
 
-/** Query the exit status of a process.
+/**
+ * Query the status of a process. Returns whether the process is still running,
+ * and optionally its exit status/reason. Querying exit status code and reason
+ * requires privileged access to the process, but just querying whether the
+ * process is running (_status and _reason are both NULL) is allowed from any
+ * process.
+ *
  * @param handle        Handle to process.
  * @param _status       Where to store exit status of process (can be NULL).
  * @param _reason       Where to store exit reason (can be NULL).
- * @return              Status code describing result of the operation. */
+ *
+ * @return              STATUS_SUCCESS if the process is dead.
+ *                      STATUS_STILL_RUNNING if the process is running.
+ *                      STATUS_ACCESS_DENIED if _status or _reason are not null
+ *                      and the caller does not have privileged access to the
+ *                      process.
+ *                      STATUS_INVALID_HANDLE if handle is invalid.
+ */
 status_t kern_process_status(handle_t handle, int *_status, int *_reason) {
     process_t *process;
     status_t ret;
@@ -1486,7 +1499,7 @@ status_t kern_process_status(handle_t handle, int *_status, int *_reason) {
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    if (!process_access(process)) {
+    if ((_status || _reason) && !process_access(process)) {
         ret = STATUS_ACCESS_DENIED;
     } else if (process->state != PROCESS_DEAD) {
         ret = STATUS_STILL_RUNNING;
