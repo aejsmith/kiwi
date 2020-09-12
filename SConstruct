@@ -30,7 +30,7 @@ cc_warning_flags = [
 
 # C++ warning flags.
 cxx_warning_flags = [
-    '-Wold-style-cast', '-Wsign-promo',
+    '-Wsign-promo',
 ]
 
 # Variables to set in target environments.
