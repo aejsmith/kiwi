@@ -22,6 +22,8 @@
 #ifndef __CORE_MUTEX_H
 #define __CORE_MUTEX_H
 
+#include <system/defs.h>
+
 #include <kernel/types.h>
 
 #ifdef __cplusplus
@@ -41,6 +43,35 @@ typedef int32_t core_mutex_t;
 extern bool core_mutex_held(core_mutex_t *mutex);
 extern status_t core_mutex_lock(core_mutex_t *mutex, nstime_t timeout);
 extern void core_mutex_unlock(core_mutex_t *mutex);
+
+static inline void __core_mutex_unlockp(void *p) {
+    core_mutex_t *mutex = *(core_mutex_t **)p;
+
+    if (mutex)
+        core_mutex_unlock(mutex);
+}
+
+/**
+ * RAII-style scoped lock for use in C code. Locks the mutex, and defines a
+ * variable with a cleanup attribute which will unlock the mutex once it goes
+ * out of scope.
+ *
+ * @param name          Scoped lock variable name.
+ * @param mutex         Mutex to lock.
+ */
+#define CORE_MUTEX_SCOPED_LOCK(name, mutex) \
+    core_mutex_lock(mutex, -1); \
+    core_mutex_t *name __sys_cleanup(__core_mutex_unlockp) = mutex;
+
+/**
+ * Explicit unlock for CORE_MUTEX_SCOPED_LOCK. If used, the lock will not be
+ * unlocked again once the lock variable goes out of scope.
+ *
+ * @param name          Scoped lock variable name.
+ */
+#define CORE_MUTEX_SCOPED_UNLOCK(name) \
+    core_mutex_unlock(name); \
+    name = NULL;
 
 #ifdef __cplusplus
 }

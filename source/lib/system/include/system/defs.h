@@ -35,5 +35,6 @@
 #define __sys_fini          __attribute__((destructor))
 #define __sys_export        __attribute__((visibility("default")))
 #define __sys_hidden        __attribute__((visibility("hidden")))
+#define __sys_cleanup(f)    __attribute__((cleanup(f)))
 
 #endif /* __SYSTEM_DEFS_H */
