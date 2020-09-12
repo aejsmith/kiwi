@@ -16,6 +16,7 @@
 
 dirs = [
     'service_manager',
+    'test',
 ]
 
 SConscript(dirs = dirs)

@@ -16,26 +16,38 @@
 
 /**
  * @file
- * @brief               IPC service functions.
+ * @brief               Test IPC service.
  */
 
-#ifndef __CORE_SERVICE_H
-#define __CORE_SERVICE_H
+#include <core/log.h>
+#include <core/service.h>
 
-#include <core/ipc.h>
+#include <kernel/ipc.h>
+#include <kernel/status.h>
+#include <kernel/thread.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <stdio.h>
+#include <stdlib.h>
 
-extern status_t core_service_connect(
-    const char *name, uint32_t service_flags, uint32_t conn_flags,
-    core_connection_t **_conn);
+int main(int argc, char **argv) {
+    status_t ret;
 
-extern status_t core_service_register_port(handle_t port);
+    core_log(CORE_LOG_NOTICE, "service started");
 
-#ifdef __cplusplus
+    handle_t port;
+    ret = kern_port_create(&port);
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_ERROR, "failed to create port: %d", ret);
+        return EXIT_FAILURE;
+    }
+
+    ret = core_service_register_port(port);
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_ERROR, "failed to register port: %d", ret);
+        return EXIT_FAILURE;
+    }
+
+    while (true) {
+        kern_thread_sleep(1000000000, NULL);
+    }
 }
-#endif
-
-#endif /* __CORE_SERVICE_H */

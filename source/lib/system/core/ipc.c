@@ -188,6 +188,17 @@ void core_connection_close(core_connection_t *conn) {
     libsystem_assert(conn);
 
     kern_handle_close(conn->handle);
+    core_connection_destroy(conn);
+}
+
+/**
+ * Destroy a connection object whose underlying handle is already closed (e.g.
+ * after forking, since connections are not inherited across a fork).
+ *
+ * @param conn          Connection object.
+ */
+void core_connection_destroy(core_connection_t *conn) {
+    libsystem_assert(conn);
 
     while (!core_list_empty(&conn->receive_queue)) {
         core_message_t *message = core_list_first(&conn->receive_queue, core_message_t, link);

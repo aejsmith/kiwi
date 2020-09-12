@@ -112,6 +112,7 @@ typedef enum core_message_type {
 extern core_connection_t *core_connection_create(handle_t handle, uint32_t flags);
 extern status_t core_connection_open(handle_t port, nstime_t timeout, uint32_t flags, core_connection_t **_conn);
 extern void core_connection_close(core_connection_t *conn);
+extern void core_connection_destroy(core_connection_t *conn);
 
 extern handle_t core_connection_get_handle(core_connection_t *conn);
 

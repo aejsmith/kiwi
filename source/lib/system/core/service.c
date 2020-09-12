@@ -25,10 +25,33 @@
 #include <kernel/ipc.h>
 #include <kernel/status.h>
 
+#include "posix/posix.h"
+
 #include "../../../services/service_manager/protocol.h"
 
 static CORE_MUTEX_DEFINE(service_lock);
-static handle_t service_manager_conn = INVALID_HANDLE;
+static core_connection_t *service_manager_conn = NULL;
+
+static void core_service_fork(void) {
+    /* Clear the service manager connection - connections are not inheritable. */
+    if (service_manager_conn) {
+        core_connection_destroy(service_manager_conn);
+        service_manager_conn = NULL;
+    }
+}
+
+static __sys_init void core_service_init(void) {
+    register_fork_handler(core_service_fork);
+}
+
+static status_t open_service_manager(void) {
+    status_t ret = STATUS_SUCCESS;
+
+    if (!service_manager_conn)
+        ret = core_connection_open(PROCESS_ROOT_PORT, -1, 0, &service_manager_conn);
+
+    return ret;
+}
 
 /**
  * Looks up the service with the given name in the current process' service
@@ -50,17 +73,66 @@ status_t core_service_connect(
 {
     status_t ret;
 
-    core_mutex_lock(&service_lock, -1);
+    CORE_MUTEX_SCOPED_LOCK(lock, &service_lock);
 
-    if (service_manager_conn == INVALID_HANDLE) {
-        ret = kern_connection_open(PROCESS_ROOT_PORT, -1, &service_manager_conn);
-        if (ret != STATUS_SUCCESS)
-            goto out;
-    }
+    ret = open_service_manager();
+    if (ret != STATUS_SUCCESS)
+        return ret;
 
     ret = STATUS_NOT_IMPLEMENTED;
 
-out:
-    core_mutex_unlock(&service_lock);
+    // if we get a connnection failure due to the other end closing after we've got the port, need to re-attempt connection
+// don't forget to close the port
+
+    return ret;
+}
+
+/**
+ * Register an IPC service with the service manager. This is only a valid
+ * operation for a service process that has been started by the service manager.
+ * It will associate the service's name as configured in the service manager
+ * with the given port, and subsequent requests to connect to the service will
+ * be directed to the port.
+ *
+ * @param port          Port to register for the service.
+ *
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_NOT_FOUND if the calling process is not known as
+ *                      an IPC service to the service manager.
+ *                      STATUS_ALREADY_EXISTS if a port is already registered
+ *                      for the service.
+ *                      STATUS_NO_MEMORY if allocation fails.
+ *                      Any error returned by core_connection_request().
+ */
+status_t core_service_register_port(handle_t port) {
+    status_t ret;
+
+    CORE_MUTEX_SCOPED_LOCK(lock, &service_lock);
+
+    ret = open_service_manager();
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    core_message_t *request = core_message_create_request(SERVICE_MANAGER_REQUEST_REGISTER_PORT, 0);
+    if (!request)
+        return STATUS_NO_MEMORY;
+
+    core_message_attach_handle(request, port, false);
+
+    core_message_t *reply;
+    ret = core_connection_request(service_manager_conn, request, &reply);
+    if (ret == STATUS_SUCCESS) {
+        libsystem_assert(core_message_get_size(reply) == sizeof(service_manager_request_register_port_reply_t));
+
+        const service_manager_request_register_port_reply_t *reply_data =
+            (const service_manager_request_register_port_reply_t *)core_message_get_data(reply);
+
+        ret = reply_data->result;
+
+        core_message_destroy(reply);
+    }
+
+    core_message_destroy(request);
+
     return ret;
 }

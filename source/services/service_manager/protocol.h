@@ -22,8 +22,42 @@
 #ifndef SERVICE_MANAGER_PROTOCOL_H
 #define SERVICE_MANAGER_PROTOCOL_H
 
-/**
- * Get a port handle for a named service.
- */
+/** Service manager message IDs. */
+enum {
+    /**
+     * Connect to a service.
+     *
+     * Request:
+     *  - Data = service_manager_request_connect_t
+     *
+     * Reply:
+     *  - Data = service_manager_request_connect_reply_t
+     *  - Handle = Service port (if successful)
+     */
+    SERVICE_MANAGER_REQUEST_CONNECT = 0,
+
+    /**
+     * Register a service port.
+     *
+     * Request:
+     *  - Handle = Service port
+     *
+     * Reply:
+     *  - Data = service_manager_request_register_port_reply_t
+     */
+    SERVICE_MANAGER_REQUEST_REGISTER_PORT = 1,
+};
+
+//typedef struct service_manager_request_connect {
+//
+//} service_manager_request_connect_t;
+
+//typedef struct service_manager_request_connect_reply {
+//
+//} service_manager_request_connect_reply_t;
+
+typedef struct service_manager_request_register_port_reply {
+    status_t result;
+} service_manager_request_register_port_reply_t;
 
 #endif /* SERVICE_MANAGER_PROTOCOL_H */
