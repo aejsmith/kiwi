@@ -621,6 +621,12 @@ void core_message_attach_handle(core_message_t *message, handle_t handle, bool o
 
     message->handle = handle;
 
+    if (handle != INVALID_HANDLE) {
+        message->message.flags |= IPC_MESSAGE_HANDLE;
+    } else {
+        message->message.flags &= ~IPC_MESSAGE_HANDLE;
+    }
+
     if (own) {
         message->flags |= CORE_MESSAGE_OWNS_HANDLE;
     } else {
