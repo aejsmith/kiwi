@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief               Service manager main function.
+ * @brief               Service manager.
  */
 
 #include <core/ipc.h>
@@ -244,6 +244,17 @@ int ServiceManager::run() {
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_WARN, "failed to wait for events: %d", ret);
             continue;
+        }
+
+        for (object_event_t& event : m_events) {
+            if (event.flags & OBJECT_EVENT_ERROR) {
+                core_log(CORE_LOG_WARN, "error flagged on event %u for handle %u", event.event, event.handle);
+            } else if (event.flags & OBJECT_EVENT_SIGNALLED) {
+                auto handler = reinterpret_cast<EventHandler *>(event.udata);
+                handler->handleEvent(&event);
+            }
+
+            event.flags &= ~(OBJECT_EVENT_SIGNALLED | OBJECT_EVENT_ERROR);
         }
     }
 }

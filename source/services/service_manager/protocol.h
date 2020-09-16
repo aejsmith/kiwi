@@ -31,7 +31,7 @@ enum {
      *  - Data = service_manager_request_connect_t
      *
      * Reply:
-     *  - Data = service_manager_request_connect_reply_t
+     *  - Data = service_manager_reply_connect_t
      *  - Handle = Service port (if successful)
      */
     SERVICE_MANAGER_REQUEST_CONNECT = 0,
@@ -43,7 +43,7 @@ enum {
      *  - Handle = Service port
      *
      * Reply:
-     *  - Data = service_manager_request_register_port_reply_t
+     *  - Data = service_manager_reply_register_port_t
      */
     SERVICE_MANAGER_REQUEST_REGISTER_PORT = 1,
 };
@@ -52,12 +52,12 @@ enum {
 //
 //} service_manager_request_connect_t;
 
-//typedef struct service_manager_request_connect_reply {
+//typedef struct service_manager_reply_connect {
 //
-//} service_manager_request_connect_reply_t;
+//} service_manager_reply_connect_t;
 
-typedef struct service_manager_request_register_port_reply {
+typedef struct service_manager_reply_register_port {
     status_t result;
-} service_manager_request_register_port_reply_t;
+} service_manager_reply_register_port_t;
 
 #endif /* SERVICE_MANAGER_PROTOCOL_H */

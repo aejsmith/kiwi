@@ -122,10 +122,10 @@ status_t core_service_register_port(handle_t port) {
     core_message_t *reply;
     ret = core_connection_request(service_manager_conn, request, &reply);
     if (ret == STATUS_SUCCESS) {
-        libsystem_assert(core_message_get_size(reply) == sizeof(service_manager_request_register_port_reply_t));
+        libsystem_assert(core_message_get_size(reply) == sizeof(service_manager_reply_register_port_t));
 
-        const service_manager_request_register_port_reply_t *reply_data =
-            (const service_manager_request_register_port_reply_t *)core_message_get_data(reply);
+        const service_manager_reply_register_port_t *reply_data =
+            (const service_manager_reply_register_port_t *)core_message_get_data(reply);
 
         ret = reply_data->result;
 
