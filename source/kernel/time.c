@@ -471,6 +471,12 @@ __init_text void time_init(void) {
     kdb_register_command("uptime", "Display the system uptime.", kdb_cmd_uptime);
 }
 
+/** Initialise per-CPU time state. */
+__init_text void time_init_percpu(void) {
+    if (timer_device->type == TIMER_DEVICE_ONESHOT)
+        curr_cpu->timer_enabled = true;
+}
+
 /**
  * User timer API.
  */

@@ -146,5 +146,6 @@ extern void spin(nstime_t nsecs);
 extern nstime_t platform_time_from_hardware(void);
 
 extern void time_init(void);
+extern void time_init_percpu(void);
 
 #endif /* __TIME_H */

@@ -144,6 +144,7 @@ __init_text void kmain_secondary(cpu_t *cpu) {
 
     /* Initialize everything. */
     cpu_early_init_percpu(cpu);
+    time_init_percpu();
     mmu_init_percpu();
     cpu_init_percpu();
     sched_init_percpu();
