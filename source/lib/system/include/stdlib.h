@@ -60,7 +60,7 @@ typedef struct {
 } lldiv_t;
 
 extern void _Exit(int status) __sys_noreturn;
-extern void abort(void);
+extern void abort(void) __sys_noreturn;
 extern int abs(int j);
 extern int atexit(void (*func)(void));
 extern double atof(const char *s);
