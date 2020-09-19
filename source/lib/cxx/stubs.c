@@ -219,11 +219,6 @@ locale_t uselocale(locale_t locale) {
     return locale;
 }
 
-int vasprintf(char **strp, const char *fmt, va_list ap) {
-    fprintf(stderr, "STUB: %s\n", __func__);
-    *(int *)0xdeadc0de = 0; abort();
-}
-
 size_t wcrtomb(char *__restrict s, wchar_t wc, mbstate_t *__restrict ps) {
     //fprintf(stderr, "STUB: %s\n", __func__);
     //*(int *)0xdeadc0de = 0; abort();

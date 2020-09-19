@@ -144,13 +144,18 @@ extern int vsnprintf(char *__restrict buf, size_t size, const char *__restrict f
 extern int vsprintf(char *__restrict buf, const char *__restrict fmt, va_list args);
 extern int vsscanf(const char *__restrict buf, const char *__restrict fmt, va_list args);
 
-// Needed for libcxx build.
+/**
+ * GNU extensions.
+ */
+
+extern int vasprintf(char **strp, const char *__restrict fmt, va_list args);
+extern int asprintf(char **strp, const char *__restrict fmt, ...);
+
+// Stubs needed for libcxx build.
 #ifdef __cplusplus
 
 extern int fgetpos(FILE *, fpos_t *);
 extern int fsetpos(FILE *, const fpos_t *);
-
-extern int vasprintf(char **strp, const char *fmt, va_list ap);
 
 #endif
 
