@@ -48,13 +48,14 @@ enum {
     SERVICE_MANAGER_REQUEST_REGISTER_PORT = 1,
 };
 
-//typedef struct service_manager_request_connect {
-//
-//} service_manager_request_connect_t;
+typedef struct service_manager_request_connect {
+    uint32_t flags;
+    char name[];
+} service_manager_request_connect_t;
 
-//typedef struct service_manager_reply_connect {
-//
-//} service_manager_reply_connect_t;
+typedef struct service_manager_reply_connect {
+    status_t result;
+} service_manager_reply_connect_t;
 
 typedef struct service_manager_reply_register_port {
     status_t result;

@@ -42,6 +42,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
+#include <list>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -76,6 +77,8 @@ public:
 
     void handleEvent(const object_event_t *event) override;
 
+    void finishConnect(Service *service, core_message_t *reply);
+
 private:
     void handleMessage();
     void handleConnect(core_message_t *request);
@@ -85,6 +88,7 @@ private:
     core_connection_t *m_connection;
     process_id_t m_processId;
     Service *m_service;
+    std::list<Service *> m_pendingConnects;
 };
 
 /** Represents a service. */
@@ -106,13 +110,23 @@ public:
     uint32_t flags() const          { return m_flags; }
     process_id_t processId() const  { return m_processId; }
     Client *client() const          { return m_client; }
+    handle_t port() const           { return m_port; }
 
     void setClient(Client *client) { m_client = client; }
     bool setPort(handle_t port);
 
+    void addPendingConnect(Client *client, core_message_t *reply);
+    void removePendingConnects(Client *client);
+
     bool start();
 
     void handleEvent(const object_event_t *event) override;
+
+private:
+    struct PendingConnect {
+        Client *client;
+        core_message_t *reply;
+    };
 
 private:
     void handleDeath();
@@ -128,6 +142,8 @@ private:
     Client *m_client;
 
     handle_t m_port;
+
+    std::list<PendingConnect> m_pendingConnects;
 };
 
 /** Main class of the service manager. */
@@ -137,6 +153,8 @@ public:
     ~ServiceManager();
 
     int run();
+
+    Service* findService(const std::string &name);
 
     status_t spawnProcess(const char *path, handle_t *_handle = nullptr) const;
 
@@ -162,7 +180,8 @@ static ServiceManager g_serviceManager;
 
 Client::Client(core_connection_t *connection, process_id_t processId) :
     m_connection (connection),
-    m_processId  (processId)
+    m_processId  (processId),
+    m_service    (nullptr)
 {
     handle_t handle = core_connection_get_handle(m_connection);
     g_serviceManager.addEvent(handle, CONNECTION_EVENT_HANGUP, this);
@@ -172,6 +191,9 @@ Client::Client(core_connection_t *connection, process_id_t processId) :
 Client::~Client() {
     if (m_service)
         m_service->setClient(nullptr);
+
+    for (Service *service : m_pendingConnects)
+        service->removePendingConnects(this);
 
     g_serviceManager.removeEvents(this);
     core_connection_close(m_connection);
@@ -222,8 +244,65 @@ void Client::handleMessage() {
 }
 
 void Client::handleConnect(core_message_t *request) {
-    // TODO
-    // need to wait if port is not set.
+    core_message_t *reply = core_message_create_reply(request, sizeof(service_manager_reply_connect_t));
+    if (!reply) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return;
+    }
+
+    auto replyData = reinterpret_cast<service_manager_reply_connect_t *>(core_message_get_data(reply));
+
+    size_t requestSize = core_message_get_size(request);
+
+    Service *service = nullptr;
+    bool canReply    = true;
+
+    if (requestSize <= sizeof(service_manager_request_connect_t)) {
+        replyData->result = STATUS_INVALID_ARG;
+    } else {
+        auto requestData = reinterpret_cast<service_manager_request_connect_t *>(core_message_get_data(request));
+
+        size_t nameSize = requestSize - sizeof(service_manager_request_connect_t);
+        requestData->name[nameSize - 1] = 0;
+
+        service = g_serviceManager.findService(requestData->name);
+        if (service) {
+            replyData->result = STATUS_SUCCESS;
+
+            /* Ensure the service is started. */
+            service->start();
+
+            /* The port may not have been registered yet, especially if we've
+             * just started it. We wait until the port is registered before
+             * replying. */
+            canReply = service->port() != INVALID_HANDLE;
+            if (!canReply) {
+                service->addPendingConnect(this, reply);
+                m_pendingConnects.emplace_back(service);
+            }
+        } else {
+            replyData->result = STATUS_NOT_FOUND;
+        }
+    }
+
+    /* Reply immediately if we failed or the service port is already available. */
+    if (canReply)
+        finishConnect(service, reply);
+}
+
+void Client::finishConnect(Service *service, core_message_t *reply) {
+    if (service) {
+        assert(service->port() != INVALID_HANDLE);
+        core_message_attach_handle(reply, service->port(), false);
+
+        m_pendingConnects.remove(service);
+    }
+
+    status_t ret = core_connection_reply(m_connection, reply);
+    if (ret != STATUS_SUCCESS)
+        core_log(CORE_LOG_WARN, "failed to send reply message: %" PRId32, ret);
+
+    core_message_destroy(reply);
 }
 
 void Client::handleRegisterPort(core_message_t *request) {
@@ -281,10 +360,37 @@ Service::~Service() {
 bool Service::setPort(handle_t port) {
     if (m_port == INVALID_HANDLE) {
         m_port = port;
-// TODO: Signal connection requests.
+
+        /* Reply to pending connections. */
+        while (!m_pendingConnects.empty()) {
+            PendingConnect &connect = m_pendingConnects.front();
+            connect.client->finishConnect(this, connect.reply);
+            m_pendingConnects.pop_front();
+        }
+
         return true;
     } else {
         return false;
+    }
+}
+
+void Service::addPendingConnect(Client *client, core_message_t *reply) {
+    m_pendingConnects.emplace_back();
+    PendingConnect &connect = m_pendingConnects.back();
+
+    connect.client = client;
+    connect.reply  = reply;
+}
+
+void Service::removePendingConnects(Client *client) {
+    for (auto it = m_pendingConnects.begin(); it != m_pendingConnects.end(); ) {
+        if (it->client == client) {
+            /* We have to destroy this reply since the client won't do it. */
+            core_message_destroy(it->reply);
+            it = m_pendingConnects.erase(it);
+        } else {
+            ++it;
+        }
     }
 }
 
@@ -365,7 +471,7 @@ int ServiceManager::run() {
     addEvent(m_servicePort, PORT_EVENT_CONNECTION, this);
 
     /* TODO: Service configuration. */
-    addService("org.kiwi.test", "/system/services/test", Service::kIpc);
+    addService("org.kiwi.test", "/system/services/test", Service::kIpc | Service::kOnDemand);
 
     spawnProcess("/system/bin/shell");
 
@@ -410,6 +516,15 @@ void ServiceManager::addService(std::string name, std::string path, uint32_t fla
         service->start();
 
     m_services.emplace(service->name(), std::move(service));
+}
+
+Service* ServiceManager::findService(const std::string &name) {
+    auto ret = m_services.find(name);
+    if (ret != m_services.end()) {
+        return ret->second.get();
+    } else {
+        return nullptr;
+    }
 }
 
 status_t ServiceManager::spawnProcess(const char *path, handle_t *_handle) const {

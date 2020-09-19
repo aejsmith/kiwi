@@ -25,6 +25,8 @@
 #include <kernel/ipc.h>
 #include <kernel/status.h>
 
+#include <string.h>
+
 #include "posix/posix.h"
 
 #include "../../../services/service_manager/protocol.h"
@@ -79,10 +81,58 @@ status_t core_service_connect(
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    ret = STATUS_NOT_IMPLEMENTED;
+    size_t name_len = strlen(name);
+    libsystem_assert(name_len > 0);
+    name_len++;
 
-    // if we get a connnection failure due to the other end closing after we've got the port, need to re-attempt connection
-// don't forget to close the port
+    core_connection_t *conn;
+
+    /* It is possible for a service to exit in between us receiving its port
+     * from the service manager and trying to connect to it. To handle this,
+     * we'll loop. */
+    ret = STATUS_CONN_HUNGUP;
+    while (ret == STATUS_CONN_HUNGUP) {
+        core_message_t *request = core_message_create_request(
+            SERVICE_MANAGER_REQUEST_CONNECT,
+            sizeof(service_manager_request_connect_t) + name_len);
+        if (!request) {
+            ret = STATUS_NO_MEMORY;
+            break;
+        }
+
+        service_manager_request_connect_t *request_data =
+            (service_manager_request_connect_t *)core_message_get_data(request);
+
+        request_data->flags = service_flags;
+        memcpy(request_data->name, name, name_len);
+
+        core_message_t *reply;
+        ret = core_connection_request(service_manager_conn, request, &reply);
+        if (ret == STATUS_SUCCESS) {
+            libsystem_assert(core_message_get_size(reply) == sizeof(service_manager_reply_connect_t));
+
+            const service_manager_reply_connect_t *reply_data =
+                (const service_manager_reply_connect_t *)core_message_get_data(reply);
+
+            ret = reply_data->result;
+
+            if (ret == STATUS_SUCCESS) {
+                handle_t port = core_message_detach_handle(reply);
+
+                libsystem_assert(port != INVALID_HANDLE);
+
+                ret = core_connection_open(port, -1, conn_flags, &conn);
+                kern_handle_close(port);
+            }
+
+            core_message_destroy(reply);
+        }
+
+        core_message_destroy(request);
+    }
+
+    if (ret == STATUS_SUCCESS)
+        *_conn = conn;
 
     return ret;
 }
