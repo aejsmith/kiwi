@@ -1,9 +1,6 @@
 [submodule "3rdparty/lib/libcxx"]
 	path = 3rdparty/lib/libcxx
 	url = https://github.com/aejsmith/kiwi-libcxx.git
-[submodule "3rdparty/lib/libunwind"]
-	path = 3rdparty/lib/libunwind
-	url = https://github.com/aejsmith/kiwi-libunwind.git
 [submodule "3rdparty/kboot"]
 	path = 3rdparty/kboot
 	url = https://github.com/aejsmith/kboot.git
