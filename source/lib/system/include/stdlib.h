@@ -87,6 +87,7 @@ extern void *malloc(size_t size);
 extern char *mktemp(char *tpl);
 //extern char *mkdtemp(char *tpl);
 extern int mkstemp(char *tpl);
+extern int posix_memalign(void **memptr, size_t alignment, size_t size);
 extern int putenv(char *str);
 extern void qsort(
     void *base, size_t nmemb, size_t size,

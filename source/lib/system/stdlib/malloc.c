@@ -20,6 +20,7 @@
  */
 
 #include <core/mutex.h>
+#include <core/utility.h>
 
 #include <kernel/object.h>
 #include <kernel/status.h>
@@ -95,3 +96,21 @@ static MLOCK_T malloc_global_mutex = CORE_MUTEX_INITIALIZER;
 #pragma clang diagnostic ignored "-Wnull-pointer-arithmetic"
 
 #include "dlmalloc.c"
+
+int posix_memalign(void **memptr, size_t alignment, size_t size) {
+    if (!core_is_pow2(size))
+        return EINVAL;
+
+    if (size == 0) {
+        *memptr = NULL;
+        return 0;
+    }
+
+    void *ret = memalign(alignment, size);
+    if (ret) {
+        *memptr = ret;
+        return 0;
+    } else {
+        return ENOMEM;
+    }
+}
