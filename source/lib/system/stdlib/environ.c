@@ -74,6 +74,9 @@ static char *getenv_unsafe(const char *name) {
     char *key, *val;
     size_t i, len;
 
+    if (!environ)
+        return NULL;
+
     for (i = 0; environ[i]; i++) {
         key = environ[i];
         val = strchr(key, '=');
