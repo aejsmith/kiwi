@@ -44,7 +44,7 @@ struct scanf_args {
 };
 
 /** Type for a do_printf() helper function. */
-typedef void (*printf_helper_t)(char, void *, int *);
+typedef void (*printf_helper_t)(char, void *);
 
 extern int do_vprintf(
     printf_helper_t helper, void *data, const char *restrict fmt,
@@ -53,6 +53,6 @@ extern int do_printf(
     printf_helper_t helper, void *data, const char *restrict fmt,
     ...) __sys_hidden;
 
-extern int do_scanf(struct scanf_args *data, const char *restrict fmt,va_list args) __sys_hidden;
+extern int do_scanf(struct scanf_args *data, const char *restrict fmt, va_list args) __sys_hidden;
 
 #endif /* __SYSTEM_STDIO_H */

@@ -21,13 +21,9 @@
 
 #include "stdio/stdio.h"
 
-/** Helper for vfprintf().
- * @param ch            Character to print.
- * @param data          Pointer to file stream.
- * @param total         Pointer to total character count. */
-static void vfprintf_helper(char ch, void *data, int *total) {
+/** Helper for vfprintf(). */
+static void vfprintf_helper(char ch, void *data) {
     fputc(ch, (FILE *)data);
-    *total = *total + 1;
 }
 
 /** Output a formatted string to a file stream.

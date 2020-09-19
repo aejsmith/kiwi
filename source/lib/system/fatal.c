@@ -28,15 +28,10 @@
 
 #include "libsystem.h"
 
-/** Helper for libsystem_fatal().
- * @param ch            Character to print.
- * @param data          Pointer to file stream.
- * @param total         Pointer to total character count. */
-static void libsystem_fatal_helper(char ch, void *data, int *total) {
+/** Helper for libsystem_fatal(). */
+static void libsystem_fatal_helper(char ch, void *data) {
     if (data)
         fputc(ch, (FILE *)data);
-
-    *total = *total + 1;
 }
 
 /** Print out a fatal error and terminate the process.

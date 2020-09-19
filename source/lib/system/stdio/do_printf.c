@@ -58,7 +58,8 @@ static const char printf_digits_lower[] = "0123456789abcdef";
  * @param state         Internal state structure.
  * @param ch            Character to write. */
 static void print_char(printf_state_t *state, char ch) {
-    state->helper(ch, state->data, &state->total);
+    state->helper(ch, state->data);
+    state->total++;
 }
 
 /** Helper to print a string of characters.
