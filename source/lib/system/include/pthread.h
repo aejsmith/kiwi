@@ -61,6 +61,10 @@ enum {
 #define PTHREAD_MUTEX_INITIALIZER \
     { 0, -1, 0, { PTHREAD_MUTEX_DEFAULT, PTHREAD_PROCESS_PRIVATE } }
 
+// TODO
+#define PTHREAD_RWLOCK_INITIALIZER \
+    PTHREAD_MUTEX_INITIALIZER
+
 /** Default initializer for pthread_cond_t. */
 #define PTHREAD_COND_INITIALIZER \
     { 0, 0, 0, NULL, { PTHREAD_PROCESS_PRIVATE } }
@@ -170,13 +174,13 @@ extern int pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type);
 
 //int pthread_rwlock_init(pthread_rwlock_t *__restrict, const pthread_rwlockattr_t *__restrict);
 //int pthread_rwlock_destroy(pthread_rwlock_t *);
-//int pthread_rwlock_rdlock(pthread_rwlock_t *);
+int pthread_rwlock_rdlock(pthread_rwlock_t *);
 //int pthread_rwlock_timedrdlock(pthread_rwlock_t *__restrict, const struct timespec *__restrict);
 //int pthread_rwlock_timedwrlock(pthread_rwlock_t *__restrict, const struct timespec *__restrict);
 //int pthread_rwlock_tryrdlock(pthread_rwlock_t *);
 //int pthread_rwlock_trywrlock(pthread_rwlock_t *);
-//int pthread_rwlock_unlock(pthread_rwlock_t *);
-//int pthread_rwlock_wrlock(pthread_rwlock_t *);
+int pthread_rwlock_unlock(pthread_rwlock_t *);
+int pthread_rwlock_wrlock(pthread_rwlock_t *);
 //int pthread_rwlockattr_init(pthread_rwlockattr_t *);
 //int pthread_rwlockattr_destroy(pthread_rwlockattr_t *);
 //int pthread_rwlockattr_getpshared(const pthread_rwlockattr_t *__restrict, int *__restrict);

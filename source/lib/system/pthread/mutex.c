@@ -289,3 +289,17 @@ int pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type) {
     attr->type = type;
     return 0;
 }
+
+// TODO: Dummy rwlock implementation as a mutex for libunwind
+
+int pthread_rwlock_rdlock(pthread_rwlock_t *rwlock) {
+    return pthread_mutex_lock(rwlock);
+}
+
+int pthread_rwlock_wrlock(pthread_rwlock_t *rwlock) {
+    return pthread_mutex_lock(rwlock);
+}
+
+int pthread_rwlock_unlock(pthread_rwlock_t *rwlock) {
+    return pthread_mutex_unlock(rwlock);
+}

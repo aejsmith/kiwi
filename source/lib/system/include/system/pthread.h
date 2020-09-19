@@ -55,6 +55,9 @@ typedef struct {
     pthread_mutexattr_t attr;       /**< Attributes for the mutex. */
 } pthread_mutex_t;
 
+// TODO
+typedef pthread_mutex_t pthread_rwlock_t;
+
 /** Structure containing condition variable attributes. */
 typedef struct {
     int pshared;                    /**< Process sharing attribute. */

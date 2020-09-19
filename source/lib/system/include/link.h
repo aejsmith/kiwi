@@ -32,11 +32,13 @@
 extern "C" {
 #endif
 
-#ifdef _GNU_SOURCE
-
 #define ElfW(type)          _ElfW(Elf, __WORDSIZE, type)
 #define _ElfW(e,w,t)        _ElfW_1(e, w, _##t)
 #define _ElfW_1(e,w,t)      e##w##t
+
+/** Compatibility definitions. */
+#define PT_LOAD             ELF_PT_LOAD
+#define PT_GNU_EH_FRAME     ELF_PT_GNU_EH_FRAME
 
 /** Structure containing information about a loaded shared object. */
 struct dl_phdr_info {
@@ -49,8 +51,6 @@ struct dl_phdr_info {
 extern int dl_iterate_phdr(
     int (*callback)(struct dl_phdr_info *, size_t, void *),
     void *data);
-
-#endif /* _GNU_SOURCE */
 
 #ifdef __cplusplus
 }
