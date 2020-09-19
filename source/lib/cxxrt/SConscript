@@ -20,10 +20,10 @@ env = manager.Create(libraries = ['system'], flags = {
     'CPPPATH': [Dir('include')],
     'CCFLAGS': [
         '-Wno-missing-field-initializers', '-Wno-sometimes-uninitialized',
-        '-Wno-unused-const-variable',
+        '-Wno-unused-const-variable', '-Wno-unused-variable',
     ],
     'CXXFLAGS': [
-        '-Wno-old-style-cast', '-Wno-implicit-exception-spec-mismatch',
+        '-Wno-implicit-exception-spec-mismatch',
     ],
 
     # We must use -nodefaultlibs as by default the build system would try
