@@ -47,6 +47,8 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    core_log(CORE_LOG_NOTICE, "registered port");
+
     while (true) {
         kern_thread_sleep(1000000000, NULL);
     }

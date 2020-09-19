@@ -97,8 +97,8 @@ status_t core_service_connect(
  * @param port          Port to register for the service.
  *
  * @return              STATUS_SUCCESS on success.
- *                      STATUS_NOT_FOUND if the calling process is not known as
- *                      an IPC service to the service manager.
+ *                      STATUS_INVALID_REQUEST if the calling process is not
+ *                      known as an IPC service to the service manager.
  *                      STATUS_ALREADY_EXISTS if a port is already registered
  *                      for the service.
  *                      STATUS_NO_MEMORY if allocation fails.

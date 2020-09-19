@@ -17,6 +17,14 @@
 /**
  * @file
  * @brief               Service manager.
+ *
+ * TODO:
+ *  - Shouldn't block when sending messages if the remote message queue is full
+ *    as this could be used for denial of service by blocking the service
+ *    manager. We need a core_connection function that can do an asynchronous
+ *    send driven by an event for space becoming available, and drop messages
+ *    if we can't send them in a set amount of time to prevent us from piling
+ *    up unsent messages.
  */
 
 #include <core/ipc.h>
@@ -34,12 +42,13 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
-#include <condition_variable>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "protocol.h"
 
 extern const char *const *environ;
 
@@ -61,11 +70,18 @@ public:
     Client(core_connection_t *connection, process_id_t processId);
     ~Client();
 
+    Service *service() const { return m_service; }
+
     void setService(Service *service) { m_service = service; }
 
     void handleEvent(const object_event_t *event) override;
 
-protected:
+private:
+    void handleMessage();
+    void handleConnect(core_message_t *request);
+    void handleRegisterPort(core_message_t *request);
+
+private:
     core_connection_t *m_connection;
     process_id_t m_processId;
     Service *m_service;
@@ -86,7 +102,13 @@ public:
     Service(std::string name, std::string path, uint32_t flags);
     ~Service();
 
-    const std::string &getName() const { return m_name; }
+    const std::string &name() const { return m_name; }
+    uint32_t flags() const          { return m_flags; }
+    process_id_t processId() const  { return m_processId; }
+    Client *client() const          { return m_client; }
+
+    void setClient(Client *client) { m_client = client; }
+    bool setPort(handle_t port);
 
     bool start();
 
@@ -101,11 +123,11 @@ private:
     const uint32_t m_flags;
 
     handle_t m_process;
-    handle_t m_port;
+    process_id_t m_processId;
 
     Client *m_client;
 
-    std::condition_variable m_portWait;
+    handle_t m_port;
 };
 
 /** Main class of the service manager. */
@@ -118,13 +140,13 @@ public:
 
     status_t spawnProcess(const char *path, handle_t *_handle = nullptr) const;
 
+    void addEvent(handle_t handle, unsigned id, EventHandler *handler);
+    void removeEvents(EventHandler *handler);
+
     void handleEvent(const object_event_t *event) override;
 
 private:
     void addService(std::string name, std::string path, uint32_t flags);
-
-    void addEvent(handle_t handle, unsigned id, EventHandler *handler);
-    void removeEvents(EventHandler *handler);
 
 private:
     using ServiceMap = std::unordered_map<std::string, std::unique_ptr<Service>>;
@@ -141,23 +163,109 @@ static ServiceManager g_serviceManager;
 Client::Client(core_connection_t *connection, process_id_t processId) :
     m_connection (connection),
     m_processId  (processId)
-{}
+{
+    handle_t handle = core_connection_get_handle(m_connection);
+    g_serviceManager.addEvent(handle, CONNECTION_EVENT_HANGUP, this);
+    g_serviceManager.addEvent(handle, CONNECTION_EVENT_MESSAGE, this);
+}
 
 Client::~Client() {
+    if (m_service)
+        m_service->setClient(nullptr);
+
+    g_serviceManager.removeEvents(this);
     core_connection_close(m_connection);
 }
 
 void Client::handleEvent(const object_event_t *event) {
-// clean up events, detach from service if not null.
+    assert(event->handle == core_connection_get_handle(m_connection));
+
+    switch (event->event) {
+        case CONNECTION_EVENT_HANGUP:
+            delete this;
+            break;
+
+        case CONNECTION_EVENT_MESSAGE:
+            handleMessage();
+            break;
+
+        default:
+            core_unreachable();
+            break;
+    }
+}
+
+void Client::handleMessage() {
+    core_message_t *message;
+    status_t ret = core_connection_receive(m_connection, 0, &message);
+    if (ret != STATUS_SUCCESS)
+        return;
+
+    assert(core_message_get_type(message) == CORE_MESSAGE_REQUEST);
+
+    uint32_t id = core_message_get_id(message);
+    switch (id) {
+        case SERVICE_MANAGER_REQUEST_CONNECT:
+            handleConnect(message);
+            break;
+        case SERVICE_MANAGER_REQUEST_REGISTER_PORT:
+            handleRegisterPort(message);
+            break;
+        default:
+            core_log(
+                CORE_LOG_NOTICE, "received unrecognised message type %" PRId32 " from client %" PRId32,
+                id, m_processId);
+            break;
+    }
+
+    core_message_destroy(message);
+}
+
+void Client::handleConnect(core_message_t *request) {
+    // TODO
+    // need to wait if port is not set.
+}
+
+void Client::handleRegisterPort(core_message_t *request) {
+    core_message_t *reply = core_message_create_reply(request, sizeof(service_manager_reply_register_port_t));
+    if (!reply) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return;
+    }
+
+    auto replyData = reinterpret_cast<service_manager_reply_register_port_t *>(core_message_get_data(reply));
+
+    if (m_service) {
+        handle_t handle = core_message_detach_handle(request);
+
+        if (handle != INVALID_HANDLE) {
+            if (m_service->setPort(handle)) {
+                replyData->result = STATUS_SUCCESS;
+            } else {
+                kern_handle_close(handle);
+            }
+        } else {
+            replyData->result = STATUS_INVALID_ARG;
+        }
+    } else {
+        replyData->result = STATUS_INVALID_REQUEST;
+    }
+
+    status_t ret = core_connection_reply(m_connection, reply);
+    if (ret != STATUS_SUCCESS)
+        core_log(CORE_LOG_WARN, "failed to send reply message: %" PRId32, ret);
+
+    core_message_destroy(reply);
 }
 
 Service::Service(std::string name, std::string path, uint32_t flags) :
-    m_name    (std::move(name)),
-    m_path    (std::move(path)),
-    m_flags   (flags),
-    m_process (INVALID_HANDLE),
-    m_port    (INVALID_HANDLE),
-    m_client  (nullptr)
+    m_name      (std::move(name)),
+    m_path      (std::move(path)),
+    m_flags     (flags),
+    m_process   (INVALID_HANDLE),
+    m_processId (-1),
+    m_client    (nullptr),
+    m_port      (INVALID_HANDLE)
 {}
 
 Service::~Service() {
@@ -166,6 +274,18 @@ Service::~Service() {
 
     if (m_port != INVALID_HANDLE)
         kern_handle_close(m_port);
+}
+
+/** Set the port for the service, failing if already set.
+ * @return              Whether successful. */
+bool Service::setPort(handle_t port) {
+    if (m_port == INVALID_HANDLE) {
+        m_port = port;
+// TODO: Signal connection requests.
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /** Start the service if it is not already running. */
@@ -184,20 +304,30 @@ bool Service::start() {
             core_log(CORE_LOG_WARN, "failed to start service '%s': %d", m_name.c_str(), ret);
             return false;
         }
+
+        m_processId = kern_process_id(m_process);
+
+        g_serviceManager.addEvent(m_process, PROCESS_EVENT_DEATH, this);
     }
 
     return true;
 }
 
 void Service::handleEvent(const object_event_t *event) {
+    assert(event->handle == m_process);
+    assert(event->event == PROCESS_EVENT_DEATH);
 
+    handleDeath();
 }
 
 void Service::handleDeath() {
     core_log(CORE_LOG_WARN, "service '%s' terminated unexpectedly", m_name.c_str());
 
+    g_serviceManager.removeEvents(this);
+
     kern_handle_close(m_process);
-    m_process = INVALID_HANDLE;
+    m_process   = INVALID_HANDLE;
+    m_processId = -1;
 
     if (m_port != INVALID_HANDLE) {
         kern_handle_close(m_port);
@@ -246,15 +376,29 @@ int ServiceManager::run() {
             continue;
         }
 
-        for (object_event_t& event : m_events) {
-            if (event.flags & OBJECT_EVENT_ERROR) {
+        size_t numEvents = m_events.size();
+
+        for (size_t i = 0; i < numEvents; ) {
+            object_event_t &event = m_events[i];
+
+            uint32_t flags = event.flags;
+            event.flags &= ~(OBJECT_EVENT_SIGNALLED | OBJECT_EVENT_ERROR);
+
+            if (flags & OBJECT_EVENT_ERROR) {
                 core_log(CORE_LOG_WARN, "error flagged on event %u for handle %u", event.event, event.handle);
-            } else if (event.flags & OBJECT_EVENT_SIGNALLED) {
+            } else if (flags & OBJECT_EVENT_SIGNALLED) {
                 auto handler = reinterpret_cast<EventHandler *>(event.udata);
                 handler->handleEvent(&event);
             }
 
-            event.flags &= ~(OBJECT_EVENT_SIGNALLED | OBJECT_EVENT_ERROR);
+            /* Calling the handler may change the event array, so we have to
+             * handle this - start from the beginning. */
+            if (numEvents != m_events.size()) {
+                numEvents = m_events.size();
+                i = 0;
+            } else {
+                i++;
+            }
         }
     }
 }
@@ -265,7 +409,7 @@ void ServiceManager::addService(std::string name, std::string path, uint32_t fla
     if (!(flags & Service::kOnDemand))
         service->start();
 
-    m_services.emplace(service->getName(), std::move(service));
+    m_services.emplace(service->name(), std::move(service));
 }
 
 status_t ServiceManager::spawnProcess(const char *path, handle_t *_handle) const {
@@ -311,10 +455,15 @@ void ServiceManager::handleEvent(const object_event_t *event) {
 
     Client* client = new Client(connection, ipcClient.pid);
 
-    addEvent(handle, CONNECTION_EVENT_HANGUP, client);
-    addEvent(handle, CONNECTION_EVENT_MESSAGE, client);
+    /* See if this client matches one of our services. */
+    for (const auto &it : m_services) {
+        Service *service = it.second.get();
 
-    core_log(CORE_LOG_DEBUG, "got client %" PRId32, ipcClient.pid);
+        if (service->processId() == ipcClient.pid) {
+            service->setClient(client);
+            client->setService(service);
+        }
+    }
 }
 
 void ServiceManager::addEvent(handle_t handle, unsigned id, EventHandler *handler) {

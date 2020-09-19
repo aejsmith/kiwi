@@ -22,11 +22,18 @@
 #ifndef __CORE_UTILITY_H
 #define __CORE_UTILITY_H
 
+#include <assert.h>
 #include <stddef.h>
 
 /** Compiler attribute/builtin macros. */
-#define core_likely(x)      __builtin_expect(!!(x), 1)
-#define core_unlikely(x)    __builtin_expect(!!(x), 0)
+#define core_likely(x)          __builtin_expect(!!(x), 1)
+#define core_unlikely(x)        __builtin_expect(!!(x), 0)
+
+#ifdef NDEBUG
+#   define core_unreachable()   __builtin_unreachable()
+#else
+#   define core_unreachable()   assert(false)
+#endif
 
 /** Get the number of elements in an array. */
 #define core_array_size(a)  (sizeof((a)) / sizeof((a)[0]))
