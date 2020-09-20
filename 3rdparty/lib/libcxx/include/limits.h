@@ -43,7 +43,7 @@ Macros:
 #pragma GCC system_header
 #endif
 
-#ifndef __GNUC__
+#if !defined(__GNUC__) || defined(__Kiwi__)
 #include_next <limits.h>
 #else
 // GCC header limits.h recursively includes itself through another header called

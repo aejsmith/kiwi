@@ -307,7 +307,7 @@
    // random data even when using sandboxing mechanisms such as chroots,
    // Capsicum, etc.
 #  define _LIBCPP_USING_ARC4_RANDOM
-#elif defined(__Fuchsia__) || defined(__wasi__)
+#elif defined(__Fuchsia__) || defined(__wasi__) || defined(__Kiwi__)
 #  define _LIBCPP_USING_GETENTROPY
 #elif defined(__native_client__)
    // NaCl's sandbox (which PNaCl also runs in) doesn't allow filesystem access,
@@ -1122,6 +1122,7 @@ _LIBCPP_FUNC_VIS extern "C" void __sanitizer_annotate_contiguous_container(
       defined(__APPLE__) || \
       defined(__CloudABI__) || \
       defined(__sun__) || \
+      defined(__Kiwi__) || \
       (defined(__MINGW32__) && __has_include(<pthread.h>))
 #    define _LIBCPP_HAS_THREAD_API_PTHREAD
 #  elif defined(__Fuchsia__)
@@ -1178,7 +1179,8 @@ _LIBCPP_FUNC_VIS extern "C" void __sanitizer_annotate_contiguous_container(
 //               respective stakeholders.
 #if (defined(_LIBCPP_HAS_THREAD_API_PTHREAD) && defined(__GLIBC__)) \
   || (defined(_LIBCPP_HAS_THREAD_API_C11) && defined(__Fuchsia__)) \
-  || defined(_LIBCPP_HAS_THREAD_API_WIN32)
+  || defined(_LIBCPP_HAS_THREAD_API_WIN32) \
+  || defined(__Kiwi__)
 # define _LIBCPP_HAS_TRIVIAL_MUTEX_DESTRUCTION
 #endif
 
@@ -1191,7 +1193,8 @@ _LIBCPP_FUNC_VIS extern "C" void __sanitizer_annotate_contiguous_container(
 // TODO(EricWF): This is potentially true for some pthread implementations
 // as well.
 #if (defined(_LIBCPP_HAS_THREAD_API_C11) && defined(__Fuchsia__)) || \
-     defined(_LIBCPP_HAS_THREAD_API_WIN32)
+     defined(_LIBCPP_HAS_THREAD_API_WIN32) || \
+     defined(__Kiwi__)
 # define _LIBCPP_HAS_TRIVIAL_CONDVAR_DESTRUCTION
 #endif
 
