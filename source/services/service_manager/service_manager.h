@@ -55,7 +55,7 @@ private:
     using ServiceMap = std::unordered_map<std::string, std::unique_ptr<Service>>;
 
 private:
-    handle_t m_servicePort;
+    handle_t m_port;
 
     ServiceMap m_services;
     std::vector<object_event_t> m_events;

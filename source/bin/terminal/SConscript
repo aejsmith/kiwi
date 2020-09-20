@@ -14,10 +14,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-dirs = [
-    'shell',
-    'terminal',
-    'test',
-]
+Import('manager')
 
-SConscript(dirs = dirs)
+env = manager.Create(libraries = ['kernel'])
+env.KiwiApplication('terminal', ['main.cpp'])

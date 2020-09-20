@@ -36,12 +36,12 @@
 extern const char *const *environ;
 
 ServiceManager::ServiceManager() :
-    m_servicePort (INVALID_HANDLE)
+    m_port (INVALID_HANDLE)
 {}
 
 ServiceManager::~ServiceManager() {
-    if (m_servicePort != INVALID_HANDLE)
-        kern_handle_close(m_servicePort);
+    if (m_port != INVALID_HANDLE)
+        kern_handle_close(m_port);
 }
 
 int ServiceManager::run() {
@@ -49,16 +49,17 @@ int ServiceManager::run() {
 
     core_log(CORE_LOG_NOTICE, "service manager started");
 
-    ret = kern_port_create(&m_servicePort);
+    ret = kern_port_create(&m_port);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create port: %d", ret);
         return EXIT_FAILURE;
     }
 
-    addEvent(m_servicePort, PORT_EVENT_CONNECTION, this);
+    addEvent(m_port, PORT_EVENT_CONNECTION, this);
 
     /* TODO: Service configuration. */
     addService("org.kiwi.test", "/system/services/test", Service::kIpc | Service::kOnDemand);
+    addService("org.kiwi.terminal", "/system/services/terminal", Service::kIpc | Service::kOnDemand);
 
     spawnProcess("/system/bin/shell");
 
@@ -118,7 +119,7 @@ status_t ServiceManager::spawnProcess(const char *path, handle_t *_handle) const
     process_attrib_t attrib;
     handle_t map[][2] = { { 0, 0 }, { 1, 1 }, { 2, 2 } };
     attrib.token     = INVALID_HANDLE;
-    attrib.root_port = m_servicePort;
+    attrib.root_port = m_port;
     attrib.map       = map;
     attrib.map_count = core_array_size(map);
 
@@ -135,12 +136,12 @@ status_t ServiceManager::spawnProcess(const char *path, handle_t *_handle) const
 void ServiceManager::handleEvent(const object_event_t *event) {
     status_t ret;
 
-    assert(event->handle == m_servicePort);
+    assert(event->handle == m_port);
     assert(event->event == PORT_EVENT_CONNECTION);
 
     handle_t handle;
     ipc_client_t ipcClient;
-    ret = kern_port_listen(m_servicePort, &ipcClient, 0, &handle);
+    ret = kern_port_listen(m_port, &ipcClient, 0, &handle);
     if (ret != STATUS_SUCCESS) {
         /* This may be harmless - client's connection attempt could be cancelled
          * between us receiving the event and calling listen, for instance. */
