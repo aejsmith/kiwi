@@ -19,9 +19,4 @@
  * @brief               <Description>.
  */
 
-#ifndef
-#define
-
-
-
-#endif /*  */
+#pragma once
