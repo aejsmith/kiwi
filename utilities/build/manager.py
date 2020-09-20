@@ -187,8 +187,9 @@ class BuildManager:
         # here if what we're building isn't C++, but we don't know that here,
         # so just add it - it's not a big deal.
         if not 'CCFLAGS' in flags or '-nostdinc' not in flags['CCFLAGS']:
-            add_library('system')
             add_library('c++')
+            add_library('m')
+            add_library('system')
 
         # Set up emitters to set dependencies on default libraries.
         def add_library_deps(target, source, env):

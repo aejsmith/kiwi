@@ -60,6 +60,9 @@ int pthread_cond_init(pthread_cond_t *__restrict cond, const pthread_condattr_t 
  *                      results in undefined behaviour.
  * @return              Always returns 0. */
 int pthread_cond_destroy(pthread_cond_t *cond) {
+    /* libcxx is currently configured to not call this since it is trivial, if
+     * this changes, update libcxx accordingly. */
+
     if (cond->waiters != 0)
         libsystem_fatal("destroying condition variable %p with waiters", cond);
 

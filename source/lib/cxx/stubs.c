@@ -1,3 +1,4 @@
+#include <sys/random.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
@@ -154,6 +155,16 @@ int strcoll_l(const char *s1, const char *s2, locale_t locale) {
 }
 
 size_t strftime_l(char *__restrict s, size_t maxsize, const char *__restrict format, const struct tm *__restrict tm, locale_t locale) {
+    fprintf(stderr, "STUB: %s\n", __func__);
+    *(int *)0xdeadc0de = 0; abort();
+}
+
+double strtod_l(const char *__restrict s, char **__restrict endp, locale_t locale) {
+    fprintf(stderr, "STUB: %s\n", __func__);
+    *(int *)0xdeadc0de = 0; abort();
+}
+
+float strtof_l(const char *__restrict s, char **__restrict endp, locale_t locale) {
     fprintf(stderr, "STUB: %s\n", __func__);
     *(int *)0xdeadc0de = 0; abort();
 }
@@ -328,6 +339,11 @@ int pthread_detach(pthread_t thread) {
 }
 
 int pthread_join(pthread_t thread, void **val) {
+    fprintf(stderr, "STUB: %s\n", __func__);
+    *(int *)0xdeadc0de = 0; abort();
+}
+
+int getentropy(void *buffer, size_t length) {
     fprintf(stderr, "STUB: %s\n", __func__);
     *(int *)0xdeadc0de = 0; abort();
 }

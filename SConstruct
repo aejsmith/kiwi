@@ -37,7 +37,7 @@ cxx_warning_flags = [
 target_flags = {
     'CCFLAGS': cc_warning_flags + ['-gdwarf-2', '-pipe', '-fno-omit-frame-pointer'],
     'CFLAGS': ['-std=gnu11'],
-    'CXXFLAGS': cxx_warning_flags + ['-std=c++11'],
+    'CXXFLAGS': cxx_warning_flags + ['-std=c++17'],
     'ASFLAGS': ['-D__ASM__'],
 }
 

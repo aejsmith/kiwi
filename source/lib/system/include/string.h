@@ -51,6 +51,7 @@ extern size_t strcspn(const char *s, const char *reject);
 extern char *strdup(const char *s);
 extern char *strerror(int err);
 /* char *strerror_l(int, locale_t); */
+extern int strerror_r(int err, char *buf, size_t buflen);
 extern size_t strlen(const char *str);
 extern int strncasecmp(const char *s1, const char *s2, size_t n);
 extern char *strncat(char *__restrict dest, const char *__restrict src, size_t max);

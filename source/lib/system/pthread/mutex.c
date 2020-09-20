@@ -77,6 +77,9 @@ int pthread_mutex_init(
  *                      results in undefined behaviour.
  * @return              Always returns 0. */
 int pthread_mutex_destroy(pthread_mutex_t *mutex) {
+    /* libcxx is currently configured to not call this since it is trivial, if
+     * this changes, update libcxx accordingly. */
+
     if (mutex->futex != 0)
         libsystem_fatal("destroying held mutex %p", mutex);
 
