@@ -19,8 +19,7 @@
  * @brief               Circular doubly-linked list implementation.
  */
 
-#ifndef __LIB_LIST_H
-#define __LIB_LIST_H
+#pragma once
 
 #include <types.h>
 
@@ -214,5 +213,3 @@ static inline void list_splice_after(list_t *position, list_t *list) {
         list_init(list);
     }
 }
-
-#endif /* __LIB_LIST_H */

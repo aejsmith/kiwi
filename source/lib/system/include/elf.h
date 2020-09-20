@@ -19,8 +19,7 @@
  * @brief               ELF file types/definitions.
  */
 
-#ifndef __ELF_H
-#define __ELF_H
+#pragma once
 
 #ifdef __KERNEL
 #   include <types.h>
@@ -575,5 +574,3 @@ typedef struct {
     Elf64_Word n_descsz;                    /**< Length of the note's descriptor. */
     Elf64_Word n_type;                      /**< Type of the note. */
 } __packed Elf64_Note;
-
-#endif /* __ELF_H */

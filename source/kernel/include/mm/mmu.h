@@ -29,8 +29,7 @@
  * remote TLB invalidations and performing them all in one go.
  */
 
-#ifndef __MM_MMU_H
-#define __MM_MMU_H
+#pragma once
 
 #include <arch/mmu.h>
 #include <arch/page.h>
@@ -137,5 +136,3 @@ extern void arch_mmu_init_percpu(void);
 
 extern void mmu_init(void);
 extern void mmu_init_percpu(void);
-
-#endif /* __MM_MMU_H */

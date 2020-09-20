@@ -19,8 +19,7 @@
  * @brief               AMD64 MMU context definitions.
  */
 
-#ifndef __X86_MMU_H
-#define __X86_MMU_H
+#pragma once
 
 /** Definitions of paging structure bits. */
 #define X86_PTE_PRESENT         (1<<0)      /**< Page is present. */
@@ -43,5 +42,3 @@
 
 /** Cacheability flag mask. */
 #define X86_PTE_CACHE_MASK      (X86_PTE_PWT | X86_PTE_PCD)
-
-#endif /* __X86_MMU_H */

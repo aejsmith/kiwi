@@ -19,8 +19,7 @@
  * @brief               Fixed heap allocator.
  */
 
-#ifndef __LIB_FIXED_HEAP_H
-#define __LIB_FIXED_HEAP_H
+#pragma once
 
 #include <types.h>
 
@@ -35,5 +34,3 @@ extern void *fixed_heap_alloc(fixed_heap_t *heap, size_t size);
 extern void fixed_heap_free(fixed_heap_t *heap, void *ptr);
 
 extern void fixed_heap_init(fixed_heap_t *heap, void *mem, size_t size);
-
-#endif /* __LIB_FIXED_HEAP_H */

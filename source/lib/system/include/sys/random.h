@@ -19,8 +19,7 @@
  * @brief               Random number generation.
  */
 
-#ifndef __SYS_RANDOM_H
-#define __SYS_RANDOM_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -33,5 +32,3 @@ extern int getentropy(void *buffer, size_t length);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SYS_RANDOM_H */

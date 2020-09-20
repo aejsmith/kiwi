@@ -19,4 +19,6 @@
  * @brief               Input/output multiplexing.
  */
 
+#pragma once
+
 #include <sys/poll.h>

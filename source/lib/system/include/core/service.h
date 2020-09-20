@@ -19,8 +19,7 @@
  * @brief               IPC service functions.
  */
 
-#ifndef __CORE_SERVICE_H
-#define __CORE_SERVICE_H
+#pragma once
 
 #include <core/ipc.h>
 
@@ -37,5 +36,3 @@ extern status_t core_service_register_port(handle_t port);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __CORE_SERVICE_H */

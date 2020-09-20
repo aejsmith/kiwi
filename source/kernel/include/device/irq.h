@@ -19,8 +19,7 @@
  * @brief               Interrupt handling code.
  */
 
-#ifndef __DEVICE_IRQ_H
-#define __DEVICE_IRQ_H
+#pragma once
 
 #include <types.h>
 
@@ -80,5 +79,3 @@ extern status_t irq_unregister(unsigned num, irq_top_t top, irq_bottom_t bottom,
 extern void irq_handler(unsigned num);
 
 extern void irq_init(irq_controller_t *ctrlr);
-
-#endif /* __DEVICE_IRQ_H */

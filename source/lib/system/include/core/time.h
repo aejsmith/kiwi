@@ -19,8 +19,7 @@
  * @brief               Time functions.
  */
 
-#ifndef __CORE_TIME_H
-#define __CORE_TIME_H
+#pragma once
 
 #include <kernel/time.h>
 
@@ -73,5 +72,3 @@ static inline nstime_t core_nsecs_to_usecs(nstime_t nsecs) {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __CORE_TIME_H */

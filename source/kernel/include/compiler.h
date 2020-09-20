@@ -19,8 +19,7 @@
  * @brief               Compiler-specific macros/definitions.
  */
 
-#ifndef __COMPILER_H
-#define __COMPILER_H
+#pragma once
 
 #include <arch/cache.h>
 
@@ -60,5 +59,3 @@
 
 #define STRINGIFY(val)          #val
 #define XSTRINGIFY(val)         STRINGIFY(val)
-
-#endif /* __COMPILER_H */

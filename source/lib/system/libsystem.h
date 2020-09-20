@@ -19,8 +19,7 @@
  * @brief               Internal libsystem definitions.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -48,5 +47,3 @@ extern void libsystem_assert_fail(const char *cond, const char *file, unsigned i
 extern void libsystem_status_to_errno(status_t status) __sys_hidden;
 
 extern int main(int argc, char **argv, char **envp);
-
-#endif /* __LIBSYSTEM_H */

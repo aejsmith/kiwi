@@ -19,8 +19,7 @@
  * @brief               Dynamic linker interface.
  */
 
-#ifndef __LINK_H
-#define __LINK_H
+#pragma once
 
 #include <system/arch/types.h>
 
@@ -55,5 +54,3 @@ extern int dl_iterate_phdr(
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __LINK_H */

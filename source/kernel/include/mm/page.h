@@ -19,8 +19,7 @@
  * @brief               Physical memory management.
  */
 
-#ifndef __MM_PAGE_H
-#define __MM_PAGE_H
+#pragma once
 
 #include <arch/page.h>
 
@@ -103,5 +102,3 @@ extern void page_early_init(void);
 extern void page_init(void);
 extern void page_daemon_init(void);
 extern void page_late_init(void);
-
-#endif /* __MM_PAGE_H */

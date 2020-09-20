@@ -20,8 +20,7 @@
  * @brief		Complex arithmetic functions.
  */
 
-#ifndef __COMPLEX_H
-#define __COMPLEX_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -127,5 +126,3 @@ long double creall(long double complex);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __COMPLEX_H */

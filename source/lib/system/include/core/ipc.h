@@ -60,8 +60,7 @@
  *    multiple threads sending requests to a service.
  */
 
-#ifndef __CORE_IPC_H
-#define __CORE_IPC_H
+#pragma once
 
 #include <kernel/ipc.h>
 
@@ -139,5 +138,3 @@ extern handle_t core_message_detach_handle(core_message_t *message);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __CORE_IPC_H */

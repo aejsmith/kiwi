@@ -19,8 +19,7 @@
  * @brief               Logging functions.
  */
 
-#ifndef __CORE_LOG_H
-#define __CORE_LOG_H
+#pragma once
 
 #include <system/defs.h>
 
@@ -44,5 +43,3 @@ extern void core_log(core_log_level_t level, const char *fmt, ...) __sys_printf(
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __CORE_LOG_H */

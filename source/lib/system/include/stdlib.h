@@ -19,8 +19,7 @@
  * @brief               Standard library functions.
  */
 
-#ifndef __STDLIB_H
-#define __STDLIB_H
+#pragma once
 
 #define __need_size_t
 #define __need_wchar_t
@@ -133,5 +132,3 @@ extern long double strtold_l(const char *__restrict, char **__restrict, locale_t
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __STDLIB_H */

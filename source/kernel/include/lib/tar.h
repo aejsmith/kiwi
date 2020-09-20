@@ -19,8 +19,7 @@
  * @brief               TAR types/definitions.
  */
 
-#ifndef __LIB_TAR_H
-#define __LIB_TAR_H
+#pragma once
 
 struct object_handle;
 
@@ -70,5 +69,3 @@ typedef struct tar_header {
 #define TOEXEC      00001
 
 extern status_t tar_extract(struct object_handle *handle, const char *dest);
-
-#endif /* __LIB_TAR_H */

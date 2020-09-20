@@ -19,8 +19,7 @@
  * @brief               POSIX internal functions/definitions.
  */
 
-#ifndef __SYSTEM_POSIX_H
-#define __SYSTEM_POSIX_H
+#pragma once
 
 #include <core/list.h>
 #include <core/mutex.h>
@@ -46,5 +45,3 @@ extern mode_t __sys_hidden current_umask;
 extern void register_fork_handler(void (*func)(void)) __sys_hidden;
 
 //extern object_acl_t *posix_mode_to_acl(object_acl_t *current, mode_t mode) __sys_hidden;
-
-#endif /* __SYSTEM_POSIX_H */

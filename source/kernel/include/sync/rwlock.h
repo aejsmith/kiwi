@@ -19,8 +19,7 @@
  * @brief               Readers-writer lock implementation.
  */
 
-#ifndef __SYNC_RWLOCK_H
-#define __SYNC_RWLOCK_H
+#pragma once
 
 #include <lib/list.h>
 
@@ -56,5 +55,3 @@ extern void rwlock_write_lock(rwlock_t *lock);
 extern void rwlock_unlock(rwlock_t *lock);
 
 extern void rwlock_init(rwlock_t *lock, const char *name);
-
-#endif /* __SYNC_RWLOCK_H */

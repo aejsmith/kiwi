@@ -19,8 +19,7 @@
  * @brief               AMD64 local IRQ state control functions.
  */
 
-#ifndef __ARCH_LIRQ_H
-#define __ARCH_LIRQ_H
+#pragma once
 
 #include <types.h>
 
@@ -60,5 +59,3 @@ static inline bool local_irq_state(void) {
     __asm__ volatile("pushf; pop %0" : "=r"(flags));
     return (flags & (1 << 9)) ? true : false;
 }
-
-#endif /* __ARCH_LIRQ_H */

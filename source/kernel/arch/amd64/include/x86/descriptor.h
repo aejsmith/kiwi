@@ -19,8 +19,7 @@
  * @brief               x86 descriptor table functions.
  */
 
-#ifndef __X86_DESCRIPTOR_H
-#define __X86_DESCRIPTOR_H
+#pragma once
 
 /** Descriptor table sizes. */
 #define GDT_ENTRY_COUNT     7       /**< Total number of GDT entries. */
@@ -142,4 +141,3 @@ extern void descriptor_init(struct cpu *cpu);
 extern void idt_init(void);
 
 #endif /* __ASM__ */
-#endif /* __X86_DESCRIPTOR_H */

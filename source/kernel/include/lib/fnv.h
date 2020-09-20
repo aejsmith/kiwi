@@ -23,8 +23,7 @@
  *    http://www.isthe.com/chongo/tech/comp/fnv/
  */
 
-#ifndef __LIB_FNV_H
-#define __LIB_FNV_H
+#pragma once
 
 #include <types.h>
 
@@ -49,5 +48,3 @@
         } \
         __fnv_hash; \
     })
-
-#endif /* __LIB_FNV_H */

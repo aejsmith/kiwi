@@ -19,8 +19,7 @@
  * @brief               Directory handling functions.
  */
 
-#ifndef __SYSTEM_DIRENT_H
-#define __SYSTEM_DIRENT_H
+#pragma once
 
 #include <kernel/fs.h>
 #include <kernel/object.h>
@@ -37,5 +36,3 @@ struct __dstream_internal {
     handle_t handle;                /**< Handle to the directory. */
     char buf[DIRSTREAM_BUF_SIZE];   /**< Buffer for entry structures. */
 };
-
-#endif /* __SYSTEM_DIRENT_H */

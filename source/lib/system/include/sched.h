@@ -19,8 +19,7 @@
  * @brief               Scheduling definitions.
  */
 
-#ifndef __SCHED_H
-#define __SCHED_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -35,5 +34,3 @@ extern int sched_yield(void);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SCHED_H */

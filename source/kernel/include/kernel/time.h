@@ -19,8 +19,7 @@
  * @brief               Time functions.
  */
 
-#ifndef __KERNEL_TIME_H
-#define __KERNEL_TIME_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -49,5 +48,3 @@ extern status_t kern_time_set(unsigned source, nstime_t time);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_TIME_H */

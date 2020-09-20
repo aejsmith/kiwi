@@ -19,8 +19,7 @@
  * @brief               Kernel security definitions.
  */
 
-#ifndef __KERNEL_SECURITY_H
-#define __KERNEL_SECURITY_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -174,5 +173,3 @@ extern status_t kern_token_query(handle_t handle, security_context_t *ctx);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_SECURITY_H */

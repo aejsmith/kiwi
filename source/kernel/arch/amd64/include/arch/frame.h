@@ -19,8 +19,7 @@
  * @brief               AMD64 interrupt frame structure.
  */
 
-#ifndef __ARCH_FRAME_H
-#define __ARCH_FRAME_H
+#pragma once
 
 /** Interrupt frame structure offsets. */
 #define FRAME_OFF_R15       0x0
@@ -86,4 +85,3 @@ static inline bool frame_from_user(frame_t *frame) {
 }
 
 #endif /* __ASM__ */
-#endif /* __ARCH_FRAME_H */

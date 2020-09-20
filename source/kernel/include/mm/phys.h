@@ -19,8 +19,7 @@
  * @brief               Physical memory management.
  */
 
-#ifndef __MM_PHYS_H
-#define __MM_PHYS_H
+#pragma once
 
 #include <arch/page.h>
 
@@ -45,5 +44,3 @@ extern bool phys_copy(phys_ptr_t dest, phys_ptr_t source, unsigned mmflag);
 
 extern unsigned phys_memory_type(phys_ptr_t addr);
 extern void phys_set_memory_type(phys_ptr_t addr, phys_size_t size, unsigned type);
-
-#endif /* __MM_PHYS_H */

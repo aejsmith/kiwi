@@ -19,8 +19,7 @@
  * @brief               Kernel IPC interface.
  */
 
-#ifndef __IPC_IPC_H
-#define __IPC_IPC_H
+#pragma once
 
 #include <kernel/ipc.h>
 
@@ -167,5 +166,3 @@ extern void ipc_port_release(ipc_port_t *port);
 extern status_t ipc_port_publish(ipc_port_t *port, handle_t *_id, handle_t *_uid);
 
 extern void ipc_init(void);
-
-#endif /* __IPC_IPC_H */

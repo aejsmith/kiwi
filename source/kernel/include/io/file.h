@@ -19,8 +19,7 @@
  * @brief               File object interface.
  */
 
-#ifndef __IO_FILE_H
-#define __IO_FILE_H
+#pragma once
 
 #include <kernel/file.h>
 
@@ -182,5 +181,3 @@ extern status_t file_sync(object_handle_t *handle);
 extern status_t file_request(
     object_handle_t *handle, unsigned request, const void *in, size_t in_size,
     void **_out, size_t *_out_size);
-
-#endif /* __IO_FILE_H */

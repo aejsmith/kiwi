@@ -19,8 +19,7 @@
  * @brief               AMD64 FPU functions.
  */
 
-#ifndef __X86_FPU_H
-#define __X86_FPU_H
+#pragma once
 
 #include <x86/cpu.h>
 
@@ -91,5 +90,3 @@ static inline uint32_t x86_fpu_mxcsr(void) {
     __asm__ __volatile__("stmxcsr %0" : "+m" (mxcsr));
     return mxcsr;
 }
-
-#endif /* __X86_FPU_H */

@@ -19,8 +19,7 @@
  * @brief               ELF loader.
  */
 
-#ifndef __KERNEL_ELF_H
-#define __KERNEL_ELF_H
+#pragma once
 
 #include "../../lib/system/include/elf.h"
 
@@ -76,5 +75,3 @@ extern void elf_init(elf_image_t *image);
 
 extern void elf_process_clone(struct process *process, struct process *parent);
 extern void elf_process_cleanup(struct process *process);
-
-#endif /* __KERNEL_ELF_H */

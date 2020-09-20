@@ -19,8 +19,7 @@
  * @brief               Standard I/O functions.
  */
 
-#ifndef __STDIO_H
-#define __STDIO_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -162,5 +161,3 @@ extern int fsetpos(FILE *, const fpos_t *);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __STDIO_H */

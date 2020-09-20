@@ -19,8 +19,7 @@
  * @brief               Password functions/definitions.
  */
 
-#ifndef __PWD_H
-#define __PWD_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -48,5 +47,3 @@ extern void setpwent(void);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __PWD_H */

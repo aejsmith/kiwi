@@ -19,8 +19,7 @@
  * @brief               Access/modification time functions.
  */
 
-#ifndef __UTIME_H
-#define __UTIME_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -39,5 +38,3 @@ extern int utime(const char *path, const struct utimbuf *times);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __UTIME_H */

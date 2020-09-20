@@ -19,8 +19,7 @@
  * @brief               Condition variable implementation.
  */
 
-#ifndef __SYNC_CONDVAR_H
-#define __SYNC_CONDVAR_H
+#pragma once
 
 #include <sync/mutex.h>
 #include <sync/spinlock.h>
@@ -50,5 +49,3 @@ extern bool condvar_signal(condvar_t *cv);
 extern bool condvar_broadcast(condvar_t *cv);
 
 extern void condvar_init(condvar_t *cv, const char *name);
-
-#endif /* __SYNC_CONDVAR_H */

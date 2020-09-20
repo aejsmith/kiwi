@@ -19,8 +19,7 @@
  * @brief               Semaphore object.
  */
 
-#ifndef __KERNEL_SEMAPHORE_H
-#define __KERNEL_SEMAPHORE_H
+#pragma once
 
 #include <kernel/object.h>
 
@@ -38,5 +37,3 @@ extern status_t kern_semaphore_up(handle_t handle, size_t count);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_SEMAPHORE_H */

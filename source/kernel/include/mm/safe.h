@@ -19,8 +19,7 @@
  * @brief               Safe user memory access functions.
  */
 
-#ifndef __MM_SAFE_H
-#define __MM_SAFE_H
+#pragma once
 
 #include <mm/aspace.h>
 #include <mm/mm.h>
@@ -145,5 +144,3 @@ extern status_t __write_user64(void *ptr, const void *src);
 extern status_t __write_user32(void *ptr, const void *src);
 extern status_t __write_user16(void *ptr, const void *src);
 extern status_t __write_user8(void *ptr, const void *src);
-
-#endif /* __MM_SAFE_H */

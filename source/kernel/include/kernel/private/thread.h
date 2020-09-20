@@ -19,8 +19,7 @@
  * @brief               Internal thread functions/definitions.
  */
 
-#ifndef __KERNEL_PRIVATE_THREAD_H
-#define __KERNEL_PRIVATE_THREAD_H
+#pragma once
 
 #include <kernel/thread.h>
 
@@ -50,5 +49,3 @@ extern void _kern_thread_exit(int status) __attribute__((noreturn));
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_PRIVATE_THREAD_H */

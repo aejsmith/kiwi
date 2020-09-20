@@ -19,8 +19,7 @@
  * @brief               Service manager IPC protocol.
  */
 
-#ifndef TEST_PROTOCOL_H
-#define TEST_PROTOCOL_H
+#pragma once
 
 /** Service manager message IDs. */
 enum {
@@ -34,5 +33,3 @@ typedef struct test_request_ping {
     uint32_t index;
     char string[TEST_STRING_LEN];
 } test_request_ping_t;
-
-#endif /* TEST_PROTOCOL_H */

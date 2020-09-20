@@ -19,8 +19,7 @@
  * @brief               Kernel module loader.
  */
 
-#ifndef __MODULE_H
-#define __MODULE_H
+#pragma once
 
 #include <kernel/module.h>
 
@@ -105,5 +104,3 @@ extern bool symbol_lookup(const char *name, bool global, bool exported, symbol_t
 
 extern void module_early_init(void);
 extern void module_init(void);
-
-#endif /* __MODULE_H */

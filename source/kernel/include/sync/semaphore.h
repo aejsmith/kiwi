@@ -19,8 +19,7 @@
  * @brief               Semaphore implementation.
  */
 
-#ifndef __SYNC_SEMAPHORE_H
-#define __SYNC_SEMAPHORE_H
+#pragma once
 
 #include <lib/list.h>
 
@@ -58,5 +57,3 @@ extern status_t semaphore_down_etc(semaphore_t *sem, nstime_t timeout, unsigned 
 extern void semaphore_down(semaphore_t *sem);
 extern void semaphore_up(semaphore_t *sem, size_t count);
 extern void semaphore_init(semaphore_t *sem, const char *name, size_t initial);
-
-#endif /* __SYNC_SEMAPHORE_H */

@@ -19,8 +19,7 @@
  * @brief               Kernel limit definitions.
  */
 
-#ifndef __KERNEL_LIMITS_H
-#define __KERNEL_LIMITS_H
+#pragma once
 
 /** Process/threading limits. */
 #define PROCESS_ID_MAX      32767       /**< Highest possible process ID. */
@@ -41,5 +40,3 @@
 /** Kernel module limits. */
 #define MODULE_NAME_MAX     16          /** Maximum length of a module name. */
 #define MODULE_DESC_MAX     80          /** Maximum length of a module description. */
-
-#endif /* __KERNEL_LIMITS_H */

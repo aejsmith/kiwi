@@ -19,8 +19,7 @@
  * @brief               Bitmap implementation.
  */
 
-#ifndef __LIB_BITMAP_H
-#define __LIB_BITMAP_H
+#pragma once
 
 #include <lib/utility.h>
 
@@ -41,5 +40,3 @@ extern bool bitmap_test(const unsigned long *bitmap, unsigned long bit);
 extern long bitmap_ffs(const unsigned long *bitmap, size_t nbits);
 extern long bitmap_ffz(const unsigned long *bitmap, size_t nbits);
 extern long bitmap_next(const unsigned long *bitmap, size_t nbits, unsigned long current);
-
-#endif /* __LIB_BITMAP_H */

@@ -19,8 +19,7 @@
  * @brief               Futex functions.
  */
 
-#ifndef __KERNEL_FUTEX_H
-#define __KERNEL_FUTEX_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -36,5 +35,3 @@ extern status_t kern_futex_requeue(
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_FUTEX_H */

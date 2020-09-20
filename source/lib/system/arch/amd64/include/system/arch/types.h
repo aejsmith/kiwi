@@ -19,10 +19,7 @@
  * @brief               AMD64 type definitions.
  */
 
-#ifndef __SYSTEM_ARCH_TYPES_H
-#define __SYSTEM_ARCH_TYPES_H
+#pragma once
 
 /** Word size of the architecture. */
 #define __WORDSIZE 64
-
-#endif /* __SYSTEM_ARCH_TYPES_H */

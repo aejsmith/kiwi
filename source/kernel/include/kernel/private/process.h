@@ -19,8 +19,7 @@
  * @brief               Internal process functions/definitions.
  */
 
-#ifndef __KERNEL_PRIVATE_PROCESS_H
-#define __KERNEL_PRIVATE_PROCESS_H
+#pragma once
 
 #include <kernel/process.h>
 
@@ -57,5 +56,3 @@ extern process_id_t _kern_process_id(handle_t handle);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_PRIVATE_PROCESS_H */

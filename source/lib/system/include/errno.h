@@ -19,8 +19,7 @@
  * @brief               Error numbers definitions.
  */
 
-#ifndef __ERRNO_H
-#define __ERRNO_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -119,5 +118,3 @@ extern int *__errno_location(void);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __ERRNO_H */

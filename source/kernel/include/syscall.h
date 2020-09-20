@@ -19,8 +19,7 @@
  * @brief               System call dispatcher.
  */
 
-#ifndef __SYSCALL_H
-#define __SYSCALL_H
+#pragma once
 
 #include <types.h>
 
@@ -29,5 +28,3 @@ typedef struct __packed syscall {
     ptr_t addr;                 /**< Address of handler. */
     size_t count;               /**< Number of arguments. */
 } syscall_t;
-
-#endif /* __SYSCALL_H */

@@ -19,8 +19,7 @@
  * @brief               Memory allocation functions.
  */
 
-#ifndef __MM_MALLOC_H
-#define __MM_MALLOC_H
+#pragma once
 
 #include <mm/mm.h>
 
@@ -32,5 +31,3 @@ extern void *krealloc(void *addr, size_t size, unsigned mmflag) __malloc;
 extern void kfree(void *addr);
 
 extern void malloc_init(void);
-
-#endif /* __MM_MALLOC_H */

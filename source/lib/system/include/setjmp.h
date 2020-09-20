@@ -19,8 +19,7 @@
  * @brief               Non-local jump functions.
  */
 
-#ifndef __SETJMP_H
-#define __SETJMP_H
+#pragma once
 
 #include <system/arch/setjmp.h>
 #include <system/defs.h>
@@ -49,5 +48,3 @@ extern int sigsetjmp(sigjmp_buf env, int savemask);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SETJMP_H */

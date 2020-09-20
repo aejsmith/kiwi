@@ -19,8 +19,7 @@
  * @brief               AMD64 MMU context definitions.
  */
 
-#ifndef __ARCH_MMU_H
-#define __ARCH_MMU_H
+#pragma once
 
 #include <types.h>
 
@@ -40,5 +39,3 @@ typedef struct arch_mmu_context {
     ptr_t pages_to_invalidate[INVALIDATE_ARRAY_SIZE];
     size_t invalidate_count;
 } arch_mmu_context_t;
-
-#endif /* __ARCH_MMU_H */

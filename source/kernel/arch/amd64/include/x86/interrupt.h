@@ -19,8 +19,7 @@
  * @brief               x86 interrupt handling definitions.
  */
 
-#ifndef __X86_INTERRUPT_H
-#define __X86_INTERRUPT_H
+#pragma once
 
 #include <arch/frame.h>
 
@@ -52,5 +51,3 @@ typedef void (*interrupt_handler_t)(frame_t *frame);
 extern interrupt_handler_t interrupt_table[IDT_ENTRY_COUNT];
 
 extern void interrupt_init(void);
-
-#endif /* __X86_INTERRUPT_H */

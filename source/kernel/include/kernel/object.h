@@ -19,8 +19,7 @@
  * @brief               Kernel object management.
  */
 
-#ifndef __KERNEL_OBJECT_H
-#define __KERNEL_OBJECT_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -98,5 +97,3 @@ extern status_t kern_handle_close(handle_t handle);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_OBJECT_H */

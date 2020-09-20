@@ -19,8 +19,7 @@
  * @brief               I/O request API.
  */
 
-#ifndef __IO_REQUEST_H
-#define __IO_REQUEST_H
+#pragma once
 
 #include <kernel/file.h>
 
@@ -56,5 +55,3 @@ extern status_t io_request_init(
 extern void io_request_destroy(io_request_t *request);
 
 extern status_t io_request_copy(io_request_t *request, void *buf, size_t size);
-
-#endif /* __IO_REQUEST_H */

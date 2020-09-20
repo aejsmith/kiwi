@@ -23,8 +23,7 @@
  * interface for operations specific to that type, defined in a separate header.
  */
 
-#ifndef __KERNEL_FILE_H
-#define __KERNEL_FILE_H
+#pragma once
 
 #include <kernel/object.h>
 
@@ -125,5 +124,3 @@ extern status_t kern_file_request(
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_FILE_H */

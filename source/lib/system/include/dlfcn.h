@@ -19,8 +19,7 @@
  * @brief               Dynamic linking functions.
  */
 
-#ifndef __DLFCN_H
-#define __DLFCN_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,5 +49,3 @@ static inline int dladdr(void *addr, Dl_info *info) { return 0; }
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __DLFCN_H */

@@ -19,8 +19,7 @@
  * @brief               AMD64 bit operations.
  */
 
-#ifndef __ARCH_BITOPS_H
-#define __ARCH_BITOPS_H
+#pragma once
 
 #include <types.h>
 
@@ -64,5 +63,3 @@ static inline unsigned long fls(unsigned long value) {
     __asm__("bsr %1, %0" : "=r" (value) : "rm"(value) : "cc");
     return value;
 }
-
-#endif /* __ARCH_BITOPS_H */

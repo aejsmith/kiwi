@@ -19,8 +19,7 @@
  * @brief               CPU context structure.
  */
 
-#ifndef __KERNEL_CONTEXT_H
-#define __KERNEL_CONTEXT_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -63,5 +62,3 @@ typedef struct cpu_context {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_CONTEXT_H_ */

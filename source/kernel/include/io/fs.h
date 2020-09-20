@@ -19,8 +19,7 @@
  * @brief               Filesystem interface.
  */
 
-#ifndef __IO_FS_H
-#define __IO_FS_H
+#pragma once
 
 #include <io/file.h>
 
@@ -405,5 +404,3 @@ extern status_t fs_sync(void);
 
 extern void fs_init(void);
 extern void fs_shutdown(void);
-
-#endif /* __IO_FS_H */

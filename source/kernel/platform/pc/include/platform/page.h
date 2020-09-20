@@ -19,8 +19,7 @@
  * @brief               PC physical memory management definitions.
  */
 
-#ifndef __PLATFORM_PAGE_H
-#define __PLATFORM_PAGE_H
+#pragma once
 
 /** Number of free page lists. */
 #define PAGE_FREE_LIST_COUNT        3
@@ -38,5 +37,3 @@
 #define PAGE_FREE_LIST_ABOVE4G      0
 #define PAGE_FREE_LIST_BELOW4G      1
 #define PAGE_FREE_LIST_BELOW16M     2
-
-#endif /* __PLATFORM_PAGE_H */

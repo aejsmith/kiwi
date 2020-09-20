@@ -19,8 +19,7 @@
  * @brief               Programmable Interrupt Controller code.
  */
 
-#ifndef __PC_PIC_H
-#define __PC_PIC_H
+#pragma once
 
 /** PIC port definitions. */
 #define PIC_MASTER_COMMAND  0x20    /**< Command port (Master). */
@@ -42,5 +41,3 @@
 #define PIC_ICW4_8086       (1<<0)  /**< Should operate in 80x86 mode. */
 
 extern void pic_init(void);
-
-#endif /* __PC_PIC_H */

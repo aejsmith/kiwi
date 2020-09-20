@@ -19,8 +19,7 @@
  * @brief               Virtual memory manager.
  */
 
-#ifndef __MM_VM_H
-#define __MM_VM_H
+#pragma once
 
 #include <arch/page.h>
 
@@ -153,5 +152,3 @@ extern vm_aspace_t *vm_aspace_clone(vm_aspace_t *parent);
 extern void vm_aspace_destroy(vm_aspace_t *as);
 
 extern void vm_init(void);
-
-#endif /* __MM_VM_H */

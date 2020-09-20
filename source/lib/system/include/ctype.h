@@ -19,8 +19,7 @@
  * @brief               Character type functions.
  */
 
-#ifndef __CTYPE_H
-#define __CTYPE_H
+#pragma once
 
 #include <locale.h>
 
@@ -71,5 +70,3 @@ extern int toupper_l(int, locale_t);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __CTYPE_H */

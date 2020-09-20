@@ -19,8 +19,7 @@
  * @brief               Character type functions.
  */
 
-#ifndef __LIB_CTYPE_H
-#define __LIB_CTYPE_H
+#pragma once
 
 /** Test if a character is lower-case.
  * @param ch            Character to test.
@@ -156,5 +155,3 @@ static inline int toupper(int ch) {
 
 #define _tolower(ch)    ((ch) | 0x20)
 #define _toupper(ch)    ((ch) & ~0x20)
-
-#endif /* __LIB_CTYPE_H */

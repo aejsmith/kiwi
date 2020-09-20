@@ -19,8 +19,7 @@
  * @brief               AMD64 CPU management.
  */
 
-#ifndef __ARCH_CPU_H
-#define __ARCH_CPU_H
+#pragma once
 
 #include <x86/descriptor.h>
 
@@ -92,5 +91,3 @@ static inline void arch_cpu_spin_hint(void) {
 static inline void arch_cpu_invalidate_caches(void) {
     __asm__ volatile("wbinvd");
 }
-
-#endif /* __ARCH_CPU_H */

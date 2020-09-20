@@ -19,8 +19,7 @@
  * @brief               POSIX time functions/definitions.
  */
 
-#ifndef __SYS_TIME_H
-#define __SYS_TIME_H
+#pragma once
 
 //#include <sys/select.h>
 #include <sys/types.h>
@@ -40,5 +39,3 @@ extern int gettimeofday(struct timeval *tv, void *tz);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SYS_TIME_H */

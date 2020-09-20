@@ -19,8 +19,7 @@
  * @brief               Process management functions.
  */
 
-#ifndef __PROC_PROCESS_H
-#define __PROC_PROCESS_H
+#pragma once
 
 #include <io/context.h>
 
@@ -134,5 +133,3 @@ extern status_t process_create(
 
 extern void process_init(void);
 extern void process_shutdown(void);
-
-#endif /* __PROC_PROCESS_H */

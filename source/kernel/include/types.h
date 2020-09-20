@@ -19,8 +19,7 @@
  * @brief               Type definitions.
  */
 
-#ifndef __TYPES_H
-#define __TYPES_H
+#pragma once
 
 #include <compiler.h>
 #include <stdalign.h>
@@ -133,5 +132,3 @@ typedef uint32_t page_num_t;            /**< Integer type representing a number 
 #include <arch/types.h>
 
 #include <kernel/types.h>
-
-#endif /* __TYPES_H */

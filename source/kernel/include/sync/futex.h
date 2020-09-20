@@ -19,13 +19,10 @@
  * @brief               Futex implementation.
  */
 
-#ifndef __SYNC_FUTEX_H
-#define __SYNC_FUTEX_H
+#pragma once
 
 #include <kernel/futex.h>
 
 struct process;
 
 extern void futex_process_cleanup(struct process *proc);
-
-#endif /* __SYNC_FUTEX_H */

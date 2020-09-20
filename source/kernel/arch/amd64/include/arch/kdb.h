@@ -19,11 +19,8 @@
  * @brief               AMD64 kernel debugger definitions.
  */
 
-#ifndef __ARCH_KDB_H
-#define __ARCH_KDB_H
+#pragma once
 
 /** Number of breakpoints supported. */
 #define KDB_BREAKPOINT_COUNT    4
 #define KDB_WATCHPOINT_COUNT    4
-
-#endif /* __ARCH_KDB_H */

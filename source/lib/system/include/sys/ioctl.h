@@ -19,8 +19,7 @@
  * @brief               Device control function.
  */
 
-#ifndef __SYS_IOCTL_H
-#define __SYS_IOCTL_H
+#pragma once
 
 /** Some things that use this expect termios.h to be included by it. */
 #include <termios.h>
@@ -34,5 +33,3 @@ extern int ioctl(int fd, int request, ...);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SYS_IOCTL_H */

@@ -19,8 +19,7 @@
  * @brief               Standard I/O private functions.
  */
 
-#ifndef __SYSTEM_STDIO_H
-#define __SYSTEM_STDIO_H
+#pragma once
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -54,5 +53,3 @@ extern int do_printf(
     ...) __sys_hidden;
 
 extern int do_scanf(struct scanf_args *data, const char *restrict fmt, va_list args) __sys_hidden;
-
-#endif /* __SYSTEM_STDIO_H */

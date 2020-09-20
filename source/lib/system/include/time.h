@@ -19,8 +19,7 @@
  * @brief               Time functions.
  */
 
-#ifndef __TIME_H
-#define __TIME_H
+#pragma once
 
 #include <sys/types.h>
 #define __need_NULL
@@ -86,5 +85,3 @@ extern size_t strftime_l(
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __TIME_H */

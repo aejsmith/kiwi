@@ -19,8 +19,7 @@
  * @brief               Event notification system.
  */
 
-#ifndef __LIB_NOTIFIER_H
-#define __LIB_NOTIFIER_H
+#pragma once
 
 #include <sync/mutex.h>
 
@@ -62,5 +61,3 @@ extern bool notifier_run_unsafe(notifier_t *notifier, void *data, bool destroy);
 extern bool notifier_run(notifier_t *notifier, void *data, bool destroy);
 extern void notifier_register(notifier_t *notifier, notifier_func_t func, void *data);
 extern void notifier_unregister(notifier_t *notifier, notifier_func_t func, void *data);
-
-#endif /* __LIB_NOTIFIER_H */

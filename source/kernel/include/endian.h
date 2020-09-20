@@ -19,8 +19,7 @@
  * @brief               Endian conversion functions.
  */
 
-#ifndef __ENDIAN_H
-#define __ENDIAN_H
+#pragma once
 
 #include <types.h>
 
@@ -94,5 +93,3 @@ static inline uint64_t byte_order_swap64(uint64_t val) {
 #else
 #   error "__BYTE_ORDER__ is not defined"
 #endif
-
-#endif /* __ENDIAN_H */

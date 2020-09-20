@@ -19,8 +19,7 @@
  * @brief               POSIX file information functions.
  */
 
-#ifndef __SYS_STAT_H
-#define __SYS_STAT_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -100,5 +99,3 @@ extern mode_t umask(mode_t mask);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SYS_STAT_H */

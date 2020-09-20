@@ -19,8 +19,7 @@
  * @brief               Fixed size integer types.
  */
 
-#ifndef __INTTYPES_H
-#define __INTTYPES_H
+#pragma once
 
 #include <system/arch/types.h>
 
@@ -282,5 +281,3 @@ typedef struct {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __INTTYPES_H */

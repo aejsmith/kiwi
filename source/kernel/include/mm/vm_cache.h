@@ -19,8 +19,7 @@
  * @brief               Page-based data cache.
  */
 
-#ifndef __MM_VM_CACHE_H
-#define __MM_VM_CACHE_H
+#pragma once
 
 #include <lib/avl_tree.h>
 
@@ -81,5 +80,3 @@ extern vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *dat
 extern status_t vm_cache_destroy(vm_cache_t *cache, bool discard);
 
 extern void vm_cache_init(void);
-
-#endif /* __MM_VM_CACHE_H */

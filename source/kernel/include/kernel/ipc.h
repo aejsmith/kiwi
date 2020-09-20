@@ -19,8 +19,7 @@
  * @brief               Inter-Process Communication (IPC) interface.
  */
 
-#ifndef __KERNEL_IPC_H
-#define __KERNEL_IPC_H
+#pragma once
 
 #include <kernel/object.h>
 #include <kernel/security.h>
@@ -84,5 +83,3 @@ extern status_t kern_connection_receive_handle(handle_t handle, handle_t *_attac
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_IPC_H */

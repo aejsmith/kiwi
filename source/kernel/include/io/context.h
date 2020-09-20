@@ -19,8 +19,7 @@
  * @brief               I/O context functions.
  */
 
-#ifndef __IO_CONTEXT_H
-#define __IO_CONTEXT_H
+#pragma once
 
 #include <sync/rwlock.h>
 
@@ -36,5 +35,3 @@ typedef struct io_context {
 
 extern void io_process_init(struct process *process, struct process *parent);
 extern void io_process_cleanup(struct process *process);
-
-#endif /* __IO_CONTEXT_H */

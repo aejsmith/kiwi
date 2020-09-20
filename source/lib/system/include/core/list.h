@@ -19,8 +19,7 @@
  * @brief               Circular doubly-linked list implementation.
  */
 
-#ifndef __CORE_LIST_H
-#define __CORE_LIST_H
+#pragma once
 
 #include <stdbool.h>
 #define __need_offsetof
@@ -224,5 +223,3 @@ static inline void core_list_splice_after(core_list_t *position, core_list_t *li
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __CORE_LIST_H */

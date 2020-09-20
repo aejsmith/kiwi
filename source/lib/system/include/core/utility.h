@@ -19,8 +19,7 @@
  * @brief               Utility functions.
  */
 
-#ifndef __CORE_UTILITY_H
-#define __CORE_UTILITY_H
+#pragma once
 
 #include <assert.h>
 #include <stddef.h>
@@ -99,5 +98,3 @@
         const typeof(((type *)0)->member) *__mptr = ptr; \
         (type *)((char *)__mptr - offsetof(type, member)); \
     })
-
-#endif /* __CORE_UTILITY_H */

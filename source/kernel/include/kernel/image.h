@@ -19,8 +19,7 @@
  * @brief               Library image loader.
  */
 
-#ifndef __KERNEL_IMAGE_H
-#define __KERNEL_IMAGE_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -33,5 +32,3 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_IMAGE_H */

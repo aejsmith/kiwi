@@ -20,8 +20,7 @@
  * @brief               POSIX signal functions.
  */
 
-#ifndef __SIGNAL_H
-#define __SIGNAL_H
+#pragma once
 
 #include <kernel/context.h>
 
@@ -220,5 +219,3 @@ extern int sigsuspend(const sigset_t *mask);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SIGNAL_H */

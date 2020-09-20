@@ -19,8 +19,7 @@
  * @brief               POSIX standard symbolic constants and types.
  */
 
-#ifndef __UNISTD_H
-#define __UNISTD_H
+#pragma once
 
 #include <system/arch/unistd.h>
 
@@ -139,5 +138,3 @@ extern ssize_t write(int fd, const void *buf, size_t count);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __UNISTD_H */

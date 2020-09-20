@@ -19,8 +19,7 @@
  * @brief               Deferred procedure call functions.
  */
 
-#ifndef __DPC_H
-#define __DPC_H
+#pragma once
 
 /** Handler function for a DPC.
  * @param arg           Argument passed to dpc_run(). */
@@ -29,5 +28,3 @@ typedef void (*dpc_function_t)(void *arg);
 extern void dpc_request(dpc_function_t func, void *arg);
 extern bool dpc_inited(void);
 extern void dpc_init(void);
-
-#endif /* __DPC_H */

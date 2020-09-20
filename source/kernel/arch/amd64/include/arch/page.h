@@ -19,8 +19,7 @@
  * @brief               AMD64 paging definitions.
  */
 
-#ifndef __ARCH_PAGE_H
-#define __ARCH_PAGE_H
+#pragma once
 
 /** Page size definitions. */
 #define PAGE_WIDTH          12          /**< Width of a page in bits. */
@@ -33,5 +32,3 @@
 
 /** Mask to clear page offset and unsupported bits from a physical address. */
 #define PHYS_PAGE_MASK      0x000000fffffff000l
-
-#endif /* __ARCH_PAGE_H */

@@ -19,8 +19,7 @@
  * @brief               Spinlock implementation.
  */
 
-#ifndef __SYNC_SPINLOCK_H
-#define __SYNC_SPINLOCK_H
+#pragma once
 
 #include <lib/atomic.h>
 
@@ -56,5 +55,3 @@ extern void spinlock_unlock(spinlock_t *lock);
 extern void spinlock_unlock_noirq(spinlock_t *lock);
 
 extern void spinlock_init(spinlock_t *lock, const char *name);
-
-#endif /* __SYNC_SPINLOCK_H */

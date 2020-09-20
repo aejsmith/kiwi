@@ -19,8 +19,7 @@
  * @brief               PC Programmable Interval Timer code.
  */
 
-#ifndef __PC_PIT_H
-#define __PC_PIT_H
+#pragma once
 
 /** Base frequency of the PIT. */
 #define PIT_BASE_FREQUENCY      1193182
@@ -35,5 +34,3 @@
 #define PIT_CHAN2               0x42
 
 extern void pit_init(void);
-
-#endif /* __PC_PIT_H */

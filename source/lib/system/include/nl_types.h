@@ -19,8 +19,7 @@
  * @brief               Native language support data types.
  */
 
-#ifndef __NL_TYPES_H
-#define __NL_TYPES_H
+#pragma once
 
 #include <locale.h>
 #include <stdarg.h>
@@ -56,5 +55,3 @@ extern nl_catd catopen(const char *, int);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __NL_TYPES_H */

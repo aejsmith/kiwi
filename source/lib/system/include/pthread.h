@@ -19,8 +19,7 @@
  * @brief               POSIX threads.
  */
 
-#ifndef __PTHREAD_H
-#define __PTHREAD_H
+#pragma once
 
 #include <system/pthread.h>
 
@@ -205,5 +204,3 @@ extern int pthread_join(pthread_t, void **);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __PTHREAD_H */

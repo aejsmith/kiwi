@@ -19,8 +19,7 @@
  * @brief               Virtual memory management.
  */
 
-#ifndef __KERNEL_VM_H
-#define __KERNEL_VM_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -51,5 +50,3 @@ extern status_t kern_vm_unmap(void *start, size_t size);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_VM_H */

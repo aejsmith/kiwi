@@ -19,8 +19,7 @@
  * @brief               Path manipulation functions.
  */
 
-#ifndef __CORE_PATH_H
-#define __CORE_PATH_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,5 +31,3 @@ extern char *core_path_dirname(const char *path);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __CORE_PATH_H */

@@ -19,8 +19,7 @@
  * @brief               AMD64 setjmp definitions.
  */
 
-#ifndef __SYSTEM_ARCH_SETJMP_H
-#define __SYSTEM_ARCH_SETJMP_H
+#pragma once
 
 /**
  * Jump buffer size.
@@ -36,5 +35,3 @@
  *  jmp_buf[7] = r15
  */
 #define JMP_BUF_SIZE 8
-
-#endif /* __SYSTEM_ARCH_SETJMP_H */

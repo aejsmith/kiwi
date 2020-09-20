@@ -19,8 +19,7 @@
  * @brief               Thread management code.
  */
 
-#ifndef __PROC_THREAD_H
-#define __PROC_THREAD_H
+#pragma once
 
 #include <arch/setjmp.h>
 #include <arch/thread.h>
@@ -229,5 +228,3 @@ extern status_t thread_create(
 extern void thread_run(thread_t *thread);
 
 extern void thread_init(void);
-
-#endif /* __PROC_THREAD_H */

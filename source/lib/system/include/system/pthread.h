@@ -22,8 +22,7 @@
  *  - Make all of these opaque structures?
  */
 
-#ifndef __SYSTEM_PTHREAD_H
-#define __SYSTEM_PTHREAD_H
+#pragma once
 
 #include <core/mutex.h>
 
@@ -81,5 +80,3 @@ typedef int32_t pthread_attr_t;
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SYSTEM_PTHREAD_H */

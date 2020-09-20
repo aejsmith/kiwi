@@ -19,8 +19,7 @@
  * @brief               ACPI structures/definitions.
  */
 
-#ifndef __PC_ACPI_H
-#define __PC_ACPI_H
+#pragma once
 
 #include <types.h>
 
@@ -102,5 +101,3 @@ extern bool acpi_supported;
 
 extern acpi_header_t *acpi_table_find(const char *signature);
 extern void acpi_init(void);
-
-#endif /* __PC_ACPI_H */

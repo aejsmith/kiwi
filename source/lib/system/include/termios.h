@@ -19,8 +19,7 @@
  * @brief               Terminal control functions.
  */
 
-#ifndef __TERMIOS_H
-#define __TERMIOS_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -181,5 +180,3 @@ extern int tcsetattr(int fd, int action, const struct termios *tio);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __TERMIOS_H */

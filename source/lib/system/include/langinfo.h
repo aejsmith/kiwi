@@ -19,8 +19,7 @@
  * @brief               Locale functions/definitions.
  */
 
-#ifndef __LANGINFO_H
-#define __LANGINFO_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,5 +30,3 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __LANGINFO_H */

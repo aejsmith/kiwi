@@ -19,8 +19,7 @@
  * @brief               User context definition.
  */
 
-#ifndef __UCONTEXT_H
-#define __UCONTEXT_H
+#pragma once
 
 #include <signal.h>
 
@@ -36,5 +35,3 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __UCONTEXT_H */

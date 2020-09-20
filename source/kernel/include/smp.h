@@ -19,8 +19,7 @@
  * @brief               Symmetric Multi-Processing (SMP) support.
  */
 
-#ifndef __SMP_H
-#define __SMP_H
+#pragma once
 
 #include <cpu.h>
 #include <kernel.h>
@@ -90,5 +89,3 @@ static inline void smp_init(void) {}
 static inline void smp_boot(void) {}
 
 #endif /* CONFIG_SMP */
-
-#endif /* __SMP_H */

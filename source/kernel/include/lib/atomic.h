@@ -19,8 +19,7 @@
  * @brief               Atomic operations.
  */
 
-#ifndef __LIB_ATOMIC_H
-#define __LIB_ATOMIC_H
+#pragma once
 
 #include <arch/atomic.h>
 
@@ -85,5 +84,3 @@ static inline int64_t atomic_dec64(atomic64_t *var) {
 }
 
 #endif /* CONFIG_64BIT */
-
-#endif /* __LIB_ATOMIC_H */

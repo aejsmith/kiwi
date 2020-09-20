@@ -19,8 +19,7 @@
  * @brief               Security helper functions.
  */
 
-#ifndef __SECURITY_SECURITY_H
-#define __SECURITY_SECURITY_H
+#pragma once
 
 #include <security/token.h>
 
@@ -56,5 +55,3 @@ static inline bool security_check_priv(unsigned priv) {
 
     return security_context_has_priv(&token->ctx, priv);
 }
-
-#endif /* __SECURITY_SECURITY_H */

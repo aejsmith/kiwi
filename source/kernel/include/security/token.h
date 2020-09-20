@@ -19,8 +19,7 @@
  * @brief               Security tokens.
  */
 
-#ifndef __SECURITY_TOKEN_H
-#define __SECURITY_TOKEN_H
+#pragma once
 
 #include <kernel/security.h>
 
@@ -52,5 +51,3 @@ extern token_t *token_current(void);
 extern status_t token_publish(token_t *token, handle_t *_id, handle_t *_uid);
 
 extern void token_init(void);
-
-#endif /* __SECURITY_TOKEN_H */

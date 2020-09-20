@@ -19,8 +19,7 @@
  * @brief               Filesystem functions/definitions.
  */
 
-#ifndef __KERNEL_FS_H
-#define __KERNEL_FS_H
+#pragma once
 
 #include <kernel/file.h>
 #include <kernel/limits.h>
@@ -77,5 +76,3 @@ extern status_t kern_fs_sync(void);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_FS_H */

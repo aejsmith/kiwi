@@ -19,8 +19,7 @@
  * @brief               Automatically freed allocation function.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,5 +31,3 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __ALLOCA_H */

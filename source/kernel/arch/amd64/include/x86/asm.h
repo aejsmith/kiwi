@@ -19,8 +19,7 @@
  * @brief               x86 assembly code definitions.
  */
 
-#ifndef __X86_ASM_H
-#define __X86_ASM_H
+#pragma once
 
 #ifndef __ASM__
 # error "What are you doing?"
@@ -45,5 +44,3 @@
 #define SYMBOL(name) \
     .global name; \
     name:
-
-#endif /* __X86_ASM_H */

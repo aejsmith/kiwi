@@ -19,8 +19,7 @@
  * @brief               POSIX process waiting functions.
  */
 
-#ifndef __SYS_WAIT_H
-#define __SYS_WAIT_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -51,5 +50,3 @@ extern pid_t waitpid(pid_t pid, int *_status, int flags);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SYS_WAIT_H */

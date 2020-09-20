@@ -19,8 +19,7 @@
  * @brief               Locale functions/definitions.
  */
 
-#ifndef __LOCALE_H
-#define __LOCALE_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -98,5 +97,3 @@ extern locale_t newlocale(int, const char *, locale_t);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __LOCALE_H */

@@ -19,8 +19,7 @@
  * @brief               Mutex implementation.
  */
 
-#ifndef __CORE_MUTEX_H
-#define __CORE_MUTEX_H
+#pragma once
 
 #include <system/defs.h>
 
@@ -76,5 +75,3 @@ static inline void __core_mutex_unlockp(void *p) {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __CORE_MUTEX_H */

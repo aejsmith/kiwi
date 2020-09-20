@@ -19,8 +19,7 @@
  * @brief               Kernel library header.
  */
 
-#ifndef __LIBKERNEL_H
-#define __LIBKERNEL_H
+#pragma once
 
 #include <core/list.h>
 #include <core/utility.h>
@@ -125,5 +124,3 @@ extern void tls_destroy(tls_tcb_t *tcb);
 
 extern void libkernel_init(process_args_t *args) __sys_noreturn;
 extern void libkernel_abort(void) __sys_noreturn;
-
-#endif /* __LIBKERNEL_H */

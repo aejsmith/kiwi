@@ -19,8 +19,7 @@
  * @brief               x86 port I/O functions.
  */
 
-#ifndef __ARCH_IO_H
-#define __ARCH_IO_H
+#pragma once
 
 #include <types.h>
 
@@ -98,5 +97,3 @@ static inline void in16s(uint16_t port, size_t count, uint16_t *buf) {
         : "d"(port), "0"(count), "1"(buf)
         : "memory");
 }
-
-#endif /* __ARCH_IO_H */

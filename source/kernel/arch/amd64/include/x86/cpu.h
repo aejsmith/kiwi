@@ -19,8 +19,7 @@
  * @brief               x86 CPU management.
  */
 
-#ifndef __X86_CPU_H
-#define __X86_CPU_H
+#pragma once
 
 /** Flags in the CR0 Control Register. */
 #define X86_CR0_PE              (1<<0)      /**< Protected Mode Enable. */
@@ -379,4 +378,3 @@ static inline void x86_invlpg(ptr_t addr) {
 extern uint64_t calculate_frequency(uint64_t (*func)());
 
 #endif /* __ASM__ */
-#endif /* __X86_CPU_H */

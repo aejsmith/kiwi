@@ -19,8 +19,7 @@
  * @brief               x86 local APIC definitions.
  */
 
-#ifndef __X86_LAPIC_H
-#define __X86_LAPIC_H
+#pragma once
 
 #include <types.h>
 
@@ -103,5 +102,3 @@ extern void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector);
 
 extern void lapic_init_percpu(void);
 extern void lapic_init(void);
-
-#endif /* __X86_LAPIC_H */

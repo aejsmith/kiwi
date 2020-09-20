@@ -19,8 +19,7 @@
  * @brief               Mutex implementation.
  */
 
-#ifndef __SYNC_MUTEX_H
-#define __SYNC_MUTEX_H
+#pragma once
 
 #include <lib/atomic.h>
 #include <lib/list.h>
@@ -78,5 +77,3 @@ extern status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, unsigned flags);
 extern void mutex_lock(mutex_t *lock);
 extern void mutex_unlock(mutex_t *lock);
 extern void mutex_init(mutex_t *lock, const char *name, unsigned flags);
-
-#endif /* __SYNC_MUTEX_H */

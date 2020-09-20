@@ -19,8 +19,7 @@
  * @brief               File map functions.
  */
 
-#ifndef __IO_FILE_MAP_H
-#define __IO_FILE_MAP_H
+#pragma once
 
 #include <lib/avl_tree.h>
 #include <lib/bitmap.h>
@@ -81,5 +80,3 @@ extern status_t file_map_read_page(
     struct vm_cache *cache, void *buf, offset_t offset, bool nonblock);
 extern status_t file_map_write_page(
     struct vm_cache *cache, const void *buf, offset_t offset, bool nonblock);
-
-#endif /* __IO_FILE_MAP_H */

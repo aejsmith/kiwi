@@ -19,8 +19,7 @@
  * @brief               Slab allocator.
  */
 
-#ifndef __MM_SLAB_H
-#define __MM_SLAB_H
+#pragma once
 
 #include <arch/page.h>
 
@@ -119,5 +118,3 @@ extern void slab_cache_destroy(slab_cache_t *cache);
 
 extern void slab_init(void);
 extern void slab_late_init(void);
-
-#endif /* __MM_SLAB_H */

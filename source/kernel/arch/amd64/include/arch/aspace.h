@@ -28,8 +28,7 @@
  *  0xffffffff80000000-0xffffffffffffffff - 2GB   - Kernel image/modules.
  */
 
-#ifndef __ARCH_ASPACE_H
-#define __ARCH_ASPACE_H
+#pragma once
 
 /** Memory layout definitions. */
 #define USER_BASE           0x0000000000000000  /**< User address space base. */
@@ -54,5 +53,3 @@ extern char __data_seg_start[], __data_seg_end[];
 extern char __init_seg_start[], __init_seg_end[];
 extern char __ap_trampoline_start[], __ap_trampoline_end[];
 #endif
-
-#endif /* __ARCH_ASPACE_H */

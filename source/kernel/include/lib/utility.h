@@ -19,8 +19,7 @@
  * @brief               Utility functions/macros.
  */
 
-#ifndef __LIB_UTILITY_H
-#define __LIB_UTILITY_H
+#pragma once
 
 #include <arch/bitops.h>
 
@@ -173,5 +172,3 @@ static inline bool checksum_range(void *start, size_t size) {
 }
 
 extern void qsort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
-
-#endif /* __LIB_UTILITY_H */

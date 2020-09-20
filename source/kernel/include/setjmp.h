@@ -19,8 +19,7 @@
  * @brief               Non-local jump functions.
  */
 
-#ifndef __SETJMP_H
-#define __SETJMP_H
+#pragma once
 
 #include <arch/setjmp.h>
 #include <types.h>
@@ -41,5 +40,3 @@ extern int setjmp(jmp_buf buf);
  * @param buf           Buffer to restore.
  * @param val           Value to return from setjmp(). */
 extern void longjmp(jmp_buf buf, int val) __noreturn;
-
-#endif /* __SETJMP_H */

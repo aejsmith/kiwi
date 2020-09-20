@@ -19,8 +19,7 @@
  * @brief               Kernel object manager.
  */
 
-#ifndef __OBJECT_H
-#define __OBJECT_H
+#pragma once
 
 #include <kernel/object.h>
 
@@ -146,5 +145,3 @@ extern void object_event_signal(object_event_t *event, unsigned long data);
 extern void object_event_notifier(void *arg1, void *arg2, void *arg3);
 
 extern void object_init(void);
-
-#endif /* __OBJECT_H */

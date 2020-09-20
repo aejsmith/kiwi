@@ -51,8 +51,7 @@
  * @brief		Math functions.
  */
 
-#ifndef __MATH_H
-#define __MATH_H
+#pragma once
 
 #include <sys/types.h>
 #include <limits.h>
@@ -519,5 +518,3 @@ extern double infnan(int);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __MATH_H */

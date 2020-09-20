@@ -19,8 +19,7 @@
  * @brief               String functions.
  */
 
-#ifndef __STRINGS_H
-#define __STRINGS_H
+#pragma once
 
 #include <string.h>
 
@@ -42,5 +41,3 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __STRINGS_H */

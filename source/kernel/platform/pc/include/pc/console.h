@@ -19,8 +19,7 @@
  * @brief               PC console code.
  */
 
-#ifndef __PC_CONSOLE_H
-#define __PC_CONSOLE_H
+#pragma once
 
 /** Convert the serial port number from the configuration to a port number. */
 #if CONFIG_PC_SERIAL_PORT == 1
@@ -64,5 +63,3 @@
 #define RIGHT_SHIFT         0x36
 
 extern void i8042_init(void);
-
-#endif /* __PC_CONSOLE_H */

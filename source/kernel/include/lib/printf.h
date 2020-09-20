@@ -19,8 +19,7 @@
  * @brief               Formatted output function.
  */
 
-#ifndef __LIB_PRINTF_H
-#define __LIB_PRINTF_H
+#pragma once
 
 #include <types.h>
 
@@ -29,5 +28,3 @@ typedef void (*printf_helper_t)(char, void *, int *);
 
 extern int do_vprintf(printf_helper_t helper, void *data, const char *fmt, va_list args);
 extern int do_printf(printf_helper_t helper, void *data, const char *fmt, ...);
-
-#endif /* __LIB_PRINTF_H */

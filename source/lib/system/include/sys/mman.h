@@ -19,8 +19,7 @@
  * @brief               Memory management functions.
  */
 
-#ifndef __SYS_MMAN_H
-#define __SYS_MMAN_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -58,5 +57,3 @@ extern int munmap(void *start, size_t size);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SYS_MMAN_H */

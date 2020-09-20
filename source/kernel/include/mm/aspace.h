@@ -19,8 +19,7 @@
  * @brief               Address space layout definitions.
  */
 
-#ifndef __MM_ASPACE_H
-#define __MM_ASPACE_H
+#pragma once
 
 #include <arch/aspace.h>
 
@@ -47,5 +46,3 @@
 #ifndef __ASM__
 extern char __end[];
 #endif
-
-#endif /* __MM_ASPACE_H */

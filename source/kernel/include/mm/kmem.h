@@ -19,8 +19,7 @@
  * @brief               Kernel virtual memory allocator.
  */
 
-#ifndef __MM_KMEM_H
-#define __MM_KMEM_H
+#pragma once
 
 #include <arch/page.h>
 
@@ -37,5 +36,3 @@ extern void kmem_unmap(void *addr, size_t size, bool shared);
 
 extern void kmem_init(void);
 extern void kmem_late_init(void);
-
-#endif /* __MM_KMEM_H */

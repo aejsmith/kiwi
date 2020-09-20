@@ -19,8 +19,7 @@
  * @brief               String functions.
  */
 
-#ifndef __STRING_H
-#define __STRING_H
+#pragma once
 
 #define __need_size_t
 #define __need_NULL
@@ -80,5 +79,3 @@ extern size_t strxfrm_l(char *__restrict, const char *__restrict, size_t, locale
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __STRING_H */

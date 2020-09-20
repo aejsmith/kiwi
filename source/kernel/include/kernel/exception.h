@@ -19,8 +19,7 @@
  * @brief               Exception handling definitions.
  */
 
-#ifndef __KERNEL_EXCEPTION_H
-#define __KERNEL_EXCEPTION_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -83,5 +82,3 @@ typedef void (*exception_handler_t)(exception_info_t *info, struct thread_contex
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_EXCEPTION_H */

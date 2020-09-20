@@ -19,12 +19,7 @@
  * @brief               AMD64 ELF definitions.
  */
 
-#ifndef __ARCH_ELF_H
-#define __ARCH_ELF_H
-
-#ifndef __ELF_H
-# error "Do not include this file directly; use elf.h instead"
-#endif
+#pragma once
 
 /** Definitions of ELF machine type, endianness, etc. */
 #define ELF_MACHINE ELF_EM_X86_64   /**< ELF machine (x86_64). */
@@ -39,5 +34,3 @@ typedef Elf64_Sym  elf_sym_t;       /**< ELF symbol structure. */
 typedef Elf64_Addr elf_addr_t;      /**< ELF address type. */
 typedef Elf64_Rel  elf_rel_t;       /**< ELF REL type. */
 typedef Elf64_Rela elf_rela_t;      /**< ELF RELA type. */
-
-#endif /* __ARCH_ELF_H */

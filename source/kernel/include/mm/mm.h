@@ -19,8 +19,7 @@
  * @brief               Memory management core definitions.
  */
 
-#ifndef __MM_MM_H
-#define __MM_MM_H
+#pragma once
 
 /** Memory allocation behaviour flags. */
 #define MM_NOWAIT       0       /**< Attempt to reclaim memory, but don't wait if none available. */
@@ -55,5 +54,3 @@
 
 /** Mask to select only generic allocation flags. */
 #define MM_FLAG_MASK    (MM_WAIT | MM_ATOMIC | MM_BOOT)
-
-#endif /* __MM_MM_H */

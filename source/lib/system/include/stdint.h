@@ -19,8 +19,7 @@
  * @brief               Standard integer definitions.
  */
 
-#ifndef __STDINT_H
-#define __STDINT_H
+#pragma once
 
 #include <system/arch/types.h>
 
@@ -179,5 +178,3 @@ typedef uint64_t uintmax_t;
 #define UINTMAX_C(x)        __UINT64_C(x)
 
 #endif
-
-#endif /* __STDINT_H */

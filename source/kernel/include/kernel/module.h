@@ -19,8 +19,7 @@
  * @brief               Kernel module functions.
  */
 
-#ifndef __KERNEL_MODULE_H
-#define __KERNEL_MODULE_H
+#pragma once
 
 #include <kernel/limits.h>
 #include <kernel/types.h>
@@ -43,5 +42,3 @@ extern status_t kern_module_info(module_info_t *_info, size_t *_count);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_MODULE_H */

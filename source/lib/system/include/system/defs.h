@@ -19,8 +19,7 @@
  * @brief               Internal libsystem definitions.
  */
 
-#ifndef __SYSTEM_DEFS_H
-#define __SYSTEM_DEFS_H
+#pragma once
 
 /** Compiler attribute definitions. */
 #define __sys_unused        __attribute__((unused))
@@ -36,5 +35,3 @@
 #define __sys_export        __attribute__((visibility("default")))
 #define __sys_hidden        __attribute__((visibility("hidden")))
 #define __sys_cleanup(f)    __attribute__((cleanup(f)))
-
-#endif /* __SYSTEM_DEFS_H */

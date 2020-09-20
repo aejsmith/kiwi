@@ -19,8 +19,7 @@
  * @brief               ANSI escape code parser.
  */
 
-#ifndef __LIB_ANSI_PARSER_H
-#define __LIB_ANSI_PARSER_H
+#pragma once
 
 #include <types.h>
 
@@ -37,5 +36,3 @@ typedef struct ansi_parser {
 
 extern uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch);
 extern void ansi_parser_init(ansi_parser_t *parser);
-
-#endif /* __LIB_ANSI_PARSER_H */

@@ -19,8 +19,7 @@
  * @brief               Assertion function.
  */
 
-#ifndef __ASSERT_H
-#define __ASSERT_H
+#pragma once
 
 #include <kernel.h>
 
@@ -43,5 +42,3 @@ extern void __assert_fail(const char *cond, const char *file, int line) __noretu
 #ifndef __cplusplus
 #   define static_assert(cond, err)    _Static_assert(cond, err)
 #endif
-
-#endif /* __ASSERT_H */

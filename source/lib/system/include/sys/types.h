@@ -19,8 +19,7 @@
  * @brief               POSIX type definitions.
  */
 
-#ifndef __SYS_TYPES_H
-#define __SYS_TYPES_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -62,5 +61,3 @@ typedef unsigned long u_long;
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SYS_TYPES_H */

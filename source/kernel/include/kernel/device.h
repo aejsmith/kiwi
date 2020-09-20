@@ -19,8 +19,7 @@
  * @brief               Device functions.
  */
 
-#ifndef __KERNEL_DEVICE_H
-#define __KERNEL_DEVICE_H
+#pragma once
 
 #include <kernel/file.h>
 #include <kernel/limits.h>
@@ -34,5 +33,3 @@ extern status_t kern_device_open(const char *path, uint32_t rights, uint32_t fla
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_DEVICE_H */

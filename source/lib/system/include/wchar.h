@@ -19,8 +19,7 @@
  * @brief               Wide-character handling.
  */
 
-#ifndef __WCHAR_H
-#define __WCHAR_H
+#pragma once
 
 #include <locale.h>
 #include <stdarg.h>
@@ -203,5 +202,3 @@ extern int wscanf(const wchar_t *__restrict, ...);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __WCHAR_H */

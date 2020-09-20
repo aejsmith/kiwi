@@ -19,8 +19,7 @@
  * @brief               POSIX file control functions.
  */
 
-#ifndef __FCNTL_H
-#define __FCNTL_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -74,5 +73,3 @@ extern int open(const char *path, int oflag, ...);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __FCNTL_H */

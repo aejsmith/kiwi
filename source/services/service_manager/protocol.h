@@ -19,8 +19,7 @@
  * @brief               Service manager IPC protocol.
  */
 
-#ifndef SERVICE_MANAGER_PROTOCOL_H
-#define SERVICE_MANAGER_PROTOCOL_H
+#pragma once
 
 /** Service manager message IDs. */
 enum {
@@ -60,5 +59,3 @@ typedef struct service_manager_reply_connect {
 typedef struct service_manager_reply_register_port {
     status_t result;
 } service_manager_reply_register_port_t;
-
-#endif /* SERVICE_MANAGER_PROTOCOL_H */

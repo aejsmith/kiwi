@@ -19,8 +19,7 @@
  * @brief               Device manager.
  */
 
-#ifndef __IO_DEVICE_H
-#define __IO_DEVICE_H
+#pragma once
 
 #include <io/file.h>
 
@@ -199,5 +198,3 @@ extern status_t device_open(
     object_handle_t **_handle);
 
 extern void device_init(void);
-
-#endif /* __IO_DEVICE_H */

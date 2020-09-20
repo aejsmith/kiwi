@@ -19,8 +19,7 @@
  * @brief               AMD64 kernel library definitions.
  */
 
-#ifndef __LIBKERNEL_ARCH_H
-#define __LIBKERNEL_ARCH_H
+#pragma once
 
 #include <elf.h>
 
@@ -75,5 +74,3 @@ static inline void arch_tls_tcb_init(tls_tcb_t *tcb) {
 }
 
 extern void libkernel_relocate(process_args_t *args, elf_dyn_t *dyn);
-
-#endif /* __LIBKERNEL_ARCH_H */

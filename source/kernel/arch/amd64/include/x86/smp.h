@@ -19,8 +19,7 @@
  * @brief               x86 SMP definitions.
  */
 
-#ifndef __X86_SMP_H
-#define __X86_SMP_H
+#pragma once
 
 struct cpu;
 
@@ -31,5 +30,3 @@ struct cpu;
 extern void x86_smp_boot_prepare(void);
 extern void x86_smp_boot(struct cpu *cpu);
 extern void x86_smp_boot_cleanup(void);
-
-#endif /* __X86_SMP_H */

@@ -19,8 +19,7 @@
  * @brief               KBoot utility functions.
  */
 
-#ifndef __KERNEL_KBOOT_H
-#define __KERNEL_KBOOT_H
+#pragma once
 
 #include <lib/utility.h>
 
@@ -51,5 +50,3 @@ extern const char *kboot_string_option(const char *name);
 
 extern void kboot_log_write(char ch);
 extern void kboot_log_flush(void);
-
-#endif /* __KERNEL_KBOOT_H */

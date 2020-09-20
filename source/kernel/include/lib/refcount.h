@@ -23,8 +23,7 @@
  * is atomic.
  */
 
-#ifndef __LIB_REFCOUNT_H
-#define __LIB_REFCOUNT_H
+#pragma once
 
 #include <lib/atomic.h>
 #include <kernel.h>
@@ -100,5 +99,3 @@ static inline int refcount_get(refcount_t *ref) {
 static inline void refcount_set(refcount_t *ref, int val) {
     atomic_set(ref, val);
 }
-
-#endif /* __LIB_REFCOUNT_H */

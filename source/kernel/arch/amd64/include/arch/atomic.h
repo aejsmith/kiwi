@@ -19,8 +19,7 @@
  * @brief               AMD64 atomic operations.
  */
 
-#ifndef __ARCH_ATOMIC_H
-#define __ARCH_ATOMIC_H
+#pragma once
 
 #include <types.h>
 
@@ -174,5 +173,3 @@ static inline int64_t atomic_cas64(atomic64_t *var, int64_t cmp, int64_t val) {
 
     return r;
 }
-
-#endif /* __ARCH_ATOMIC_H */

@@ -19,8 +19,7 @@
  * @brief               Directory handling functions.
  */
 
-#ifndef __DIRENT_H
-#define __DIRENT_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -54,5 +53,3 @@ extern int scandir(
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __DIRENT_H */

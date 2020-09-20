@@ -19,8 +19,7 @@
  * @brief               AMD64-specific thread definitions.
  */
 
-#ifndef __ARCH_THREAD_H
-#define __ARCH_THREAD_H
+#pragma once
 
 #ifndef __ASM__
 
@@ -79,5 +78,3 @@ static inline struct thread *arch_curr_thread(void) {
 #define ARCH_THREAD_OFF_USER_RSP    0x18
 #define ARCH_THREAD_OFF_USER_FRAME  0x28
 #define ARCH_THREAD_OFF_FLAGS       0x30
-
-#endif /* __ARCH_THREAD_H */

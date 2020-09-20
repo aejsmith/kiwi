@@ -19,8 +19,7 @@
  * @brief               Input/output multiplexing.
  */
 
-#ifndef __SYS_POLL_H
-#define __SYS_POLL_H
+#pragma once
 
 #define __need_size_t
 #include <stddef.h>
@@ -56,5 +55,3 @@ extern int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __SYS_POLL_H */

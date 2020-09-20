@@ -19,8 +19,7 @@
  * @brief               Time handling functions.
  */
 
-#ifndef __TIME_H
-#define __TIME_H
+#pragma once
 
 #include <kernel/time.h>
 #include <lib/list.h>
@@ -147,5 +146,3 @@ extern nstime_t platform_time_from_hardware(void);
 
 extern void time_init(void);
 extern void time_init_percpu(void);
-
-#endif /* __TIME_H */

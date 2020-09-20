@@ -19,8 +19,7 @@
  * @brief               Wide-character classification and mapping utilities.
  */
 
-#ifndef __WCTYPE_H
-#define __WCTYPE_H
+#pragma once
 
 #include <locale.h>
 #include <wchar.h>
@@ -114,5 +113,3 @@ extern wctype_t wctype_l(const char *, locale_t);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __WCTYPE_H */

@@ -19,12 +19,9 @@
  * @brief               AMD64 setjmp() definitions.
  */
 
-#ifndef __ARCH_SETJMP_H
-#define __ARCH_SETJMP_H
+#pragma once
 
 #include <types.h>
 
 /** Type of the buffer for setjmp(). */
 typedef unsigned long jmp_buf[8];
-
-#endif /* __ARCH_SETJMP_H */

@@ -19,8 +19,7 @@
  * @brief               Process management functions.
  */
 
-#ifndef __KERNEL_PROCESS_H
-#define __KERNEL_PROCESS_H
+#pragma once
 
 #include <kernel/exception.h>
 #include <kernel/exit.h>
@@ -114,5 +113,3 @@ extern void kern_process_exit(int status) __attribute__((noreturn));
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_PROCESS_H */

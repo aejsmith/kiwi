@@ -19,8 +19,7 @@
  * @brief               Process/thread exit code definitions.
  */
 
-#ifndef __KERNEL_EXIT_H
-#define __KERNEL_EXIT_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -36,5 +35,3 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_EXIT_H */

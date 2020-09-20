@@ -19,8 +19,7 @@
  * @brief               x86 TSC handling functions.
  */
 
-#ifndef __X86_TSC_H
-#define __X86_TSC_H
+#pragma once
 
 /** Read the Time Stamp Counter.
  * @return              Value of the TSC. */
@@ -33,5 +32,3 @@ static inline uint64_t x86_rdtsc(void) {
 
 extern void tsc_init_target(void);
 extern void tsc_init_source(void);
-
-#endif /* __X86_TSC_H */

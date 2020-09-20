@@ -19,8 +19,7 @@
  * @brief               Internal image loader functions.
  */
 
-#ifndef __KERNEL_PRIVATE_IMAGE_H
-#define __KERNEL_PRIVATE_IMAGE_H
+#pragma once
 
 #include <kernel/image.h>
 
@@ -49,5 +48,3 @@ extern status_t kern_image_unregister(image_id_t id);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_PRIVATE_IMAGE_H */

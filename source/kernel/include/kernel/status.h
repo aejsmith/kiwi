@@ -19,8 +19,7 @@
  * @brief               Kernel status code definitions.
  */
 
-#ifndef __KERNEL_STATUS_H
-#define __KERNEL_STATUS_H
+#pragma once
 
 /** Definitions of status codes returned by kernel functions. */
 #define STATUS_SUCCESS              0   /**< Operation completed successfully. */
@@ -86,5 +85,3 @@ extern size_t __kernel_status_size;
 #endif
 
 #endif /* !__KERNEL && !__ASM__ */
-
-#endif /* __KERNEL_STATUS_H */

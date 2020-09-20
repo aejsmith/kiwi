@@ -19,8 +19,7 @@
  * @brief               Kernel console functions.
  */
 
-#ifndef __CONSOLE_H
-#define __CONSOLE_H
+#pragma once
 
 #include <lib/list.h>
 
@@ -117,5 +116,3 @@ extern status_t fb_console_configure(const fb_info_t *info, unsigned mmflag);
 extern void fb_console_acquire(void);
 extern void fb_console_release(void);
 extern void fb_console_early_init(struct kboot_tag_video *video);
-
-#endif /* __CONSOLE_H */

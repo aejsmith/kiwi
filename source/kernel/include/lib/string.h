@@ -19,8 +19,7 @@
  * @brief               String handling functions.
  */
 
-#ifndef __LIB_STRING_H
-#define __LIB_STRING_H
+#pragma once
 
 #include <mm/mm.h>
 
@@ -57,5 +56,3 @@ extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
 extern int vsprintf(char *buf, const char *fmt, va_list args);
 extern int snprintf(char *buf, size_t size, const char *fmt, ...);
 extern int sprintf(char *buf, const char *fmt, ...);
-
-#endif /* __LIB_STRING_H */

@@ -19,8 +19,7 @@
  * @brief               Miscellaneous system functions.
  */
 
-#ifndef __KERNEL_SYSTEM_H
-#define __KERNEL_SYSTEM_H
+#pragma once
 
 #include <kernel/types.h>
 
@@ -43,5 +42,3 @@ extern void kern_system_fatal(const char *message);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_SYSTEM_H */

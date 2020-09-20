@@ -19,8 +19,7 @@
  * @brief               Implementation-defined constants.
  */
 
-#ifndef __LIMITS_H
-#define __LIMITS_H
+#pragma once
 
 #include <kernel/limits.h>
 
@@ -36,5 +35,3 @@
 #ifndef _GCC_LIMITS_H_
 #   include_next <limits.h>
 #endif
-
-#endif /* __LIMITS_H */

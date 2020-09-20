@@ -19,8 +19,7 @@
  * @brief               AMD64 stack size definitions.
  */
 
-#ifndef __ARCH_STACK_H
-#define __ARCH_STACK_H
+#pragma once
 
 /** Stack size definitions. */
 #define KSTACK_SIZE         0x2000      /**< Kernel stack size (8KB). */
@@ -28,5 +27,3 @@
 
 /** Stack direction definition. */
 #define STACK_GROWS_DOWN    1
-
-#endif /* __ARCH_STACK_H */

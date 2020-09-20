@@ -19,8 +19,7 @@
  * @brief               Unidirectional data pipe implementation.
  */
 
-#ifndef __IPC_PIPE_H
-#define __IPC_PIPE_H
+#pragma once
 
 #include <lib/notifier.h>
 
@@ -54,5 +53,3 @@ extern void pipe_unwait(pipe_t *pipe, bool write, object_event_t *event);
 
 extern pipe_t *pipe_create(void);
 extern void pipe_destroy(pipe_t *pipe);
-
-#endif /* __IPC_PIPE_H */

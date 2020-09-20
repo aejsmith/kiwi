@@ -19,8 +19,7 @@
  * @brief               Pipe functions.
  */
 
-#ifndef __KERNEL_PIPE_H
-#define __KERNEL_PIPE_H
+#pragma once
 
 #include <kernel/file.h>
 
@@ -33,5 +32,3 @@ extern status_t kern_pipe_create(handle_t handles[2]);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __KERNEL_PIPE_H */

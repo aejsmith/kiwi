@@ -19,8 +19,7 @@
  * @brief               Kernel debugger.
  */
 
-#ifndef __KDB_H
-#define __KDB_H
+#pragma once
 
 #include <lib/atomic.h>
 #include <lib/notifier.h>
@@ -120,5 +119,3 @@ extern void kdb_unregister_command(const char *name);
 
 extern void arch_kdb_init(void);
 extern void kdb_init(void);
-
-#endif /* __KDB_H */
