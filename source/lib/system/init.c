@@ -28,6 +28,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+/* This is here as a hack to make sure a link for this exists in the build tree
+ * before libc++ is built (which include_next's it), because we don't have any
+ * of wchar.h implemented yet and nothing else includes it. */
+#include <wchar.h>
+#include <wctype.h>
+
 #include "libsystem.h"
 
 /** Name of the current program. */
