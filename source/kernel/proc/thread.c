@@ -1267,22 +1267,26 @@ fail:
 }
 
 /** Open a handle to a thread.
- * @param id            ID of the thread to open.
+ * @param id            ID of the thread to open, or THREAD_SELF for calling
+ *                      thread.
  * @param _handle       Where to store handle to thread.
  * @return              Status code describing result of the operation. */
 status_t kern_thread_open(thread_id_t id, handle_t *_handle) {
-    thread_t *thread;
-    status_t ret;
-
     if (!_handle)
         return STATUS_INVALID_ARG;
 
-    thread = thread_lookup(id);
-    if (!thread)
-        return STATUS_NOT_FOUND;
+    thread_t *thread;
+    if (id == THREAD_SELF) {
+        thread = curr_thread;
+        thread_retain(thread);
+    } else {
+        thread = thread_lookup(id);
+        if (!thread)
+            return STATUS_NOT_FOUND;
+    }
 
     /* Reference added by thread_lookup() is taken over by this handle. */
-    ret = object_handle_open(&thread_object_type, thread, NULL, _handle);
+    status_t ret = object_handle_open(&thread_object_type, thread, NULL, _handle);
     if (ret != STATUS_SUCCESS)
         thread_release(thread);
 

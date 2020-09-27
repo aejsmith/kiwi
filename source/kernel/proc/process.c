@@ -1331,27 +1331,31 @@ status_t kern_process_clone(handle_t *_handle) {
 }
 
 /** Open a handle to a process.
- * @param id            ID of the process to open.
+ * @param id            ID of the process to open, or PROCESS_SELF for calling
+ *                      process.
  * @param _handle       Where to store handle to process.
  * @return              Status code describing result of the operation. */
 status_t kern_process_open(process_id_t id, handle_t *_handle) {
-    process_t *process;
-    status_t ret;
-
     if (!_handle)
         return STATUS_INVALID_ARG;
 
-    process = process_lookup(id);
-    if (!process)
-        return STATUS_NOT_FOUND;
+    process_t *process;
+    if (id == PROCESS_SELF) {
+        process = curr_proc;
+        process_retain(process);
+    } else {
+        process = process_lookup(id);
+        if (!process)
+            return STATUS_NOT_FOUND;
 
-    if (process == kernel_proc) {
-        process_release(process);
-        return STATUS_NOT_FOUND;
+        if (process == kernel_proc) {
+            process_release(process);
+            return STATUS_NOT_FOUND;
+        }
     }
 
     /* Reference added by process_lookup() is taken over by this handle. */
-    ret = object_handle_open(&process_object_type, process, NULL, _handle);
+    status_t ret = object_handle_open(&process_object_type, process, NULL, _handle);
     if (ret != STATUS_SUCCESS)
         process_release(process);
 
