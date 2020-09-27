@@ -36,6 +36,8 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
+TerminalService g_terminalService;
+
 TerminalService::TerminalService() {}
 
 TerminalService::~TerminalService() {

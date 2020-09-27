@@ -35,6 +35,8 @@
 
 extern const char *const *environ;
 
+ServiceManager g_serviceManager;
+
 ServiceManager::ServiceManager() :
     m_port (INVALID_HANDLE)
 {}

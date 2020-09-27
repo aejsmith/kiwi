@@ -34,4 +34,4 @@ private:
     handle_t m_port;
 };
 
-static TerminalService g_terminalService;
+extern TerminalService g_terminalService;

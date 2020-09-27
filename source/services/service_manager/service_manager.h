@@ -61,4 +61,4 @@ private:
     std::vector<object_event_t> m_events;
 };
 
-static ServiceManager g_serviceManager;
+extern ServiceManager g_serviceManager;
