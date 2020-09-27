@@ -20,8 +20,12 @@
  *
  * TODO:
  *  - Key reuse. This would need to make sure the values are all set to NULL.
- *  - Call destructors when threads are actually implemented.
  */
+
+#include "libsystem.h"
+
+#include <kernel/private/thread.h>
+#include <kernel/status.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -43,10 +47,29 @@ static pthread_specific_t pthread_specific[PTHREAD_KEYS_MAX];
 /** Per-thread data values. */
 static __thread void *pthread_specific_values[PTHREAD_KEYS_MAX];
 
+/** Number of currently registered keys with destructors. */
+static int specific_dtor_count = 0;
+
+static void run_specific_dtors(void) {
+    if (specific_dtor_count > 0) {
+        for (size_t i = 0; i < PTHREAD_KEYS_MAX; i++) {
+            if (pthread_specific[i].allocated &&
+                pthread_specific[i].dtor &&
+                pthread_specific_values[i])
+            {
+                pthread_specific[i].dtor(pthread_specific_values[i]);
+            }
+        }
+    }
+}
+
+static __sys_init void pthread_specific_init(void) {
+    status_t ret = kern_thread_add_dtor(run_specific_dtors);
+    libsystem_assert(ret == STATUS_SUCCESS);
+}
+
 /**
- * Create a thread-specific data key.
- *
- * Creates a new thread-specific data key that can be used by all threads in
+ * Creates a new thread-specific data key. The key can be used by all threads in
  * the process to store data local to that thread using pthread_getspecific()
  * and pthread_setspecific().
  *
@@ -62,9 +85,8 @@ static __thread void *pthread_specific_values[PTHREAD_KEYS_MAX];
  *                      per process has been exceeded.
  */
 int pthread_key_create(pthread_key_t *_key, void (*dtor)(void *val)) {
-    pthread_key_t key;
-
     /* Try to allocate a new key. */
+    pthread_key_t key;
     while (true) {
         key = next_pthread_key;
 
@@ -77,15 +99,16 @@ int pthread_key_create(pthread_key_t *_key, void (*dtor)(void *val)) {
 
     assert(!pthread_specific[key].allocated);
     pthread_specific[key].allocated = true;
-    pthread_specific[key].dtor = dtor;
+    pthread_specific[key].dtor      = dtor;
+
+    if (dtor)
+        __sync_fetch_and_add(&specific_dtor_count, 1);
 
     *_key = key;
     return 0;
 }
 
 /**
- * Delete a thread-specific data key.
- *
  * Deletes the given thread-specific data key. The values associated with the
  * key need not be NULL at the time of deletion, but the destructor function
  * will not be called: it is the responsibility of the application to ensure
@@ -98,6 +121,9 @@ int pthread_key_create(pthread_key_t *_key, void (*dtor)(void *val)) {
 int pthread_key_delete(pthread_key_t key) {
     if (!pthread_specific[key].allocated)
         return EINVAL;
+
+    if (pthread_specific[key].dtor)
+        __sync_fetch_and_sub(&specific_dtor_count, 1);
 
     pthread_specific[key].allocated = false;
     return 0;

@@ -35,6 +35,10 @@ extern "C" {
 extern status_t kern_thread_control(unsigned action, const void *in, void *out);
 extern void kern_thread_restore(void);
 
+typedef void (*thread_dtor_t)(void);
+
+extern status_t kern_thread_add_dtor(thread_dtor_t dtor);
+
 #ifdef __LIBKERNEL
 
 extern status_t _kern_thread_create(

@@ -38,15 +38,16 @@ typedef struct thread_create {
 /** Saved ID for the current thread. */
 __thread thread_id_t curr_thread_id = -1;
 
+/** Thread destructor functions. */
+#define THREAD_DTOR_MAX 8
+static thread_dtor_t thread_dtors[THREAD_DTOR_MAX] = {};
+
 /** Thread entry wrapper.
  * @param _create       Pointer to information structure. */
 static int thread_trampoline(void *_create) {
     thread_create_t *create = _create;
-    thread_id_t id;
-    thread_entry_t entry;
-    void *arg;
 
-    id = _kern_thread_id(THREAD_SELF);
+    thread_id_t id = _kern_thread_id(THREAD_SELF);
 
     /* Set our TCB. */
     dprintf("tls: TCB for thread %" PRId32 " is %p\n", id, create->tcb);
@@ -56,8 +57,8 @@ static int thread_trampoline(void *_create) {
     curr_thread_id = id;
 
     /* After we unblock the creating thread, create is no longer valid. */
-    entry = create->entry;
-    arg = create->arg;
+    thread_entry_t entry = create->entry;
+    void *arg            = create->arg;
 
     /* Unblock our creator. */
     create->futex = 1;
@@ -91,15 +92,15 @@ __sys_export status_t kern_thread_create(
     const char *name, thread_entry_t entry, void *arg,
     const thread_stack_t *stack, uint32_t flags, handle_t *_handle)
 {
-    thread_create_t create;
     status_t ret;
 
     if (!entry)
         return STATUS_INVALID_ARG;
 
+    thread_create_t create;
     create.futex = 0;
     create.entry = entry;
-    create.arg = arg;
+    create.arg   = arg;
 
     /* Allocate a TLS block. */
     ret = tls_alloc(&create.tcb);
@@ -140,9 +141,42 @@ __sys_export thread_id_t kern_thread_id(handle_t handle) {
 __sys_export void kern_thread_exit(int status) {
     tls_tcb_t *tcb = arch_tls_tcb();
 
-    dprintf("tls: destroying block %p for thread %" PRId32 "\n", tcb->base,curr_thread_id);
+    for (size_t i = 0; i < THREAD_DTOR_MAX; i++) {
+        if (thread_dtors[i])
+            thread_dtors[i]();
+    }
+
+    dprintf("tls: destroying block %p for thread %" PRId32 "\n", tcb->base, curr_thread_id);
 
     tls_destroy(tcb);
 
     _kern_thread_exit(status);
+}
+
+/**
+ * Add a destructor function to be called whenever a thread exits. If the
+ * function already exists in the list then it will not be added again.
+ *
+ * @param dtor          Destructor function.
+ *
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_NO_MEMORY if there is no space in the destructor
+ *                      list.
+ */
+__sys_export status_t kern_thread_add_dtor(thread_dtor_t dtor) {
+    size_t first_free = THREAD_DTOR_MAX;
+    for (size_t i = 0; i < THREAD_DTOR_MAX; i++) {
+        if (thread_dtors[i] == dtor) {
+            return STATUS_SUCCESS;
+        } else if (!thread_dtors[i]) {
+            first_free = i;
+        }
+    }
+
+    if (first_free < THREAD_DTOR_MAX) {
+        thread_dtors[first_free] = dtor;
+        return STATUS_SUCCESS;
+    } else {
+        return STATUS_NO_MEMORY;
+    }
 }

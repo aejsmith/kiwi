@@ -7,7 +7,6 @@
 #include <time.h>
 #include <nl_types.h>
 #include <langinfo.h>
-#include <pthread.h>
 
 wint_t btowc(int c) {
     fprintf(stderr, "STUB: %s\n", __func__);
@@ -322,23 +321,6 @@ wchar_t *wmemmove(wchar_t *dst, const wchar_t *src, size_t n) {
 }
 
 char *catgets(nl_catd catd, int set_id, int msg_id, const char *s) {
-    fprintf(stderr, "STUB: %s\n", __func__);
-    *(int *)0xdeadc0de = 0; abort();
-}
-
-int pthread_create(pthread_t *__restrict thread, const pthread_attr_t *__restrict attr,
-    void *(*func)(void *), void *__restrict arg)
-{
-    fprintf(stderr, "STUB: %s\n", __func__);
-    *(int *)0xdeadc0de = 0; abort();
-}
-
-int pthread_detach(pthread_t thread) {
-    fprintf(stderr, "STUB: %s\n", __func__);
-    *(int *)0xdeadc0de = 0; abort();
-}
-
-int pthread_join(pthread_t thread, void **val) {
     fprintf(stderr, "STUB: %s\n", __func__);
     *(int *)0xdeadc0de = 0; abort();
 }

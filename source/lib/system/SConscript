@@ -18,6 +18,10 @@ Import('manager', 'config')
 
 env = manager.Create(libraries = ['kernel'], flags = {
     'LINKFLAGS': ['-nodefaultlibs'],
+    'CPPDEFINES': {
+        # We use some private libkernel interfaces.
+        '__KERNEL_PRIVATE': None,
+    },
     'CPPPATH': [
         Dir('.'),
         Dir('include'),

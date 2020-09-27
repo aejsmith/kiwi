@@ -73,13 +73,14 @@ enum {
 //int pthread_cancel(pthread_t);
 //void pthread_cleanup_pop(int);
 //void pthread_cleanup_push(void (*)(void*), void *);
-//int pthread_create(pthread_t *__restrict, const pthread_attr_t *__restrict,
-//  void *(*)(void*), void *__restrict);
-//int pthread_detach(pthread_t);
+extern int pthread_create(
+    pthread_t *__restrict _thread, const pthread_attr_t *__restrict attr,
+    void *(*start_routine)(void *), void *__restrict arg);
+extern int pthread_detach(pthread_t thread);
 extern int pthread_equal(pthread_t p1, pthread_t p2);
-//void pthread_exit(void *);
+extern void pthread_exit(void *value_ptr) __sys_noreturn;
 //int pthread_getschedparam(pthread_t, int *__restrict, struct sched_param *__restrict);
-//int pthread_join(pthread_t, void **);
+extern int pthread_join(pthread_t thread, void **_value_ptr);
 extern int pthread_once(pthread_once_t *once, void (*func)(void));
 extern pthread_t pthread_self(void);
 //int pthread_setcancelstate(int, int *);
@@ -190,16 +191,6 @@ int pthread_rwlock_wrlock(pthread_rwlock_t *);
 //int pthread_spin_lock(pthread_spinlock_t *);
 //int pthread_spin_trylock(pthread_spinlock_t *);
 //int pthread_spin_unlock(pthread_spinlock_t *);
-
-#ifdef __cplusplus
-
-extern int pthread_create(
-    pthread_t *__restrict, const pthread_attr_t *__restrict,
-    void *(*)(void*), void *__restrict);
-extern int pthread_detach(pthread_t);
-extern int pthread_join(pthread_t, void **);
-
-#endif
 
 #ifdef __cplusplus
 }
