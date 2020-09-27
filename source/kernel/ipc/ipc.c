@@ -524,26 +524,26 @@ void ipc_connection_close(ipc_endpoint_t *endpoint) {
          * and return an error. */
         condvar_broadcast(&endpoint->space_cvar);
         condvar_broadcast(&endpoint->remote->data_cvar);
-
-        /* Discard all currently queued messages. */
-        list_foreach_safe(&endpoint->messages, iter) {
-            msg = list_entry(iter, ipc_kmessage_t, header);
-
-            list_remove(&msg->header);
-            ipc_kmessage_release(msg);
-        }
-
-        endpoint->message_count = 0;
-
-        if (endpoint->pending) {
-            ipc_kmessage_release(endpoint->pending);
-            endpoint->pending = NULL;
-        }
     }
 
     if (conn->state != IPC_CONNECTION_CLOSED) {
         conn->state = IPC_CONNECTION_CLOSED;
         notifier_run(&endpoint->remote->hangup_notifier, NULL, false);
+    }
+
+    /* Discard all currently queued messages. */
+    list_foreach_safe(&endpoint->messages, iter) {
+        msg = list_entry(iter, ipc_kmessage_t, header);
+
+        list_remove(&msg->header);
+        ipc_kmessage_release(msg);
+    }
+
+    endpoint->message_count = 0;
+
+    if (endpoint->pending) {
+        ipc_kmessage_release(endpoint->pending);
+        endpoint->pending = NULL;
     }
 
     assert(notifier_empty(&endpoint->hangup_notifier));
