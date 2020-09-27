@@ -69,8 +69,7 @@ bool Service::setPort(handle_t port) {
 }
 
 void Service::addPendingConnect(Client *client, core_message_t *reply) {
-    m_pendingConnects.emplace_back();
-    PendingConnect &connect = m_pendingConnects.back();
+    PendingConnect &connect = m_pendingConnects.emplace_back();
 
     connect.client = client;
     connect.reply  = reply;

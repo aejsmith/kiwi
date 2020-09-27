@@ -100,7 +100,7 @@ int ServiceManager::run() {
 }
 
 void ServiceManager::addService(std::string name, std::string path, uint32_t flags) {
-    std::unique_ptr<Service> service(new Service(std::move(name), std::move(path), flags));
+    auto service = std::make_unique<Service>(std::move(name), std::move(path), flags);
 
     if (!(flags & Service::kOnDemand))
         service->start();
@@ -172,8 +172,7 @@ void ServiceManager::handleEvent(const object_event_t *event) {
 }
 
 void ServiceManager::addEvent(handle_t handle, unsigned id, EventHandler *handler) {
-    m_events.emplace_back();
-    object_event_t &event = m_events.back();
+    object_event_t &event = m_events.emplace_back();
 
     event.handle = handle;
     event.event  = id;
