@@ -934,7 +934,7 @@ static inline void dump_thread(thread_t *thread) {
     }
 
     kdb_printf(
-        "%-5d %-4" PRIu32 " %-4zu %-4d %-4d 0x%-3x %-20s %-5" PRId32 " %s\n",
+        "%-5d %-4" PRIu32 " %-4zu %-4d %-4d 0x%-3x %-24s %-5" PRId32 " %s\n",
         refcount_get(&thread->count), (thread->cpu) ? thread->cpu->id : 0,
         thread->wired, thread->priority, thread->curr_prio, thread->flags,
         (thread->state == THREAD_SLEEPING) ? thread->waiting_on : "<none>",
@@ -961,8 +961,8 @@ static kdb_status_t kdb_cmd_thread(int argc, char **argv, kdb_filter_t *filter) 
         return KDB_FAILURE;
     }
 
-    kdb_printf("ID     State        Count CPU  Wire Prio Curr Flags Waiting On           Owner Name\n");
-    kdb_printf("==     =====        ===== ===  ==== ==== ==== ===== ==========           ===== ====\n");
+    kdb_printf("ID     State        Count CPU  Wire Prio Curr Flags Waiting On               Owner Name\n");
+    kdb_printf("==     =====        ===== ===  ==== ==== ==== ===== ==========               ===== ====\n");
 
     if (argc == 2) {
         /* Find the process ID. */

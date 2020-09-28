@@ -28,6 +28,7 @@
 
 #include <sync/spinlock.h>
 
+#include <assert.h>
 #include <console.h>
 #include <kboot.h>
 #include <kernel.h>
@@ -58,6 +59,7 @@ __init_text void console_init(void) {
 
     if (debug_console.out && debug_console.out->init)
         debug_console.out->init(video);
+
     if (main_console.out && main_console.out->init)
         main_console.out->init(video);
 }
@@ -66,18 +68,49 @@ __init_text void console_init(void) {
  * Kernel console device functions.
  */
 
-/** Perform I/O on the kernel console device.
- * @param device        Device to perform I/O on.
- * @param handle        File handle structure.
- * @param request       I/O request.
- * @return              Status code describing result of the operation. */
+/** Signal that a kernel console device event is being waited for. */
+static status_t kconsole_device_wait(device_t *device, file_handle_t *handle, object_event_t *event) {
+    switch (event->event) {
+    case FILE_EVENT_READABLE:
+        if (!main_console.in || !main_console.in->wait)
+            return STATUS_NOT_SUPPORTED;
+
+        main_console.in->wait(event);
+        return STATUS_SUCCESS;
+
+    case FILE_EVENT_WRITABLE:
+        if (!main_console.out)
+            return STATUS_NOT_SUPPORTED;
+
+        object_event_signal(event, 0);
+        return STATUS_SUCCESS;
+
+    default:
+        return STATUS_NOT_SUPPORTED;
+    }
+}
+
+/** Stop waiting for a kernel console device event. */
+static void kconsole_device_unwait(device_t *device, file_handle_t *handle, object_event_t *event) {
+    switch (event->event) {
+    case FILE_EVENT_READABLE:
+        assert(main_console.in);
+
+        if (main_console.in->unwait)
+            main_console.in->unwait(event);
+
+        break;
+
+    default:
+        break;
+    }
+}
+
+/** Perform I/O on the kernel console device. */
 static status_t kconsole_device_io(device_t *device, file_handle_t *handle, io_request_t *request) {
-    char *buf;
-    size_t i;
-    uint16_t ch;
     status_t ret;
 
-    buf = kmalloc(request->total, MM_USER);
+    char *buf = kmalloc(request->total, MM_USER);
     if (!buf)
         return STATUS_NO_MEMORY;
 
@@ -91,7 +124,7 @@ static status_t kconsole_device_io(device_t *device, file_handle_t *handle, io_r
         if (ret != STATUS_SUCCESS)
             goto out;
 
-        for (i = 0; i < request->total; i++)
+        for (size_t i = 0; i < request->total; i++)
             main_console.out->putc(buf[i]);
     } else {
         if (!main_console.in || !main_console.in->getc) {
@@ -99,18 +132,26 @@ static status_t kconsole_device_io(device_t *device, file_handle_t *handle, io_r
             goto out;
         }
 
-        for (i = 0; i < request->total; i++) {
-            /* TODO: Escape sequences for special keys, nonblock. */
+        size_t size;
+        for (size = 0; size < request->total; size++) {
+            /* TODO: Escape sequences for special keys. */
+            uint16_t ch;
             do {
-                ret = main_console.in->getc(&ch);
-                if (ret != STATUS_SUCCESS)
-                    goto out;
+                if (handle->flags & FILE_NONBLOCK) {
+                    ch = main_console.in->poll();
+                    if (ch == 0)
+                        break;
+                } else {
+                    ret = main_console.in->getc(&ch);
+                    if (ret != STATUS_SUCCESS)
+                        goto out;
+                }
             } while (ch > 0xff);
 
-            buf[i] = ch;
+            buf[size] = ch;
         }
 
-        ret = io_request_copy(request, buf, request->total);
+        ret = io_request_copy(request, buf, size);
     }
 
 out:
@@ -120,8 +161,10 @@ out:
 
 /** Kernel console device operations structure. */
 static device_ops_t kconsole_device_ops = {
-    .type = FILE_TYPE_CHAR,
-    .io = kconsole_device_io,
+    .type   = FILE_TYPE_CHAR,
+    .wait   = kconsole_device_wait,
+    .unwait = kconsole_device_unwait,
+    .io     = kconsole_device_io,
 };
 
 /** Register the kernel console device. */

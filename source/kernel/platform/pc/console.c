@@ -29,6 +29,7 @@
 #include <device/irq.h>
 
 #include <lib/ansi_parser.h>
+#include <lib/notifier.h>
 #include <lib/string.h>
 
 #include <mm/phys.h>
@@ -37,7 +38,7 @@
 
 #include <proc/thread.h>
 
-#include <sync/semaphore.h>
+#include <sync/condvar.h>
 #include <sync/spinlock.h>
 
 #include <console.h>
@@ -67,8 +68,10 @@ static uint16_t vga_cursor_y;       /**< Y position of the cursor. */
 #define I8042_BUFFER_SIZE   16
 
 /** Keyboard implementation details. */
-static SEMAPHORE_DEFINE(i8042_sem, 0);
+static CONDVAR_DEFINE(i8042_cvar);
 static SPINLOCK_DEFINE(i8042_lock);
+static NOTIFIER_DEFINE(i8042_notifier, NULL);
+static int i8042_shutdown_action = -1;
 static uint16_t i8042_buffer[I8042_BUFFER_SIZE];
 static size_t i8042_buffer_start;
 static size_t i8042_buffer_size;
@@ -123,8 +126,6 @@ static uint16_t i8042_console_translate(uint8_t code) {
     static bool alt = false;
     static bool extended = false;
 
-    uint16_t ret;
-
     /* Check for an extended code. */
     if (code >= 0xe0) {
         if (code == 0xe0)
@@ -162,7 +163,7 @@ static uint16_t i8042_console_translate(uint8_t code) {
         }
     }
 
-    ret = (extended)
+    uint16_t ret = (extended)
         ? kbd_layout_extended[code]
         : ((shift) ? kbd_layout_shift[code] : kbd_layout[code]);
 
@@ -170,15 +171,11 @@ static uint16_t i8042_console_translate(uint8_t code) {
     return ret;
 }
 
-/** Read a character from the i8042 keyboard.
- * @return              Character read, or 0 if none available. */
+/** Read a character from the i8042 keyboard. */
 static uint16_t i8042_console_poll(void) {
-    uint8_t status;
-    uint16_t ret;
-
     while (true) {
         /* Check for keyboard data. */
-        status = in8(0x64);
+        uint8_t status = in8(0x64);
         if (status & (1 << 0)) {
             if (status & (1 << 5)) {
                 /* Mouse data, discard. */
@@ -190,7 +187,7 @@ static uint16_t i8042_console_poll(void) {
         }
 
         /* Read the code. */
-        ret = i8042_console_translate(in8(0x60));
+        uint16_t ret = i8042_console_translate(in8(0x60));
 
         /* Little hack so that pressing Enter won't result in an extra newline
          * being sent. */
@@ -205,45 +202,60 @@ static uint16_t i8042_console_poll(void) {
     }
 }
 
-/** Read a character from the keyboard, blocking until it can do so.
- * @param _ch           Where to store character read.
- * @return              Status code describing the result of the operation. */
+/** Read a character from the keyboard, blocking until it can do so. */
 static status_t i8042_console_getc(uint16_t *_ch) {
-    status_t ret;
+    bool have_char = false;
 
-    ret = semaphore_down_etc(&i8042_sem, -1, SLEEP_INTERRUPTIBLE);
-    if (ret != STATUS_SUCCESS)
-        return ret;
+    while (!have_char) {
+        status_t ret = condvar_wait_etc(&i8042_cvar, NULL, -1, SLEEP_INTERRUPTIBLE);
+        if (ret != STATUS_SUCCESS)
+            return ret;
 
-    spinlock_lock(&i8042_lock);
+        spinlock_lock(&i8042_lock);
 
-    *_ch = i8042_buffer[i8042_buffer_start];
-    i8042_buffer_size--;
-    if (++i8042_buffer_start == I8042_BUFFER_SIZE)
-        i8042_buffer_start = 0;
+        have_char = i8042_buffer_size > 0;
+        if (have_char) {
+            *_ch = i8042_buffer[i8042_buffer_start];
+            i8042_buffer_size--;
+            if (++i8042_buffer_start == I8042_BUFFER_SIZE)
+                i8042_buffer_start = 0;
+        }
 
-    spinlock_unlock(&i8042_lock);
+        spinlock_unlock(&i8042_lock);
+    }
+
     return STATUS_SUCCESS;
+}
+
+/** Start waiting for input on the keyboard. */
+static void i8042_console_wait(object_event_t *event) {
+    if (i8042_buffer_size > 0) {
+        object_event_signal(event, 0);
+    } else {
+        notifier_register(&i8042_notifier, object_event_notifier, event);
+    }
+}
+
+/** Stop waiting for input on the keyboard. */
+static void i8042_console_unwait(object_event_t *event) {
+    notifier_unregister(&i8042_notifier, object_event_notifier, event);
 }
 
 /** i8042 early console input operations. */
 static console_in_ops_t i8042_console_in_ops = {
-    .poll = i8042_console_poll,
-    .getc = i8042_console_getc,
+    .poll   = i8042_console_poll,
+    .getc   = i8042_console_getc,
+    .wait   = i8042_console_wait,
+    .unwait = i8042_console_unwait,
 };
 
-/** IRQ handler for i8042 keyboard.
- * @param num           IRQ number.
- * @return              IRQ status code. */
+/** IRQ handler for i8042 keyboard. */
 static irq_status_t i8042_irq(unsigned num, void *data) {
-    uint8_t code;
-    uint16_t ch;
-
     if (!(in8(0x64) & (1 << 0)) || in8(0x64) & (1 << 5))
         return IRQ_UNHANDLED;
 
     /* Read the code. */
-    code = in8(0x60);
+    uint8_t code = in8(0x60);
 
     /* Some debugging hooks to go into KDB, etc. */
     switch (code) {
@@ -257,35 +269,47 @@ static irq_status_t i8042_irq(unsigned num, void *data) {
         break;
     case 61:
         /* F3 - Reboot. */
-        dpc_request((dpc_function_t)system_shutdown, (void *)((ptr_t)SHUTDOWN_REBOOT));
+        i8042_shutdown_action = SHUTDOWN_REBOOT;
         break;
     case 62:
         /* F4 - Shutdown. */
-        dpc_request((dpc_function_t)system_shutdown, (void *)((ptr_t)SHUTDOWN_POWEROFF));
+        i8042_shutdown_action = SHUTDOWN_POWEROFF;
         break;
     }
 
     spinlock_lock(&i8042_lock);
 
-    ch = i8042_console_translate(code);
+    uint16_t ch = i8042_console_translate(code);
 
-    if (ch && i8042_buffer_size < I8042_BUFFER_SIZE) {
+    bool has_input = ch && i8042_buffer_size < I8042_BUFFER_SIZE;
+    if (has_input)
         i8042_buffer[(i8042_buffer_start + i8042_buffer_size++) % I8042_BUFFER_SIZE] = ch;
-        semaphore_up(&i8042_sem, 1);
-    }
 
     spinlock_unlock(&i8042_lock);
-    return IRQ_HANDLED;
+    return (has_input || i8042_shutdown_action >= 0) ? IRQ_RUN_THREAD : IRQ_HANDLED;
 }
 
-/** Initialize keyboard input. */
+/** i8042 IRQ thread. */
+static void i8042_irq_thread(unsigned num, void *data) {
+    if (i8042_shutdown_action >= 0) {
+        system_shutdown(i8042_shutdown_action);
+    } else if (i8042_buffer_size > 0) {
+        condvar_broadcast(&i8042_cvar);
+        notifier_run(&i8042_notifier, NULL, true);
+    }
+}
+
 __init_text void i8042_init(void) {
     /* Empty i8042 buffer. */
     while (in8(0x64) & 1)
         in8(0x60);
-
-    irq_register(1, i8042_irq, NULL, NULL);
 }
+
+static __init_text void i8042_irq_init(void) {
+    irq_register(1, i8042_irq, i8042_irq_thread, NULL);
+}
+
+INITCALL(i8042_irq_init);
 
 /**
  * VGA console operations.
@@ -301,8 +325,6 @@ static inline void vga_write(size_t idx, uint16_t ch) {
 /** Write to the console without taking any locks (for fatal/KDB).
  * @param ch            Character to print. */
 static void vga_console_putc_unsafe(char ch) {
-    uint16_t i;
-
     switch (ch) {
     case '\b':
         /* Backspace, move back one character if we can. */
@@ -346,7 +368,7 @@ static void vga_console_putc_unsafe(char ch) {
     if (vga_cursor_y >= vga_lines) {
         memmove(vga_mapping, vga_mapping + vga_cols, (vga_lines - 1) * vga_cols * 2);
 
-        for (i = 0; i < vga_cols; i++)
+        for (uint16_t i = 0; i < vga_cols; i++)
             vga_write(((vga_lines - 1) * vga_cols) + i, ' ');
 
         vga_cursor_y = vga_lines - 1;
@@ -415,8 +437,6 @@ static void serial_console_putc(char ch) {
  * @return              Character read, or 0 if none available. */
 static uint16_t serial_console_poll(void) {
     unsigned char ch = in8(SERIAL_PORT + 6);
-    uint16_t converted;
-
     if ((ch & ((1 << 4) | (1 << 5))) && ch != 0xff) {
         if (in8(SERIAL_PORT + 5) & 0x01) {
             ch = in8(SERIAL_PORT);
@@ -429,7 +449,7 @@ static uint16_t serial_console_poll(void) {
             }
 
             /* Handle escape sequences. */
-            converted = ansi_parser_filter(&serial_ansi_parser, ch);
+            uint16_t converted = ansi_parser_filter(&serial_ansi_parser, ch);
             if (converted)
                 return converted;
         }
@@ -441,10 +461,8 @@ static uint16_t serial_console_poll(void) {
 /** Early initialization of the serial console.
  * @return              Whether the serial console is present. */
 static bool serial_console_early_init(void) {
-    uint8_t status;
-
     /* Check whether the port is present. */
-    status = in8(SERIAL_PORT + 6);
+    uint8_t status = in8(SERIAL_PORT + 6);
     if (!(status & ((1 << 4) | (1 << 5))) || status == 0xff)
         return false;
 
@@ -466,7 +484,7 @@ static bool serial_console_early_init(void) {
 
 /** Serial port console output operations. */
 static console_out_ops_t serial_console_out_ops = {
-    .putc = serial_console_putc,
+    .putc        = serial_console_putc,
     .putc_unsafe = serial_console_putc,
 };
 

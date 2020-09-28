@@ -24,6 +24,7 @@
 #include <lib/list.h>
 
 struct kboot_tag_video;
+struct object_event;
 
 /**
  * Kernel console output operations.
@@ -60,6 +61,16 @@ typedef struct console_in_ops {
      * @param _ch           Where to store character read.
      * @return              Status code describing the result of the operation. */
     status_t (*getc)(uint16_t *_ch);
+
+    /** Start waiting for input on the console.
+     * @note                If input is available, this function should call the
+     *                      callback function and return success.
+     * @param event         Event that is being waited for. */
+    void (*wait)(struct object_event *event);
+
+    /** Stop waiting for input on the console.
+     * @param event         Event that is being waited for. */
+    void (*unwait)(struct object_event *event);
 } console_in_ops_t;
 
 /** Special console key definitions. */
