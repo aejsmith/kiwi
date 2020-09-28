@@ -17,4 +17,8 @@
 Import('manager')
 
 env = manager.Create(libraries = ['kernel'])
-env.KiwiApplication('terminal', ['main.cpp'])
+
+env.KiwiApplication('terminal', [
+    'terminal_app.cpp',
+    'terminal.cpp',
+])

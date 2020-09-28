@@ -16,11 +16,33 @@
 
 /**
  * @file
- * @brief               Terminal application.
+ * @brief               Terminal class.
  */
 
-#include <stdlib.h>
+#pragma once
 
-int main(int argc, char **argv) {
-    return EXIT_SUCCESS;
-}
+#include <core/ipc.h>
+
+#include <vector>
+
+class Terminal {
+public:
+    Terminal();
+    ~Terminal();
+
+    void run();
+
+private:
+    bool handleEvent(object_event_t &event);
+    void handleMessages();
+    void handleOutput(core_message_t *message);
+    void handleInput();
+
+    status_t spawnProcess(const char *path, handle_t &handle);
+
+private:
+    core_connection_t *m_connection;        /**< Connection to terminal service. */
+    handle_t m_device;                      /**< Target device. */
+    handle_t m_childProcess;                /**< Main child process. */
+    std::vector<object_event_t> m_events;   /**< Event list. */
+};

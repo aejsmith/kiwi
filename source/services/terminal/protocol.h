@@ -21,6 +21,8 @@
 
 #pragma once
 
+#define TERMINAL_SERVICE_NAME "org.kiwi.terminal"
+
 /** Terminal service message IDs. */
 enum {
     /**
