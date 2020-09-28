@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-extern status_t kern_device_open(const char *path, uint32_t rights, uint32_t flags, handle_t *_handle);
+extern status_t kern_device_open(const char *path, uint32_t access, uint32_t flags, handle_t *_handle);
 
 #ifdef __cplusplus
 }

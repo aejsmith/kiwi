@@ -191,10 +191,10 @@ extern device_attr_t *device_attr(device_t *device, const char *name, int type);
 extern char *device_path(device_t *device);
 
 extern status_t device_get(
-    device_t *device, uint32_t rights, uint32_t flags,
+    device_t *device, uint32_t access, uint32_t flags,
     object_handle_t **_handle);
 extern status_t device_open(
-    const char *path, uint32_t rights, uint32_t flags,
+    const char *path, uint32_t access, uint32_t flags,
     object_handle_t **_handle);
 
 extern void device_init(void);

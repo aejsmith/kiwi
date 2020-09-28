@@ -522,11 +522,11 @@ char *device_path(device_t *device) {
 
 /** Get a handle to a device.
  * @param device        Device to get handle to.
- * @param rights        Requested rights for the handle.
+ * @param access        Requested access rights for the handle.
  * @param flags         Behaviour flags for the handle.
  * @param _handle       Where to store handle to device.
  * @return              Status code describing result of the operation. */
-status_t device_get(device_t *device, uint32_t rights, uint32_t flags, object_handle_t **_handle) {
+status_t device_get(device_t *device, uint32_t access, uint32_t flags, object_handle_t **_handle) {
     file_handle_t *handle;
     status_t ret;
 
@@ -535,12 +535,12 @@ status_t device_get(device_t *device, uint32_t rights, uint32_t flags, object_ha
 
     mutex_lock(&device->lock);
 
-    if (rights && !file_access(&device->file, rights)) {
+    if (access && !file_access(&device->file, access)) {
         mutex_unlock(&device->lock);
         return STATUS_ACCESS_DENIED;
     }
 
-    handle = file_handle_alloc(&device->file, rights, flags);
+    handle = file_handle_alloc(&device->file, access, flags);
 
     if (device->ops && device->ops->open) {
         ret = device->ops->open(device, flags, &handle->private);
@@ -559,11 +559,11 @@ status_t device_get(device_t *device, uint32_t rights, uint32_t flags, object_ha
 
 /** Create a handle to a device.
  * @param path          Path to device to open.
- * @param rights        Requested rights for the handle.
+ * @param access        Requested access access for the handle.
  * @param flags         Behaviour flags for the handle.
  * @param _handle       Where to store pointer to handle structure.
  * @return              Status code describing result of the operation. */
-status_t device_open(const char *path, uint32_t rights, uint32_t flags, object_handle_t **_handle) {
+status_t device_open(const char *path, uint32_t access, uint32_t flags, object_handle_t **_handle) {
     device_t *device;
     file_handle_t *handle;
     status_t ret;
@@ -577,13 +577,13 @@ status_t device_open(const char *path, uint32_t rights, uint32_t flags, object_h
 
     mutex_lock(&device->lock);
 
-    if (rights && !file_access(&device->file, rights)) {
+    if (access && !file_access(&device->file, access)) {
         refcount_dec(&device->count);
         mutex_unlock(&device->lock);
         return STATUS_ACCESS_DENIED;
     }
 
-    handle = file_handle_alloc(&device->file, rights, flags);
+    handle = file_handle_alloc(&device->file, access, flags);
 
     if (device->ops && device->ops->open) {
         ret = device->ops->open(device, flags, &handle->private);
@@ -726,11 +726,11 @@ __init_text void device_init(void) {
 
 /** Open a handle to a device.
  * @param path          Device tree path for device to open.
- * @param rights        Requested rights for the handle.
+ * @param access        Requested access rights for the handle.
  * @param flags         Behaviour flags for the handle.
  * @param _handle       Where to store handle to the device.
  * @return              Status code describing result of the operation. */
-status_t kern_device_open(const char *path, uint32_t rights, uint32_t flags, handle_t *_handle) {
+status_t kern_device_open(const char *path, uint32_t access, uint32_t flags, handle_t *_handle) {
     object_handle_t *handle;
     status_t ret;
     char *kpath;
@@ -742,7 +742,7 @@ status_t kern_device_open(const char *path, uint32_t rights, uint32_t flags, han
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    ret = device_open(kpath, rights, flags, &handle);
+    ret = device_open(kpath, access, flags, &handle);
     if (ret != STATUS_SUCCESS) {
         kfree(kpath);
         return ret;
