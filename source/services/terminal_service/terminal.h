@@ -19,31 +19,28 @@
  * @brief               Terminal class.
  */
 
-#include "terminal.h"
+#pragma once
 
-#include <core/log.h>
+#include <core/ipc.h>
 
-#include <kernel/thread.h>
+#include <thread>
 
-Terminal::Terminal(core_connection_t *connection) :
-    m_connection (connection)
-{}
+class Terminal {
+public:
+    Terminal(core_connection_t *connection);
+    ~Terminal();
 
-Terminal::~Terminal() {
-    core_connection_close(m_connection);
-}
+    void run();
 
-void Terminal::run() {
-    m_thread = std::thread([this] () { thread(); });
-}
+private:
+    void thread();
 
-void Terminal::thread() {
-    core_log(CORE_LOG_DEBUG, "thread started");
+    bool handleEvent(object_event_t &event);
+    bool handleMessages();
+    core_message_t *handleOpenHandle(core_message_t *request);
+    core_message_t *handleInput(core_message_t *request);
 
-    while (true) {
-        kern_thread_sleep(1000000000, nullptr);
-
-        // TODO: Make sure we delete the terminal and clean up the thread when
-        // there's a disconnect.
-    }
-}
+private:
+    core_connection_t *const m_connection;
+    std::thread m_thread;
+};

@@ -16,7 +16,7 @@
 
 dirs = [
     'service_manager',
-    'terminal',
+    'terminal_service',
     'test',
 ]
 

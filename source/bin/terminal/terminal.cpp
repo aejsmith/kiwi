@@ -33,7 +33,9 @@
 #include <assert.h>
 #include <inttypes.h>
 
-#include "../../services/terminal/protocol.h"
+#include <array>
+
+#include "../../services/terminal_service/protocol.h"
 
 extern const char *const *environ;
 
@@ -63,15 +65,15 @@ void Terminal::run() {
     if (spawnProcess("/system/bin/shell", m_childProcess) != STATUS_SUCCESS)
         return;
 
-    m_events.resize(4);
-    m_events[0].handle = core_connection_get_handle(m_connection);
-    m_events[0].event  = CONNECTION_EVENT_HANGUP;
-    m_events[1].handle = m_events[0].handle;
-    m_events[1].event  = CONNECTION_EVENT_MESSAGE;
-    m_events[2].handle = m_childProcess;
-    m_events[2].event  = PROCESS_EVENT_DEATH;
-    m_events[3].handle = m_device;
-    m_events[3].event  = FILE_EVENT_READABLE;
+    std::array<object_event_t, 4> events;
+    events[0].handle = core_connection_get_handle(m_connection);
+    events[0].event  = CONNECTION_EVENT_HANGUP;
+    events[1].handle = events[0].handle;
+    events[1].event  = CONNECTION_EVENT_MESSAGE;
+    events[2].handle = m_childProcess;
+    events[2].event  = PROCESS_EVENT_DEATH;
+    events[3].handle = m_device;
+    events[3].event  = FILE_EVENT_READABLE;
 
     bool exit = false;
 
@@ -83,13 +85,13 @@ void Terminal::run() {
          * signal. */
         handleMessages();
 
-        ret = kern_object_wait(m_events.data(), m_events.size(), 0, -1);
+        ret = kern_object_wait(events.data(), events.size(), 0, -1);
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_WARN, "failed to wait for events: %" PRId32, ret);
             continue;
         }
 
-        for (object_event_t &event : m_events) {
+        for (object_event_t &event : events) {
             if (event.flags & OBJECT_EVENT_SIGNALLED) {
                 exit = handleEvent(event);
             } else if (event.flags & OBJECT_EVENT_ERROR) {
@@ -102,9 +104,7 @@ void Terminal::run() {
 }
 
 bool Terminal::handleEvent(object_event_t &event) {
-    handle_t connHandle = core_connection_get_handle(m_connection);
-
-    if (event.handle == connHandle) {
+    if (event.handle == core_connection_get_handle(m_connection)) {
         switch (event.event) {
             case CONNECTION_EVENT_HANGUP:
                 core_log(CORE_LOG_ERROR, "lost connection to terminal service, exiting");

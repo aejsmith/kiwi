@@ -23,8 +23,6 @@
 
 #include <core/ipc.h>
 
-#include <vector>
-
 class Terminal {
 public:
     Terminal();
@@ -44,5 +42,4 @@ private:
     core_connection_t *m_connection;        /**< Connection to terminal service. */
     handle_t m_device;                      /**< Target device. */
     handle_t m_childProcess;                /**< Main child process. */
-    std::vector<object_event_t> m_events;   /**< Event list. */
 };
