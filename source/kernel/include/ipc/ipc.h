@@ -97,36 +97,10 @@ typedef struct ipc_connection {
 #define SERVER_ENDPOINT     0           /**< Endpoint for the server (port owner). */
 #define CLIENT_ENDPOINT     1           /**< Endpoint for the client (connection opener). */
 
-/** IPC port operations. */
-typedef struct ipc_port_ops {
-    /**
-     * Handle a connection on a port.
-     *
-     * This function is called when a connection attempt is made to this port.
-     * The given endpoint refers to the server side of the connection. This
-     * function is called from the context of the thread making the connection.
-     *
-     * Returning an error from this function has the effect of rejecting the
-     * connection and causing that error to be returned to the client's connect
-     * call. Returning STATUS_SUCCESS causes the connection to become active.
-     *
-     * @param port          Port being connected to (locked).
-     * @param endpoint      Endpoint for server side of the connection.
-     * @param timeout       Timeout in nanoseconds. 0 should return immediately
-     *                      if unable to connect without delay, -1 should block
-     *                      forever.
-     *
-     * @return              Status code describing result of the operation.
-     */
-    status_t (*connect)(struct ipc_port *port, ipc_endpoint_t *endpoint, nstime_t timeout);
-} ipc_port_ops_t;
-
 /** IPC port structure. */
 typedef struct ipc_port {
     mutex_t lock;                       /**< Lock for structure. */
     refcount_t count;                   /**< References to the port. */
-    ipc_port_ops_t *ops;                /**< Operations for the port. */
-    void *private;                      /**< Private data pointer. */
     process_t *owner;                   /**< Owning process. */
     size_t owner_count;                 /**< References from the owner. */
     list_t waiting;                     /**< List of in-progress connection attempts. */
@@ -159,8 +133,6 @@ extern status_t ipc_connection_receive(
     ipc_endpoint_t *endpoint, unsigned flags, nstime_t timeout,
     ipc_kmessage_t **_msg);
 
-extern ipc_port_t *ipc_port_create(ipc_port_ops_t *ops, void *private);
-extern void ipc_port_destroy(ipc_port_t *port);
 extern void ipc_port_retain(ipc_port_t *port);
 extern void ipc_port_release(ipc_port_t *port);
 extern status_t ipc_port_publish(ipc_port_t *port, handle_t *_id, handle_t *_uid);
