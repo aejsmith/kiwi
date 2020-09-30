@@ -48,11 +48,39 @@ typedef struct ipc_kmessage {
     object_handle_t *handle;            /**< Attached handle (can be NULL). */
 } ipc_kmessage_t;
 
+/** IPC endpoint operations. */
+typedef struct ipc_endpoint_ops {
+    /**
+     * Handle a message received on the endpoint. This function is called from
+     * the context of the thread that sent the message.
+     *
+     * If an endpoint has this function set on it, then all messages will be
+     * directed to it instead of being queued on the endpoint (i.e. calls to
+     * ipc_connection_receive() will be invalid).
+     *
+     * @param endpoint      Endpoint message is being received on (connection
+     *                      is locked).
+     * @param msg           Message that is received. If this is needed beyond
+     *                      the end of this function, the function should add a
+     *                      reference to it, otherwise it'll be destroyed.
+     * @param flags         Behaviour flags (IPC_*).
+     * @param timeout       Timeout in nanoseconds. 0 should return immediately
+     *                      if unable to receive without delay, -1 should block
+     *                      forever.
+     *
+     * @return              Status code describing result of the operation.
+     */
+    status_t (*receive)(struct ipc_endpoint *endpoint, ipc_kmessage_t *msg, unsigned flags, nstime_t timeout);
+} ipc_endpoint_ops_t;
+
 /** IPC endpoint structure. */
 typedef struct ipc_endpoint {
     struct ipc_endpoint *remote;        /**< Other end of the connection. */
     struct ipc_connection *conn;        /**< Connection structure. */
     unsigned flags;                     /**< Behaviour flags for the endpoint. */
+
+    ipc_endpoint_ops_t *ops;            /**< Endpoint operations. */
+    void *private;                      /**< Private data for endpoint owner. */
 
     list_t messages;                    /**< List of queued messages. */
     size_t message_count;               /**< Number of messages in message queue. */
@@ -125,6 +153,9 @@ static inline bool ipc_kmessage_has_attachment(ipc_kmessage_t *msg) {
     return (msg->data || msg->handle);
 }
 
+extern status_t ipc_connection_create(
+    unsigned flags, ipc_endpoint_ops_t *ops, void *private,
+    ipc_endpoint_t **_endpoint, handle_t *_uid);
 extern void ipc_connection_close(ipc_endpoint_t *endpoint);
 extern status_t ipc_connection_send(
     ipc_endpoint_t *endpoint, ipc_kmessage_t *msg, unsigned flags,
