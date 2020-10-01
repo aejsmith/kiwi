@@ -474,7 +474,8 @@ void ipc_connection_close(ipc_endpoint_t *endpoint) {
         condvar_broadcast(&endpoint->remote->data_cvar);
     }
 
-    if (conn->state != IPC_CONNECTION_CLOSED) {
+    bool closing = conn->state != IPC_CONNECTION_CLOSED;
+    if (closing) {
         conn->state = IPC_CONNECTION_CLOSED;
         notifier_run(&endpoint->remote->hangup_notifier, NULL, false);
     }
@@ -500,6 +501,9 @@ void ipc_connection_close(ipc_endpoint_t *endpoint) {
     dprintf("ipc: closed endpoint %p (conn: %p)\n", endpoint, conn);
 
     mutex_unlock(&conn->lock);
+
+    if (closing && endpoint->remote->ops && endpoint->remote->ops->close)
+        endpoint->remote->ops->close(endpoint->remote);
 
     ipc_connection_release(conn);
 }

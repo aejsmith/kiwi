@@ -73,6 +73,10 @@ typedef struct ipc_endpoint_ops {
     status_t (*receive)(
         struct ipc_endpoint *endpoint, ipc_kmessage_t *msg, unsigned flags,
         nstime_t timeout);
+
+    /** Called when the other side hangs up the connection.
+     * @param endpoint      Connection endpoint (connection is *not* locked). */
+    void (*close)(struct ipc_endpoint *endpoint);
 } ipc_endpoint_ops_t;
 
 /** IPC endpoint structure. */
