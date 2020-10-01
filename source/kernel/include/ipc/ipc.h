@@ -59,7 +59,7 @@ typedef struct ipc_endpoint_ops {
      * ipc_connection_receive() will be invalid).
      *
      * @param endpoint      Endpoint message is being received on (connection
-     *                      is locked).
+     *                      is *not* locked).
      * @param msg           Message that is received. If this is needed beyond
      *                      the end of this function, the function should add a
      *                      reference to it, otherwise it'll be destroyed.
@@ -70,7 +70,9 @@ typedef struct ipc_endpoint_ops {
      *
      * @return              Status code describing result of the operation.
      */
-    status_t (*receive)(struct ipc_endpoint *endpoint, ipc_kmessage_t *msg, unsigned flags, nstime_t timeout);
+    status_t (*receive)(
+        struct ipc_endpoint *endpoint, ipc_kmessage_t *msg, unsigned flags,
+        nstime_t timeout);
 } ipc_endpoint_ops_t;
 
 /** IPC endpoint structure. */
@@ -155,7 +157,7 @@ static inline bool ipc_kmessage_has_attachment(ipc_kmessage_t *msg) {
 
 extern status_t ipc_connection_create(
     unsigned flags, ipc_endpoint_ops_t *ops, void *private,
-    ipc_endpoint_t **_endpoint, handle_t *_uid);
+    ipc_endpoint_t **_endpoint, handle_t *_id, handle_t *_uid);
 extern void ipc_connection_close(ipc_endpoint_t *endpoint);
 extern status_t ipc_connection_send(
     ipc_endpoint_t *endpoint, ipc_kmessage_t *msg, unsigned flags,

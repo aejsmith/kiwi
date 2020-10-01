@@ -262,68 +262,6 @@ static object_type_t connection_object_type = {
     .unwait = connection_object_unwait,
 };
 
-/** Send a message to an endpoint.
- * @param conn          Connection being sent on (must be locked).
- * @param endpoint      Remote endpoint to send to.
- * @param msg           Message to send.
- * @param flags         Behaviour flags.
- * @param timeout       Timeout in nanoseconds.
- * @return              Status code describing result of the operation. */
-static status_t send_message(
-    ipc_connection_t *conn, ipc_endpoint_t *endpoint, ipc_kmessage_t *msg,
-    unsigned flags, nstime_t timeout)
-{
-    status_t ret;
-
-    assert(conn->state != IPC_CONNECTION_SETUP);
-
-    if (conn->state == IPC_CONNECTION_CLOSED)
-        return STATUS_CONN_HUNGUP;
-
-    if (endpoint->flags & IPC_ENDPOINT_DROP)
-        return STATUS_SUCCESS;
-
-    /* Save the message timestamp and security context. */
-    msg->msg.timestamp = system_time();
-    memcpy(&msg->security, security_current_context(), sizeof(msg->security));
-
-    if (endpoint->ops && endpoint->ops->receive) {
-        return endpoint->ops->receive(endpoint, msg, flags, timeout);
-    } else {
-        /* Wait for queue space if we're not forcing the send. */
-        if (!(flags & IPC_FORCE)) {
-            nstime_t absolute = (timeout > 0) ? system_time() + timeout : timeout;
-            unsigned sleep    = SLEEP_ABSOLUTE;
-
-            if (flags & IPC_INTERRUPTIBLE)
-                sleep |= SLEEP_INTERRUPTIBLE;
-
-            while (endpoint->message_count >= IPC_QUEUE_MAX) {
-                ret = condvar_wait_etc(&endpoint->space_cvar, &conn->lock, absolute, sleep);
-
-                /* Connection could have been closed while we were waiting (see
-                * ipc_connection_close()). */
-                if (conn->state == IPC_CONNECTION_CLOSED)
-                    return STATUS_CONN_HUNGUP;
-
-                if (ret != STATUS_SUCCESS) {
-                    if (endpoint->message_count >= IPC_QUEUE_MAX)
-                        return ret;
-                }
-            }
-        }
-
-        /* Queue the message. */
-        ipc_kmessage_retain(msg);
-        list_append(&endpoint->messages, &msg->header);
-        endpoint->message_count++;
-        condvar_signal(&endpoint->data_cvar);
-        notifier_run(&endpoint->message_notifier, NULL, false);
-
-        return STATUS_SUCCESS;
-    }
-}
-
 /** Receive a message on an endpoint.
  * @param conn          Connection being received on (must be locked).
  * @param endpoint      Endpoint to receive from.
@@ -337,6 +275,12 @@ static status_t receive_message(
 {
     assert(conn->state != IPC_CONNECTION_SETUP);
     assert(!(endpoint->flags & IPC_ENDPOINT_DROP));
+
+    /* Clear any pending data left at our endpoint. */
+    if (endpoint->pending) {
+        ipc_kmessage_release(endpoint->pending);
+        endpoint->pending = NULL;
+    }
 
     /* If the connection is closed we should still return queued messages
      * until there is nothing left to receive, at which point we return an
@@ -462,20 +406,21 @@ void ipc_kmessage_set_handle(ipc_kmessage_t *msg, object_handle_t *handle) {
  *
  * The returned endpoint is the kernel side of the connection, and a handle to
  * the user side of the connection will be created and written to the given
- * user pointer.
+ * pointers.
  *
  * @param flags         Kernel endpoint flags (IPC_ENDPOINT_*).
  * @param ops           Kernel endpoint operations (can be null if the kernel
  *                      side will just communicate via regular send/receive).
  * @param private       Private data pointer for the operations to use.
  * @param _endpoint     Where to return kernel endpoint.
- * @param _uid          Where to return user handle ID (user pointer).
+ * @param _id           If not NULL, a kernel location to store handle ID in.
+ * @param _uid          If not NULL, a user location to store handle ID in.
  *
  * @return              Status code describing result of the operation.
  */
 status_t ipc_connection_create(
     unsigned flags, ipc_endpoint_ops_t *ops, void *private,
-    ipc_endpoint_t **_endpoint, handle_t *_uid)
+    ipc_endpoint_t **_endpoint, handle_t *_id, handle_t *_uid)
 {
     if (!_uid)
         return STATUS_INVALID_ARG;
@@ -498,7 +443,7 @@ status_t ipc_connection_create(
     client->ops     = NULL;
     client->private = NULL;
 
-    status_t ret = object_handle_open(&connection_object_type, client, NULL, _uid);
+    status_t ret = object_handle_open(&connection_object_type, client, _id, _uid);
     if (ret != STATUS_SUCCESS) {
         /* Release both sides. */
         ipc_connection_close(server);
@@ -568,6 +513,8 @@ void ipc_connection_close(ipc_endpoint_t *endpoint) {
  * queue size limit to be ignored. If the IPC_INTERRUPTIBLE flag is set, the
  * thread will be interruptible while waiting for queue space.
  *
+ * Kernel messages are sent with the security context of the current thread.
+ *
  * @param endpoint      Caller's endpoint of the connection.
  * @param msg           Message to send. Will be referenced, caller must still
  *                      release it after sending.
@@ -593,12 +540,76 @@ status_t ipc_connection_send(
     ipc_endpoint_t *endpoint, ipc_kmessage_t *msg, unsigned flags,
     nstime_t timeout)
 {
+    status_t ret;
+
     ipc_connection_t *conn = endpoint->conn;
+    ipc_endpoint_t *remote = endpoint->remote;
 
     mutex_lock(&conn->lock);
-    status_t ret = send_message(conn, endpoint->remote, msg, flags, timeout);
-    mutex_unlock(&conn->lock);
 
+    assert(conn->state != IPC_CONNECTION_SETUP);
+
+    /* Clear any pending data left at our endpoint. */
+    if (endpoint->pending) {
+        ipc_kmessage_release(endpoint->pending);
+        endpoint->pending = NULL;
+    }
+
+    if (conn->state == IPC_CONNECTION_CLOSED) {
+        ret = STATUS_CONN_HUNGUP;
+        goto out;
+    }
+
+    if (remote->flags & IPC_ENDPOINT_DROP) {
+        ret = STATUS_SUCCESS;
+        goto out;
+    }
+
+    /* Save the message timestamp and security context. */
+    msg->msg.timestamp = system_time();
+    memcpy(&msg->security, security_current_context(), sizeof(msg->security));
+
+    if (remote->ops && remote->ops->receive) {
+        mutex_unlock(&conn->lock);
+        return remote->ops->receive(remote, msg, flags, timeout);
+    }
+
+    /* Wait for queue space if we're not forcing the send. */
+    if (!(flags & IPC_FORCE)) {
+        nstime_t absolute = (timeout > 0) ? system_time() + timeout : timeout;
+        unsigned sleep    = SLEEP_ABSOLUTE;
+
+        if (flags & IPC_INTERRUPTIBLE)
+            sleep |= SLEEP_INTERRUPTIBLE;
+
+        while (remote->message_count >= IPC_QUEUE_MAX) {
+            ret = condvar_wait_etc(&remote->space_cvar, &conn->lock, absolute, sleep);
+
+            /* Connection could have been closed while we were waiting (see
+            * ipc_connection_close()). */
+            if (conn->state == IPC_CONNECTION_CLOSED) {
+                ret = STATUS_CONN_HUNGUP;
+                goto out;
+            }
+
+            if (ret != STATUS_SUCCESS) {
+                if (remote->message_count >= IPC_QUEUE_MAX)
+                    goto out;
+            }
+        }
+    }
+
+    /* Queue the message. */
+    ipc_kmessage_retain(msg);
+    list_append(&remote->messages, &msg->header);
+    remote->message_count++;
+    condvar_signal(&remote->data_cvar);
+    notifier_run(&remote->message_notifier, NULL, false);
+
+    ret = STATUS_SUCCESS;
+
+out:
+    mutex_unlock(&conn->lock);
     return ret;
 }
 
@@ -1080,23 +1091,13 @@ status_t kern_connection_send(
         return ret;
 
     ipc_endpoint_t *endpoint = khandle->private;
-    ipc_connection_t *conn   = endpoint->conn;
 
     ipc_kmessage_t *kmsg;
     ret = copy_message_from_user(msg, data, attached, &kmsg);
     if (ret != STATUS_SUCCESS)
         goto out_release_conn;
 
-    mutex_lock(&conn->lock);
-
-    /* Clear any pending data left at our endpoint. */
-    if (endpoint->pending) {
-        ipc_kmessage_release(endpoint->pending);
-        endpoint->pending = NULL;
-    }
-
-    ret = send_message(conn, endpoint->remote, kmsg, IPC_INTERRUPTIBLE, timeout);
-    mutex_unlock(&conn->lock);
+    ret = ipc_connection_send(endpoint, kmsg, IPC_INTERRUPTIBLE, timeout);
     ipc_kmessage_release(kmsg);
 
 out_release_conn:
@@ -1156,12 +1157,6 @@ status_t kern_connection_receive(
     ipc_connection_t *conn   = endpoint->conn;
 
     mutex_lock(&conn->lock);
-
-    /* Clear any pending data left at our endpoint. */
-    if (endpoint->pending) {
-        ipc_kmessage_release(endpoint->pending);
-        endpoint->pending = NULL;
-    }
 
     ipc_kmessage_t *kmsg;
     ret = receive_message(conn, endpoint, IPC_INTERRUPTIBLE, timeout, &kmsg);
