@@ -36,11 +36,20 @@ private:
     void thread();
 
     bool handleEvent(object_event_t &event);
-    bool handleMessages();
-    core_message_t *handleOpenHandle(core_message_t *request);
-    core_message_t *handleInput(core_message_t *request);
+
+    bool handleClientMessages();
+    core_message_t *handleClientOpenHandle(core_message_t *request);
+    core_message_t *handleClientInput(core_message_t *request);
+
+    bool handleFileMessages();
+    status_t handleFileRead(const ipc_message_t &message);
+    status_t handleFileWrite(const ipc_message_t &message, const void *data);
+    status_t handleFileInfo(const ipc_message_t &message);
 
 private:
     core_connection_t *const m_connection;
     std::thread m_thread;
+
+    handle_t m_userFile;
+    handle_t m_userFileConnection;
 };
