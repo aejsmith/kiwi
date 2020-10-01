@@ -31,6 +31,7 @@ struct device;
 struct file_handle;
 struct fs_node;
 struct io_request;
+struct user_file;
 
 /** Operations for a file. */
 typedef struct file_ops {
@@ -120,24 +121,25 @@ typedef struct file_ops {
 
 /** Header for a file object. */
 typedef struct file {
-    file_ops_t *ops;                /**< File operations structure. */
-    file_type_t type;               /**< Type of the file. */
+    file_ops_t *ops;                    /**< File operations structure. */
+    file_type_t type;                   /**< Type of the file. */
 } file_t;
 
 /** File handle information. */
 typedef struct file_handle {
     union {
-        file_t *file;               /**< File object. */
-        struct fs_node *node;       /**< Filesystem node. */
-        struct device *device;      /**< Device node. */
+        file_t *file;                   /**< File object. */
+        struct fs_node *node;           /**< Filesystem node. */
+        struct device *device;          /**< Device node. */
+        struct user_file *user_file;    /**< User file. */
     };
 
-    uint32_t access;                /**< Access rights the handle was opened with. */
-    uint32_t flags;                 /**< Flags modifying handle behaviour. */
-    void *private;                  /**< Implementation data pointer. */
-    mutex_t lock;                   /**< Lock to protect offset. */
-    offset_t offset;                /**< Current file offset. */
-    struct fs_dentry *entry;        /**< Directory entry used to open the node. */
+    uint32_t access;                    /**< Access rights the handle was opened with. */
+    uint32_t flags;                     /**< Flags modifying handle behaviour. */
+    void *private;                      /**< Implementation data pointer. */
+    mutex_t lock;                       /**< Lock to protect offset. */
+    offset_t offset;                    /**< Current file offset. */
+    struct fs_dentry *entry;            /**< Directory entry used to open the node. */
 } file_handle_t;
 
 /**

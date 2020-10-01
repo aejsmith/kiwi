@@ -694,6 +694,8 @@ status_t file_info(object_handle_t *handle, file_info_t *info) {
     file_handle_t *fhandle = handle->private;
 
     fhandle->file->ops->info(fhandle, info);
+
+    assert(info->type == fhandle->file->type);
     return STATUS_SUCCESS;
 }
 

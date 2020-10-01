@@ -147,3 +147,5 @@ syscall kern_timer_stop(handle_t, ptr_t);
 
 syscall kern_image_register(image_id_t, ptr_t) hidden;
 syscall kern_image_unregister(image_id_t) hidden;
+
+syscall kern_user_file_create(int, uint32_t, uint32_t, ptr_t, ptr_t);

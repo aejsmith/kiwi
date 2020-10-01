@@ -32,6 +32,7 @@ sources = FeatureSources(config, [
     'io/memory_file.c',
     'io/ramfs.c',
     'io/request.c',
+    'io/user_file.c',
 
     'ipc/ipc.c',
     'ipc/pipe.c',
