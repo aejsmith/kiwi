@@ -446,7 +446,8 @@ status_t core_connection_receive(core_connection_t *conn, nstime_t timeout, core
          * care about. Therefore we have to loop. TODO: Timeouts other than
          * 0/-1 are not handled properly. */
         while (!message) {
-            status_t ret = receive_message(conn, -1, &message);
+            libsystem_assert(timeout <= 0);
+            status_t ret = receive_message(conn, timeout, &message);
             if (ret != STATUS_SUCCESS)
                 return ret;
         }
