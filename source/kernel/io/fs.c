@@ -978,6 +978,24 @@ err_free_entry:
  * File operations.
  */
 
+/** Open a FS handle.
+ * @param handle        File handle structure.
+ * @return              Status code describing the result of the operation. */
+static status_t fs_file_open(file_handle_t *handle) {
+    status_t ret = STATUS_SUCCESS;
+
+    if (handle->access & FILE_ACCESS_WRITE && fs_node_is_read_only(handle->node))
+        return STATUS_READ_ONLY;
+
+    if (handle->node->ops && handle->node->ops->open)
+        ret = handle->node->ops->open(handle);
+
+    if (ret == STATUS_SUCCESS)
+        fs_dentry_retain(handle->entry);
+
+    return ret;
+}
+
 /** Close a FS handle.
  * @param handle        File handle structure. */
 static void fs_file_close(file_handle_t *handle) {
@@ -1120,6 +1138,7 @@ static status_t fs_file_sync(file_handle_t *handle) {
 
 /** FS file object operations. */
 static file_ops_t fs_file_ops = {
+    .open = fs_file_open,
     .close = fs_file_close,
     .name = fs_file_name,
     .wait = fs_file_wait,

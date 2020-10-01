@@ -90,6 +90,8 @@ typedef struct io_vec {
 #define FILE_EVENT_READABLE 1           /**< Wait for the device to be readable. */
 #define FILE_EVENT_WRITABLE 2           /**< Wait for the device to be writable. */
 
+extern status_t kern_file_reopen(handle_t handle, uint32_t access, uint32_t flags, handle_t *_new);
+
 extern status_t kern_file_read(
     handle_t handle, void *buf, size_t size, offset_t offset,
     size_t *_bytes);

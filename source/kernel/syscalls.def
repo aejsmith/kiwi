@@ -45,6 +45,7 @@ syscall kern_handle_set_flags(handle_t, uint32_t);
 syscall kern_handle_duplicate(handle_t, handle_t, ptr_t);
 syscall kern_handle_close(handle_t);
 
+syscall kern_file_reopen(handle_t, uint32_t, uint32_t, ptr_t);
 syscall kern_file_read(handle_t, ptr_t, size_t, offset_t, ptr_t);
 syscall kern_file_write(handle_t, ptr_t, size_t, offset_t, ptr_t);
 syscall kern_file_read_vecs(handle_t, ptr_t, size_t, offset_t, ptr_t);

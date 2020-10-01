@@ -40,6 +40,21 @@ device_t *device_tree_root;
 /** Standard device directories. */
 device_t *device_bus_dir;
 
+/** Open a device.
+ * @param handle        File handle structure.
+ * @return              Status code describing the result of the operation. */
+static status_t device_file_open(file_handle_t *handle) {
+    status_t ret = STATUS_SUCCESS;
+
+    if (handle->device->ops && handle->device->ops->open)
+        ret = handle->device->ops->open(handle->device, handle->flags, &handle->private);
+
+    if (ret == STATUS_SUCCESS)
+        refcount_inc(&handle->device->count);
+
+    return ret;
+}
+
 /** Close a device.
  * @param handle        File handle structure. */
 static void device_file_close(file_handle_t *handle) {
@@ -128,6 +143,7 @@ static status_t device_file_request(
 
 /** Device file operations structure. */
 static file_ops_t device_file_ops = {
+    .open = device_file_open,
     .close = device_file_close,
     .wait = device_file_wait,
     .unwait = device_file_unwait,

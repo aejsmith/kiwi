@@ -34,6 +34,11 @@ struct io_request;
 
 /** Operations for a file. */
 typedef struct file_ops {
+    /** Open a file (via file_reopen).
+     * @param handle        File handle structure.
+     * @return              Status code describing the result of the operation. */
+    status_t (*open)(struct file_handle *handle);
+
     /** Close a file.
      * @param handle        File handle structure. All data allocated for
      *                      the handle should be freed. */
@@ -144,10 +149,13 @@ extern bool file_access(file_t *file, uint32_t access);
 extern file_handle_t *file_handle_alloc(file_t *file, uint32_t access, uint32_t flags);
 extern void file_handle_free(file_handle_t *fhandle);
 extern object_handle_t *file_handle_create(file_handle_t *fhandle);
+extern status_t file_handle_attach(file_t *file, uint32_t access, uint32_t flags, handle_t *_id, handle_t *_uid);
 
 /**
  * Public kernel interface.
  */
+
+extern status_t file_reopen(object_handle_t *handle, uint32_t access, uint32_t flags, object_handle_t **_new);
 
 extern status_t file_read(
     object_handle_t *handle, void *buf, size_t size, offset_t offset,

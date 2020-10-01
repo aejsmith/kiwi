@@ -33,8 +33,7 @@
 #include <object.h>
 #include <status.h>
 
-/** Close a handle to a file.
- * @param handle        Handle to the file. */
+/** Close a handle to a file. */
 static void file_object_close(object_handle_t *handle) {
     file_handle_t *fhandle = handle->private;
 
@@ -44,9 +43,7 @@ static void file_object_close(object_handle_t *handle) {
     file_handle_free(fhandle);
 }
 
-/** Get the name of a file object.
- * @param handle        Handle to the file.
- * @return              Pointer to allocated name string. */
+/** Get the name of a file object. */
 static char *file_object_name(object_handle_t *handle) {
     file_handle_t *fhandle = handle->private;
 
@@ -56,10 +53,7 @@ static char *file_object_name(object_handle_t *handle) {
     return fhandle->file->ops->name(fhandle);
 }
 
-/** Signal that a file event is being waited for.
- * @param handle        Handle to the file.
- * @param event         Event that is being waited for.
- * @return              Status code describing result of the operation. */
+/** Signal that a file event is being waited for. */
 static status_t file_object_wait(object_handle_t *handle, object_event_t *event) {
     file_handle_t *fhandle = handle->private;
 
@@ -69,9 +63,7 @@ static status_t file_object_wait(object_handle_t *handle, object_event_t *event)
     return fhandle->file->ops->wait(fhandle, event);
 }
 
-/** Stop waiting for a file event.
- * @param handle        Handle to the file.
- * @param event         Event that is being waited for. */
+/** Stop waiting for a file event. */
 static void file_object_unwait(object_handle_t *handle, object_event_t *event) {
     file_handle_t *fhandle = handle->private;
 
@@ -79,13 +71,9 @@ static void file_object_unwait(object_handle_t *handle, object_event_t *event) {
     return fhandle->file->ops->unwait(fhandle, event);
 }
 
-/** Map a file object into memory.
- * @param handle        Handle to object.
- * @param region        Region being mapped.
- * @return              Status code describing result of the operation. */
+/** Map a file object into memory. */
 static status_t file_object_map(object_handle_t *handle, vm_region_t *region) {
     file_handle_t *fhandle = handle->private;
-    uint32_t access = 0;
 
     /* Directories cannot be memory-mapped. */
     if (fhandle->file->type == FILE_TYPE_DIR || !fhandle->file->ops->map)
@@ -93,6 +81,7 @@ static status_t file_object_map(object_handle_t *handle, vm_region_t *region) {
 
     /* Check for the necessary access rights. Don't need write permission for
      * private mappings, changes won't be written back to the file. */
+    uint32_t access = 0;
     if (region->access & VM_ACCESS_READ) {
         access |= FILE_ACCESS_READ;
     } else if (region->access & VM_ACCESS_WRITE && !(region->flags & VM_MAP_PRIVATE)) {
@@ -109,20 +98,19 @@ static status_t file_object_map(object_handle_t *handle, vm_region_t *region) {
 
 /** File object type definition. */
 static object_type_t file_object_type = {
-    .id = OBJECT_TYPE_FILE,
-    .flags = OBJECT_TRANSFERRABLE,
-    .close = file_object_close,
-    .name = file_object_name,
-    .wait = file_object_wait,
+    .id     = OBJECT_TYPE_FILE,
+    .flags  = OBJECT_TRANSFERRABLE,
+    .close  = file_object_close,
+    .name   = file_object_name,
+    .wait   = file_object_wait,
     .unwait = file_object_unwait,
-    .map = file_object_map,
+    .map    = file_object_map,
 };
 
 /**
- * Check for access to a file.
- *
- * Checks the current thread's security context against a file's ACL to
- * determine whether that it has the specified access rights to the file.
+ * Check for access to a file. The current thread's security context is checked
+ * against the file's ACL to determine whether that it has the specified access
+ * rights to the file.
  *
  * @param file          File to check.
  * @param access        Access rights to check for.
@@ -140,15 +128,16 @@ bool file_access(file_t *file, uint32_t access) {
  * @param flags         Flags for the handle.
  * @return              Pointer to allocated structure. */
 file_handle_t *file_handle_alloc(file_t *file, uint32_t access, uint32_t flags) {
-    file_handle_t *fhandle;
+    file_handle_t *fhandle = kmalloc(sizeof(*fhandle), MM_KERNEL);
 
-    fhandle = kmalloc(sizeof(*fhandle), MM_KERNEL);
     mutex_init(&fhandle->lock, "file_handle_lock", 0);
-    fhandle->file = file;
-    fhandle->access = access;
-    fhandle->flags = flags;
+
+    fhandle->file    = file;
+    fhandle->access  = access;
+    fhandle->flags   = flags;
     fhandle->private = NULL;
-    fhandle->offset = 0;
+    fhandle->offset  = 0;
+
     return fhandle;
 }
 
@@ -165,22 +154,70 @@ object_handle_t *file_handle_create(file_handle_t *fhandle) {
     return object_handle_create(&file_object_type, fhandle);
 }
 
-/** Determine whether a file is seekable.
- * @param file          File to check.
- * @return              Whether the file is seekable. */
+/** Shortcut for file_handle_alloc/create() + object_handle_attach().
+ * @param file          File that handle is to.
+ * @param access        Access rights for the handle.
+ * @param flags         Flags for the handle.
+ * @param _id           If not NULL, a kernel location to store handle ID in.
+ * @param _uid          If not NULL, a user location to store handle ID in.
+ * @return              Status code describing result of the operation. */
+status_t file_handle_attach(file_t *file, uint32_t access, uint32_t flags, handle_t *_id, handle_t *_uid) {
+    file_handle_t *fhandle  = file_handle_alloc(file, access, flags);
+    object_handle_t *handle = file_handle_create(fhandle);
+
+    status_t ret = object_handle_attach(handle, _id, _uid);
+    object_handle_release(handle);
+    return ret;
+}
+
+/** Determine whether a file is seekable. */
 static inline bool is_seekable(file_t *file) {
     return (file->type == FILE_TYPE_REGULAR || file->type == FILE_TYPE_BLOCK);
 }
 
-/** Perform an I/O request on a file.
- * @param handle        Handle to file to perform request on.
- * @param request       I/O request to perform.
- * @return              Status code describing result of the operation. */
+/**
+ * Create a new handle to an already open file. This handle has entirely
+ * separate state to the existing handle, i.e. changes to flags, offset, etc.
+ * on it will not affect the original handle. The calling thread must have
+ * the specified access to the file. The offset of the new handle will be 0.
+ *
+ * @param handle        Handle to reopen.
+ * @param access        Requested access rights for the handle.
+ * @param flags         Behaviour flags for the handle.
+ * @param _new          Where to store new handle.
+ *
+ * @return              Status code describing the result of the operation.
+ */
+status_t file_reopen(object_handle_t *handle, uint32_t access, uint32_t flags, object_handle_t **_new) {
+    status_t ret;
+
+    if (handle->type->id != OBJECT_TYPE_FILE)
+        return STATUS_INVALID_HANDLE;
+
+    file_handle_t *fhandle = handle->private;
+
+    if (!fhandle->file->ops->open)
+        return STATUS_NOT_SUPPORTED;
+
+    if (access && !file_access(fhandle->file, access))
+        return STATUS_ACCESS_DENIED;
+
+    file_handle_t *new = file_handle_alloc(fhandle->file, access, flags);
+    new->entry = fhandle->entry;
+
+    ret = new->file->ops->open(new);
+    if (ret != STATUS_SUCCESS) {
+        file_handle_free(new);
+        return ret;
+    }
+
+    *_new = file_handle_create(new);
+    return STATUS_SUCCESS;
+}
+
+/** Perform an I/O request on a file. */
 static status_t file_io(object_handle_t *handle, io_request_t *request) {
-    file_handle_t *fhandle;
-    uint32_t access;
     bool update_offset = false;
-    file_info_t info;
     status_t ret;
 
     if (handle->type->id != OBJECT_TYPE_FILE) {
@@ -188,9 +225,9 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
         goto out;
     }
 
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
 
-    access = (request->op == IO_OP_WRITE) ? FILE_ACCESS_WRITE : FILE_ACCESS_READ;
+    uint32_t access = (request->op == IO_OP_WRITE) ? FILE_ACCESS_WRITE : FILE_ACCESS_READ;
     if (!(fhandle->access & access)) {
         ret = STATUS_ACCESS_DENIED;
         goto out;
@@ -215,8 +252,12 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
         if (request->offset < 0) {
             if (request->op == IO_OP_WRITE && fhandle->flags & FILE_APPEND) {
                 mutex_lock(&fhandle->lock);
+
+                file_info_t info;
                 fhandle->file->ops->info(fhandle, &info);
+
                 fhandle->offset = request->offset = info.size;
+
                 mutex_unlock(&fhandle->lock);
             } else {
                 request->offset = fhandle->offset;
@@ -245,13 +286,11 @@ out:
 }
 
 /**
- * Read from a file.
- *
- * Reads data from a file into a buffer. If the specified offset is greater
- * than or equal to 0, then data will be read from exactly that offset in the
- * file, and the handle's offset will not be modified. Otherwise, the read will
- * occur from the file handle's current offset, and before returning the offset
- * will be incremented by the number of bytes read.
+ * Read data from a file into a buffer. If the specified offset is greater than
+ * or equal to 0, then data will be read from exactly that offset in the file,
+ * and the handle's offset will not be modified. Otherwise, the read will occur
+ * from the file handle's current offset, and before returning the offset will
+ * be incremented by the number of bytes read.
  *
  * @param handle        Handle to file to read from. Must have the
  *                      FILE_ACCESS_READ access right.
@@ -270,16 +309,16 @@ status_t file_read(
     object_handle_t *handle, void *buf, size_t size, offset_t offset,
     size_t *_bytes)
 {
-    io_vec_t vec;
-    io_request_t request;
     status_t ret;
 
     assert(handle);
     assert(buf);
 
+    io_vec_t vec;
     vec.buffer = buf;
-    vec.size = size;
+    vec.size   = size;
 
+    io_request_t request;
     ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ, IO_TARGET_KERNEL);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -293,9 +332,7 @@ status_t file_read(
 }
 
 /**
- * Write to a file.
- *
- * Writes data from a buffer to a file. If the specified offset is greater than
+ * Write data from a buffer to a file. If the specified offset is greater than
  * or equal to 0, then data will be written to exactly that offset in the file,
  * and the handle's offset will not be modified. Otherwise, the write will
  * occur at the file handle's current offset (which will be set to the end of
@@ -319,16 +356,16 @@ status_t file_write(
     object_handle_t *handle, const void *buf, size_t size, offset_t offset,
     size_t *_bytes)
 {
-    io_vec_t vec;
-    io_request_t request;
     status_t ret;
 
     assert(handle);
     assert(buf);
 
+    io_vec_t vec;
     vec.buffer = (void *)buf;
-    vec.size = size;
+    vec.size   = size;
 
+    io_request_t request;
     ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -342,9 +379,7 @@ status_t file_write(
 }
 
 /**
- * Read from a file.
- *
- * Reads data from a file into multiple buffers. If the specified offset is
+ * Read data from a file into multiple buffers. If the specified offset is
  * greater than or equal to 0, then data will be read from exactly that offset
  * in the file, and the handle's offset will not be modified. Otherwise, the
  * read will occur from the file handle's current offset, and before returning
@@ -366,11 +401,11 @@ status_t file_read_vecs(
     object_handle_t *handle, const io_vec_t *vecs, size_t count, offset_t offset,
     size_t *_bytes)
 {
-    io_request_t request;
     status_t ret;
 
     assert(handle);
 
+    io_request_t request;
     ret = io_request_init(&request, vecs, count, offset, IO_OP_READ, IO_TARGET_KERNEL);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -384,9 +419,7 @@ status_t file_read_vecs(
 }
 
 /**
- * Write to a file.
- *
- * Writes data from multiple buffers to a file. If the specified offset is
+ * Write data from multiple buffers to a file. If the specified offset is
  * greater than or equal to 0, then data will be written to exactly that offset
  * in the file, and the handle's offset will not be modified. Otherwise, the
  * write will occur at the file handle's current offset (which will be set to
@@ -409,11 +442,11 @@ status_t file_write_vecs(
     object_handle_t *handle, const io_vec_t *vecs, size_t count, offset_t offset,
     size_t *_bytes)
 {
-    io_request_t request;
     status_t ret;
 
     assert(handle);
 
+    io_request_t request;
     ret = io_request_init(&request, vecs, count, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -427,13 +460,10 @@ status_t file_write_vecs(
 }
 
 /**
- * Read a directory entry.
- *
- * Reads a single directory entry structure from a directory into a buffer. As
- * the structure length is variable, a buffer size argument must be provided
- * to ensure that the buffer isn't overflowed. The number of the entry read
- * will be the handle's current offset, and upon success the handle's offset
- * will be incremented by 1.
+ * Read a single entry from a directory into a buffer. As the structure length
+ * is variable, a buffer size argument must be provided to ensure that the
+ * buffer isn't overflowed. The entry number read will be the handle's current
+ * offset, and upon success the handle's offset will be incremented by 1.
  *
  * @param handle        Handle to directory to read from. Must have the
  *                      FILE_ACCESS_READ access right.
@@ -448,8 +478,6 @@ status_t file_write_vecs(
  *                      entry.
  */
 status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size) {
-    file_handle_t *fhandle;
-    dir_entry_t *entry;
     status_t ret;
 
     assert(handle);
@@ -457,7 +485,7 @@ status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size) {
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
 
     if (!(fhandle->access & FILE_ACCESS_READ)) {
         return STATUS_ACCESS_DENIED;
@@ -470,8 +498,12 @@ status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size) {
     /* Lock the handle around the call, the implementation is allowed to modify
      * the offset. */
     mutex_lock(&fhandle->lock);
+
+    dir_entry_t *entry;
     ret = fhandle->file->ops->read_dir(fhandle, &entry);
+
     mutex_unlock(&fhandle->lock);
+
     if (ret != STATUS_SUCCESS) {
         return ret;
     } else if (entry->length > size) {
@@ -488,14 +520,12 @@ status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size) {
  * @param handle        Handle to directory to rewind.
  * @return              Status code describing result of the operation. */
 status_t file_rewind_dir(object_handle_t *handle) {
-    file_handle_t *fhandle;
-
     assert(handle);
 
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
 
     if (!(fhandle->access & FILE_ACCESS_READ)) {
         return STATUS_ACCESS_DENIED;
@@ -521,19 +551,19 @@ status_t file_rewind_dir(object_handle_t *handle) {
  *                      STATUS_NOT_SUPPORTED if attempting to retrieve current
  *                      offset and the file is not seekable. */
 status_t file_state(object_handle_t *handle, uint32_t *_access, uint32_t *_flags, offset_t *_offset) {
-    file_handle_t *fhandle;
-
     assert(handle);
 
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
 
     if (_access)
         *_access = fhandle->access;
+
     if (_flags)
         *_flags = fhandle->flags;
+
     if (_offset) {
         if (!is_seekable(fhandle->file))
             return STATUS_NOT_SUPPORTED;
@@ -550,8 +580,6 @@ status_t file_state(object_handle_t *handle, uint32_t *_access, uint32_t *_flags
  * @return              STATUS_SUCCESS on success.
  *                      STATUS_INVALID_HANDLE if handle is not a file. */
 status_t file_set_flags(object_handle_t *handle, uint32_t flags) {
-    file_handle_t *fhandle;
-
     assert(handle);
 
     if (handle->type->id != OBJECT_TYPE_FILE)
@@ -559,17 +587,15 @@ status_t file_set_flags(object_handle_t *handle, uint32_t flags) {
 
     /* TODO: We'll need an underlying FS call for certain flag changes, e.g.
      * FILE_DIRECT. */
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
     fhandle->flags = flags;
     return STATUS_SUCCESS;
 }
 
 /**
- * Set the offset of a file handle.
- *
- * Modifies the offset of a file handle (the position that will next be read
- * from or written to) according to the specified action, and returns the new
- * offset.
+ * Set the offset of a file handle. The offset (the position that will next be
+ * read from or written to) is modified according to the specified action, and
+ * the new offset is returned.
  *
  * @param handle        Handle to modify offset of.
  * @param action        Operation to perform (FILE_SEEK_*).
@@ -579,36 +605,35 @@ status_t file_set_flags(object_handle_t *handle, uint32_t flags) {
  * @return              Status code describing result of the operation.
  */
 status_t file_seek(object_handle_t *handle, unsigned action, offset_t offset, offset_t *_result) {
-    file_handle_t *fhandle;
-    offset_t result;
-    file_info_t info;
-
     assert(handle);
 
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
 
     if (!is_seekable(fhandle->file))
         return STATUS_NOT_SUPPORTED;
 
     mutex_lock(&fhandle->lock);
 
+    file_info_t info;
+    offset_t result;
+
     switch (action) {
-    case FILE_SEEK_SET:
-        result = offset;
-        break;
-    case FILE_SEEK_ADD:
-        result = fhandle->offset + offset;
-        break;
-    case FILE_SEEK_END:
-        fhandle->file->ops->info(fhandle, &info);
-        result = info.size + offset;
-        break;
-    default:
-        mutex_unlock(&fhandle->lock);
-        return STATUS_INVALID_ARG;
+        case FILE_SEEK_SET:
+            result = offset;
+            break;
+        case FILE_SEEK_ADD:
+            result = fhandle->offset + offset;
+            break;
+        case FILE_SEEK_END:
+            fhandle->file->ops->info(fhandle, &info);
+            result = info.size + offset;
+            break;
+        default:
+            mutex_unlock(&fhandle->lock);
+            return STATUS_INVALID_ARG;
     }
 
     if (result < 0) {
@@ -626,10 +651,8 @@ status_t file_seek(object_handle_t *handle, unsigned action, offset_t offset, of
 }
 
 /**
- * Modify the size of a file.
- *
- * Modifies the size of a file. If the new size is smaller than the previous
- * size of the file, then the extra data is discarded. If it is larger than the
+ * Modify the size of a file. If the new size is smaller than the previous size
+ * of the file, then the extra data is discarded. If it is larger than the
  * previous size, then the extended space will be filled with zero bytes.
  *
  * @param handle        Handle to file to resize. Must have the
@@ -639,14 +662,12 @@ status_t file_seek(object_handle_t *handle, unsigned action, offset_t offset, of
  * @return              Status code describing result of the operation.
  */
 status_t file_resize(object_handle_t *handle, offset_t size) {
-    file_handle_t *fhandle;
-
     assert(handle);
 
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
 
     if (!(fhandle->access & FILE_ACCESS_WRITE)) {
         return STATUS_ACCESS_DENIED;
@@ -664,15 +685,13 @@ status_t file_resize(object_handle_t *handle, offset_t size) {
  * @param info          Information structure to fill in.
  * @return              Status code describing result of the operation. */
 status_t file_info(object_handle_t *handle, file_info_t *info) {
-    file_handle_t *fhandle;
-
     assert(handle);
     assert(info);
 
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
 
     fhandle->file->ops->info(fhandle, info);
     return STATUS_SUCCESS;
@@ -682,14 +701,12 @@ status_t file_info(object_handle_t *handle, file_info_t *info) {
  * @param handle        Handle to file to flush.
  * @return              Status code describing result of the operation. */
 status_t file_sync(object_handle_t *handle) {
-    file_handle_t *fhandle;
-
     assert(handle);
 
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
 
     /* If it's not implemented, assume there is nothing to sync. */
     if (!fhandle->file->ops->sync)
@@ -712,14 +729,12 @@ status_t file_request(
     object_handle_t *handle, unsigned request, const void *in, size_t in_size,
     void **_out, size_t *_out_size)
 {
-    file_handle_t *fhandle;
-
     assert(handle);
 
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    fhandle = handle->private;
+    file_handle_t *fhandle = handle->private;
 
     if (!fhandle->file->ops->request)
         return STATUS_INVALID_REQUEST;
@@ -732,13 +747,45 @@ status_t file_request(
  */
 
 /**
- * Read from a file.
+ * Create a new handle to an already open file. This handle has entirely
+ * separate state to the existing handle, i.e. changes to flags, offset, etc.
+ * on it will not affect the original handle. The calling thread must have
+ * the specified access to the file. The offset of the new handle will be 0.
  *
- * Reads data from a file into a buffer. If the specified offset is greater
- * than or equal to 0, then data will be read from exactly that offset in the
- * file, and the handle's offset will not be modified. Otherwise, the read will
- * occur from the file handle's current offset, and before returning the offset
- * will be incremented by the number of bytes read.
+ * @param handle        Handle to reopen.
+ * @param access        Requested access rights for the handle.
+ * @param flags         Behaviour flags for the handle.
+ * @param _new          Where to store new handle.
+ *
+ * @return              Status code describing the result of the operation.
+ */
+status_t kern_file_reopen(handle_t handle, uint32_t access, uint32_t flags, handle_t *_new) {
+    status_t ret;
+
+    object_handle_t *khandle;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    object_handle_t *new;
+    ret = file_reopen(khandle, access, flags, &new);
+    if (ret != STATUS_SUCCESS)
+        goto out;
+
+    ret = object_handle_attach(new, NULL, _new);
+    object_handle_release(new);
+
+out:
+    object_handle_release(khandle);
+    return ret;
+}
+
+/**
+ * Read data from a file into a buffer. If the specified offset is greater than
+ * or equal to 0, then data will be read from exactly that offset in the file,
+ * and the handle's offset will not be modified. Otherwise, the read will occur
+ * from the file handle's current offset, and before returning the offset will
+ * be incremented by the number of bytes read.
  *
  * @param handle        Handle to file to read from. Must have the
  *                      FILE_ACCESS_READ access right.
@@ -757,11 +804,9 @@ status_t kern_file_read(
     handle_t handle, void *buf, size_t size, offset_t offset,
     size_t *_bytes)
 {
-    object_handle_t *khandle;
-    io_vec_t vec;
-    io_request_t request;
-    status_t ret, err;
+    status_t ret;
 
+    io_request_t request;
     request.transferred = 0;
 
     if (!buf) {
@@ -769,12 +814,14 @@ status_t kern_file_read(
         goto out;
     }
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         goto out;
 
+    io_vec_t vec;
     vec.buffer = buf;
-    vec.size = size;
+    vec.size   = size;
 
     ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ, IO_TARGET_USER);
     if (ret != STATUS_SUCCESS) {
@@ -788,7 +835,7 @@ status_t kern_file_read(
 
 out:
     if (_bytes) {
-        err = write_user(_bytes, request.transferred);
+        status_t err = write_user(_bytes, request.transferred);
         if (err != STATUS_SUCCESS)
             ret = err;
     }
@@ -797,9 +844,7 @@ out:
 }
 
 /**
- * Write to a file.
- *
- * Writes data from a buffer to a file. If the specified offset is greater than
+ * Write data from a buffer to a file. If the specified offset is greater than
  * or equal to 0, then data will be written to exactly that offset in the file,
  * and the handle's offset will not be modified. Otherwise, the write will
  * occur at the file handle's current offset (which will be set to the end of
@@ -823,11 +868,9 @@ status_t kern_file_write(
     handle_t handle, const void *buf, size_t size, offset_t offset,
     size_t *_bytes)
 {
-    object_handle_t *khandle;
-    io_vec_t vec;
-    io_request_t request;
-    status_t ret, err;
+    status_t ret;
 
+    io_request_t request;
     request.transferred = 0;
 
     if (!buf) {
@@ -835,12 +878,14 @@ status_t kern_file_write(
         goto out;
     }
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         goto out;
 
+    io_vec_t vec;
     vec.buffer = (void *)buf;
-    vec.size = size;
+    vec.size   = size;
 
     ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE, IO_TARGET_USER);
     if (ret != STATUS_SUCCESS) {
@@ -854,7 +899,7 @@ status_t kern_file_write(
 
 out:
     if (_bytes) {
-        err = write_user(_bytes, request.transferred);
+        status_t err = write_user(_bytes, request.transferred);
         if (err != STATUS_SUCCESS)
             ret = err;
     }
@@ -863,9 +908,7 @@ out:
 }
 
 /**
- * Read from a file.
- *
- * Reads data from a file into multiple buffers. If the specified offset is
+ * Read data from a file into multiple buffers. If the specified offset is
  * greater than or equal to 0, then data will be read from exactly that offset
  * in the file, and the handle's offset will not be modified. Otherwise, the
  * read will occur from the file handle's current offset, and before returning
@@ -887,11 +930,9 @@ status_t kern_file_read_vecs(
     handle_t handle, const io_vec_t *vecs, size_t count, offset_t offset,
     size_t *_bytes)
 {
-    object_handle_t *khandle;
-    io_vec_t *kvecs;
-    io_request_t request;
-    status_t ret, err;
+    status_t ret;
 
+    io_request_t request;
     request.transferred = 0;
 
     if (!vecs) {
@@ -899,6 +940,7 @@ status_t kern_file_read_vecs(
         goto out;
     }
 
+    io_vec_t *kvecs;
     kvecs = kmalloc(sizeof(*kvecs) * count, MM_USER);
     if (!kvecs) {
         ret = STATUS_NO_MEMORY;
@@ -911,6 +953,7 @@ status_t kern_file_read_vecs(
         goto out;
     }
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS) {
         kfree(kvecs);
@@ -930,7 +973,7 @@ status_t kern_file_read_vecs(
 
 out:
     if (_bytes) {
-        err = write_user(_bytes, request.transferred);
+        status_t err = write_user(_bytes, request.transferred);
         if (err != STATUS_SUCCESS)
             ret = err;
     }
@@ -939,9 +982,7 @@ out:
 }
 
 /**
- * Write to a file.
- *
- * Writes data from multiple buffers to a file. If the specified offset is
+ * Write data from multiple buffers to a file. If the specified offset is
  * greater than or equal to 0, then data will be written to exactly that offset
  * in the file, and the handle's offset will not be modified. Otherwise, the
  * write will occur at the file handle's current offset (which will be set to
@@ -964,11 +1005,9 @@ status_t kern_file_write_vecs(
     handle_t handle, const io_vec_t *vecs, size_t count, offset_t offset,
     size_t *_bytes)
 {
-    object_handle_t *khandle;
-    io_vec_t *kvecs;
-    io_request_t request;
-    status_t ret, err;
+    status_t ret;
 
+    io_request_t request;
     request.transferred = 0;
 
     if (!vecs) {
@@ -976,6 +1015,7 @@ status_t kern_file_write_vecs(
         goto out;
     }
 
+    io_vec_t *kvecs;
     kvecs = kmalloc(sizeof(*kvecs) * count, MM_USER);
     if (!kvecs) {
         ret = STATUS_NO_MEMORY;
@@ -988,6 +1028,7 @@ status_t kern_file_write_vecs(
         goto out;
     }
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS) {
         kfree(kvecs);
@@ -1007,7 +1048,7 @@ status_t kern_file_write_vecs(
 
 out:
     if (_bytes) {
-        err = write_user(_bytes, request.transferred);
+        status_t err = write_user(_bytes, request.transferred);
         if (err != STATUS_SUCCESS)
             ret = err;
     }
@@ -1016,13 +1057,10 @@ out:
 }
 
 /**
- * Read a directory entry.
- *
- * Reads a single directory entry structure from a directory into a buffer. As
- * the structure length is variable, a buffer size argument must be provided
- * to ensure that the buffer isn't overflowed. The number of the entry read
- * will be the handle's current offset, and upon success the handle's offset
- * will be incremented by 1.
+ * Read a single entry from a directory into a buffer. As the structure length
+ * is variable, a buffer size argument must be provided to ensure that the
+ * buffer isn't overflowed. The entry number read will be the handle's current
+ * offset, and upon success the handle's offset will be incremented by 1.
  *
  * @param handle        Handle to directory to read from. Must have the
  *                      FILE_ACCESS_READ access right.
@@ -1037,17 +1075,17 @@ out:
  *                      entry.
  */
 status_t kern_file_read_dir(handle_t handle, dir_entry_t *buf, size_t size) {
-    object_handle_t *khandle;
-    dir_entry_t *kbuf;
     status_t ret;
 
     if (!buf)
         return STATUS_INVALID_ARG;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    dir_entry_t *kbuf;
     kbuf = kmalloc(size, MM_USER);
     if (!kbuf) {
         object_handle_release(khandle);
@@ -1067,9 +1105,9 @@ status_t kern_file_read_dir(handle_t handle, dir_entry_t *buf, size_t size) {
  * @param handle        Handle to directory to rewind.
  * @return              Status code describing result of the operation. */
 status_t kern_file_rewind_dir(handle_t handle) {
-    object_handle_t *khandle;
     status_t ret;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -1089,18 +1127,18 @@ status_t kern_file_rewind_dir(handle_t handle) {
  *                      STATUS_NOT_SUPPORTED if attempting to retrieve current
  *                      offset and the file is not seekable. */
 status_t kern_file_state(handle_t handle, uint32_t *_access, uint32_t *_flags, offset_t *_offset) {
-    object_handle_t *khandle;
-    uint32_t access, flags;
-    offset_t offset;
     status_t ret;
 
     if (!_access && !_flags && !_offset)
         return STATUS_INVALID_ARG;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    uint32_t access, flags;
+    offset_t offset;
     ret = file_state(khandle, &access, &flags, (_offset) ? &offset : NULL);
     if (ret != STATUS_SUCCESS)
         goto out;
@@ -1132,9 +1170,9 @@ out:
  * @param handle        Handle to set flags for.
  * @param flags         New flags to set. */
 status_t kern_file_set_flags(handle_t handle, uint32_t flags) {
-    object_handle_t *khandle;
     status_t ret;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -1145,11 +1183,9 @@ status_t kern_file_set_flags(handle_t handle, uint32_t flags) {
 }
 
 /**
- * Set the offset of a file handle.
- *
- * Modifies the offset of a file handle (the position that will next be read
- * from or written to) according to the specified action, and returns the new
- * offset.
+ * Set the offset of a file handle. The offset (the position that will next be
+ * read from or written to) is modified according to the specified action, and
+ * the new offset is returned.
  *
  * @param handle        Handle to modify offset of.
  * @param action        Operation to perform (FILE_SEEK_*).
@@ -1159,14 +1195,14 @@ status_t kern_file_set_flags(handle_t handle, uint32_t flags) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset, offset_t *_result) {
-    object_handle_t *khandle;
-    offset_t result;
     status_t ret;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    offset_t result;
     ret = file_seek(khandle, action, offset, &result);
     if (ret == STATUS_SUCCESS && _result)
         ret = write_user(_result, result);
@@ -1176,10 +1212,8 @@ status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset, offse
 }
 
 /**
- * Modify the size of a file.
- *
- * Modifies the size of a file. If the new size is smaller than the previous
- * size of the file, then the extra data is discarded. If it is larger than the
+ * Modify the size of a file. If the new size is smaller than the previous size
+ * of the file, then the extra data is discarded. If it is larger than the
  * previous size, then the extended space will be filled with zero bytes.
  *
  * @param handle        Handle to file to resize. Must have the
@@ -1189,9 +1223,9 @@ status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset, offse
  * @return              Status code describing result of the operation.
  */
 status_t kern_file_resize(handle_t handle, offset_t size) {
-    object_handle_t *khandle;
     status_t ret;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -1206,17 +1240,17 @@ status_t kern_file_resize(handle_t handle, offset_t size) {
  * @param info          Information structure to fill in.
  * @return              Status code describing result of the operation. */
 status_t kern_file_info(handle_t handle, file_info_t *info) {
-    object_handle_t *khandle;
-    file_info_t kinfo;
     status_t ret;
 
     if (!info)
         return STATUS_INVALID_ARG;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    file_info_t kinfo;
     ret = file_info(khandle, &kinfo);
     if (ret == STATUS_SUCCESS)
         ret = memcpy_to_user(info, &kinfo, sizeof(*info));
@@ -1229,9 +1263,9 @@ status_t kern_file_info(handle_t handle, file_info_t *info) {
  * @param handle        Handle to file to flush.
  * @return              Status code describing result of the operation. */
 status_t kern_file_sync(handle_t handle) {
-    object_handle_t *khandle;
     status_t ret;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -1255,16 +1289,17 @@ status_t kern_file_request(
     handle_t handle, unsigned request, const void *in, size_t in_size,
     void *out, size_t out_size, size_t *_bytes)
 {
-    void *kin = NULL, *kout = NULL;
-    object_handle_t *khandle;
     status_t ret, err;
-    size_t kout_size;
 
     if (in_size && !in)
         return STATUS_INVALID_ARG;
+
     if (out_size && !out)
         return STATUS_INVALID_ARG;
 
+    void *kin = NULL, *kout = NULL;
+
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         goto out;
@@ -1281,6 +1316,7 @@ status_t kern_file_request(
             goto out;
     }
 
+    size_t kout_size;
     ret = file_request(khandle, request, kin, in_size, (out) ? &kout : NULL, (out) ? &kout_size : NULL);
 
     if (kout) {
