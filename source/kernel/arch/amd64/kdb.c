@@ -424,8 +424,10 @@ void arch_kdb_dump_registers(void) {
 
 /** Trap all other CPUs to wait for KDB to exit. */
 void arch_kdb_trap_cpus(void) {
-    /* The NMI handler checks kdb_running and spins until it is 0. */
-    lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
+    if (cpu_count > 1) {
+        /* The NMI handler checks kdb_running and spins until it is 0. */
+        lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
+    }
 }
 
 /** Register architecture-specific KDB commands. */
