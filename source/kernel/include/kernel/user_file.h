@@ -111,22 +111,18 @@ enum {
      *
      * Input:
      *   Arguments:
-     *     USER_FILE_MESSAGE_ARG_SERIAL           = Operation serial.
-     *     USER_FILE_MESSAGE_ARG_FLAGS            = Current handle flags.
-     *     USER_FILE_MESSAGE_ARG_REQUEST_NUM      = Request number.
-     *     USER_FILE_MESSAGE_ARG_REQUEST_OUT_SIZE = Output buffer size.
+     *     USER_FILE_MESSAGE_ARG_SERIAL         = Operation serial.
+     *     USER_FILE_MESSAGE_ARG_FLAGS          = Current handle flags.
+     *     USER_FILE_MESSAGE_ARG_REQUEST_NUM    = Request number.
      *   Data:
      *     Input data passed to the request (size specified in message).
      *
      * Reply:
      *   Arguments:
-     *     USER_FILE_MESSAGE_ARG_SERIAL           = Operation serial.
+     *     USER_FILE_MESSAGE_ARG_SERIAL         = Operation serial.
+     *     USER_FILE_MESSAGE_ARG_REQUEST_STATUS = Status code.
      *   Data:
      *     Output data.
-     *
-     * Data size for the reply is used as the actual output size, can be less
-     * or equal (but not more) than the operation requested, as per
-     * kern_file_request().
      */
     USER_FILE_OP_REQUEST = 3,
 };
@@ -147,7 +143,8 @@ enum {
     USER_FILE_MESSAGE_ARG_WRITE_SIZE        = 2,
 
     USER_FILE_MESSAGE_ARG_REQUEST_NUM       = 2,
-    USER_FILE_MESSAGE_ARG_REQUEST_OUT_SIZE  = 3,
+
+    USER_FILE_MESSAGE_ARG_REQUEST_STATUS    = 1,
 };
 
 extern status_t kern_user_file_create(

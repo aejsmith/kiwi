@@ -365,7 +365,44 @@ static status_t user_file_request(
     struct file_handle *handle, unsigned request, const void *in,
     size_t in_size, void **_out, size_t *_out_size)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    user_file_t *file = handle->user_file;
+    status_t ret;
+
+    /* Has to fit in a single message. */
+    if (in_size > IPC_DATA_MAX)
+        return STATUS_TOO_LARGE;
+
+    mutex_lock(&file->lock);
+
+    user_file_op_t *op = user_file_op_alloc(file, USER_FILE_OP_REQUEST, in_size);
+
+    if (in_size > 0)
+        memcpy(op->msg->data, in, in_size);
+
+    op->msg->msg.args[USER_FILE_MESSAGE_ARG_FLAGS]       = handle->flags;
+    op->msg->msg.args[USER_FILE_MESSAGE_ARG_REQUEST_NUM] = request;
+
+    ret = user_file_op_send(file, op);
+    if (ret == STATUS_SUCCESS) {
+        assert(op->msg);
+
+        if (_out) {
+            /* Take over this buffer from the message. */
+            *_out      = op->msg->data;
+            *_out_size = op->msg->msg.size;
+
+            op->msg->data     = NULL;
+            op->msg->msg.size = 0;
+        }
+
+        ret = op->msg->msg.args[USER_FILE_MESSAGE_ARG_REQUEST_STATUS];
+    }
+
+    mutex_unlock(&file->lock);
+
+    user_file_op_free(op);
+
+    return ret;
 }
 
 static file_ops_t user_file_ops = {

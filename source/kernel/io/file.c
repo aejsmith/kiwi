@@ -724,7 +724,11 @@ status_t file_sync(object_handle_t *handle) {
  *                      operation handler.
  * @param in_size       Size of input buffer.
  * @param _out          Where to store pointer to data returned by the
- *                      operation handler (optional).
+ *                      operation handler (optional). This will be a kmalloc()'d
+ *                      buffer which must be freed with kfree(). Data can be
+ *                      returned even on failure - the caller must always check
+ *                      for data if this parameter is not NULL, and ensure it
+ *                      gets freed.
  * @param _out_size     Where to store size of data returned.
  * @return              Status code describing result of the operation. */
 status_t file_request(
@@ -732,6 +736,13 @@ status_t file_request(
     void **_out, size_t *_out_size)
 {
     assert(handle);
+
+    /* Initialize these if specified so it will be null if the handler doesn't
+     * return anything. */
+    if (_out) {
+        *_out      = NULL;
+        *_out_size = 0;
+    }
 
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
