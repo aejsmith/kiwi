@@ -19,13 +19,147 @@
  * @brief               Terminal control functions.
  */
 
+#include <kernel/file.h>
+#include <kernel/status.h>
+
 #include <sys/ioctl.h>
 
 #include <errno.h>
+#include <stdarg.h>
 #include <termios.h>
 #include <unistd.h>
 
 #include "libsystem.h"
+
+/** Check whether a file descriptor refers to a TTY.
+ * @param fd            File descriptor to check.
+ * @return              1 if a TTY, 0 if not. */
+int isatty(int fd) {
+    file_info_t info;
+    unsigned type;
+    status_t ret;
+
+    ret = kern_object_type(fd, &type);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return 0;
+    }
+
+    bool is_tty = type == OBJECT_TYPE_FILE;
+
+    if (is_tty) {
+        ret = kern_file_info(fd, &info);
+        if (ret != STATUS_SUCCESS) {
+            libsystem_status_to_errno(ret);
+            return 0;
+        }
+
+        is_tty = info.type == FILE_TYPE_CHAR;
+
+        if (is_tty) {
+            struct winsize ws;
+            size_t bytes;
+            ret = kern_file_request(fd, TIOCGWINSZ, NULL, 0, &ws, sizeof(ws), &bytes);
+
+            is_tty = ret == STATUS_SUCCESS && bytes == sizeof(ws);
+        }
+    }
+
+    if (!is_tty)
+        errno = ENOTTY;
+
+    return is_tty;
+}
+
+/**
+ * Control a device. The Kiwi implementation of this function only works for
+ * terminals, and will return an error if used on anything else.
+ *
+ * @param fd            File descriptor to device.
+ * @param request       Request to perform.
+ * @param ...           Optional argument pointer.
+ *
+ * @return              Request-dependant return code, or -1 for an error.
+ */
+int ioctl(int fd, int request, ...) {
+    status_t ret;
+
+    if (!isatty(fd)) {
+        errno = ENOTTY;
+        return -1;
+    }
+
+    va_list args;
+    va_start(args, request);
+
+    void *in = NULL, *out = NULL;
+    size_t in_size = 0, out_size = 0;
+    int arg;
+
+    switch (request) {
+        case TIOCDRAIN:
+            break;
+        case TCXONC:
+        case TCFLSH:
+            arg = va_arg(args, int);
+            in = &arg;
+            in_size = sizeof(arg);
+            break;
+        case TCGETA:
+            out = va_arg(args, void *);
+            out_size = sizeof(struct termios);
+            break;
+        case TCSETA:
+        case TCSETAW:
+        case TCSETAF:
+            in = va_arg(args, void *);
+            in_size = sizeof(struct termios);
+            break;
+        case TIOCGPGRP:
+            in = va_arg(args, void *);
+            in_size = sizeof(int);
+            break;
+        case TIOCSPGRP:
+            out = va_arg(args, void *);
+            out_size = sizeof(int);
+            break;
+        case TIOCGWINSZ:
+            out = va_arg(args, void *);
+            out_size = sizeof(struct winsize);
+            break;
+        case TIOCSWINSZ:
+            in = va_arg(args, void *);
+            in_size = sizeof(struct winsize);
+            break;
+        default:
+            errno = EINVAL;
+            break;
+    }
+
+    va_end(args);
+
+    ret = kern_file_request(fd, request, in, in_size, out, out_size, NULL);
+    if (ret != STATUS_SUCCESS) {
+        if (ret == STATUS_INVALID_REQUEST) {
+            errno = ENOTTY;
+        } else {
+            libsystem_status_to_errno(ret);
+        }
+
+        return -1;
+    }
+
+    return 0;
+}
+
+/** Get the path to the terminal device.
+ * @param fd            File descriptor to terminal device to get path to.
+ * @return              Pointer to path string, or NULL on failure. */
+char *ttyname(int fd) {
+    /* Our terminals don't exist in the filesystem. */
+    errno = ENOSYS;
+    return NULL;
+}
 
 /** Get the input baud rate from a termios structure.
  * @param tio           Terminal I/O settings structure.
@@ -42,8 +176,6 @@ speed_t cfgetospeed(const struct termios *tio) {
 }
 
 /**
- * Set the input baud rate in a termios structure.
- *
  * Sets the input baud rate in a termios structure. This will have no effect on
  * the settings of a terminal until the attributes are set using tcsetattr().
  *
@@ -58,8 +190,6 @@ int cfsetispeed(struct termios *tio, speed_t speed) {
 }
 
 /**
- * Set the output baud rate in a termios structure.
- *
  * Sets the output baud rate in a termios structure. This will have no effect
  * on the settings of a terminal until the attributes are set using tcsetattr().
  *
@@ -138,18 +268,18 @@ int tcsetattr(int fd, int action, const struct termios *tio) {
     int request;
 
     switch (action) {
-    case TCSANOW:
-        request = TCSETA;
-        break;
-    case TCSADRAIN:
-        request = TCSETAW;
-        break;
-    case TCSAFLUSH:
-        request = TCSETAF;
-        break;
-    default:
-        errno = EINVAL;
-        return -1;
+        case TCSANOW:
+            request = TCSETA;
+            break;
+        case TCSADRAIN:
+            request = TCSETAW;
+            break;
+        case TCSAFLUSH:
+            request = TCSETAF;
+            break;
+        default:
+            errno = EINVAL;
+            return -1;
     }
 
     return ioctl(fd, request, tio);

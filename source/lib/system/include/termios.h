@@ -150,20 +150,17 @@ struct winsize {
 #define TCOON           3           /**< Restart output. */
 
 /** Terminal ioctl() requests. */
-#define TIOCDRAIN       32          /**< Implements tcdrain(). */
-#define TCXONC          33          /**< Implements tcflow(). */
-#define TCFLSH          34          /**< Implements tcflush(). */
-#define TCGETA          35          /**< Implements tcgetattr(). */
-#define TCSETA          36          /**< Implements tcsetattr(fd, TCSANOW). */
-#define TCSETAW         37          /**< Implements tcsetattr(fd, TCSADRAIN). */
-#define TCSETAF         38          /**< Implements tcsetattr(fd, TCSAFLUSH). */
-#define TIOCGPGRP       39          /**< Implements tcgetpgrp(). */
-#define TIOCSPGRP       40          /**< Implements tcsetpgrp(). */
-#define TIOCGWINSZ      41          /**< Get terminal size. */
-#define TIOCSWINSZ      42          /**< Set terminal size. */
-
-/** Terminal master requests. */
-#define TTY_MASTER_ID   64          /**< Get the slave device ID. */
+#define TIOCDRAIN       0           /**< Implements tcdrain(). */
+#define TCXONC          1           /**< Implements tcflow(). */
+#define TCFLSH          2           /**< Implements tcflush(). */
+#define TCGETA          3           /**< Implements tcgetattr(). */
+#define TCSETA          4           /**< Implements tcsetattr(fd, TCSANOW). */
+#define TCSETAW         5           /**< Implements tcsetattr(fd, TCSADRAIN). */
+#define TCSETAF         6           /**< Implements tcsetattr(fd, TCSAFLUSH). */
+#define TIOCGPGRP       7           /**< Implements tcgetpgrp(). */
+#define TIOCSPGRP       8           /**< Implements tcsetpgrp(). */
+#define TIOCGWINSZ      9           /**< Get terminal size. */
+#define TIOCSWINSZ      10          /**< Set terminal size. */
 
 extern speed_t cfgetispeed(const struct termios *tio);
 extern speed_t cfgetospeed(const struct termios *tio);
