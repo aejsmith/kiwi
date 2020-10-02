@@ -35,11 +35,43 @@
 
 #include "protocol.h"
 
+/** Map an uppercase ASCII character to a control character. */
+static constexpr cc_t toControl(unsigned char ch) {
+    return ch & 0x1f;
+}
+
 Terminal::Terminal(core_connection_t *connection) :
     m_connection         (connection),
     m_userFile           (INVALID_HANDLE),
-    m_userFileConnection (INVALID_HANDLE)
-{}
+    m_userFileConnection (INVALID_HANDLE),
+    m_escaped            (false),
+    m_inhibited          (false),
+    m_inputBufferStart   (0),
+    m_inputBufferSize    (0),
+    m_inputBufferLines   (0)
+{
+    /* Initialise terminal settings to default. */
+    m_termios.c_iflag      = ICRNL;
+    m_termios.c_oflag      = OPOST | ONLCR;
+    m_termios.c_cflag      = CREAD | CS8 | HUPCL | CLOCAL;
+    m_termios.c_lflag      = ICANON | IEXTEN | ISIG | ECHO | ECHOE | ECHONL;
+    m_termios.c_cc[VEOF]   = toControl('D');
+    m_termios.c_cc[VEOL]   = _POSIX_VDISABLE;
+    m_termios.c_cc[VERASE] = toControl('H');
+    m_termios.c_cc[VINTR]  = toControl('C');
+    m_termios.c_cc[VKILL]  = toControl('U');
+    m_termios.c_cc[VMIN]   = _POSIX_VDISABLE;
+    m_termios.c_cc[VQUIT]  = toControl('\\');
+    m_termios.c_cc[VSTART] = toControl('Q');
+    m_termios.c_cc[VSTOP]  = toControl('S');
+    m_termios.c_cc[VSUSP]  = toControl('Z');
+    m_termios.c_cc[VTIME]  = _POSIX_VDISABLE;
+    m_termios.c_cc[VLNEXT] = toControl('V');
+    m_termios.c_ispeed     = B38400;
+    m_termios.c_ospeed     = B38400;
+    m_winsize.ws_col       = 80;
+    m_winsize.ws_row       = 25;
+}
 
 Terminal::~Terminal() {
     core_connection_close(m_connection);
@@ -68,7 +100,7 @@ void Terminal::run() {
 void Terminal::thread() {
     status_t ret;
 
-    core_log(CORE_LOG_DEBUG, "thread started");
+    core_log(CORE_LOG_DEBUG, "terminal started");
 
     std::array<object_event_t, 4> events;
     events[0].handle = core_connection_get_handle(m_connection);
@@ -209,6 +241,12 @@ core_message_t *Terminal::handleClientOpenHandle(core_message_t *request) {
 }
 
 core_message_t *Terminal::handleClientInput(core_message_t *request) {
+    auto requestData   = reinterpret_cast<unsigned char *>(core_message_get_data(request));
+    size_t requestSize = core_message_get_size(request);
+
+    for (size_t i = 0; i < requestSize; i++)
+        addInput(requestData[i]);
+
     core_message_t *reply = core_message_create_reply(request, sizeof(terminal_reply_input_t));
     if (!reply) {
         core_log(CORE_LOG_ERROR, "failed to create message");
@@ -216,7 +254,7 @@ core_message_t *Terminal::handleClientInput(core_message_t *request) {
     }
 
     auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_get_data(reply));
-    replyData->result = STATUS_NOT_IMPLEMENTED;
+    replyData->result = STATUS_SUCCESS;
 
     return reply;
 }
@@ -258,6 +296,9 @@ bool Terminal::handleFileMessages() {
             case USER_FILE_OP_INFO:
                 ret = handleFileInfo(message);
                 break;
+            case USER_FILE_OP_REQUEST:
+                ret = handleFileRequest(message, data.get());
+                break;
             default:
                 core_unreachable();
         }
@@ -269,38 +310,35 @@ bool Terminal::handleFileMessages() {
     }
 }
 
-static ipc_message_t initializeFileReply(const ipc_message_t &message) {
+static ipc_message_t initializeFileReply(uint32_t id, uint64_t serial) {
     ipc_message_t reply = {};
-    reply.id = message.id;
-    reply.args[USER_FILE_MESSAGE_ARG_SERIAL] = message.args[USER_FILE_MESSAGE_ARG_SERIAL];
+    reply.id = id;
+    reply.args[USER_FILE_MESSAGE_ARG_SERIAL] = serial;
     return reply;
 }
 
+static ipc_message_t initializeFileReply(const ipc_message_t &message) {
+    return initializeFileReply(message.id, message.args[USER_FILE_MESSAGE_ARG_SERIAL]);
+}
+
 status_t Terminal::handleFileRead(const ipc_message_t &message) {
-    //ipc_message_t reply = initializeFileReply(message);
-    // This needs to block until input is available (except for nonblocking read).
+    ReadOperation op;
+    op.serial   = message.args[USER_FILE_MESSAGE_ARG_SERIAL];
+    op.size     = message.args[USER_FILE_MESSAGE_ARG_READ_SIZE];
+    op.canon    = m_termios.c_lflag & ICANON;
+    op.nonblock = message.args[USER_FILE_MESSAGE_ARG_FLAGS] & FILE_NONBLOCK;
+
+    if (!readBuffer(op)) {
+        /* Cannot be completed yet, queue it. */
+        m_pendingReads.emplace_back(op);
+    }
+
     return STATUS_SUCCESS;
 }
 
 status_t Terminal::handleFileWrite(const ipc_message_t &message, const void *data) {
-    status_t ret;
-
     /* Pass this on to the client. */
-    core_message_t *signal = core_message_create_signal(TERMINAL_SIGNAL_OUTPUT, message.size);
-    if (signal) {
-        memcpy(core_message_get_data(signal), data, message.size);
-
-        ret = core_connection_signal(m_connection, signal);
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_WARN, "failed to send signal: %" PRId32, ret);
-            ret = STATUS_DEVICE_ERROR;
-        }
-
-        core_message_destroy(signal);
-    } else {
-        core_log(CORE_LOG_ERROR, "failed to create message");
-        ret = STATUS_NO_MEMORY;
-    }
+    status_t ret = sendOutput(data, message.size);
 
     ipc_message_t reply = initializeFileReply(message);
     reply.args[USER_FILE_MESSAGE_ARG_WRITE_STATUS] = ret;
@@ -319,4 +357,284 @@ status_t Terminal::handleFileInfo(const ipc_message_t &message) {
     reply.size = sizeof(file_info_t);
 
     return kern_connection_send(m_userFileConnection, &reply, &info, INVALID_HANDLE, -1);
+}
+
+status_t Terminal::handleFileRequest(const ipc_message_t &message, const void *data) {
+    // TODO
+    ipc_message_t reply = initializeFileReply(message);
+    reply.args[USER_FILE_MESSAGE_ARG_REQUEST_STATUS] = STATUS_INVALID_REQUEST;
+
+    return kern_connection_send(m_userFileConnection, &reply, nullptr, INVALID_HANDLE, -1);
+}
+
+status_t Terminal::sendOutput(const void *data, size_t size) {
+    status_t ret;
+
+    core_message_t *signal = core_message_create_signal(TERMINAL_SIGNAL_OUTPUT, size);
+    if (signal) {
+        memcpy(core_message_get_data(signal), data, size);
+
+        ret = core_connection_signal(m_connection, signal);
+        if (ret != STATUS_SUCCESS) {
+            core_log(CORE_LOG_WARN, "failed to send signal: %" PRId32, ret);
+            ret = STATUS_DEVICE_ERROR;
+        }
+
+        core_message_destroy(signal);
+    } else {
+        core_log(CORE_LOG_ERROR, "failed to create message");
+        ret = STATUS_NO_MEMORY;
+    }
+
+    return ret;
+}
+
+void Terminal::addInput(unsigned char value) {
+    uint16_t ch = value;
+
+    /* Strip character to 7-bits if required. */
+    if (m_termios.c_iflag & ISTRIP)
+        ch &= 0x7f;
+
+    /* Perform extended processing if required. For now we only support escaping
+     * the next character (VLNEXT). */
+    if (m_termios.c_lflag & IEXTEN) {
+        if (m_escaped) {
+            /* Escape the current character. */
+            ch |= kChar_Escaped;
+            m_escaped = false;
+        } else if (isControlChar(ch, VLNEXT)) {
+            m_escaped = true;
+            return;
+        }
+    }
+
+    /* Handle CR/NL characters. */
+    switch (ch) {
+        case '\r':
+            if (m_termios.c_iflag & IGNCR) {
+                /* Ignore it. */
+                return;
+            } else if (m_termios.c_iflag & ICRNL) {
+                /* Convert it to a newline. */
+                ch = '\n';
+            }
+
+            break;
+        case '\n':
+            if (m_termios.c_iflag & INLCR) {
+                /* Convert it to a carriage return. */
+                ch = '\r';
+            }
+
+            break;
+    }
+
+    /* Check for output control characters. */
+    if (m_termios.c_iflag & IXON) {
+        if (isControlChar(ch, VSTOP)) {
+            m_inhibited = true;
+            return;
+        } else if (m_inhibited) {
+            /* Restart on any character if IXANY is set, but don't ignore it. */
+            if (m_termios.c_iflag & IXANY) {
+                m_inhibited = false;
+            } else if (isControlChar(ch, VSTART)) {
+                m_inhibited = false;
+                return;
+            }
+        }
+    }
+
+    if (m_inhibited)
+        return;
+
+    /* Perform canonical-mode processing. */
+    if (m_termios.c_lflag & ICANON) {
+        if (isControlChar(ch, VERASE)) {
+            /* Erase one character. */
+            if (eraseChar()) {
+                /* ECHOE means print an erasing backspace. */
+                if (m_termios.c_lflag & ECHOE) {
+                    echoInput('\b', true);
+                    echoInput(' ', true);
+                    echoInput('\b', true);
+                } else {
+                    echoInput(ch, false);
+                }
+            }
+
+            return;
+        } else if (isControlChar(ch, VKILL)) {
+            size_t erased = eraseLine();
+            if (erased > 0) {
+                if (m_termios.c_lflag & ECHOE) {
+                    while (erased--) {
+                        echoInput('\b', true);
+                        echoInput(' ', true);
+                        echoInput('\b', true);
+                    }
+                }
+
+                if (m_termios.c_lflag & ECHOK)
+                    echoInput('\n', true);
+            }
+
+            return;
+        }
+    }
+
+    /* Generate signals on INTR and QUIT if ISIG is set. */
+    if (m_termios.c_lflag & ISIG) {
+        if (isControlChar(ch, VINTR)) {
+            /* TODO: Send signal. */
+            return;
+        } else if (isControlChar(ch, VQUIT)) {
+            /* TODO: Send signal. */
+            return;
+        }
+    }
+
+    /* Check for newline/EOF. */
+    if (ch == '\n' || isControlChar(ch, VEOF) || isControlChar(ch, VEOL)) {
+        if (isControlChar(ch, VEOF))
+            ch |= kChar_Eof;
+
+        ch |= kChar_NewLine;
+    }
+
+    if (m_inputBufferSize == kInputBufferMax) {
+        // TODO: What should we do here? Not complete the request until there's
+        // space?
+        core_log(CORE_LOG_DEBUG, "input buffer full, dropping input");
+        return;
+    }
+
+    /* Echo the character. */
+    echoInput(ch, false);
+
+    m_inputBuffer[(m_inputBufferStart + m_inputBufferSize) % kInputBufferMax] = ch;
+
+    m_inputBufferSize++;
+    if (ch & kChar_NewLine)
+        m_inputBufferLines++;
+
+    /* Check if we have any pending reads which can now be completed. */
+    for (auto it = m_pendingReads.begin(); it != m_pendingReads.end(); ) {
+        if (readBuffer(*it)) {
+            it = m_pendingReads.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+/** Check if a character is a certain control character according to termios. */
+bool Terminal::isControlChar(uint16_t ch, int control) const {
+    if (ch & kChar_Escaped || ch == _POSIX_VDISABLE)
+        return false;
+
+    return ch == static_cast<uint16_t>(m_termios.c_cc[control]);
+}
+
+void Terminal::echoInput(uint16_t ch, bool raw) {
+    uint8_t buf[2] = { static_cast<uint8_t>(ch), 0 };
+    size_t size = 1;
+
+    if (!(m_termios.c_lflag & ECHO)) {
+        /* Even if ECHO is not set, newlines should be echoed if both ECHONL and
+         * ICANON are set. */
+        if (buf[0] != '\n' || (m_termios.c_lflag & (ECHONL | ICANON)) != (ECHONL | ICANON))
+            return;
+    }
+
+    if (!raw && buf[0] < ' ') {
+        if (ch & kChar_Escaped || (buf[0] != '\n' && buf[0] != '\r' && buf[0] != '\t')) {
+            /* Print it as ^ch. */
+            buf[0] = '^';
+            buf[1] = '@' + (ch & 0xff);
+            size++;
+        }
+    }
+
+    sendOutput(buf, size);
+}
+
+/** Try to read from the input buffer.
+ * @return              Whether the operation was completed. */
+bool Terminal::readBuffer(ReadOperation &op) {
+    /* Canonical mode reads return at most one line and when a line is available
+     * can return less data than requested. Non-blocking reads always complete
+     * immediately but we can return less data than requested if it's not
+     * available. */
+    bool allAvailable = (op.canon) ? m_inputBufferLines > 0 : m_inputBufferSize >= op.size;
+    bool canComplete  = op.nonblock || allAvailable;
+
+    if (!canComplete)
+        return false;
+
+    ipc_message_t reply = initializeFileReply(USER_FILE_OP_READ, op.serial);
+    reply.args[USER_FILE_MESSAGE_ARG_READ_STATUS] = (allAvailable) ? STATUS_SUCCESS : STATUS_WOULD_BLOCK;
+
+    /* Gather the data to return. Canonical mode cannot return anything unless
+     * we have a whole line. */
+    size_t size = (!op.canon || allAvailable) ? std::min(op.size, m_inputBufferSize) : 0;
+
+    std::unique_ptr<uint8_t[]> data;
+    if (size > 0)
+        data.reset(new uint8_t[size]);
+
+    for (size_t i = 0; i < size; i++) {
+        uint16_t ch = m_inputBuffer[m_inputBufferStart];
+        data[i] = static_cast<uint8_t>(ch);
+
+        m_inputBufferStart = (m_inputBufferStart + 1) % kInputBufferMax;
+        m_inputBufferSize--;
+
+        if (ch & kChar_NewLine) {
+            m_inputBufferLines--;
+
+            if (op.canon) {
+                /* We return regular newlines but not EOF. */
+                if (!(ch & kChar_Eof))
+                    i++;
+
+                size = i;
+                break;
+            }
+        }
+    }
+
+    reply.size = size;
+
+    status_t ret = kern_connection_send(m_userFileConnection, &reply, data.get(), INVALID_HANDLE, -1);
+    if (ret != STATUS_SUCCESS)
+        core_log(CORE_LOG_WARN, "failed to send file message: %" PRId32, ret);
+
+    return true;
+}
+
+/** Try to erase a character from the current line of the input buffer.
+ * @return              Whether a character was erased. */
+bool Terminal::eraseChar() {
+    if (m_inputBufferSize == 0)
+        return false;
+
+    size_t pos = (m_inputBufferStart + m_inputBufferSize - 1) % kInputBufferMax;
+
+    if (m_inputBuffer[pos] & kChar_NewLine)
+        return false;
+
+    m_inputBufferSize--;
+    return true;
+}
+
+/** Try to erase a line from the input buffer.
+ * @return              Number of characters erased. */
+size_t Terminal::eraseLine() {
+    size_t erased = 0;
+    while (eraseChar())
+        erased++;
+
+    return erased;
 }

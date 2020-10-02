@@ -39,9 +39,28 @@
 
 extern const char *const *environ;
 
-Terminal::Terminal() {}
+Terminal::Terminal() :
+    m_connection   (nullptr),
+    m_device       (INVALID_HANDLE),
+    m_childProcess (INVALID_HANDLE),
+    m_terminal     {INVALID_HANDLE, INVALID_HANDLE}
+{}
 
-Terminal::~Terminal() {}
+Terminal::~Terminal() {
+    if (m_connection)
+        core_connection_close(m_connection);
+
+    if (m_device != INVALID_HANDLE)
+        kern_handle_close(m_device);
+
+    if (m_childProcess != INVALID_HANDLE)
+        kern_handle_close(m_childProcess);
+
+    for (handle_t handle : m_terminal) {
+        if (handle != INVALID_HANDLE)
+            kern_handle_close(handle);
+    }
+}
 
 void Terminal::run() {
     status_t ret;
@@ -50,6 +69,41 @@ void Terminal::run() {
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to open connection to terminal service: %" PRId32, ret);
         return;
+    }
+
+    /* Request handles to the terminal. */
+    const uint32_t handleAccess[2] = { FILE_ACCESS_READ, FILE_ACCESS_WRITE };
+    for (int i = 0; i < 2; i++) {
+        core_message_t *request =
+            core_message_create_request(TERMINAL_REQUEST_OPEN_HANDLE, sizeof(terminal_request_open_handle_t));
+
+        auto requestData = reinterpret_cast<terminal_request_open_handle_t *>(core_message_get_data(request));
+        requestData->access = handleAccess[i];
+
+        core_message_t *reply;
+        ret = core_connection_request(m_connection, request, &reply);
+
+        core_message_destroy(request);
+
+        if (ret != STATUS_SUCCESS) {
+            core_log(CORE_LOG_ERROR, "failed to make terminal handle request: %" PRId32, ret);
+            return;
+        }
+
+        auto replyData = reinterpret_cast<terminal_reply_open_handle_t *>(core_message_get_data(reply));
+        ret           = replyData->result;
+        m_terminal[i] = core_message_detach_handle(reply);
+
+        core_message_destroy(reply);
+
+        if (ret != STATUS_SUCCESS) {
+            core_log(CORE_LOG_ERROR, "failed to open terminal handle: %" PRId32, ret);
+            return;
+        }
+
+        assert(m_terminal[i] != INVALID_HANDLE);
+
+        kern_handle_set_flags(m_terminal[i], HANDLE_INHERITABLE);
     }
 
     /* Open a non-blocking kernel console device handle (temporary, once we
@@ -208,51 +262,15 @@ void Terminal::handleInput() {
 
 /** Spawn a process attached to the terminal. */
 status_t Terminal::spawnProcess(const char *path, handle_t &handle) {
-    status_t ret;
-
-    /* Request handles to the terminal. */
-    const uint32_t handleAccess[2] = { FILE_ACCESS_READ, FILE_ACCESS_WRITE };
-    handle_t handles[2];
-    for (int i = 0; i < 2; i++) {
-        core_message_t *request =
-            core_message_create_request(TERMINAL_REQUEST_OPEN_HANDLE, sizeof(terminal_request_open_handle_t));
-
-        auto requestData = reinterpret_cast<terminal_request_open_handle_t *>(core_message_get_data(request));
-        requestData->access = handleAccess[i];
-
-        core_message_t *reply;
-        ret = core_connection_request(m_connection, request, &reply);
-
-        core_message_destroy(request);
-
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_ERROR, "failed to make terminal handle request: %" PRId32, ret);
-            return ret;
-        }
-
-        auto replyData = reinterpret_cast<terminal_reply_open_handle_t *>(core_message_get_data(reply));
-        ret        = replyData->result;
-        handles[i] = core_message_detach_handle(reply);
-
-        core_message_destroy(reply);
-
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_ERROR, "failed to open terminal handle: %" PRId32, ret);
-            return ret;
-        }
-
-        assert(handles[i] != INVALID_HANDLE);
-    }
-
     process_attrib_t attrib;
-    handle_t map[][2] = { { handles[0], 0 }, { handles[1], 1 }, { handles[1], 2 } };
+    handle_t map[][2] = { { m_terminal[0], 0 }, { m_terminal[1], 1 }, { m_terminal[1], 2 } };
     attrib.token     = INVALID_HANDLE;
     attrib.root_port = INVALID_HANDLE;
     attrib.map       = map;
     attrib.map_count = core_array_size(map);
 
     const char *args[] = { path, nullptr };
-    ret = kern_process_create(path, args, environ, 0, &attrib, &handle);
+    status_t ret = kern_process_create(path, args, environ, 0, &attrib, &handle);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create process '%s': %d", path, ret);
         return ret;

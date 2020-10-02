@@ -63,7 +63,7 @@ int ServiceManager::run() {
     addService("org.kiwi.test", "/system/services/test", Service::kIpc | Service::kOnDemand);
     addService("org.kiwi.terminal", "/system/services/terminal_service", Service::kIpc | Service::kOnDemand);
 
-    spawnProcess("/system/bin/shell");
+    spawnProcess("/system/bin/terminal");
 
     while (true) {
         ret = kern_object_wait(m_events.data(), m_events.size(), 0, -1);

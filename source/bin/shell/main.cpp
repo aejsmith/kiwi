@@ -284,20 +284,10 @@ int main(int argc, char **argv) {
         while (true) {
             char ch = getchar();
 
-            if (ch == '\n') {
-                putchar('\n');
+            if (ch == '\n')
                 break;
-            } else if (ch == '\b') {
-                if (line.size()) {
-                    line.pop_back();
-                    putchar('\b');
-                    putchar(' ');
-                    putchar('\b');
-                }
-            } else if (isprint(ch)) {
-                line.push_back(ch);
-                putchar(ch);
-            }
+
+            line.push_back(ch);
         }
 
         std::vector<std::string> args;
