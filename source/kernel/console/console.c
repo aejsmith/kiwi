@@ -137,21 +137,22 @@ static status_t kconsole_device_io(device_t *device, file_handle_t *handle, io_r
             /* TODO: Escape sequences for special keys. */
             uint16_t ch;
             do {
-                if (handle->flags & FILE_NONBLOCK) {
-                    ch = main_console.in->poll();
-                    if (ch == 0)
-                        break;
-                } else {
-                    ret = main_console.in->getc(&ch);
-                    if (ret != STATUS_SUCCESS)
-                        goto out;
-                }
-            } while (ch > 0xff);
+                ret = main_console.in->getc(handle->flags & FILE_NONBLOCK, &ch);
+            } while (ret == STATUS_SUCCESS && ch > 0xff);
+
+            if (ret != STATUS_SUCCESS) {
+                if (ret == STATUS_WOULD_BLOCK)
+                    ret = STATUS_SUCCESS;
+
+                break;
+            }
 
             buf[size] = ch;
         }
 
-        ret = io_request_copy(request, buf, size);
+        status_t err = io_request_copy(request, buf, size);
+        if (err != STATUS_SUCCESS)
+            ret = err;
     }
 
 out:

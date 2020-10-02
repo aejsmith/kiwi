@@ -51,16 +51,20 @@ typedef struct console_out_ops {
 
 /** Kernel console input operations structure. */
 typedef struct console_in_ops {
-    /** Check for a character from the console.
-     * @note                This function must be safe to use from interrupt
-     *                      context.
-     * @return              Character read, or 0 if none available. */
+    /**
+     * Check for a character from the console. This function must be safe to
+     * use from interrupt context, and should read directly from the device
+     * rather than being driven by IRQs.
+     *
+     * @return              Character read, or 0 if none available.
+     */
     uint16_t (*poll)(void);
 
-    /** Read a character from the console, blocking until it can do so.
+    /** Read a character from the console.
+     * @param nonblock      If true, fails if no data is available immediately.
      * @param _ch           Where to store character read.
      * @return              Status code describing the result of the operation. */
-    status_t (*getc)(uint16_t *_ch);
+    status_t (*getc)(bool nonblock, uint16_t *_ch);
 
     /** Start waiting for input on the console.
      * @note                If input is available, this function should call the

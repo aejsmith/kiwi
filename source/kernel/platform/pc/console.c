@@ -203,14 +203,10 @@ static uint16_t i8042_console_poll(void) {
 }
 
 /** Read a character from the keyboard, blocking until it can do so. */
-static status_t i8042_console_getc(uint16_t *_ch) {
+static status_t i8042_console_getc(bool nonblock, uint16_t *_ch) {
     bool have_char = false;
 
-    while (!have_char) {
-        status_t ret = condvar_wait_etc(&i8042_cvar, NULL, -1, SLEEP_INTERRUPTIBLE);
-        if (ret != STATUS_SUCCESS)
-            return ret;
-
+    while (true) {
         spinlock_lock(&i8042_lock);
 
         have_char = i8042_buffer_size > 0;
@@ -222,9 +218,17 @@ static status_t i8042_console_getc(uint16_t *_ch) {
         }
 
         spinlock_unlock(&i8042_lock);
-    }
 
-    return STATUS_SUCCESS;
+        if (have_char) {
+            return STATUS_SUCCESS;
+        } else if (nonblock) {
+            return STATUS_WOULD_BLOCK;
+        }
+
+        status_t ret = condvar_wait_etc(&i8042_cvar, NULL, -1, SLEEP_INTERRUPTIBLE);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
 }
 
 /** Start waiting for input on the keyboard. */
