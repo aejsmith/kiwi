@@ -140,12 +140,8 @@ static status_t kconsole_device_io(device_t *device, file_handle_t *handle, io_r
                 ret = main_console.in->getc(handle->flags & FILE_NONBLOCK, &ch);
             } while (ret == STATUS_SUCCESS && ch > 0xff);
 
-            if (ret != STATUS_SUCCESS) {
-                if (ret == STATUS_WOULD_BLOCK)
-                    ret = STATUS_SUCCESS;
-
+            if (ret != STATUS_SUCCESS)
                 break;
-            }
 
             buf[size] = ch;
         }

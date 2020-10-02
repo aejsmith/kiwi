@@ -292,6 +292,12 @@ out:
  * from the file handle's current offset, and before returning the offset will
  * be incremented by the number of bytes read.
  *
+ * If the handle has the FILE_NONBLOCK flag set, for certain types of file
+ * which support it (some devices, pipes), the read will not block if data is
+ * not yet available to complete the whole read. If this is the case, then this
+ * will return STATUS_WOULD_BLOCK. If some of the data is available, it may be
+ * returned - _bytes should be checked on failure to see how much was read.
+ *
  * @param handle        Handle to file to read from. Must have the
  *                      FILE_ACCESS_READ access right.
  * @param buf           Buffer to read data into.
@@ -338,6 +344,13 @@ status_t file_read(
  * occur at the file handle's current offset (which will be set to the end of
  * the file if the handle has the FILE_APPEND flag set), and before returning
  * the offset will be incremented by the number of bytes written.
+ *
+ * If the handle has the FILE_NONBLOCK flag set, for certain types of file
+ * which support it (some devices, pipes), the write will not block if it
+ * cannot yet be completed (e.g. need to wait for buffer space). If this is the
+ * case, then this will return STATUS_WOULD_BLOCK. If some of the data can be
+ * written immediately, this may be done - _bytes should be checked on failure
+ * to see how much was written.
  *
  * @param handle        Handle to file to write to. Must have the
  *                      FILE_ACCESS_WRITE access right.
