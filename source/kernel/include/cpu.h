@@ -55,13 +55,11 @@ typedef struct cpu {
     bool timer_enabled;             /**< Whether the timer device is enabled. */
     spinlock_t timer_lock;          /**< Timer list lock. */
 
-    #if CONFIG_SMP
-        /** SMP call information. */
-        list_t call_queue;          /**< List of calls queued to this CPU. */
-        bool ipi_sent;              /**< Whether an IPI has been sent to the CPU. */
-        struct smp_call *curr_call; /**< SMP call currently being handled. */
-        spinlock_t call_lock;       /**< Lock to protect call queue. */
-    #endif
+    /** SMP call information. */
+    list_t call_queue;              /**< List of calls queued to this CPU. */
+    bool ipi_sent;                  /**< Whether an IPI has been sent to the CPU. */
+    struct smp_call *curr_call;     /**< SMP call currently being handled. */
+    spinlock_t call_lock;           /**< Lock to protect call queue. */
 } cpu_t;
 
 /**
@@ -80,9 +78,7 @@ extern size_t cpu_count;
 extern list_t running_cpus;
 extern cpu_t **cpus;
 
-#if CONFIG_SMP
 extern cpu_t *cpu_register(cpu_id_t id, int state);
-#endif
 
 extern cpu_id_t cpu_id(void);
 extern void cpu_dump(cpu_t *cpu);

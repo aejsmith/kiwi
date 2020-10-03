@@ -134,8 +134,6 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
     sched_enter();
 }
 
-#if CONFIG_SMP
-
 /** Kernel entry point for a secondary CPU.
  * @param cpu           Pointer to CPU structure for the CPU. */
 __init_text void kmain_secondary(cpu_t *cpu) {
@@ -159,8 +157,6 @@ __init_text void kmain_secondary(cpu_t *cpu) {
     /* Begin scheduling threads. */
     sched_enter();
 }
-
-#endif /* CONFIG_SMP */
 
 /** Second-stage intialization thread.
  * @param arg1          Unused.

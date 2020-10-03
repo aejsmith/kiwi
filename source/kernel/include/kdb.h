@@ -95,12 +95,7 @@ extern bool arch_kdb_get_watchpoint(unsigned index, ptr_t *_addr, size_t *_size,
 extern void arch_kdb_backtrace(struct thread *thread, kdb_backtrace_cb_t cb);
 extern bool arch_kdb_register_value(const char *name, size_t len, unsigned long *_reg);
 extern void arch_kdb_dump_registers(void);
-
-#if CONFIG_SMP
 extern void arch_kdb_trap_cpus(void);
-#else
-static inline void arch_kdb_trap_cpus(void) {}
-#endif
 
 extern kdb_status_t kdb_main(kdb_reason_t reason, struct frame *frame, unsigned index);
 extern void kdb_exception(const char *name, struct frame *frame);

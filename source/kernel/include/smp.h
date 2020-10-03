@@ -34,8 +34,6 @@
  *                      or multicast calls, no value will be returned. */
 typedef status_t (*smp_call_func_t)(void *arg);
 
-#if CONFIG_SMP
-
 extern volatile unsigned smp_boot_status;
 
 extern void arch_smp_ipi(cpu_id_t dest);
@@ -60,32 +58,3 @@ extern void platform_smp_boot_cleanup(void);
 
 extern void smp_init(void);
 extern void smp_boot(void);
-
-#else /* CONFIG_SMP */
-
-static inline status_t smp_call_single(
-    cpu_id_t dest, smp_call_func_t func, void *arg, unsigned flags)
-{
-    bool state;
-    status_t ret = STATUS_SUCCESS;
-
-    if (dest == curr_cpu->id && func) {
-        state = local_irq_disable();
-        ret = func(arg);
-        local_irq_restore(state);
-    }
-
-    return ret;
-}
-
-static inline void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags) {
-    /* smp_call_broadcast() doesn't call on the current CPU, so we have
-     * nothing to do here. */
-}
-
-static inline void smp_call_acknowledge(status_t status) {}
-
-static inline void smp_init(void) {}
-static inline void smp_boot(void) {}
-
-#endif /* CONFIG_SMP */

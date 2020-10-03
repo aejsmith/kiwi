@@ -116,12 +116,8 @@ typedef struct sched_cpu {
     size_t total;                       /**< Total running/ready thread count. */
 } sched_cpu_t;
 
-#if CONFIG_SMP
-
 /** Total number of running/ready threads across all CPUs. */
 static atomic_t threads_running;
-
-#endif
 
 /** Add a thread to a queue.
  * @param queue         Queue to add to.
@@ -259,9 +255,7 @@ void sched_reschedule(bool state) {
         assert(curr_thread != cpu->idle_thread);
         cpu->total--;
 
-        #if CONFIG_SMP
-            atomic_dec(&threads_running);
-        #endif
+        atomic_dec(&threads_running);
     }
 
     /* Find a new thread to run. A NULL return value means no threads are ready,
@@ -405,8 +399,6 @@ void preempt_enable(void) {
     local_irq_restore(state);
 }
 
-#if CONFIG_SMP
-
 /** Allocate a CPU for a thread to run on.
  * @param thread        Thread to allocate for. */
 static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
@@ -455,14 +447,6 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
     return cpu;
 }
 
-#else /* CONFIG_SMP */
-
-static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
-    return curr_cpu;
-}
-
-#endif /* CONFIG_SMP */
-
 /** Insert a thread into the scheduler.
  * @param thread        Thread to insert (should be locked and in the Ready
  *                      state). */
@@ -486,9 +470,7 @@ void sched_insert_thread(thread_t *thread) {
     sched_queue_insert(sched->active, thread);
     sched->total++;
 
-    #if CONFIG_SMP
-        atomic_inc(&threads_running);
-    #endif
+    atomic_inc(&threads_running);
 
     /* If the thread has a higher priority than the currently running thread on
      * the CPU, or if the CPU is idle, preempt it. */
@@ -496,10 +478,8 @@ void sched_insert_thread(thread_t *thread) {
         if (!thread->cpu->idle)
             thread->cpu->should_preempt = true;
 
-        #if CONFIG_SMP
-            if (thread->cpu != curr_cpu)
-                smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
-        #endif
+        if (thread->cpu != curr_cpu)
+            smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
     }
 
     spinlock_unlock(&sched->lock);

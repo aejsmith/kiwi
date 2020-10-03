@@ -43,12 +43,8 @@ size_t cpu_count;                   /**< Number of CPUs. */
 LIST_DEFINE(running_cpus);          /**< List of running CPUs. */
 cpu_t **cpus;                       /**< Array of CPU structure pointers (index == CPU ID). */
 
-#if CONFIG_SMP
-
 /** Variable to wait on while waiting for a CPU to boot. */
 volatile int cpu_boot_wait;
-
-#endif
 
 /** Initialize a CPU structure.
  * @param cpu           Structure to initialize.
@@ -60,18 +56,14 @@ static void cpu_ctor(cpu_t *cpu, cpu_id_t id, int state) {
     cpu->id = id;
     cpu->state = state;
 
-    #if CONFIG_SMP
-        /* Initialize SMP call information. */
-        list_init(&cpu->call_queue);
-        spinlock_init(&cpu->call_lock, "ipi_lock");
-    #endif
+    /* Initialize SMP call information. */
+    list_init(&cpu->call_queue);
+    spinlock_init(&cpu->call_lock, "ipi_lock");
 
     /* Initialize timer information. */
     list_init(&cpu->timers);
     spinlock_init(&cpu->timer_lock, "timer_lock");
 }
-
-#if CONFIG_SMP
 
 /** Register a non-boot CPU.
  * @param id            ID of CPU to add.
@@ -98,8 +90,6 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
     cpu_count++;
     return cpu;
 }
-
-#endif /* CONFIG_SMP */
 
 /** Perform early CPU subsystem initialization. */
 __init_text void cpu_early_init(void) {

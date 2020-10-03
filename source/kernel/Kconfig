@@ -14,13 +14,6 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-config SYS_SUPPORTS_SMP
-	bool
-
-config SMP
-	depends on SYS_SUPPORTS_SMP
-	def_bool y
-
 config KLOG_SIZE
 	int "Kernel log buffer size"
 	default 16384

@@ -27,8 +27,6 @@
 #include <cpu.h>
 #include <status.h>
 
-#if CONFIG_SMP
-
 /** Internal spinlock locking code.
  * @param lock          Spinlock to acquire. */
 static inline void spinlock_lock_internal(spinlock_t *lock) {
@@ -52,20 +50,6 @@ static inline void spinlock_lock_internal(spinlock_t *lock) {
         fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
     }
 }
-
-#else /* CONFIG_SMP */
-
-/** Internal spinlock locking code.
- * @param lock          Spinlock to acquire. */
-static inline void spinlock_lock_internal(spinlock_t *lock) {
-    /* Same as above. When running on a single processor there is no need for
-     * us to spin as there should only ever be one thing here at any one time,
-     * so just die. */
-    if (unlikely(atomic_dec(&lock->value) != 1))
-        fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
-}
-
-#endif /* CONFIG_SMP */
 
 /**
  * Acquire a spinlock.

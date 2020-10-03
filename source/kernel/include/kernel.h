@@ -81,7 +81,4 @@ extern void preempt_disable(void);
 extern void preempt_enable(void);
 
 extern void kmain(uint32_t magic, struct kboot_tag *tags);
-
-#if CONFIG_SMP
 extern void kmain_secondary(struct cpu *cpu);
-#endif
