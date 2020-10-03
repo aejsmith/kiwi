@@ -31,25 +31,6 @@
 #include <object.h>
 #include <status.h>
 
-#if 0
-/** Convert a TAR mode to a set of rights.
- * @param mode          Mode to convert (the part of interest should be in the
- *                      lowest 3 bits).
- * @return              Converted rights. */
-static inline object_rights_t mode_to_rights(uint16_t mode) {
-    object_rights_t rights = 0;
-
-    if (mode & TOREAD)
-        rights |= FILE_RIGHT_READ;
-    if (mode & TOWRITE)
-        rights |= FILE_RIGHT_WRITE;
-    if (mode & TOEXEC)
-        rights |= FILE_RIGHT_EXECUTE;
-
-    return rights;
-}
-#endif
-
 /** Handle an entry in a TAR file.
  * @param header        Header for the entry.
  * @param data          Data for the entry.
@@ -57,12 +38,10 @@ static inline object_rights_t mode_to_rights(uint16_t mode) {
  * @param prefix        Prefix for path string.
  * @return              Status code describing result of the operation. */
 static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, const char *prefix) {
-    object_handle_t *handle;
     status_t ret;
-    size_t bytes;
-    char *path;
 
     /* Work out the path to the entry. */
+    char *path;
     if (prefix) {
         path = kmalloc(strlen(prefix) + strlen(header->name) + 2, MM_KERNEL);
         strcpy(path, prefix);
@@ -74,43 +53,45 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
     }
 
     /* Handle the entry based on its type flag. */
+    object_handle_t *handle;
+    size_t bytes;
     switch (header->typeflag) {
-    case 'x':
-        /* PAX extended header. Ignore for now. */
-        break;
-    case REGTYPE:
-    case AREGTYPE:
-        ret = fs_open(path, FILE_ACCESS_WRITE, 0, FS_MUST_CREATE, &handle);
-        if (ret != STATUS_SUCCESS)
-            goto out;
+        case 'x':
+            /* PAX extended header. Ignore for now. */
+            break;
+        case REGTYPE:
+        case AREGTYPE:
+            ret = fs_open(path, FILE_ACCESS_WRITE, 0, FS_MUST_CREATE, &handle);
+            if (ret != STATUS_SUCCESS)
+                goto out;
 
-        ret = file_write(handle, data, size, -1, &bytes);
-        if (ret != STATUS_SUCCESS) {
+            ret = file_write(handle, data, size, -1, &bytes);
+            if (ret != STATUS_SUCCESS) {
+                object_handle_release(handle);
+                goto out;
+            } else if (bytes != size) {
+                ret = STATUS_DEVICE_ERROR;
+                object_handle_release(handle);
+                goto out;
+            }
+
             object_handle_release(handle);
-            goto out;
-        } else if (bytes != size) {
-            ret = STATUS_DEVICE_ERROR;
-            object_handle_release(handle);
-            goto out;
-        }
+            break;
+        case DIRTYPE:
+            ret = fs_create_dir(path);
+            if (ret != STATUS_SUCCESS && ret != STATUS_ALREADY_EXISTS)
+                goto out;
 
-        object_handle_release(handle);
-        break;
-    case DIRTYPE:
-        ret = fs_create_dir(path);
-        if (ret != STATUS_SUCCESS)
-            goto out;
+            break;
+        case SYMTYPE:
+            ret = fs_create_symlink(path, header->linkname);
+            if (ret != STATUS_SUCCESS)
+                goto out;
 
-        break;
-    case SYMTYPE:
-        ret = fs_create_symlink(path, header->linkname);
-        if (ret != STATUS_SUCCESS)
-            goto out;
-
-        break;
-    default:
-        kprintf(LOG_DEBUG, "tar: unhandled type flag '%c'\n", header->typeflag);
-        break;
+            break;
+        default:
+            kprintf(LOG_DEBUG, "tar: unhandled type flag '%c'\n", header->typeflag);
+            break;
     }
 
     ret = STATUS_SUCCESS;
