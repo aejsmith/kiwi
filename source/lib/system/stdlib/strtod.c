@@ -19,6 +19,8 @@
  * @brief               String to double function.
  */
 
+#include "libsystem.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -92,4 +94,17 @@ done:
         *endptr = (char *)p;
 
     return value * sign;
+}
+
+/** Convert a string to a double precision number.
+ * @param s             String to convert.
+ * @param endptr        Pointer to store end of string in (can be NULL).
+ * @return              Converted number. */
+long double strtold(const char *__restrict s, char **__restrict endptr) {
+    libsystem_stub("strtold", false);
+
+    if (endptr)
+        *endptr = (char *)s;
+
+    return 0;
 }

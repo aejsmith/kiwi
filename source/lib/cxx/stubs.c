@@ -167,11 +167,6 @@ float strtof(const char *__restrict s, char **__restrict endptr) {
     *(int *)0xdeadc0de = 0; abort();
 }
 
-long double strtold(const char *__restrict str, char **__restrict endptr) {
-    fprintf(stderr, "STUB: %s\n", __func__);
-    *(int *)0xdeadc0de = 0; abort();
-}
-
 long double strtold_l(const char *__restrict str, char **__restrict endp, locale_t locale) {
     fprintf(stderr, "STUB: %s\n", __func__);
     *(int *)0xdeadc0de = 0; abort();
