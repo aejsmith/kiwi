@@ -25,7 +25,7 @@ sources = FeatureSources(config, [
     'pit.c',
     'platform.c',
     'rtc.c',
-    ('SMP', 'smp.c'),
+    'smp.c',
 ])
 
 Return('sources')

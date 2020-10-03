@@ -18,7 +18,7 @@ from util import FeatureSources
 Import('config', 'env')
 
 sources = FeatureSources(config, [
-    ('SMP', 'ap_boot.bin.c'),
+    'ap_boot.bin.c',
     'cpu.c',
     'descriptor.c',
     'elf.c',
@@ -28,7 +28,7 @@ sources = FeatureSources(config, [
     'lapic.c',
     'mmu.c',
     'setjmp.S',
-    ('SMP', 'smp.c'),
+    'smp.c',
     'switch.S',
     'thread.c',
     'time.c',
@@ -48,14 +48,13 @@ env['LINKFLAGS'] += ['-Wl,-z,max-page-size=0x1000', '-Wl,-z,common-page-size=0x1
 env['LDSCRIPT'] = env.LDScript('link.ld', 'link.ld.in')
 
 # Generate the AP boot code.
-if config['SMP']:
-    env.Command(
-        'ap_boot.bin',
-        env.Object('ap_boot.S'),
-        Action('$LD -Ttext=0 --oformat binary --strip-all -o $TARGET $SOURCE', None))
-    env.Command(
-        'ap_boot.bin.c',
-        ['ap_boot.bin'],
-        Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET', '$GENCOMSTR'))
+env.Command(
+    'ap_boot.bin',
+    env.Object('ap_boot.S'),
+    Action('$LD -Ttext=0 --oformat binary --strip-all -o $TARGET $SOURCE', None))
+env.Command(
+    'ap_boot.bin.c',
+    ['ap_boot.bin'],
+    Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET', '$GENCOMSTR'))
 
 Return('sources')

@@ -83,7 +83,7 @@ sources = FeatureSources(config, [
     'module.c',
     'object.c',
     'shutdown.c',
-    ('SMP', 'smp.c'),
+    'smp.c',
     'syscall_table.c',
     'time.c',
     'version.c',
