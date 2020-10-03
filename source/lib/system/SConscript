@@ -78,7 +78,7 @@ sources = [File(f) for f in [
     'posix/sync.c',
     'posix/termios.c',
     'posix/uidgid.c',
-    #'posix/umask.c',
+    'posix/umask.c',
     'posix/unlink.c',
     'posix/utime.c',
     'posix/wait.c',
