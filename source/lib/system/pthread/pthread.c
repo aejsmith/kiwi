@@ -41,7 +41,7 @@
 static __thread pthread_t pthread_self_pointer = NULL;
 
 static void pthread_release(pthread_t thread) {
-    if (__sync_fetch_and_sub(&thread->refcount, 1) == 1) {
+    if (atomic_fetch_sub_explicit(&thread->refcount, 1, memory_order_acq_rel) == 1) {
         kern_handle_close(thread->handle);
         free(thread);
     }
@@ -97,7 +97,8 @@ int pthread_create(
         return EAGAIN;
 
     /* 2 references for what we return and the thread's pthread_self pointer. */
-    thread->refcount      = 2;
+    atomic_store_explicit(&thread->refcount, 2, memory_order_relaxed);
+
     thread->start_routine = start_routine;
     thread->arg           = arg;
     thread->exit_value    = NULL;
@@ -192,7 +193,8 @@ pthread_t pthread_self(void) {
         /* We weren't created by pthread_create() so make a pthread for ourself. */
         pthread_self_pointer = malloc(sizeof(*pthread_self_pointer));
         libsystem_assert(pthread_self_pointer);
-        pthread_self_pointer->refcount = 1;
+
+        atomic_store_explicit(&pthread_self_pointer->refcount, 1, memory_order_relaxed);
 
         status_t ret = kern_thread_open(THREAD_SELF, &pthread_self_pointer->handle);
         libsystem_assert(ret == STATUS_SUCCESS);

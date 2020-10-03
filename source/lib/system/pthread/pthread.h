@@ -24,6 +24,7 @@
 #include "libsystem.h"
 
 #include <pthread.h>
+#include <stdatomic.h>
 
 struct __pthread {
     handle_t handle;            /**< Kernel thread handle. */
@@ -37,7 +38,7 @@ struct __pthread {
      *
      * This is handled by wrapping the handle in a reference counted structure.
      */
-    int refcount;
+    atomic_int refcount;
 
     /** Entry/exit details. */
     void *(*start_routine)(void *);

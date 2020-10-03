@@ -22,6 +22,8 @@
  *  - Key reuse. This would need to make sure the values are all set to NULL.
  */
 
+#include "pthread/pthread.h"
+
 #include "libsystem.h"
 
 #include <kernel/private/thread.h>
@@ -34,12 +36,12 @@
 
 /** Structure containing global data slot information. */
 typedef struct pthread_specific {
-    bool allocated;                 /**< Whether this data slot is allocated. */
+    atomic_bool allocated;          /**< Whether this data slot is allocated. */
     void (*dtor)(void *);           /**< Destructor function. */
 } pthread_specific_t;
 
 /** Next available thread-specific data key. */
-static volatile int32_t next_pthread_key;
+static volatile atomic_int next_pthread_key;
 
 /** Global data slot information. */
 static pthread_specific_t pthread_specific[PTHREAD_KEYS_MAX];
@@ -48,12 +50,12 @@ static pthread_specific_t pthread_specific[PTHREAD_KEYS_MAX];
 static __thread void *pthread_specific_values[PTHREAD_KEYS_MAX];
 
 /** Number of currently registered keys with destructors. */
-static int specific_dtor_count = 0;
+static atomic_uint specific_dtor_count = 0;
 
 static void run_specific_dtors(void) {
-    if (specific_dtor_count > 0) {
+    if (atomic_load_explicit(&specific_dtor_count, memory_order_acquire) > 0) {
         for (size_t i = 0; i < PTHREAD_KEYS_MAX; i++) {
-            if (pthread_specific[i].allocated &&
+            if (atomic_load_explicit(&pthread_specific[i].allocated, memory_order_acquire) &&
                 pthread_specific[i].dtor &&
                 pthread_specific_values[i])
             {
@@ -88,21 +90,25 @@ int pthread_key_create(pthread_key_t *_key, void (*dtor)(void *val)) {
     /* Try to allocate a new key. */
     pthread_key_t key;
     while (true) {
-        key = next_pthread_key;
+        key = atomic_load_explicit(&next_pthread_key, memory_order_relaxed);
 
         if (key >= PTHREAD_KEYS_MAX)
             return EAGAIN;
 
-        if (__sync_bool_compare_and_swap(&next_pthread_key, key, key + 1))
+        if (atomic_compare_exchange_weak_explicit(
+                &next_pthread_key, &key, key + 1, memory_order_relaxed,
+                memory_order_relaxed))
             break;
     }
 
-    assert(!pthread_specific[key].allocated);
-    pthread_specific[key].allocated = true;
-    pthread_specific[key].dtor      = dtor;
+    assert(!atomic_load_explicit(&pthread_specific[key].allocated, memory_order_relaxed));
+
+    pthread_specific[key].dtor = dtor;
+
+    atomic_store_explicit(&pthread_specific[key].allocated, true, memory_order_release);
 
     if (dtor)
-        __sync_fetch_and_add(&specific_dtor_count, 1);
+        atomic_fetch_add_explicit(&specific_dtor_count, 1, memory_order_acq_rel);
 
     *_key = key;
     return 0;
@@ -119,13 +125,13 @@ int pthread_key_create(pthread_key_t *_key, void (*dtor)(void *val)) {
  * @return              Always returns 0.
  */
 int pthread_key_delete(pthread_key_t key) {
-    if (!pthread_specific[key].allocated)
+    if (!atomic_load_explicit(&pthread_specific[key].allocated, memory_order_relaxed))
         return EINVAL;
 
     if (pthread_specific[key].dtor)
-        __sync_fetch_and_sub(&specific_dtor_count, 1);
+        atomic_fetch_sub_explicit(&specific_dtor_count, 1, memory_order_acq_rel);
 
-    pthread_specific[key].allocated = false;
+    atomic_store_explicit(&pthread_specific[key].allocated, false, memory_order_release);
     return 0;
 }
 
@@ -134,7 +140,7 @@ int pthread_key_delete(pthread_key_t key) {
  * @return              Value retrieved. If the key is invalid, NULL will be
  *                      returned. */
 void *pthread_getspecific(pthread_key_t key) {
-    if (!pthread_specific[key].allocated)
+    if (!atomic_load_explicit(&pthread_specific[key].allocated, memory_order_relaxed))
         return NULL;
 
     return pthread_specific_values[key];
@@ -145,7 +151,7 @@ void *pthread_getspecific(pthread_key_t key) {
  * @param val           Value to set.
  * @return              0 if value set successfully, EINVAL if key is invalid. */
 int pthread_setspecific(pthread_key_t key, const void *val) {
-    if (!pthread_specific[key].allocated)
+    if (!atomic_load_explicit(&pthread_specific[key].allocated, memory_order_relaxed))
         return EINVAL;
 
     pthread_specific_values[key] = (void *)val;
