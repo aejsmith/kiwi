@@ -21,13 +21,13 @@
 
 #pragma once
 
+#include <system/defs.h>
+
 #include <stdbool.h>
 #define __need_offsetof
 #include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Doubly linked list node structure. */
 typedef struct core_list {
@@ -220,6 +220,4 @@ static inline void core_list_splice_after(core_list_t *position, core_list_t *li
     }
 }
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

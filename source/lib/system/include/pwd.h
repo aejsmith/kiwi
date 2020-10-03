@@ -23,9 +23,7 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** User information structure. */
 struct passwd {
@@ -44,6 +42,4 @@ extern struct passwd *getpwent(void);
 extern struct passwd *getpwuid(uid_t uid);
 extern void setpwent(void);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

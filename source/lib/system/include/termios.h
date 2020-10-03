@@ -23,9 +23,7 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Size of termios control character array. */
 #define NCCS            32
@@ -174,6 +172,4 @@ extern pid_t tcgetsid(int fd);
 extern int tcsendbreak(int fd, int duration);
 extern int tcsetattr(int fd, int action, const struct termios *tio);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

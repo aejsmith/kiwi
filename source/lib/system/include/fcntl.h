@@ -23,9 +23,7 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** File access mode flags for open(). */
 #define O_RDONLY        0x0001      /**< Open for reading. */
@@ -70,6 +68,4 @@ extern int fcntl(int fd, int cmd, ...);
 extern int open(const char *path, int oflag, ...);
 /* int openat(int, const char *, int, ...); */
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

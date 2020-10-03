@@ -23,9 +23,7 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** POSIX utimbuf structure. */
 struct utimbuf {
@@ -35,6 +33,4 @@ struct utimbuf {
 
 extern int utime(const char *path, const struct utimbuf *times);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

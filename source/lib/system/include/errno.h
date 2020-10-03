@@ -21,9 +21,9 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <system/defs.h>
+
+__SYS_EXTERN_C_BEGIN
 
 #define ESUCCESS        0       /**< Success. */
 
@@ -115,6 +115,4 @@ extern "C" {
 extern int *__errno_location(void);
 #define errno (*__errno_location())
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

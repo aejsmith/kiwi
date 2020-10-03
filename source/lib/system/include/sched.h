@@ -25,12 +25,8 @@
 
 #include <time.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 extern int sched_yield(void);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

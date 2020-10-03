@@ -23,9 +23,7 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** File type mode defintions. */
 #define S_IFMT      0170000         /**< Bitmask for the file type bitfields. */
@@ -96,6 +94,4 @@ extern int stat(const char *__restrict path, struct stat *__restrict st);
 extern mode_t umask(mode_t mask);
 /* int utimensat(int, const char *, const struct timespec [2], int); */
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

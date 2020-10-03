@@ -25,9 +25,7 @@
 
 #include <stdarg.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Log levels. */
 typedef enum core_log_level {
@@ -40,6 +38,4 @@ typedef enum core_log_level {
 extern void core_log_args(core_log_level_t level, const char *fmt, va_list args);
 extern void core_log(core_log_level_t level, const char *fmt, ...) __sys_printf(2, 3);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

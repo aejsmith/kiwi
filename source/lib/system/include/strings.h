@@ -23,9 +23,7 @@
 
 #include <string.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /* Get size_t and NULL from stddef.h. I would love to know why stdc defines
  * size_t and NULL in 3 headers. */
@@ -38,6 +36,4 @@ extern "C" {
 #define index(a, b)         strchr((a),(b))
 #define rindex(a, b)        strrchr((a),(b))
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

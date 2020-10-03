@@ -27,9 +27,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 struct tm;
 
@@ -199,6 +197,4 @@ extern int wscanf(const wchar_t *__restrict, ...);
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

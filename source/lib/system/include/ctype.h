@@ -23,9 +23,7 @@
 
 #include <locale.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 extern int isalnum(int ch);
 extern int isalpha(int ch);
@@ -67,6 +65,4 @@ extern int toupper_l(int, locale_t);
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

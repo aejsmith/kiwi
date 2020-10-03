@@ -64,9 +64,9 @@
 
 #include <kernel/ipc.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <system/defs.h>
+
+__SYS_EXTERN_C_BEGIN
 
 /** Connection object (opaque). */
 typedef struct core_connection core_connection_t;
@@ -135,6 +135,4 @@ extern void *core_message_get_data(core_message_t *message);
 extern void core_message_attach_handle(core_message_t *message, handle_t handle, bool own);
 extern handle_t core_message_detach_handle(core_message_t *message);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

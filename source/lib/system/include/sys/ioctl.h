@@ -24,12 +24,8 @@
 /** Some things that use this expect termios.h to be included by it. */
 #include <termios.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 extern int ioctl(int fd, int request, ...);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

@@ -23,12 +23,8 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 extern int getentropy(void *buffer, size_t length);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

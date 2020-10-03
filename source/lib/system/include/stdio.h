@@ -27,9 +27,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 struct __fstream_internal;
 
@@ -158,6 +156,4 @@ extern int fsetpos(FILE *, const fpos_t *);
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

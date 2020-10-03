@@ -21,13 +21,11 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <system/defs.h>
+
+__SYS_EXTERN_C_BEGIN
 
 extern char *core_path_basename(const char *path);
 extern char *core_path_dirname(const char *path);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

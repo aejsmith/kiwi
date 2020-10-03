@@ -25,9 +25,7 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Type of a mutex. */
 typedef int32_t core_mutex_t;
@@ -72,6 +70,4 @@ static inline void __core_mutex_unlockp(void *p) {
     core_mutex_unlock(name); \
     name = NULL;
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

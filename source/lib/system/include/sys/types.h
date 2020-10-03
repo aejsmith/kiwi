@@ -25,10 +25,6 @@
 
 #include <system/pthread.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /** POSIX type definitions. */
 typedef int64_t time_t;             /**< Used for UNIX timestamps. */
 typedef int64_t clock_t;            /**< Used to store clock ticks since process start. */
@@ -57,7 +53,3 @@ typedef unsigned long u_long;
 /* id_t */
 /* [XSI] key_t */
 /* timer_t */
-
-#ifdef __cplusplus
-}
-#endif

@@ -24,9 +24,7 @@
 #include <locale.h>
 #include <wchar.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Type that can hold locale-specific character mappings. */
 typedef const int32_t *wctrans_t;
@@ -110,6 +108,4 @@ extern wctype_t wctype_l(const char *, locale_t);
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

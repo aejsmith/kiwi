@@ -24,9 +24,7 @@
 #define __need_size_t
 #include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Poll file descriptor information. */
 struct pollfd {
@@ -52,6 +50,4 @@ typedef size_t nfds_t;
 
 extern int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

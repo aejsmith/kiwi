@@ -32,9 +32,7 @@
 
 #include <locale.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 #define RAND_MAX        32767
 #define ATEXIT_MAX      32
@@ -125,6 +123,4 @@ extern long double strtold_l(const char *__restrict, char **__restrict, locale_t
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

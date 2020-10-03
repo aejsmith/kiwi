@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <system/arch/types.h>
+#include <system/defs.h>
 
 typedef signed char int8_t;
 typedef signed short int16_t;

@@ -21,14 +21,10 @@
 
 #pragma once
 
-#include <system/arch/types.h>
-
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Type returned by imaxdiv(). */
 typedef struct {
@@ -278,6 +274,4 @@ typedef struct {
 /* intmax_t wcstoimax(const wchar_t *restrict, wchar_t **restrict, int); */
 /* uintmax_t wcstoumax(const wchar_t *restrict, wchar_t **restrict, int); */
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

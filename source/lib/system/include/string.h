@@ -27,9 +27,7 @@
 
 #include <locale.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 extern int ffs(int i);
 extern void *memchr(const void *s, int c, size_t n);
@@ -76,6 +74,4 @@ extern size_t strxfrm_l(char *__restrict, const char *__restrict, size_t, locale
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

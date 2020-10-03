@@ -24,9 +24,7 @@
 //#include <sys/select.h>
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Time value structure. */
 struct timeval {
@@ -36,6 +34,4 @@ struct timeval {
 
 extern int gettimeofday(struct timeval *tv, void *tz);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

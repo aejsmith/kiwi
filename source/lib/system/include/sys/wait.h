@@ -23,9 +23,7 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Process exit status codes. */
 #define __WEXITED       (1<<0)      /**< Process exited normally. */
@@ -47,6 +45,4 @@ extern pid_t wait(int *_status);
 /* int waitid(idtype_t, id_t, siginfo_t *, int); */
 extern pid_t waitpid(pid_t pid, int *_status, int flags);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

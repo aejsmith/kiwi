@@ -23,9 +23,7 @@
 
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Swap byte order in a 16-bit value.
  * @param val           Value to swap order of.
@@ -98,6 +96,4 @@ static inline uint64_t byte_order_swap64(uint64_t val) {
 #   error "__BYTE_ORDER__ is not defined"
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

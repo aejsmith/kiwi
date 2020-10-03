@@ -27,9 +27,7 @@
 
 #include <locale.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Time specification structure. */
 struct timespec {
@@ -82,6 +80,4 @@ extern size_t strftime_l(
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

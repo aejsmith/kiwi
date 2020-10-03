@@ -25,9 +25,7 @@
 
 #include <sched.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Process sharing attributes. */
 enum {
@@ -192,6 +190,4 @@ int pthread_rwlock_wrlock(pthread_rwlock_t *);
 //int pthread_spin_trylock(pthread_spinlock_t *);
 //int pthread_spin_unlock(pthread_spinlock_t *);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

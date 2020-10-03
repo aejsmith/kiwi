@@ -23,9 +23,9 @@
 
 #include <kernel/time.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <system/defs.h>
+
+__SYS_EXTERN_C_BEGIN
 
 /** Convert seconds to nanoseconds.
  * @param secs          Seconds value to convert.
@@ -69,6 +69,4 @@ static inline nstime_t core_nsecs_to_usecs(nstime_t nsecs) {
     return nsecs / 1000;
 }
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

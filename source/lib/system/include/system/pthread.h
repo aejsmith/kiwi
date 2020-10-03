@@ -28,9 +28,7 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 struct __pthread;
 
@@ -77,6 +75,4 @@ typedef struct __pthread *pthread_t;
 /** Type of a thread attributes object (TODO). */
 typedef int32_t pthread_attr_t;
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

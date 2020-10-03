@@ -21,9 +21,7 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Mode flags for dlopen(). */
 #define RTLD_LAZY       (1<<0)      /**< Relocations are performed as needed. */
@@ -46,6 +44,4 @@ typedef struct dl_info {
 
 static inline int dladdr(void *addr, Dl_info *info) { return 0; }
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

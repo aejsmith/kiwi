@@ -27,9 +27,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Type used to identify a message catalog descriptor. */
 typedef void *nl_catd;
@@ -52,6 +50,4 @@ extern nl_catd catopen(const char *, int);
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

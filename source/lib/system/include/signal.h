@@ -26,9 +26,7 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /**
  * Signal number definitions. Values of default action:
@@ -216,6 +214,4 @@ extern int sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__rest
 extern int sigsuspend(const sigset_t *mask);
 /* int sigwait(const sigset_t *, int *); */
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

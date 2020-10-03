@@ -23,9 +23,7 @@
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Protection flags for mmap(). */
 #define PROT_NONE       0           /**< No access is given to the region. */
@@ -54,6 +52,4 @@ extern int munmap(void *start, size_t size);
 /* int shm_open(const char *, int, mode_t); */
 /* int shm_unlink(const char *); */
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

@@ -25,9 +25,7 @@
 
 #include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** POSIX version/feature definitions.
  * @note                Not actually compliant to these versions yet. :P */
@@ -135,6 +133,4 @@ extern int unlink(const char *path);
 //extern int unlinkat(int, const char *, int);
 extern ssize_t write(int fd, const void *buf, size_t count);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

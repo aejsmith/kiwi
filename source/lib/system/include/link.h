@@ -21,15 +21,11 @@
 
 #pragma once
 
-#include <system/arch/types.h>
-
 #include <elf.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 #define ElfW(type)          _ElfW(Elf, __WORDSIZE, type)
 #define _ElfW(e,w,t)        _ElfW_1(e, w, _##t)
@@ -51,6 +47,4 @@ extern int dl_iterate_phdr(
     int (*callback)(struct dl_phdr_info *, size_t, void *),
     void *data);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

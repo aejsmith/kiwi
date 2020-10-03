@@ -26,9 +26,7 @@
 
 #include <signal.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__SYS_EXTERN_C_BEGIN
 
 /** Type containing setjmp() saved state. */
 typedef unsigned long jmp_buf[JMP_BUF_SIZE];
@@ -45,6 +43,4 @@ extern int setjmp(jmp_buf env);
 extern void siglongjmp(sigjmp_buf env, int val) __sys_noreturn;
 extern int sigsetjmp(sigjmp_buf env, int savemask);
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END

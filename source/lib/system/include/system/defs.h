@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <system/arch/defs.h>
+
 /** Compiler attribute definitions. */
 #define __sys_unused        __attribute__((unused))
 #define __sys_used          __attribute__((used))
@@ -35,3 +37,11 @@
 #define __sys_export        __attribute__((visibility("default")))
 #define __sys_hidden        __attribute__((visibility("hidden")))
 #define __sys_cleanup(f)    __attribute__((cleanup(f)))
+
+#ifdef __cplusplus
+    #define __SYS_EXTERN_C_BEGIN    extern "C" {
+    #define __SYS_EXTERN_C_END      }
+#else
+    #define __SYS_EXTERN_C_BEGIN
+    #define __SYS_EXTERN_C_END
+#endif

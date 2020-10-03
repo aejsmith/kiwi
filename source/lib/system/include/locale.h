@@ -21,9 +21,9 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <system/defs.h>
+
+__SYS_EXTERN_C_BEGIN
 
 struct __locale;
 
@@ -94,6 +94,4 @@ extern locale_t newlocale(int, const char *, locale_t);
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__SYS_EXTERN_C_END
