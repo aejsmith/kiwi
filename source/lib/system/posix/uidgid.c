@@ -19,39 +19,36 @@
  * @brief               POSIX user/group functions.
  */
 
+#include "libsystem.h"
+
 #include <kernel/process.h>
 #include <kernel/security.h>
 #include <kernel/status.h>
 
 #include <errno.h>
+#include <inttypes.h>
 #include <unistd.h>
-
-#include "libsystem.h"
 
 /** Get the process' effective group ID.
  * @return              Effective group ID of the process. */
 gid_t getegid(void) {
-    security_context_t context;
-    status_t ret;
-
-    ret = kern_process_control(-1, PROCESS_GET_SECTX, NULL, &context);
+    security_context_t ctx;
+    status_t ret = kern_process_security(PROCESS_SELF, &ctx);
     if (ret != STATUS_SUCCESS)
-        libsystem_fatal("failed to obtain security context: %d", ret);
+        libsystem_fatal("failed to obtain security context: %" PRId32, ret);
 
-    return context.groups[0];
+    return ctx.gid;
 }
 
 /** Get the process' effective user ID.
  * @return              Effective user ID of the process. */
 uid_t geteuid(void) {
-    security_context_t context;
-    status_t ret;
-
-    ret = kern_process_control(-1, PROCESS_GET_SECTX, NULL, &context);
+    security_context_t ctx;
+    status_t ret = kern_process_security(PROCESS_SELF, &ctx);
     if (ret != STATUS_SUCCESS)
-        libsystem_fatal("failed to obtain security context: %d", ret);
+        libsystem_fatal("failed to obtain security context: %" PRId32, ret);
 
-    return context.uid;
+    return ctx.uid;
 }
 
 /** Get the process' group ID.
