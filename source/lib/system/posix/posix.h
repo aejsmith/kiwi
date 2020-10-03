@@ -43,5 +43,3 @@ extern core_mutex_t __sys_hidden child_processes_lock;
 extern mode_t __sys_hidden current_umask;
 
 extern void register_fork_handler(void (*func)(void)) __sys_hidden;
-
-//extern object_acl_t *posix_mode_to_acl(object_acl_t *current, mode_t mode) __sys_hidden;

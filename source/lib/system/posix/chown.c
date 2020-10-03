@@ -19,12 +19,9 @@
  * @brief               POSIX change owner function.
  */
 
-#include <kernel/fs.h>
-#include <kernel/status.h>
+#include "libsystem.h"
 
 #include <unistd.h>
-
-#include "libsystem.h"
 
 /** Change the owner of a filesystem entry.
  * @param path          Path to entry.
@@ -32,20 +29,8 @@
  * @param gid           New group ID.
  * @return              0 on success, -1 on failure. */
 int chown(const char *path, uid_t uid, gid_t gid) {
-    object_security_t security;
-    status_t ret;
-
-    security.uid = uid;
-    security.gid = gid;
-    security.acl = NULL;
-
-    ret = kern_fs_set_security(path, true, &security);
-    if (ret != STATUS_SUCCESS) {
-        libsystem_status_to_errno(ret);
-        return -1;
-    }
-
-    return 0;
+    libsystem_stub("chown", false);
+    return -1;
 }
 
 /** Change the owner of a filesystem entry.
@@ -55,20 +40,8 @@ int chown(const char *path, uid_t uid, gid_t gid) {
  * @param gid           New group ID.
  * @return              0 on success, -1 on failure. */
 int lchown(const char *path, uid_t uid, gid_t gid) {
-    object_security_t security;
-    status_t ret;
-
-    security.uid = uid;
-    security.gid = gid;
-    security.acl = NULL;
-
-    ret = kern_fs_set_security(path, false, &security);
-    if (ret != STATUS_SUCCESS) {
-        libsystem_status_to_errno(ret);
-        return -1;
-    }
-
-    return 0;
+    libsystem_stub("lchown", false);
+    return -1;
 }
 
 /** Change the owner of a filesystem entry.
@@ -77,18 +50,6 @@ int lchown(const char *path, uid_t uid, gid_t gid) {
  * @param gid           New group ID.
  * @return              0 on success, -1 on failure. */
 int fchown(int fd, uid_t uid, gid_t gid) {
-    object_security_t security;
-    status_t ret;
-
-    security.uid = uid;
-    security.gid = gid;
-    security.acl = NULL;
-
-    ret = kern_object_set_security(fd, &security);
-    if (ret != STATUS_SUCCESS) {
-        libsystem_status_to_errno(ret);
-        return -1;
-    }
-
-    return 0;
+    libsystem_stub("fchown", false);
+    return -1;
 }
