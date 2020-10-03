@@ -19,55 +19,15 @@
  * @brief               POSIX alarm function.
  */
 
-#include <core/mutex.h>
-
-#include <kernel/time.h>
-#include <kernel/status.h>
+#include "libsystem.h"
 
 #include <unistd.h>
-
-#include "posix/posix.h"
-
-/** Alarm timer handle. */
-static handle_t alarm_handle = INVALID_HANDLE;
-static CORE_MUTEX_DEFINE(alarm_lock);
-
-/** Fork handler to reset the alarm handle. */
-static void reset_alarm(void) {
-    /* POSIX specifies that after a fork "the time left until an alarm clock
-     * signal shall be reset to zero, and the alarm, if any, shall be canceled".
-     * The handle is not inheritable so it is already cancelled. It will be
-     * recreated on the next call to alarm(). */
-    alarm_handle = INVALID_HANDLE;
-}
-
-/** Register the fork handler. */
-static __sys_init void alarm_init(void) {
-    register_fork_handler(reset_alarm);
-}
 
 /** Arrange for a SIGALRM signal to be delivered after a certain time.
  * @param seconds       Seconds to wait for.
  * @return              Seconds until previously scheduled alarm was to be
  *                      delivered, or 0 if no previous alarm. */
 unsigned int alarm(unsigned int seconds) {
-    nstime_t rem;
-    status_t ret;
-
-    core_mutex_lock(&alarm_lock, -1);
-
-    /* Create the alarm timer if it has not already been created. */
-    if (alarm_handle < 0) {
-        ret = kern_timer_create(TIMER_SIGNAL, &alarm_handle);
-        if (ret != STATUS_SUCCESS) {
-            /* Augh, POSIX doesn't let this fail. */
-            libsystem_fatal("failed to create alarm timer (%d)", ret);
-        }
-    }
-
-    kern_timer_stop(alarm_handle, &rem);
-    kern_timer_start(alarm_handle, seconds * 1000000000, TIMER_ONESHOT);
-
-    core_mutex_unlock(&alarm_lock);
-    return rem / 1000000000;
+    libsystem_stub("alarm", true);
+    return 0;
 }
