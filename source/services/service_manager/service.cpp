@@ -104,7 +104,8 @@ bool Service::start() {
             return false;
         }
 
-        m_processId = kern_process_id(m_process);
+        ret = kern_process_id(m_process, &m_processId);
+        assert(ret == STATUS_SUCCESS);
 
         g_serviceManager.addEvent(m_process, PROCESS_EVENT_DEATH, this);
     }

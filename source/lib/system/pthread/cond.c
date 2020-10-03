@@ -111,7 +111,10 @@ int pthread_cond_wait(pthread_cond_t *__restrict cond, pthread_mutex_t *__restri
     if (mutex->attr.type == PTHREAD_MUTEX_RECURSIVE)
         libsystem_fatal("using recursive mutex %p with condition %p", mutex, cond);
 
-    if (mutex->holder != kern_thread_id(THREAD_SELF)) {
+    thread_id_t self;
+    kern_thread_id(THREAD_SELF, &self);
+
+    if (mutex->holder != self) {
         if (mutex->attr.type == PTHREAD_MUTEX_ERRORCHECK)
             return EPERM;
 
@@ -171,7 +174,7 @@ int pthread_cond_wait(pthread_cond_t *__restrict cond, pthread_mutex_t *__restri
         }
     }
 
-    mutex->holder = kern_thread_id(THREAD_SELF);
+    mutex->holder    = self;
     mutex->recursion = 1;
     return 0;
 }

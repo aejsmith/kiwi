@@ -85,7 +85,7 @@ extern status_t kern_thread_create(
     const char *name, thread_entry_t entry, void *arg,
     const thread_stack_t *stack, uint32_t flags, handle_t *_handle);
 extern status_t kern_thread_open(thread_id_t id, handle_t *_handle);
-extern thread_id_t kern_thread_id(handle_t handle);
+extern status_t kern_thread_id(handle_t handle, thread_id_t *_id);
 extern status_t kern_thread_security(handle_t handle, security_context_t *ctx);
 extern status_t kern_thread_status(handle_t handle, int *_status, int *_reason);
 extern status_t kern_thread_kill(handle_t handle);

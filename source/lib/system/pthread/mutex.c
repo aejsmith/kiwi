@@ -107,11 +107,14 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
     status_t ret;
     int32_t val;
 
+    thread_id_t self;
+    kern_thread_id(THREAD_SELF, &self);
+
     /* If the futex is currently 0 (unlocked), just set it to 1 (locked, no
      * waiters) and return. */
     val = __sync_val_compare_and_swap(&mutex->futex, 0, 1);
     if (val != 0) {
-        if (mutex->holder == kern_thread_id(THREAD_SELF)) {
+        if (mutex->holder == self) {
             if (mutex->attr.type == PTHREAD_MUTEX_RECURSIVE) {
                 /* Already hold it and the mutex is recursive, increase count
                  * and succeed. */
@@ -147,7 +150,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
         }
     }
 
-    mutex->holder = kern_thread_id(THREAD_SELF);
+    mutex->holder    = self;
     mutex->recursion = 1;
     return 0;
 }
@@ -169,10 +172,11 @@ int pthread_mutex_lock(pthread_mutex_t *mutex) {
  *                      and the maximum recursion count has been reached.
  */
 int pthread_mutex_trylock(pthread_mutex_t *mutex) {
+    thread_id_t self;
+    kern_thread_id(THREAD_SELF, &self);
+
     if (!__sync_bool_compare_and_swap(&mutex->futex, 0, 1)) {
-        if (mutex->holder == kern_thread_id(THREAD_SELF) &&
-            mutex->attr.type == PTHREAD_MUTEX_RECURSIVE)
-        {
+        if (mutex->holder == self && mutex->attr.type == PTHREAD_MUTEX_RECURSIVE) {
             mutex->recursion++;
             return 0;
         }
@@ -180,7 +184,7 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
         return EBUSY;
     }
 
-    mutex->holder = kern_thread_id(THREAD_SELF);
+    mutex->holder    = self;
     mutex->recursion = 1;
     return 0;
 }
@@ -203,7 +207,10 @@ int pthread_mutex_trylock(pthread_mutex_t *mutex) {
  *                      not hold the lock.
  */
 int pthread_mutex_unlock(pthread_mutex_t *mutex) {
-    if (mutex->holder != kern_thread_id(THREAD_SELF)) {
+    thread_id_t self;
+    kern_thread_id(THREAD_SELF, &self);
+
+    if (mutex->holder != self) {
         if (mutex->attr.type == PTHREAD_MUTEX_ERRORCHECK ||
             mutex->attr.type == PTHREAD_MUTEX_RECURSIVE)
         {

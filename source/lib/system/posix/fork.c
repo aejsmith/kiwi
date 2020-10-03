@@ -101,8 +101,9 @@ pid_t fork(void) {
         return 0;
     } else {
         core_list_init(&process->header);
-        process->pid = kern_process_id(process->handle);
-        if (process->pid < 1)
+
+        ret = kern_process_id(process->handle, &process->pid);
+        if (ret != STATUS_SUCCESS)
             libsystem_fatal("could not get ID of child");
 
         /* Add it to the child list. */

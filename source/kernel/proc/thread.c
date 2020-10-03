@@ -1295,19 +1295,19 @@ status_t kern_thread_open(thread_id_t id, handle_t *_handle) {
 
 /** Get the ID of a thread.
  * @param handle        Handle to thread, or THREAD_SELF for calling thread.
- * @return              Thread ID on success, -1 if handle is invalid. */
-thread_id_t kern_thread_id(handle_t handle) {
-    thread_id_t id = -1;
+ * @param _id           Where to store ID of thread.
+ * @return              Status code describing result of the operation. */
+status_t kern_thread_id(handle_t handle, thread_id_t *_id) {
     thread_t *thread;
     status_t ret;
 
     ret = thread_handle_lookup(handle, &thread);
     if (ret == STATUS_SUCCESS) {
-        id = thread->id;
+        ret = write_user(_id, thread->id);
         thread_release(thread);
     }
 
-    return id;
+    return ret;
 }
 
 /**

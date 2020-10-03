@@ -56,7 +56,9 @@ void libsystem_init(process_args_t *args) {
     __program_name = core_path_basename(args->path);
 
     /* If we're process 1, set default environment variables. */
-    if (kern_process_id(-1) == 1) {
+    process_id_t self;
+    kern_process_id(PROCESS_SELF, &self);
+    if (self == 1) {
         setenv("PATH", "/system/bin", 1);
         setenv("HOME", "/users/admin", 1);
     }

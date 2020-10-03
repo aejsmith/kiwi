@@ -1364,19 +1364,19 @@ status_t kern_process_open(process_id_t id, handle_t *_handle) {
 
 /** Get the ID of a process.
  * @param handle        Handle to process, or PROCESS_SELF for calling process.
- * @return              Process ID on success, -1 if handle is invalid. */
-process_id_t kern_process_id(handle_t handle) {
-    process_id_t id = -1;
+ * @param _id           Where to store ID of process.
+ * @return              Status code describing result of the operation. */
+status_t kern_process_id(handle_t handle, process_id_t *_id) {
     process_t *process;
     status_t ret;
 
     ret = process_handle_lookup(handle, &process);
     if (ret == STATUS_SUCCESS) {
-        id = process->id;
+        ret = write_user(_id, process->id);
         process_release(process);
     }
 
-    return id;
+    return ret;
 }
 
 /**

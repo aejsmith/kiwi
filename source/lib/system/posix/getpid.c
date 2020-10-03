@@ -19,14 +19,20 @@
  * @brief               POSIX get PID function.
  */
 
+#include "libsystem.h"
+
 #include <kernel/process.h>
+#include <kernel/status.h>
 
 #include <unistd.h>
 
 /** Get the current process ID.
  * @return              ID of calling process. */
 pid_t getpid(void) {
-    return kern_process_id(-1);
+    process_id_t id;
+    status_t ret = kern_process_id(PROCESS_SELF, &id);
+    libsystem_assert(ret == STATUS_SUCCESS);
+    return id;
 }
 
 /** Get the parent process ID.

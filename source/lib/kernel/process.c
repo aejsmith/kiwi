@@ -58,23 +58,24 @@ __sys_export status_t kern_process_clone(handle_t *_handle) {
 
     /* In the child, we must update the saved process and thread IDs. */
     if (*_handle == INVALID_HANDLE) {
-        curr_process_id = _kern_process_id(PROCESS_SELF);
-        curr_thread_id = _kern_thread_id(THREAD_SELF);
+        _kern_process_id(PROCESS_SELF, &curr_process_id);
+        _kern_thread_id(THREAD_SELF, &curr_thread_id);
     }
 
     return STATUS_SUCCESS;
 }
 
 /** Get the ID of a process.
- * @param handle        Handle for process to get ID of, or PROCESS_SELF to get
- *                      ID of the calling process.
- * @return              Process ID on success, -1 if handle is invalid. */
-__sys_export process_id_t kern_process_id(handle_t handle) {
+ * @param handle        Handle to process, or PROCESS_SELF for calling process.
+ * @param _id           Where to store ID of process.
+ * @return              Status code describing result of the operation. */
+__sys_export status_t kern_process_id(handle_t handle, process_id_t *_id) {
     /* We save the current process ID to avoid having to perform a kernel call
      * just to get our own ID. */
-    if (handle < 0) {
-        return curr_process_id;
+    if (handle == PROCESS_SELF) {
+        *_id = curr_process_id;
+        return STATUS_SUCCESS;
     } else {
-        return _kern_process_id(handle);
+        return _kern_process_id(handle, _id);
     }
 }

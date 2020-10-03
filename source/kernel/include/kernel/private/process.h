@@ -48,7 +48,7 @@ extern status_t kern_process_control(unsigned action, const void *in, void *out)
 #ifdef __LIBKERNEL
 
 extern status_t _kern_process_clone(handle_t *_handle);
-extern process_id_t _kern_process_id(handle_t handle);
+extern status_t _kern_process_id(handle_t handle, process_id_t *_id);
 
 #endif /* __LIBKERNEL */
 #endif /* __KERNEL_PRIVATE */

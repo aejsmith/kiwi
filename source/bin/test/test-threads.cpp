@@ -93,9 +93,10 @@ int main(int argc, char **argv) {
 
         events[i].event = THREAD_EVENT_DEATH;
 
-        printf(
-            "Created thread %" PRId32 ", handle %" PRId32 "\n",
-            kern_thread_id(events[i].handle), events[i].handle);
+        thread_id_t id;
+        kern_thread_id(events[i].handle, &id);
+
+        printf("Created thread %" PRId32 ", handle %" PRId32 "\n", id, events[i].handle);
     }
 
     printf("Unlocking...\n");

@@ -47,7 +47,8 @@ static thread_dtor_t thread_dtors[THREAD_DTOR_MAX] = {};
 static int thread_trampoline(void *_create) {
     thread_create_t *create = _create;
 
-    thread_id_t id = _kern_thread_id(THREAD_SELF);
+    thread_id_t id;
+    _kern_thread_id(THREAD_SELF, &id);
 
     /* Set our TCB. */
     dprintf("tls: TCB for thread %" PRId32 " is %p\n", id, create->tcb);
@@ -123,16 +124,17 @@ __sys_export status_t kern_thread_create(
 }
 
 /** Get the ID of a thread.
- * @param handle        Handle for thread to get ID of, or THREAD_SELF to get
- *                      ID of the calling thread.
- * @return              Thread ID on success, -1 if handle is invalid. */
-__sys_export thread_id_t kern_thread_id(handle_t handle) {
+ * @param handle        Handle to thread, or THREAD_SELF for calling thread.
+ * @param _id           Where to store ID of thread.
+ * @return              Status code describing result of the operation. */
+__sys_export status_t kern_thread_id(handle_t handle, thread_id_t *_id) {
     /* We save the current thread ID to avoid having to perform a kernel call
      * just to get our own ID. */
-    if (handle < 0) {
-        return curr_thread_id;
+    if (handle == THREAD_SELF) {
+        *_id = curr_thread_id;
+        return STATUS_SUCCESS;
     } else {
-        return _kern_thread_id(handle);
+        return _kern_thread_id(handle, _id);
     }
 }
 

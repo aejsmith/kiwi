@@ -46,7 +46,7 @@ void libkernel_init(process_args_t *args) {
     kern_system_info(SYSTEM_INFO_PAGE_SIZE, &page_size);
 
     /* Save the current process ID for the kern_process_id() wrapper. */
-    curr_process_id = _kern_process_id(PROCESS_SELF);
+    _kern_process_id(PROCESS_SELF, &curr_process_id);
 
     /* If we're the first process, open handles to the kernel console. */
     if (curr_process_id == 1) {
@@ -82,7 +82,7 @@ void libkernel_init(process_args_t *args) {
     kern_thread_control(THREAD_SET_TLS_ADDR, tcb, NULL);
 
     /* Save the current thread ID in TLS for the kern_thread_id() wrapper. */
-    curr_thread_id = _kern_thread_id(THREAD_SELF);
+    _kern_thread_id(THREAD_SELF, &curr_thread_id);
 
     /* Let the kernel know where kern_thread_restore() is. */
     kern_process_control(PROCESS_SET_RESTORE, kern_thread_restore, NULL);
