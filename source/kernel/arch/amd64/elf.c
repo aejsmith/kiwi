@@ -26,21 +26,13 @@
 #include <module.h>
 #include <status.h>
 
-/** Perform a REL relocation on an ELF module.
- * @param image         Image to relocate.
- * @param rel           Relocation to perform.
- * @param target        Section to perform relocation on.
- * @return              Status code describing result of the operation. */
+/** Perform a REL relocation on an ELF module. */
 status_t arch_elf_module_relocate_rel(elf_image_t *image, elf_rel_t *rel, elf_shdr_t *target) {
     kprintf(LOG_WARN, "elf: REL relocation section unsupported\n");
     return STATUS_NOT_IMPLEMENTED;
 }
 
-/** Perform a RELA relocation on an ELF module.
- * @param image         Image to relocate.
- * @param rel           Relocation to perform.
- * @param target        Section to perform relocation on.
- * @return              Status code describing result of the operation. */
+/** Perform a RELA relocation on an ELF module. */
 status_t arch_elf_module_relocate_rela(elf_image_t *image, elf_rela_t *rel, elf_shdr_t *target) {
     Elf64_Addr *where64, val = 0;
     Elf32_Addr *where32;
@@ -57,23 +49,24 @@ status_t arch_elf_module_relocate_rela(elf_image_t *image, elf_rela_t *rel, elf_
 
     /* Perform the relocation. */
     switch (ELF64_R_TYPE(rel->r_info)) {
-    case ELF_R_X86_64_NONE:
-        break;
-    case ELF_R_X86_64_32:
-        *where32 = val + rel->r_addend;
-        break;
-    case ELF_R_X86_64_64:
-        *where64 = val + rel->r_addend;
-        break;
-    case ELF_R_X86_64_PC32:
-        *where32 = (val + rel->r_addend) - (ptr_t)where32;
-        break;
-    case ELF_R_X86_64_32S:
-        *where32 = val + rel->r_addend;
-        break;
-    default:
-        kprintf(LOG_WARN, "elf: encountered unknown relocation type: %lu\n", ELF64_R_TYPE(rel->r_info));
-        return STATUS_MALFORMED_IMAGE;
+        case ELF_R_X86_64_NONE:
+            break;
+        case ELF_R_X86_64_32:
+            *where32 = val + rel->r_addend;
+            break;
+        case ELF_R_X86_64_64:
+            *where64 = val + rel->r_addend;
+            break;
+        case ELF_R_X86_64_PC32:
+        case ELF_R_X86_64_PLT32:
+            *where32 = (val + rel->r_addend) - (ptr_t)where32;
+            break;
+        case ELF_R_X86_64_32S:
+            *where32 = val + rel->r_addend;
+            break;
+        default:
+            kprintf(LOG_WARN, "elf: encountered unknown relocation type: %lu\n", ELF64_R_TYPE(rel->r_info));
+            return STATUS_MALFORMED_IMAGE;
     }
 
     return STATUS_SUCCESS;

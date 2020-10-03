@@ -35,4 +35,3 @@ static status_t test_unload(void) {
 MODULE_NAME("test");
 MODULE_DESC("Test driver");
 MODULE_FUNCS(test_init, test_unload);
-
