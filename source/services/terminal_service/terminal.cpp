@@ -360,11 +360,141 @@ status_t Terminal::handleFileInfo(const ipc_message_t &message) {
 }
 
 status_t Terminal::handleFileRequest(const ipc_message_t &message, const void *data) {
-    // TODO
-    ipc_message_t reply = initializeFileReply(message);
-    reply.args[USER_FILE_MESSAGE_ARG_REQUEST_STATUS] = STATUS_INVALID_REQUEST;
+    status_t ret;
 
-    return kern_connection_send(m_userFileConnection, &reply, nullptr, INVALID_HANDLE, -1);
+    std::unique_ptr<uint8_t[]> outData;
+    size_t outDataSize = 0;
+
+    unsigned request = message.args[USER_FILE_MESSAGE_ARG_REQUEST_NUM];
+    switch (request) {
+        case TIOCDRAIN: {
+            /* tcdrain(int fd) - nothing to do, we don't buffer any output. */
+            ret = STATUS_SUCCESS;
+            break;
+        }
+        case TCXONC: {
+            /* tcflow(int fd, int action). */
+            if (message.size != sizeof(int)) {
+                ret = STATUS_INVALID_ARG;
+                break;
+            }
+
+            int action = *reinterpret_cast<const int *>(data);
+
+            switch (action) {
+                case TCIOFF:
+                    addInput(m_termios.c_cc[VSTOP]);
+                    ret = STATUS_SUCCESS;
+                    break;
+                case TCION:
+                    addInput(m_termios.c_cc[VSTART]);
+                    ret = STATUS_SUCCESS;
+                    break;
+                case TCOOFF:
+                case TCOON:
+                    ret = STATUS_NOT_IMPLEMENTED;
+                    break;
+                default:
+                    ret = STATUS_INVALID_ARG;
+                    break;
+            }
+
+            break;
+        }
+        case TCFLSH: {
+            /* tcflush(int fd, int action) - TODO. */
+            if (message.size != sizeof(int)) {
+                ret = STATUS_INVALID_ARG;
+                break;
+            }
+
+            int action = *reinterpret_cast<const int *>(data);
+
+            /* No output buffering so just need to deal with input. */
+            switch (action) {
+                case TCIFLUSH:
+                case TCIOFLUSH:
+                    clearBuffer();
+                    [[fallthrough]];
+                case TCOFLUSH:
+                    ret = STATUS_SUCCESS;
+                    break;
+                default:
+                    ret = STATUS_INVALID_ARG;
+                    break;
+            }
+
+            break;
+        }
+        case TCGETA: {
+            /* tcgetattr(int fd, struct termios *tiop). */
+            outDataSize = sizeof(struct termios);
+            outData.reset(new uint8_t[outDataSize]);
+
+            memcpy(outData.get(), &m_termios, sizeof(m_termios));
+
+            ret = STATUS_SUCCESS;
+            break;
+        }
+        case TCSETA:
+        case TCSETAW:
+        case TCSETAF: {
+            /* tcsetattr(int fd, TCSANOW / TCSADRAIN / TCSAFLUSH). */
+            if (message.size != sizeof(struct termios)) {
+                ret = STATUS_INVALID_ARG;
+                break;
+            }
+
+            /* No output buffering to flush, just input. */
+            if (request == TCSETAF)
+                clearBuffer();
+
+            memcpy(&m_termios, data, sizeof(m_termios));
+
+            ret = STATUS_SUCCESS;
+            break;
+        }
+        case TIOCGPGRP: {
+            /* tcgetpgrp(int fd) - TODO. */
+            ret = STATUS_NOT_IMPLEMENTED;
+            break;
+        }
+        case TIOCSPGRP: {
+            /* tcsetpgrp(int fd, pid_t pgid) - TODO. */
+            ret = STATUS_NOT_IMPLEMENTED;
+            break;
+        }
+        case TIOCGWINSZ: {
+            outDataSize = sizeof(struct winsize);
+            outData.reset(new uint8_t[outDataSize]);
+
+            memcpy(outData.get(), &m_winsize, sizeof(m_winsize));
+
+            ret = STATUS_SUCCESS;
+            break;
+        }
+        case TIOCSWINSZ: {
+            if (message.size != sizeof(struct winsize)) {
+                ret = STATUS_INVALID_ARG;
+                break;
+            }
+
+            memcpy(&m_winsize, data, sizeof(m_winsize));
+
+            ret = STATUS_SUCCESS;
+            break;
+        }
+        default: {
+            ret = STATUS_INVALID_REQUEST;
+            break;
+        }
+    }
+
+    ipc_message_t reply = initializeFileReply(message);
+    reply.size = outDataSize;
+    reply.args[USER_FILE_MESSAGE_ARG_REQUEST_STATUS] = ret;
+
+    return kern_connection_send(m_userFileConnection, &reply, outData.get(), INVALID_HANDLE, -1);
 }
 
 status_t Terminal::sendOutput(const void *data, size_t size) {
@@ -637,4 +767,11 @@ size_t Terminal::eraseLine() {
         erased++;
 
     return erased;
+}
+
+/** Discard all unread input. */
+void Terminal::clearBuffer() {
+    m_inputBufferStart = 0;
+    m_inputBufferSize  = 0;
+    m_inputBufferLines = 0;
 }

@@ -77,6 +77,7 @@ private:
     bool readBuffer(ReadOperation &op);
     bool eraseChar();
     size_t eraseLine();
+    void clearBuffer();
 
 private:
     core_connection_t *const m_connection;
