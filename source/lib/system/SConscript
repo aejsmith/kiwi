@@ -131,6 +131,7 @@ sources = [File(f) for f in [
     'stdlib/ldiv.c',
     'stdlib/malloc.c',
     'stdlib/mkstemp.c',
+    'stdlib/multibyte.c',
     'stdlib/qsort.c',
     'stdlib/rand.c',
     'stdlib/strtod.c',

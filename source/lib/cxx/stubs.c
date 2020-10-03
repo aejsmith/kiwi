@@ -138,12 +138,6 @@ size_t mbsrtowcs(wchar_t *__restrict dst, const char **__restrict src, size_t le
     *(int *)0xdeadc0de = 0; abort();
 }
 
-int mbtowc(wchar_t *__restrict pwc, const char *__restrict s, size_t n) {
-    //fprintf(stderr, "STUB: %s\n", __func__);
-    //*(int *)0xdeadc0de = 0; abort();
-    return -1;
-}
-
 locale_t newlocale(int mask, const char *locale, locale_t base) {
     return (void *)0xdeadbeef;
 }
