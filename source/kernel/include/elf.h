@@ -56,6 +56,7 @@ extern status_t elf_binary_load(
     object_handle_t *handle, const char *path, struct vm_aspace *as,
     elf_image_t **_image);
 extern ptr_t elf_binary_finish(elf_image_t *image);
+extern void elf_binary_destroy(elf_image_t *image);
 
 extern status_t arch_elf_module_relocate_rel(elf_image_t *image, elf_rel_t *rel, elf_shdr_t *target);
 extern status_t arch_elf_module_relocate_rela(elf_image_t *image, elf_rela_t *rela, elf_shdr_t *target);

@@ -34,16 +34,13 @@ status_t arch_elf_module_relocate_rel(elf_image_t *image, elf_rel_t *rel, elf_sh
 
 /** Perform a RELA relocation on an ELF module. */
 status_t arch_elf_module_relocate_rela(elf_image_t *image, elf_rela_t *rel, elf_shdr_t *target) {
-    Elf64_Addr *where64, val = 0;
-    Elf32_Addr *where32;
-    status_t ret;
-
     /* Get the location of the relocation. */
-    where64 = (Elf64_Addr *)(target->sh_addr + rel->r_offset);
-    where32 = (Elf32_Addr *)(target->sh_addr + rel->r_offset);
+    Elf64_Addr *where64 = (Elf64_Addr *)(target->sh_addr + rel->r_offset);
+    Elf32_Addr *where32 = (Elf32_Addr *)(target->sh_addr + rel->r_offset);
 
     /* Obtain the symbol value. */
-    ret = elf_module_resolve(image, ELF64_R_SYM(rel->r_info), &val);
+    Elf64_Addr val;
+    status_t ret = elf_module_resolve(image, ELF64_R_SYM(rel->r_info), &val);
     if (ret != STATUS_SUCCESS)
         return ret;
 

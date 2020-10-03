@@ -435,12 +435,12 @@ static status_t process_load(process_load_t *load, process_t *parent) {
      * arguments/stack don't end up placed where the binary wants to be. */
     ret = fs_open(load->path, FILE_ACCESS_READ | FILE_ACCESS_EXECUTE, 0, 0, &handle);
     if (ret != STATUS_SUCCESS)
-        goto fail;
+        return ret;
 
     ret = elf_binary_reserve(handle, load->aspace);
     object_handle_release(handle);
     if (ret != STATUS_SUCCESS)
-        goto fail;
+        return ret;
 
     /* If the kernel library has not been opened, open it now. We keep a handle
      * to it open all the time so that if it gets replaced by a new version,
@@ -458,7 +458,7 @@ static status_t process_load(process_load_t *load, process_t *parent) {
     /* Map the kernel library. */
     ret = elf_binary_load(kernel_library, LIBKERNEL_PATH, load->aspace, &load->image);
     if (ret != STATUS_SUCCESS)
-        goto fail;
+        return ret;
 
     /* Determine the size of the argument block. Each argument/environment
      * entry requires the length of the string plus another pointer for the
@@ -488,14 +488,9 @@ static status_t process_load(process_load_t *load, process_t *parent) {
         VM_ACCESS_READ | VM_ACCESS_WRITE, VM_MAP_PRIVATE | VM_MAP_STACK,
         NULL, 0, "main_stack");
     if (ret != STATUS_SUCCESS)
-        goto fail;
+        return ret;
 
     return STATUS_SUCCESS;
-
-fail:
-    vm_aspace_destroy(load->aspace);
-    load->aspace = NULL;
-    return ret;
 }
 
 /** Copy the data contained in a string array to the argument block.
@@ -594,7 +589,7 @@ status_t process_create(
     const char *const args[], const char *const env[], uint32_t flags,
     int priority, process_t **_process)
 {
-    process_load_t load;
+    process_load_t load = {};
     process_t *process;
     thread_t *thread;
     status_t ret;
@@ -606,21 +601,22 @@ status_t process_create(
 
     load.path = (char *)args[0];
     load.args = (char **)args;
-    load.env = (char **)env;
+    load.env  = (char **)env;
 
     /* Create the address space for the process. */
     ret = process_load(&load, NULL);
     if (ret != STATUS_SUCCESS)
-        return ret;
+        goto err;
 
     token_retain(system_token);
 
     /* Create the new process. */
     ret = process_alloc(args[0], -1, NULL, priority, load.aspace, system_token, NULL, &process);
-    if (ret != STATUS_SUCCESS) {
-        vm_aspace_destroy(load.aspace);
-        return ret;
-    }
+    if (ret != STATUS_SUCCESS)
+        goto err;
+
+    /* This will now be freed with the process. */
+    load.aspace = NULL;
 
     if (flags & PROCESS_CREATE_CRITICAL)
         process->flags |= PROCESS_CRITICAL;
@@ -629,7 +625,7 @@ status_t process_create(
     ret = thread_create("main", process, 0, process_entry_trampoline, &load, NULL, &thread);
     if (ret != STATUS_SUCCESS) {
         process_release(process);
-        return ret;
+        goto err;
     }
 
     process->load = &load;
@@ -646,6 +642,15 @@ status_t process_create(
     }
 
     return load.status;
+
+err:
+    if (load.aspace)
+        vm_aspace_destroy(load.aspace);
+
+    if (load.image)
+        elf_binary_destroy(load.image);
+
+    return ret;
 }
 
 /**
@@ -862,6 +867,9 @@ static void free_process_args(process_load_t *load) {
     if (load->aspace)
         vm_aspace_destroy(load->aspace);
 
+    if (load->image)
+        elf_binary_destroy(load->image);
+
     if (load->token)
         token_release(load->token);
 
@@ -1049,8 +1057,8 @@ status_t kern_process_create(
         goto out_free_args;
 
     /* These will now be freed when destroying the process. */
-    load.aspace = NULL;
-    load.token = NULL;
+    load.aspace    = NULL;
+    load.token     = NULL;
     load.root_port = NULL;
 
     if (flags & PROCESS_CREATE_CRITICAL)

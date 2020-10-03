@@ -78,7 +78,7 @@ typedef struct symbol {
 
 /** Set the description of a module. */
 #define MODULE_DESC(mdesc) \
-        static char __used __section(MODULE_INFO_SECTION) __module_desc[] = mdesc
+    static char __used __section(MODULE_INFO_SECTION) __module_desc[] = mdesc
 
 /** Set the module hook functions. */
 #define MODULE_FUNCS(minit, munload) \
@@ -96,6 +96,9 @@ extern module_t kernel_module;
 
 extern ptr_t module_mem_alloc(size_t size);
 extern void module_mem_free(ptr_t base, size_t size);
+
+extern module_t *module_for_addr(ptr_t addr);
+extern module_t *module_self(void);
 
 extern status_t module_load(const char *path, char *depbuf);
 

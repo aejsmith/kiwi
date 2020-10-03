@@ -63,37 +63,29 @@ typedef struct boot_module {
 static LIST_DEFINE(module_list);
 static MUTEX_DEFINE(module_lock, 0);
 
-#ifdef KERNEL_MODULE_BASE
-
-/** Module memory allocation space. */
-static ptr_t next_module_addr = KERNEL_MODULE_BASE;
-static size_t remaining_module_size = KERNEL_MODULE_SIZE;
-
-#endif
-
 /** Kernel module structure. */
 module_t kernel_module;
 
 #ifdef KERNEL_MODULE_BASE
 
+/** Module memory allocation space. */
+static ptr_t next_module_addr       = KERNEL_MODULE_BASE;
+static size_t remaining_module_size = KERNEL_MODULE_SIZE;
+
 /** Allocate memory suitable to hold a kernel module.
  * @param size          Size of the allocation.
  * @return              Address allocated or 0 if no available memory. */
 ptr_t module_mem_alloc(size_t size) {
-    page_t *page;
-    ptr_t addr;
-    size_t i;
-
     size = round_up(size, PAGE_SIZE);
     if (size > remaining_module_size)
         return 0;
 
-    addr = next_module_addr;
+    ptr_t addr = next_module_addr;
 
     mmu_context_lock(&kernel_mmu_context);
 
-    for (i = 0; i < size; i += PAGE_SIZE) {
-        page = page_alloc(MM_BOOT);
+    for (size_t i = 0; i < size; i += PAGE_SIZE) {
+        page_t *page = page_alloc(MM_BOOT);
         mmu_context_map(
             &kernel_mmu_context, addr + i, page->addr,
             VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
@@ -102,8 +94,9 @@ ptr_t module_mem_alloc(size_t size) {
 
     mmu_context_unlock(&kernel_mmu_context);
 
-    next_module_addr += size;
+    next_module_addr      += size;
     remaining_module_size -= size;
+
     return addr;
 }
 
@@ -136,10 +129,9 @@ void module_mem_free(ptr_t base, size_t size) {
  * @param name          Name of module to find.
  * @return              Pointer to module structure, NULL if not found. */
 static module_t *module_find(const char *name) {
-    module_t *module;
-
     list_foreach(&module_list, iter) {
-        module = list_entry(iter, module_t, header);
+        module_t *module = list_entry(iter, module_t, header);
+
         if (strcmp(module->name, name) == 0)
             return module;
     }
@@ -147,9 +139,7 @@ static module_t *module_find(const char *name) {
     return NULL;
 }
 
-/** Find and check a module's information.
- * @param module        Module being loaded.
- * @return              Status code describing result of the operation. */
+/** Find and check a module's information. */
 static status_t find_module_info(module_t *module) {
     symbol_t sym;
     bool found;
@@ -166,13 +156,13 @@ static status_t find_module_info(module_t *module) {
 
     /* Check if it is valid. */
     if (!module->name || !module->description || !module->init) {
-        kprintf(LOG_NOTICE, "module: information for module %s is invalid\n", module->image.name);
+        kprintf(LOG_NOTICE, "module: information for module '%s' is invalid\n", module->image.name);
         return STATUS_MALFORMED_IMAGE;
     } else if (strnlen(module->name, MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
-        kprintf(LOG_NOTICE, "module: name of module %s is too long\n", module->image.name);
+        kprintf(LOG_NOTICE, "module: name of module '%s' is too long\n", module->image.name);
         return STATUS_MALFORMED_IMAGE;
     } else if (strnlen(module->description, MODULE_DESC_MAX + 1) == (MODULE_DESC_MAX + 1)) {
-        kprintf(LOG_NOTICE, "module: description of module %s is too long\n", module->image.name);
+        kprintf(LOG_NOTICE, "module: description of module '%s' is too long\n", module->image.name);
         return STATUS_MALFORMED_IMAGE;
     }
 
@@ -190,14 +180,12 @@ static status_t find_module_info(module_t *module) {
  *                      it will be stored here.
  * @return              Status code describing result of the operation. */
 static status_t finish_module(module_t *module, const char **_name, module_t **_dep) {
-    symbol_t sym;
-    size_t i;
-    module_t *dep;
     status_t ret;
 
     module->state = MODULE_DEPS;
 
     /* No dependencies symbol means no dependencies. */
+    symbol_t sym;
     if (elf_symbol_lookup(&module->image, "__module_deps", false, false, &sym)) {
         module->deps = (const char **)sym.addr;
     } else {
@@ -205,13 +193,13 @@ static status_t finish_module(module_t *module, const char **_name, module_t **_
     }
 
     /* Loop through each dependency. The array is NULL-terminated. */
-    for (i = 0; module->deps && module->deps[i]; i++) {
+    for (size_t i = 0; module->deps && module->deps[i]; i++) {
         if (strnlen(module->deps[i], MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
             kprintf(LOG_WARN, "module: module %s has invalid dependency\n", module->name);
             return STATUS_MALFORMED_IMAGE;
         }
 
-        dep = module_find(module->deps[i]);
+        module_t *dep = module_find(module->deps[i]);
         if (!dep || dep->state != MODULE_READY) {
             if (_name)
                 *_name = module->deps[i];
@@ -234,16 +222,17 @@ static status_t finish_module(module_t *module, const char **_name, module_t **_
 
     /* Call the module initialization function. */
     dprintf(
-        "module: calling init function %p for module %p (%s)...\n",
+        "module: calling init function %p for module %p (%s)\n",
         module->init, module, module->name);
+
     ret = module->init();
     if (ret != STATUS_SUCCESS)
         return ret;
 
     /* Reference all the dependencies. We leave this until now to avoid having
      * to go through and remove the reference if anything above fails. */
-    for (i = 0; module->deps && module->deps[i]; i++) {
-        dep = module_find(module->deps[i]);
+    for (size_t i = 0; module->deps && module->deps[i]; i++) {
+        module_t *dep = module_find(module->deps[i]);
         refcount_inc(&dep->count);
     }
 
@@ -257,8 +246,6 @@ static status_t finish_module(module_t *module, const char **_name, module_t **_
 }
 
 /**
- * Load a kernel module.
- *
  * Loads a kernel module from the filesystem. If any of the dependencies of the
  * module are not met, the name of the first unmet dependency encountered is
  * stored in the buffer provided, which should be MODULE_NAME_MAX bytes long.
@@ -274,19 +261,18 @@ static status_t finish_module(module_t *module, const char **_name, module_t **_
  *                      return STATUS_MISSING_LIBRARY.
  */
 status_t module_load(const char *path, char *depbuf) {
-    object_handle_t *handle;
-    module_t *module;
-    const char *dep;
     status_t ret;
 
     assert(path);
 
     /* Open a handle to the file. */
+    object_handle_t *handle;
     ret = fs_open(path, FILE_ACCESS_READ, 0, 0, &handle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    module = kmalloc(sizeof(module_t), MM_KERNEL);
+    module_t *module = kmalloc(sizeof(module_t), MM_KERNEL);
+
     list_init(&module->header);
     refcount_set(&module->count, 0);
 
@@ -296,48 +282,45 @@ status_t module_load(const char *path, char *depbuf) {
     /* Perform first stage of loading the module. */
     ret = elf_module_load(handle, path, &module->image);
     object_handle_release(handle);
-    if (ret != STATUS_SUCCESS) {
-        mutex_unlock(&module_lock);
-        kfree(module);
-        return ret;
-    }
+    if (ret != STATUS_SUCCESS)
+        goto err_unlock;
 
     ret = find_module_info(module);
-    if (ret != STATUS_SUCCESS) {
-        elf_module_destroy(&module->image);
-        mutex_unlock(&module_lock);
-        kfree(module);
-        return ret;
-    }
+    if (ret != STATUS_SUCCESS)
+        goto err_destroy;
 
     module->state = MODULE_LOADED;
     list_append(&module_list, &module->header);
 
+    const char *dep;
     ret = finish_module(module, &dep, NULL);
     if (ret != STATUS_SUCCESS) {
         if (ret == STATUS_MISSING_LIBRARY && depbuf)
             strncpy(depbuf, dep, MODULE_NAME_MAX + 1);
 
         list_remove(&module->header);
-        elf_module_destroy(&module->image);
-        mutex_unlock(&module_lock);
-        kfree(module);
-        return ret;
+        goto err_destroy;
     }
 
     mutex_unlock(&module_lock);
     return STATUS_SUCCESS;
+
+err_destroy:
+    elf_module_destroy(&module->image);
+
+err_unlock:
+    mutex_unlock(&module_lock);
+    kfree(module);
+    return ret;
 }
 
 /**
- * Look up a kernel symbol by address.
- *
  * Looks for the kernel symbol corresponding to an address in all loaded
  * modules, and gets the offset of the address in the symbol. Note that
  * symbol lookups should only be performed in KDB or by the module loader:
  * they do not take a lock and are therefore unsafe.
  *
- * If an matching symbol is not found, the symbol structure will still be
+ * If a matching symbol is not found, the symbol structure will still be
  * filled in. The symbol name will be set to "<unknown>". If the given address
  * lies within a loaded image, the image pointer will be set to that image,
  * otherwise it will be set to NULL. Everything else will be set to 0.
@@ -349,12 +332,10 @@ status_t module_load(const char *path, char *depbuf) {
  * @return              Whether a symbol was found for the address.
  */
 bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *_off) {
-    module_t *module;
-
     symbol->image = NULL;
 
     list_foreach(&module_list, iter) {
-        module = list_entry(iter, module_t, header);
+        module_t *module = list_entry(iter, module_t, header);
 
         if (elf_symbol_from_addr(&module->image, addr, symbol, _off)) {
             return true;
@@ -373,8 +354,6 @@ bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *_off) {
 }
 
 /**
- * Look up a kernel symbol by name.
- *
  * Looks for a symbol with the specified name in all loaded modules. If
  * requested, only global and/or exported symbols will be returned. Note that
  * symbol lookups should only be performed in KDB or by the module loader:
@@ -388,10 +367,8 @@ bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *_off) {
  * @return              Whether a symbol by this name was found.
  */
 bool symbol_lookup(const char *name, bool global, bool exported, symbol_t *symbol) {
-    module_t *module;
-
     list_foreach(&module_list, iter) {
-        module = list_entry(iter, module_t, header);
+        module_t *module = list_entry(iter, module_t, header);
 
         if (elf_symbol_lookup(&module->image, name, global, exported, symbol))
             return true;
@@ -400,10 +377,6 @@ bool symbol_lookup(const char *name, bool global, bool exported, symbol_t *symbo
     return false;
 }
 
-/** Print a list of loaded kernel modules.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
 static kdb_status_t kdb_cmd_modules(int argc, char **argv, kdb_filter_t *filter) {
     module_t *module;
 
@@ -448,15 +421,16 @@ static kdb_status_t kdb_cmd_modules(int argc, char **argv, kdb_filter_t *filter)
     return KDB_SUCCESS;
 }
 
-/** Initialize the module system.. */
 __init_text void module_early_init(void) {
     /* Initialize the kernel module structure. */
     list_init(&kernel_module.header);
     refcount_set(&kernel_module.count, 1);
-    kernel_module.name = "kernel";
-    kernel_module.description = "Kiwi kernel";
-    kernel_module.state = MODULE_READY;
     elf_init(&kernel_module.image);
+
+    kernel_module.name        = "kernel";
+    kernel_module.description = "Kiwi kernel";
+    kernel_module.state       = MODULE_READY;
+
     list_append(&module_list, &kernel_module.header);
 
     /* Register the KDB command. */
@@ -465,15 +439,11 @@ __init_text void module_early_init(void) {
         kdb_cmd_modules);
 }
 
-/** Finish loading a boot module.
- * @param module        Module to finish. */
 static __init_text void finish_boot_module(module_t *module) {
-    const char *name;
-    module_t *dep;
-    status_t ret;
-
     while (true) {
-        ret = finish_module(module, &name, &dep);
+        const char *name;
+        module_t *dep;
+        status_t ret = finish_module(module, &name, &dep);
         if (ret == STATUS_MISSING_LIBRARY) {
             if (!dep) {
                 fatal("Boot module %s depends on %s which is not available", module->name, name);
@@ -490,22 +460,18 @@ static __init_text void finish_boot_module(module_t *module) {
     }
 }
 
-/** Load boot kernel modules. */
 __init_text void module_init(void) {
-    const char *name;
-    void *mapping;
-    object_handle_t *handle;
-    module_t *module;
     status_t ret;
 
     /* Perform the first stage of loading all the modules to find out their
      * names and dependencies. */
     kboot_tag_foreach(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
-        name = kboot_tag_data(tag, 0);
-        mapping = phys_map(tag->addr, tag->size, MM_BOOT);
-        handle = memory_file_create(mapping, tag->size);
+        const char *name        = kboot_tag_data(tag, 0);
+        void *mapping           = phys_map(tag->addr, tag->size, MM_BOOT);
+        object_handle_t *handle = memory_file_create(mapping, tag->size);
 
-        module = kmalloc(sizeof(module_t), MM_BOOT);
+        module_t *module = kmalloc(sizeof(module_t), MM_BOOT);
+
         list_init(&module->header);
         refcount_set(&module->count, 0);
 
@@ -527,13 +493,14 @@ __init_text void module_init(void) {
             fatal("Boot module %s has invalid information", name);
 
         module->state = MODULE_LOADED;
+
         list_append(&module_list, &module->header);
     }
 
     /* Now all of the modules are partially loaded, we can resolve dependencies
      * and load them all in the correct order. */
     list_foreach(&module_list, iter) {
-        module = list_entry(iter, module_t, header);
+        module_t *module = list_entry(iter, module_t, header);
 
         /* May already be loaded due to a dependency from another module. */
         if (module->state == MODULE_READY)
@@ -544,8 +511,6 @@ __init_text void module_init(void) {
 }
 
 /**
- * Load a kernel module.
- *
  * Loads a kernel module from the filesystem. If any of the dependencies of the
  * module are not met, the name of the first unmet dependency encountered is
  * stored in the buffer provided. The intended usage of this function is to
@@ -561,17 +526,17 @@ __init_text void module_init(void) {
  *                      return STATUS_MISSING_LIBRARY.
  */
 status_t kern_module_load(const char *path, char *depbuf) {
-    char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
-    status_t ret, err;
+    status_t ret;
 
-    /* Copy the path across. */
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    char kdepbuf[MODULE_NAME_MAX + 1];
     ret = module_load(kpath, kdepbuf);
     if (ret == STATUS_MISSING_LIBRARY && depbuf) {
-        err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1);
+        status_t err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1);
         if (err != STATUS_SUCCESS)
             ret = err;
     }
