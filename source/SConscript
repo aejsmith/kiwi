@@ -36,7 +36,7 @@ dist = manager['dist']
 #################
 
 # Build the kernel.
-SConscript(dirs = ['kernel'])
+SConscript(dirs = ['kernel', 'drivers'])
 
 ################
 # KBoot build. #
