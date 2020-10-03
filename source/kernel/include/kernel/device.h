@@ -28,6 +28,14 @@
 extern "C" {
 #endif
 
+/** Start of class-specific event/request numbers. */
+#define DEVICE_CLASS_EVENT_START    32
+#define DEVICE_CLASS_REQUEST_START  32
+
+/** Start of device-specific event/request numbers. */
+#define DEVICE_CUSTOM_EVENT_START   1024
+#define DEVICE_CUSTOM_REQUEST_START 1024
+
 extern status_t kern_device_open(const char *path, uint32_t access, uint32_t flags, handle_t *_handle);
 
 #ifdef __cplusplus

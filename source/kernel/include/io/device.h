@@ -158,14 +158,6 @@ enum {
  * @return              Action to perform (DEVICE_ITERATE_*). */
 typedef int (*device_iterate_t)(device_t *device, void *data);
 
-/** Start of class-specific event/request numbers. */
-#define DEVICE_CLASS_EVENT_START    32
-#define DEVICE_CLASS_REQUEST_START  32
-
-/** Start of device-specific event/request numbers. */
-#define DEVICE_CUSTOM_EVENT_START   1024
-#define DEVICE_CUSTOM_REQUEST_START 1024
-
 extern device_t *device_tree_root;
 extern device_t *device_bus_dir;
 
