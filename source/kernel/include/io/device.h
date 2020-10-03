@@ -130,6 +130,7 @@ typedef struct device {
     char *name;                     /**< Name of the device. */
     mutex_t lock;                   /**< Lock to protect structure. */
     refcount_t count;               /**< Number of users of the device. */
+    nstime_t time;                  /**< Creation time. */
 
     struct device *parent;          /**< Parent tree entry. */
     radix_tree_t children;          /**< Child devices. */
@@ -179,7 +180,7 @@ extern status_t device_alias(
 extern status_t device_destroy(device_t *device);
 
 extern void device_iterate(device_t *start, device_iterate_t func, void *data);
-extern device_attr_t *device_attr(device_t *device, const char *name, int type);
+extern const device_attr_t *device_attr(device_t *device, const char *name, int type);
 extern char *device_path(device_t *device);
 
 extern status_t device_get(
