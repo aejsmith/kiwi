@@ -41,7 +41,7 @@ const char *__program_name;
 /** Early system library initialisation (run in .init). */
 static __sys_init void libsystem_early_init(void) {
     /* Attempt to open standard I/O streams from existing handles. */
-    stdin = fdopen(STDIN_FILENO, "r");
+    stdin  = fdopen(STDIN_FILENO, "r");
     stdout = fdopen(STDOUT_FILENO, "a");
     stderr = fdopen(STDERR_FILENO, "a");
 }
@@ -54,14 +54,6 @@ void libsystem_init(process_args_t *args) {
 
     /* Save the program name. */
     __program_name = core_path_basename(args->path);
-
-    /* If we're process 1, set default environment variables. */
-    process_id_t self;
-    kern_process_id(PROCESS_SELF, &self);
-    if (self == 1) {
-        setenv("PATH", "/system/bin", 1);
-        setenv("HOME", "/users/admin", 1);
-    }
 
     /* Call the main function. */
     exit(main(args->arg_count, args->args, args->env));

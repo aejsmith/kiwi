@@ -32,6 +32,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <stdlib.h>
 
 extern const char *const *environ;
 
@@ -48,6 +49,11 @@ ServiceManager::~ServiceManager() {
 
 int ServiceManager::run() {
     status_t ret;
+
+    /* Set default environment variables. TODO: Not appropriate for a per-
+     * session service manager instance. */
+    setenv("PATH", "/system/bin", 1);
+    setenv("HOME", "/users/admin", 1);
 
     core_log(CORE_LOG_NOTICE, "service manager started");
 
