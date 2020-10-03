@@ -19,17 +19,17 @@
  * @brief               IPC service functions.
  */
 
+#include "posix/posix.h"
+
 #include <core/mutex.h>
 #include <core/service.h>
 
 #include <kernel/ipc.h>
 #include <kernel/status.h>
 
+#include <services/service_manager.h>
+
 #include <string.h>
-
-#include "posix/posix.h"
-
-#include "../../../services/service_manager/protocol.h"
 
 static CORE_MUTEX_DEFINE(service_lock);
 static core_connection_t *service_manager_conn = NULL;

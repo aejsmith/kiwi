@@ -28,7 +28,6 @@
  */
 
 #include "client.h"
-#include "protocol.h"
 #include "service_manager.h"
 #include "service.h"
 
@@ -36,6 +35,8 @@
 #include <core/utility.h>
 
 #include <kernel/status.h>
+
+#include <services/service_manager.h>
 
 #include <assert.h>
 #include <inttypes.h>

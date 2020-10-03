@@ -30,12 +30,12 @@
 #include <kernel/process.h>
 #include <kernel/status.h>
 
+#include <services/terminal_service.h>
+
 #include <assert.h>
 #include <inttypes.h>
 
 #include <array>
-
-#include "../../services/terminal_service/protocol.h"
 
 extern const char *const *environ;
 

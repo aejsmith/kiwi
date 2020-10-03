@@ -28,12 +28,12 @@
 #include <kernel/thread.h>
 #include <kernel/user_file.h>
 
+#include <services/terminal_service.h>
+
 #include <assert.h>
 #include <inttypes.h>
 
 #include <array>
-
-#include "protocol.h"
 
 /** Map an uppercase ASCII character to a control character. */
 static constexpr cc_t toControl(unsigned char ch) {
