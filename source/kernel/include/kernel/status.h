@@ -68,6 +68,7 @@
 #define STATUS_DIFFERENT_FS         43  /**< Link source and destination on different FS. */
 #define STATUS_IS_DIR               44  /**< Not a directory. */
 #define STATUS_CONN_HUNGUP          45  /**< Connection was hung up. */
+#define STATUS_CANCELLED            46  /**< Operation was cancelled. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 

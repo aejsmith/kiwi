@@ -178,8 +178,8 @@ static status_t user_file_endpoint_receive(
     mutex_lock(&file->lock);
 
     uint64_t serial = msg->msg.args[USER_FILE_MESSAGE_ARG_SERIAL];
+    status_t ret    = STATUS_CANCELLED;
 
-    bool found = false;
     list_foreach(&file->ops, iter) {
         user_file_op_t *op = list_entry(iter, user_file_op_t, header);
 
@@ -194,18 +194,13 @@ static status_t user_file_endpoint_receive(
             condvar_signal(&op->cvar);
             list_remove(&op->header);
 
-            found = true;
+            ret = STATUS_SUCCESS;
             break;
         }
     }
 
-    if (!found) {
-        kprintf(LOG_DEBUG, "user_file: received reply for unknown serial %" PRIu64 ", terminating\n", serial);
-        user_file_terminate(file);
-    }
-
     mutex_unlock(&file->lock);
-    return STATUS_SUCCESS;
+    return ret;
 }
 
 /** Handle the connection being closed. */

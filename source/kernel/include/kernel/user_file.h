@@ -29,6 +29,17 @@
  * serial number in order to match it with the right operation. There is no
  * need to reply to operations in the same order that they are received, as the
  * serial number takes care of this.
+ *
+ * By the time that an operation is completed, the thread which initiated the
+ * operation may have cancelled it (e.g. due to being interrupted). To handle
+ * this, when sending the reply message for an operation, if the serial number
+ * does not match a currently outstanding operation, the call to
+ * kern_connection_send() will return STATUS_CANCELLED. Depending on the
+ * implementation of the user file, this may need to be handled to ensure that
+ * data is not lost. For example, for a read operation, in response to a
+ * cancellation the data that was to be returned might need to be added back to
+ * an input buffer, so that it can be returned to a subsequent operation rather
+ * than lost.
  */
 
 #pragma once
