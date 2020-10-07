@@ -35,11 +35,6 @@
 
 #include <array>
 
-/** Map an uppercase ASCII character to a control character. */
-static constexpr cc_t toControl(unsigned char ch) {
-    return ch & 0x1f;
-}
-
 Terminal::Terminal(core_connection_t *connection) :
     m_connection         (connection),
     m_userFile           (INVALID_HANDLE),
@@ -50,6 +45,10 @@ Terminal::Terminal(core_connection_t *connection) :
     m_inputBufferSize    (0),
     m_inputBufferLines   (0)
 {
+    auto toControl = [] (unsigned char ch) -> cc_t {
+        return ch & 0x1f;
+    };
+
     /* Initialise terminal settings to default. */
     m_termios.c_iflag      = ICRNL;
     m_termios.c_oflag      = OPOST | ONLCR;
@@ -209,7 +208,7 @@ bool Terminal::handleClientMessages() {
 
             core_message_destroy(reply);
 
-            if (ret != STATUS_SUCCESS)
+            if (ret != STATUS_SUCCESS && ret != STATUS_CANCELLED)
                 core_log(CORE_LOG_WARN, "failed to send reply: %" PRId32, ret);
         }
 
@@ -708,38 +707,46 @@ bool Terminal::readBuffer(ReadOperation &op) {
 
     /* Gather the data to return. Canonical mode cannot return anything unless
      * we have a whole line. */
-    size_t size = (!op.canon || allAvailable) ? std::min(op.size, m_inputBufferSize) : 0;
+    reply.size = (!op.canon || allAvailable) ? std::min(op.size, m_inputBufferSize) : 0;
 
     std::unique_ptr<uint8_t[]> data;
-    if (size > 0)
-        data.reset(new uint8_t[size]);
+    if (reply.size > 0)
+        data.reset(new uint8_t[reply.size]);
 
-    for (size_t i = 0; i < size; i++) {
-        uint16_t ch = m_inputBuffer[m_inputBufferStart];
+    size_t bufferStart = m_inputBufferStart;
+    size_t bufferSize  = m_inputBufferSize;
+    size_t bufferLines = m_inputBufferLines;
+
+    for (size_t i = 0; i < reply.size; i++) {
+        uint16_t ch = m_inputBuffer[bufferStart];
         data[i] = static_cast<uint8_t>(ch);
 
-        m_inputBufferStart = (m_inputBufferStart + 1) % kInputBufferMax;
-        m_inputBufferSize--;
+        bufferStart = (bufferStart + 1) % kInputBufferMax;
+        bufferSize--;
 
         if (ch & kChar_NewLine) {
-            m_inputBufferLines--;
+            bufferLines--;
 
             if (op.canon) {
                 /* We return regular newlines but not EOF. */
                 if (!(ch & kChar_Eof))
                     i++;
 
-                size = i;
+                reply.size = i;
                 break;
             }
         }
     }
 
-    reply.size = size;
-
     status_t ret = kern_connection_send(m_userFileConnection, &reply, data.get(), INVALID_HANDLE, -1);
-    if (ret != STATUS_SUCCESS)
+    if (ret == STATUS_SUCCESS) {
+        /* Only remove from the buffer if we could complete it. */
+        m_inputBufferStart = bufferStart;
+        m_inputBufferSize  = bufferSize;
+        m_inputBufferLines = bufferLines;
+    } else if (ret != STATUS_CANCELLED) {
         core_log(CORE_LOG_WARN, "failed to send file message: %" PRId32, ret);
+    }
 
     return true;
 }
