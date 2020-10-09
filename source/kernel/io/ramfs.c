@@ -22,7 +22,6 @@
 #include <io/fs.h>
 #include <io/request.h>
 
-#include <lib/atomic.h>
 #include <lib/string.h>
 
 #include <mm/malloc.h>

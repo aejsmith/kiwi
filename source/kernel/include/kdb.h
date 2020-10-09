@@ -21,7 +21,6 @@
 
 #pragma once
 
-#include <lib/atomic.h>
 #include <lib/notifier.h>
 #include <lib/string.h>
 

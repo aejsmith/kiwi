@@ -25,7 +25,6 @@
 
 #include <kernel/fs.h>
 
-#include <lib/atomic.h>
 #include <lib/avl_tree.h>
 #include <lib/radix_tree.h>
 #include <lib/refcount.h>

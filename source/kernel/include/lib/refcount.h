@@ -25,7 +25,6 @@
 
 #pragma once
 
-#include <lib/atomic.h>
 #include <kernel.h>
 
 /** Type containing a reference count */

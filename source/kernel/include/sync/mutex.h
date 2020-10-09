@@ -21,7 +21,6 @@
 
 #pragma once
 
-#include <lib/atomic.h>
 #include <lib/list.h>
 
 #include <sync/spinlock.h>

@@ -23,7 +23,6 @@
 
 #include <arch/page.h>
 
-#include <lib/atomic.h>
 #include <lib/list.h>
 
 #include <mm/mm.h>

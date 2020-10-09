@@ -28,7 +28,6 @@
 #include <x86/cpu.h>
 #include <x86/mmu.h>
 
-#include <lib/atomic.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 

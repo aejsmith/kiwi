@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <lib/atomic.h>
+#include <types.h>
 
 /** Structure containing a spinlock. */
 typedef struct spinlock {
