@@ -26,12 +26,11 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #if CONFIG_64BIT
-#   define __INT_64     long
 #   define __PRI_64     "l"
 #else
-#   define __INT_64     long long
 #   define __PRI_64     "ll"
 #endif
 
@@ -53,34 +52,8 @@
 #define PRIo32          "o"             /**< Format for (u)int32_t (octal). */
 #define PRIo64          __PRI_64 "o"    /**< Format for (u)int64_t (octal). */
 
-/** Unsigned data types. */
-typedef unsigned char uint8_t;          /**< Unsigned 8-bit. */
-typedef unsigned short uint16_t;        /**< Unsigned 16-bit. */
-typedef unsigned int uint32_t;          /**< Unsigned 32-bit. */
-typedef unsigned __INT_64 uint64_t;     /**< Unsigned 64-bit. */
-
-/** Signed data types. */
-typedef signed char int8_t;             /**< Signed 8-bit. */
-typedef signed short int16_t;           /**< Signed 16-bit. */
-typedef signed int int32_t;             /**< Signed 32-bit. */
-typedef signed __INT_64 int64_t;        /**< Signed 64-bit. */
-
 /** Internal kernel integer types. */
 typedef uint32_t page_num_t;            /**< Integer type representing a number of pages. */
-
-/** Limits for specific integer types. */
-#define INT8_MIN        (-128)
-#define INT8_MAX        127
-#define UINT8_MAX       255
-#define INT16_MIN       (-32767-1)
-#define INT16_MAX       32767
-#define UINT16_MAX      65535u
-#define INT32_MIN       (-2147483647-1)
-#define INT32_MAX       2147483647
-#define UINT32_MAX      4294967295u
-#define INT64_MIN       (-9223372036854775807ll-1)
-#define INT64_MAX       9223372036854775807ll
-#define UINT64_MAX      18446744073709551615ull
 
 /** Number of bits in a char. */
 #define CHAR_BIT        8
