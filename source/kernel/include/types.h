@@ -24,6 +24,7 @@
 #include <compiler.h>
 #include <stdalign.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -51,6 +52,16 @@
 #define PRIo16          "o"             /**< Format for (u)int16_t (octal). */
 #define PRIo32          "o"             /**< Format for (u)int32_t (octal). */
 #define PRIo64          __PRI_64 "o"    /**< Format for (u)int64_t (octal). */
+
+/** More atomic type definitions. */
+typedef _Atomic(int8_t) atomic_int8_t;
+typedef _Atomic(uint8_t) atomic_uint8_t;
+typedef _Atomic(int16_t) atomic_int16_t;
+typedef _Atomic(uint16_t) atomic_uint16_t;
+typedef _Atomic(int32_t) atomic_int32_t;
+typedef _Atomic(uint32_t) atomic_uint32_t;
+typedef _Atomic(int64_t) atomic_int64_t;
+typedef _Atomic(uint64_t) atomic_uint64_t;
 
 /** Internal kernel integer types. */
 typedef uint32_t page_num_t;            /**< Integer type representing a number of pages. */
