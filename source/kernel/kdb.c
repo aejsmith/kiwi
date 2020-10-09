@@ -91,7 +91,7 @@ NOTIFIER_DEFINE(kdb_entry_notifier, NULL);
 NOTIFIER_DEFINE(kdb_exit_notifier, NULL);
 
 /** Whether KDB is currently running on any CPU. */
-atomic_t kdb_running;
+atomic_uint kdb_running;
 
 /** Interrupt frame that KDB was entered with. */
 frame_t *curr_kdb_frame;
@@ -288,7 +288,7 @@ void *kdb_malloc(size_t size) {
     ret = fixed_heap_alloc(&kdb_heap, size);
     if (!ret) {
         /* The KDB heap can be used outside of KDB when registering commands. */
-        if (atomic_get(&kdb_running)) {
+        if (atomic_load(&kdb_running) > 0) {
             kdb_printf("Exhausted KDB heap");
             arch_cpu_halt();
         } else {
@@ -812,7 +812,7 @@ static kdb_status_t perform_call(kdb_args_t *call, kdb_filter_t *filter, kdb_fil
     }
 
     /* Set kdb_running to 2 to signal that we're in a command. */
-    atomic_set(&kdb_running, 2);
+    atomic_store(&kdb_running, 2);
     current_filter = filter;
 
     /* Save the current context to resume from if a fault occurs. */
@@ -823,7 +823,7 @@ static kdb_status_t perform_call(kdb_args_t *call, kdb_filter_t *filter, kdb_fil
     }
 
     current_filter = NULL;
-    atomic_set(&kdb_running, 1);
+    atomic_store(&kdb_running, 1);
     return ret;
 }
 
@@ -853,7 +853,8 @@ kdb_status_t kdb_main(kdb_reason_t reason, frame_t *frame, unsigned index) {
     state = local_irq_disable();
 
     /* Check if we're already running. If we are, something bad has happened. */
-    if (atomic_cas(&kdb_running, 0, 1) != 0) {
+    unsigned expected = 0;
+    if (!atomic_compare_exchange_strong(&kdb_running, &expected, 1)) {
         kdb_printf("Multiple entries to KDB.\n");
         local_irq_restore(state);
         return KDB_FAILURE;
@@ -863,7 +864,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, frame_t *frame, unsigned index) {
     if (kdb_steps_remaining) {
         if (reason == KDB_REASON_STEP) {
             if (--kdb_steps_remaining > 0) {
-                atomic_set(&kdb_running, 0);
+                atomic_store(&kdb_running, 0);
                 local_irq_restore(state);
                 return KDB_STEP;
             }
@@ -912,7 +913,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, frame_t *frame, unsigned index) {
         kdb_printf("Backtrace:\n");
         kdb_backtrace_cb(frame->ip);
 
-        atomic_set(&kdb_running, 2);
+        atomic_store(&kdb_running, 2);
 
         if (setjmp(kdb_fault_context)) {
             /* Backtrace faulted, just ignore. */
@@ -920,7 +921,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, frame_t *frame, unsigned index) {
             arch_kdb_backtrace(NULL, kdb_backtrace_cb);
         }
 
-        atomic_set(&kdb_running, 1);
+        atomic_store(&kdb_running, 1);
 
         /* Flush and disable writing the KBoot log. */
         kboot_log_flush();
@@ -992,7 +993,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, frame_t *frame, unsigned index) {
     /* Run exit notifiers. */
     notifier_run_unsafe(&kdb_exit_notifier, NULL, false);
 
-    atomic_set(&kdb_running, 0);
+    atomic_store(&kdb_running, 0);
     local_irq_restore(state);
     return ret;
 }

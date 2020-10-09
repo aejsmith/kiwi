@@ -25,7 +25,7 @@
 
 /** Structure containing a spinlock. */
 typedef struct spinlock {
-    atomic_t value;             /**< Value of lock (1 == free, 0 == held, others == held with waiters). */
+    atomic_int value;           /**< Value of lock (1 == free, 0 == held, others == held with waiters). */
     volatile bool state;        /**< Interrupt state prior to locking. */
     const char *name;           /**< Name of the spinlock. */
 } spinlock_t;
@@ -46,7 +46,7 @@ typedef struct spinlock {
  * @param lock          Spinlock to check.
  * @return              True if lock is locked, false otherwise. */
 static inline bool spinlock_held(spinlock_t *lock) {
-    return atomic_get(&lock->value) != 1;
+    return atomic_load_explicit(&lock->value, memory_order_relaxed) != 1;
 }
 
 extern void spinlock_lock(spinlock_t *lock);

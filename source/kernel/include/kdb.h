@@ -81,7 +81,7 @@ static inline bool kdb_help(int argc, char **argv) {
 struct frame;
 struct thread;
 
-extern atomic_t kdb_running;
+extern atomic_uint kdb_running;
 extern struct frame *curr_kdb_frame;
 extern notifier_t kdb_entry_notifier;
 extern notifier_t kdb_exit_notifier;

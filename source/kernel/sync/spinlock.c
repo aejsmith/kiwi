@@ -31,7 +31,7 @@
  * @param lock          Spinlock to acquire. */
 static inline void spinlock_lock_internal(spinlock_t *lock) {
     /* Attempt to take the lock. Prefer the uncontended case. */
-    if (likely(atomic_dec(&lock->value) == 1))
+    if (likely(atomic_fetch_sub(&lock->value, 1) == 1))
         return;
 
     /* When running on a single processor there is no need for us to spin as
@@ -39,11 +39,11 @@ static inline void spinlock_lock_internal(spinlock_t *lock) {
     if (likely(cpu_count > 1)) {
         while (true) {
             /* Wait for it to become unheld. */
-            while (atomic_get(&lock->value) != 1)
+            while (atomic_load(&lock->value) != 1)
                 arch_cpu_spin_hint();
 
             /* Try to acquire it. */
-            if (atomic_dec(&lock->value) == 1)
+            if (atomic_fetch_sub(&lock->value, 1) == 1)
                 break;
         }
     } else {
@@ -111,7 +111,7 @@ void spinlock_unlock(spinlock_t *lock) {
         fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
 
     state = lock->state;
-    atomic_set(&lock->value, 1);
+    atomic_store(&lock->value, 1);
     local_irq_restore(state);
 }
 
@@ -121,14 +121,14 @@ void spinlock_unlock_noirq(spinlock_t *lock) {
     if (unlikely(!spinlock_held(lock)))
         fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
 
-    atomic_set(&lock->value, 1);
+    atomic_store(&lock->value, 1);
 }
 
 /** Initialize a spinlock.
  * @param lock          Spinlock to initialize.
  * @param name          Name of the spinlock, used for debugging purposes. */
 void spinlock_init(spinlock_t *lock, const char *name) {
-    atomic_set(&lock->value, 1);
+    atomic_store_explicit(&lock->value, 1, memory_order_relaxed);
     lock->name = name;
     lock->state = false;
 }

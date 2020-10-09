@@ -295,7 +295,7 @@ typedef struct fs_node {
 
     refcount_t count;               /**< Number of references to the node. */
     node_id_t id;                   /**< ID of the node. */
-    atomic_t flags;                 /**< Flags for the node. */
+    atomic_uint32_t flags;          /**< Flags for the node. */
 
     fs_node_ops_t *ops;             /**< Node operations. */
     void *private;                  /**< Filesystem type private data. */
@@ -313,14 +313,14 @@ typedef struct fs_node {
  * @param node          Node to set flag on.
  * @param flag          Flag to set. */
 static inline void fs_node_set_flag(fs_node_t *node, uint32_t flag) {
-    atomic_or(&node->flags, flag);
+    atomic_fetch_or(&node->flags, flag);
 }
 
 /** Atomically clear a flag on a filesystem node.
  * @param node          Node to clear flag on.
  * @param flag          Flag to clear. */
 static inline void fs_node_clear_flag(fs_node_t *node, uint32_t flag) {
-    atomic_and(&node->flags, ~flag);
+    atomic_fetch_and(&node->flags, ~flag);
 }
 
 /** Check if a node is read only.

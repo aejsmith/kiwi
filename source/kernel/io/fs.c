@@ -1998,7 +1998,7 @@ static kdb_status_t kdb_cmd_mount(int argc, char **argv, kdb_filter_t *filter) {
         }
         kdb_printf(
             "lock:       %d (%" PRId32 ")\n",
-            atomic_get(&mount->lock.value),
+            atomic_load(&mount->lock.value),
             (mount->lock.holder) ? mount->lock.holder->id : -1);
         kdb_printf("flags:      0x%x\n", mount->flags);
         kdb_printf("ops:        %ps\n", mount->ops);
@@ -2150,7 +2150,7 @@ static kdb_status_t kdb_cmd_dentry(int argc, char **argv, kdb_filter_t *filter) 
     kdb_printf("=================================================\n");
     kdb_printf(
         "lock:    %d (%" PRId32 ")\n",
-        atomic_get(&entry->lock.value), (entry->lock.holder) ? entry->lock.holder->id : -1);
+        atomic_load(&entry->lock.value), (entry->lock.holder) ? entry->lock.holder->id : -1);
     kdb_printf("count:   %d\n", refcount_get(&entry->count));
     kdb_printf("flags:   0x%x\n", entry->flags);
     kdb_printf("mount:   %p%c", entry->mount, (entry->mount) ? ' ' : '\n');

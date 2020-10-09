@@ -117,7 +117,7 @@ typedef struct sched_cpu {
 } sched_cpu_t;
 
 /** Total number of running/ready threads across all CPUs. */
-static atomic_t threads_running;
+static atomic_uint threads_running;
 
 /** Add a thread to a queue.
  * @param queue         Queue to add to.
@@ -255,7 +255,7 @@ void sched_reschedule(bool state) {
         assert(curr_thread != cpu->idle_thread);
         cpu->total--;
 
-        atomic_dec(&threads_running);
+        atomic_fetch_sub(&threads_running, 1);
     }
 
     /* Find a new thread to run. A NULL return value means no threads are ready,
@@ -411,7 +411,7 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 
     /* Add 1 to the total number of threads to account for the thread we're
      * adding. */
-    total = atomic_get(&threads_running) + 1;
+    total = atomic_load(&threads_running) + 1;
 
     /* Start on the current CPU that the thread currently belongs to. */
     cpu = (thread->cpu) ? thread->cpu : curr_cpu;
@@ -470,7 +470,7 @@ void sched_insert_thread(thread_t *thread) {
     sched_queue_insert(sched->active, thread);
     sched->total++;
 
-    atomic_inc(&threads_running);
+    atomic_fetch_add(&threads_running, 1);
 
     /* If the thread has a higher priority than the currently running thread on
      * the CPU, or if the CPU is idle, preempt it. */

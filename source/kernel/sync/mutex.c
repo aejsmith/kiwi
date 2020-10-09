@@ -47,10 +47,11 @@ static inline void mutex_recursive_error(mutex_t *lock) {
 static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, unsigned flags) {
     status_t ret;
 
-    if (atomic_cas(&lock->value, 0, 1) != 0) {
+    unsigned expected = 0;
+    if (!atomic_compare_exchange_strong(&lock->value, &expected, 1)) {
         if (lock->holder == curr_thread) {
             if (likely(lock->flags & MUTEX_RECURSIVE)) {
-                atomic_inc(&lock->value);
+                atomic_fetch_add(&lock->value, 1);
                 return STATUS_SUCCESS;
             } else {
                 mutex_recursive_error(lock);
@@ -60,7 +61,8 @@ static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, unsi
 
             /* Check again now that we have the lock, in case mutex_unlock() was
              * called on another CPU. */
-            if (atomic_cas(&lock->value, 0, 1) == 0) {
+            expected = 0;
+            if (atomic_compare_exchange_strong(&lock->value, &expected, 1)) {
                 spinlock_unlock(&lock->lock);
             } else {
                 list_append(&lock->threads, &curr_thread->wait_link);
@@ -150,7 +152,7 @@ void mutex_unlock(mutex_t *lock) {
 
     spinlock_lock(&lock->lock);
 
-    if (unlikely(!atomic_get(&lock->value))) {
+    if (unlikely(!mutex_held(lock))) {
         fatal("Release of unheld mutex %s (%p)", lock->name, lock);
     } else if (unlikely(lock->holder != curr_thread)) {
         fatal(
@@ -161,17 +163,17 @@ void mutex_unlock(mutex_t *lock) {
     /* If the current value is 1, the lock is being released. If there is a
      * thread waiting, we do not need to modify the count, as we transfer
      * ownership of the lock to it. Otherwise, decrement the count. */
-    if (atomic_get(&lock->value) == 1) {
+    if (atomic_load(&lock->value) == 1) {
         lock->holder = NULL;
 
         if (!list_empty(&lock->threads)) {
             thread = list_first(&lock->threads, thread_t, wait_link);
             thread_wake(thread);
         } else {
-            atomic_dec(&lock->value);
+            atomic_fetch_sub(&lock->value, 1);
         }
     } else {
-        atomic_dec(&lock->value);
+        atomic_fetch_sub(&lock->value, 1);
     }
 
     spinlock_unlock(&lock->lock);
@@ -182,7 +184,7 @@ void mutex_unlock(mutex_t *lock) {
  * @param name          Name to give the mutex.
  * @param flags         Behaviour flags for the mutex. */
 void mutex_init(mutex_t *lock, const char *name, unsigned flags) {
-    atomic_set(&lock->value, 0);
+    atomic_store_explicit(&lock->value, 0, memory_order_relaxed);
     spinlock_init(&lock->lock, "mutex_lock");
     list_init(&lock->threads);
     lock->flags = flags;

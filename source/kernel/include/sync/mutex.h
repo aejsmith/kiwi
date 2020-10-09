@@ -30,7 +30,7 @@ struct thread;
 
 /** Structure containing a mutex. */
 typedef struct mutex {
-    atomic_t value;                 /**< Lock count. */
+    atomic_uint value;              /**< Lock count. */
     unsigned flags;                 /**< Behaviour flags for the mutex. */
     spinlock_t lock;                /**< Lock to protect the thread list. */
     list_t threads;                 /**< List of waiting threads. */
@@ -63,14 +63,14 @@ typedef struct mutex {
  * @param lock          Mutex to check.
  * @return              Whether the mutex is held. */
 static inline bool mutex_held(mutex_t *lock) {
-    return atomic_get(&lock->value) != 0;
+    return atomic_load_explicit(&lock->value, memory_order_relaxed) != 0;
 }
 
 /** Get the current recursion count of a mutex.
  * @param lock          Mutex to check.
  * @return              Current recursion count of mutex. */
 static inline int mutex_recursion(mutex_t *lock) {
-    return atomic_get(&lock->value);
+    return atomic_load_explicit(&lock->value, memory_order_relaxed);
 }
 
 extern status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, unsigned flags);

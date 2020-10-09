@@ -42,7 +42,7 @@ typedef struct smp_call {
     smp_call_func_t func;           /**< Handler function. */
     void *arg;                      /**< Argument to handler. */
 
-    atomic_t *result;               /**< Caller's completion count pointer. */
+    atomic_uint *result;            /**< Caller's completion count pointer. */
     status_t status;                /**< Function return status code. */
     refcount_t count;               /**< Reference count to track structure usage. */
 } smp_call_t;
@@ -142,7 +142,7 @@ void smp_ipi_handler(void) {
          * acknowledged. */
         if (call->result) {
             call->status = ret;
-            atomic_dec(call->result);
+            atomic_fetch_sub(call->result, 1);
         }
 
         /* Release the call structure. */
@@ -200,7 +200,7 @@ static void smp_call_queue(smp_call_t *call, cpu_t *cpu) {
  */
 status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigned flags) {
     smp_call_t *call;
-    atomic_t acked;
+    atomic_uint acked;
     status_t ret;
     bool state;
 
@@ -229,7 +229,7 @@ status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigne
 
     /* Only 1 CPU to acknowledge. */
     if (!(flags & SMP_CALL_ASYNC)) {
-        acked = 1;
+        atomic_store(&acked, 1);
         call->result = &acked;
     } else {
         call->result = NULL;
@@ -243,7 +243,7 @@ status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigne
         ret = STATUS_SUCCESS;
     } else {
         /* Synchronous, wait for the message to be acknowledged. */
-        while (atomic_get(&acked) != 0)
+        while (atomic_load(&acked) != 0)
             smp_ipi_handler();
 
         ret = call->status;
@@ -272,7 +272,7 @@ status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigne
  * @param flags         Behaviour flags.
  */
 void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags) {
-    atomic_t acked = 0;
+    atomic_uint acked = 0;
     smp_call_t *call;
     cpu_t *cpu;
     bool state;
@@ -296,7 +296,7 @@ void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags) {
         call->arg = arg;
 
         if (!(flags & SMP_CALL_ASYNC)) {
-            atomic_inc(&acked);
+            atomic_fetch_add(&acked, 1);
             call->result = &acked;
         } else {
             call->result = NULL;
@@ -313,7 +313,7 @@ void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags) {
     /* If calling synchronously, wait for all the sent messages to be
      * acknowledged. */
     if (!(flags & SMP_CALL_ASYNC)) {
-        while (atomic_get(&acked) != 0)
+        while (atomic_load(&acked) != 0)
             smp_ipi_handler();
     }
 
@@ -341,7 +341,7 @@ void smp_call_acknowledge(status_t status) {
 
     if (curr_cpu->curr_call->result) {
         curr_cpu->curr_call->status = status;
-        atomic_dec(curr_cpu->curr_call->result);
+        atomic_fetch_sub(curr_cpu->curr_call->result, 1);
         curr_cpu->curr_call->result = NULL;
     }
 }

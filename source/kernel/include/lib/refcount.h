@@ -29,7 +29,7 @@
 #include <kernel.h>
 
 /** Type containing a reference count */
-typedef atomic_t refcount_t;
+typedef atomic_int refcount_t;
 
 /** Initializes a statically defined reference count. */
 #define REFCOUNT_INITIALIZER(_initial) \
@@ -43,12 +43,10 @@ typedef atomic_t refcount_t;
  * @param ref           Reference count to increase.
  * @return              The new value of the count. */
 static inline int refcount_inc(refcount_t *ref) {
-    return atomic_inc(ref) + 1;
+    return atomic_fetch_add(ref, 1) + 1;
 }
 
 /**
- * Decrease a reference count.
- *
  * Atomically decreases the value of a reference count. If it goes below 0
  * then a fatal() call will be made.
  *
@@ -57,31 +55,10 @@ static inline int refcount_inc(refcount_t *ref) {
  * @return              The new value of the count.
  */
 static inline int refcount_dec(refcount_t *ref) {
-    int val = atomic_dec(ref) - 1;
+    int val = atomic_fetch_sub(ref, 1) - 1;
 
     if (unlikely(val < 0))
         fatal("Reference count %p went negative", ref);
-
-    return val;
-}
-
-/**
- * Decrease a reference count.
- *
- * Atomically decreases the value of a reference count. If it goes below 0
- * then the specified function will be called with a pointer to the reference
- * count as a parameter.
- *
- * @param ref           Reference count to decrease.
- * @param func          Function to call if count goes negative.
- *
- * @return              The new value of the count.
- */
-static inline int refcount_dec_func(refcount_t *ref, void (*func)(refcount_t *)) {
-    int val = atomic_dec(ref) - 1;
-
-    if (unlikely(val < 0))
-        func(ref);
 
     return val;
 }
@@ -90,12 +67,12 @@ static inline int refcount_dec_func(refcount_t *ref, void (*func)(refcount_t *))
  * @param ref           Reference count to get value of.
  * @return              The value of the count. */
 static inline int refcount_get(refcount_t *ref) {
-    return atomic_get(ref);
+    return atomic_load(ref);
 }
 
 /** Set the value of a reference count.
  * @param ref           Reference count to set.
  * @param val           Value to set to. */
 static inline void refcount_set(refcount_t *ref, int val) {
-    atomic_set(ref, val);
+    atomic_store(ref, val);
 }

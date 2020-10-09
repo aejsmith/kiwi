@@ -41,7 +41,7 @@
 NOTIFIER_DEFINE(fatal_notifier, NULL);
 
 /** Atomic variable to protect against nested calls to fatal(). */
-atomic_t in_fatal;
+atomic_uint in_fatal;
 
 /** Helper for fatal_printf(). */
 static void fatal_printf_helper(char ch, void *data, int *total) {
@@ -70,7 +70,7 @@ void fatal_etc(frame_t *frame, const char *fmt, ...) {
 
     local_irq_disable();
 
-    if (atomic_inc(&in_fatal) == 0) {
+    if (atomic_fetch_add(&in_fatal, 1) == 0) {
         /* Run callback functions registered. */
         notifier_run_unsafe(&fatal_notifier, NULL, false);
 

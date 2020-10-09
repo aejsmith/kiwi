@@ -587,8 +587,8 @@ void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
         ret = slab_cpu_obj_alloc(cache);
         if (likely(ret)) {
             #if CONFIG_SLAB_STATS
-                atomic_inc(&cache->alloc_total);
-                atomic_inc(&cache->alloc_current);
+                atomic_fetch_add(&cache->alloc_total, 1);
+                atomic_fetch_add(&cache->alloc_current, 1);
             #endif
 
             #if CONFIG_SLAB_TRACING
@@ -605,8 +605,8 @@ void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
     ret = slab_obj_alloc(cache, mmflag);
     if (likely(ret)) {
         #if CONFIG_SLAB_STATS
-            atomic_inc(&cache->alloc_total);
-            atomic_inc(&cache->alloc_current);
+            atomic_fetch_add(&cache->alloc_total, 1);
+            atomic_fetch_add(&cache->alloc_current, 1);
         #endif
 
         #if CONFIG_SLAB_TRACING
@@ -628,7 +628,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
     if (!(cache->flags & SLAB_CACHE_NOMAG)) {
         if (likely(slab_cpu_obj_free(cache, obj))) {
             #if CONFIG_SLAB_STATS
-                atomic_dec(&cache->alloc_current);
+                atomic_fetch_sub(&cache->alloc_current, 1);
             #endif
 
             #if CONFIG_SLAB_TRACING
@@ -645,7 +645,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
     slab_obj_free(cache, obj);
 
     #if CONFIG_SLAB_STATS
-        atomic_dec(&cache->alloc_current);
+        atomic_fetch_sub(&cache->alloc_current, 1);
     #endif
 
     #if CONFIG_SLAB_TRACING
@@ -707,8 +707,8 @@ static status_t slab_cache_init(
     cache->slab_count = 0;
 
     #if CONFIG_SLAB_STATS
-        atomic_set(&cache->alloc_current, 0);
-        atomic_set(&cache->alloc_total, 0);
+        atomic_store(&cache->alloc_current, 0);
+        atomic_store(&cache->alloc_total, 0);
     #endif
 
     memset(cache->bufctl_hash, 0, sizeof(cache->bufctl_hash));
@@ -881,7 +881,7 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
             cache->slab_size, cache->flags, cache->slab_count);
 
         #if CONFIG_SLAB_STATS
-            kdb_printf(" %-7d %d", atomic_get(&cache->alloc_current), atomic_get(&cache->alloc_total));
+            kdb_printf(" %-7d %d", atomic_load(&cache->alloc_current), atomic_load(&cache->alloc_total));
         #endif
 
         kdb_printf("\n");

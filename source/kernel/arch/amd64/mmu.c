@@ -137,19 +137,18 @@ static inline uint64_t clear_pte(uint64_t *pte) {
      * so we can get the accessed/dirty bits. A non-atomic update could allow a
      * CPU to access the page between reading and clearing the PTE and lose the
      * accessed/dirty bit updates. */
-    return atomic_swap64((atomic64_t *)pte, 0);
+    return atomic_exchange((atomic_uint64_t *)pte, 0);
 }
 
 /** Test and set a page table entry.
  * @param pte           Page table entry to update.
  * @param cmp           Value to compare with.
  * @param val           Value to set if equal.
- * @return              Previous value of the PTE. If equal to cmp, the update
- *                      succeeded. */
-static inline uint64_t test_and_set_pte(uint64_t *pte, uint64_t cmp, uint64_t val) {
+ * @return              Whether successful */
+static inline bool test_and_set_pte(uint64_t *pte, uint64_t cmp, uint64_t val) {
     /* With the same reasoning as clear_pte(), this function allows safe changes
      * to page table entries to avoid accessed/dirty bit updates being lost. */
-    return atomic_cas64((atomic64_t *)pte, cmp, val);
+    return atomic_compare_exchange_strong((atomic_uint64_t *)pte, &cmp, val);
 }
 
 /** Get the virtual address of a page structure.
@@ -415,7 +414,7 @@ static void amd64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
                 if (!(access & VM_ACCESS_EXECUTE) && cpu_features.xd)
                     entry |= X86_PTE_NOEXEC;
 
-                if (test_and_set_pte(&ptbl[pte], prev, entry) == prev)
+                if (test_and_set_pte(&ptbl[pte], prev, entry))
                     break;
             }
 

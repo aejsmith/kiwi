@@ -1906,7 +1906,7 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
         kdb_printf(" count:      %d\n", refcount_get(&region->amap->count));
         kdb_printf(
             " lock:       %d (%" PRId32 ")\n",
-            atomic_get(&region->amap->lock.value),
+            atomic_load(&region->amap->lock.value),
             (region->amap->lock.holder) ? region->amap->lock.holder->id : -1);
         kdb_printf(" curr_size:  %zu\n", region->amap->curr_size);
         kdb_printf(" max_size:   %zu\n", region->amap->max_size);
@@ -2040,7 +2040,7 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
 
         kdb_printf(
             "lock:       %d (%" PRId32 ")\n",
-            atomic_get(&as->lock.value), (as->lock.holder) ? as->lock.holder->id : -1);
+            atomic_load(&as->lock.value), (as->lock.holder) ? as->lock.holder->id : -1);
         kdb_printf("count:      %d\n", refcount_get(&as->count));
         kdb_printf("find_cache: %p\n", as->find_cache);
         kdb_printf("mmu:        %p\n", as->mmu);

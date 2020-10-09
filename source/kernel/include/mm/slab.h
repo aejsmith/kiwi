@@ -58,8 +58,8 @@ typedef struct slab_cache {
 
     /** Statistics. */
     #if CONFIG_SLAB_STATS
-        atomic_t alloc_total;           /**< Total number of allocations that have been made. */
-        atomic_t alloc_current;         /**< Number of currently allocated objects. */
+        atomic_uint alloc_total;        /**< Total number of allocations that have been made. */
+        atomic_uint alloc_current;      /**< Number of currently allocated objects. */
     #endif
     size_t slab_count;                  /**< Number of allocated slabs. */
 

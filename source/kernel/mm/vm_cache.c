@@ -581,7 +581,7 @@ static kdb_status_t kdb_cmd_cache(int argc, char **argv, kdb_filter_t *filter) {
 
     kdb_printf(
         "locked:  %d (%" PRId32 ")\n",
-        atomic_get(&cache->lock.value), (cache->lock.holder) ? cache->lock.holder->id : -1);
+        atomic_load(&cache->lock.value), (cache->lock.holder) ? cache->lock.holder->id : -1);
     kdb_printf("size:    %" PRIu64 "\n", cache->size);
     kdb_printf("ops:     %p\n", cache->ops);
     kdb_printf("data:    %p\n", cache->data);

@@ -79,7 +79,7 @@ static void unhandled_exception(frame_t *frame, unsigned code) {
         ? except_strings[frame->num]
         : "Reserved";
 
-    if (atomic_get(&kdb_running) == 2) {
+    if (atomic_load(&kdb_running) == 2) {
         kdb_exception(string, frame);
     } else if (code && frame_from_user(frame)) {
         kprintf(
@@ -120,7 +120,7 @@ static void hardware_interrupt(frame_t *frame) {
 /** Unhandled interrupt function.
  * @param frame         Interrupt stack frame. */
 static void unknown_interrupt(frame_t *frame) {
-    if (atomic_get(&kdb_running) == 2) {
+    if (atomic_load(&kdb_running) == 2) {
         kdb_exception("Unknown", frame);
     } else {
         fatal_etc(frame, "Received unknown interrupt %lu", frame->num);
@@ -136,8 +136,8 @@ static void de_exception(frame_t *frame) {
 /** Handler for NMIs.
  * @param frame         Interrupt stack frame. */
 static void nmi_interrupt(frame_t *frame) {
-    if (atomic_get(&kdb_running) > 0 || atomic_get(&in_fatal) > 0) {
-        while (atomic_get(&kdb_running) > 0 || atomic_get(&in_fatal) > 0)
+    if (atomic_load(&kdb_running) > 0 || atomic_load(&in_fatal) > 0) {
+        while (atomic_load(&kdb_running) > 0 || atomic_load(&in_fatal) > 0)
             arch_cpu_spin_hint();
     } else {
         fatal_etc(frame, "Received unexpected NMI");
@@ -217,7 +217,7 @@ static void gp_exception(frame_t *frame) {
  * @param frame         Interrupt stack frame. */
 static void pf_exception(frame_t *frame) {
     /* We can't service a page fault while running KDB. */
-    if (unlikely(atomic_get(&kdb_running) == 2)) {
+    if (unlikely(atomic_load(&kdb_running) == 2)) {
         kdb_exception(except_strings[frame->num], frame);
         return;
     }

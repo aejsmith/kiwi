@@ -40,7 +40,7 @@ typedef struct ramfs_node {
         char *target;               /**< Symbolic link destination. */
     };
 
-    atomic_t links;                 /**< Link count. */
+    atomic_uint links;              /**< Link count. */
     nstime_t created;               /**< Time of creation. */
     nstime_t accessed;              /**< Time of last access. */
     nstime_t modified;              /**< Time last modified. */
@@ -48,7 +48,7 @@ typedef struct ramfs_node {
 
 /** Mount information structure. */
 typedef struct ramfs_mount {
-    atomic_t next_id;               /**< Next node ID. */
+    atomic_uint64_t next_id;        /**< Next node ID. */
 } ramfs_mount_t;
 
 /** Root node ID. */
@@ -91,11 +91,11 @@ static status_t ramfs_node_create(
     assert(_parent->file.type == FILE_TYPE_DIR);
 
     node = kmalloc(sizeof(*node), MM_KERNEL);
-    atomic_set(&node->links, 1);
+    atomic_store(&node->links, 1);
     node->created = node->accessed = node->modified = unix_time();
 
     /* Allocate a unique ID for the node. */
-    _node->id = entry->id = atomic_inc(&mount->next_id);
+    _node->id = entry->id = atomic_fetch_add(&mount->next_id, 1);
     _node->ops = _parent->ops;
     _node->private = node;
 
@@ -109,8 +109,8 @@ static status_t ramfs_node_create(
     case FILE_TYPE_DIR:
         /* Our link count should include the '.' entry to ourself, and the
          * parent's should include one for our '..' entry. */
-        atomic_inc(&node->links);
-        atomic_inc(&parent->links);
+        atomic_fetch_add(&node->links, 1);
+        atomic_fetch_add(&parent->links, 1);
         break;
     default:
         kfree(node);
@@ -132,7 +132,7 @@ static status_t ramfs_node_create(
 static status_t ramfs_node_link(fs_node_t *_parent, fs_dentry_t *entry, fs_node_t *_node) {
     ramfs_node_t *node = _node->private;
 
-    if (atomic_inc(&node->links) == 0)
+    if (atomic_fetch_add(&node->links, 1) == 0)
         fs_node_clear_flag(_node, FS_NODE_REMOVED);
 
     return STATUS_SUCCESS;
@@ -152,13 +152,13 @@ static status_t ramfs_node_unlink(fs_node_t *_parent, fs_dentry_t *entry, fs_nod
      * calling into this function to save a call out to the FS when it already
      * knows that the directory is not empty. Therefore, we don't need to do a
      * check here. */
-    val = atomic_dec(&node->links);
+    val = atomic_fetch_sub(&node->links, 1);
 
     if (_node->file.type == FILE_TYPE_DIR) {
         /* Drop an extra link on ourself for the '.' entry, and one on the
          * parent for the '..' entry. */
-        atomic_dec(&parent->links);
-        val = atomic_dec(&node->links);
+        atomic_fetch_sub(&parent->links, 1);
+        val = atomic_fetch_sub(&node->links, 1);
     }
 
     if (val == 1)
@@ -173,7 +173,7 @@ static status_t ramfs_node_unlink(fs_node_t *_parent, fs_dentry_t *entry, fs_nod
 static void ramfs_node_info(fs_node_t *_node, file_info_t *info) {
     ramfs_node_t *node = _node->private;
 
-    info->links = atomic_get(&node->links);
+    info->links = atomic_load(&node->links);
     info->block_size = PAGE_SIZE;
     info->created = node->created;
     info->accessed = node->accessed;
@@ -375,7 +375,7 @@ static status_t ramfs_mount(fs_mount_t *_mount, fs_mount_option_t *opts, size_t 
     ramfs_mount_t *mount;
 
     mount = kmalloc(sizeof(*mount), MM_KERNEL);
-    atomic_set(&mount->next_id, 1);
+    atomic_store(&mount->next_id, 1);
 
     _mount->ops = &ramfs_mount_ops;
     _mount->private = mount;

@@ -32,7 +32,7 @@ struct cpu;
 struct frame;
 struct kboot_tag;
 
-extern atomic_t in_fatal;
+extern atomic_uint in_fatal;
 extern notifier_t fatal_notifier;
 extern bool shutdown_in_progress;
 
