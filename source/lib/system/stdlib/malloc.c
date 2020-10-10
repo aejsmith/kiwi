@@ -99,4 +99,38 @@ static MLOCK_T malloc_global_mutex = CORE_MUTEX_INITIALIZER;
 
 #pragma clang diagnostic ignored "-Wnull-pointer-arithmetic"
 
+/*
+ * Work around clang being "clever". The implementation of calloc() calls
+ * malloc(), then checks the chunk header flags to see if it needs to zero.
+ * clang thinks that because the memory returned by malloc() hasn't been touched
+ * at all, then reads from it are undefined, so it doesn't bother doing so and
+ * just removes the check/memset entirely.
+ *
+ * To avoid this, rename all the functions, and then wrap them with the proper
+ * names. This stops clang from applying it's special behaviours for calling
+ * malloc().
+ */
+#define DLMALLOC_EXPORT extern __sys_hidden
+#define USE_DL_PREFIX 1
+
 #include "dlmalloc.c"
+
+void *malloc(size_t size) {
+    return dlmalloc(size);
+}
+
+void *calloc(size_t nmemb, size_t size) {
+    return dlcalloc(nmemb, size);
+}
+
+void *realloc(void *ptr, size_t size) {
+    return dlrealloc(ptr, size);
+}
+
+void free(void *ptr) {
+    return dlfree(ptr);
+}
+
+int posix_memalign(void **memptr, size_t alignment, size_t size) {
+    return dlposix_memalign(memptr, alignment, size);
+}
