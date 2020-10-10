@@ -30,6 +30,8 @@
 
 #include <sync/mutex.h>
 
+#include <module.h>
+
 struct device;
 
 /** Structure containing device operations. */
@@ -130,6 +132,7 @@ typedef struct device {
     char *name;                     /**< Name of the device. */
     mutex_t lock;                   /**< Lock to protect structure. */
     refcount_t count;               /**< Number of users of the device. */
+    module_t *module;               /**< Module that owns the device. */
     nstime_t time;                  /**< Creation time. */
 
     struct device *parent;          /**< Parent tree entry. */
@@ -172,11 +175,21 @@ static inline const char *device_name(object_handle_t *_handle) {
     return device->name;
 }
 
-extern status_t device_create(
-    const char *name, device_t *parent, device_ops_t *ops, void *data,
-    device_attr_t *attrs, size_t count, device_t **_device);
-extern status_t device_alias(
-    const char *name, device_t *parent, device_t *dest, device_t **_device);
+extern status_t device_create_impl(
+    module_t *module, const char *name, device_t *parent, device_ops_t *ops,
+    void *data, device_attr_t *attrs, size_t count, device_t **_device);
+extern status_t device_alias_impl(
+    module_t *module, const char *name, device_t *parent, device_t *dest,
+    device_t **_device);
+
+/** @see device_create_impl(). */
+#define device_create(name, parent, ops, data, attrs, count, _device) \
+    device_create_impl(module_self(), name, parent, ops, data, attrs, count, _device)
+
+/** @see device_alias_impl(). */
+#define device_alias(name, parent, dest, _device) \
+    device_alias_impl(module_self(), name, parent, dest, _device)
+
 extern status_t device_destroy(device_t *device);
 
 extern void device_iterate(device_t *start, device_iterate_t func, void *data);

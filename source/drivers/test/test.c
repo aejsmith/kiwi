@@ -23,7 +23,8 @@
 #include <status.h>
 
 static status_t test_init(void) {
-    kprintf(LOG_DEBUG, "test: loaded\n");
+    module_t *module = module_self();
+    kprintf(LOG_DEBUG, "test: loaded %p '%s'\n", module, module->name);
     return STATUS_SUCCESS;
 }
 

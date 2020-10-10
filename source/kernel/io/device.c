@@ -58,6 +58,7 @@ static void device_file_close(file_handle_t *handle) {
     if (handle->device->ops && handle->device->ops->close)
         handle->device->ops->close(handle->device, handle);
 
+    module_release(handle->device->module);
     refcount_dec(&handle->device->count);
 }
 
@@ -150,7 +151,8 @@ static file_ops_t device_file_ops = {
  * reference on it. The device can have no operations, in which case it will
  * simply act as a container for other devices.
  *
- * @param name          Name of device to create (will be duplicated).
+ * @param module        Module that owns the device.
+ * @param name          Name of device to create (will be copied).
  * @param parent        Parent device. Must not be an alias.
  * @param ops           Pointer to operations for the device (can be NULL).
  * @param data          Implementation-specific data pointer.
@@ -161,12 +163,13 @@ static file_ops_t device_file_ops = {
  *
  * @return              Status code describing result of the operation.
  */
-status_t device_create(
-    const char *name, device_t *parent, device_ops_t *ops, void *data,
-    device_attr_t *attrs, size_t count, device_t **_device)
+status_t device_create_impl(
+    module_t *module, const char *name, device_t *parent, device_ops_t *ops,
+    void *data, device_attr_t *attrs, size_t count, device_t **_device)
 {
     status_t ret;
 
+    assert(module);
     assert(name);
     assert(strlen(name) < DEVICE_NAME_MAX);
     assert(parent);
@@ -191,6 +194,7 @@ status_t device_create(
     device->file.ops  = &device_file_ops;
     device->file.type = (ops) ? ops->type : FILE_TYPE_CHAR;
     device->name      = kstrdup(name, MM_KERNEL);
+    device->module    = module;
     device->time      = system_time();
     device->parent    = parent;
     device->dest      = NULL;
@@ -255,7 +259,8 @@ err_free:
  * Creates an alias for another device in the device tree. Any attempts to open
  * the alias will open the device it is an alias for.
  *
- * @param name          Name to give alias.
+ * @param module        Module that owns the device.
+ * @param name          Name to give alias (will be copied).
  * @param parent        Device to create alias under.
  * @param dest          Destination device. If this is an alias, the new alias
  *                      will refer to the destination, not the alias itself.
@@ -263,7 +268,11 @@ err_free:
  *
  * @return              Status code describing result of the operation.
  */
-status_t device_alias(const char *name, device_t *parent, device_t *dest, device_t **_device) {
+status_t device_alias_impl(
+    module_t *module, const char *name, device_t *parent, device_t *dest,
+    device_t **_device)
+{
+    assert(module);
     assert(name);
     assert(strlen(name) < DEVICE_NAME_MAX);
     assert(parent);
@@ -292,6 +301,7 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
     device->file.ops   = &device_file_ops;
     device->file.type  = (dest->ops) ? dest->ops->type : FILE_TYPE_CHAR;
     device->name       = kstrdup(name, MM_KERNEL);
+    device->module     = module;
     device->time       = dest->time;
     device->parent     = parent;
     device->dest       = dest;
@@ -528,24 +538,28 @@ char *device_path(device_t *device) {
  * @param _handle       Where to store handle to device.
  * @return              Status code describing result of the operation. */
 status_t device_get(device_t *device, uint32_t access, uint32_t flags, object_handle_t **_handle) {
+    status_t ret;
+
     assert(device);
     assert(_handle);
+
+    if (!module_retain(device->module))
+        return STATUS_DEVICE_ERROR;
 
     mutex_lock(&device->lock);
 
     if (access && !file_access(&device->file, access)) {
-        mutex_unlock(&device->lock);
-        return STATUS_ACCESS_DENIED;
+        ret = STATUS_ACCESS_DENIED;
+        goto err;
     }
 
     file_handle_t *handle = file_handle_alloc(&device->file, access, flags);
 
     if (device->ops && device->ops->open) {
-        status_t ret = device->ops->open(device, flags, &handle->private);
+        ret = device->ops->open(device, flags, &handle->private);
         if (ret != STATUS_SUCCESS) {
             file_handle_free(handle);
-            mutex_unlock(&device->lock);
-            return ret;
+            goto err;
         }
     }
 
@@ -554,6 +568,11 @@ status_t device_get(device_t *device, uint32_t access, uint32_t flags, object_ha
     mutex_unlock(&device->lock);
 
     return STATUS_SUCCESS;
+
+err:
+    mutex_unlock(&device->lock);
+    module_release(device->module);
+    return ret;
 }
 
 /** Create a handle to a device.
@@ -563,6 +582,8 @@ status_t device_get(device_t *device, uint32_t access, uint32_t flags, object_ha
  * @param _handle       Where to store pointer to handle structure.
  * @return              Status code describing result of the operation. */
 status_t device_open(const char *path, uint32_t access, uint32_t flags, object_handle_t **_handle) {
+    status_t ret;
+
     assert(path);
     assert(_handle);
 
@@ -570,23 +591,25 @@ status_t device_open(const char *path, uint32_t access, uint32_t flags, object_h
     if (!device)
         return STATUS_NOT_FOUND;
 
+    if (!module_retain(device->module)) {
+        ret = STATUS_DEVICE_ERROR;
+        goto err_release;
+    }
+
     mutex_lock(&device->lock);
 
     if (access && !file_access(&device->file, access)) {
-        refcount_dec(&device->count);
-        mutex_unlock(&device->lock);
-        return STATUS_ACCESS_DENIED;
+        ret = STATUS_ACCESS_DENIED;
+        goto err_unlock;
     }
 
     file_handle_t *handle = file_handle_alloc(&device->file, access, flags);
 
     if (device->ops && device->ops->open) {
-        status_t ret = device->ops->open(device, flags, &handle->private);
+        ret = device->ops->open(device, flags, &handle->private);
         if (ret != STATUS_SUCCESS) {
             file_handle_free(handle);
-            refcount_dec(&device->count);
-            mutex_unlock(&device->lock);
-            return ret;
+            goto err_unlock;
         }
     }
 
@@ -594,6 +617,14 @@ status_t device_open(const char *path, uint32_t access, uint32_t flags, object_h
     mutex_unlock(&device->lock);
 
     return STATUS_SUCCESS;
+
+err_unlock:
+    mutex_unlock(&device->lock);
+    module_release(device->module);
+
+err_release:
+    refcount_dec(&device->count);
+    return ret;
 }
 
 static void dump_children(radix_tree_t *tree, int indent) {
