@@ -85,9 +85,13 @@ static inline int munmap_wrapper(void *start, size_t length) {
 /* To stop it defining dev_zero_fd. */
 #define MAP_ANONYMOUS       0
 
+static inline void init_lock(core_mutex_t *lock) {
+    *lock = CORE_MUTEX_INITIALIZER;
+}
+
 #define USE_LOCKS           2
 #define MLOCK_T             core_mutex_t
-#define INITIAL_LOCK(sl)    do { *(sl) = CORE_MUTEX_INITIALIZER; } while (0)
+#define INITIAL_LOCK(sl)    init_lock((sl))
 #define ACQUIRE_LOCK(sl)    core_mutex_lock((sl), -1)
 #define RELEASE_LOCK(sl)    core_mutex_unlock((sl))
 
@@ -96,21 +100,3 @@ static MLOCK_T malloc_global_mutex = CORE_MUTEX_INITIALIZER;
 #pragma clang diagnostic ignored "-Wnull-pointer-arithmetic"
 
 #include "dlmalloc.c"
-
-int posix_memalign(void **memptr, size_t alignment, size_t size) {
-    if (!core_is_pow2(size))
-        return EINVAL;
-
-    if (size == 0) {
-        *memptr = NULL;
-        return 0;
-    }
-
-    void *ret = memalign(alignment, size);
-    if (ret) {
-        *memptr = ret;
-        return 0;
-    } else {
-        return ENOMEM;
-    }
-}
