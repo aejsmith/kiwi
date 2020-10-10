@@ -42,13 +42,20 @@ device_t *device_bus_dir;
 
 /** Open a device. */
 static status_t device_file_open(file_handle_t *handle) {
+    device_t *device = handle->device;
+
+    if (!module_retain(device->module))
+        return STATUS_DEVICE_ERROR;
+
     status_t ret = STATUS_SUCCESS;
+    if (device->ops && device->ops->open)
+        ret = device->ops->open(device, handle->flags, &handle->private);
 
-    if (handle->device->ops && handle->device->ops->open)
-        ret = handle->device->ops->open(handle->device, handle->flags, &handle->private);
-
-    if (ret == STATUS_SUCCESS)
-        refcount_inc(&handle->device->count);
+    if (ret == STATUS_SUCCESS) {
+        refcount_inc(&device->count);
+    } else {
+        module_release(device->module);
+    }
 
     return ret;
 }
