@@ -24,7 +24,6 @@
 #include <kernel/module.h>
 
 #include <lib/list.h>
-#include <lib/refcount.h>
 
 #include <elf.h>
 #include <object.h>
@@ -38,21 +37,28 @@ typedef status_t (*module_init_t)(void);
 /** Module unload function type. */
 typedef status_t (*module_unload_t)(void);
 
+/** State of a module. */
+enum {
+    MODULE_STATE_LOADING,           /**< Module is being loaded. */
+    MODULE_STATE_READY,             /**< Module is initialized and ready for use. */
+    MODULE_STATE_UNLOADING,         /**< Module is being unloaded. */
+};
+
+/**
+ * Bits in module_t::state.
+ * 0-29  = Reference count.
+ * 30-31 = State.
+ */
+#define MODULE_STATE_MASK   0xc0000000
+#define MODULE_STATE_SHIFT  30
+#define MODULE_COUNT_MASK   0x3fffffff
+
 /** Structure defining a kernel module. */
 typedef struct module {
     list_t header;                  /**< Link to loaded modules list. */
 
-    refcount_t count;               /**< Count of modules depending on this module. */
+    atomic_uint32_t state;          /**< Combined state + reference count. */
     elf_image_t image;              /**< ELF image for the module. */
-
-    /** State of the module. */
-    enum {
-        MODULE_LOADED,              /**< Module loaded into memory, deps not resolved. */
-        MODULE_DEPS,                /**< Resolving dependencies on the module. */
-        MODULE_INIT,                /**< Module initialization function being called. */
-        MODULE_READY,               /**< Module is initialized and ready for use. */
-        MODULE_UNLOAD,              /**< Module is being unloaded. */
-    } state;
 
     /** Module information. */
     const char *name;               /**< Name of module. */
@@ -94,13 +100,27 @@ typedef struct symbol {
 
 extern module_t kernel_module;
 
+/** Get the state of a module. */
+static inline uint32_t module_state(module_t *module) {
+    return atomic_load_explicit(&module->state, memory_order_relaxed) >> MODULE_STATE_SHIFT;
+}
+
+/** Get the reference count of a module. */
+static inline uint32_t module_count(module_t *module) {
+    return atomic_load_explicit(&module->state, memory_order_relaxed) & MODULE_COUNT_MASK;
+}
+
 extern ptr_t module_mem_alloc(size_t size);
 extern void module_mem_free(ptr_t base, size_t size);
 
-extern module_t *module_for_addr(ptr_t addr);
+extern bool module_retain(module_t *module);
+extern void module_release(module_t *module);
+
+extern module_t *module_for_addr(void *addr);
 extern module_t *module_self(void);
 
 extern status_t module_load(const char *path, char *depbuf);
+extern status_t module_unload(const char *name);
 
 extern bool symbol_from_addr(ptr_t addr, symbol_t *symbol, size_t *_off);
 extern bool symbol_lookup(const char *name, bool global, bool exported, symbol_t *symbol);

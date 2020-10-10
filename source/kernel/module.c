@@ -50,21 +50,14 @@
 #   define dprintf(fmt...)
 #endif
 
-/** Structure describing a boot module. */
-typedef struct boot_module {
-    list_t header;                  /**< Link to modules list. */
-    void *mapping;                  /**< Pointer to mapped module data. */
-    size_t size;                    /**< Size of the module data. */
-    object_handle_t *handle;        /**< File handle for the module data. */
-    char *name;                     /**< Name of the module. */
-} boot_module_t;
-
 /** List of loaded modules. */
 static LIST_DEFINE(module_list);
 static MUTEX_DEFINE(module_lock, 0);
 
 /** Kernel module structure. */
 module_t kernel_module;
+
+static LIST_DEFINE(boot_module_list);
 
 #ifdef KERNEL_MODULE_BASE
 
@@ -125,6 +118,60 @@ void module_mem_free(ptr_t base, size_t size) {
 
 #endif /* KERNEL_MODULE_BASE */
 
+/**
+ * Try to increase the reference count of a module. Holding a reference to a
+ * module prevents it from being unloaded. This will only succeed if the module
+ * is currently in the ready state.
+ *
+ * @return              Whether a reference could be added.
+ */
+bool module_retain(module_t *module) {
+    uint32_t current = atomic_load(&module->state);
+
+    while (true) {
+        if ((current >> MODULE_STATE_SHIFT) != MODULE_STATE_READY)
+            return false;
+
+        uint32_t new = current + 1;
+
+        if (atomic_compare_exchange_strong(&module->state, &current, new))
+            return true;
+    }
+}
+
+/** Release a reference to a module. */
+void module_release(module_t *module) {
+    assert(module_count(module) > 0);
+    atomic_fetch_sub(&module->state, 1);
+}
+
+/** Find the module containing a given address.
+ * @param addr          Address to find. Must be a kernel code address.
+ * @return              Module containing address (always returns a valid
+ *                      module - returns kernel_module if not in an actual
+ *                      module). */
+module_t *module_for_addr(void *addr) {
+    ptr_t ptr = (ptr_t)addr;
+
+    list_foreach(&module_list, iter) {
+        module_t *module = list_entry(iter, module_t, header);
+
+        if (module != &kernel_module &&
+            ptr >= module->image.load_base &&
+            ptr < (module->image.load_base + module->image.load_size))
+        {
+            return module;
+        }
+    }
+
+    return &kernel_module;
+}
+
+/** Find the module containing the calling function. */
+__noinline module_t *module_self(void) {
+    return module_for_addr(__builtin_return_address(0));
+}
+
 /** Find a module in the module list.
  * @param name          Name of module to find.
  * @return              Pointer to module structure, NULL if not found. */
@@ -176,13 +223,9 @@ static status_t find_module_info(module_t *module) {
 /** Finish loading a module.
  * @param module        Module being loaded.
  * @param _name         Where to store name of unmet dependency.
- * @param _dep          If a dependency is loaded but not ready, a pointer to
- *                      it will be stored here.
  * @return              Status code describing result of the operation. */
-static status_t finish_module(module_t *module, const char **_name, module_t **_dep) {
+static status_t finish_module(module_t *module, const char **_name) {
     status_t ret;
-
-    module->state = MODULE_DEPS;
 
     /* No dependencies symbol means no dependencies. */
     symbol_t sym;
@@ -200,12 +243,9 @@ static status_t finish_module(module_t *module, const char **_name, module_t **_
         }
 
         module_t *dep = module_find(module->deps[i]);
-        if (!dep || dep->state != MODULE_READY) {
+        if (!dep || module_state(dep) != MODULE_STATE_READY) {
             if (_name)
                 *_name = module->deps[i];
-
-            if (_dep)
-                *_dep = dep;
 
             return STATUS_MISSING_LIBRARY;
         }
@@ -217,8 +257,6 @@ static status_t finish_module(module_t *module, const char **_name, module_t **_
     ret = elf_module_finish(&module->image);
     if (ret != STATUS_SUCCESS)
         return ret;
-
-    module->state = MODULE_INIT;
 
     /* Call the module initialization function. */
     dprintf(
@@ -233,10 +271,16 @@ static status_t finish_module(module_t *module, const char **_name, module_t **_
      * to go through and remove the reference if anything above fails. */
     for (size_t i = 0; module->deps && module->deps[i]; i++) {
         module_t *dep = module_find(module->deps[i]);
-        refcount_inc(&dep->count);
+
+        /* This should succeeds since we hold the module lock and we've already
+         * checked the state. */
+        bool retained __unused = module_retain(dep);
+        assert(retained);
     }
 
-    module->state = MODULE_READY;
+    /* Should have no references yet. */
+    assert(module->state == MODULE_STATE_LOADING << MODULE_STATE_SHIFT);
+    module->state = MODULE_STATE_READY << MODULE_STATE_SHIFT;
 
     kprintf(
         LOG_NOTICE, "module: successfully loaded module %s (%s)\n",
@@ -274,7 +318,7 @@ status_t module_load(const char *path, char *depbuf) {
     module_t *module = kmalloc(sizeof(module_t), MM_KERNEL);
 
     list_init(&module->header);
-    refcount_set(&module->count, 0);
+    module->state = MODULE_STATE_LOADING << MODULE_STATE_SHIFT;
 
     /* Take the module lock to serialise module loading. */
     mutex_lock(&module_lock);
@@ -289,11 +333,10 @@ status_t module_load(const char *path, char *depbuf) {
     if (ret != STATUS_SUCCESS)
         goto err_destroy;
 
-    module->state = MODULE_LOADED;
     list_append(&module_list, &module->header);
 
     const char *dep;
-    ret = finish_module(module, &dep, NULL);
+    ret = finish_module(module, &dep);
     if (ret != STATUS_SUCCESS) {
         if (ret == STATUS_MISSING_LIBRARY && depbuf)
             strncpy(depbuf, dep, MODULE_NAME_MAX + 1);
@@ -312,6 +355,25 @@ err_unlock:
     mutex_unlock(&module_lock);
     kfree(module);
     return ret;
+}
+
+/**
+ * Unload a kernel module. A module can only be unloaded where there are no
+ * other modules loaded which depend on it, and when there are no handles open
+ * to any devices it has created.
+ *
+ * @param name          Name of the module to unload.
+ *
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_IN_USE if the module is still in use.
+ *                      STATUS_NOT_FOUND if the module was not found.
+ *                      Any other status code returned by the module's unload
+ *                      function.
+ */
+status_t module_unload(const char *name) {
+    /* TODO: Need to atomically test and set the module state to unload ensuring
+     * that the count is 0. */
+    return STATUS_NOT_IMPLEMENTED;
 }
 
 /**
@@ -387,35 +449,29 @@ static kdb_status_t kdb_cmd_modules(int argc, char **argv, kdb_filter_t *filter)
         return KDB_SUCCESS;
     }
 
-    kdb_printf("Name             State  Count Image Description\n");
-    kdb_printf("====             =====  ===== ===== ===========\n");
+    kdb_printf("Name             State     Count Image Description\n");
+    kdb_printf("====             =====     ===== ===== ===========\n");
 
     list_foreach(&module_list, iter) {
         module = list_entry(iter, module_t, header);
 
         kdb_printf("%-16s ", module->name);
 
-        switch (module->state) {
-        case MODULE_LOADED:
-            kdb_printf("Loaded ");
-            break;
-        case MODULE_DEPS:
-            kdb_printf("Deps   ");
-            break;
-        case MODULE_INIT:
-            kdb_printf("Init   ");
-            break;
-        case MODULE_READY:
-            kdb_printf("Ready  ");
-            break;
-        case MODULE_UNLOAD:
-            kdb_printf("Unload ");
-            break;
+        switch (module_state(module)) {
+            case MODULE_STATE_LOADING:
+                kdb_printf("Loading   ");
+                break;
+            case MODULE_STATE_READY:
+                kdb_printf("Ready     ");
+                break;
+            case MODULE_STATE_UNLOADING:
+                kdb_printf("Unloading ");
+                break;
         }
 
         kdb_printf(
             "%-5d %-5d %s\n",
-            refcount_get(&module->count), module->image.id, module->description);
+            module_count(module), module->image.id, module->description);
     }
 
     return KDB_SUCCESS;
@@ -424,12 +480,11 @@ static kdb_status_t kdb_cmd_modules(int argc, char **argv, kdb_filter_t *filter)
 __init_text void module_early_init(void) {
     /* Initialize the kernel module structure. */
     list_init(&kernel_module.header);
-    refcount_set(&kernel_module.count, 1);
     elf_init(&kernel_module.image);
 
     kernel_module.name        = "kernel";
     kernel_module.description = "Kiwi kernel";
-    kernel_module.state       = MODULE_READY;
+    kernel_module.state       = (MODULE_STATE_READY << MODULE_STATE_SHIFT) | 1;
 
     list_append(&module_list, &kernel_module.header);
 
@@ -440,16 +495,28 @@ __init_text void module_early_init(void) {
 }
 
 static __init_text void finish_boot_module(module_t *module) {
+    list_append(&module_list, &module->header);
+
     while (true) {
         const char *name;
-        module_t *dep;
-        status_t ret = finish_module(module, &name, &dep);
+        status_t ret = finish_module(module, &name);
         if (ret == STATUS_MISSING_LIBRARY) {
-            if (!dep) {
-                fatal("Boot module %s depends on %s which is not available", module->name, name);
-            } else if (dep->state != MODULE_LOADED) {
-                fatal("Circular module dependency detected for %s", dep->name);
+            /* If it's in the module list we're already trying to load it. */
+            if (module_find(name))
+                fatal("Circular module dependency detected for %s", name);
+
+            module_t *dep = NULL;
+            list_foreach(&boot_module_list, iter) {
+                module_t *entry = list_entry(iter, module_t, header);
+
+                if (strcmp(entry->name, name) == 0) {
+                    dep = entry;
+                    break;
+                }
             }
+
+            if (!dep)
+                fatal("Boot module %s depends on %s which is not available", module->name, name);
 
             finish_boot_module(dep);
         } else if (ret != STATUS_SUCCESS) {
@@ -473,7 +540,7 @@ __init_text void module_init(void) {
         module_t *module = kmalloc(sizeof(module_t), MM_BOOT);
 
         list_init(&module->header);
-        refcount_set(&module->count, 0);
+        module->state = MODULE_STATE_LOADING << MODULE_STATE_SHIFT;
 
         ret = elf_module_load(handle, name, &module->image);
         object_handle_release(handle);
@@ -492,20 +559,15 @@ __init_text void module_init(void) {
         if (ret != STATUS_SUCCESS)
             fatal("Boot module %s has invalid information", name);
 
-        module->state = MODULE_LOADED;
-
-        list_append(&module_list, &module->header);
+        list_append(&boot_module_list, &module->header);
     }
 
     /* Now all of the modules are partially loaded, we can resolve dependencies
      * and load them all in the correct order. */
-    list_foreach(&module_list, iter) {
+    list_foreach_safe(&boot_module_list, iter) {
         module_t *module = list_entry(iter, module_t, header);
 
-        /* May already be loaded due to a dependency from another module. */
-        if (module->state == MODULE_READY)
-            continue;
-
+        assert(module_state(module) == MODULE_STATE_LOADING);
         finish_boot_module(module);
     }
 }
