@@ -31,7 +31,7 @@
  *                      be NULL).
  * @return              0 on success, -1 on failure. */
 int sigaction(int num, const struct sigaction *restrict act, struct sigaction *restrict oldact) {
-    libsystem_stub("sigaction", false);
+    //libsystem_stub("sigaction", false);
     return -1;
 }
 

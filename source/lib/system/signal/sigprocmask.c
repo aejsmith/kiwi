@@ -30,6 +30,6 @@
  * @param oset          Where to store previous masked signal set (can be NULL).
  * @return              0 on success, -1 on failure. */
 int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict oset) {
-    libsystem_stub("sigprocmask", false);
+    //libsystem_stub("sigprocmask", false);
     return -1;
 }
