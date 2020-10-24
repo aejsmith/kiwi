@@ -68,13 +68,18 @@ def fs_image_func(target, source, env):
         tarinfo.gname = "root"
         tar.addfile(tarinfo)
 
-    # Add in extra stuff from the directory specified in the configuration.
-    if len(config['EXTRA_FSIMAGE']) > 0:
+    def add_dir(name):
         cwd = os.getcwd()
-        os.chdir(config['EXTRA_FSIMAGE'])
+        os.chdir(name)
         for f in glob.glob('*'):
             tar.add(f)
         os.chdir(cwd)
+
+    add_dir(str(Dir('#/data')))
+
+    # Add in extra stuff from the directory specified in the configuration.
+    if len(config['EXTRA_FSIMAGE']) > 0:
+        add_dir(config['EXTRA_FSIMAGE'])
 
     tar.close()
     return 0
