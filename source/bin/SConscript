@@ -15,6 +15,7 @@
 #
 
 dirs = [
+    'bash',
     'shell',
     'terminal',
     'test',
