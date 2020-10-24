@@ -1374,8 +1374,10 @@ time_command (command, asynchronous, pipe_in, pipe_out, fds_to_close)
       before.tv_sec = shell_start_time;
       before.tv_usec = 0;
 #else
+#  if defined (HAVE_TIMES)
       before.tms_utime = before.tms_stime = before.tms_cutime = before.tms_cstime = 0;
       tbefore = shell_start_time;
+#  endif
 #endif
     }
 

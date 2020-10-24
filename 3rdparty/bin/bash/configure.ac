@@ -1119,6 +1119,7 @@ powerux*)	LOCAL_LIBS="-lgen" ;;
 cygwin*)	LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
 opennt*|interix*) LOCAL_CFLAGS="-DNO_MAIN_ENV_ARG -DBROKEN_DIRENT_D_INO -D_POSIX_SOURCE -D_ALL_SOURCE -DRECYCLES_PIDS" ;;
 *openstep*)	LOCAL_CFLAGS="-D__APPLE_CC__" ;;
+kiwi*)	    LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
 esac
 
 dnl Stanza for OS/compiler pair-specific flags

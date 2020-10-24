@@ -23,6 +23,7 @@ $PRODUCES ulimit.c
 $BUILTIN ulimit
 $FUNCTION ulimit_builtin
 $DEPENDS_ON !_MINIX
+$DEPENDS_ON !__Kiwi__
 $SHORT_DOC ulimit [-SHabcdefiklmnpqrstuvxPT] [limit]
 Modify shell resource limits.
 
@@ -70,7 +71,7 @@ Exit Status:
 Returns success unless an invalid option is supplied or an error occurs.
 $END
 
-#if !defined (_MINIX)
+#if !defined (_MINIX) && !defined (__Kiwi__)
 
 #include <config.h>
 
@@ -793,4 +794,4 @@ set_all_limits (mode, newlim)
   return retval;
 }
 
-#endif /* !_MINIX */
+#endif /* !_MINIX && !__Kiwi__ */
