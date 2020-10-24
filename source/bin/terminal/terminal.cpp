@@ -116,7 +116,7 @@ void Terminal::run() {
     }
 
     /* Spawn a process attached to the terminal. */
-    if (spawnProcess("/system/bin/shell", m_childProcess) != STATUS_SUCCESS)
+    if (spawnProcess("/system/bin/bash", m_childProcess) != STATUS_SUCCESS)
         return;
 
     std::array<object_event_t, 4> events;
