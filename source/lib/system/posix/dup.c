@@ -55,5 +55,12 @@ int dup2(int fd, int newfd) {
         return -1;
     }
 
+    ret = kern_handle_set_flags(new, HANDLE_INHERITABLE);
+    if (ret != STATUS_SUCCESS) {
+        kern_handle_close(new);
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
+
     return new;
 }
