@@ -478,6 +478,11 @@ status_t file_write_vecs(
  * buffer isn't overflowed. The entry number read will be the handle's current
  * offset, and upon success the handle's offset will be incremented by 1.
  *
+ * Changes to the directory contents while a directory handle is open may cause
+ * some entries to be missed or for duplicate entries to be returned by
+ * subsequent calls, as changes can change where the offset points to in the
+ * directory.
+ *
  * @param handle        Handle to directory to read from. Must have the
  *                      FILE_ACCESS_READ access right.
  * @param buf           Buffer to read entry in to.
