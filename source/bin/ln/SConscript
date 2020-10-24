@@ -14,19 +14,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-dirs = [
-    'bash',
-    'cat',
-    'ln',
-    'ls',
-    'mkdir',
-    'mv',
-    'rm',
-    'rmdir',
-    'shell',
-    'terminal',
-    'test',
-    'unlink',
-]
+Import('manager')
 
-SConscript(dirs = dirs)
+env = manager.Create()
+env.KiwiApplication('ln', ['ln.c'])
