@@ -14,9 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env', 'envmgr')
+Import('manager')
 
-# Build the program itself.
+env = manager.Create()
 target = env.KiwiApplication('dungeon',
 	sources = [
 		'actors.c',
@@ -73,11 +73,11 @@ target = env.KiwiApplication('dungeon',
 env.Command(
 	'dtextc.dat',
 	['dtextc.uu1', 'dtextc.uu2', 'dtextc.uu3', 'dtextc.uu4'],
-	Action('cat $SOURCES | uudecode -o $TARGET', '$GENCOMSTR')
-)
+	Action('cat $SOURCES | uudecode -o $TARGET', '$GENCOMSTR'))
+data = File('dtextc.dat')
 
 # Depend on the data file.
-Depends(target, File('dtextc.dat'))
+Depends(target, data)
 
 # Add the data file to the boot image.
-envmgr['dist']['DATA']['dungeon'] = [File('dtextc.dat')]
+manager['dist'].AddFile(data, 'system/data/dungeon/dtextc.dat')

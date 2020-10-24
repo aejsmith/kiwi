@@ -17,6 +17,7 @@
 dirs = [
     'bash',
     'cat',
+    'dungeon',
     'ln',
     'ls',
     'mkdir',
