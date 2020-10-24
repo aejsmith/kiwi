@@ -23,7 +23,6 @@ dirs = [
     'mv',
     'rm',
     'rmdir',
-    'shell',
     'terminal',
     'test',
     'unlink',
