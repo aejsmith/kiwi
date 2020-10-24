@@ -95,7 +95,7 @@ extern uid_t getuid(void);
 extern char *getwd(char *buf);
 extern int isatty(int fd);
 extern int lchown(const char *path, uid_t uid, gid_t gid);
-//extern int link(const char *source, const char *dest);
+extern int link(const char *source, const char *dest);
 /* int linkat(int, const char *, int, const char *, int); */
 /* int lockf(int, int, off_t); */
 extern off_t lseek(int fd, off_t off, int act);

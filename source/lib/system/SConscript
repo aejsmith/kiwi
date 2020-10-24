@@ -61,6 +61,7 @@ sources = [File(f) for f in [
     'posix/getcwd.c',
     'posix/getopt.c',
     'posix/getpid.c',
+    'posix/link.c',
     'posix/lseek.c',
     'posix/mkdir.c',
     'posix/mknod.c',
