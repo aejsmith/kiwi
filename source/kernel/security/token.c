@@ -136,7 +136,7 @@ token_t *token_current(void) {
 
 /**
  * Creates a handle to a token and publishes it in the current process' handle
- * table.
+ * table. A new reference will be added to the token.
  *
  * @param token         Token to publish.
  * @param _id           If not NULL, a kernel location to store handle ID in.
@@ -258,7 +258,7 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *_handle) {
         }
     }
 
-    /* Will free the token on failure. */
+    /* Will free the token on failure because we initialised the count to 0. */
     return token_publish(token, NULL, _handle);
 
 err_free_token:
