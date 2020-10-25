@@ -205,7 +205,8 @@ static status_t load_image(
         if (exist->node == file.id && exist->mount == file.mount) {
             if (exist->state == RTLD_IMAGE_LOADING) {
                 dprintf("rtld: cyclic dependency on %s detected!\n", exist->name);
-                return STATUS_MALFORMED_IMAGE;
+                ret = STATUS_MALFORMED_IMAGE;
+                goto fail;
             }
 
             dprintf("rtld: increasing reference count on %s (%p)\n", exist->name, exist);
@@ -215,6 +216,7 @@ static status_t load_image(
             if (_image)
                 *_image = exist;
 
+            kern_handle_close(handle);
             return STATUS_SUCCESS;
         }
     }
