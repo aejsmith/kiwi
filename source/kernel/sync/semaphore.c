@@ -39,7 +39,7 @@ typedef struct user_semaphore {
     notifier_t notifier;            /**< Notifier for semaphore events. */
 } user_semaphore_t;
 
-/** Down a semaphore.
+/** Decreases the count of a semaphore.
  * @param sem           Semaphore to down.
  * @param timeout       Timeout in nanoseconds. If SLEEP_ABSOLUTE is specified,
  *                      will always be taken to be a system time at which the
@@ -66,26 +66,23 @@ status_t semaphore_down_etc(semaphore_t *sem, nstime_t timeout, unsigned flags) 
     return thread_sleep(&sem->lock, timeout, sem->name, flags);
 }
 
-/** Down a semaphore.
+/** Decreases the count of a semaphore.
  * @param sem           Semaphore to down. */
 void semaphore_down(semaphore_t *sem) {
     semaphore_down_etc(sem, -1, 0);
 }
 
-/** Up a semaphore.
+/** Increases the count of a semaphore.
  * @param sem           Semaphore to up.
  * @param count         Value to increment the count by. */
 void semaphore_up(semaphore_t *sem, size_t count) {
-    thread_t *thread;
-    size_t i;
-
     spinlock_lock(&sem->lock);
 
-    for (i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
         if (list_empty(&sem->threads)) {
             sem->count++;
         } else {
-            thread = list_first(&sem->threads, thread_t, wait_link);
+            thread_t *thread = list_first(&sem->threads, thread_t, wait_link);
             thread_wake(thread);
         }
     }
@@ -93,23 +90,23 @@ void semaphore_up(semaphore_t *sem, size_t count) {
     spinlock_unlock(&sem->lock);
 }
 
-/** Initialize a semaphore structure.
+/** Initializes a semaphore structure.
  * @param sem           Semaphore to initialize.
  * @param name          Name of the semaphore, for debugging purposes.
  * @param initial       Initial value of the semaphore. */
 void semaphore_init(semaphore_t *sem, const char *name, size_t initial) {
     spinlock_init(&sem->lock, "semaphore_lock");
     list_init(&sem->threads);
+
     sem->count = initial;
-    sem->name = name;
+    sem->name  = name;
 }
 
 /**
  * User semaphore API.
  */
 
-/** Closes a handle to a semaphore.
- * @param handle        Handle being closed. */
+/** Closes a handle to a semaphore. */
 static void semaphore_object_close(object_handle_t *handle) {
     user_semaphore_t *sem = handle->private;
 
@@ -117,63 +114,55 @@ static void semaphore_object_close(object_handle_t *handle) {
     kfree(sem);
 }
 
-/** Signal that a semaphore is being waited for.
- * @param handle        Handle to semaphore.
- * @param event         Event being waited for.
- * @return              Status code describing result of the operation. */
+/** Signal that a semaphore is being waited for. */
 static status_t semaphore_object_wait(object_handle_t *handle, object_event_t *event) {
     user_semaphore_t *sem = handle->private;
 
     switch (event->event) {
-    case SEMAPHORE_EVENT:
-        if (!(event->flags & OBJECT_EVENT_EDGE) && sem->sem.count) {
-            object_event_signal(event, 0);
-        } else {
-            notifier_register(&sem->notifier, object_event_notifier, event);
-        }
+        case SEMAPHORE_EVENT:
+            if (!(event->flags & OBJECT_EVENT_EDGE) && sem->sem.count) {
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&sem->notifier, object_event_notifier, event);
+            }
 
-        return STATUS_SUCCESS;
-    default:
-        return STATUS_INVALID_EVENT;
+            return STATUS_SUCCESS;
+        default:
+            return STATUS_INVALID_EVENT;
     }
 }
 
-/** Stop waiting for a semaphore.
- * @param handle        Handle to semaphore.
- * @param event         Event being waited for. */
+/** Stop waiting for a semaphore. */
 static void semaphore_object_unwait(object_handle_t *handle, object_event_t *event) {
     user_semaphore_t *sem = handle->private;
 
     switch (event->event) {
-    case SEMAPHORE_EVENT:
-        notifier_unregister(&sem->notifier, object_event_notifier, event);
-        break;
+        case SEMAPHORE_EVENT:
+            notifier_unregister(&sem->notifier, object_event_notifier, event);
+            break;
     }
 }
 
 /** Semaphore object type. */
 static object_type_t semaphore_object_type = {
-    .id = OBJECT_TYPE_SEMAPHORE,
-    .flags = OBJECT_TRANSFERRABLE,
-    .close = semaphore_object_close,
-    .wait = semaphore_object_wait,
+    .id     = OBJECT_TYPE_SEMAPHORE,
+    .flags  = OBJECT_TRANSFERRABLE,
+    .close  = semaphore_object_close,
+    .wait   = semaphore_object_wait,
     .unwait = semaphore_object_unwait,
 };
 
-/** Create a semaphore object.
+/** Creates a semaphore object.
  * @param count         Initial value of the semaphore.
  * @param _handle       Where to store handle to semaphore.
  * @return              STATUS_SUCCESS on success.
  *                      STATUS_NO_HANDLES if handle table is full. */
 status_t kern_semaphore_create(size_t count, handle_t *_handle) {
-    user_semaphore_t *sem;
-    status_t ret;
-
-    sem = kmalloc(sizeof(*sem), MM_KERNEL);
+    user_semaphore_t *sem = kmalloc(sizeof(*sem), MM_KERNEL);
     semaphore_init(&sem->sem, "user_semaphore", count);
     notifier_init(&sem->notifier, sem);
 
-    ret = object_handle_open(&semaphore_object_type, sem, NULL, _handle);
+    status_t ret = object_handle_open(&semaphore_object_type, sem, NULL, _handle);
     if (ret != STATUS_SUCCESS)
         kfree(sem);
 
@@ -181,8 +170,6 @@ status_t kern_semaphore_create(size_t count, handle_t *_handle) {
 }
 
 /**
- * Down a semaphore.
- *
  * Decreases a semaphore's current count. If the count is currently zero, then
  * the function will block until the count becomes non-zero due to a call to
  * kern_semaphore_up(), and then decreases it again and returns.
@@ -206,26 +193,24 @@ status_t kern_semaphore_create(size_t count, handle_t *_handle) {
  *                      waiting.
  */
 status_t kern_semaphore_down(handle_t handle, nstime_t timeout) {
-    object_handle_t *khandle;
-    user_semaphore_t *sem;
     status_t ret;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    sem = khandle->private;
+    user_semaphore_t *sem = khandle->private;
 
     ret = semaphore_down_etc(&sem->sem, timeout, SLEEP_INTERRUPTIBLE);
+
     object_handle_release(khandle);
     return ret;
 }
 
 /**
- * Up a semaphore.
- *
  * Increases the count of a semaphore by the specified value, which may result
- * in threads waiting in kern_semaphore_down() to be unblocked.
+ * in threads waiting in kern_semaphore_down() being unblocked.
  *
  * @param handle        Handle to semaphore.
  * @param count         Value to increase count by.
@@ -239,25 +224,20 @@ status_t kern_semaphore_down(handle_t handle, nstime_t timeout) {
  *                      (in this case no threads are woken).
  */
 status_t kern_semaphore_up(handle_t handle, size_t count) {
-    object_handle_t *khandle;
-    user_semaphore_t *sem;
-    thread_t *thread;
-    size_t num_threads, i;
-    status_t ret;
-
     if (!count)
         return STATUS_INVALID_ARG;
 
-    ret = object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, &khandle);
+    object_handle_t *khandle;
+    status_t ret = object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    sem = khandle->private;
+    user_semaphore_t *sem = khandle->private;
 
     spinlock_lock(&sem->sem.lock);
 
     /* Count the number of threads we would wake. */
-    num_threads = 0;
+    size_t num_threads = 0;
     list_foreach(&sem->sem.threads, iter) {
         if (++num_threads == count)
             break;
@@ -271,8 +251,8 @@ status_t kern_semaphore_up(handle_t handle, size_t count) {
     }
 
     /* Wake them up. */
-    for (i = 0; i < num_threads; i++) {
-        thread = list_first(&sem->sem.threads, thread_t, wait_link);
+    for (size_t i = 0; i < num_threads; i++) {
+        thread_t *thread = list_first(&sem->sem.threads, thread_t, wait_link);
         thread_wake(thread);
     }
 

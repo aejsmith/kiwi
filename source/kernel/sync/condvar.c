@@ -26,8 +26,6 @@
 #include <assert.h>
 
 /**
- * Wait for a condition to become true.
- *
  * Atomically releases a mutex and then blocks until a condition becomes true.
  * The specified mutex should be held by the calling thread. When the function
  * returns (both for success and failure), the mutex will be held again by the
@@ -51,8 +49,6 @@
  *                      SLEEP_INTERRUPTIBLE flag is set.
  */
 status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, unsigned flags) {
-    status_t ret;
-
     spinlock_lock(&cv->lock);
 
     /* Release the specfied lock. */
@@ -61,7 +57,7 @@ status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, unsig
 
     /* Go to sleep. */
     list_append(&cv->threads, &curr_thread->wait_link);
-    ret = thread_sleep(&cv->lock, timeout, cv->name, flags);
+    status_t ret = thread_sleep(&cv->lock, timeout, cv->name, flags);
 
     /* Re-acquire the lock. */
     if (mutex)
@@ -71,8 +67,6 @@ status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, unsig
 }
 
 /**
- * Wait for a condition to become true.
- *
  * Atomically releases a mutex and then blocks until a condition becomes true.
  * The specified mutex should be held by the calling thread. When the function
  * returns the mutex will be held again by the calling thread. A condition
@@ -87,8 +81,6 @@ void condvar_wait(condvar_t *cv, mutex_t *mutex) {
 }
 
 /**
- * Signal that a condition has become true.
- *
  * Wakes the first thread (if any) waiting for a condition variable to become
  * true.
  *
@@ -97,15 +89,14 @@ void condvar_wait(condvar_t *cv, mutex_t *mutex) {
  * @return              Whether a thread was woken.
  */
 bool condvar_signal(condvar_t *cv) {
-    thread_t *thread;
-    bool ret = false;
-
     spinlock_lock(&cv->lock);
+
+    bool ret = false;
 
     if (!list_empty(&cv->threads)) {
         ret = true;
 
-        thread = list_first(&cv->threads, thread_t, wait_link);
+        thread_t *thread = list_first(&cv->threads, thread_t, wait_link);
         thread_wake(thread);
     }
 
@@ -114,8 +105,6 @@ bool condvar_signal(condvar_t *cv) {
 }
 
 /**
- * Broadcast that a condition has become true.
- *
  * Wakes all threads (if any) currently waiting for a condition variable to
  * become true.
  *
@@ -124,16 +113,15 @@ bool condvar_signal(condvar_t *cv) {
  * @return              Whether any threads were woken.
  */
 bool condvar_broadcast(condvar_t *cv) {
-    thread_t *thread;
-    bool ret = false;
-
     spinlock_lock(&cv->lock);
+
+    bool ret = false;
 
     if (!list_empty(&cv->threads)) {
         ret = true;
 
         while (!list_empty(&cv->threads)) {
-            thread = list_first(&cv->threads, thread_t, wait_link);
+            thread_t *thread = list_first(&cv->threads, thread_t, wait_link);
             thread_wake(thread);
         }
     }
@@ -142,11 +130,12 @@ bool condvar_broadcast(condvar_t *cv) {
     return ret;
 }
 
-/** Initialize a condition variable.
+/** Initializes a condition variable.
  * @param cv            Condition variable to initialize.
  * @param name          Name to give the condition variable. */
 void condvar_init(condvar_t *cv, const char *name) {
     spinlock_init(&cv->lock, "condvar_lock");
     list_init(&cv->threads);
+
     cv->name = name;
 }

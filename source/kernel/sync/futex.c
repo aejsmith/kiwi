@@ -72,9 +72,6 @@ static slab_cache_t *futex_cache;
 static AVL_TREE_DEFINE(futex_tree);
 static MUTEX_DEFINE(futex_tree_lock, 0);
 
-/** Constructor for futex structures.
- * @param obj           Object to construct.
- * @param data          Unused. */
 static void futex_ctor(void *obj, void *data) {
     futex_t *futex = obj;
 
@@ -82,18 +79,15 @@ static void futex_ctor(void *obj, void *data) {
     list_init(&futex->threads);
 }
 
-/** Clean up a process' futexes.
+/** Cleans up a process' futexes.
  * @param proc          Process to clean up. */
 void futex_process_cleanup(process_t *proc) {
-    futex_link_t *link;
-    futex_t *futex;
-
     mutex_lock(&futex_tree_lock);
 
     avl_tree_foreach_safe(&proc->futexes, iter) {
-        link = avl_tree_entry(iter, futex_link_t, node);
+        futex_link_t *link = avl_tree_entry(iter, futex_link_t, node);
+        futex_t *futex     = link->futex;
 
-        futex = link->futex;
         avl_tree_remove(&proc->futexes, &link->node);
         kfree(link);
 
@@ -107,31 +101,26 @@ void futex_process_cleanup(process_t *proc) {
     mutex_unlock(&futex_tree_lock);
 }
 
-/** Look up a futex.
+/** Looks up a futex.
  * @param addr          Virtual address in current process.
  * @param _futex        Where to store pointer to futex structure.
  * @return              STATUS_SUCCESS on success, STATUS_INVALID_ADDR or
  *                      STATUS_ACCESS_DENIED if the address is invalid or is
  *                      not writeable. */
 static status_t futex_lookup(int32_t *addr, futex_t **_futex) {
-    ptr_t base, offset;
-    phys_ptr_t phys;
-    futex_link_t *link;
-    futex_t *futex;
-    status_t ret;
-
     /* Check if the address is 4 byte aligned. This will ensure that the address
      * does not cross a page boundary because page sizes are powers of 2. */
     if (!addr || (ptr_t)addr % sizeof(int32_t))
         return STATUS_INVALID_ARG;
 
     /* Get the page containing the address and the offset within it. */
-    base = round_down((ptr_t)addr, PAGE_SIZE);
-    offset = (ptr_t)addr - base;
+    ptr_t base   = round_down((ptr_t)addr, PAGE_SIZE);
+    ptr_t offset = (ptr_t)addr - base;
 
     /* Lock the page for read and write access and look up the physical address
      * of it. */
-    ret = vm_lock_page(curr_proc->aspace, base, VM_ACCESS_READ | VM_ACCESS_WRITE, &phys);
+    phys_ptr_t phys;
+    status_t ret = vm_lock_page(curr_proc->aspace, base, VM_ACCESS_READ | VM_ACCESS_WRITE, &phys);
     if (ret != STATUS_SUCCESS)
         return ret;
 
@@ -143,12 +132,12 @@ static status_t futex_lookup(int32_t *addr, futex_t **_futex) {
      * searching the global tree (after the first access to the futex by the
      * process), as a process will only use a small subset of all of the futexes
      * in the system. */
-    link = avl_tree_lookup(&curr_proc->futexes, phys, futex_link_t, node);
+    futex_link_t *link = avl_tree_lookup(&curr_proc->futexes, phys, futex_link_t, node);
     if (!link) {
         mutex_lock(&futex_tree_lock);
 
         /* Use the global tree. */
-        futex = avl_tree_lookup(&futex_tree, phys, futex_t, tree_link);
+        futex_t *futex = avl_tree_lookup(&futex_tree, phys, futex_t, tree_link);
         if (!futex) {
             /* Couldn't find it, this means that this is the first access to
              * this futex. Create a structure for it. */
@@ -176,8 +165,7 @@ static status_t futex_lookup(int32_t *addr, futex_t **_futex) {
     return STATUS_SUCCESS;
 }
 
-/** Unlock the page containing a futex.
- * @param addr          Address of futex. */
+/** Unlocks the page containing a futex. */
 static void futex_finish(int32_t *addr) {
     ptr_t base;
 
@@ -185,7 +173,7 @@ static void futex_finish(int32_t *addr) {
     vm_unlock_page(curr_proc->aspace, base);
 }
 
-/** Wait for a futex.
+/** Waits for a futex.
  * @param addr          Pointer to futex.
  * @param val           Value of the futex prior to the call. This is needed to
  *                      prevent a race condition if another thread modifies the
@@ -197,10 +185,9 @@ static void futex_finish(int32_t *addr) {
  *                      will be returned immediately.
  * @return              Status code describing result of the operation. */
 status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
-    futex_t *futex;
     status_t ret;
 
-    /* Find the futex. */
+    futex_t *futex;
     ret = futex_lookup(addr, &futex);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -221,30 +208,27 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
     return ret;
 }
 
-/** Wake up threads waiting on a futex.
+/** Wakes up threads waiting on a futex.
  * @param addr          Pointer to futex.
  * @param count         Number of threads to attempt to wake.
  * @param _woken        Where to store number of threads actually woken.
  * @return              Status code describing result of the operation. */
 status_t kern_futex_wake(int32_t *addr, size_t count, size_t *_woken) {
-    futex_t *futex;
-    size_t woken = 0;
-    thread_t *thread;
-    status_t ret;
-
     if (!count)
         return STATUS_INVALID_ARG;
 
     /* Find the futex. */
-    ret = futex_lookup(addr, &futex);
+    futex_t *futex;
+    status_t ret = futex_lookup(addr, &futex);
     if (ret != STATUS_SUCCESS)
         return ret;
 
     spinlock_lock(&futex->lock);
 
     /* Wake the threads. */
+    size_t woken = 0;
     while (count-- && !list_empty(&futex->threads)) {
-        thread = list_first(&futex->threads, thread_t, wait_link);
+        thread_t  *thread = list_first(&futex->threads, thread_t, wait_link);
         thread_wake(thread);
         woken++;
     }
@@ -257,8 +241,6 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *_woken) {
 }
 
 /**
- * Wake up or requeue threads waiting on a futex.
- *
  * Wakes up the specified number of threads from the source futex, and moves
  * all the remaining waiting threads to the wait queue of the destination
  * futex.
@@ -275,19 +257,18 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *_woken) {
  * @return              Status code describing the result of the operation.
  */
 status_t kern_futex_requeue(int32_t *addr1, int32_t val, size_t count, int32_t *addr2, size_t *_woken) {
-    futex_t *source, *dest;
-    size_t woken = 0;
-    thread_t *thread;
     status_t ret;
 
     if (!count)
         return STATUS_INVALID_ARG;
 
     /* Find the futexes. */
+    futex_t *source;
     ret = futex_lookup(addr1, &source);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    futex_t *dest;
     ret = futex_lookup(addr2, &dest);
     if (ret != STATUS_SUCCESS) {
         futex_finish(addr1);
@@ -314,8 +295,9 @@ status_t kern_futex_requeue(int32_t *addr1, int32_t val, size_t count, int32_t *
     }
 
     /* Wake the specified number of threads. */
+    size_t woken = 0;
     while (count-- && !list_empty(&source->threads)) {
-        thread = list_first(&source->threads, thread_t, wait_link);
+        thread_t *thread = list_first(&source->threads, thread_t, wait_link);
         thread_wake(thread);
         woken++;
     }
@@ -323,7 +305,7 @@ status_t kern_futex_requeue(int32_t *addr1, int32_t val, size_t count, int32_t *
     if (source != dest) {
         /* Now move the remaining threads onto the destination list. */
         list_foreach_safe(&source->threads, iter) {
-            thread = list_entry(iter, thread_t, wait_link);
+            thread_t *thread = list_entry(iter, thread_t, wait_link);
 
             /* We don't need to lock the thread here. The members we are
              * changing are only touched when interrupting threads under
@@ -352,7 +334,7 @@ out:
     return ret;
 }
 
-/** Initialize the futex cache. */
+/** Initializes the futex cache. */
 static __init_text void futex_init(void) {
     futex_cache = object_cache_create(
         "futex_cache",

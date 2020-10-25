@@ -54,20 +54,18 @@ static SEMAPHORE_DEFINE(dpc_request_sem, 0);
 /** DPC thread. */
 static thread_t *dpc_thread;
 
-/** DPC thread main function.
- * @param arg1          Unused.
- * @param arg2          Unused. */
 static void dpc_thread_func(void *arg1, void *arg2) {
-    dpc_request_t *request;
-
     while (true) {
         semaphore_down(&dpc_request_sem);
 
         /* Get the next request in the list. */
         spinlock_lock(&dpc_lock);
+
         assert(!list_empty(&dpc_requests));
-        request = list_first(&dpc_requests, dpc_request_t, header);
+
+        dpc_request_t *request = list_first(&dpc_requests, dpc_request_t, header);
         list_remove(&request->header);
+
         spinlock_unlock(&dpc_lock);
 
         /* Call the function. */
@@ -80,24 +78,18 @@ static void dpc_thread_func(void *arg1, void *arg2) {
     }
 }
 
-/** DPC structure allocator.
- * @return              Pointer to allocated structure. */
 static dpc_request_t *dpc_request_alloc(void) {
-    dpc_request_t *request;
-
     if (list_empty(&dpc_free)) {
         /* TODO: Allocate more before we run out. */
         fatal("Out of DPC request structures");
     }
 
-    request = list_first(&dpc_free, dpc_request_t, header);
+    dpc_request_t *request = list_first(&dpc_free, dpc_request_t, header);
     list_remove(&request->header);
     return request;
 }
 
 /**
- * Make a DPC request.
- *
  * Adds a function to the DPC queue to be called by the DPC thread. This
  * function is safe to use from interrupt context.
  *
@@ -105,13 +97,11 @@ static dpc_request_t *dpc_request_alloc(void) {
  * @param arg           Argument to pass to the function.
  */
 void dpc_request(dpc_function_t function, void *arg) {
-    dpc_request_t *request;
-
     spinlock_lock(&dpc_lock);
 
-    request = dpc_request_alloc();
+    dpc_request_t *request = dpc_request_alloc();
     request->function = function;
-    request->arg = arg;
+    request->arg      = arg;
 
     /* Add it to the queue and wake up the DPC thread. */
     list_append(&dpc_requests, &request->header);
@@ -120,28 +110,24 @@ void dpc_request(dpc_function_t function, void *arg) {
     spinlock_unlock(&dpc_lock);
 }
 
-/** Check whether the DPC system has been initialized.
- * @return              Whether initialized. */
+/** Check whether the DPC system has been initialized. */
 bool dpc_inited(void) {
-    return dpc_thread;
+    return dpc_thread != NULL;
 }
 
 /** Initialize the DPC thread. */
 __init_text void dpc_init(void) {
-    dpc_request_t *alloc;
-    status_t ret;
-    size_t i;
-
     /* Allocate a chunk of DPC structures. We do not allocate a new structure
      * upon every dpc_request() call to make it usable from interrupt context. */
-    alloc = kmem_alloc(PAGE_SIZE, MM_BOOT);
-    for (i = 0; i < (PAGE_SIZE / sizeof(dpc_request_t)); i++) {
+    dpc_request_t *alloc = kmem_alloc(PAGE_SIZE, MM_BOOT);
+
+    for (size_t i = 0; i < (PAGE_SIZE / sizeof(dpc_request_t)); i++) {
         list_init(&alloc[i].header);
         list_append(&dpc_free, &alloc[i].header);
     }
 
     /* Create the DPC thread */
-    ret = thread_create("dpc", NULL, 0, dpc_thread_func, NULL, NULL, &dpc_thread);
+    status_t ret = thread_create("dpc", NULL, 0, dpc_thread_func, NULL, NULL, &dpc_thread);
     if (ret != STATUS_SUCCESS)
         fatal("Failed to create DPC thread: %d\n", ret);
 

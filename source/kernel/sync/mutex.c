@@ -26,8 +26,6 @@
 #include <assert.h>
 #include <status.h>
 
-/** Handle a recursive locking error.
- * @param lock          Lock error occurred on. */
 static inline void mutex_recursive_error(mutex_t *lock) {
     #if CONFIG_DEBUG
         fatal(
@@ -39,14 +37,7 @@ static inline void mutex_recursive_error(mutex_t *lock) {
     #endif
 }
 
-/** Internal mutex locking code.
- * @param lock          Mutex to acquire.
- * @param timeout       Timeout in nanoseconds.
- * @param flags         Sleeping behaviour flags.
- * @return              Status code describing result of the operation. */
 static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, unsigned flags) {
-    status_t ret;
-
     unsigned expected = 0;
     if (!atomic_compare_exchange_strong(&lock->value, &expected, 1)) {
         if (lock->holder == curr_thread) {
@@ -69,7 +60,7 @@ static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, unsi
 
                 /* If sleep is successful, lock ownership will have been
                  * transferred to us. */
-                ret = thread_sleep(&lock->lock, timeout, lock->name, flags);
+                status_t ret = thread_sleep(&lock->lock, timeout, lock->name, flags);
                 if (ret != STATUS_SUCCESS)
                     return ret;
             }
@@ -81,8 +72,6 @@ static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, unsi
 }
 
 /**
- * Acquire a mutex.
- *
  * Attempts to acquire a mutex. If the mutex has the MUTEX_RECURSIVE flag
  * set, and the calling thread already holds it, the recursion count will be
  * increased. Otherwise, the function will block until the mutex can be
@@ -105,9 +94,7 @@ static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, unsi
  *                      SLEEP_INTERRUPTIBLE flag is set.
  */
 status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, unsigned flags) {
-    status_t ret;
-
-    ret = mutex_lock_internal(lock, timeout, flags);
+    status_t ret = mutex_lock_internal(lock, timeout, flags);
     #if CONFIG_DEBUG
         if (likely(ret == STATUS_SUCCESS))
             lock->caller = __builtin_return_address(0);
@@ -117,8 +104,6 @@ status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, unsigned flags) {
 }
 
 /**
- * Acquire a mutex.
- *
  * Acquires a mutex. If the mutex has the MUTEX_RECURSIVE flag set, and the
  * calling thread already holds it, the recursion count will be increased.
  * Otherwise, the function will block until the mutex can be acquired.
@@ -127,9 +112,7 @@ status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, unsigned flags) {
  */
 void mutex_lock(mutex_t *lock) {
     #if CONFIG_DEBUG
-        status_t ret;
-
-        ret = mutex_lock_internal(lock, -1, 0);
+        status_t ret = mutex_lock_internal(lock, -1, 0);
         assert(ret == STATUS_SUCCESS);
         lock->caller = __builtin_return_address(0);
     #else
@@ -138,8 +121,6 @@ void mutex_lock(mutex_t *lock) {
 }
 
 /**
- * Release a mutex.
- *
  * Releases a mutex. Must be held by the current thread, else a fatal error
  * will occur. It is also invalid to release an already unheld mutex. If
  * the mutex has the MUTEX_RECURSIVE flag set, there must be an equal number
@@ -148,8 +129,6 @@ void mutex_lock(mutex_t *lock) {
  * @param lock          Mutex to unlock.
  */
 void mutex_unlock(mutex_t *lock) {
-    thread_t *thread;
-
     spinlock_lock(&lock->lock);
 
     if (unlikely(!mutex_held(lock))) {
@@ -167,7 +146,7 @@ void mutex_unlock(mutex_t *lock) {
         lock->holder = NULL;
 
         if (!list_empty(&lock->threads)) {
-            thread = list_first(&lock->threads, thread_t, wait_link);
+            thread_t *thread = list_first(&lock->threads, thread_t, wait_link);
             thread_wake(thread);
         } else {
             atomic_fetch_sub(&lock->value, 1);
@@ -179,7 +158,7 @@ void mutex_unlock(mutex_t *lock) {
     spinlock_unlock(&lock->lock);
 }
 
-/** Initialize a mutex.
+/** Initializes a mutex.
  * @param lock          Mutex to initialize.
  * @param name          Name to give the mutex.
  * @param flags         Behaviour flags for the mutex. */
@@ -187,7 +166,8 @@ void mutex_init(mutex_t *lock, const char *name, unsigned flags) {
     atomic_store_explicit(&lock->value, 0, memory_order_relaxed);
     spinlock_init(&lock->lock, "mutex_lock");
     list_init(&lock->threads);
-    lock->flags = flags;
+
+    lock->flags  = flags;
     lock->holder = NULL;
-    lock->name = name;
+    lock->name   = name;
 }

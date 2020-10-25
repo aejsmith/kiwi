@@ -51,17 +51,14 @@ typedef struct user_timer {
     bool fired;                     /**< Whether the event has fired. */
 } user_timer_t;
 
-/** Check if a year is a leap year. */
 static inline bool is_leap_year(unsigned year) {
     return ((year % 4) == 0 && ((year % 100) != 0 || (year % 400) == 0));
 }
 
-/** Get number of days in a year. */
 static inline unsigned days_in_year(unsigned year) {
     return (is_leap_year(year)) ? 366 : 365;
 }
 
-/** Table containing number of days before a month. */
 static unsigned days_before_month[] = {
     0,
     /* Jan. */ 0,
@@ -84,20 +81,12 @@ nstime_t boot_unix_time;
 /** Hardware timer device. */
 static timer_device_t *timer_device;
 
-/** Convert a date/time to nanoseconds since the epoch.
- * @param year          Year.
- * @param month         Month (1-12).
- * @param day           Day of month (1-31).
- * @param hour          Hour (0-23).
- * @param min           Minute (0-59).
- * @param sec           Second (0-59).
- * @return              Number of nanoseconds since the epoch. */
+/** Convert a date/time to nanoseconds since the epoch. */
 nstime_t time_to_unix(
     unsigned year, unsigned month, unsigned day, unsigned hour,
     unsigned min, unsigned sec)
 {
     uint32_t seconds = 0;
-    unsigned i;
 
     /* Start by adding the time of day and day of month together. */
     seconds += sec;
@@ -114,16 +103,14 @@ nstime_t time_to_unix(
         seconds += 24 * 60 * 60;
 
     /* Add the days in each year before this year from 1970. */
-    for (i = 1970; i < year; i++)
+    for (unsigned i = 1970; i < year; i++)
         seconds += days_in_year(i) * 24 * 60 * 60;
 
     return secs_to_nsecs(seconds);
 }
 
 /**
- * Get the number of nanoseconds since the Unix Epoch.
- *
- * Returns the number of nanoseconds that have passed since the Unix Epoch,
+ * Gets the number of nanoseconds that have passed since the Unix Epoch,
  * 00:00:00 UTC, January 1st, 1970.
  *
  * @return              Number of nanoseconds since epoch.
@@ -138,8 +125,7 @@ nstime_t boot_time(void) {
     return boot_unix_time;
 }
 
-/** Prepares next timer tick.
- * @param timer             Timer to prepare for. */
+/** Prepares next timer tick. */
 static void timer_device_prepare(timer_t *timer) {
     nstime_t length = timer->target - system_time();
 
@@ -167,8 +153,6 @@ static inline void timer_device_disable(void) {
 }
 
 /**
- * Set the timer device.
- *
  * Sets the device that will provide timer ticks. This function must only be
  * called once.
  *
@@ -184,12 +168,8 @@ void timer_device_set(timer_device_t *device) {
     kprintf(LOG_NOTICE, "timer: activated timer device %s\n", device->name);
 }
 
-/** Start a timer, with CPU timer lock held.
- * @param timer         Timer to start. */
+/** Start a timer, with CPU timer lock held. */
 static void timer_start_unsafe(timer_t *timer) {
-    timer_t *exist;
-    list_t *pos;
-
     assert(list_empty(&timer->header));
 
     /* Work out the absolute completion time. */
@@ -197,9 +177,10 @@ static void timer_start_unsafe(timer_t *timer) {
 
     /* Find the insertion point for the timer: the list must be ordered with
      * nearest expiration time first. */
-    pos = curr_cpu->timers.next;
+    list_t *pos = curr_cpu->timers.next;
     while (pos != &curr_cpu->timers) {
-        exist = list_entry(pos, timer_t, header);
+        timer_t *exist = list_entry(pos, timer_t, header);
+
         if (exist->target > timer->target)
             break;
 
@@ -209,8 +190,6 @@ static void timer_start_unsafe(timer_t *timer) {
     list_add_before(pos, &timer->header);
 }
 
-/** DPC function to run a timer function.
- * @param _timer        Pointer to timer. */
 static void timer_dpc_request(void *_timer) {
     timer_t *timer = _timer;
     timer->func(timer->data);
@@ -219,21 +198,21 @@ static void timer_dpc_request(void *_timer) {
 /** Handles a timer tick.
  * @return              Whether to preempt the current thread. */
 bool timer_tick(void) {
-    nstime_t time = system_time();
-    bool preempt = false;
-    timer_t *timer;
-
     assert(timer_device);
     assert(!local_irq_state());
 
     if (!curr_cpu->timer_enabled)
         return false;
 
+    nstime_t time = system_time();
+
     spinlock_lock(&curr_cpu->timer_lock);
+
+    bool preempt = false;
 
     /* Iterate the list and check for expired timers. */
     list_foreach_safe(&curr_cpu->timers, iter) {
-        timer = list_entry(iter, timer_t, header);
+        timer_t *timer = list_entry(iter, timer_t, header);
 
         /* Since the list is ordered soonest expiry first, we can break if the
          * current timer has not expired. */
@@ -257,19 +236,19 @@ bool timer_tick(void) {
     }
 
     switch (timer_device->type) {
-    case TIMER_DEVICE_ONESHOT:
-        /* Prepare the next tick if there is still a timer in the list. */
-        if (!list_empty(&curr_cpu->timers))
-            timer_device_prepare(list_first(&curr_cpu->timers, timer_t, header));
+        case TIMER_DEVICE_ONESHOT:
+            /* Prepare the next tick if there is still a timer in the list. */
+            if (!list_empty(&curr_cpu->timers))
+                timer_device_prepare(list_first(&curr_cpu->timers, timer_t, header));
 
-        break;
-    case TIMER_DEVICE_PERIODIC:
-        /* For periodic devices, if the list is empty disable the device so the
-         * timer does not interrupt unnecessarily. */
-        if (list_empty(&curr_cpu->timers))
-            timer_device_disable();
+            break;
+        case TIMER_DEVICE_PERIODIC:
+            /* For periodic devices, if the list is empty disable the device so the
+            * timer does not interrupt unnecessarily. */
+            if (list_empty(&curr_cpu->timers))
+                timer_device_disable();
 
-        break;
+            break;
     }
 
     spinlock_unlock(&curr_cpu->timer_lock);
@@ -284,10 +263,11 @@ bool timer_tick(void) {
  * @param flags         Behaviour flags for the timer. */
 void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data, uint32_t flags) {
     list_init(&timer->header);
-    timer->func = func;
-    timer->data = data;
+
+    timer->func  = func;
+    timer->data  = data;
     timer->flags = flags;
-    timer->name = name;
+    timer->name  = name;
 }
 
 /** Start a timer.
@@ -296,16 +276,14 @@ void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data,
  *                      the function will do nothing.
  * @param mode          Mode for the timer. */
 void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
-    bool state;
-
     if (length <= 0)
         return;
 
     /* Prevent curr_cpu from changing underneath us. */
-    state = local_irq_disable();
+    bool irq_state = local_irq_disable();
 
-    timer->cpu = curr_cpu;
-    timer->mode = mode;
+    timer->cpu     = curr_cpu;
+    timer->mode    = mode;
     timer->initial = length;
 
     spinlock_lock_noirq(&curr_cpu->timer_lock);
@@ -314,35 +292,34 @@ void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
     timer_start_unsafe(timer);
 
     switch (timer_device->type) {
-    case TIMER_DEVICE_ONESHOT:
-        /* If the new timer is at the beginning of the list, then it has the
-         * shortest remaining time, so we need to adjust the device to tick for
-         * it. */
-        if (timer == list_first(&curr_cpu->timers, timer_t, header))
-            timer_device_prepare(timer);
+        case TIMER_DEVICE_ONESHOT:
+            /* If the new timer is at the beginning of the list, then it has
+             * the shortest remaining time, so we need to adjust the device to
+             * tick for it. */
+            if (timer == list_first(&curr_cpu->timers, timer_t, header))
+                timer_device_prepare(timer);
 
-        break;
-    case TIMER_DEVICE_PERIODIC:
-        /* Enable the device. */
-        timer_device_enable();
-        break;
+            break;
+        case TIMER_DEVICE_PERIODIC:
+            /* Enable the device. */
+            timer_device_enable();
+            break;
     }
 
     spinlock_unlock_noirq(&curr_cpu->timer_lock);
-    local_irq_restore(state);
+    local_irq_restore(irq_state);
 }
 
 /** Cancel a running timer.
  * @param timer         Timer to stop. */
 void timer_stop(timer_t *timer) {
-    timer_t *first;
-
     if (!list_empty(&timer->header)) {
         assert(timer->cpu);
 
         spinlock_lock(&timer->cpu->timer_lock);
 
-        first = list_first(&timer->cpu->timers, timer_t, header);
+        timer_t *first = list_first(&timer->cpu->timers, timer_t, header);
+
         list_remove(&timer->header);
 
         /* If the timer is running on this CPU, adjust the tick length or
@@ -350,18 +327,18 @@ void timer_stop(timer_t *timer) {
          * no big deal: the tick handler is able to handle unexpected ticks. */
         if (timer->cpu == curr_cpu) {
             switch (timer_device->type) {
-            case TIMER_DEVICE_ONESHOT:
-                if (first == timer && !list_empty(&curr_cpu->timers)) {
-                    first = list_first(&curr_cpu->timers, timer_t, header);
-                    timer_device_prepare(first);
-                }
+                case TIMER_DEVICE_ONESHOT:
+                    if (first == timer && !list_empty(&curr_cpu->timers)) {
+                        first = list_first(&curr_cpu->timers, timer_t, header);
+                        timer_device_prepare(first);
+                    }
 
-                break;
-            case TIMER_DEVICE_PERIODIC:
-                if (list_empty(&curr_cpu->timers))
-                    timer_device_disable();
+                    break;
+                case TIMER_DEVICE_PERIODIC:
+                    if (list_empty(&curr_cpu->timers))
+                        timer_device_disable();
 
-                break;
+                    break;
             }
         }
 
@@ -377,11 +354,9 @@ void timer_stop(timer_t *timer) {
  * @return              STATUS_SUCCESS on success, STATUS_INTERRUPTED if
  *                      SLEEP_INTERRUPTIBLE specified and sleep was interrupted. */
 status_t delay_etc(nstime_t nsecs, int flags) {
-    status_t ret;
-
     assert(nsecs >= 0);
 
-    ret = thread_sleep(NULL, nsecs, "delay", flags);
+    status_t ret = thread_sleep(NULL, nsecs, "delay", flags);
     if (likely(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK))
         ret = STATUS_SUCCESS;
 
@@ -395,15 +370,8 @@ void delay(nstime_t nsecs) {
     delay_etc(nsecs, 0);
 }
 
-/** Dump a list of timers.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
+/** Dump a list of timers. */
 static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) {
-    timer_t *timer;
-    uint64_t id;
-    cpu_t *cpu;
-
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s [<CPU ID>]\n\n", argv[0]);
 
@@ -415,14 +383,18 @@ static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) 
         return KDB_FAILURE;
     }
 
+    cpu_t *cpu;
     if (argc == 2) {
+        uint64_t id;
         if (kdb_parse_expression(argv[1], &id, NULL) != KDB_SUCCESS)
             return KDB_FAILURE;
 
-        if (id > highest_cpu_id || !(cpu = cpus[id])) {
+        if (id > highest_cpu_id || !cpus[id]) {
             kdb_printf("Invalid CPU ID.\n");
             return KDB_FAILURE;
         }
+
+        cpu = cpus[id];
     } else {
         cpu = curr_cpu;
     }
@@ -431,7 +403,7 @@ static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) 
     kdb_printf("====                 ======           ========           ====\n");
 
     list_foreach(&cpu->timers, iter) {
-        timer = list_entry(iter, timer_t, header);
+        timer_t *timer = list_entry(iter, timer_t, header);
 
         kdb_printf(
             "%-20s %-16llu %-18p %p\n",
@@ -441,14 +413,8 @@ static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) 
     return KDB_SUCCESS;
 }
 
-/** Print the system uptime.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @param filter        Unused.
- * @return              KDB status code. */
+/** Print the system uptime. */
 static kdb_status_t kdb_cmd_uptime(int argc, char **argv, kdb_filter_t *filter) {
-    nstime_t time;
-
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s\n\n", argv[0]);
 
@@ -456,7 +422,7 @@ static kdb_status_t kdb_cmd_uptime(int argc, char **argv, kdb_filter_t *filter) 
         return KDB_SUCCESS;
     }
 
-    time = system_time();
+    nstime_t time = system_time();
     kdb_printf("%llu seconds (%llu nanoseconds)\n", nsecs_to_secs(time), time);
     return KDB_SUCCESS;
 }
@@ -481,8 +447,7 @@ __init_text void time_init_percpu(void) {
  * User timer API.
  */
 
-/** Closes a handle to a timer.
- * @param handle        Handle being closed. */
+/** Closes a handle to a timer. */
 static void timer_object_close(object_handle_t *handle) {
     user_timer_t *timer = handle->private;
 
@@ -490,52 +455,44 @@ static void timer_object_close(object_handle_t *handle) {
     kfree(timer);
 }
 
-/** Signal that a timer is being waited for.
- * @param handle        Handle to timer.
- * @param event         Event being waited for.
- * @return              Status code describing result of the operation. */
+/** Signal that a timer is being waited for. */
 static status_t timer_object_wait(object_handle_t *handle, object_event_t *event) {
     user_timer_t *timer = handle->private;
 
     switch (event->event) {
-    case TIMER_EVENT:
-        if (!(event->flags & OBJECT_EVENT_EDGE) && timer->fired) {
-            object_event_signal(event, 0);
-        } else {
-            notifier_register(&timer->notifier, object_event_notifier, event);
-        }
+        case TIMER_EVENT:
+            if (!(event->flags & OBJECT_EVENT_EDGE) && timer->fired) {
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&timer->notifier, object_event_notifier, event);
+            }
 
-        return STATUS_SUCCESS;
-    default:
-        return STATUS_INVALID_EVENT;
+            return STATUS_SUCCESS;
+        default:
+            return STATUS_INVALID_EVENT;
     }
 }
 
-/** Stop waiting for a timer.
- * @param handle        Handle to timer.
- * @param event         Event being waited for. */
+/** Stop waiting for a timer. */
 static void timer_object_unwait(object_handle_t *handle, object_event_t *event) {
     user_timer_t *timer = handle->private;
 
     switch (event->event) {
-    case TIMER_EVENT:
-        notifier_unregister(&timer->notifier, object_event_notifier, event);
-        break;
+        case TIMER_EVENT:
+            notifier_unregister(&timer->notifier, object_event_notifier, event);
+            break;
     }
 }
 
 /** Timer object type. */
 static object_type_t timer_object_type = {
-    .id = OBJECT_TYPE_TIMER,
-    .flags = OBJECT_TRANSFERRABLE,
-    .close = timer_object_close,
-    .wait = timer_object_wait,
+    .id     = OBJECT_TYPE_TIMER,
+    .flags  = OBJECT_TRANSFERRABLE,
+    .close  = timer_object_close,
+    .wait   = timer_object_wait,
     .unwait = timer_object_unwait,
 };
 
-/** Timer handler function for a userspace timer.
- * @param _timer        Pointer to timer.
- * @return              Whether to preempt. */
 static bool user_timer_func(void *_timer) {
     user_timer_t *timer = _timer;
 
@@ -551,19 +508,18 @@ static bool user_timer_func(void *_timer) {
  * @param _handle       Where to store handle to timer object.
  * @return              Status code describing result of the operation. */
 status_t kern_timer_create(uint32_t flags, handle_t *_handle) {
-    user_timer_t *timer;
-    status_t ret;
-
     if (!_handle)
         return STATUS_INVALID_ARG;
 
-    timer = kmalloc(sizeof(*timer), MM_KERNEL);
+    user_timer_t *timer = kmalloc(sizeof(*timer), MM_KERNEL);
+
     timer_init(&timer->timer, "timer_object", user_timer_func, timer, TIMER_THREAD);
     notifier_init(&timer->notifier, timer);
+
     timer->flags = flags;
     timer->fired = false;
 
-    ret = object_handle_open(&timer_object_type, timer, NULL, _handle);
+    status_t ret = object_handle_open(&timer_object_type, timer, NULL, _handle);
     if (ret != STATUS_SUCCESS)
         kfree(timer);
 
@@ -571,8 +527,6 @@ status_t kern_timer_create(uint32_t flags, handle_t *_handle) {
 }
 
 /**
- * Start a timer.
- *
  * Starts a timer. A timer can be started in one of two modes. TIMER_ONESHOT
  * will fire the timer event once after the specified time period. After the
  * time period has expired, the timer will remain in the fired state, i.e. a
@@ -591,47 +545,44 @@ status_t kern_timer_create(uint32_t flags, handle_t *_handle) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode) {
-    object_handle_t *khandle;
-    user_timer_t *timer;
-    status_t ret;
-
     if (interval <= 0 || (mode != TIMER_ONESHOT && mode != TIMER_PERIODIC))
         return STATUS_INVALID_ARG;
 
-    ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, &khandle);
+    object_handle_t *khandle;
+    status_t ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    timer = khandle->private;
+    user_timer_t *timer = khandle->private;
 
     timer_stop(&timer->timer);
     timer->fired = false;
     timer_start(&timer->timer, interval, mode);
+
     object_handle_release(khandle);
     return STATUS_SUCCESS;
 }
 
-/** Stop a timer.
+/** Stops a timer.
  * @param handle        Handle to timer object.
  * @param _rem          If not NULL, where to store remaining time.
  * @return              Status code describing result of the operation. */
 status_t kern_timer_stop(handle_t handle, nstime_t *_rem) {
-    object_handle_t *khandle;
-    user_timer_t *timer;
-    nstime_t rem;
     status_t ret;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    timer = khandle->private;
+    user_timer_t *timer = khandle->private;
 
     if (!list_empty(&timer->timer.header)) {
         timer_stop(&timer->timer);
         timer->fired = false;
+
         if (_rem) {
-            rem = system_time() - timer->timer.target;
+            nstime_t rem = system_time() - timer->timer.target;
             ret = write_user(_rem, rem);
         }
     } else if (_rem) {
@@ -643,8 +594,6 @@ status_t kern_timer_stop(handle_t handle, nstime_t *_rem) {
 }
 
 /**
- * Get the current time from a time source.
- *
  * Gets the current time, in nanoseconds, from the specified time source. There
  * are currently 2 time sources defined:
  *  - TIME_SYSTEM: A monotonic timer which gives the time since the system was
@@ -660,28 +609,25 @@ status_t kern_timer_stop(handle_t handle, nstime_t *_rem) {
  *                      NULL.
  */
 status_t kern_time_get(unsigned source, nstime_t *_time) {
-    nstime_t time;
-
     if (!_time)
         return STATUS_INVALID_ARG;
 
+    nstime_t time;
     switch (source) {
-    case TIME_SYSTEM:
-        time = system_time();
-        break;
-    case TIME_REAL:
-        time = unix_time();
-        break;
-    default:
-        return STATUS_INVALID_ARG;
+        case TIME_SYSTEM:
+            time = system_time();
+            break;
+        case TIME_REAL:
+            time = unix_time();
+            break;
+        default:
+            return STATUS_INVALID_ARG;
     }
 
     return write_user(_time, time);
 }
 
 /**
- * Set the current time.
- *
  * Sets the current time, in nanoseconds, for a time source. Currently only
  * the TIME_REAL source (see kern_time_get()) can be changed.
  *

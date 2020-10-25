@@ -40,15 +40,14 @@ static slab_cache_t *token_cache;
 /** Fully privileged token used by the kernel and initial user process. */
 token_t *system_token;
 
-/** Closes a handle to a token.
- * @param handle        Handle being closed. */
+/** Closes a handle to a token. */
 static void token_object_close(object_handle_t *handle) {
     token_release(handle->private);
 }
 
 /** Token object type. */
 static object_type_t token_object_type = {
-    .id = OBJECT_TYPE_TOKEN,
+    .id    = OBJECT_TYPE_TOKEN,
     .flags = OBJECT_TRANSFERRABLE,
     .close = token_object_close,
 };
@@ -67,9 +66,7 @@ void token_release(token_t *token) {
 }
 
 /**
- * Inherit a token.
- *
- * Inherit a token for a newly created process. If possible, the token is
+ * Inherits a token for a newly created process. If possible, the token is
  * shared, in which case the reference count will be increased. Otherwise, a
  * copy will be created.
  *
@@ -78,14 +75,13 @@ void token_release(token_t *token) {
  * @return              Pointer to token to use for new process.
  */
 token_t *token_inherit(token_t *source) {
-    token_t *token;
-
     if (source->copy_on_inherit) {
-        token = slab_cache_alloc(token_cache, MM_KERNEL);
+        token_t *token = slab_cache_alloc(token_cache, MM_KERNEL);
         refcount_set(&token->count, 1);
 
         token->ctx.uid = source->ctx.uid;
         token->ctx.gid = source->ctx.gid;
+
         memcpy(&token->ctx.groups, &source->ctx.groups, sizeof(token->ctx.groups));
 
         /* Both the effective and inheritable sets should be set to the source's
@@ -101,8 +97,6 @@ token_t *token_inherit(token_t *source) {
 }
 
 /**
- * Get the currently active security token.
- *
  * Gets the current thread's active security token. A thread's active security
  * token remains constant for the entire time that the thread is in the kernel,
  * i.e. if another thread changes the process-wide security context, the change
@@ -141,8 +135,6 @@ token_t *token_current(void) {
 }
 
 /**
- * Publish a token to userspace.
- *
  * Creates a handle to a token and publishes it in the current process' handle
  * table.
  *
@@ -151,21 +143,16 @@ token_t *token_current(void) {
  * @param _uid          If not NULL, a user location to store handle ID in.
  */
 status_t token_publish(token_t *token, handle_t *_id, handle_t *_uid) {
-    object_handle_t *handle;
-    status_t ret;
-
     token_retain(token);
 
-    handle = object_handle_create(&token_object_type, token);
-    ret = object_handle_attach(handle, _id, _uid);
+    object_handle_t *handle = object_handle_create(&token_object_type, token);
+    status_t ret = object_handle_attach(handle, _id, _uid);
     object_handle_release(handle);
     return ret;
 }
 
-/** Initialize the security token allocator. */
+/** Initializes the security token allocator. */
 __init_text void token_init(void) {
-    size_t i;
-
     token_cache = object_cache_create("token_cache", token_t, NULL, NULL, NULL, 0, MM_BOOT);
 
     /* Create the system token. It is granted all privileges. */
@@ -173,15 +160,14 @@ __init_text void token_init(void) {
     refcount_set(&system_token->count, 1);
     system_token->ctx.uid = 0;
     system_token->ctx.gid = 0;
-    for (i = 0; i < SECURITY_CONTEXT_MAX_GROUPS; i++)
+    for (size_t i = 0; i < SECURITY_CONTEXT_MAX_GROUPS; i++)
         system_token->ctx.groups[i] = -1;
-    for (i = 0; i <= PRIV_MAX; i++) {
+    for (size_t i = 0; i <= PRIV_MAX; i++) {
         security_context_set_priv(&system_token->ctx, i);
         security_context_set_inherit(&system_token->ctx, i);
     }
 }
 
-/** Comparison function. */
 static int compare_group(const void *a, const void *b) {
     group_id_t ga = *(const group_id_t *)a;
     group_id_t gb = *(const group_id_t *)b;
@@ -197,8 +183,6 @@ static int compare_group(const void *a, const void *b) {
 }
 
 /**
- * Create a security token.
- *
  * Creates a new security token encapsulating the given security context. The
  * calling thread must have have the necessary privileges to create the token.
  * Unless the thread has the PRIV_CHANGE_IDENTITY privilege, the user ID and
@@ -211,14 +195,13 @@ static int compare_group(const void *a, const void *b) {
  * @param _handle       Where to store handle to created token.
  */
 status_t kern_token_create(const security_context_t *ctx, handle_t *_handle) {
-    token_t *token, *creator;
-    size_t i;
     status_t ret;
 
-    creator = token_current();
+    token_t *creator = token_current();
 
-    token = slab_cache_alloc(token_cache, MM_KERNEL);
+    token_t *token = slab_cache_alloc(token_cache, MM_KERNEL);
     refcount_set(&token->count, 0);
+
     token->copy_on_inherit = false;
 
     ret = memcpy_from_user(&token->ctx, ctx, sizeof(token->ctx));
@@ -238,12 +221,12 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *_handle) {
         sizeof(token->ctx.groups[0]), compare_group);
 
     /* Mask out unsupported bits. */
-    for (i = PRIV_MAX + 1; i < SECURITY_CONTEXT_MAX_PRIVS; i++) {
+    for (size_t i = PRIV_MAX + 1; i < SECURITY_CONTEXT_MAX_PRIVS; i++) {
         security_context_unset_priv(&token->ctx, i);
         security_context_unset_inherit(&token->ctx, i);
     }
 
-    for (i = 0; i < array_size(token->ctx.privs); i++) {
+    for (size_t i = 0; i < array_size(token->ctx.privs); i++) {
         /* The inheritable set must be a subset of the effective set. */
         if (token->ctx.inherit[i] & ~(token->ctx.privs[i])) {
             ret = STATUS_INVALID_ARG;
@@ -257,7 +240,7 @@ status_t kern_token_create(const security_context_t *ctx, handle_t *_handle) {
     }
 
     /* Cannot set privileges that the creator does not have. */
-    for (i = 0; i < array_size(token->ctx.privs); i++) {
+    for (size_t i = 0; i < array_size(token->ctx.privs); i++) {
         if (token->ctx.privs[i] & ~(creator->ctx.privs[i])) {
             ret = STATUS_PERM_DENIED;
             goto err_free_token;
@@ -283,19 +266,18 @@ err_free_token:
     return ret;
 }
 
-/** Retrieve the security context held by a token.
+/** Retrieves the security context held by a token.
  * @param handle        Handle to security token.
  * @param ctx           Where to store security context. */
 status_t kern_token_query(handle_t handle, security_context_t *ctx) {
-    object_handle_t *khandle;
-    token_t *token;
     status_t ret;
 
+    object_handle_t *khandle;
     ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    token = khandle->private;
+    token_t *token = khandle->private;
 
     ret = memcpy_to_user(ctx, &token->ctx, sizeof(token->ctx));
     object_handle_release(khandle);

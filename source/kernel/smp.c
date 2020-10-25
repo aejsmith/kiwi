@@ -57,8 +57,7 @@ static bool smp_call_enabled;
 /** Variable used to synchronise the stages of the SMP boot process. */
 volatile unsigned smp_boot_status;
 
-/** Get a free SMP call structure.
- * @return              SMP call structure. */
+/** Get a free SMP call structure. */
 static smp_call_t *smp_call_get(void) {
     smp_call_t *call = NULL;
 
@@ -91,8 +90,7 @@ static smp_call_t *smp_call_get(void) {
     return call;
 }
 
-/** Free an SMP call structure.
- * @param call          Call structure to free. */
+/** Free an SMP call structure. */
 static void smp_call_release(smp_call_t *call) {
     if (refcount_dec(&call->count) == 0) {
         assert(list_empty(&call->cpu_link));
@@ -106,9 +104,6 @@ static void smp_call_release(smp_call_t *call) {
 
 /** Process pending calls to the current CPU. */
 void smp_ipi_handler(void) {
-    smp_call_t *call;
-    status_t ret;
-
     assert(smp_call_enabled);
 
     spinlock_lock(&curr_cpu->call_lock);
@@ -122,12 +117,14 @@ void smp_ipi_handler(void) {
 
     /* Loop through and handle each call that's been queued to us. */
     while (!list_empty(&curr_cpu->call_queue)) {
-        call = list_first(&curr_cpu->call_queue, smp_call_t, cpu_link);
+        smp_call_t *call = list_first(&curr_cpu->call_queue, smp_call_t, cpu_link);
         list_remove(&call->cpu_link);
+
         spinlock_unlock(&curr_cpu->call_lock);
 
         curr_cpu->curr_call = call;
 
+        status_t ret;
         if (call->func) {
             ret = call->func(call->arg);
         } else {
@@ -155,9 +152,7 @@ void smp_ipi_handler(void) {
     spinlock_unlock(&curr_cpu->call_lock);
 }
 
-/** Queue a call to a CPU and send an IPI if required.
- * @param call          Call to queue.
- * @param cpu           CPU to queue in. */
+/** Queue a call to a CPU and send an IPI if required. */
 static void smp_call_queue(smp_call_t *call, cpu_t *cpu) {
     spinlock_lock(&cpu->call_lock);
 
@@ -176,8 +171,6 @@ static void smp_call_queue(smp_call_t *call, cpu_t *cpu) {
 }
 
 /**
- * Call a function on a single CPU.
- *
  * Interrupts a single CPU and causes the specified function to be called on it.
  * If the SMP_CALL_ASYNC flag is specified, this function will return
  * immediately after queueing the call. Otherwise, it will not return until the
@@ -199,23 +192,20 @@ static void smp_call_queue(smp_call_t *call, cpu_t *cpu) {
  *                      the called function or set with smp_call_acknowledge().
  */
 status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigned flags) {
-    smp_call_t *call;
-    atomic_uint acked;
     status_t ret;
-    bool state;
 
-    state = local_irq_disable();
+    bool irq_state = local_irq_disable();
 
     if (dest == curr_cpu->id) {
         ret = func(arg);
-        local_irq_restore(state);
+        local_irq_restore(irq_state);
         return ret;
     }
 
     /* Don't do anything more if the call system isn't enabled, other CPUs won't
      * be up. */
     if (!smp_call_enabled) {
-        local_irq_restore(state);
+        local_irq_restore(irq_state);
         return STATUS_SUCCESS;
     }
 
@@ -223,11 +213,12 @@ status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigne
     if (dest > highest_cpu_id || !cpus[dest])
         fatal("Attempting to call on non-existant CPU");
 
-    call = smp_call_get();
+    smp_call_t *call = smp_call_get();
     call->func = func;
-    call->arg = arg;
+    call->arg  = arg;
 
     /* Only 1 CPU to acknowledge. */
+    atomic_uint acked;
     if (!(flags & SMP_CALL_ASYNC)) {
         atomic_store(&acked, 1);
         call->result = &acked;
@@ -250,13 +241,11 @@ status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigne
     }
 
     smp_call_release(call);
-    local_irq_restore(state);
+    local_irq_restore(irq_state);
     return ret;
 }
 
 /**
- * Call a function on all remote CPUs.
- *
  * Interrupts all remote CPUs and causes the specified function to be called
  * on them. If the SMP_CALL_ASYNC flag is specified, this function will
  * return immediately after queueing the call. Otherwise, it will not return
@@ -272,28 +261,25 @@ status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigne
  * @param flags         Behaviour flags.
  */
 void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags) {
-    atomic_uint acked = 0;
-    smp_call_t *call;
-    cpu_t *cpu;
-    bool state;
-
-    state = local_irq_disable();
+    bool irq_state = local_irq_disable();
 
     /* Don't do anything if the call system isn't enabled. */
     if (!smp_call_enabled) {
-        local_irq_restore(state);
+        local_irq_restore(irq_state);
         return;
     }
 
+    atomic_uint acked = 0;
+
     /* Loop through all running CPUs, excluding ourselves. */
     list_foreach(&running_cpus, iter) {
-        cpu = list_entry(iter, cpu_t, header);
+        cpu_t *cpu = list_entry(iter, cpu_t, header);
         if (cpu == curr_cpu)
             continue;
 
-        call = smp_call_get();
+        smp_call_t *call = smp_call_get();
         call->func = func;
-        call->arg = arg;
+        call->arg  = arg;
 
         if (!(flags & SMP_CALL_ASYNC)) {
             atomic_fetch_add(&acked, 1);
@@ -317,12 +303,10 @@ void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags) {
             smp_ipi_handler();
     }
 
-    local_irq_restore(state);
+    local_irq_restore(irq_state);
 }
 
 /**
- * Acknowledge a call from another CPU.
- *
  * Acknowledges the call from another CPU that is currently being executed,
  * and sets its status code to the given value. This function is only of use
  * when the call is sent synchronously, and the handler needs to acknowledge
@@ -348,9 +332,6 @@ void smp_call_acknowledge(status_t status) {
 
 /** Initialize the SMP call system and detect secondary CPUs. */
 __init_text void smp_init(void) {
-    smp_call_t *calls;
-    size_t i, count;
-
     /* If SMP is forced to be disabled, do not need to do anything. */
     if (kboot_boolean_option("smp_disabled"))
         return;
@@ -363,11 +344,11 @@ __init_text void smp_init(void) {
         return;
 
     /* Allocate message structures based on the total CPU count. */
-    count = cpu_count * SMP_CALLS_PER_CPU;
-    calls = kcalloc(count, sizeof(smp_call_t), MM_BOOT);
+    size_t count      = cpu_count * SMP_CALLS_PER_CPU;
+    smp_call_t *calls = kcalloc(count, sizeof(smp_call_t), MM_BOOT);
 
     /* Initialize each structure and add it to the pool. */
-    for (i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
         list_init(&calls[i].cpu_link);
 
         calls[i].next = smp_call_pool;
@@ -379,13 +360,11 @@ __init_text void smp_init(void) {
 
 /** Boot secondary CPUs. */
 __init_text void smp_boot(void) {
-    cpu_id_t i;
-    bool state;
+    bool irq_state = local_irq_disable();
 
-    state = local_irq_disable();
     platform_smp_boot_prepare();
 
-    for (i = 0; i <= highest_cpu_id; i++) {
+    for (cpu_id_t i = 0; i <= highest_cpu_id; i++) {
         if (cpus[i] && cpus[i]->state == CPU_OFFLINE) {
             smp_boot_status = SMP_BOOT_INIT;
             platform_smp_boot(cpus[i]);
@@ -398,5 +377,5 @@ __init_text void smp_boot(void) {
      * scheduling threads (see kmain_secondary()). */
     smp_boot_status = SMP_BOOT_COMPLETE;
 
-    local_irq_restore(state);
+    local_irq_restore(irq_state);
 }

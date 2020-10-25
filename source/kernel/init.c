@@ -67,8 +67,6 @@ static kboot_tag_t *kboot_tag_list __init_data;
  * @param magic         KBoot magic number.
  * @param tags          Tag list pointer. */
 __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
-    status_t ret;
-
     /* Save the tag list address. */
     kboot_tag_list = tags;
 
@@ -126,7 +124,7 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
     vm_init();
 
     /* Create the second stage initialization thread. */
-    ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL);
+    status_t ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL);
     if (ret != STATUS_SUCCESS)
         fatal("Could not create second-stage initialization thread");
 
@@ -162,12 +160,6 @@ __init_text void kmain_secondary(cpu_t *cpu) {
  * @param arg1          Unused.
  * @param arg2          Unused. */
 static void init_thread(void *arg1, void *arg2) {
-    const char *pargs[] = { "/system/services/service_manager", NULL }, *penv[] = { NULL };
-    initcall_t *initcall;
-    size_t count = 0;
-    const char *name;
-    void *mapping;
-    object_handle_t *handle;
     status_t ret;
 
     /* Bring up all detected secondary CPUs. */
@@ -182,7 +174,7 @@ static void init_thread(void *arg1, void *arg2) {
     fs_init();
 
     /* Call other initialization functions. */
-    for (initcall = __initcall_start; initcall != __initcall_end; initcall++)
+    for (initcall_t *initcall = __initcall_start; initcall != __initcall_end; initcall++)
         (*initcall)();
 
     update_boot_progress(10);
@@ -200,14 +192,17 @@ static void init_thread(void *arg1, void *arg2) {
             fatal("Could not mount ramfs for root (%d)", ret);
 
         /* Search the KBoot module list for any filesystem images. */
+        size_t count = 0;
         kboot_tag_foreach(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
-            name = kboot_tag_data(tag, 0);
-            mapping = phys_map(tag->addr, tag->size, MM_BOOT);
-            handle = memory_file_create(mapping, tag->size);
+            const char *name        = kboot_tag_data(tag, 0);
+            void *mapping           = phys_map(tag->addr, tag->size, MM_BOOT);
+            object_handle_t *handle = memory_file_create(mapping, tag->size);
 
             ret = tar_extract(handle, "/");
+
             object_handle_release(handle);
             phys_unmap(mapping, tag->size, true);
+
             if (ret == STATUS_UNKNOWN_IMAGE) {
                 continue;
             } else if (ret != STATUS_SUCCESS) {
@@ -229,7 +224,9 @@ static void init_thread(void *arg1, void *arg2) {
     update_boot_progress(20);
 
     /* Run the service manager. */
-    ret = process_create(pargs, penv, PROCESS_CREATE_CRITICAL, PRIORITY_CLASS_SYSTEM, NULL);
+    const char *args[] = { "/system/services/service_manager", NULL };
+    const char *env[]  = { NULL };
+    ret = process_create(args, env, PROCESS_CREATE_CRITICAL, PRIORITY_CLASS_SYSTEM, NULL);
     if (ret != STATUS_SUCCESS)
         fatal("Could not start service manager (%d)", ret);
 }
@@ -253,15 +250,10 @@ __init_text void *kboot_tag_iterate(uint32_t type, void *current) {
     return header;
 }
 
-/** Look up a KBoot option tag.
- * @param name          Name to look up.
- * @param type          Required option type.
- * @return              Pointer to the option value. */
 static __init_text void *lookup_option(const char *name, uint32_t type) {
-    const char *found;
-
     kboot_tag_foreach(KBOOT_TAG_OPTION, kboot_tag_option_t, tag) {
-        found = kboot_tag_data(tag, 0);
+        const char *found = kboot_tag_data(tag, 0);
+
         if (strcmp(found, name) == 0) {
             if (tag->type != type)
                 fatal("Kernel option `%s' has incorrect type", name);

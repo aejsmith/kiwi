@@ -41,10 +41,8 @@ static struct {
     unsigned char ch;               /**< Character. */
 } klog_buffer[CONFIG_KLOG_SIZE] __aligned(PAGE_SIZE);
 
-/** Start of the log buffer. */
+/** Log buffer start position and size. */
 static uint32_t klog_start;
-
-/** Number of characters in the buffer. */
 static uint32_t klog_length;
 
 /** Lock protecting the kernel log. */
@@ -54,10 +52,6 @@ static SPINLOCK_DEFINE(klog_lock);
 kboot_log_t *kboot_log;
 size_t kboot_log_size;
 
-/** Helper for kvprintf().
- * @param ch            Character to display.
- * @param data          Pointer to log level.
- * @param total         Pointer to total character count. */
 static void kvprintf_helper(char ch, void *data, int *total) {
     int level = *(int *)data;
 
@@ -87,8 +81,6 @@ static void kvprintf_helper(char ch, void *data, int *total) {
  * @param args          Arguments to substitute into format string.
  * @return              Number of characters written. */
 int kvprintf(int level, const char *fmt, va_list args) {
-    int ret;
-
     #if !CONFIG_DEBUG
         /* When debug output is disabled, do not do anything. */
         if (level == LOG_DEBUG)
@@ -96,7 +88,7 @@ int kvprintf(int level, const char *fmt, va_list args) {
     #endif
 
     spinlock_lock(&klog_lock);
-    ret = do_vprintf(kvprintf_helper, &level, fmt, args);
+    int ret = do_vprintf(kvprintf_helper, &level, fmt, args);
     spinlock_unlock(&klog_lock);
 
     return ret;
@@ -109,10 +101,10 @@ int kvprintf(int level, const char *fmt, va_list args) {
  * @return              Number of characters written. */
 int kprintf(int level, const char *fmt, ...) {
     va_list args;
-    int ret;
-
     va_start(args, fmt);
-    ret = kvprintf(level, fmt, args);
+
+    int ret = kvprintf(level, fmt, args);
+
     va_end(args);
 
     return ret;
@@ -136,14 +128,8 @@ void kboot_log_flush(void) {
     arch_cpu_invalidate_caches();
 }
 
-/** Print out the kernel log buffer.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
+/** Print out the kernel log buffer. */
 static kdb_status_t kdb_cmd_log(int argc, char **argv, kdb_filter_t *filter) {
-    int level = -1;
-    size_t i, pos;
-
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s [/level]\n\n", argv[0]);
 
@@ -161,25 +147,28 @@ static kdb_status_t kdb_cmd_log(int argc, char **argv, kdb_filter_t *filter) {
     }
 
     /* Look for a log level. */
+    int level = -1;
     if (argc == 2) {
         argv[1]++;
+
         switch (*argv[1]) {
-        case 'd':
-            level = LOG_DEBUG;
-            break;
-        case 'n':
-            level = LOG_NOTICE;
-            break;
-        case 'w':
-            level = LOG_WARN;
-            break;
-        default:
-            kdb_printf("Unknown level character '%c'\n", *argv[1]);
-            return KDB_FAILURE;
+            case 'd':
+                level = LOG_DEBUG;
+                break;
+            case 'n':
+                level = LOG_NOTICE;
+                break;
+            case 'w':
+                level = LOG_WARN;
+                break;
+            default:
+                kdb_printf("Unknown level character '%c'\n", *argv[1]);
+                return KDB_FAILURE;
         }
     }
 
-    for (i = 0, pos = klog_start; i < klog_length; i++) {
+    size_t pos = klog_start;
+    for (size_t i = 0; i < klog_length; i++) {
         if (level == -1 || klog_buffer[pos].level >= level)
             kdb_printf("%c", klog_buffer[pos].ch);
 
@@ -205,11 +194,9 @@ __init_text void log_early_init(void) {
 
 /** Create the kernel log device. */
 static __init_text void log_init(void) {
-    kboot_tag_log_t *tag;
-
     /* The KBoot log mapping will go away so we need to remap it somewhere else. */
     if (kboot_log) {
-        tag = kboot_tag_iterate(KBOOT_TAG_LOG, NULL);
+        kboot_tag_log_t *tag = kboot_tag_iterate(KBOOT_TAG_LOG, NULL);
         kboot_log = phys_map(tag->log_phys, tag->log_size, MM_BOOT);
     }
 }

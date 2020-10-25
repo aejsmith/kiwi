@@ -29,8 +29,6 @@
 #include <status.h>
 
 /**
- * Get system information.
- *
  * Retrieves information about the system. The what argument specifies the
  * information to get, which will be stored in the given buffer. The buffer
  * should be large enough to hold whatever information is being requested.
@@ -46,9 +44,9 @@ status_t kern_system_info(unsigned what, void *buf) {
         return STATUS_INVALID_ARG;
 
     switch (what) {
-    case SYSTEM_INFO_PAGE_SIZE:
-        return write_user((size_t *)buf, PAGE_SIZE);
-    default:
-        return STATUS_INVALID_ARG;
+        case SYSTEM_INFO_PAGE_SIZE:
+            return write_user((size_t *)buf, PAGE_SIZE);
+        default:
+            return STATUS_INVALID_ARG;
     }
 }

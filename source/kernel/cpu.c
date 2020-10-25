@@ -46,10 +46,7 @@ cpu_t **cpus;                       /**< Array of CPU structure pointers (index 
 /** Variable to wait on while waiting for a CPU to boot. */
 volatile int cpu_boot_wait;
 
-/** Initialize a CPU structure.
- * @param cpu           Structure to initialize.
- * @param id            ID of the CPU to add.
- * @param state         State of the CPU. */
+/** Initialize a CPU structure. */
 static void cpu_ctor(cpu_t *cpu, cpu_id_t id, int state) {
     memset(cpu, 0, sizeof(cpu_t));
     list_init(&cpu->header);
@@ -58,11 +55,11 @@ static void cpu_ctor(cpu_t *cpu, cpu_id_t id, int state) {
 
     /* Initialize SMP call information. */
     list_init(&cpu->call_queue);
-    spinlock_init(&cpu->call_lock, "ipi_lock");
+    spinlock_init(&cpu->call_lock, "cpu_call_lock");
 
     /* Initialize timer information. */
     list_init(&cpu->timers);
-    spinlock_init(&cpu->timer_lock, "timer_lock");
+    spinlock_init(&cpu->timer_lock, "cpu_timer_lock");
 }
 
 /** Register a non-boot CPU.
@@ -70,11 +67,9 @@ static void cpu_ctor(cpu_t *cpu, cpu_id_t id, int state) {
  * @param state         Current state of the CPU.
  * @return              Pointer to CPU structure. */
 cpu_t *cpu_register(cpu_id_t id, int state) {
-    cpu_t *cpu;
-
     assert(cpus);
 
-    cpu = kmalloc(sizeof(*cpu), MM_BOOT);
+    cpu_t *cpu = kmalloc(sizeof(*cpu), MM_BOOT);
     cpu_ctor(cpu, id, state);
 
     /* Resize the CPU array if required. */
@@ -86,6 +81,7 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
     }
 
     assert(!cpus[id]);
+
     cpus[id] = cpu;
     cpu_count++;
     return cpu;

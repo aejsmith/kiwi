@@ -28,12 +28,11 @@
 
 #include <status.h>
 
-/** Transfer lock ownership to a waiting writer or waiting readers.
- * @note                Queue lock should be held.
- * @param lock          Lock to transfer ownership of. */
+/**
+ * Transfers lock ownership to a waiting writer or waiting readers. Queue lock
+ * should be held.
+ */
 static void rwlock_transfer_ownership(rwlock_t *lock) {
-    thread_t *thread;
-
     /* Check if there are any threads to transfer ownership to. */
     if (list_empty(&lock->threads)) {
         /* There aren't. If there are still readers (it is possible for there to
@@ -45,7 +44,7 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
     } else {
         /* Go through all threads queued. */
         list_foreach_safe(&lock->threads, iter) {
-            thread = list_entry(iter, thread_t, wait_link);
+            thread_t *thread = list_entry(iter, thread_t, wait_link);
 
             /* If it is a reader, we can wake it and continue. If it is a writer
              * and the lock has no readers, wake it up and finish. If it is a
@@ -66,8 +65,6 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
 }
 
 /**
- * Acquire a readers-writer lock for reading.
- *
  * Acquires a readers-writer lock for reading. Multiple readers can hold a
  * readers-writer lock at any one time, however if there are any writers
  * waiting for the lock, the function will block and allow the writer to take
@@ -111,8 +108,6 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) 
 }
 
 /**
- * Acquire a readers-writer lock for writing.
- *
  * Acquires a readers-writer lock for writing. When the lock has been acquired,
  * no other readers or writers will be holding the lock, or be able to acquire
  * it.
@@ -161,8 +156,6 @@ status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags)
 }
 
 /**
- * Acquire a readers-writer lock for reading.
- *
  * Acquires a readers-writer lock for reading. Multiple readers can hold a
  * readers-writer lock at any one time, however if there are any writers
  * waiting for the lock, the function will block and allow the writer to take
@@ -175,8 +168,6 @@ void rwlock_read_lock(rwlock_t *lock) {
 }
 
 /**
- * Acquire a readers-writer lock for writing.
- *
  * Acquires a readers-writer lock for writing. When the lock has been acquired,
  * no other readers or writers will be holding the lock, or be able to acquire
  * it.
@@ -187,7 +178,7 @@ void rwlock_write_lock(rwlock_t *lock) {
     rwlock_write_lock_etc(lock, -1, 0);
 }
 
-/** Release a readers-writer lock.
+/** Releases a readers-writer lock.
  * @param lock          Lock to release. */
 void rwlock_unlock(rwlock_t *lock) {
     spinlock_lock(&lock->lock);
@@ -201,13 +192,14 @@ void rwlock_unlock(rwlock_t *lock) {
     spinlock_unlock(&lock->lock);
 }
 
-/** Initialize a readers-writer lock.
+/** Initializes a readers-writer lock.
  * @param lock          Lock to initialize.
  * @param name          Name to give lock. */
 void rwlock_init(rwlock_t *lock, const char *name) {
     spinlock_init(&lock->lock, "rwlock_lock");
     list_init(&lock->threads);
-    lock->held = 0;
+
+    lock->held    = 0;
     lock->readers = 0;
-    lock->name = name;
+    lock->name    = name;
 }

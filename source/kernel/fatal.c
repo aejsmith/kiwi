@@ -56,18 +56,14 @@ static void fatal_printf_helper(char ch, void *data, int *total) {
 }
 
 /**
- * Handle an unrecoverable kernel error.
- *
- * Halts all CPUs, prints a formatted error message to the console and enters
- * KDB. The function will never return.
+ * Handles an unrecoverable kernel error. Halts all CPUs, prints a formatted
+ * error message to the console and enters KDB. The function will never return.
  *
  * @param frame         Interrupt stack frame (if any).
  * @param fmt           Error message format string.
  * @param ...           Arguments to substitute into format string.
  */
 void fatal_etc(frame_t *frame, const char *fmt, ...) {
-    va_list args;
-
     local_irq_disable();
 
     if (atomic_fetch_add(&in_fatal, 1) == 0) {
@@ -77,9 +73,12 @@ void fatal_etc(frame_t *frame, const char *fmt, ...) {
         arch_kdb_trap_cpus();
 
         do_printf(fatal_printf_helper, NULL, "\nFATAL: ");
+
+        va_list args;
         va_start(args, fmt);
         do_vprintf(fatal_printf_helper, NULL, fmt, args);
         va_end(args);
+
         do_printf(fatal_printf_helper, NULL, "\n");
 
         kdb_enter(KDB_REASON_FATAL, frame);
@@ -89,17 +88,11 @@ void fatal_etc(frame_t *frame, const char *fmt, ...) {
     arch_cpu_halt();
 }
 
-/** Handle failure of an assertion.
- * @param cond          String of the condition that failed.
- * @param file          File name that contained the assertion.
- * @param line          Line number of the assertion. */
 void __assert_fail(const char *cond, const char *file, int line) {
     fatal("Assertion `%s' failed\nat %s:%d", cond, file, line);
 }
 
 /**
- * Print a fatal error message and halt the system.
- *
  * Prints a fatal error message and halts the system. The calling process must
  * have the PRIV_FATAL privilege.
  *

@@ -52,38 +52,37 @@ static inline void spinlock_lock_internal(spinlock_t *lock) {
 }
 
 /**
- * Acquire a spinlock.
- *
  * Attempts to acquire the specified spinlock, and spins in a loop until it is
- * able to do so. If the call is made on a single-processor system, then
- * fatal() will be called if the lock is already held rather than spinning -
- * spinlocks disable interrupts while locked so nothing should attempt to
- * acquire an already held spinlock on a single-processor system.
+ * able to do so.
+ *
+ * If the call is made on a single-processor system, then fatal() will be
+ * called if the lock is already held rather than spinning - spinlocks disable
+ * interrupts while locked so nothing should attempt to acquire an already held
+ * spinlock on a single-processor system.
  *
  * @param lock          Spinlock to acquire.
  */
 void spinlock_lock(spinlock_t *lock) {
-    bool state;
-
     /* Disable interrupts while locked to ensure that nothing else will run on
      * the current CPU for the duration of the lock. */
-    state = local_irq_disable();
+    bool irq_state = local_irq_disable();
 
     spinlock_lock_internal(lock);
-    lock->state = state;
+    lock->state = irq_state;
 }
 
 /**
- * Acquire a spinlock without changing interrupt state.
- *
  * Attempts to acquire the specified spinlock, and spins in a loop until it is
- * able to do so. If the call is made on a single-processor system, then
- * fatal() will be called if the lock is already held rather than spinning -
- * spinlocks disable interrupts while locked so nothing should attempt to
- * acquire an already held spinlock on a single-processor system. This function
- * does not modify the interrupt state so the caller must ensure that
- * interrupts are disabled (an assertion is made to ensure that this is the
- * case). The interrupt state field of the lock is not updated, therefore a
+ * able to do so, without changing interrupt state.
+ *
+ * If the call is made on a single-processor system, then fatal() will be
+ * called if the lock is already held rather than spinning - spinlocks disable
+ * interrupts while locked so nothing should attempt to acquire an already held
+ * spinlock on a single-processor system.
+ *
+ * This function does not modify the interrupt state so the caller must ensure
+ * that interrupts are disabled (an assertion is made to ensure that this is
+ * the case). The interrupt state field of the lock is not updated, therefore a
  * lock that was acquired with this function MUST be released with
  * spinlock_unlock_noirq().
  *
@@ -96,8 +95,6 @@ void spinlock_lock_noirq(spinlock_t *lock) {
 }
 
 /**
- * Release a spinlock.
- *
  * Releases the specified spinlock and restores the interrupt state to what it
  * was before the lock was acquired. This should only be used if the lock was
  * acquired using spinlock_lock().
@@ -105,18 +102,20 @@ void spinlock_lock_noirq(spinlock_t *lock) {
  * @param lock          Spinlock to release.
  */
 void spinlock_unlock(spinlock_t *lock) {
-    bool state;
-
     if (unlikely(!spinlock_held(lock)))
         fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
 
-    state = lock->state;
+    bool irq_state = lock->state;
     atomic_store(&lock->value, 1);
-    local_irq_restore(state);
+    local_irq_restore(irq_state);
 }
 
-/** Release a spinlock without changing interrupt state.
- * @param lock          Spinlock to release. */
+/**
+ * Releases the specified spinlock without restoring interrupt state. This must
+ * be used if the lock was acquired using spinlock_lock_noirq().
+ *
+ * @param lock          Spinlock to release.
+ */
 void spinlock_unlock_noirq(spinlock_t *lock) {
     if (unlikely(!spinlock_held(lock)))
         fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
@@ -124,11 +123,11 @@ void spinlock_unlock_noirq(spinlock_t *lock) {
     atomic_store(&lock->value, 1);
 }
 
-/** Initialize a spinlock.
+/** Initializes a spinlock.
  * @param lock          Spinlock to initialize.
  * @param name          Name of the spinlock, used for debugging purposes. */
 void spinlock_init(spinlock_t *lock, const char *name) {
     atomic_store_explicit(&lock->value, 1, memory_order_relaxed);
-    lock->name = name;
+    lock->name  = name;
     lock->state = false;
 }

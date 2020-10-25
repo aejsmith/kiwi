@@ -34,15 +34,11 @@
 /** Whether a system shutdown is in progress. */
 bool shutdown_in_progress;
 
-/** SMP call handler to halt a CPU. */
 static status_t shutdown_call_func(void *data) {
     smp_call_acknowledge(STATUS_SUCCESS);
     arch_cpu_halt();
 }
 
-/** System shutdown thread.
- * @param _action       Action to perform once the system has been shut down.
- * @param arg2          Unused. */
 static void shutdown_thread_entry(void *_action, void *arg2) {
     int action = (int)((ptr_t)_action);
 
@@ -57,14 +53,14 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
     smp_call_broadcast(shutdown_call_func, NULL, 0);
 
     switch (action) {
-    case SHUTDOWN_REBOOT:
-        kprintf(LOG_NOTICE, "system: rebooting...\n");
-        platform_reboot();
-        break;
-    case SHUTDOWN_POWEROFF:
-        kprintf(LOG_NOTICE, "system: powering off...\n");
-        platform_poweroff();
-        break;
+        case SHUTDOWN_REBOOT:
+            kprintf(LOG_NOTICE, "system: rebooting...\n");
+            platform_reboot();
+            break;
+        case SHUTDOWN_POWEROFF:
+            kprintf(LOG_NOTICE, "system: powering off...\n");
+            platform_poweroff();
+            break;
     }
 
     kprintf(LOG_NOTICE, "system: halted.\n");
@@ -74,8 +70,6 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 /** Shut down the system.
  * @param action        Action to perform once the system has been shut down. */
 void system_shutdown(unsigned action) {
-    status_t ret;
-
     if (!shutdown_in_progress) {
         shutdown_in_progress = true;
         preempt_disable();
@@ -84,7 +78,7 @@ void system_shutdown(unsigned action) {
          * other processes will be terminated. Don't use a DPC, as it's possible
          * that parts of the shutdown process will use them, and if we're
          * running in one, we'll block those DPCs from executing. */
-        ret = thread_create(
+        status_t ret = thread_create(
             "shutdown", NULL, 0, shutdown_thread_entry, (void *)((ptr_t)action),
             NULL, NULL);
         if (ret != STATUS_SUCCESS) {
@@ -103,10 +97,8 @@ void system_shutdown(unsigned action) {
 }
 
 /**
- * Shut down the system.
- *
  * Terminates all running processes, flushes and unmounts all filesystems, and
- * then performs the specified action.
+ * then performs the specified shutdown action.
  *
  * @param action        Action to perform once the system has been shut down.
  *
