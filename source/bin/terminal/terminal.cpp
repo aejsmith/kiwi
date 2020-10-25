@@ -109,7 +109,7 @@ void Terminal::run() {
     /* Open a non-blocking kernel console device handle (temporary, once we
      * have drivers implemented this will go away and we'll go directly to the
      * input/framebuffer devices, and then to a GUI once that's implemented). */
-    ret = kern_device_open("/kconsole", FILE_ACCESS_READ | FILE_ACCESS_WRITE, FILE_NONBLOCK, &m_device);
+    ret = kern_device_open("/virtual/kconsole", FILE_ACCESS_READ | FILE_ACCESS_WRITE, FILE_NONBLOCK, &m_device);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to open input device: %" PRId32, ret);
         return;

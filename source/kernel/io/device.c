@@ -35,10 +35,32 @@
 #include <time.h>
 
 /** Root of the device tree. */
-device_t *device_tree_root;
+device_t *device_root_dir;
 
-/** Standard device directories. */
+/**
+ * Standard device directories.
+ * 
+ *  - device_bus_dir ("/bus") - All physical devices in the system live under
+ *    this directory, laid out according to how they are connected to the system
+ *    (e.g. "/bus/pci/...", "/bus/usb/...").
+ *
+ *  - device_bus_platform_dir ("/bus/platform") - This is a special bus for
+ *    physical devices which exist in the system but not connected to any
+ *    specific bus like PCI or USB. For example, hardware blocks built into an
+ *    SoC, or legacy PC devices.
+ *
+ *  - device_class_dir ("/class") - Most devices are of a certain class (e.g.
+ *    input, network, etc.), managed by a class driver. Class drivers create
+ *    aliases under this directory - everything here should be an alias to
+ *    something elsewhere ("/bus" or "/virtual").
+ *
+ *  - device_virtual_dir("/virtual") - Virtual devices which do not correspond
+ *    to a physical device attached to the system.
+ */
 device_t *device_bus_dir;
+device_t *device_bus_platform_dir;
+device_t *device_class_dir;
+device_t *device_virtual_dir;
 
 /** Open a device. */
 static status_t device_file_open(file_handle_t *handle) {
@@ -443,7 +465,7 @@ static device_t *device_lookup(const char *path) {
     char *dup  = kstrdup(path, MM_KERNEL);
     char *orig = dup;
 
-    device_t *device = device_tree_root;
+    device_t *device = device_root_dir;
     mutex_lock(&device->lock);
 
     char *tok;
@@ -511,7 +533,7 @@ char *device_path(device_t *device) {
     char *path = NULL;
     size_t len = 0;
 
-    while (device != device_tree_root) {
+    while (device != device_root_dir) {
         mutex_lock(&device->lock);
 
         len += strlen(device->name) + 1;
@@ -667,7 +689,7 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
         kdb_printf("Name                     Address            Parent             Count\n");
         kdb_printf("====                     =======            ======             =====\n");
 
-        dump_children(&device_tree_root->children, 0);
+        dump_children(&device_root_dir->children, 0);
         return KDB_SUCCESS;
     }
 
@@ -728,20 +750,34 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
 
 /** Initialize the device manager. */
 __init_text void device_init(void) {
+    status_t ret;
+
     /* Create the root node of the device tree. */
-    device_tree_root = kcalloc(1, sizeof(device_t), MM_BOOT);
+    device_root_dir = kcalloc(1, sizeof(device_t), MM_BOOT);
 
-    mutex_init(&device_tree_root->lock, "device_root_lock", 0);
-    refcount_set(&device_tree_root->count, 0);
-    radix_tree_init(&device_tree_root->children);
+    mutex_init(&device_root_dir->lock, "device_root_lock", 0);
+    refcount_set(&device_root_dir->count, 0);
+    radix_tree_init(&device_root_dir->children);
 
-    device_tree_root->name = (char *)"<root>";
-    device_tree_root->time = boot_time();
+    device_root_dir->name = (char *)"<root>";
+    device_root_dir->time = boot_time();
 
     /* Create standard device directories. */
-    status_t ret = device_create("bus", device_tree_root, NULL, NULL, NULL, 0, &device_bus_dir);
+    ret = device_create("bus", device_root_dir, NULL, NULL, NULL, 0, &device_bus_dir);
     if (ret != STATUS_SUCCESS)
-        fatal("Could not create bus directory in device tree (%d)", ret);
+        fatal("Could not create standard device directory (%d)", ret);
+
+    ret = device_create("platform", device_bus_dir, NULL, NULL, NULL, 0, &device_bus_platform_dir);
+    if (ret != STATUS_SUCCESS)
+        fatal("Could not create standard device directory (%d)", ret);
+
+    ret = device_create("class", device_root_dir, NULL, NULL, NULL, 0, &device_class_dir);
+    if (ret != STATUS_SUCCESS)
+        fatal("Could not create standard device directory (%d)", ret);
+
+    ret = device_create("virtual", device_root_dir, NULL, NULL, NULL, 0, &device_virtual_dir);
+    if (ret != STATUS_SUCCESS)
+        fatal("Could not create standard device directory (%d)", ret);
 
     /* Register the KDB command. */
     kdb_register_command("device", "Examine the device tree.", kdb_cmd_device);

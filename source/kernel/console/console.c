@@ -168,7 +168,7 @@ static device_ops_t kconsole_device_ops = {
 static __init_text void console_device_init(void) {
     status_t ret;
 
-    ret = device_create("kconsole", device_tree_root, &kconsole_device_ops, NULL, NULL, 0, NULL);
+    ret = device_create("kconsole", device_virtual_dir, &kconsole_device_ops, NULL, NULL, 0, NULL);
     if (ret != STATUS_SUCCESS)
         fatal("Failed to register kernel console device (%d)", ret);
 }

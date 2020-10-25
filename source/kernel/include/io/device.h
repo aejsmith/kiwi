@@ -162,8 +162,11 @@ enum {
  * @return              Action to perform (DEVICE_ITERATE_*). */
 typedef int (*device_iterate_t)(device_t *device, void *data);
 
-extern device_t *device_tree_root;
+extern device_t *device_root_dir;
 extern device_t *device_bus_dir;
+extern device_t *device_bus_platform_dir;
+extern device_t *device_class_dir;
+extern device_t *device_virtual_dir;
 
 /** Get the name of a device from a handle.
  * @param handle        Handle to get name from.

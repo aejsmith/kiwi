@@ -51,11 +51,11 @@ void libkernel_init(process_args_t *args) {
     /* If we're the first process, open handles to the kernel console. */
     if (curr_process_id == 1) {
         handle_t handle;
-        kern_device_open("/kconsole", FILE_ACCESS_READ, 0, &handle);
+        kern_device_open("/virtual/kconsole", FILE_ACCESS_READ, 0, &handle);
         kern_handle_set_flags(handle, HANDLE_INHERITABLE);
-        kern_device_open("/kconsole", FILE_ACCESS_WRITE, 0, &handle);
+        kern_device_open("/virtual/kconsole", FILE_ACCESS_WRITE, 0, &handle);
         kern_handle_set_flags(handle, HANDLE_INHERITABLE);
-        kern_device_open("/kconsole", FILE_ACCESS_WRITE, 0, &handle);
+        kern_device_open("/virtual/kconsole", FILE_ACCESS_WRITE, 0, &handle);
         kern_handle_set_flags(handle, HANDLE_INHERITABLE);
     }
 
