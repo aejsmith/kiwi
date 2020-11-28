@@ -45,16 +45,12 @@ typedef struct process {
     mutex_t lock;
 
     /**
-     * Reference count.
-     *
      * This reference count counts the number of handles and pointers to the
      * process, as well as the number of threads attached (in any state).
      */
     refcount_t count;
 
     /**
-     * Running thread count.
-     *
      * This counts the number of threads running in the process. It is used to
      * determine when the process has died and when we can free up its
      * resources: a process can potentially stay alive a long time after it has

@@ -119,32 +119,22 @@ typedef struct sched_cpu {
 /** Total number of running/ready threads across all CPUs. */
 static atomic_uint threads_running;
 
-/** Add a thread to a queue.
- * @param queue         Queue to add to.
- * @param thread        Thread to add. */
 static inline void sched_queue_insert(sched_queue_t *queue, thread_t *thread) {
     list_append(&queue->threads[thread->curr_prio], &thread->runq_link);
     queue->bitmap |= (1 << thread->curr_prio);
 }
 
-/** Remove a thread from a queue.
- * @param queue         Queue to remove from.
- * @param thread        Thread to remove. */
 static inline void sched_queue_remove(sched_queue_t *queue, thread_t *thread) {
     list_remove(&thread->runq_link);
     if (list_empty(&queue->threads[thread->curr_prio]))
         queue->bitmap &= ~(1 << thread->curr_prio);
 }
 
-/** Calculate the initial priority of a thread.
- * @param thread        Thread to calculate for. */
 static inline void sched_calculate_priority(thread_t *thread) {
-    int priority;
-
     /* We need to map the priority class and the thread priority onto our 32
      * priority levels. See documentation/sched-priorities.txt for a pretty bad
      * explanation of what this is doing. */
-    priority = 5 + (thread->owner->priority * 8);
+    int priority = 5 + (thread->owner->priority * 8);
     priority += (thread->priority - 1) * 2;
 
     dprintf(
@@ -154,9 +144,6 @@ static inline void sched_calculate_priority(thread_t *thread) {
     thread->max_prio = thread->curr_prio = priority;
 }
 
-/** Tweak priority of a thread being stored.
- * @param cpu           Per-CPU scheduler information structure.
- * @param thread        Thread to tweak. */
 static inline void sched_tweak_priority(sched_cpu_t *cpu, thread_t *thread) {
     if (thread->timeslice != 0) {
         /* The timeslice wasn't fully used, give a bonus if we're not already
@@ -181,13 +168,7 @@ static inline void sched_tweak_priority(sched_cpu_t *cpu, thread_t *thread) {
     }
 }
 
-/** Pick a new thread to run.
- * @param cpu           Per-CPU scheduler information structure.
- * @return              Pointer to thread, or NULL if no threads available. */
 static thread_t *sched_pick_thread(sched_cpu_t *cpu) {
-    thread_t *thread;
-    int i;
-
     if (!cpu->active->bitmap) {
         /* The active queue is empty. If there are threads on the expired queue,
          * swap them. */
@@ -199,8 +180,8 @@ static thread_t *sched_pick_thread(sched_cpu_t *cpu) {
     }
 
     /* Get the thread to run. */
-    i = fls(cpu->active->bitmap);
-    thread = list_first(&cpu->active->threads[i], thread_t, runq_link);
+    int i = fls(cpu->active->bitmap);
+    thread_t *thread = list_first(&cpu->active->threads[i], thread_t, runq_link);
     sched_queue_remove(cpu->active, thread);
     return thread;
 }
@@ -214,8 +195,6 @@ static bool sched_timer_handler(void *data) {
 }
 
 /**
- * Main function of the scheduler.
- *
  * Main function of the scheduler. Picks a new thread to run and switches to
  * it. Interrupts must be disabled (explicitly, before taking the thread lock),
  * and the current thread must be locked. When the thread is next run and this
@@ -229,7 +208,6 @@ static bool sched_timer_handler(void *data) {
  */
 void sched_reschedule(bool state) {
     sched_cpu_t *cpu = curr_cpu->sched;
-    thread_t *next;
 
     spinlock_lock_noirq(&cpu->lock);
 
@@ -260,7 +238,7 @@ void sched_reschedule(bool state) {
 
     /* Find a new thread to run. A NULL return value means no threads are ready,
      * so we schedule the idle thread in this case. */
-    next = sched_pick_thread(cpu);
+    thread_t *next = sched_pick_thread(cpu);
     if (next) {
         if (next != curr_thread)
             spinlock_lock_noirq(&next->lock);
@@ -353,8 +331,6 @@ void sched_preempt(void) {
 }
 
 /**
- * Disable preemption for the current thread.
- *
  * Prevents the current thread from being preempted. This also prevents the
  * thread from being moved to a different CPU. This function can be nested,
  * i.e. in order for preemption to be enabled again, there must be an equal
@@ -366,62 +342,53 @@ void preempt_disable(void) {
 }
 
 /**
- * Re-enable preemption for the current thread.
- *
  * Decrements the preemption disable count. If it reaches 0, preemption will
  * be re-enabled for the current thread. If a preemption was missed due to
  * being disabled, the thread will be preempted immediately unless interrupts
  * are currently disabled.
  */
 void preempt_enable(void) {
-    bool state;
-
     if (!curr_thread)
         return;
 
-    state = local_irq_disable();
+    bool irq_state = local_irq_disable();
 
     assert(curr_thread->preempt_count > 0);
 
-    if (--curr_thread->preempt_count == 0 && state) {
+    if (--curr_thread->preempt_count == 0 && irq_state) {
         spinlock_lock_noirq(&curr_thread->lock);
 
         /* If a preemption was missed then preempt immediately. */
         if (curr_thread->flags & THREAD_PREEMPTED) {
             curr_thread->flags &= ~THREAD_PREEMPTED;
-            sched_reschedule(state);
+            sched_reschedule(irq_state);
             return;
         }
 
         spinlock_unlock_noirq(&curr_thread->lock);
     }
 
-    local_irq_restore(state);
+    local_irq_restore(irq_state);
 }
 
-/** Allocate a CPU for a thread to run on.
- * @param thread        Thread to allocate for. */
 static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
-    size_t total, average, load;
-    cpu_t *cpu, *other;
-
     /* On uniprocessor systems, we only have one choice. */
     if (cpu_count == 1)
         return curr_cpu;
 
     /* Add 1 to the total number of threads to account for the thread we're
      * adding. */
-    total = atomic_load(&threads_running) + 1;
+    size_t total = atomic_load(&threads_running) + 1;
 
     /* Start on the current CPU that the thread currently belongs to. */
-    cpu = (thread->cpu) ? thread->cpu : curr_cpu;
+    cpu_t *cpu = (thread->cpu) ? thread->cpu : curr_cpu;
 
     /* Get the average number of threads that a CPU should have as well as the
      * CPU's current load. We round up to a multiple of the CPU count rather
      * than rounding down here to stop us from loading off threads
      * unnecessarily. */
-    average = (round_up(total, cpu_count) / cpu_count);
-    load = cpu->sched->total;
+    size_t average = (round_up(total, cpu_count) / cpu_count);
+    size_t load    = cpu->sched->total;
 
     /* If the CPU has less than or equal to the average, we're OK to keep the
      * thread on it. */
@@ -431,7 +398,7 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
     /* We need to pick another CPU. Try to find one with a load less than the
      * average. If there isn't one, we just keep the thread on its current CPU. */
     list_foreach(&running_cpus, iter) {
-        other = list_entry(iter, cpu_t, header);
+        cpu_t *other = list_entry(iter, cpu_t, header);
 
         load = other->sched->total;
         if (load < average) {
@@ -448,11 +415,9 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 }
 
 /** Insert a thread into the scheduler.
- * @param thread        Thread to insert (should be locked and in the Ready
+ * @param thread        Thread to insert (should be locked and in the ready
  *                      state). */
 void sched_insert_thread(thread_t *thread) {
-    sched_cpu_t *sched;
-
     assert(thread->state == THREAD_READY);
 
     /* If we've been newly created, we will not have a priority set. Calculate
@@ -464,7 +429,7 @@ void sched_insert_thread(thread_t *thread) {
     if (!thread->wired && !thread->preempt_count)
         thread->cpu = sched_allocate_cpu(thread);
 
-    sched = thread->cpu->sched;
+    sched_cpu_t *sched = thread->cpu->sched;
     spinlock_lock(&sched->lock);
 
     sched_queue_insert(sched->active, thread);
@@ -485,9 +450,6 @@ void sched_insert_thread(thread_t *thread) {
     spinlock_unlock(&sched->lock);
 }
 
-/** Scheduler idle thread function.
- * @param arg1          Unused.
- * @param arg2          Unused. */
 static void sched_idle_thread(void *arg1, void *arg2) {
     /* We run the loop with interrupts disabled. The arch_cpu_idle() function is
      * expected to re-enable interrupts as required. */
@@ -509,10 +471,6 @@ __init_text void sched_init(void) {
 
 /** Initialize the scheduler for the current CPU. */
 __init_text void sched_init_percpu(void) {
-    char name[THREAD_NAME_MAX];
-    status_t ret;
-    int i, j;
-
     /* Create the per-CPU information structure. */
     curr_cpu->sched = kmalloc(sizeof(sched_cpu_t), MM_BOOT);
     spinlock_init(&curr_cpu->sched->lock, "sched_lock");
@@ -521,8 +479,9 @@ __init_text void sched_init_percpu(void) {
     curr_cpu->sched->expired = &curr_cpu->sched->queues[1];
 
     /* Create the idle thread. */
+    char name[THREAD_NAME_MAX];
     sprintf(name, "idle-%" PRIu32, curr_cpu->id);
-    ret = thread_create(
+    status_t ret = thread_create(
         name, NULL, 0, sched_idle_thread, NULL, NULL,
         &curr_cpu->sched->idle_thread);
     if (ret != STATUS_SUCCESS)
@@ -542,9 +501,9 @@ __init_text void sched_init_percpu(void) {
     timer_init(&curr_cpu->sched->timer, "sched_timer", sched_timer_handler, NULL, 0);
 
     /* Initialize queues. */
-    for (i = 0; i < 2; i++) {
+    for (int i = 0; i < 2; i++) {
         curr_cpu->sched->queues[i].bitmap = 0;
-        for (j = 0; j < PRIORITY_COUNT; j++)
+        for (int j = 0; j < PRIORITY_COUNT; j++)
             list_init(&curr_cpu->sched->queues[i].threads[j]);
     }
 }

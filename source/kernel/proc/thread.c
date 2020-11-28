@@ -138,9 +138,6 @@ void thread_trampoline(void) {
     thread_exit();
 }
 
-/** Constructor for thread objects.
- * @param obj           Pointer to object.
- * @param data          Ignored. */
 static void thread_ctor(void *obj, void *data) {
     thread_t *thread = (thread_t *)obj;
 
@@ -156,8 +153,6 @@ static void thread_ctor(void *obj, void *data) {
 }
 
 /**
- * Increase the reference count of a thread.
- *
  * Increases the reference count of a thread. This should be done when you
  * want to ensure that the thread will not freed: it will only be freed once
  * the count reaches 0.
@@ -168,11 +163,7 @@ void thread_retain(thread_t *thread) {
     refcount_inc(&thread->count);
 }
 
-/** Clean up a thread's resources after it has died.
- * @param thread        Thread to clean up. */
 static void thread_cleanup(thread_t *thread) {
-    thread_interrupt_t *interrupt;
-
     /* If the user stack was allocated by us on behalf of the program, we should
      * unmap it. */
     if (thread->ustack_size)
@@ -185,7 +176,7 @@ static void thread_cleanup(thread_t *thread) {
     object_thread_cleanup(thread);
 
     list_foreach_safe(&thread->interrupts, iter) {
-        interrupt = list_entry(iter, thread_interrupt_t, header);
+        thread_interrupt_t *interrupt = list_entry(iter, thread_interrupt_t, header);
 
         list_remove(&interrupt->header);
         kfree(interrupt);
@@ -193,8 +184,6 @@ static void thread_cleanup(thread_t *thread) {
 }
 
 /**
- * Decrease the reference count of a thread.
- *
  * Decreases the reference count of a thread. This should be called once you
  * no longer require a thread object (that was returned from thread_create() or
  * thread_lookup(), or that you previously called thread_retain() on). Once the
@@ -230,20 +219,17 @@ void thread_release(thread_t *thread) {
     slab_cache_free(thread_cache, thread);
 }
 
-/** Dead thread reaper.
- * @param arg1          Unused.
- * @param arg2          Unused. */
 static void reaper_thread(void *arg1, void *arg2) {
-    thread_t *thread;
-
     while (true) {
         semaphore_down(&dead_thread_sem);
 
         /* Take the next thread off the list. */
         spinlock_lock(&dead_thread_lock);
+
         assert(!list_empty(&dead_threads));
-        thread = list_first(&dead_threads, thread_t, runq_link);
+        thread_t *thread = list_first(&dead_threads, thread_t, runq_link);
         list_remove(&thread->runq_link);
+
         spinlock_unlock(&dead_thread_lock);
 
         /* Attempt to lock the thread and then unlock it. We must do this to
@@ -274,8 +260,6 @@ void thread_rename(thread_t *thread, const char *name) {
 }
 
 /**
- * Wire a thread to its current CPU.
- *
  * Wires a thread to the CPU it is currently running on. If the thread does not
  * have a CPU, it will be set to the current CPU. This prevents it from being
  * moved to another CPU by the scheduler. In order for the thread to be unwired,
@@ -301,8 +285,6 @@ void thread_wire(thread_t *thread) {
 }
 
 /**
- * Unwire a thread from its CPU.
- *
  * Decreases the wire count of a thread. If the count reaches 0, the thread
  * will be unwired and the scheduler will be allowed to move it to another
  * CPU.
@@ -318,8 +300,6 @@ void thread_unwire(thread_t *thread) {
     }
 }
 
-/** Internal part of thread_wake().
- * @param thread        Thread to wake up. */
 static void thread_wake_unsafe(thread_t *thread) {
     assert(thread->state == THREAD_SLEEPING);
     assert(!thread->wait_lock || spinlock_held(thread->wait_lock));
@@ -336,9 +316,6 @@ static void thread_wake_unsafe(thread_t *thread) {
     sched_insert_thread(thread);
 }
 
-/** Acquire a thread's wait lock.
- * @param thread        Thread to lock for.
- * @return              Lock that was acquired. */
 static inline spinlock_t *acquire_wait_lock(thread_t *thread) {
     spinlock_t *lock;
 
@@ -361,16 +338,12 @@ static inline spinlock_t *acquire_wait_lock(thread_t *thread) {
     return lock;
 }
 
-/** Sleep timeout handler.
- * @param _thread       Pointer to thread to wake.
- * @return              Whether to preempt. */
 static bool thread_timeout(void *_thread) {
     thread_t *thread = _thread;
-    spinlock_t *lock;
 
     /* To maintain the correct locking order and prevent deadlock, we must take
      * the wait lock before the thread lock. */
-    lock = acquire_wait_lock(thread);
+    spinlock_t *lock = acquire_wait_lock(thread);
 
     spinlock_lock(&thread->lock);
 
@@ -389,8 +362,6 @@ static bool thread_timeout(void *_thread) {
 }
 
 /**
- * Wake up a sleeping thread.
- *
  * Wakes up a thread that is currently asleep. This function is for use in the
  * implementation of synchronization mechanisms, never call it manually. The
  * lock that thread_sleep() was called with (if any) must be held. The thread
@@ -404,8 +375,6 @@ void thread_wake(thread_t *thread) {
     spinlock_unlock(&thread->lock);
 }
 
-/** Internal thread interruption code.
- * @param thread        Thread to interrupt. */
 static void thread_interrupt_internal(thread_t *thread) {
     /* Set the interrupted flag to signal that there is an unblocked interrupt
      * pending. This flag is checked by thread_sleep() if entering interruptible
@@ -423,22 +392,18 @@ static void thread_interrupt_internal(thread_t *thread) {
 }
 
 /**
- * Request a thread to terminate.
- *
- * Ask a userspace thread to terminate as soon as possible (upon next exit from
- * the kernel). If the thread is currently in interruptible sleep, it will be
- * woken. You cannot kill a kernel thread.
+ * Asks a userspace thread to terminate as soon as possible (upon next exit
+ * from the kernel). If the thread is currently in interruptible sleep, it will
+ * be woken. You cannot kill a kernel thread.
  *
  * @param thread        Thread to kill.
  */
 void thread_kill(thread_t *thread) {
-    spinlock_t *lock;
-
     if (thread->owner == kernel_proc)
         return;
 
     /* Correct locking order, see thread_timeout(). */
-    lock = acquire_wait_lock(thread);
+    spinlock_t *lock = acquire_wait_lock(thread);
     spinlock_lock(&thread->lock);
 
     thread->flags |= THREAD_KILLED;
@@ -450,9 +415,7 @@ void thread_kill(thread_t *thread) {
 }
 
 /**
- * Interrupt a thread.
- *
- * Queue a user mode interrupt to a thread. Interrupts are queued highest
+ * Queues a user mode interrupt to a thread. Interrupts are queued highest
  * priority first, and in FIFO order within priorities. Once the interrupt
  * reaches the head of the queue and the thread's IPL does not block it, the
  * thread will execute the handler upon its next return to user mode. If the
@@ -465,9 +428,6 @@ void thread_kill(thread_t *thread) {
  *                      been handled.
  */
 void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
-    spinlock_t *lock;
-    thread_interrupt_t *exist;
-
     if (thread->owner == kernel_proc) {
         kfree(interrupt);
         return;
@@ -479,13 +439,13 @@ void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
     list_init(&interrupt->header);
 
     /* Correct locking order, see thread_timeout(). */
-    lock = acquire_wait_lock(thread);
+    spinlock_t *lock = acquire_wait_lock(thread);
     spinlock_lock(&thread->lock);
 
     /* Find where to insert the interrupt. List is ordered by highest priority
      * first, and in FIFO order within priorities. */
     list_foreach(&thread->interrupts, iter) {
-        exist = list_entry(iter, thread_interrupt_t, header);
+        thread_interrupt_t *exist = list_entry(iter, thread_interrupt_t, header);
 
         if (interrupt->priority > exist->priority) {
             list_add_before(&exist->header, &interrupt->header);
@@ -499,8 +459,8 @@ void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
 
     /* If the interrupt is the head of the list and the thread's IPL does not
      * block it, wake it up. */
-    exist = list_first(&thread->interrupts, thread_interrupt_t, header);
-    if (exist == interrupt && interrupt->priority >= thread->ipl)
+    thread_interrupt_t *first = list_first(&thread->interrupts, thread_interrupt_t, header);
+    if (first == interrupt && interrupt->priority >= thread->ipl)
         thread_interrupt_internal(thread);
 
     spinlock_unlock(&thread->lock);
@@ -509,8 +469,6 @@ void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
 }
 
 /**
- * Send the current thread to sleep.
- *
  * Sends the current thread to sleep until it is either woken manually, the
  * given timeout expires, or (if interruptible) it is interrupted. When the
  * function returns, it will no longer be attached to any waiting list in all
@@ -538,7 +496,6 @@ void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
  */
 status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsigned flags) {
     status_t ret;
-    bool state;
 
     /* Convert an absolute target time to a relative time. */
     if (flags & SLEEP_ABSOLUTE && timeout > 0) {
@@ -561,7 +518,7 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsi
     }
 
     /* We're definitely going to sleep. Get the IRQ state to restore. */
-    state = (lock) ? lock->state : local_irq_disable();
+    bool irq_state = (lock) ? lock->state : local_irq_disable();
 
     spinlock_lock_noirq(&curr_thread->lock);
     curr_thread->sleep_status = STATUS_SUCCESS;
@@ -580,7 +537,7 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsi
         spinlock_unlock_noirq(lock);
 
     curr_thread->state = THREAD_SLEEPING;
-    sched_reschedule(state);
+    sched_reschedule(irq_state);
     return curr_thread->sleep_status;
 
 cancel:
@@ -603,9 +560,8 @@ void thread_yield(void) {
 
 /** Terminate the current thread (does not return). */
 void thread_exit(void) {
-    bool state;
+    bool irq_state = local_irq_disable();
 
-    state = local_irq_disable();
     spinlock_lock_noirq(&curr_thread->lock);
 
     /* Queue the thread up to the reaper so that it gets cleaned up after the
@@ -617,17 +573,14 @@ void thread_exit(void) {
 
     curr_thread->state = THREAD_DEAD;
 
-    sched_reschedule(state);
+    sched_reschedule(irq_state);
     fatal("Shouldn't get here");
 }
 
 /** Handle a user mode thread exception.
  * @param info          Exception information structure (will be copied). */
 void thread_exception(exception_info_t *info) {
-    exception_handler_t handler;
-    thread_interrupt_t *interrupt;
-
-    handler = curr_thread->exceptions[info->code];
+    exception_handler_t handler = curr_thread->exceptions[info->code];
     if (!handler)
         handler = curr_proc->exceptions[info->code];
 
@@ -642,12 +595,14 @@ void thread_exception(exception_info_t *info) {
         process_exit();
     }
 
-    interrupt = kmalloc(sizeof(*interrupt) + sizeof(*info), MM_KERNEL);
+    thread_interrupt_t *interrupt = kmalloc(sizeof(*interrupt) + sizeof(*info), MM_KERNEL);
+
     memcpy(interrupt + 1, info, sizeof(*info));
     memcpy(&interrupt->stack, &curr_thread->exception_stack, sizeof(interrupt->stack));
+
     interrupt->priority = THREAD_IPL_EXCEPTION;
-    interrupt->handler = (ptr_t)handler;
-    interrupt->size = sizeof(*info);
+    interrupt->handler  = (ptr_t)handler;
+    interrupt->size     = sizeof(*info);
 
     thread_interrupt(curr_thread, interrupt);
     assert(curr_thread->flags & THREAD_INTERRUPTED);
@@ -655,12 +610,10 @@ void thread_exception(exception_info_t *info) {
 
 /** Perform tasks necessary when a thread is entering the kernel. */
 void thread_at_kernel_entry(void) {
-    nstime_t now;
-
     /* Update accounting information. */
-    now = system_time();
+    nstime_t now = system_time();
     curr_thread->user_time += now - curr_thread->last_time;
-    curr_thread->last_time = now;
+    curr_thread->last_time  = now;
 
     /* Terminate the thread if killed. */
     if (unlikely(curr_thread->flags & THREAD_KILLED)) {
@@ -671,11 +624,6 @@ void thread_at_kernel_entry(void) {
 
 /** Perform tasks necessary when a thread is returning to userspace. */
 void thread_at_kernel_exit(void) {
-    thread_interrupt_t *interrupt;
-    unsigned ipl;
-    nstime_t now;
-    status_t ret;
-
     /* Clear active security token. */
     if (unlikely(curr_thread->active_token)) {
         token_release(curr_thread->active_token);
@@ -693,19 +641,20 @@ void thread_at_kernel_exit(void) {
         spinlock_lock(&curr_thread->lock);
 
         assert(!list_empty(&curr_thread->interrupts));
-        interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
+
+        thread_interrupt_t *interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
         list_remove(&interrupt->header);
         curr_thread->flags &= ~THREAD_INTERRUPTED;
 
         assert(interrupt->priority >= curr_thread->ipl);
 
         /* Raise the IPL to block further interrupts. */
-        ipl = curr_thread->ipl;
+        unsigned ipl = curr_thread->ipl;
         curr_thread->ipl = interrupt->priority + 1;
 
         spinlock_unlock(&curr_thread->lock);
 
-        ret = arch_thread_interrupt_setup(interrupt, ipl);
+        status_t ret = arch_thread_interrupt_setup(interrupt, ipl);
         if (unlikely(ret != STATUS_SUCCESS)) {
             /* TODO: Once there is a way to use an alternate stack for an
              * exception handler we should queue up an exception and retry to
@@ -720,14 +669,12 @@ void thread_at_kernel_exit(void) {
     }
 
     /* Update accounting information. */
-    now = system_time();
+    nstime_t now = system_time();
     curr_thread->kernel_time += now - curr_thread->last_time;
     curr_thread->last_time = now;
 }
 
 /**
- * Look up a thread without taking the tree lock.
- *
  * Looks up a thread by its ID, without taking the tree lock. The returned
  * thread will not have an extra reference on it.
  *
@@ -743,8 +690,6 @@ thread_t *thread_lookup_unsafe(thread_id_t id) {
 }
 
 /**
- * Look up a running thread.
- *
  * Looks up a running thread by its ID. Newly created and dead threads are
  * ignored. If the thread is found, it will be returned with a reference
  * added to it. Once it is no longer needed, thread_release() should be called
@@ -755,11 +700,9 @@ thread_t *thread_lookup_unsafe(thread_id_t id) {
  * @return              Pointer to thread found, or NULL if not found.
  */
 thread_t *thread_lookup(thread_id_t id) {
-    thread_t *thread;
-
     rwlock_read_lock(&thread_tree_lock);
 
-    thread = thread_lookup_unsafe(id);
+    thread_t *thread = thread_lookup_unsafe(id);
     if (thread) {
         /* Ignore newly created and dead threads. TODO: Perhaps we want to allow
          * dead threads to be looked up. Possible case: process/thread list
@@ -778,8 +721,6 @@ thread_t *thread_lookup(thread_id_t id) {
 }
 
 /**
- * Create a new kernel mode thread.
- *
  * Creates a new thread running in kernel mode. The state the thread will be in
  * depends on whether the _thread argument is non-NULL. If it is NULL, the
  * thread will begin execution immediately. If non-NULL, the thread will be
@@ -804,27 +745,21 @@ status_t thread_create(
     const char *name, process_t *owner, unsigned flags, thread_func_t func,
     void *arg1, void *arg2, thread_t **_thread)
 {
-    thread_t *thread;
-
     assert(name);
 
     if (!owner)
         owner = kernel_proc;
 
-    /* Allocate a thread structure from the cache. */
-    thread = slab_cache_alloc(thread_cache, MM_KERNEL);
+    thread_t *thread = slab_cache_alloc(thread_cache, MM_KERNEL);
 
-    /* Allocate an ID for the thread. */
     thread->id = id_allocator_alloc(&thread_id_allocator);
     if (thread->id < 0) {
         slab_cache_free(thread_cache, thread);
         return STATUS_THREAD_LIMIT;
     }
 
-    /* Allocate a kernel stack and initialize the thread context. */
     thread->kstack = kmem_alloc(KSTACK_SIZE, MM_KERNEL);
 
-    /* Initialize the architecture-specific data. */
     arch_thread_init(thread);
 
     /* Initially set the CPU to NULL - the thread will be assigned to a CPU when
@@ -835,34 +770,36 @@ status_t thread_create(
     if (_thread)
         refcount_inc(&thread->count);
 
-    thread->state = THREAD_CREATED;
-    thread->flags = flags;
-    thread->priority = THREAD_PRIORITY_NORMAL;
-    thread->wired = 0;
-    thread->preempt_count = 0;
-    thread->max_prio = -1;
-    thread->curr_prio = -1;
-    thread->timeslice = 0;
-    thread->wait_lock = NULL;
-    thread->last_time = 0;
-    thread->kernel_time = 0;
-    thread->user_time = 0;
-    thread->in_usermem = false;
-    thread->ipl = 0;
     memset(thread->exceptions, 0, sizeof(thread->exceptions));
-    thread->exception_stack.base = 0;
-    thread->exception_stack.size = 0;
-    thread->token = NULL;
-    thread->active_token = NULL;
-    thread->func = func;
-    thread->arg1 = arg1;
-    thread->arg2 = arg2;
+
     strncpy(thread->name, name, THREAD_NAME_MAX);
     thread->name[THREAD_NAME_MAX - 1] = 0;
-    thread->ustack = 0;
-    thread->ustack_size = 0;
-    thread->status = 0;
-    thread->reason = EXIT_REASON_NORMAL;
+
+    thread->state                = THREAD_CREATED;
+    thread->flags                = flags;
+    thread->priority             = THREAD_PRIORITY_NORMAL;
+    thread->wired                = 0;
+    thread->preempt_count        = 0;
+    thread->max_prio             = -1;
+    thread->curr_prio            = -1;
+    thread->timeslice            = 0;
+    thread->wait_lock            = NULL;
+    thread->last_time            = 0;
+    thread->kernel_time          = 0;
+    thread->user_time            = 0;
+    thread->in_usermem           = false;
+    thread->ipl                  = 0;
+    thread->exception_stack.base = 0;
+    thread->exception_stack.size = 0;
+    thread->token                = NULL;
+    thread->active_token         = NULL;
+    thread->func                 = func;
+    thread->arg1                 = arg1;
+    thread->arg2                 = arg2;
+    thread->ustack               = 0;
+    thread->ustack_size          = 0;
+    thread->status               = 0;
+    thread->reason               = EXIT_REASON_NORMAL;
 
     /* Add the thread to the owner. */
     process_attach_thread(owner, thread);
@@ -902,35 +839,33 @@ void thread_run(thread_t *thread) {
     spinlock_unlock(&thread->lock);
 }
 
-/** Print information about a thread.
- * @param thread        Thread to print. */
 static inline void dump_thread(thread_t *thread) {
     kdb_printf("%-5" PRId32 "%s ", thread->id, (thread == curr_thread) ? "*" : " ");
 
     switch (thread->state) {
-    case THREAD_CREATED:
-        kdb_printf("Created      ");
-        break;
-    case THREAD_READY:
-        kdb_printf("Ready        ");
-        break;
-    case THREAD_RUNNING:
-        kdb_printf("Running      ");
-        break;
-    case THREAD_SLEEPING:
-        kdb_printf("Sleeping ");
-        if (thread->flags & THREAD_INTERRUPTIBLE) {
-            kdb_printf("(I) ");
-        } else {
-            kdb_printf("    ");
-        }
-        break;
-    case THREAD_DEAD:
-        kdb_printf("Dead         ");
-        break;
-    default:
-        kdb_printf("Bad          ");
-        break;
+        case THREAD_CREATED:
+            kdb_printf("Created      ");
+            break;
+        case THREAD_READY:
+            kdb_printf("Ready        ");
+            break;
+        case THREAD_RUNNING:
+            kdb_printf("Running      ");
+            break;
+        case THREAD_SLEEPING:
+            kdb_printf("Sleeping ");
+            if (thread->flags & THREAD_INTERRUPTIBLE) {
+                kdb_printf("(I) ");
+            } else {
+                kdb_printf("    ");
+            }
+            break;
+        case THREAD_DEAD:
+            kdb_printf("Dead         ");
+            break;
+        default:
+            kdb_printf("Bad          ");
+            break;
     }
 
     kdb_printf(
@@ -941,15 +876,8 @@ static inline void dump_thread(thread_t *thread) {
         thread->owner->id, thread->name);
 }
 
-/** Dump a list of threads.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
+/** Dump a list of threads. */
 static kdb_status_t kdb_cmd_thread(int argc, char **argv, kdb_filter_t *filter) {
-    process_t *process;
-    thread_t *thread;
-    uint64_t pid;
-
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s [<process ID>]\n\n", argv[0]);
 
@@ -966,20 +894,23 @@ static kdb_status_t kdb_cmd_thread(int argc, char **argv, kdb_filter_t *filter) 
 
     if (argc == 2) {
         /* Find the process ID. */
-        if (kdb_parse_expression(argv[1], &pid, NULL) != KDB_SUCCESS) {
+        uint64_t pid;
+        if (kdb_parse_expression(argv[1], &pid, NULL) != KDB_SUCCESS)
             return KDB_FAILURE;
-        } else if (!(process = process_lookup_unsafe(pid))) {
+
+        process_t *process = process_lookup_unsafe(pid);
+        if (!process) {
             kdb_printf("Invalid process ID.\n");
             return KDB_FAILURE;
         }
 
         list_foreach(&process->threads, iter) {
-            thread = list_entry(iter, thread_t, owner_link);
+            thread_t *thread = list_entry(iter, thread_t, owner_link);
             dump_thread(thread);
         }
     } else {
         avl_tree_foreach(&thread_tree, iter) {
-            thread = avl_tree_entry(iter, thread_t, tree_link);
+            thread_t *thread = avl_tree_entry(iter, thread_t, tree_link);
             dump_thread(thread);
         }
     }
@@ -987,14 +918,8 @@ static kdb_status_t kdb_cmd_thread(int argc, char **argv, kdb_filter_t *filter) 
     return KDB_SUCCESS;
 }
 
-/** Kill a thread.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
+/** Kill a thread. */
 static kdb_status_t kdb_cmd_kill(int argc, char **argv, kdb_filter_t *filter) {
-    thread_t *thread;
-    uint64_t tid;
-
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s [<thread ID>]\n\n", argv[0]);
 
@@ -1006,9 +931,12 @@ static kdb_status_t kdb_cmd_kill(int argc, char **argv, kdb_filter_t *filter) {
         return KDB_FAILURE;
     }
 
-    if (kdb_parse_expression(argv[1], &tid, NULL) != KDB_SUCCESS) {
+    uint64_t tid;
+    if (kdb_parse_expression(argv[1], &tid, NULL) != KDB_SUCCESS)
         return KDB_FAILURE;
-    } else if (!(thread = thread_lookup_unsafe(tid))) {
+
+    thread_t *thread = thread_lookup_unsafe(tid);
+    if (!thread) {
         kdb_printf("Invalid thread ID.\n");
         return KDB_FAILURE;
     }
@@ -1019,8 +947,6 @@ static kdb_status_t kdb_cmd_kill(int argc, char **argv, kdb_filter_t *filter) {
 
 /** Initialize the thread system. */
 __init_text void thread_init(void) {
-    status_t ret;
-
     /* Initialize the thread ID allocator. */
     id_allocator_init(&thread_id_allocator, 65535, MM_BOOT);
 
@@ -1037,7 +963,7 @@ __init_text void thread_init(void) {
     sched_init();
 
     /* Create the thread reaper. */
-    ret = thread_create("reaper", NULL, 0, reaper_thread, NULL, NULL, NULL);
+    status_t ret = thread_create("reaper", NULL, 0, reaper_thread, NULL, NULL, NULL);
     if (ret != STATUS_SUCCESS)
         fatal("Could not create thread reaper (%d)", ret);
 }
@@ -1046,67 +972,53 @@ __init_text void thread_init(void) {
  * System calls.
  */
 
-/** Closes a handle to a thread.
- * @param handle        Handle being closed. */
+/** Closes a handle to a thread. */
 static void thread_object_close(object_handle_t *handle) {
     thread_release(handle->private);
 }
 
-/** Signal that a thread is being waited for.
- * @param handle        Handle to thread.
- * @param event         Event being waited for.
- * @return              Status code describing result of the operation. */
+/** Signal that a thread is being waited for. */
 static status_t thread_object_wait(object_handle_t *handle, object_event_t *event) {
     thread_t *thread = handle->private;
 
     switch (event->event) {
-    case THREAD_EVENT_DEATH:
-        if (thread->state == THREAD_DEAD) {
-            /* For edge-triggered, there's no point adding to the notifier if
-             * it's already dead, it won't become dead again. */
-            if (!(event->flags & OBJECT_EVENT_EDGE))
-                object_event_signal(event, 0);
-        } else {
-            notifier_register(&thread->death_notifier, object_event_notifier, event);
-        }
+        case THREAD_EVENT_DEATH:
+            if (thread->state == THREAD_DEAD) {
+                /* For edge-triggered, there's no point adding to the notifier if
+                * it's already dead, it won't become dead again. */
+                if (!(event->flags & OBJECT_EVENT_EDGE))
+                    object_event_signal(event, 0);
+            } else {
+                notifier_register(&thread->death_notifier, object_event_notifier, event);
+            }
 
-        return STATUS_SUCCESS;
-    default:
-        return STATUS_INVALID_EVENT;
+            return STATUS_SUCCESS;
+        default:
+            return STATUS_INVALID_EVENT;
     }
 }
 
-/** Stop waiting for a thread.
- * @param handle        Handle to thread.
- * @param event         Event being waited for. */
+/** Stop waiting for a thread. */
 static void thread_object_unwait(object_handle_t *handle, object_event_t *event) {
     thread_t *thread = handle->private;
 
     switch (event->event) {
-    case THREAD_EVENT_DEATH:
-        notifier_unregister(&thread->death_notifier, object_event_notifier, event);
-        break;
+        case THREAD_EVENT_DEATH:
+            notifier_unregister(&thread->death_notifier, object_event_notifier, event);
+            break;
     }
 }
 
 /** Thread object type. */
 static object_type_t thread_object_type = {
-    .id = OBJECT_TYPE_THREAD,
-    .flags = OBJECT_TRANSFERRABLE,
-    .close = thread_object_close,
-    .wait = thread_object_wait,
+    .id     = OBJECT_TYPE_THREAD,
+    .flags  = OBJECT_TRANSFERRABLE,
+    .close  = thread_object_close,
+    .wait   = thread_object_wait,
     .unwait = thread_object_unwait,
 };
 
-/** Look up a thread given a handle.
- * @param handle        Handle to thread, or THREAD_SELF for calling thread.
- * @param _thread       Where to store pointer to thread (referenced).
- * @return              Status code describing result of the operation. */
 static status_t thread_handle_lookup(handle_t handle, thread_t **_thread) {
-    object_handle_t *khandle;
-    thread_t *thread;
-    status_t ret;
-
     if (handle == THREAD_SELF) {
         refcount_inc(&curr_thread->count);
 
@@ -1114,11 +1026,12 @@ static status_t thread_handle_lookup(handle_t handle, thread_t **_thread) {
         return STATUS_SUCCESS;
     }
 
-    ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle);
+    object_handle_t *khandle;
+    status_t ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    thread = khandle->private;
+    thread_t *thread = khandle->private;
     refcount_inc(&thread->count);
     object_handle_release(khandle);
 
@@ -1126,9 +1039,6 @@ static status_t thread_handle_lookup(handle_t handle, thread_t **_thread) {
     return STATUS_SUCCESS;
 }
 
-/** Entry function for a userspace thread.
- * @param _args         Argument structure pointer (will be freed).
- * @param arg2          Unused. */
 static void thread_user_trampoline(void *_args, void *arg2) {
     thread_user_args_t *args = _args;
     frame_t frame;
@@ -1139,9 +1049,7 @@ static void thread_user_trampoline(void *_args, void *arg2) {
 }
 
 /**
- * Create a new thread.
- *
- * Create a new thread within the calling process and start it executing at
+ * Creates a new thread within the calling process and start it executing at
  * the given entry function. If a stack is provided for the thread, that will
  * be used, and the stack will not be freed when the thread exits. Otherwise,
  * a stack will be allocated for the thread with a default size, and will be
@@ -1162,13 +1070,6 @@ status_t kern_thread_create(
     const char *name, thread_entry_t entry, void *arg,
     const thread_stack_t *stack, uint32_t flags, handle_t *_handle)
 {
-    thread_stack_t kstack;
-    thread_user_args_t *args;
-    thread_t *thread = NULL;
-    object_handle_t *khandle;
-    handle_t uhandle = -1;
-    char str[THREAD_NAME_MAX];
-    char *kname;
     status_t ret;
 
     if (!name || !entry)
@@ -1177,6 +1078,7 @@ status_t kern_thread_create(
     if (!is_user_address(entry))
         return STATUS_INVALID_ADDR;
 
+    thread_stack_t kstack;
     if (stack) {
         ret = memcpy_from_user(&kstack, stack, sizeof(kstack));
         if (ret != STATUS_SUCCESS)
@@ -1194,31 +1096,35 @@ status_t kern_thread_create(
         kstack.size = 0;
     }
 
+    char *kname;
     ret = strndup_from_user(name, THREAD_NAME_MAX, &kname);
     if (ret != STATUS_SUCCESS)
         return ret;
 
     /* Create arguments structure. This will be freed by the entry trampoline. */
-    args = kmalloc(sizeof(thread_user_args_t), MM_KERNEL);
+    thread_user_args_t *args = kmalloc(sizeof(thread_user_args_t), MM_KERNEL);
     args->entry = (ptr_t)entry;
-    args->arg = (ptr_t)arg;
+    args->arg   = (ptr_t)arg;
 
     /* Create the thread, but do not run it yet. We attempt to create the handle
      * to the thread before running it as this allows us to terminate it if not
      * successful. */
+    thread_t *thread;
     ret = thread_create(kname, curr_proc, 0, thread_user_trampoline, args, NULL, &thread);
     if (ret != STATUS_SUCCESS)
-        goto fail;
+        goto err_free_args;
 
     /* Create a handle to the thread if necessary. */
+    handle_t uhandle = -1;
     if (_handle) {
         refcount_inc(&thread->count);
 
-        khandle = object_handle_create(&thread_object_type, thread);
+        object_handle_t *khandle = object_handle_create(&thread_object_type, thread);
         ret = object_handle_attach(khandle, &uhandle, _handle);
         object_handle_release(khandle);
+
         if (ret != STATUS_SUCCESS)
-            goto fail;
+            goto err_free_thread;
     }
 
     /* Create a userspace stack. TODO: Stack direction! */
@@ -1231,14 +1137,15 @@ status_t kern_thread_create(
             kstack.size = USTACK_SIZE;
         }
 
-        snprintf(str, sizeof(str), "%s_stack", kname);
+        char stack_name[THREAD_NAME_MAX];
+        snprintf(stack_name, sizeof(stack_name), "%s_stack", kname);
 
         ret = vm_map(
             curr_proc->aspace, &thread->ustack, kstack.size, kstack.size,
             VM_ADDRESS_ANY, VM_ACCESS_READ | VM_ACCESS_WRITE,
-            VM_MAP_PRIVATE | VM_MAP_STACK, NULL, 0, str);
+            VM_MAP_PRIVATE | VM_MAP_STACK, NULL, 0, stack_name);
         if (ret != STATUS_SUCCESS)
-            goto fail;
+            goto err_free_thread;
 
         /* Stack will be unmapped when the thread exits by thread_cleanup(). Do
          * not set until here as will be freed if ustack_size is non-zero, so if
@@ -1251,22 +1158,24 @@ status_t kern_thread_create(
 
     thread_run(thread);
     thread_release(thread);
+
     kfree(kname);
     return STATUS_SUCCESS;
 
-fail:
+err_free_thread:
     if (uhandle >= 0)
         object_handle_detach(uhandle);
 
     if (thread)
         thread_release(thread);
 
+err_free_args:
     kfree(args);
     kfree(kname);
     return ret;
 }
 
-/** Open a handle to a thread.
+/** Opens a handle to a thread.
  * @param id            ID of the thread to open, or THREAD_SELF for calling
  *                      thread.
  * @param _handle       Where to store handle to thread.
@@ -1293,15 +1202,13 @@ status_t kern_thread_open(thread_id_t id, handle_t *_handle) {
     return ret;
 }
 
-/** Get the ID of a thread.
+/** Gets the ID of a thread.
  * @param handle        Handle to thread, or THREAD_SELF for calling thread.
  * @param _id           Where to store ID of thread.
  * @return              Status code describing result of the operation. */
 status_t kern_thread_id(handle_t handle, thread_id_t *_id) {
     thread_t *thread;
-    status_t ret;
-
-    ret = thread_handle_lookup(handle, &thread);
+    status_t ret = thread_handle_lookup(handle, &thread);
     if (ret == STATUS_SUCCESS) {
         ret = write_user(_id, thread->id);
         thread_release(thread);
@@ -1311,8 +1218,6 @@ status_t kern_thread_id(handle_t handle, thread_id_t *_id) {
 }
 
 /**
- * Get a thread's current security context.
- *
  * Gets the given thread's current security context. If the thread has an
  * overridden security token, the context contained in that will be returned,
  * otherwise the context from the process-wide token will be returned. The
@@ -1327,13 +1232,12 @@ status_t kern_thread_id(handle_t handle, thread_id_t *_id) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
-    thread_t *thread;
-    token_t *token;
     status_t ret;
 
     if (!ctx)
         return STATUS_INVALID_ARG;
 
+    thread_t *thread;
     ret = thread_handle_lookup(handle, &thread);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -1346,7 +1250,7 @@ status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
         return STATUS_ACCESS_DENIED;
     }
 
-    token = (thread->token) ? thread->token : thread->owner->token;
+    token_t *token = (thread->token) ? thread->token : thread->owner->token;
     token_retain(token);
 
     mutex_unlock(&thread->owner->lock);
@@ -1364,11 +1268,11 @@ status_t kern_thread_security(handle_t handle, security_context_t *ctx) {
  * @param _reason       Where to store exit reason (can be NULL).
  * @return              Status code describing result of the operation. */
 status_t kern_thread_status(handle_t handle, int *_status, int *_reason) {
-    thread_t *thread;
     status_t ret;
 
     /* Although getting the status of the current thread is silly (it'll error
      * below), support it anyway for consistency's sake. */
+    thread_t *thread;
     ret = thread_handle_lookup(handle, &thread);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -1390,9 +1294,7 @@ status_t kern_thread_status(handle_t handle, int *_status, int *_reason) {
 }
 
 /**
- * Kill a thread.
- *
- * Kill the thread (i.e. cause it to immediately exit) referred to by the
+ * Kills the thread (i.e. cause it to immediately exit) referred to by the
  * specified handle. The calling thread must have privileged access to the
  * process owning the thread.
  *
@@ -1404,9 +1306,9 @@ status_t kern_thread_status(handle_t handle, int *_status, int *_reason) {
  *                      privileged access to the thread.
  */
 status_t kern_thread_kill(handle_t handle) {
-    thread_t *thread;
     status_t ret;
 
+    thread_t *thread;
     ret = thread_handle_lookup(handle, &thread);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -1422,8 +1324,6 @@ status_t kern_thread_kill(handle_t handle) {
 }
 
 /**
- * Get the calling thread's IPL.
- *
  * Gets the calling thread's current interrupt priority level (IPL). The IPL
  * is used to block interrupts to a thread's normal flow of execution. There
  * are 2 sources of thread interrupts: exceptions and asynchronous object event
@@ -1449,8 +1349,6 @@ status_t kern_thread_ipl(unsigned *_ipl) {
 }
 
 /**
- * Set the calling thread's IPL.
- *
  * Sets the calling thread's current interrupt priority level (IPL) (see
  * kern_thread_ipl() for a description of the IPL). If the new IPL is lower
  * than the current IPL, any pending interrupts which have become unblocked
@@ -1462,7 +1360,6 @@ status_t kern_thread_ipl(unsigned *_ipl) {
  *                      STATUS_INVALID_ARG if the new IPL is invalid.
  */
 status_t kern_thread_set_ipl(unsigned ipl) {
-    thread_interrupt_t *interrupt;
 
     if (ipl > THREAD_IPL_MAX)
         return STATUS_INVALID_ARG;
@@ -1476,7 +1373,7 @@ status_t kern_thread_set_ipl(unsigned ipl) {
      * return to user mode. */
     curr_thread->flags &= ~THREAD_INTERRUPTED;
     if (!list_empty(&curr_thread->interrupts)) {
-        interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
+        thread_interrupt_t *interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
         if (interrupt->priority >= ipl)
             curr_thread->flags |= THREAD_INTERRUPTED;
     }
@@ -1486,8 +1383,6 @@ status_t kern_thread_set_ipl(unsigned ipl) {
 }
 
 /**
- * Get the calling thread's overridden security token.
- *
  * Gets a handle to the calling thread's current overridden security token.
  * If the thread does not have an overridden token, the function will return
  * STATUS_SUCCESS, but the location referred to by _handle will be set to
@@ -1517,8 +1412,6 @@ status_t kern_thread_token(handle_t *_handle) {
 }
 
 /**
- * Set the calling thread's overridden security token.
- *
  * Sets the overridden security token of the calling thread to the given token
  * object. The overridden security token can be used by a thread to temporarily
  * change its security context to that contained in another token and take on
@@ -1532,11 +1425,12 @@ status_t kern_thread_token(handle_t *_handle) {
  * @return              Status code describing the result of the operation.
  */
 status_t kern_thread_set_token(handle_t handle) {
-    object_handle_t *khandle;
-    token_t *token = NULL;
     status_t ret;
 
+    token_t *token = NULL;
+
     if (handle != INVALID_HANDLE) {
+        object_handle_t *khandle;
         ret = object_handle_lookup(handle, OBJECT_TYPE_TOKEN, &khandle);
         if (ret != STATUS_SUCCESS)
             return ret;
@@ -1558,13 +1452,12 @@ status_t kern_thread_set_token(handle_t handle) {
 }
 
 /**
- * Set an exception handler.
- *
- * Set an exception handler for the current thread. Each thread has its own set
- * of exception handlers in addition to the process-wide handlers. If a handler
- * is set to non-NULL in a thread, it will be used instead of the process-wide
- * handler (if any). If there is neither a per-thread handler or a process-wide
- * handler for an exception that occurs, the whole process is killed.
+ * Sets an exception handler for the current thread. Each thread has its own
+ * set of exception handlers in addition to the process-wide handlers. If a
+ * handler is set to non-NULL in a thread, it will be used instead of the
+ * process-wide handler (if any). If there is neither a per-thread handler or a
+ * process-wide handler for an exception that occurs, the whole process is
+ * killed.
  *
  * @param code          Exception to set handler for.
  * @param handler       Handler function to use (NULL to unset the per-thread
@@ -1586,8 +1479,6 @@ status_t kern_thread_set_exception_handler(unsigned code, exception_handler_t ha
 }
 
 /**
- * Set the exception stack.
- *
  * Sets an alternate stack to use when handling exceptions in the calling
  * thread. The exception stack is set per-thread. The specified stack will be
  * switched to whenever executing an exception handler on this thread.
@@ -1603,11 +1494,9 @@ status_t kern_thread_set_exception_handler(unsigned code, exception_handler_t ha
  *                      STATUS_INVALID_ADDR if stack range is invalid.
  */
 status_t kern_thread_set_exception_stack(const thread_stack_t *stack) {
-    thread_stack_t kstack;
-    status_t ret;
-
     if (stack) {
-        ret = memcpy_from_user(&kstack, stack, sizeof(kstack));
+        thread_stack_t kstack;
+        status_t ret = memcpy_from_user(&kstack, stack, sizeof(kstack));
         if (ret != STATUS_SUCCESS)
             return ret;
 
@@ -1627,8 +1516,6 @@ status_t kern_thread_set_exception_stack(const thread_stack_t *stack) {
 }
 
 /**
- * Raise an exception in the calling thread.
- *
  * Raises an exception in the calling thread. If a handler is registered and
  * the current IPL does not block exceptions, then the handler will be executed.
  * Otherwise, the process will be terminated.
@@ -1641,13 +1528,11 @@ status_t kern_thread_set_exception_stack(const thread_stack_t *stack) {
  *                      STATUS_INVALID_ADDR if info points to an invalid address.
  */
 status_t kern_thread_raise(exception_info_t *info) {
-    exception_info_t kinfo;
-    status_t ret;
-
     if (!info)
         return STATUS_INVALID_ARG;
 
-    ret = memcpy_from_user(&kinfo, info, sizeof(kinfo));
+    exception_info_t kinfo;
+    status_t ret = memcpy_from_user(&kinfo, info, sizeof(kinfo));
     if (ret != STATUS_SUCCESS)
         return ret;
 
@@ -1658,14 +1543,13 @@ status_t kern_thread_raise(exception_info_t *info) {
     return STATUS_SUCCESS;
 }
 
-/** Sleep for a certain amount of time.
+/** Sleeps for a certain amount of time.
  * @param nsecs         Number of nanoseconds to sleep for. Must be 0 or
  *                      higher.
  * @param _rem          If not NULL, the number of nanoseconds remaining will
  *                      be stored here if the wait is interrupted.
  * @return              Status code describing result of the operation. */
 status_t kern_thread_sleep(nstime_t nsecs, nstime_t *_rem) {
-    nstime_t begin, elapsed;
     status_t ret;
 
     if (nsecs < 0)
@@ -1676,14 +1560,14 @@ status_t kern_thread_sleep(nstime_t nsecs, nstime_t *_rem) {
     // SLEEP_ABSOLUTE, and repeatedly wait until we reach that target.
 
     /* FIXME: The method getting remaining time isn't quite accurate. */
-    begin = system_time();
+    nstime_t begin = system_time();
 
     ret = thread_sleep(NULL, nsecs, "kern_thread_sleep", SLEEP_INTERRUPTIBLE);
     if (likely(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK))
         ret = STATUS_SUCCESS;
 
     if (ret == STATUS_INTERRUPTED && _rem) {
-        elapsed = system_time() - begin;
+        nstime_t elapsed = system_time() - begin;
         if (elapsed < nsecs) {
             write_user(_rem, nsecs - elapsed);
         } else {
@@ -1694,36 +1578,36 @@ status_t kern_thread_sleep(nstime_t nsecs, nstime_t *_rem) {
     return ret;
 }
 
-/** Terminate the calling thread.
+/** Terminates the calling thread.
  * @param status        Exit status code. */
 void kern_thread_exit(int status) {
     curr_thread->status = status;
     thread_exit();
 }
 
-/** Perform operations on the current thread (for internal use by libkernel).
+/** Performs operations on the current thread (for internal use by libkernel).
  * @param action        Action to perform.
  * @param in            Pointer to input buffer.
  * @param out           Pointer to output buffer.
  * @return              Status code describing result of the operation. */
 status_t kern_thread_control(unsigned action, const void *in, void *out) {
     switch (action) {
-    case THREAD_SET_TLS_ADDR:
-        if (!is_user_address(in))
-            return STATUS_INVALID_ADDR;
+        case THREAD_SET_TLS_ADDR:
+            if (!is_user_address(in))
+                return STATUS_INVALID_ADDR;
 
-        arch_thread_set_tls_addr((ptr_t)in);
-        return STATUS_SUCCESS;
-    default:
-        return STATUS_INVALID_ARG;
+            arch_thread_set_tls_addr((ptr_t)in);
+            return STATUS_SUCCESS;
+        default:
+            return STATUS_INVALID_ARG;
     }
 }
 
-/** Restore previous state upon return from an interrupt handler. */
+/** Restores previous state upon return from an interrupt handler. */
 void kern_thread_restore(void) {
-    unsigned ipl;
     status_t ret;
 
+    unsigned ipl;
     ret = arch_thread_interrupt_restore(&ipl);
     if (ret != STATUS_SUCCESS) {
         /* TODO: Same as in thread_at_kernel_exit(). */

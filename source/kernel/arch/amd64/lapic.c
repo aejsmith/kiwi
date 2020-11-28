@@ -116,14 +116,12 @@ uint32_t lapic_id(void) {
  * @param mode          Delivery Mode.
  * @param vector        Value of vector field. */
 void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
-    bool state;
-
     /* Must perform this check to prevent problems if fatal() is called before
      * we've initialized the LAPIC. */
     if (!lapic_mapping)
         return;
 
-    state = local_irq_disable();
+    bool irq_state = local_irq_disable();
 
     /* Write the destination ID to the high part of the ICR. */
     lapic_write(LAPIC_REG_ICR1, ((uint32_t)id << 24));
@@ -140,21 +138,19 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
     while (lapic_read(LAPIC_REG_ICR0) & (1 << 12))
         arch_cpu_spin_hint();
 
-    local_irq_restore(state);
+    local_irq_restore(irq_state);
 }
 
 /** Function to calculate the LAPIC timer frequency.
  * @return              Calculated frequency. */
 static __init_text uint64_t calculate_lapic_frequency(void) {
-    uint16_t shi, slo, ehi, elo, pticks;
-    uint64_t end, lticks;
-
     /* First set the PIT to rate generator mode. */
     out8(0x43, 0x34);
     out8(0x40, 0xff);
     out8(0x40, 0xff);
 
     /* Wait for the cycle to begin. */
+    uint16_t shi, slo;
     do {
         out8(0x43, 0x00);
         slo = in8(0x40);
@@ -165,6 +161,7 @@ static __init_text uint64_t calculate_lapic_frequency(void) {
     lapic_write(LAPIC_REG_TIMER_INITIAL, 0xffffffff);
 
     /* Wait for the high byte to drop to 128. */
+    uint16_t ehi, elo;
     do {
         out8(0x43, 0x00);
         elo = in8(0x40);
@@ -172,11 +169,11 @@ static __init_text uint64_t calculate_lapic_frequency(void) {
     } while (ehi > 0x80);
 
     /* Get the current timer value. */
-    end = lapic_read(LAPIC_REG_TIMER_CURRENT);
+    uint64_t end = lapic_read(LAPIC_REG_TIMER_CURRENT);
 
     /* Calculate the differences between the values. */
-    lticks = 0xffffffff - end;
-    pticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
+    uint64_t lticks = 0xffffffff - end;
+    uint16_t pticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
 
     /* Calculate frequency. */
     return (lticks * 8 * PIT_BASE_FREQUENCY) / pticks;
@@ -184,8 +181,6 @@ static __init_text uint64_t calculate_lapic_frequency(void) {
 
 /** Initialize the local APIC. */
 __init_text void lapic_init(void) {
-    uint64_t base;
-
     /* Don't do anything if we don't have LAPIC support or have been asked not
      * to use the LAPIC. */
     if (!cpu_features.apic || kboot_boolean_option("lapic_disabled"))
@@ -193,7 +188,7 @@ __init_text void lapic_init(void) {
 
     /* Get the base address of the LAPIC mapping. If bit 11 is 0, the LAPIC is
      * disabled. */
-    base = x86_read_msr(X86_MSR_APIC_BASE);
+    uint64_t base = x86_read_msr(X86_MSR_APIC_BASE);
     if (!(base & (1 << 11))) {
         return;
     } else if (cpu_features.x2apic && base & (1 << 10)) {

@@ -90,11 +90,10 @@ static void kdb_enter_internal(kdb_reason_t reason, frame_t *frame, unsigned ind
  * @param frame         Interrupt frame. */
 void kdb_db_exception(frame_t *frame) {
     kdb_reason_t reason = KDB_REASON_USER;
-    unsigned long dr6;
     unsigned i = 0;
 
     /* Work out the reason. */
-    dr6 = x86_read_dr6();
+    unsigned long dr6 = x86_read_dr6();
     if (!(dr6 & (X86_DR6_B0 | X86_DR6_B1 | X86_DR6_B2 | X86_DR6_B3 | X86_DR6_BD | X86_DR6_BS | X86_DR6_BT))) {
         /* No bits set, assume this came from from kdb_enter(), in which case
          * the reason will be in AX. */
@@ -146,9 +145,7 @@ void kdb_enter(kdb_reason_t reason, frame_t *frame) {
  * @param addr          Address of the breakpoint.
  * @return              Index of added breakpoint, or -1 if none available. */
 int arch_kdb_install_breakpoint(ptr_t addr) {
-    size_t i;
-
-    for (i = 0; i < array_size(kdb_breakpoints); i++) {
+    for (size_t i = 0; i < array_size(kdb_breakpoints); i++) {
         if (kdb_breakpoints[i].dr7)
             continue;
 
@@ -168,15 +165,12 @@ int arch_kdb_install_breakpoint(ptr_t addr) {
  *                      just writes.
  * @return              Index of added watchpoint, or -1 if none available. */
 int arch_kdb_install_watchpoint(ptr_t addr, size_t size, bool rw) {
-    unsigned long dr7;
-    size_t i;
-
-    for (i = 0; i < array_size(kdb_breakpoints); i++) {
+    for (size_t i = 0; i < array_size(kdb_breakpoints); i++) {
         if (kdb_breakpoints[i].dr7)
             continue;
 
         /* Set the global enable bit for the breakpoint. */
-        dr7 = (1 << (1 + (i * 2)));
+        unsigned long dr7 = (1 << (1 + (i * 2)));
 
         /* Set the condition. */
         dr7 |= (1 << (16 + (i * 4)));
@@ -185,19 +179,19 @@ int arch_kdb_install_watchpoint(ptr_t addr, size_t size, bool rw) {
 
         /* Set the size. */
         switch (size) {
-        case 1:
-            break;
-        case 4:
-            dr7 |= (1 << (19 + (i * 4)));
-        case 2:
-            dr7 |= (1 << (18 + (i * 4)));
-            break;
-        case 8:
-            dr7 |= (1 << (19 + (i * 4)));
-            break;
-        default:
-            kdb_printf("Invalid size.\n");
-            return -1;
+            case 1:
+                break;
+            case 4:
+                dr7 |= (1 << (19 + (i * 4)));
+            case 2:
+                dr7 |= (1 << (18 + (i * 4)));
+                break;
+            case 8:
+                dr7 |= (1 << (19 + (i * 4)));
+                break;
+            default:
+                kdb_printf("Invalid size.\n");
+                return -1;
         }
 
         kdb_breakpoints[i].dr7 = dr7;
@@ -265,18 +259,18 @@ bool arch_kdb_get_watchpoint(unsigned index, ptr_t *_addr, size_t *_size, bool *
 
     /* Work out the size. */
     switch ((kdb_breakpoints[index].dr7 >> (18 + (index * 4))) & 0x3) {
-    case 0:
-        *_size = 1;
-        break;
-    case 1:
-        *_size = 2;
-        break;
-    case 2:
-        *_size = 8;
-        break;
-    case 3:
-        *_size = 4;
-        break;
+        case 0:
+            *_size = 1;
+            break;
+        case 1:
+            *_size = 2;
+            break;
+        case 2:
+            *_size = 8;
+            break;
+        case 3:
+            *_size = 4;
+            break;
     }
 
     /* Get RW property. */
@@ -311,13 +305,10 @@ static bool is_kstack_address(thread_t *thread, ptr_t addr) {
  * @param thread        Thread to trace. If NULL, use the current frame.
  * @param cb            Backtrace callback. */
 void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
-    stack_frame_t *frame;
-    unsigned long *sp;
-    ptr_t bp;
-
     /* Get the stack frame. */
+    ptr_t bp;
     if (thread) {
-        sp = (unsigned long *)thread->arch.saved_rsp;
+        unsigned long *sp = (unsigned long *)thread->arch.saved_rsp;
         bp = sp[5];
     } else {
         bp = curr_kdb_frame->bp;
@@ -331,7 +322,7 @@ void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
                 break;
         }
 
-        frame = (stack_frame_t *)bp;
+        stack_frame_t *frame = (stack_frame_t *)bp;
 
         if (frame->addr)
             cb(frame->addr);
@@ -402,23 +393,23 @@ void arch_kdb_dump_registers(void) {
         curr_kdb_frame->ss);
 
     switch (curr_kdb_frame->num) {
-    case X86_EXCEPTION_PF:
-        kdb_printf(
-            "EC:  0x%04lx (%s/%s%s%s)\n", curr_kdb_frame->err_code,
-            (curr_kdb_frame->err_code & (1 << 0)) ? "protection" : "not-present",
-            (curr_kdb_frame->err_code & (1 << 1)) ? "write" : "read",
-            (curr_kdb_frame->err_code & (1 << 3)) ? "/reserved-bit" : "",
-            (curr_kdb_frame->err_code & (1 << 4)) ? "/execute" : "");
-        kdb_printf("CR2: 0x%016lx\n", x86_read_cr2());
-        break;
-    case X86_EXCEPTION_DF:
-    case X86_EXCEPTION_TS:
-    case X86_EXCEPTION_NP:
-    case X86_EXCEPTION_SS:
-    case X86_EXCEPTION_GP:
-    case X86_EXCEPTION_AC:
-        kdb_printf("EC:  0x%04lx\n", curr_kdb_frame->err_code);
-        break;
+        case X86_EXCEPTION_PF:
+            kdb_printf(
+                "EC:  0x%04lx (%s/%s%s%s)\n", curr_kdb_frame->err_code,
+                (curr_kdb_frame->err_code & (1 << 0)) ? "protection" : "not-present",
+                (curr_kdb_frame->err_code & (1 << 1)) ? "write" : "read",
+                (curr_kdb_frame->err_code & (1 << 3)) ? "/reserved-bit" : "",
+                (curr_kdb_frame->err_code & (1 << 4)) ? "/execute" : "");
+            kdb_printf("CR2: 0x%016lx\n", x86_read_cr2());
+            break;
+        case X86_EXCEPTION_DF:
+        case X86_EXCEPTION_TS:
+        case X86_EXCEPTION_NP:
+        case X86_EXCEPTION_SS:
+        case X86_EXCEPTION_GP:
+        case X86_EXCEPTION_AC:
+            kdb_printf("EC:  0x%04lx\n", curr_kdb_frame->err_code);
+            break;
     }
 }
 

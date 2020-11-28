@@ -35,10 +35,6 @@
 
 /** Detect all secondary CPUs in the system. */
 void platform_smp_detect(void) {
-    acpi_madt_lapic_t *lapic;
-    acpi_madt_t *madt;
-    size_t i, length;
-
     /* If the LAPIC is disabled, we cannot use SMP. */
     if (!lapic_enabled()) {
         return;
@@ -46,12 +42,14 @@ void platform_smp_detect(void) {
         return;
     }
 
-    madt = (acpi_madt_t *)acpi_table_find(ACPI_MADT_SIGNATURE);
+    acpi_madt_t *madt = (acpi_madt_t *)acpi_table_find(ACPI_MADT_SIGNATURE);
     if (!madt)
         return;
 
-    length = madt->header.length - sizeof(acpi_madt_t);
-    for (i = 0; i < length; i += lapic->length) {
+    size_t length = madt->header.length - sizeof(acpi_madt_t);
+
+    acpi_madt_lapic_t *lapic;
+    for (size_t i = 0; i < length; i += lapic->length) {
         lapic = (acpi_madt_lapic_t *)(madt->apic_structures + i);
         if (lapic->type != ACPI_MADT_LAPIC) {
             continue;

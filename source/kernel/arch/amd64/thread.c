@@ -51,9 +51,9 @@ extern void amd64_context_restore(ptr_t new_rsp);
 /** Initialize AMD64-specific thread data.
  * @param thread        Thread to initialize. */
 void arch_thread_init(thread_t *thread) {
-    thread->arch.parent = thread;
-    thread->arch.flags = 0;
-    thread->arch.tls_base = 0;
+    thread->arch.parent    = thread;
+    thread->arch.flags     = 0;
+    thread->arch.tls_base  = 0;
     thread->arch.fpu_count = 0;
 
     /* Point the RSP for SYSCALL entry at the top of the stack. */
@@ -181,12 +181,12 @@ void arch_thread_user_setup(frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
     /* Clear out the frame to zero all GPRs. */
     memset(frame, 0, sizeof(*frame));
 
-    frame->di = arg;
-    frame->ip = entry;
-    frame->cs = USER_CS | 0x3;
+    frame->di    = arg;
+    frame->ip    = entry;
+    frame->cs    = USER_CS | 0x3;
     frame->flags = X86_FLAGS_IF | X86_FLAGS_ALWAYS1;
-    frame->sp = sp;
-    frame->ss = USER_DS | 0x3;
+    frame->sp    = sp;
+    frame->ss    = USER_DS | 0x3;
 }
 
 /** Prepare to execute a user mode interrupt.
@@ -222,25 +222,25 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
 
     /* Save the thread context. TODO: FPU context. */
     thread_context_t context;
-    context.cpu.rax = frame->ax;
-    context.cpu.rbx = frame->bx;
-    context.cpu.rcx = frame->cx;
-    context.cpu.rdx = frame->dx;
-    context.cpu.rdi = frame->di;
-    context.cpu.rsi = frame->si;
-    context.cpu.rbp = frame->bp;
-    context.cpu.rsp = frame->sp;
-    context.cpu.r8 = frame->r8;
-    context.cpu.r9 = frame->r9;
-    context.cpu.r10 = frame->r10;
-    context.cpu.r11 = frame->r11;
-    context.cpu.r12 = frame->r12;
-    context.cpu.r13 = frame->r13;
-    context.cpu.r14 = frame->r14;
-    context.cpu.r15 = frame->r15;
+    context.cpu.rax    = frame->ax;
+    context.cpu.rbx    = frame->bx;
+    context.cpu.rcx    = frame->cx;
+    context.cpu.rdx    = frame->dx;
+    context.cpu.rdi    = frame->di;
+    context.cpu.rsi    = frame->si;
+    context.cpu.rbp    = frame->bp;
+    context.cpu.rsp    = frame->sp;
+    context.cpu.r8     = frame->r8;
+    context.cpu.r9     = frame->r9;
+    context.cpu.r10    = frame->r10;
+    context.cpu.r11    = frame->r11;
+    context.cpu.r12    = frame->r12;
+    context.cpu.r13    = frame->r13;
+    context.cpu.r14    = frame->r14;
+    context.cpu.r15    = frame->r15;
     context.cpu.rflags = frame->flags;
-    context.cpu.rip = frame->ip;
-    context.ipl = ipl;
+    context.cpu.rip    = frame->ip;
+    context.ipl        = ipl;
 
     ret = memcpy_to_user((void *)context_addr, &context, sizeof(context));
     if (ret != STATUS_SUCCESS)
@@ -281,25 +281,25 @@ status_t arch_thread_interrupt_restore(unsigned *_ipl) {
     *_ipl = context.ipl;
 
     /* Restore the context. */
-    frame->ax = context.cpu.rax;
-    frame->bx = context.cpu.rbx;
-    frame->cx = context.cpu.rcx;
-    frame->dx = context.cpu.rdx;
-    frame->di = context.cpu.rdi;
-    frame->si = context.cpu.rsi;
-    frame->bp = context.cpu.rbp;
-    frame->sp = context.cpu.rsp;
-    frame->r8 = context.cpu.r8;
-    frame->r9 = context.cpu.r9;
-    frame->r10 = context.cpu.r10;
-    frame->r11 = context.cpu.r11;
-    frame->r12 = context.cpu.r12;
-    frame->r13 = context.cpu.r13;
-    frame->r14 = context.cpu.r14;
-    frame->r15 = context.cpu.r15;
+    frame->ax     = context.cpu.rax;
+    frame->bx     = context.cpu.rbx;
+    frame->cx     = context.cpu.rcx;
+    frame->dx     = context.cpu.rdx;
+    frame->di     = context.cpu.rdi;
+    frame->si     = context.cpu.rsi;
+    frame->bp     = context.cpu.rbp;
+    frame->sp     = context.cpu.rsp;
+    frame->r8     = context.cpu.r8;
+    frame->r9     = context.cpu.r9;
+    frame->r10    = context.cpu.r10;
+    frame->r11    = context.cpu.r11;
+    frame->r12    = context.cpu.r12;
+    frame->r13    = context.cpu.r13;
+    frame->r14    = context.cpu.r14;
+    frame->r15    = context.cpu.r15;
     frame->flags &= ~RESTORE_FLAGS;
     frame->flags |= context.cpu.rflags & RESTORE_FLAGS;
-    frame->ip = context.cpu.rip;
+    frame->ip     = context.cpu.rip;
 
     /* Same as above. */
     curr_thread->arch.flags |= ARCH_THREAD_FRAME_MODIFIED;

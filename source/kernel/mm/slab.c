@@ -110,14 +110,10 @@ static slab_cache_t *slab_percpu_cache; /**< Cache for per-CPU structures. */
 static LIST_DEFINE(slab_caches);
 static MUTEX_DEFINE(slab_caches_lock, 0);
 
-/** Destroy a slab.
- * @param cache         Cache to destroy in.
- * @param slab          Slab to destroy. */
 static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
-    void *addr = slab->base;
-    slab_bufctl_t *bufctl;
-
     assert(!slab->refcount);
+
+    void *addr = slab->base;
 
     list_remove(&slab->header);
 
@@ -125,7 +121,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
      * externally. */
     if (cache->flags & SLAB_CACHE_LARGE) {
         while (slab->free) {
-            bufctl = slab->free;
+            slab_bufctl_t *bufctl = slab->free;
             slab->free = bufctl->next;
 
             slab_cache_free(&slab_bufctl_cache, bufctl);
@@ -138,22 +134,13 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
     kmem_free(addr, cache->slab_size);
 }
 
-/** Allocate a new slab and divide it up into objects.
- * @param cache         Cache to allocate from.
- * @param mmflag        Allocation behaviour flags.
- * @return              Pointer to slab structure. */
 static inline slab_t *slab_create(slab_cache_t *cache, unsigned mmflag) {
-    slab_bufctl_t *bufctl, *prev = NULL;
-    slab_t *slab;
-    void *addr;
-    size_t i;
-
     /* Drop slab lock while creating as a reclaim may occur that wants to free
      * to this cache. */
     mutex_unlock(&cache->slab_lock);
 
     /* Allocate a new slab. */
-    addr = kmem_alloc(cache->slab_size, mmflag & MM_FLAG_MASK);
+    void *addr = kmem_alloc(cache->slab_size, mmflag & MM_FLAG_MASK);
     if (unlikely(!addr)) {
         mutex_lock(&cache->slab_lock);
         return NULL;
@@ -162,6 +149,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, unsigned mmflag) {
     mutex_lock(&cache->slab_lock);
 
     /* Create the slab structure for the slab. */
+    slab_t *slab;
     if (cache->flags & SLAB_CACHE_LARGE) {
         slab = slab_cache_alloc(&slab_slab_cache, mmflag & MM_FLAG_MASK);
         if (unlikely(!slab)) {
@@ -175,14 +163,17 @@ static inline slab_t *slab_create(slab_cache_t *cache, unsigned mmflag) {
     cache->slab_count++;
 
     list_init(&slab->header);
-    slab->base = addr;
+
+    slab->base     = addr;
     slab->refcount = 0;
-    slab->free = NULL;
-    slab->colour = cache->colour_next;
-    slab->parent = cache;
+    slab->free     = NULL;
+    slab->colour   = cache->colour_next;
+    slab->parent   = cache;
 
     /* Divide the buffer up into unconstructed, free objects. */
-    for (i = 0; i < cache->obj_count; i++) {
+    slab_bufctl_t *prev = NULL;
+    for (size_t i = 0; i < cache->obj_count; i++) {
+        slab_bufctl_t *bufctl;
         if (cache->flags & SLAB_CACHE_LARGE) {
             bufctl = slab_cache_alloc(&slab_bufctl_cache, mmflag & MM_FLAG_MASK);
             if (unlikely(!bufctl)) {
@@ -215,21 +206,18 @@ static inline slab_t *slab_create(slab_cache_t *cache, unsigned mmflag) {
     return slab;
 }
 
-/** Destruct an object and free it to the slab layer.
- * @param cache         Cache to free to.
- * @param obj           Object to free. */
+/** Destruct an object and free it to the slab layer. */
 static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
-    slab_bufctl_t *bufctl, *prev = NULL;
-    uint32_t hash;
-    slab_t *slab;
-
     mutex_lock(&cache->slab_lock);
 
     /* Find the buffer control structure. For large object caches, look it up
      * on the allocation hash table. Otherwise, we use the start of the buffer
      * as the structure. */
+    slab_bufctl_t *bufctl;
+    slab_t *slab;
     if (cache->flags & SLAB_CACHE_LARGE) {
-        hash = fnv_hash_integer((ptr_t)obj) % SLAB_HASH_SIZE;
+        uint32_t hash = fnv_hash_integer((ptr_t)obj) % SLAB_HASH_SIZE;
+        slab_bufctl_t *prev = NULL;
         for (bufctl = cache->bufctl_hash[hash]; bufctl; bufctl = bufctl->next) {
             if (bufctl->object == obj)
                 break;
@@ -280,19 +268,12 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
     mutex_unlock(&cache->slab_lock);
 }
 
-/** Allocate an object from the slab layer and construct it.
- * @param cache         Cache to allocate from.
- * @param mmflag        Allocation behaviour flags.
- * @return              Pointer to allocated object, or NULL on failure. */
+/** Allocate an object from the slab layer and construct it. */
 static inline void *slab_obj_alloc(slab_cache_t *cache, unsigned mmflag) {
-    slab_bufctl_t *bufctl;
-    uint32_t hash;
-    slab_t *slab;
-    void *obj;
-
     mutex_lock(&cache->slab_lock);
 
     /* If there is a slab in the partial list, take it. */
+    slab_t *slab;
     if (!list_empty(&cache->slab_partial)) {
         slab = list_first(&cache->slab_partial, slab_t, header);
     } else {
@@ -310,17 +291,17 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, unsigned mmflag) {
      * the object address is contained in the object field of the bufctl
      * structure. Otherwise, the object address is the same as the structure
      * address. */
-    bufctl = slab->free;
+    slab_bufctl_t *bufctl = slab->free;
     slab->free = bufctl->next;
     slab->refcount++;
 
-    obj = (cache->flags & SLAB_CACHE_LARGE)
+    void *obj = (cache->flags & SLAB_CACHE_LARGE)
         ? bufctl->object
         : (void *)bufctl;
 
     /* Place the allocation on the allocation hash table if required. */
     if (cache->flags & SLAB_CACHE_LARGE) {
-        hash = fnv_hash_integer((ptr_t)obj) % SLAB_HASH_SIZE;
+        uint32_t hash = fnv_hash_integer((ptr_t)obj) % SLAB_HASH_SIZE;
         bufctl->next = cache->bufctl_hash[hash];
         cache->bufctl_hash[hash] = bufctl;
     }
@@ -341,14 +322,11 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, unsigned mmflag) {
     return obj;
 }
 
-/** Get a full magazine from a cache's depot.
- * @param cache         Cache to get from.
- * @return              Pointer to magazine on success, NULL on failure. */
+/** Get a full magazine from a cache's depot. */
 static inline slab_magazine_t *slab_magazine_get_full(slab_cache_t *cache) {
-    slab_magazine_t *mag = NULL;
-
     mutex_lock(&cache->depot_lock);
 
+    slab_magazine_t *mag = NULL;
     if (!list_empty(&cache->magazine_full)) {
         mag = list_first(&cache->magazine_full, slab_magazine_t, header);
         list_remove(&mag->header);
@@ -359,9 +337,7 @@ static inline slab_magazine_t *slab_magazine_get_full(slab_cache_t *cache) {
     return mag;
 }
 
-/** Return a full magazine to the depot.
- * @param cache         Cache to return to.
- * @param mag           Magazine to return. */
+/** Return a full magazine to the depot. */
 static inline void slab_magazine_put_full(slab_cache_t *cache, slab_magazine_t *mag) {
     assert(mag->rounds == SLAB_MAGAZINE_SIZE);
 
@@ -370,14 +346,11 @@ static inline void slab_magazine_put_full(slab_cache_t *cache, slab_magazine_t *
     mutex_unlock(&cache->depot_lock);
 }
 
-/** Get an empty magazine from a cache's depot.
- * @param cache         Cache to get from.
- * @return              Pointer to magazine on success, NULL on failure. */
+/** Get an empty magazine from a cache's depot. */
 static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
-    slab_magazine_t *mag = NULL;
-
     mutex_lock(&cache->depot_lock);
 
+    slab_magazine_t *mag;
     if (!list_empty(&cache->magazine_empty)) {
         mag = list_first(&cache->magazine_empty, slab_magazine_t, header);
         list_remove(&mag->header);
@@ -399,9 +372,7 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
     return mag;
 }
 
-/** Return an empty magazine to the depot.
- * @param cache         Cache to return to.
- * @param mag           Magazine to return. */
+/** Return an empty magazine to the depot. */
 static inline void slab_magazine_put_empty(slab_cache_t *cache, slab_magazine_t *mag) {
     assert(!mag->rounds);
 
@@ -410,9 +381,7 @@ static inline void slab_magazine_put_empty(slab_cache_t *cache, slab_magazine_t 
     mutex_unlock(&cache->depot_lock);
 }
 
-/** Destroy a magazine.
- * @param cache         Cache the magazine belongs to.
- * @param mag           Magazine to destroy. */
+/** Destroy a magazine. */
 static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *mag) {
     size_t i;
 
@@ -424,45 +393,36 @@ static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *m
     slab_cache_free(&slab_mag_cache, mag);
 }
 
-/** Allocate an object from the magazine layer.
- * @param cache         Cache to allocate from.
- * @return              Pointer to object on success, NULL on failure. */
+/** Allocate an object from the magazine layer. */
 static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
-    slab_percpu_t *cc;
-    slab_magazine_t *mag;
-    bool state;
-    void *ret;
+    void *ret = NULL;
 
     /* We do not need locking on the per-CPU cache as it will not be used by
      * any other CPUs. We do however need to disable interrupts to prevent a
      * thread switch from occurring mid-operation. */
-    state = local_irq_disable();
+    bool irq_state = local_irq_disable();
 
-    cc = &cache->cpu_caches[curr_cpu->id];
+    slab_percpu_t *cc = &cache->cpu_caches[curr_cpu->id];
 
     /* Check if we have a magazine to allocate from. */
     if (likely(cc->loaded)) {
         if (cc->loaded->rounds) {
             ret = cc->loaded->objects[--cc->loaded->rounds];
-            local_irq_restore(state);
-            return ret;
+            goto out;
         } else if (cc->previous && cc->previous->rounds) {
             /* Previous has rounds, exchange loaded with previous and allocate
              * from it. */
             swap(cc->loaded, cc->previous);
             ret = cc->loaded->objects[--cc->loaded->rounds];
-            local_irq_restore(state);
-            return ret;
+            goto out;
         }
     }
 
     /* Try to get a full magazine from the depot. */
-    mag = slab_magazine_get_full(cache);
+    slab_magazine_t *mag = slab_magazine_get_full(cache);
     assert(!local_irq_state());
-    if (unlikely(!mag)) {
-        local_irq_restore(state);
-        return NULL;
-    }
+    if (unlikely(!mag))
+        goto out;
 
     /* Return previous to the depot. */
     if (cc->previous) {
@@ -471,46 +431,40 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
     }
 
     cc->previous = cc->loaded;
-    cc->loaded = mag;
+    cc->loaded   = mag;
+
     ret = cc->loaded->objects[--cc->loaded->rounds];
-    local_irq_restore(state);
+
+out:
+    local_irq_restore(irq_state);
     return ret;
 }
 
-/** Free an object to the magazine layer.
- * @param cache         Cache to free to.
- * @param obj           Object to free.
- * @return              True if succeeded, false if not. */
+/** Free an object to the magazine layer. */
 static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
-    slab_percpu_t *cc;
-    slab_magazine_t *mag;
-    bool state;
+    bool irq_state = local_irq_disable();
 
-    state = local_irq_disable();
-
-    cc = &cache->cpu_caches[curr_cpu->id];
+    slab_percpu_t *cc = &cache->cpu_caches[curr_cpu->id];
 
     /* If the loaded magazine has spare slots, just put the object there and
      * return. */
     if (likely(cc->loaded)) {
         if (cc->loaded->rounds < SLAB_MAGAZINE_SIZE) {
             cc->loaded->objects[cc->loaded->rounds++] = obj;
-            local_irq_restore(state);
-            return true;
+            goto success;
         } else if (cc->previous && cc->previous->rounds < SLAB_MAGAZINE_SIZE) {
             /* Previous has spare slots, exchange them and insert the object. */
             swap(cc->loaded, cc->previous);
             cc->loaded->objects[cc->loaded->rounds++] = obj;
-            local_irq_restore(state);
-            return true;
+            goto success;
         }
     }
 
     /* Get a new empty magazine. */
-    mag = slab_magazine_get_empty(cache);
+    slab_magazine_t *mag = slab_magazine_get_empty(cache);
     assert(!local_irq_state());
     if (unlikely(!mag)) {
-        local_irq_restore(state);
+        local_irq_restore(irq_state);
         return false;
     }
 
@@ -521,10 +475,12 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
     }
 
     cc->previous = cc->loaded;
-    cc->loaded = mag;
+    cc->loaded   = mag;
 
     cc->loaded->objects[cc->loaded->rounds++] = obj;
-    local_irq_restore(state);
+
+success:
+    local_irq_restore(irq_state);
     return true;
 }
 
@@ -539,11 +495,8 @@ static const char *trace_skip_names[] = {
 /** Get the address for allocation tracing output.
  * @param cache     Cache being allocated from. */
 static __always_inline void *trace_return_address(slab_cache_t *cache) {
+    void *addr = __builtin_return_address(0);
     symbol_t sym;
-    void *addr;
-    size_t i, j;
-
-    addr = __builtin_return_address(0);
     if (!symbol_from_addr((ptr_t)addr - 1, &sym, NULL))
         return addr;
 
@@ -553,13 +506,13 @@ static __always_inline void *trace_return_address(slab_cache_t *cache) {
      * integer to __builtin_return_address, so hardcode this for 2 levels deep.
      * Yeah, this is terribly inefficient, but this is only enabled for
      * debugging. */
-    for (i = 0; i < array_size(trace_skip_names); i++) {
+    for (size_t i = 0; i < array_size(trace_skip_names); i++) {
         if (strcmp(trace_skip_names[i], sym.name) == 0) {
             addr = __builtin_return_address(1);
             if (!symbol_from_addr((ptr_t)addr - 1, &sym, NULL))
                 return addr;
 
-            for (j = 0; j < array_size(trace_skip_names); j++) {
+            for (size_t j = 0; j < array_size(trace_skip_names); j++) {
                 if (strcmp(trace_skip_names[j], sym.name) == 0)
                     return __builtin_return_address(2);
             }
@@ -573,15 +526,15 @@ static __always_inline void *trace_return_address(slab_cache_t *cache) {
 
 #endif /* CONFIG_SLAB_TRACING */
 
-/** Allocate a constructed object from a slab cache.
+/** Allocates a constructed object from a slab cache.
  * @param cache         Cache to allocate from.
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to allocated object or NULL if unable to
  *                      allocate.  */
 void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
-    void *ret;
-
     assert(cache);
+
+    void *ret;
 
     if (!(cache->flags & SLAB_CACHE_NOMAG)) {
         ret = slab_cpu_obj_alloc(cache);
@@ -619,7 +572,7 @@ void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
     return ret;
 }
 
-/** Free an object to a slab cache.
+/** Frees an object to a slab cache.
  * @param cache         Cache to free to.
  * @param obj           Object to free. */
 void slab_cache_free(slab_cache_t *cache, void *obj) {
@@ -655,9 +608,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
     #endif
 }
 
-/** Create the per-CPU data for a slab cache.
- * @param cache         Cache to create for.
- * @return              Status code describing result of the operation. */
+/** Create the per-CPU data for a slab cache. */
 static status_t slab_percpu_init(slab_cache_t *cache, unsigned mmflag) {
     assert(cpu_count != 0);
     assert(slab_percpu_cache);
@@ -690,9 +641,6 @@ static status_t slab_cache_init(
     slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
     unsigned flags, unsigned mmflag)
 {
-    slab_cache_t *exist;
-    status_t ret;
-
     assert(size);
     assert(!align || is_pow2(align));
     assert(!(flags & SLAB_CACHE_LATEMAG));
@@ -704,6 +652,7 @@ static status_t slab_cache_init(
     list_init(&cache->slab_partial);
     list_init(&cache->slab_full);
     list_init(&cache->header);
+
     cache->slab_count = 0;
 
     #if CONFIG_SLAB_STATS
@@ -716,11 +665,11 @@ static status_t slab_cache_init(
     strncpy(cache->name, name, SLAB_NAME_MAX);
     cache->name[SLAB_NAME_MAX - 1] = 0;
 
-    cache->flags = flags;
-    cache->ctor = ctor;
-    cache->dtor = dtor;
-    cache->data = data;
-    cache->priority = priority;
+    cache->flags       = flags;
+    cache->ctor        = ctor;
+    cache->dtor        = dtor;
+    cache->data        = data;
+    cache->priority    = priority;
     cache->colour_next = 0;
 
     /* Alignment must be at lest SLAB_ALIGN_MIN. */
@@ -740,11 +689,11 @@ static status_t slab_cache_init(
         while ((cache->slab_size % size) > (cache->slab_size / SLAB_WASTE_FRACTION))
             cache->slab_size += PAGE_SIZE;
 
-        cache->obj_count = cache->slab_size / size;
+        cache->obj_count  = cache->slab_size / size;
         cache->colour_max = cache->slab_size - (cache->obj_count * size);
     } else {
-        cache->slab_size = PAGE_SIZE;
-        cache->obj_count = (cache->slab_size - sizeof(slab_t)) / size;
+        cache->slab_size  = PAGE_SIZE;
+        cache->obj_count  = (cache->slab_size - sizeof(slab_t)) / size;
         cache->colour_max = (cache->slab_size - (cache->obj_count * size)) - sizeof(slab_t);
     }
 
@@ -755,7 +704,7 @@ static status_t slab_cache_init(
 
     /* Initialize the CPU caches if required. */
     if (!(cache->flags & SLAB_CACHE_NOMAG)) {
-        ret = slab_percpu_init(cache, mmflag);
+        status_t ret = slab_percpu_init(cache, mmflag);
         if (ret != STATUS_SUCCESS)
             return ret;
     }
@@ -767,7 +716,7 @@ static status_t slab_cache_init(
         list_append(&slab_caches, &cache->header);
     } else {
         list_foreach(&slab_caches, iter) {
-            exist = list_entry(iter, slab_cache_t, header);
+            slab_cache_t *exist = list_entry(iter, slab_cache_t, header);
 
             if (exist->priority > priority) {
                 list_add_before(&exist->header, &cache->header);
@@ -787,12 +736,14 @@ static status_t slab_cache_init(
     return STATUS_SUCCESS;
 }
 
-/** Create a slab cache.
+/** Creates a slab cache.
  * @param name          Name of cache (for debugging purposes).
  * @param size          Size of each object.
  * @param align         Alignment of each object. Must be a power of two.
- * @param ctor          Constructor callback (optional).
- * @param dtor          Destructor callback (optional).
+ * @param ctor          Constructor callback - performs one-time initialization
+ *                      of an object (optional).
+ * @param dtor          Destructor callback - undoes anything done by the
+ *                      constructor, if applicable (optional).
  * @param data          Data to pass as second parameter to callback functions.
  * @param flags         Flags to modify the behaviour of the cache.
  * @param mmflag        Allocation behaviour flags.
@@ -801,14 +752,11 @@ slab_cache_t *slab_cache_create(
     const char *name, size_t size, size_t align, slab_ctor_t ctor,
     slab_dtor_t dtor, void *data, unsigned flags, unsigned mmflag)
 {
-    slab_cache_t *cache;
-    status_t ret;
-
-    cache = slab_cache_alloc(&slab_cache_cache, mmflag);
+    slab_cache_t *cache = slab_cache_alloc(&slab_cache_cache, mmflag);
     if (!cache)
         return NULL;
 
-    ret = slab_cache_init(
+    status_t ret = slab_cache_init(
         cache, name, size, align, ctor, dtor, data, SLAB_DEFAULT_PRIORITY,
         flags, mmflag);
     if (ret != STATUS_SUCCESS) {
@@ -819,7 +767,7 @@ slab_cache_t *slab_cache_create(
     return cache;
 }
 
-/** Destroy a slab cache.
+/** Destroys a slab cache.
  * @param cache         Cache to destroy. */
 void slab_cache_destroy(slab_cache_t *cache) {
     assert(cache);
@@ -850,13 +798,8 @@ void slab_cache_destroy(slab_cache_t *cache) {
     slab_cache_free(&slab_cache_cache, cache);
 }
 
-/** Prints a list of all slab caches.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
+/** Prints a list of all slab caches. */
 static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
-    slab_cache_t *cache;
-
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s\n\n", argv[0]);
 
@@ -873,7 +816,7 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
     #endif
 
     list_foreach(&slab_caches, iter) {
-        cache = list_entry(iter, slab_cache_t, header);
+        slab_cache_t *cache = list_entry(iter, slab_cache_t, header);
 
         kdb_printf(
             "%-*s %-6zu %-8zu %-9zu %-5d %-10zu",
@@ -921,11 +864,8 @@ __init_text void slab_init(void) {
 
 /** Enable the magazine layer. */
 __init_text void slab_late_init(void) {
-    slab_cache_t *cache;
-    size_t size;
-
     /* Create the cache for per-CPU structures. */
-    size = sizeof(slab_percpu_t) * (highest_cpu_id + 1);
+    size_t size = sizeof(slab_percpu_t) * (highest_cpu_id + 1);
     slab_percpu_cache = slab_cache_alloc(&slab_cache_cache, MM_BOOT);
     slab_cache_init(
         slab_percpu_cache, "slab_percpu_cache", size, alignof(slab_percpu_t),
@@ -935,7 +875,7 @@ __init_text void slab_late_init(void) {
 
     /* Create per-CPU structures for all caches that want the magazine layer. */
     list_foreach(&slab_caches, iter) {
-        cache = list_entry(iter, slab_cache_t, header);
+        slab_cache_t *cache = list_entry(iter, slab_cache_t, header);
 
         if (cache->flags & SLAB_CACHE_LATEMAG) {
             assert(cache->flags & SLAB_CACHE_NOMAG);

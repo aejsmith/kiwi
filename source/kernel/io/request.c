@@ -55,19 +55,17 @@ status_t io_request_init(
     io_request_t *request, const io_vec_t *vecs, size_t count, offset_t offset,
     io_op_t op, io_target_t target)
 {
-    size_t i;
-
-    request->offset = offset;
-    request->total = 0;
+    request->offset      = offset;
+    request->total       = 0;
     request->transferred = 0;
-    request->op = op;
-    request->target = target;
-    request->thread = curr_thread;
+    request->op          = op;
+    request->target      = target;
+    request->thread      = curr_thread;
 
     /* Validate and copy I/O vectors. Remove entries whose count is 0. */
-    request->vecs = kmalloc(sizeof(*request->vecs) * count, MM_KERNEL);
+    request->vecs  = kmalloc(sizeof(*request->vecs) * count, MM_KERNEL);
     request->count = 0;
-    for (i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
         if (!vecs[i].size)
             continue;
 
@@ -80,7 +78,8 @@ status_t io_request_init(
         }
 
         request->vecs[request->count].buffer = vecs[i].buffer;
-        request->vecs[request->count].size = vecs[i].size;
+        request->vecs[request->count].size   = vecs[i].size;
+
         request->total += vecs[i].size;
         request->count++;
     }
@@ -95,8 +94,6 @@ void io_request_destroy(io_request_t *request) {
 }
 
 /**
- * Copy data for an I/O request.
- *
  * Copies data for an I/O request. If the request is a read, then data will be
  * copied from the supplied buffer to the request's buffer. If it is a write,
  * data will be copied from the request's buffer to the supplied buffer. The
@@ -110,20 +107,19 @@ void io_request_destroy(io_request_t *request) {
  * @return              Status code describing result of the operation.
  */
 status_t io_request_copy(io_request_t *request, void *buf, size_t size) {
-    size_t i, vec_start, vec_size, offset = 0;
-    void *vec_buf;
     status_t ret;
 
-    for (i = 0; i < request->count && size; i++) {
+    size_t offset = 0;
+    for (size_t i = 0; i < request->count && size; i++) {
         /* Find the vector to start at. */
         if (offset + request->vecs[i].size <= request->transferred) {
             offset += request->vecs[i].size;
             continue;
         }
 
-        vec_start = request->transferred - offset;
-        vec_size = min(request->vecs[i].size - vec_start, size);
-        vec_buf = request->vecs[i].buffer + vec_start;
+        size_t vec_start = request->transferred - offset;
+        size_t vec_size  = min(request->vecs[i].size - vec_start, size);
+        void *vec_buf    = request->vecs[i].buffer + vec_start;
 
         if (request->op == IO_OP_WRITE) {
             /* Write, copy from the request to the supplied buffer. */

@@ -97,11 +97,9 @@ static __init_text int frequency_compare(const void *a, const void *b) {
  * @param func          Function to call to get a frequency.
  * @return              Median of the results. */
 __init_text uint64_t calculate_frequency(uint64_t (*func)()) {
-    uint64_t results[FREQUENCY_ATTEMPTS];
-    size_t i;
-
     /* Get the frequencies. */
-    for (i = 0; i < FREQUENCY_ATTEMPTS; i++)
+    uint64_t results[FREQUENCY_ATTEMPTS];
+    for (size_t i = 0; i < FREQUENCY_ATTEMPTS; i++)
         results[i] = func();
 
     /* Sort them in ascending order. */
@@ -114,15 +112,13 @@ __init_text uint64_t calculate_frequency(uint64_t (*func)()) {
 /** Function to calculate the CPU frequency.
  * @return              Calculated frequency. */
 static __init_text uint64_t calculate_cpu_frequency(void) {
-    uint16_t shi, slo, ehi, elo, ticks;
-    uint64_t start, end, cycles;
-
     /* First set the PIT to rate generator mode. */
     out8(0x43, 0x34);
     out8(0x40, 0xff);
     out8(0x40, 0xff);
 
     /* Wait for the cycle to begin. */
+    uint16_t shi, slo;
     do {
         out8(0x43, 0x00);
         slo = in8(0x40);
@@ -130,9 +126,10 @@ static __init_text uint64_t calculate_cpu_frequency(void) {
     } while (shi != 0xff);
 
     /* Get the start TSC value. */
-    start = x86_rdtsc();
+    uint64_t start = x86_rdtsc();
 
     /* Wait for the high byte to drop to 128. */
+    uint16_t ehi, elo;
     do {
         out8(0x43, 0x00);
         elo = in8(0x40);
@@ -140,11 +137,11 @@ static __init_text uint64_t calculate_cpu_frequency(void) {
     } while (ehi > 0x80);
 
     /* Get the end TSC value. */
-    end = x86_rdtsc();
+    uint64_t end = x86_rdtsc();
 
     /* Calculate the differences between the values. */
-    cycles = end - start;
-    ticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
+    uint64_t cycles = end - start;
+    uint16_t ticks  = ((ehi << 8) | elo) - ((shi << 8) | slo);
 
     /* Calculate frequency. */
     return (cycles * PIT_BASE_FREQUENCY) / ticks;
@@ -155,9 +152,6 @@ static __init_text uint64_t calculate_cpu_frequency(void) {
  * @param features      Pointer to the features structure to fill in. */
 static __init_text void detect_cpu_features(cpu_t *cpu, x86_features_t *features) {
     uint32_t eax, ebx, ecx, edx;
-    uint32_t *ptr;
-    size_t i, j;
-    char *str;
 
     /* Get the highest supported standard level. */
     x86_cpuid(X86_CPUID_VENDOR_ID, &features->highest_standard, &ebx, &ecx, &edx);
@@ -168,8 +162,8 @@ static __init_text void detect_cpu_features(cpu_t *cpu, x86_features_t *features
     x86_cpuid(X86_CPUID_FEATURE_INFO, &eax, &ebx, &features->standard_ecx, &features->standard_edx);
 
     /* Save model information. */
-    cpu->arch.family = (eax >> 8) & 0x0f;
-    cpu->arch.model = (eax >> 4) & 0x0f;
+    cpu->arch.family   = (eax >> 8) & 0x0f;
+    cpu->arch.model    = (eax >> 4) & 0x0f;
     cpu->arch.stepping = eax & 0x0f;
 
     /* If the CLFLUSH instruction is supported, get the cache line size. If it
@@ -192,14 +186,15 @@ static __init_text void detect_cpu_features(cpu_t *cpu, x86_features_t *features
 
         if (features->highest_extended >= X86_CPUID_BRAND_STRING3) {
             /* Get brand information. */
-            ptr = (uint32_t *)cpu->arch.model_name;
+            uint32_t *ptr = (uint32_t *)cpu->arch.model_name;
             x86_cpuid(X86_CPUID_BRAND_STRING1, &ptr[0], &ptr[1], &ptr[2],  &ptr[3]);
             x86_cpuid(X86_CPUID_BRAND_STRING2, &ptr[4], &ptr[5], &ptr[6],  &ptr[7]);
             x86_cpuid(X86_CPUID_BRAND_STRING3, &ptr[8], &ptr[9], &ptr[10], &ptr[11]);
 
             /* Some CPUs right-justify the string... */
-            str = cpu->arch.model_name;
-            i = 0; j = 0;
+            char *str = cpu->arch.model_name;
+            size_t i  = 0;
+            size_t j  = 0;
             while (str[i] == ' ')
                 i++;
             if (i > 0) {
@@ -235,13 +230,11 @@ static __init_text void detect_cpu_features(cpu_t *cpu, x86_features_t *features
 
 /** Initialize SYSCALL/SYSRET MSRs. */
 static __init_text void syscall_init(void) {
-    uint64_t fmask, lstar, star;
-
     /* Disable interrupts and clear direction flag upon entry. */
-    fmask = X86_FLAGS_IF | X86_FLAGS_DF;
+    uint64_t fmask = X86_FLAGS_IF | X86_FLAGS_DF;
 
     /* Set system call entry address. */
-    lstar = (uint64_t)syscall_entry;
+    uint64_t lstar = (uint64_t)syscall_entry;
 
     /* Set segments for entry and returning. The following happens upon
      * entry to kernel-mode:
@@ -254,7 +247,7 @@ static __init_text void syscall_init(void) {
      * things work. We set the SYSRET values below to the kernel DS, so that we
      * get the correct segment (kernel DS + 16 = user CS, and kernel DS + 8 =
      * user DS). */
-    star = ((uint64_t)(KERNEL_DS | 0x03) << 48) | ((uint64_t)KERNEL_CS << 32);
+    uint64_t star = ((uint64_t)(KERNEL_DS | 0x03) << 48) | ((uint64_t)KERNEL_CS << 32);
 
     /* Set System Call Enable (SCE) in EFER and write everything out. */
     x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_SCE);
@@ -266,8 +259,6 @@ static __init_text void syscall_init(void) {
 /** Detect and set up the current CPU.
  * @param cpu           CPU structure for the current CPU. */
 __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
-    x86_features_t features;
-
     /* If this is the boot CPU, a double fault stack will not have been
      * allocated. Use the pre-allocated one in this case. */
     if (cpu == &boot_cpu)
@@ -277,6 +268,7 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
     descriptor_init(cpu);
 
     /* Detect CPU features and information. */
+    x86_features_t features;
     detect_cpu_features(cpu, &features);
 
     /* If this is the boot CPU, copy features to the global features structure.
@@ -338,13 +330,8 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
     tsc_init_target();
 }
 
-/** Display a list of running CPUs.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
+/** Display a list of running CPUs. */
 static kdb_status_t kdb_cmd_cpus(int argc, char **argv, kdb_filter_t *filter) {
-    size_t i;
-
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s\n\n", argv[0]);
 
@@ -355,7 +342,7 @@ static kdb_status_t kdb_cmd_cpus(int argc, char **argv, kdb_filter_t *filter) {
     kdb_printf("ID   Freq (MHz) LAPIC Freq (MHz) Cache Align Model Name\n");
     kdb_printf("==   ========== ================ =========== ==========\n");
 
-    for (i = 0; i <= highest_cpu_id; i++) {
+    for (size_t i = 0; i <= highest_cpu_id; i++) {
         if (!cpus[i])
             continue;
 

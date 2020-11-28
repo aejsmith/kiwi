@@ -51,8 +51,6 @@ mmu_context_t kernel_mmu_context;
 mmu_ops_t *mmu_ops;
 
 /**
- * Lock an MMU context.
- *
  * Locks the specified MMU context. This must be done before performing any
  * operations on it, and the context must be unlocked with mmu_context_unlock()
  * after operations have been performed. Locks can be nested (implemented using
@@ -65,7 +63,7 @@ void mmu_context_lock(mmu_context_t *ctx) {
     preempt_disable();
 }
 
-/** Unlock an MMU context.
+/** Unlocks an MMU context.
  * @param ctx           Context to unlock. */
 void mmu_context_unlock(mmu_context_t *ctx) {
     /* If the lock is being released (recursion count currently 1), flush
@@ -77,7 +75,7 @@ void mmu_context_unlock(mmu_context_t *ctx) {
     mutex_unlock(&ctx->lock);
 }
 
-/** Create a mapping in an MMU context.
+/** Creates a mapping in an MMU context.
  * @param ctx           Context to map in.
  * @param virt          Virtual address to map.
  * @param phys          Physical address to map to.
@@ -105,7 +103,7 @@ status_t mmu_context_map(
     return mmu_ops->map(ctx, virt, phys, access, mmflag);
 }
 
-/** Remap a range with different access flags.
+/** Remaps a range with different access flags.
  * @param ctx           Context to modify.
  * @param virt          Start of range to update.
  * @param size          Size of range to update.
@@ -126,7 +124,7 @@ void mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t acc
     return mmu_ops->remap(ctx, virt, size, access);
 }
 
-/** Unmap a page in an MMU context.
+/** Unmaps a page in an MMU context.
  * @param ctx           Context to unmap from.
  * @param virt          Virtual address to unmap.
  * @param shared        Whether the mapping was shared across multiple CPUs.
@@ -151,7 +149,7 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_pa
     return mmu_ops->unmap(ctx, virt, shared, _page);
 }
 
-/** Query details about a mapping.
+/** Queries details about a mapping.
  * @param ctx           Context to query.
  * @param virt          Virtual address to query.
  * @param _phys         Where to store physical address the page is mapped to.
@@ -178,8 +176,6 @@ bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32
 }
 
 /**
- * Load a new MMU context.
- *
  * Switches to a new MMU context. The previously active context must first be
  * unloaded with mmu_context_unload(). This function must be called with
  * interrupts disabled.
@@ -192,7 +188,7 @@ void mmu_context_load(mmu_context_t *ctx) {
     mmu_ops->load(ctx);
 }
 
-/** Unload an MMU context.
+/** Unloads an MMU context.
  * @param ctx           Context to unload. */
 void mmu_context_unload(mmu_context_t *ctx) {
     assert(!local_irq_state());
@@ -201,20 +197,17 @@ void mmu_context_unload(mmu_context_t *ctx) {
         mmu_ops->unload(ctx);
 }
 
-/** Create and initialize an MMU context.
+/** Creates an MMU context.
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to new context, NULL on allocation failure. */
 mmu_context_t *mmu_context_create(unsigned mmflag) {
-    mmu_context_t *ctx;
-    status_t ret;
-
-    ctx = kmalloc(sizeof(*ctx), mmflag);
+    mmu_context_t *ctx = kmalloc(sizeof(*ctx), mmflag);
     if (!ctx)
         return NULL;
 
     mutex_init(&ctx->lock, "mmu_context_lock", MUTEX_RECURSIVE);
 
-    ret = mmu_ops->init(ctx, mmflag);
+    status_t ret = mmu_ops->init(ctx, mmflag);
     if (ret != STATUS_SUCCESS) {
         kfree(ctx);
         return NULL;
@@ -223,7 +216,7 @@ mmu_context_t *mmu_context_create(unsigned mmflag) {
     return ctx;
 }
 
-/** Destroy an MMU context.
+/** Destroys an MMU context.
  * @param ctx           Context to destroy. */
 void mmu_context_destroy(mmu_context_t *ctx) {
     mmu_ops->destroy(ctx);
@@ -232,8 +225,6 @@ void mmu_context_destroy(mmu_context_t *ctx) {
 
 /** Initialize the kernel MMU context. */
 __init_text void mmu_init(void) {
-    ptr_t end, i;
-
     /* Initialize the kernel context. */
     mutex_init(&kernel_mmu_context.lock, "mmu_context_lock", MUTEX_RECURSIVE);
     arch_mmu_init();
@@ -242,7 +233,7 @@ __init_text void mmu_init(void) {
 
     /* Duplicate all virtual memory mappings created by KBoot. */
     kboot_tag_foreach(KBOOT_TAG_VMEM, kboot_tag_vmem_t, range) {
-        end = range->start + range->size - 1;
+        ptr_t end = range->start + range->size - 1;
 
         /* Only want to map ranges in kmem space, and non-special mappings. */
         if (range->start < KERNEL_KMEM_BASE || end > KERNEL_KMEM_END) {
@@ -251,7 +242,7 @@ __init_text void mmu_init(void) {
             continue;
         }
 
-        for (i = 0; i < range->size; i += PAGE_SIZE) {
+        for (ptr_t i = 0; i < range->size; i += PAGE_SIZE) {
             mmu_context_map(
                 &kernel_mmu_context, range->start + i, range->phys + i,
                 VM_ACCESS_READ | VM_ACCESS_WRITE,

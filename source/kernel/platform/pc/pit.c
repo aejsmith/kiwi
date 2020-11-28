@@ -24,26 +24,18 @@
 #include <pc/pit.h>
 #include <time.h>
 
-/** Handle a PIT tick.
- * @param num           IRQ number.
- * @param data          Data associated with IRQ (unused).
- * @return              IRQ status code. */
 static irq_status_t pit_irq(unsigned num, void *data) {
     return (timer_tick()) ? IRQ_PREEMPT : IRQ_HANDLED;
 }
 
-/** Enable the PIT. */
 static void pit_enable(void) {
-    uint16_t base;
-
     /* Set channel 0 to mode 3 (square wave generator). */
-    base = PIT_BASE_FREQUENCY / PIT_TIMER_FREQUENCY;
+    uint16_t base = PIT_BASE_FREQUENCY / PIT_TIMER_FREQUENCY;
     out8(PIT_MODE, 0x36);
     out8(PIT_CHAN0, base & 0xff);
     out8(PIT_CHAN0, base >> 8);
 }
 
-/** Disable the PIT. */
 static void pit_disable(void) {
     /* After this has been done, the PIT will generate one more IRQ. This is
      * ignored. */
@@ -52,11 +44,10 @@ static void pit_disable(void) {
     out8(PIT_CHAN0, 0);
 }
 
-/** PIT clock source. */
 static timer_device_t pit_timer_device = {
-    .name = "PIT",
-    .type = TIMER_DEVICE_PERIODIC,
-    .enable = pit_enable,
+    .name    = "PIT",
+    .type    = TIMER_DEVICE_PERIODIC,
+    .enable  = pit_enable,
     .disable = pit_disable,
 };
 

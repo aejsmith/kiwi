@@ -34,58 +34,48 @@ typedef struct memory_file {
     size_t size;                    /**< Size of the data. */
 } memory_file_t;
 
-/** Close a handle to a memory file.
- * @param file          File being closed.
- * @param handle        File handle structure. */
+/** Close a handle to a memory file. */
 static void memory_file_close(file_handle_t *handle) {
     kfree(handle->file);
 }
 
-/** Perform I/O on a memory file.
- * @param handle        File handle structure.
- * @param request       I/O request.
- * @return              Status code describing result of the operation. */
+/** Perform I/O on a memory file. */
 static status_t memory_file_io(file_handle_t *handle, io_request_t *request) {
     memory_file_t *file = (memory_file_t *)handle->file;
-    size_t size;
 
     assert(request->op == IO_OP_READ);
 
     if (request->offset >= (offset_t)file->size)
         return STATUS_SUCCESS;
 
-    size = ((request->offset + request->total) > file->size)
+    size_t size = ((request->offset + request->total) > file->size)
         ? file->size - request->offset
         : request->total;
 
     return io_request_copy(request, (void *)file->data + request->offset, size);
 }
 
-/** Get information about a memory file.
- * @param handle        File handle structure.
- * @param info          Information structure to fill in. */
+/** Get information about a memory file. */
 static void memory_file_info(file_handle_t *handle, file_info_t *info) {
     memory_file_t *file = (memory_file_t *)handle->file;
 
-    info->id = 0;
-    info->mount = 0;
-    info->type = file->file.type;
+    info->id         = 0;
+    info->mount      = 0;
+    info->type       = file->file.type;
     info->block_size = 1;
-    info->size = file->size;
-    info->links = 1;
-    info->created = info->accessed = info->modified = unix_time();
+    info->size       = file->size;
+    info->links      = 1;
+    info->created    = info->accessed = info->modified = unix_time();
 }
 
 /** File operations for a memory-backed file. */
 static file_ops_t memory_file_ops = {
     .close = memory_file_close,
-    .io = memory_file_io,
-    .info = memory_file_info,
+    .io    = memory_file_io,
+    .info  = memory_file_info,
 };
 
 /**
- * Create a read-only file backed by a chunk of memory.
- *
  * Creates a special read-only file that is backed by the given chunk of memory.
  * This is useful to pass data stored in memory to code that expects to be
  * operating on files, such as the module loader. The given memory area will
@@ -101,15 +91,13 @@ static file_ops_t memory_file_ops = {
  * @return              Pointer to handle to file (has FILE_ACCESS_READ set).
  */
 object_handle_t *memory_file_create(const void *buf, size_t size) {
-    memory_file_t *file;
-    file_handle_t *handle;
+    memory_file_t *file = kmalloc(sizeof(*file), MM_BOOT);
 
-    file = kmalloc(sizeof(*file), MM_BOOT);
-    file->file.ops = &memory_file_ops;
+    file->file.ops  = &memory_file_ops;
     file->file.type = FILE_TYPE_REGULAR;
-    file->data = buf;
-    file->size = size;
+    file->data      = buf;
+    file->size      = size;
 
-    handle = file_handle_alloc(&file->file, FILE_ACCESS_READ, 0);
+    file_handle_t *handle = file_handle_alloc(&file->file, FILE_ACCESS_READ, 0);
     return file_handle_create(handle);
 }

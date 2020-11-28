@@ -21,10 +21,6 @@
  * The functions in this file implement a radix tree (aka. Patricia trie),
  * which uses strings as keys.
  *
- * Radix trees seem to be horribly underdocumented... Thanks to JamesM for
- * referring me to his radix tree implementation, helped me understand this
- * much better.
- *
  * Reference:
  * - Wikipedia: Radix tree
  *   http://en.wikipedia.org/wiki/Radix_tree
@@ -38,17 +34,10 @@
 
 #include <assert.h>
 
-/** Get length of key string.
- * @param key           Key to get length of.
- * @return              Length of key. */
 static inline size_t radix_tree_key_len(unsigned char *key) {
     return strlen((const char *)key);
 }
 
-/** Duplicate a key string.
- * @param key           Key to duplicate.
- * @param len           Length to duplicate (if 0 will duplicate entire key).
- * @return              Pointer to duplicated key. */
 static inline unsigned char *radix_tree_key_dup(unsigned char *key, size_t len) {
     if (len) {
         return (unsigned char *)kstrndup((const char *)key, len, MM_KERNEL);
@@ -57,39 +46,29 @@ static inline unsigned char *radix_tree_key_dup(unsigned char *key, size_t len) 
     }
 }
 
-/** Concatenate two key strings.
- * @param key1          First key.
- * @param key2          Second key.
- * @return              Pointer to new key. */
 static inline unsigned char *radix_tree_key_concat(unsigned char *key1, unsigned char *key2) {
-    size_t len1 = radix_tree_key_len(key1), len2 = radix_tree_key_len(key2);
-    unsigned char *concat;
+    size_t len1 = radix_tree_key_len(key1);
+    size_t len2 = radix_tree_key_len(key2);
 
-    concat = kmalloc(len1 + len2 + 1, MM_KERNEL);
+    unsigned char *concat = kmalloc(len1 + len2 + 1, MM_KERNEL);
+
     strcpy((char *)concat, (const char *)key1);
     strcpy((char *)(concat + len1), (const char *)key2);
+
     return concat;
 }
 
-/** Get common prefix of two keys.
- * @param key1          First key.
- * @param key2          Second key.
- * @return              Pointer to duplicated key. */
 static inline unsigned char *radix_tree_key_common(unsigned char *key1, unsigned char *key2) {
     size_t i = 0;
-
     while (key1[i] == key2[i])
         i++;
 
     return radix_tree_key_dup(key1, i);
 }
 
-/** Add a node as a node's child.
- * @param parent        Parent node.
- * @param child         New child node. */
 static void radix_tree_node_add_child(radix_tree_node_t *parent, radix_tree_node_t *child) {
     unsigned char high = (child->key[0] >> 4) & 0xf;
-    unsigned char low = child->key[0] & 0xf;
+    unsigned char low  = child->key[0] & 0xf;
 
     if (!parent->children[high])
         parent->children[high] = kcalloc(1, sizeof(radix_tree_node_ptr_t), MM_KERNEL);
@@ -103,12 +82,9 @@ static void radix_tree_node_add_child(radix_tree_node_t *parent, radix_tree_node
     child->parent = parent;
 }
 
-/** Remove child from a node.
- * @param parent        Parent node.
- * @param child         Child node to remove. */
 static void radix_tree_node_remove_child(radix_tree_node_t *parent, radix_tree_node_t *child) {
     unsigned char high = (child->key[0] >> 4) & 0xf;
-    unsigned char low = child->key[0] & 0xf;
+    unsigned char low  = child->key[0] & 0xf;
 
     assert(parent->children[high]);
     assert(parent->children[high]->nodes[low] == child);
@@ -123,28 +99,20 @@ static void radix_tree_node_remove_child(radix_tree_node_t *parent, radix_tree_n
     parent->child_count--;
 }
 
-/** Find child of a node.
- * @param parent        Parent node.
- * @param key           Key to search for. */
 static radix_tree_node_t *radix_tree_node_find_child(radix_tree_node_t *parent, unsigned char *key) {
     unsigned char high = (key[0] >> 4) & 0xf;
-    unsigned char low = key[0] & 0xf;
+    unsigned char low  = key[0] & 0xf;
 
     return (parent->children[high]) ? parent->children[high]->nodes[low] : NULL;
 }
 
-/** Get first child of a radix tree node.
- * @param node          Node to get first child of.
- * @return              Pointer to child, or NULL if no children. */
 static radix_tree_node_t *radix_tree_node_first_child(radix_tree_node_t *node) {
-    size_t i, j;
-
     if (node->child_count) {
-        for (i = 0; i < array_size(node->children); i++) {
+        for (size_t i = 0; i < array_size(node->children); i++) {
             if (!node->children[i] || !node->children[i]->count)
                 continue;
 
-            for (j = 0; j < array_size(node->children[i]->nodes); j++) {
+            for (size_t j = 0; j < array_size(node->children[i]->nodes); j++) {
                 if (node->children[i]->nodes[j])
                     return node->children[i]->nodes[j];
             }
@@ -154,19 +122,15 @@ static radix_tree_node_t *radix_tree_node_first_child(radix_tree_node_t *node) {
     return NULL;
 }
 
-/** Get the next sibling of a node.
- * @param node          Node to get next sibling of.
- * @return              Pointer to sibling, or NULL if there isn't one. */
 static radix_tree_node_t *radix_tree_node_next_sibling(radix_tree_node_t *node) {
     size_t high = (node->key[0] >> 4) & 0xf, low = node->key[0] & 0xf;
     radix_tree_node_t *parent = node->parent;
-    size_t i, j;
 
-    for (i = high; i < array_size(parent->children); i++) {
+    for (size_t i = high; i < array_size(parent->children); i++) {
         if (!parent->children[i] || !parent->children[i]->count)
             continue;
 
-        for (j = (i == high) ? (low + 1) : 0; j < array_size(parent->children[i]->nodes); j++) {
+        for (size_t j = (i == high) ? (low + 1) : 0; j < array_size(parent->children[i]->nodes); j++) {
             if (parent->children[i]->nodes[j])
                 return parent->children[i]->nodes[j];
         }
@@ -175,23 +139,16 @@ static radix_tree_node_t *radix_tree_node_next_sibling(radix_tree_node_t *node) 
     return NULL;
 }
 
-/** Create a new node and adds it to its parent.
- * @param parent        Parent of new node.
- * @param key           Key for new node (should be dynamically allocated).
- * @param value         Value for the node.
- * @return              Allocated node. */
 static radix_tree_node_t *radix_tree_node_alloc(radix_tree_node_t *parent, unsigned char *key, void *value) {
     radix_tree_node_t *node = kcalloc(1, sizeof(radix_tree_node_t), MM_KERNEL);
 
-    node->key = key;
+    node->key   = key;
     node->value = value;
 
     radix_tree_node_add_child(parent, node);
     return node;
 }
 
-/** Destroy a node.
- * @param node          Node to destroy. */
 static void radix_tree_node_destroy(radix_tree_node_t *node) {
     /* Do not need to free child node array entries because they are
      * automatically freed when they become empty. */
@@ -203,14 +160,11 @@ static void radix_tree_node_destroy(radix_tree_node_t *node) {
  * @param node          Node to clear.
  * @param helper        Function to call on non-NULL values (can be NULL). */
 static void radix_tree_node_clear(radix_tree_node_t *node, radix_tree_clear_helper_t helper) {
-    radix_tree_node_t *child;
-    size_t i, j;
-
-    for (i = 0; i < array_size(node->children); i++) {
+    for (size_t i = 0; i < array_size(node->children); i++) {
         /* Test the child array on each iteration - it may be freed
          * automatically by radix_tree_node_remove_child() within the loop. */
-        for (j = 0; node->children[i] && j < array_size(node->children[i]->nodes); j++) {
-            child = node->children[i]->nodes[j];
+        for (size_t j = 0; node->children[i] && j < array_size(node->children[i]->nodes); j++) {
+            radix_tree_node_t *child = node->children[i]->nodes[j];
             if (!child)
                 continue;
 
@@ -228,20 +182,17 @@ static void radix_tree_node_clear(radix_tree_node_t *node, radix_tree_clear_help
 }
 
 /** Check whether a node's key matches the given string.
- * @param node          Node to match against.
- * @param key           Key to check.
  * @return              0 if no match, 1 if key's partially match, 2 if the
  *                      keys are an exact match, or 3 if there is an exact
  *                      match between the node's key and the first part of
  *                      the supplied key (i.e. the supplied key is longer). */
 static int radix_tree_node_match(radix_tree_node_t *node, unsigned char *key) {
-    size_t i = 0;
-
     if (!node->key) {
         return 3;
     } else if (node->key[0] != key[0]) {
         return 0;
     } else {
+        size_t i = 0;
         while (node->key[i] && key[i]) {
             if (node->key[i] != key[i])
                 return 1;
@@ -256,28 +207,21 @@ static int radix_tree_node_match(radix_tree_node_t *node, unsigned char *key) {
     }
 }
 
-/** Internal part of lookup.
- * @param tree          Tree to lookup in.
- * @param key           Key to look for.
- * @return              Pointer to node structure. */
 static radix_tree_node_t *radix_tree_node_lookup(radix_tree_t *tree, unsigned char *key) {
-    radix_tree_node_t *node = &tree->root;
-    size_t i;
-    int ret;
-
     /* No zero-length keys. */
     if (!key || !key[0])
         return NULL;
 
     /* Iterate down the tree to find the node. */
+    radix_tree_node_t *node = &tree->root;
     while (true) {
-        ret = radix_tree_node_match(node, key);
+        int ret = radix_tree_node_match(node, key);
         if (ret == 2) {
             /* Exact match: return the value. */
             return node;
         } else if (ret == 3) {
             /* Supplied key is longer. */
-            i = 0;
+            size_t i = 0;
             while (node->key && node->key[i]) {
                 key++;
                 i++;
@@ -298,8 +242,6 @@ static radix_tree_node_t *radix_tree_node_lookup(radix_tree_t *tree, unsigned ch
 }
 
 /**
- * Insert a value into a radix tree.
- *
  * Inserts a value with the given key into a radix tree. If a node already
  * exists with the same key, then the node's value is replaced with the new
  * value. Zero length keys are not supported.
@@ -316,30 +258,26 @@ static radix_tree_node_t *radix_tree_node_lookup(radix_tree_t *tree, unsigned ch
  */
 void radix_tree_insert(radix_tree_t *tree, const char *key, void *value) {
     unsigned char *str = (unsigned char *)key;
-    unsigned char *common, *dup;
-    radix_tree_node_t *node = &tree->root;
-    radix_tree_node_t *inter, *child;
-    size_t i, len;
-    int ret;
 
     /* No zero-length keys. */
     if (str[0] == 0)
         return;
 
     /* Iterate down the tree to find the node. */
+    radix_tree_node_t *node = &tree->root;
     while (true) {
-        ret = radix_tree_node_match(node, str);
+        int ret = radix_tree_node_match(node, str);
         if (ret == 1) {
             /* Partial match. First get common prefix and create an intermediate
              * node. */
-            common = radix_tree_key_common(str, node->key);
-            inter = radix_tree_node_alloc(node->parent, common, NULL);
+            unsigned char *common    = radix_tree_key_common(str, node->key);
+            radix_tree_node_t *inter = radix_tree_node_alloc(node->parent, common, NULL);
 
             /* Get length of common string. */
-            len = radix_tree_key_len(common);
+            size_t len = radix_tree_key_len(common);
 
             /* Change the node's key. */
-            dup = radix_tree_key_dup(node->key + len, 0);
+            unsigned char *dup = radix_tree_key_dup(node->key + len, 0);
             kfree(node->key);
             node->key = dup;
 
@@ -363,14 +301,14 @@ void radix_tree_insert(radix_tree_t *tree, const char *key, void *value) {
             break;
         } else if (ret == 3) {
             /* Supplied key is longer. */
-            i = 0;
+            size_t i = 0;
             while (node->key && node->key[i]) {
                 str++;
                 i++;
             }
 
             /* Look for this key in the child list. */
-            child = radix_tree_node_find_child(node, str);
+            radix_tree_node_t *child = radix_tree_node_find_child(node, str);
             if (child) {
                 node = child;
                 continue;
@@ -386,8 +324,6 @@ void radix_tree_insert(radix_tree_t *tree, const char *key, void *value) {
 }
 
 /**
- * Remove a value from a radix tree.
- *
  * Removes the value with the given key from a radix tree. If the key is not
  * found in the tree then the function will do nothing.
  *
@@ -396,12 +332,8 @@ void radix_tree_insert(radix_tree_t *tree, const char *key, void *value) {
  * @param helper        Helper function to free entry data (can be NULL).
  */
 void radix_tree_remove(radix_tree_t *tree, const char *key, radix_tree_clear_helper_t helper) {
-    radix_tree_node_t *node, *child, *parent;
-    unsigned char *concat;
-    size_t i, j;
-
     /* Look for the node to delete. If it is not found return. */
-    node = radix_tree_node_lookup(tree, (unsigned char *)key);
+    radix_tree_node_t *node = radix_tree_node_lookup(tree, (unsigned char *)key);
     if (!node)
         return;
 
@@ -415,11 +347,12 @@ void radix_tree_remove(radix_tree_t *tree, const char *key, radix_tree_clear_hel
         if (node->child_count == 1) {
             /* Only one child: Just need to prepend our key to it. First need to
              * find it... */
-            for (i = 0, child = NULL; i < array_size(node->children) && !child; i++) {
+            radix_tree_node_t *child = NULL;
+            for (size_t i = 0; i < array_size(node->children) && !child; i++) {
                 if (!node->children[i])
                     continue;
 
-                for (j = 0; j < array_size(node->children[i]->nodes); j++) {
+                for (size_t j = 0; j < array_size(node->children[i]->nodes); j++) {
                     if (node->children[i]->nodes[j]) {
                         child = node->children[i]->nodes[j];
                         break;
@@ -433,7 +366,7 @@ void radix_tree_remove(radix_tree_t *tree, const char *key, radix_tree_clear_hel
             radix_tree_node_remove_child(node, child);
 
             /* Set the new key for the child. */
-            concat = radix_tree_key_concat(node->key, child->key);
+            unsigned char *concat = radix_tree_key_concat(node->key, child->key);
             kfree(child->key);
             child->key = concat;
 
@@ -445,7 +378,7 @@ void radix_tree_remove(radix_tree_t *tree, const char *key, radix_tree_clear_hel
             return;
         } else if (node->child_count == 0) {
             /* Remove the current node. Save its parent before doing so. */
-            parent = node->parent;
+            radix_tree_node_t *parent = node->parent;
             radix_tree_node_remove_child(parent, node);
             radix_tree_node_destroy(node);
 
@@ -486,11 +419,11 @@ void radix_tree_clear(radix_tree_t *tree, radix_tree_clear_helper_t helper) {
  * @param node          Node to get following node of.
  * @return              Following node or NULL if none found. */
 radix_tree_node_t *radix_tree_node_next(radix_tree_node_t *node) {
-    radix_tree_node_t *orig = node, *tmp;
+    radix_tree_node_t *orig = node;
 
     while (node == orig || !node->value) {
         /* Check if we have a child we can use. */
-        tmp = radix_tree_node_first_child(node);
+        radix_tree_node_t *tmp = radix_tree_node_first_child(node);
         if (tmp) {
             node = tmp;
             continue;

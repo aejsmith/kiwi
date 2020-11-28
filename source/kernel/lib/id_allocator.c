@@ -31,11 +31,9 @@
  * @param alloc         Allocator to allocate from.
  * @return              New ID, or -1 if no IDs available. */
 int32_t id_allocator_alloc(id_allocator_t *alloc) {
-    int32_t id;
-
     spinlock_lock(&alloc->lock);
 
-    id = bitmap_ffz(alloc->bitmap, alloc->nbits);
+    int32_t id = bitmap_ffz(alloc->bitmap, alloc->nbits);
     if (id < 0) {
         spinlock_unlock(&alloc->lock);
         return -1;
@@ -78,8 +76,10 @@ void id_allocator_reserve(id_allocator_t *alloc, int32_t id) {
  * @return              Status code describing the result of the operation. */
 status_t id_allocator_init(id_allocator_t *alloc, int32_t max, unsigned mmflag) {
     spinlock_init(&alloc->lock, "id_allocator_lock");
-    alloc->nbits = max + 1;
+
+    alloc->nbits  = max + 1;
     alloc->bitmap = bitmap_alloc(alloc->nbits, mmflag);
+
     return (alloc->bitmap) ? STATUS_SUCCESS : STATUS_NO_MEMORY;
 }
 

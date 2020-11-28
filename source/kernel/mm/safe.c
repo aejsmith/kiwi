@@ -88,29 +88,26 @@ status_t memset_user(void *dest, int val, size_t count) {
  * @return              STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
  *                      failure. */
 status_t strlen_user(const char *str, size_t *_len) {
-    size_t retval = 0;
-
     usermem_enter();
 
+    size_t len = 0;
     while (true) {
-        if (!is_user_range(str, retval + 1)) {
+        if (!is_user_range(str, len + 1)) {
             usermem_exit();
             return STATUS_INVALID_ADDR;
-        } else if (str[retval] == 0) {
+        } else if (str[len] == 0) {
             break;
         }
 
-        retval++;
+        len++;
     }
 
-    *_len = retval;
+    *_len = len;
     usermem_exit();
     return STATUS_SUCCESS;
 }
 
 /**
- * Duplicate a string from user memory.
- *
  * Allocates a buffer large enough and copies across a string from user memory.
  * The allocation is not made using MM_WAIT, as there is no length limit and
  * therefore the length could be too large to fit in memory. Use of
@@ -126,9 +123,8 @@ status_t strlen_user(const char *str, size_t *_len) {
  */
 status_t strdup_from_user(const void *src, char **_dest) {
     status_t ret;
-    size_t len;
-    char *d;
 
+    size_t len;
     ret = strlen_user(src, &len);
     if (ret != STATUS_SUCCESS) {
         return ret;
@@ -136,7 +132,7 @@ status_t strdup_from_user(const void *src, char **_dest) {
         return STATUS_INVALID_ARG;
     }
 
-    d = kmalloc(len + 1, MM_USER);
+    char *d = kmalloc(len + 1, MM_USER);
     if (!d)
         return STATUS_NO_MEMORY;
 
@@ -153,8 +149,6 @@ status_t strdup_from_user(const void *src, char **_dest) {
 }
 
 /**
- * Duplicate a string from user memory.
- *
  * Allocates a buffer large enough and copies across a string from user memory.
  * If the string is longer than the maximum length, then an error will be
  * returned. Because a length limit is provided, the allocation is made using
@@ -171,9 +165,8 @@ status_t strdup_from_user(const void *src, char **_dest) {
  */
 status_t strndup_from_user(const void *src, size_t max, char **_dest) {
     status_t ret;
-    size_t len;
-    char *d;
 
+    size_t len;
     ret = strlen_user(src, &len);
     if (ret != STATUS_SUCCESS) {
         return ret;
@@ -183,7 +176,7 @@ status_t strndup_from_user(const void *src, size_t max, char **_dest) {
         return STATUS_TOO_LONG;
     }
 
-    d = kmalloc(len + 1, MM_KERNEL);
+    char *d = kmalloc(len + 1, MM_KERNEL);
     ret = memcpy_from_user(d, src, len);
     if (ret != STATUS_SUCCESS) {
         kfree(d);
@@ -197,8 +190,6 @@ status_t strndup_from_user(const void *src, size_t max, char **_dest) {
 }
 
 /**
- * Copy a NULL-terminated array of strings from user memory.
- *
  * Copies a NULL-terminated array of strings from user memory. The array
  * itself and each array entry must be freed with kfree() once no longer
  * needed.
@@ -212,10 +203,9 @@ status_t strndup_from_user(const void *src, size_t max, char **_dest) {
 status_t arrcpy_from_user(const char *const src[], char ***_array) {
     char **array = NULL, **narr;
     status_t ret;
-    int i;
 
     /* Copy the arrays across. */
-    for (i = 0; ; i++) {
+    for (int i = 0; ; i++) {
         narr = krealloc(array, sizeof(char *) * (i + 1), MM_USER);
         if (!narr) {
             ret = STATUS_NO_MEMORY;
@@ -245,7 +235,7 @@ status_t arrcpy_from_user(const char *const src[], char ***_array) {
 
 fail:
     if (array) {
-        for (i = 0; array[i]; i++)
+        for (int i = 0; array[i]; i++)
             kfree(array[i]);
 
         kfree(array);

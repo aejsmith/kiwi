@@ -34,12 +34,8 @@
 #include <object.h>
 #include <status.h>
 
-/** Cache for pipe structures. */
 static slab_cache_t *pipe_cache;
 
-/** Constructor for pipe structures.
- * @param obj           Object to construct.
- * @param data          Unused. */
 static void pipe_ctor(void *obj, void *data) {
     pipe_t *pipe = obj;
 
@@ -48,9 +44,6 @@ static void pipe_ctor(void *obj, void *data) {
     notifier_init(&pipe->data_notifier, pipe);
 }
 
-/** Read a byte from a pipe.
- * @param pipe          Pipe structure. Should be locked, and have data.
- * @return              Character read. */
 static inline char pipe_get(pipe_t *pipe) {
     char ch;
 
@@ -62,9 +55,6 @@ static inline char pipe_get(pipe_t *pipe) {
     return ch;
 }
 
-/** Write a byte to a pipe.
- * @param pipe          Pipe structure. Should be locked, and have space.
- * @param ch            Character to write. */
 static inline void pipe_insert(pipe_t *pipe, char ch) {
     pipe->buf[pipe->end] = ch;
     if (++pipe->end >= PIPE_SIZE)
@@ -74,8 +64,6 @@ static inline void pipe_insert(pipe_t *pipe, char ch) {
 }
 
 /**
- * Read data from a pipe.
- *
  * Reads data from a pipe into a buffer. Reads of less than or equal to
  * PIPE_SIZE will either read all the requested data, or none at all. Reads of
  * greater than PIPE_SIZE may only return part of the data. A read may not be
@@ -92,50 +80,51 @@ static inline void pipe_insert(pipe_t *pipe, char ch) {
  */
 status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *_bytes) {
     status_t ret = STATUS_SUCCESS;
-    size_t i = 0;
+    size_t bytes = 0;
 
     if (count && count <= PIPE_SIZE) {
         /* Try to get all required data before reading. */
-        for (i = 0; i < count; i++) {
+        for (bytes = 0; bytes < count; bytes++) {
             ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1, SLEEP_INTERRUPTIBLE);
             if (ret != STATUS_SUCCESS) {
-                semaphore_up(&pipe->data_sem, i);
-                i = 0;
+                semaphore_up(&pipe->data_sem, bytes);
+                bytes = 0;
                 goto out;
             }
         }
 
         mutex_lock(&pipe->lock);
 
-        for (i = 0; i < count; i++)
-            buf[i] = pipe_get(pipe);
+        for (bytes = 0; bytes < count; bytes++)
+            buf[bytes] = pipe_get(pipe);
 
         notifier_run(&pipe->space_notifier, NULL, false);
 
         mutex_unlock(&pipe->lock);
     } else if (count) {
-        for (i = 0; i < count; i++) {
+        for (bytes = 0; bytes < count; bytes++) {
             ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1, SLEEP_INTERRUPTIBLE);
             if (ret != STATUS_SUCCESS)
                 goto out;
 
             mutex_lock(&pipe->lock);
-            buf[i] = pipe_get(pipe);
+
+            buf[bytes] = pipe_get(pipe);
+
             notifier_run(&pipe->space_notifier, NULL, false);
+
             mutex_unlock(&pipe->lock);
         }
     }
 
 out:
     if (_bytes)
-        *_bytes = i;
+        *_bytes = bytes;
 
     return ret;
 }
 
 /**
- * Write data to a pipe.
- *
  * Writes data from a buffer to a pipe. Writes of less than or equal to
  * PIPE_SIZE will either write all the requested data, or none at all. Writes
  * of greater than PIPE_SIZE may only write part of the data. A write may not
@@ -152,23 +141,23 @@ out:
  */
 status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_t *_bytes) {
     status_t ret = STATUS_SUCCESS;
-    size_t i = 0;
+    size_t bytes = 0;
 
     if (count && count <= PIPE_SIZE) {
         /* Try to get all required space before writing. */
-        for (i = 0; i < count; i++) {
+        for (bytes = 0; bytes < count; bytes++) {
             ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1, SLEEP_INTERRUPTIBLE);
             if (ret != STATUS_SUCCESS) {
-                semaphore_up(&pipe->space_sem, i);
-                i = 0;
+                semaphore_up(&pipe->space_sem, bytes);
+                bytes = 0;
                 goto out;
             }
         }
 
         mutex_lock(&pipe->lock);
 
-        for (i = 0; i < count; i++)
-            pipe_insert(pipe, buf[i]);
+        for (bytes = 0; bytes < count; bytes++)
+            pipe_insert(pipe, buf[bytes]);
 
         /* For atomic writes, we only run the data notifier after writing
          * everything, so we don't do too many calls. */
@@ -176,21 +165,24 @@ status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, 
 
         mutex_unlock(&pipe->lock);
     } else if (count) {
-        for (i = 0; i < count; i++) {
+        for (bytes = 0; bytes < count; bytes++) {
             ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1, SLEEP_INTERRUPTIBLE);
             if (ret != STATUS_SUCCESS)
                 goto out;
 
             mutex_lock(&pipe->lock);
-            pipe_insert(pipe, buf[i]);
+
+            pipe_insert(pipe, buf[bytes]);
+
             notifier_run(&pipe->data_notifier, NULL, false);
+
             mutex_unlock(&pipe->lock);
         }
     }
 
 out:
     if (_bytes)
-        *_bytes = i;
+        *_bytes = bytes;
 
     return ret;
 }
@@ -201,19 +193,18 @@ out:
  * @param nonblock      Whether to allow blocking.
  * @return              Status code describing result of the operation. */
 status_t pipe_io(pipe_t *pipe, io_request_t *request, bool nonblock) {
-    char *buf;
-    size_t count;
-    status_t ret, err;
+    status_t ret;
 
-    buf = kmalloc(request->total, MM_USER);
+    char *buf = kmalloc(request->total, MM_USER);
     if (!buf)
         return STATUS_NO_MEMORY;
 
     if (request->op == IO_OP_READ) {
+        size_t count;
         ret = pipe_read(pipe, buf, request->total, nonblock, &count);
 
         if (count) {
-            err = io_request_copy(request, buf, count);
+            status_t err = io_request_copy(request, buf, count);
             if (err != STATUS_SUCCESS)
                 ret = err;
         }
@@ -224,6 +215,7 @@ status_t pipe_io(pipe_t *pipe, io_request_t *request, bool nonblock) {
             return ret;
         }
 
+        size_t count;
         ret = pipe_write(pipe, buf, request->total, nonblock, &count);
         request->transferred -= request->total - count;
     }
@@ -233,8 +225,6 @@ status_t pipe_io(pipe_t *pipe, io_request_t *request, bool nonblock) {
 }
 
 /**
- * Wait for a pipe to be readable or writable.
- *
  * Waits for a pipe to become readable or writable, and notifies the specified
  * object wait pointer when it is. This is a convenience function, for example
  * for devices that use pipes internally.
@@ -272,14 +262,15 @@ void pipe_unwait(pipe_t *pipe, bool write, object_event_t *event) {
 /** Create a new pipe.
  * @return              Pointer to pipe structure. */
 pipe_t *pipe_create(void) {
-    pipe_t *pipe;
+    pipe_t *pipe = slab_cache_alloc(pipe_cache, MM_KERNEL);
 
-    pipe = slab_cache_alloc(pipe_cache, MM_KERNEL);
     semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
     semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
-    pipe->buf = kmem_alloc(PIPE_SIZE, MM_KERNEL);
+
+    pipe->buf   = kmem_alloc(PIPE_SIZE, MM_KERNEL);
     pipe->start = 0;
-    pipe->end = 0;
+    pipe->end   = 0;
+
     return pipe;
 }
 
@@ -290,11 +281,11 @@ void pipe_destroy(pipe_t *pipe) {
     assert(!mutex_held(&pipe->lock));
     assert(notifier_empty(&pipe->space_notifier));
     assert(notifier_empty(&pipe->data_notifier));
+
     kmem_free(pipe->buf, PIPE_SIZE);
     slab_cache_free(pipe_cache, pipe);
 }
 
-/** Initialize the pipe slab cache. */
 static __init_text void pipe_cache_init(void) {
     pipe_cache = object_cache_create("pipe_cache", pipe_t, pipe_ctor, NULL, NULL, 0, MM_BOOT);
 }

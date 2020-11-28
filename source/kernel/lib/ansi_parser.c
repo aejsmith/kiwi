@@ -29,8 +29,6 @@
  * @param ch            Character received.
  * @return              Value to return, 0 if no character to return yet. */
 uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch) {
-    uint16_t ret = 0;
-
     if (parser->length < 0) {
         if (ch == 0x1b) {
             parser->length = 0;
@@ -42,6 +40,8 @@ uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch) {
         parser->buffer[parser->length++] = ch;
 
         /* Check for known sequences. */
+        uint16_t ret = 0;
+
         if (parser->length == 2) {
             if (strncmp(parser->buffer, "[A", 2) == 0) {
                 ret = CONSOLE_KEY_UP;

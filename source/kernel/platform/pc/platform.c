@@ -48,11 +48,10 @@ __init_text void platform_init(void) {
 
 /** Reboot the system. */
 void platform_reboot(void) {
-    uint8_t val;
-
     arch_cpu_invalidate_caches();
 
     /* Try the keyboard controller. */
+    uint8_t val;
     do {
         val = in8(0x64);
         if (val & (1 << 0))

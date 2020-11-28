@@ -27,8 +27,6 @@
 #include <status.h>
 
 /**
- * Initialize a process' I/O context.
- *
  * Initializes a new process' I/O context. If the process has a parent, the
  * new context will inherit the parent's root and current directories. If no
  * parent is specified, the current and root directories will be set to the

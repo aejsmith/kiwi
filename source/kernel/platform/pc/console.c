@@ -263,22 +263,22 @@ static irq_status_t i8042_irq(unsigned num, void *data) {
 
     /* Some debugging hooks to go into KDB, etc. */
     switch (code) {
-    case 59:
-        /* F1 - Enter KDB. */
-        kdb_enter(KDB_REASON_USER, NULL);
-        break;
-    case 60:
-        /* F2 - Call fatal(). */
-        fatal("User requested fatal error");
-        break;
-    case 61:
-        /* F3 - Reboot. */
-        i8042_shutdown_action = SHUTDOWN_REBOOT;
-        break;
-    case 62:
-        /* F4 - Shutdown. */
-        i8042_shutdown_action = SHUTDOWN_POWEROFF;
-        break;
+        case 59:
+            /* F1 - Enter KDB. */
+            kdb_enter(KDB_REASON_USER, NULL);
+            break;
+        case 60:
+            /* F2 - Call fatal(). */
+            fatal("User requested fatal error");
+            break;
+        case 61:
+            /* F3 - Reboot. */
+            i8042_shutdown_action = SHUTDOWN_REBOOT;
+            break;
+        case 62:
+            /* F4 - Shutdown. */
+            i8042_shutdown_action = SHUTDOWN_POWEROFF;
+            break;
     }
 
     spinlock_lock(&i8042_lock);
@@ -330,36 +330,36 @@ static inline void vga_write(size_t idx, uint16_t ch) {
  * @param ch            Character to print. */
 static void vga_console_putc_unsafe(char ch) {
     switch (ch) {
-    case '\b':
-        /* Backspace, move back one character if we can. */
-        if (vga_cursor_x != 0) {
-            vga_cursor_x--;
-        } else {
-            vga_cursor_x = vga_cols - 1;
-            vga_cursor_y--;
-        }
+        case '\b':
+            /* Backspace, move back one character if we can. */
+            if (vga_cursor_x != 0) {
+                vga_cursor_x--;
+            } else {
+                vga_cursor_x = vga_cols - 1;
+                vga_cursor_y--;
+            }
 
-        break;
-    case '\r':
-        /* Carriage return, move to the start of the line. */
-        vga_cursor_x = 0;
-        break;
-    case '\n':
-        /* Newline, treat it as if a carriage return was also there. */
-        vga_cursor_x = 0;
-        vga_cursor_y++;
-        break;
-    case '\t':
-        vga_cursor_x += 8 - (vga_cursor_x % 8);
-        break;
-    default:
-        /* If it is a non-printing character, ignore it. */
-        if (ch < ' ')
             break;
+        case '\r':
+            /* Carriage return, move to the start of the line. */
+            vga_cursor_x = 0;
+            break;
+        case '\n':
+            /* Newline, treat it as if a carriage return was also there. */
+            vga_cursor_x = 0;
+            vga_cursor_y++;
+            break;
+        case '\t':
+            vga_cursor_x += 8 - (vga_cursor_x % 8);
+            break;
+        default:
+            /* If it is a non-printing character, ignore it. */
+            if (ch < ' ')
+                break;
 
-        vga_write((vga_cursor_y * vga_cols) + vga_cursor_x, ch);
-        vga_cursor_x++;
-        break;
+            vga_write((vga_cursor_y * vga_cols) + vga_cursor_x, ch);
+            vga_cursor_x++;
+            break;
     }
 
     /* If we have reached the edge of the screen insert a new line. */

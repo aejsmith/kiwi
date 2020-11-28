@@ -30,19 +30,15 @@
 #include <assert.h>
 #include <status.h>
 
-/** Get the array index containing a bit. */
 static unsigned long bit_index(unsigned long bit) {
     return bit / type_bits(unsigned long);
 }
 
-/** Get the array entry offset of a bit. */
 static unsigned long bit_offset(unsigned long bit) {
     return bit % type_bits(unsigned long);
 }
 
 /**
- * Allocate a new bitmap.
- *
  * Allocates enough space to store a bitmap of the specified size. The memory
  * is allocated with kmalloc(), and therefore must be freed with kfree().
  *
@@ -102,7 +98,7 @@ long bitmap_ffs(const unsigned long *bitmap, size_t nbits) {
         if (value)
             return result + ffs(value);
 
-        nbits -= type_bits(unsigned long);
+        nbits  -= type_bits(unsigned long);
         result += type_bits(unsigned long);
     }
 
@@ -130,7 +126,7 @@ long bitmap_ffz(const unsigned long *bitmap, size_t nbits) {
         if (value != ~0ul)
             return result + ffz(value);
 
-        nbits -= type_bits(unsigned long);
+        nbits  -= type_bits(unsigned long);
         result += type_bits(unsigned long);
     }
 

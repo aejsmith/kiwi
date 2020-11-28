@@ -71,38 +71,38 @@ __init_text void console_init(void) {
 /** Signal that a kernel console device event is being waited for. */
 static status_t kconsole_device_wait(device_t *device, file_handle_t *handle, object_event_t *event) {
     switch (event->event) {
-    case FILE_EVENT_READABLE:
-        if (!main_console.in || !main_console.in->wait)
+        case FILE_EVENT_READABLE:
+            if (!main_console.in || !main_console.in->wait)
+                return STATUS_NOT_SUPPORTED;
+
+            main_console.in->wait(event);
+            return STATUS_SUCCESS;
+
+        case FILE_EVENT_WRITABLE:
+            if (!main_console.out)
+                return STATUS_NOT_SUPPORTED;
+
+            object_event_signal(event, 0);
+            return STATUS_SUCCESS;
+
+        default:
             return STATUS_NOT_SUPPORTED;
-
-        main_console.in->wait(event);
-        return STATUS_SUCCESS;
-
-    case FILE_EVENT_WRITABLE:
-        if (!main_console.out)
-            return STATUS_NOT_SUPPORTED;
-
-        object_event_signal(event, 0);
-        return STATUS_SUCCESS;
-
-    default:
-        return STATUS_NOT_SUPPORTED;
     }
 }
 
 /** Stop waiting for a kernel console device event. */
 static void kconsole_device_unwait(device_t *device, file_handle_t *handle, object_event_t *event) {
     switch (event->event) {
-    case FILE_EVENT_READABLE:
-        assert(main_console.in);
+        case FILE_EVENT_READABLE:
+            assert(main_console.in);
 
-        if (main_console.in->unwait)
-            main_console.in->unwait(event);
+            if (main_console.in->unwait)
+                main_console.in->unwait(event);
 
-        break;
+            break;
 
-    default:
-        break;
+        default:
+            break;
     }
 }
 

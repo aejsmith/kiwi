@@ -111,14 +111,10 @@ static size_t unused_node_count;
 /** Mount at the root of the filesystem. */
 fs_mount_t *root_mount;
 
-/** Look up a filesystem type (fs_mount_lock must be held).
- * @param name          Name of filesystem type to look up.
- * @return              Pointer to type structure if found, NULL if not. */
+/** Look up a filesystem type (fs_mount_lock must be held). */
 static fs_type_t *fs_type_lookup(const char *name) {
-    fs_type_t *type;
-
     list_foreach(&fs_types, iter) {
-        type = list_entry(iter, fs_type_t, header);
+        fs_type_t *type = list_entry(iter, fs_type_t, header);
 
         if (strcmp(type->name, name) == 0)
             return type;
@@ -153,8 +149,6 @@ status_t fs_type_register(fs_type_t *type) {
 }
 
 /**
- * Remove a filesystem type.
- *
  * Removes a previously registered filesystem type. Will not succeed if the
  * filesystem type is in use by any mounts.
  *
@@ -179,14 +173,10 @@ status_t fs_type_unregister(fs_type_t *type) {
     return STATUS_SUCCESS;
 }
 
-/** Look up a mount by ID (fs_mount_lock must be held).
- * @param id            ID of mount to look up.
- * @return              Pointer to mount if found, NULL if not. */
+/** Look up a mount by ID (fs_mount_lock must be held). */
 static fs_mount_t *fs_mount_lookup(mount_id_t id) {
-    fs_mount_t *mount;
-
     list_foreach(&fs_mount_list, iter) {
-        mount = list_entry(iter, fs_mount_t, header);
+        fs_mount_t *mount = list_entry(iter, fs_mount_t, header);
         if (mount->id == id)
             return mount;
     }
@@ -198,26 +188,22 @@ static fs_mount_t *fs_mount_lookup(mount_id_t id) {
  * Node functions.
  */
 
-/** Allocate a node structure.
- * @param mount         Mount for the node.
- * @return              Pointer to allocated node structure. Reference count
- *                      will be set to 1. */
+/** Allocate a node structure (reference count will be set to 1). */
 static fs_node_t *fs_node_alloc(fs_mount_t *mount) {
-    fs_node_t *node;
+    fs_node_t *node = slab_cache_alloc(fs_node_cache, MM_KERNEL);
 
-    node = slab_cache_alloc(fs_node_cache, MM_KERNEL);
     refcount_set(&node->count, 1);
     list_init(&node->unused_link);
+
     node->file.ops = &fs_file_ops;
-    node->flags = 0;
-    node->mount = mount;
+    node->flags    = 0;
+    node->mount    = mount;
+
     return node;
 }
 
 /**
- * Free an unused node.
- *
- * Free an unused node structure. The node's mount must be locked. If the node
+ * Frees an unused node structure. The node's mount must be locked. If the node
  * is not marked as removed, the node's flush operation will be called, and the
  * node will not be freed if this fails. Removed nodes will always be freed
  * without error.
@@ -260,7 +246,7 @@ static status_t fs_node_free(fs_node_t *node) {
     return STATUS_SUCCESS;
 }
 
-/** Release a node.
+/** Releases a node.
  * @param node          Node to release. */
 static void fs_node_release(fs_node_t *node) {
     fs_mount_t *mount = node->mount;
@@ -294,7 +280,7 @@ static void fs_node_release(fs_node_t *node) {
     mutex_unlock(&mount->lock);
 }
 
-/** Get information about a node.
+/** Gets information about a node.
  * @param node          Node to get information for.
  * @param info          Structure to store information in. */
 static void fs_node_info(fs_node_t *node, file_info_t *info) {
@@ -303,18 +289,15 @@ static void fs_node_info(fs_node_t *node, file_info_t *info) {
     assert(node->ops->info);
     node->ops->info(node, info);
 
-    info->id = node->id;
+    info->id    = node->id;
     info->mount = node->mount->id;
-    info->type = node->file.type;
+    info->type  = node->file.type;
 }
 
 /**
  * Directory cache functions.
  */
 
-/** Constructor for directory entry objects.
- * @param obj           Object to construct.
- * @param data          Unused. */
 static void fs_dentry_ctor(void *obj, void *data) {
     fs_dentry_t *entry = obj;
 
@@ -324,28 +307,23 @@ static void fs_dentry_ctor(void *obj, void *data) {
     list_init(&entry->unused_link);
 }
 
-/** Allocate a new directory entry structure.
- * @param name          Name of entry to create.
- * @param mount         Mount that the entry is on.
- * @param parent        Parent entry.
- * @return              Pointer to created entry structure. Reference count
- *                      will be set to 0. */
+/** Allocate a new directory entry structure (reference count will be set to 0). */
 static fs_dentry_t *fs_dentry_alloc(const char *name, fs_mount_t *mount, fs_dentry_t *parent) {
-    fs_dentry_t *entry;
+    fs_dentry_t *entry = slab_cache_alloc(fs_dentry_cache, MM_KERNEL);
 
-    entry = slab_cache_alloc(fs_dentry_cache, MM_KERNEL);
     refcount_set(&entry->count, 0);
-    entry->flags = 0;
-    entry->name = kstrdup(name, MM_KERNEL);
-    entry->mount = mount;
-    entry->node = NULL;
-    entry->parent = parent;
+
+    entry->flags   = 0;
+    entry->name    = kstrdup(name, MM_KERNEL);
+    entry->mount   = mount;
+    entry->node    = NULL;
+    entry->parent  = parent;
     entry->mounted = NULL;
+
     return entry;
 }
 
-/** Free a directory entry structure.
- * @param entry         Entry to free. */
+/** Free a directory entry structure. */
 static void fs_dentry_free(fs_dentry_t *entry) {
     radix_tree_clear(&entry->entries, NULL);
     kfree(entry->name);
@@ -418,8 +396,6 @@ void fs_dentry_release(fs_dentry_t *entry) {
  *                      successful.
  * @return              Status code describing result of the operation. */
 static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
-    fs_mount_t *mount;
-    fs_node_t *node;
     status_t ret;
 
     mutex_lock(&entry->lock);
@@ -429,11 +405,11 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
         return STATUS_SUCCESS;
     }
 
-    mount = entry->mount;
+    fs_mount_t *mount = entry->mount;
     mutex_lock(&mount->lock);
 
     /* Check if the node is cached in the mount. */
-    node = avl_tree_lookup(&mount->nodes, entry->id, fs_node_t, tree_link);
+    fs_node_t *node = avl_tree_lookup(&mount->nodes, entry->id, fs_node_t, tree_link);
     if (node) {
         if (refcount_inc(&node->count) == 1) {
             if (!(node->flags & FS_NODE_KEEP)) {
@@ -496,8 +472,6 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
 }
 
 /**
- * Look up a child entry in a directory.
- *
  * Looks up a child entry in a directory, looking it up on the filesystem if it
  * cannot be found. This function does not handle '.' and '..' entries, an
  * assertion exists to check that these are not passed. Symbolic links are not
@@ -512,22 +486,19 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
  * @return              Status code describing the result of the operation.
  */
 static status_t fs_dentry_lookup(fs_dentry_t *parent, const char *name, fs_dentry_t **_entry) {
-    fs_dentry_t *entry;
-    status_t ret;
-
     assert(mutex_held(&parent->lock));
     assert(parent->node);
     assert(strcmp(name, ".") != 0);
     assert(strcmp(name, "..") != 0);
 
-    entry = radix_tree_lookup(&parent->entries, name);
+    fs_dentry_t *entry = radix_tree_lookup(&parent->entries, name);
     if (!entry) {
         if (!parent->node->ops->lookup)
             return STATUS_NOT_FOUND;
 
         entry = fs_dentry_alloc(name, parent->mount, parent);
 
-        ret = parent->node->ops->lookup(parent->node, entry);
+        status_t ret = parent->node->ops->lookup(parent->node, entry);
         if (ret != STATUS_SUCCESS) {
             fs_dentry_free(entry);
             return ret;
@@ -553,10 +524,6 @@ static status_t fs_lookup_internal(
     char *path, fs_dentry_t *entry, unsigned flags, unsigned nest,
     fs_dentry_t **_entry)
 {
-    fs_dentry_t *prev;
-    fs_node_t *node;
-    char *tok, *link;
-    bool follow;
     status_t ret;
 
     if (path[0] == '/') {
@@ -594,15 +561,16 @@ static status_t fs_lookup_internal(
 
     /* Loop through each element of the path string. The starting entry should
      * already be instantiated. */
-    prev = NULL;
+    fs_dentry_t *prev = NULL;
     while (true) {
         assert(entry->node);
-        node = entry->node;
-        tok = strsep(&path, "/");
+        fs_node_t *node = entry->node;
+
+        char *tok = strsep(&path, "/");
 
         /* If the current entry is a symlink and this is not the last element
          * of the path, or the caller wishes to follow the link, follow it. */
-        follow = tok || flags & FS_LOOKUP_FOLLOW;
+        bool follow = tok || flags & FS_LOOKUP_FOLLOW;
         if (node->file.type == FILE_TYPE_SYMLINK && follow) {
             /* The previous entry should be the link's parent. */
             assert(prev);
@@ -614,6 +582,8 @@ static status_t fs_lookup_internal(
             }
 
             assert(node->ops->read_symlink);
+
+            char *link;
             ret = node->ops->read_symlink(node, &link);
             if (ret != STATUS_SUCCESS)
                 goto err_release_prev;
@@ -727,8 +697,6 @@ err_release:
 }
 
 /**
- * Look up a filesystem entry.
- *
  * Looks up an entry in the filesystem. If the path is a relative path (one
  * that does not begin with a '/' character), then it will be looked up
  * relative to the current directory in the current process' I/O context.
@@ -742,9 +710,6 @@ err_release:
  * @return              Status code describing result of the operation.
  */
 static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **_entry) {
-    char *dup;
-    status_t ret;
-
     assert(path);
     assert(_entry);
 
@@ -757,31 +722,27 @@ static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **_entry
     rwlock_read_lock(&curr_proc->io.lock);
 
     /* Duplicate path so that fs_lookup_internal() can modify it. */
-    dup = kstrdup(path, MM_KERNEL);
+    char *dup = kstrdup(path, MM_KERNEL);
 
     /* Look up the path string. */
-    ret = fs_lookup_internal(dup, NULL, flags, 0, _entry);
+    status_t ret = fs_lookup_internal(dup, NULL, flags, 0, _entry);
     kfree(dup);
     rwlock_unlock(&curr_proc->io.lock);
     return ret;
 }
 
-/** Get the path to a directory entry.
- * @param entry         Entry to get path to.
- * @param _path         Where to store pointer to path string.
- * @return              Status code describing result of the operation. */
+/** Get the path to a directory entry. */
 static status_t fs_dentry_path(fs_dentry_t *entry, char **_path) {
-    char *buf = NULL, *tmp;
-    size_t total = 0, len;
-
     rwlock_read_lock(&curr_proc->io.lock);
 
     /* Loop through until we reach the root. */
+    char *buf = NULL, *tmp;
+    size_t total = 0;
     while (entry != curr_proc->io.root_dir && entry != root_mount->root) {
         if (entry == entry->mount->root)
             entry = entry->mount->mountpoint;
 
-        len = strlen(entry->name);
+        size_t len = strlen(entry->name);
         total += (buf) ? len + 1 : len;
 
         tmp = kmalloc(total + 1, MM_KERNEL);
@@ -832,13 +793,11 @@ static status_t fs_dentry_path(fs_dentry_t *entry, char **_path) {
  *                      locked.
  * @return              Status code describing result of the operation. */
 static status_t fs_create_prepare(const char *path, fs_dentry_t **_entry) {
-    char *dir, *name;
-    fs_dentry_t *parent, *entry;
     status_t ret;
 
     /* Split path into directory/name. */
-    dir = kdirname(path, MM_KERNEL);
-    name = kbasename(path, MM_KERNEL);
+    char *dir  = kdirname(path, MM_KERNEL);
+    char *name = kbasename(path, MM_KERNEL);
 
     /* It is possible for kbasename() to return a string with a '/' character
      * if the path refers to the root of the FS. */
@@ -856,6 +815,7 @@ static status_t fs_create_prepare(const char *path, fs_dentry_t **_entry) {
     }
 
     /* Look up the parent entry. */
+    fs_dentry_t *parent;
     ret = fs_lookup(dir, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, &parent);
     if (ret != STATUS_SUCCESS)
         goto out_free_name;
@@ -866,6 +826,7 @@ static status_t fs_create_prepare(const char *path, fs_dentry_t **_entry) {
     }
 
     /* Check if the name we're creating already exists. */
+    fs_dentry_t *entry;
     ret = fs_dentry_lookup(parent, name, &entry);
     if (ret != STATUS_NOT_FOUND) {
         if (ret == STATUS_SUCCESS)
@@ -924,21 +885,21 @@ static status_t fs_create(
     const char *path, file_type_t type, const char *target,
     fs_dentry_t **_entry)
 {
-    fs_dentry_t *parent, *entry;
-    fs_node_t *node;
     status_t ret;
 
+    fs_dentry_t*entry;
     ret = fs_create_prepare(path, &entry);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    parent = entry->parent;
+    fs_dentry_t* parent = entry->parent;
     if (!parent->node->ops->create) {
         ret = STATUS_NOT_SUPPORTED;
         goto err_free_entry;
     }
 
-    node = fs_node_alloc(parent->mount);
+    fs_node_t *node = fs_node_alloc(parent->mount);
+
     node->file.type = type;
 
     ret = parent->node->ops->create(parent->node, entry, node, target);
@@ -978,9 +939,7 @@ err_free_entry:
  * File operations.
  */
 
-/** Open a FS handle.
- * @param handle        File handle structure.
- * @return              Status code describing the result of the operation. */
+/** Open a FS handle. */
 static status_t fs_file_open(file_handle_t *handle) {
     status_t ret = STATUS_SUCCESS;
 
@@ -996,8 +955,7 @@ static status_t fs_file_open(file_handle_t *handle) {
     return ret;
 }
 
-/** Close a FS handle.
- * @param handle        File handle structure. */
+/** Close a FS handle. */
 static void fs_file_close(file_handle_t *handle) {
     if (handle->node->ops->close)
         handle->node->ops->close(handle);
@@ -1007,47 +965,32 @@ static void fs_file_close(file_handle_t *handle) {
     fs_dentry_release(handle->entry);
 }
 
-/** Get the name of a FS object.
- * @param handle        File handle structure.
- * @return              Pointer to allocated name string. */
+/** Get the name of a FS object. */
 static char *fs_file_name(file_handle_t *handle) {
     char *path;
-    status_t ret;
-
-    ret = fs_dentry_path(handle->entry, &path);
+    status_t ret = fs_dentry_path(handle->entry, &path);
     return (ret == STATUS_SUCCESS) ? path : NULL;
 }
 
-/** Signal that a file event is being waited for.
- * @param handle        File handle structure.
- * @param event         Event that is being waited for.
- * @return              Status code describing result of the operation. */
+/** Signal that a file event is being waited for. */
 static status_t fs_file_wait(file_handle_t *handle, object_event_t *event) {
     /* TODO. */
     return STATUS_NOT_IMPLEMENTED;
 }
 
-/** Stop waiting for a file.
- * @param handle        File handle structure.
- * @param event         Event that is being waited for. */
+/** Stop waiting for a file. */
 static void fs_file_unwait(file_handle_t *handle, object_event_t *event) {
     /* TODO. */
 }
 
-/** Perform I/O on a file.
- * @param handle        File handle structure.
- * @param request       I/O request.
- * @return              Status code describing result of the operation. */
+/** Perform I/O on a file. */
 static status_t fs_file_io(file_handle_t *handle, io_request_t *request) {
     return (handle->node->ops->io)
         ? handle->node->ops->io(handle, request)
         : STATUS_NOT_SUPPORTED;
 }
 
-/** Map a file into memory.
- * @param handle        File handle structure.
- * @param region        Region being mapped.
- * @return              Status code describing result of the operation. */
+/** Map a file into memory. */
 static status_t fs_file_map(file_handle_t *handle, vm_region_t *region) {
     fs_node_t *node = (fs_node_t *)handle->file;
 
@@ -1055,29 +998,24 @@ static status_t fs_file_map(file_handle_t *handle, vm_region_t *region) {
         return STATUS_NOT_SUPPORTED;
 
     region->private = node->ops->get_cache(handle);
-    region->ops = &vm_cache_region_ops;
+    region->ops     = &vm_cache_region_ops;
+
     return STATUS_SUCCESS;
 }
 
-/** Read the next directory entry.
- * @param handle        File handle structure.
- * @param _entry        Where to store pointer to directory entry structure.
- * @return              Status code describing result of the operation. */
+/** Read the next directory entry. */
 static status_t fs_file_read_dir(file_handle_t *handle, dir_entry_t **_entry) {
-    dir_entry_t *entry;
-    fs_mount_t *mount;
-    fs_dentry_t *child;
-    status_t ret;
-
     if (!handle->node->ops->read_dir)
         return STATUS_NOT_SUPPORTED;
 
-    ret = handle->node->ops->read_dir(handle, &entry);
+    dir_entry_t *entry;
+    status_t ret = handle->node->ops->read_dir(handle, &entry);
     if (ret != STATUS_SUCCESS)
         return ret;
 
     mutex_lock(&handle->entry->lock);
-    mount = handle->entry->mount;
+
+    fs_mount_t *mount = handle->entry->mount;
 
     /* Fix up the entry. */
     entry->mount = mount->id;
@@ -1094,7 +1032,7 @@ static status_t fs_file_read_dir(file_handle_t *handle, dir_entry_t **_entry) {
          * If we don't have an entry in the cache with the same name as this
          * entry, then it won't be a mountpoint (mountpoints are always in the
          * cache). */
-        child = radix_tree_lookup(&handle->entry->entries, entry->name);
+        fs_dentry_t *child = radix_tree_lookup(&handle->entry->entries, entry->name);
         if (child && child->mounted) {
             entry->id = child->mounted->root->id;
             entry->mount = child->mounted->id;
@@ -1107,26 +1045,19 @@ static status_t fs_file_read_dir(file_handle_t *handle, dir_entry_t **_entry) {
     return STATUS_SUCCESS;
 }
 
-/** Modify the size of a file.
- * @param handle        File handle structure.
- * @param size          New size of the file.
- * @return              Status code describing result of the operation. */
+/** Modify the size of a file. */
 static status_t fs_file_resize(file_handle_t *handle, offset_t size) {
     return (handle->node->ops->resize)
         ? handle->node->ops->resize(handle->node, size)
         : STATUS_NOT_SUPPORTED;
 }
 
-/** Get information about a file.
- * @param handle        File handle structure.
- * @param info          Information structure to fill in. */
+/** Get information about a file. */
 static void fs_file_info(file_handle_t *handle, file_info_t *info) {
     fs_node_info(handle->node, info);
 }
 
-/** Flush changes to a file.
- * @param handle        File handle structure.
- * @return              Status code describing result of the operation. */
+/** Flush changes to a file. */
 static status_t fs_file_sync(file_handle_t *handle) {
     status_t ret = STATUS_SUCCESS;
 
@@ -1138,17 +1069,17 @@ static status_t fs_file_sync(file_handle_t *handle) {
 
 /** FS file object operations. */
 static file_ops_t fs_file_ops = {
-    .open = fs_file_open,
-    .close = fs_file_close,
-    .name = fs_file_name,
-    .wait = fs_file_wait,
-    .unwait = fs_file_unwait,
-    .io = fs_file_io,
-    .map = fs_file_map,
+    .open     = fs_file_open,
+    .close    = fs_file_close,
+    .name     = fs_file_name,
+    .wait     = fs_file_wait,
+    .unwait   = fs_file_unwait,
+    .io       = fs_file_io,
+    .map      = fs_file_map,
     .read_dir = fs_file_read_dir,
-    .resize = fs_file_resize,
-    .info = fs_file_info,
-    .sync = fs_file_sync,
+    .resize   = fs_file_resize,
+    .info     = fs_file_info,
+    .sync     = fs_file_sync,
 };
 
 /**
@@ -1156,8 +1087,6 @@ static file_ops_t fs_file_ops = {
  */
 
 /**
- * Open a handle to a filesystem entry.
- *
  * Opens a handle to an entry in the filesystem, optionally creating it if it
  * doesn't exist. If the entry does not exist and it is specified to create it,
  * it will be created as a regular file.
@@ -1178,9 +1107,6 @@ status_t fs_open(
     const char *path, uint32_t access, uint32_t flags, unsigned create,
     object_handle_t **_handle)
 {
-    fs_dentry_t *entry;
-    fs_node_t *node;
-    file_handle_t *handle;
     status_t ret;
 
     assert(path);
@@ -1190,6 +1116,8 @@ status_t fs_open(
         return STATUS_INVALID_ARG;
 
     /* Look up the filesystem entry. */
+    fs_node_t *node;
+    fs_dentry_t *entry;
     ret = fs_lookup(path, FS_LOOKUP_FOLLOW, &entry);
     if (ret != STATUS_SUCCESS) {
         if (ret != STATUS_NOT_FOUND || create == FS_OPEN)
@@ -1211,12 +1139,12 @@ status_t fs_open(
          * eventually be redirected to the device layer, pipes should be
          * openable and get directed into the pipe implementation. */
         switch (node->file.type) {
-        case FILE_TYPE_REGULAR:
-        case FILE_TYPE_DIR:
-            break;
-        default:
-            fs_dentry_release(entry);
-            return STATUS_NOT_SUPPORTED;
+            case FILE_TYPE_REGULAR:
+            case FILE_TYPE_DIR:
+                break;
+            default:
+                fs_dentry_release(entry);
+                return STATUS_NOT_SUPPORTED;
         }
 
         /* Check for the requested access to the file. We don't do this when we
@@ -1232,7 +1160,8 @@ status_t fs_open(
         }
     }
 
-    handle = file_handle_alloc(&node->file, access, flags);
+    file_handle_t *handle = file_handle_alloc(&node->file, access, flags);
+
     handle->entry = entry;
 
     /* Call the FS' open hook, if any. */
@@ -1250,8 +1179,6 @@ status_t fs_open(
 }
 
 /**
- * Create a directory.
- *
  * Creates a new directory in the file system. This function cannot open a
  * handle to the created directory. The reason for this is that it is unlikely
  * that anything useful can be done on the new handle, for example reading
@@ -1266,8 +1193,6 @@ status_t fs_create_dir(const char *path) {
 }
 
 /**
- * Create a FIFO.
- *
  * Creates a new FIFO in the filesystem. A FIFO is a named pipe. Opening it
  * with FILE_ACCESS_READ will give access to the read end, and FILE_ACCESS_WRITE
  * gives access to the write end.
@@ -1281,9 +1206,7 @@ status_t fs_create_fifo(const char *path) {
 }
 
 /**
- * Create a symbolic link.
- *
- * Create a new symbolic link in the filesystem. The link target can be on any
+ * Creates a new symbolic link in the filesystem. The link target can be on any
  * mount (not just the same one as the link itself), and does not have to exist.
  * If it is a relative path, it is relative to the directory containing the
  * link.
@@ -1298,8 +1221,6 @@ status_t fs_create_symlink(const char *path, const char *target) {
 }
 
 /**
- * Get the target of a symbolic link.
- *
  * Reads the target of a symbolic link and returns it as a pointer to a string
  * allocated with kmalloc(). Should be freed with kfree() when no longer
  * needed.
@@ -1310,13 +1231,13 @@ status_t fs_create_symlink(const char *path, const char *target) {
  * @return              Status code describing result of the operation.
  */
 status_t fs_read_symlink(const char *path, char **_target) {
-    fs_dentry_t *entry;
     status_t ret;
 
     assert(path);
     assert(_target);
 
     /* Find the link node. */
+    fs_dentry_t *entry;
     ret = fs_lookup(path, 0, &entry);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -1334,21 +1255,16 @@ status_t fs_read_symlink(const char *path, char **_target) {
     return ret;
 }
 
-/** Parse mount arguments.
- * @param str           Options string.
- * @param _opts         Where to store options structure array.
- * @param _count        Where to store number of arguments in array. */
 static void parse_mount_opts(const char *str, fs_mount_option_t **_opts, size_t *_count) {
     fs_mount_option_t *opts = NULL;
-    char *dup, *name, *value;
     size_t count = 0;
 
     if (str) {
         /* Duplicate the string to allow modification with strsep(). */
-        dup = kstrdup(str, MM_KERNEL);
-
+        char *dup = kstrdup(str, MM_KERNEL);
+        char *value;
         while ((value = strsep(&dup, ","))) {
-            name = strsep(&value, "=");
+            char *name = strsep(&value, "=");
             if (strlen(name) == 0) {
                 continue;
             } else if (value && strlen(value) == 0) {
@@ -1356,25 +1272,22 @@ static void parse_mount_opts(const char *str, fs_mount_option_t **_opts, size_t 
             }
 
             opts = krealloc(opts, sizeof(*opts) * (count + 1), MM_KERNEL);
-            opts[count].name = kstrdup(name, MM_KERNEL);
+
+            opts[count].name  = kstrdup(name, MM_KERNEL);
             opts[count].value = (value) ? kstrdup(value, MM_KERNEL) : NULL;
+
             count++;
         }
 
         kfree(dup);
     }
 
-    *_opts = opts;
+    *_opts  = opts;
     *_count = count;
 }
 
-/** Free a mount options array.
- * @param opts          Array of options.
- * @param count         Number of options. */
 static void free_mount_opts(fs_mount_option_t *opts, size_t count) {
-    size_t i;
-
-    for (i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
         kfree((char *)opts[i].name);
         if (opts[i].value)
             kfree((char *)opts[i].value);
@@ -1384,8 +1297,6 @@ static void free_mount_opts(fs_mount_option_t *opts, size_t count) {
 }
 
 /**
- * Mount a filesystem.
- *
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
  * Mounting multiple filesystems on one directory at a time is not allowed.
  * The flags argument specifies generic mount options, the opts string is
@@ -1406,10 +1317,6 @@ status_t fs_mount(
     const char *device, const char *path, const char *type, uint32_t flags,
     const char *opts)
 {
-    fs_mount_option_t *opt_array;
-    size_t opt_count;
-    fs_dentry_t *mountpoint;
-    fs_mount_t *mount;
     status_t ret;
 
     assert(path);
@@ -1419,6 +1326,8 @@ status_t fs_mount(
         return STATUS_PERM_DENIED;
 
     /* Parse the options string. */
+    fs_mount_option_t *opt_array;
+    size_t opt_count;
     parse_mount_opts(opts, &opt_array, &opt_count);
 
     /* Lock the mount lock across the entire operation, so that only one mount
@@ -1427,6 +1336,7 @@ status_t fs_mount(
 
     /* If the root filesystem is not yet mounted, the only place we can mount
      * is '/'. */
+    fs_dentry_t *mountpoint;
     if (!root_mount) {
         assert(curr_proc == kernel_proc);
         if (strcmp(path, "/") != 0)
@@ -1446,14 +1356,15 @@ status_t fs_mount(
         }
     }
 
-    /* Initialize the mount structure. */
-    mount = kmalloc(sizeof(*mount), MM_KERNEL | MM_ZERO);
+    fs_mount_t *mount = kmalloc(sizeof(*mount), MM_KERNEL | MM_ZERO);
+
     mutex_init(&mount->lock, "fs_mount_lock", 0);
     avl_tree_init(&mount->nodes);
     list_init(&mount->used_entries);
     list_init(&mount->unused_entries);
     list_init(&mount->header);
-    mount->flags = flags;
+
+    mount->flags      = flags;
     mount->mountpoint = mountpoint;
 
     /* If a type is specified, look it up. */
@@ -1480,6 +1391,7 @@ status_t fs_mount(
         ret = STATUS_FS_FULL;
         goto err_free_mount;
     }
+
     mount->id = next_mount_id++;
 
     /* Create root directory entry. It will be filled in by the FS' mount
@@ -1547,8 +1459,6 @@ err_unlock:
 }
 
 /**
- * Unmount a filesystem.
- *
  * Flushes all modifications to a filesystem (if it is not read-only) and
  * unmounts it. If any entries in the filesystem are in use, then the operation
  * will fail.
@@ -1559,9 +1469,6 @@ err_unlock:
  * @return              Status code describing result of the operation.
  */
 status_t fs_unmount(const char *path, unsigned flags) {
-    fs_dentry_t *root, *parent, *entry;
-    fs_mount_t *mount;
-    fs_node_t *node;
     status_t ret;
 
     if (!security_check_priv(PRIV_FS_MOUNT))
@@ -1569,11 +1476,12 @@ status_t fs_unmount(const char *path, unsigned flags) {
 
     mutex_lock(&fs_mount_lock);
 
+    fs_dentry_t *root;
     ret = fs_lookup(path, 0, &root);
     if (ret != STATUS_SUCCESS)
         goto err_unlock;
 
-    mount = root->mount;
+    fs_mount_t *mount = root->mount;
 
     if (root->node->file.type != FILE_TYPE_DIR) {
         ret = STATUS_NOT_DIR;
@@ -1590,7 +1498,7 @@ status_t fs_unmount(const char *path, unsigned flags) {
     /* Lock the entry containing the mountpoint. Once we have determined that
      * no entries on the mount are in use, this will ensure that no lookups
      * will descend into the mount. */
-    parent = mount->mountpoint->parent;
+    fs_dentry_t *parent = mount->mountpoint->parent;
     mutex_lock(&parent->lock);
     mutex_lock(&mount->lock);
 
@@ -1609,7 +1517,7 @@ status_t fs_unmount(const char *path, unsigned flags) {
 
     /* Free all unused directory entries. */
     list_foreach_safe(&mount->unused_entries, iter) {
-        entry = list_entry(iter, fs_dentry_t, mount_link);
+        fs_dentry_t *entry = list_entry(iter, fs_dentry_t, mount_link);
 
         assert(refcount_get(&entry->count) == 0);
         assert(!entry->node);
@@ -1630,7 +1538,7 @@ status_t fs_unmount(const char *path, unsigned flags) {
      * and directory entry last as we still want to leave the mount in the
      * correct state if we fail to flush some nodes. */
     avl_tree_foreach_safe(&mount->nodes, iter) {
-        node = avl_tree_entry(iter, fs_node_t, tree_link);
+        fs_node_t *node = avl_tree_entry(iter, fs_node_t, tree_link);
 
         if (node == root->node)
             continue;
@@ -1693,11 +1601,9 @@ err_unlock:
 }
 
 /**
- * Get the path to a file or directory.
- *
- * Given a handle to a file or directory, this function will return the
- * absolute path that was used to open the handle. If the handle specified is
- * NULL, the path to the current directory will be returned.
+ * Given a handle to a file or directory, returns the absolute path that was
+ * used to open the handle. If the handle specified is NULL, the path to the
+ * current directory will be returned.
  *
  * @param handle        Handle to get path from.
  * @param _path         Where to store pointer to path string.
@@ -1705,12 +1611,9 @@ err_unlock:
  * @return              Status code describing result of the operation.
  */
 status_t fs_path(object_handle_t *handle, char **_path) {
-    file_handle_t *fhandle;
     fs_dentry_t *entry;
-    status_t ret;
-
     if (handle) {
-        fhandle = handle->private;
+        file_handle_t *fhandle = handle->private;
 
         if (fhandle->file->ops != &fs_file_ops)
             return STATUS_NOT_SUPPORTED;
@@ -1721,27 +1624,25 @@ status_t fs_path(object_handle_t *handle, char **_path) {
         entry = curr_proc->io.curr_dir;
     }
 
-    ret = fs_dentry_path(entry, _path);
+    status_t ret = fs_dentry_path(entry, _path);
     if (!handle)
         rwlock_unlock(&curr_proc->io.lock);
 
     return ret;
 }
 
-/** Get information about a filesystem entry.
+/** Gets information about a filesystem entry.
  * @param path          Path to get information on.
  * @param follow        Whether to follow if last path component is a symbolic
  *                      link.
  * @param info          Information structure to fill in.
  * @return              Status code describing result of the operation. */
 status_t fs_info(const char *path, bool follow, file_info_t *info) {
-    fs_dentry_t *entry;
-    status_t ret;
-
     assert(path);
     assert(info);
 
-    ret = fs_lookup(path, (follow) ? FS_LOOKUP_FOLLOW : 0, &entry);
+    fs_dentry_t *entry;
+    status_t ret = fs_lookup(path, (follow) ? FS_LOOKUP_FOLLOW : 0, &entry);
     if (ret != STATUS_SUCCESS)
         return ret;
 
@@ -1751,8 +1652,6 @@ status_t fs_info(const char *path, bool follow, file_info_t *info) {
 }
 
 /**
- * Create a link on the filesystem.
- *
  * Creates a new hard link in the filesystem referring to the same underlying
  * node as the source link. Both paths must exist on the same mount. If the
  * source path refers to a symbolic link, the new link will refer to the node
@@ -1764,16 +1663,15 @@ status_t fs_info(const char *path, bool follow, file_info_t *info) {
  * @return              Status code describing result of the operation.
  */
 status_t fs_link(const char *path, const char *source) {
-    fs_dentry_t *parent, *entry;
-    fs_node_t *node;
     status_t ret;
 
+    fs_dentry_t *entry;
     ret = fs_lookup(source, FS_LOOKUP_FOLLOW, &entry);
     if (ret != STATUS_SUCCESS)
         return ret;
 
     /* We just need the node, we don't care about the source dentry. */
-    node = entry->node;
+    fs_node_t *node = entry->node;
     refcount_inc(&node->count);
     fs_dentry_release(entry);
 
@@ -1787,7 +1685,7 @@ status_t fs_link(const char *path, const char *source) {
     if (ret != STATUS_SUCCESS)
         goto err_release_node;
 
-    parent = entry->parent;
+    fs_dentry_t *parent = entry->parent;
     if (parent->mount != node->mount) {
         ret = STATUS_DIFFERENT_FS;
         goto err_free_entry;
@@ -1822,8 +1720,6 @@ err_release_node:
 }
 
 /**
- * Decrease the link count of a filesystem node.
- *
  * Decreases the link count of a filesystem node, and removes the directory
  * entry for it. If the link count becomes 0, then the node will be removed
  * from the filesystem once the node's reference count becomes 0. If the given
@@ -1834,13 +1730,11 @@ err_release_node:
  * @return              Status code describing result of the operation.
  */
 status_t fs_unlink(const char *path) {
-    char *dir, *name;
-    fs_dentry_t *parent, *entry;
     status_t ret;
 
     /* Split path into directory/name. */
-    dir = kdirname(path, MM_KERNEL);
-    name = kbasename(path, MM_KERNEL);
+    char *dir  = kdirname(path, MM_KERNEL);
+    char *name = kbasename(path, MM_KERNEL);
 
     /* It is possible for kbasename() to return a string with a '/' character
      * if the path refers to the root of the FS. */
@@ -1863,6 +1757,7 @@ status_t fs_unlink(const char *path) {
     }
 
     /* Look up the parent entry. */
+    fs_dentry_t *parent;
     ret = fs_lookup(dir, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, &parent);
     if (ret != STATUS_SUCCESS)
         goto out_free_name;
@@ -1873,6 +1768,7 @@ status_t fs_unlink(const char *path) {
     }
 
     /* Look up the child entry. */
+    fs_dentry_t *entry;
     ret = fs_dentry_lookup(parent, name, &entry);
     if (ret != STATUS_SUCCESS)
         goto out_release_parent;
@@ -1925,8 +1821,6 @@ out_free_name:
 }
 
 /**
- * Rename a link on the filesystem.
- *
  * Renames a link on the filesystem. This first creates a new link referring to
  * the same underlying filesystem node as the source link, and then removes
  * the source link. Both paths must exist on the same mount. If the specified
@@ -1942,8 +1836,6 @@ status_t fs_rename(const char *source, const char *dest) {
 }
 
 /**
- * Flush all filesystem caches.
- *
  * Flushes all cached filesystem modifications that have yet to be written to
  * the disk.
  */
@@ -1955,14 +1847,8 @@ status_t fs_sync(void) {
  * Debugger commands.
  */
 
-/** Print information about mounted filesystems.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
+/** Print information about mounted filesystems. */
 static kdb_status_t kdb_cmd_mount(int argc, char **argv, kdb_filter_t *filter) {
-    fs_mount_t *mount;
-    uint64_t val;
-
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s [<mount ID|addr>]\n\n", argv[0]);
 
@@ -1975,9 +1861,11 @@ static kdb_status_t kdb_cmd_mount(int argc, char **argv, kdb_filter_t *filter) {
     }
 
     if (argc == 2) {
+    uint64_t val;
         if (kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS)
             return KDB_FAILURE;
 
+        fs_mount_t *mount;
         if (val >= KERNEL_BASE) {
             mount = (fs_mount_t *)((ptr_t)val);
         } else {
@@ -2013,7 +1901,7 @@ static kdb_status_t kdb_cmd_mount(int argc, char **argv, kdb_filter_t *filter) {
         kdb_printf("==  ====       =====    ======             ==========\n");
 
         list_foreach(&fs_mount_list, iter) {
-            mount = list_entry(iter, fs_mount_t, header);
+            fs_mount_t *mount = list_entry(iter, fs_mount_t, header);
 
             kdb_printf(
                 "%-3" PRIu16 " %-10s 0x%-6x %-18p %p ('%s')\n",
@@ -2026,19 +1914,16 @@ static kdb_status_t kdb_cmd_mount(int argc, char **argv, kdb_filter_t *filter) {
     return KDB_SUCCESS;
 }
 
-/** Display the children of a directory entry.
- * @param entry         Entry to start from.
- * @param descend       Whether to descend into children. */
+/** Display the children of a directory entry. */
 static void dump_children(fs_dentry_t *entry, bool descend) {
-    fs_dentry_t *child = NULL;
-    fs_dentry_t *prev = NULL;
-    unsigned depth = 0;
-
     kdb_printf("Entry              Count  Flags    Mount Node     Name\n");
     kdb_printf("=====              =====  =====    ===== ====     ====\n");
 
     /* We're in the debugger and descending through a potentially very large
      * tree. Don't use recursion, we really don't want to overrun the stack. */
+    fs_dentry_t *child = NULL;
+    fs_dentry_t *prev = NULL;
+    unsigned depth = 0;
     while (true) {
         radix_tree_foreach(&entry->entries, iter) {
             child = radix_tree_entry(iter, fs_dentry_t);
@@ -2101,15 +1986,8 @@ static void dump_children(fs_dentry_t *entry, bool descend) {
     }
 }
 
-/** Print information about the directory cache.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
+/** Print information about the directory cache. */
 static kdb_status_t kdb_cmd_dentry(int argc, char **argv, kdb_filter_t *filter) {
-    fs_dentry_t *entry;
-    uint64_t val;
-    int idx;
-    bool descend = false;
 
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s [--descend] [<addr>]\n\n", argv[0]);
@@ -2124,6 +2002,8 @@ static kdb_status_t kdb_cmd_dentry(int argc, char **argv, kdb_filter_t *filter) 
         return KDB_FAILURE;
     }
 
+    int idx;
+    bool descend = false;
     if (argc > 1 && argv[1][0] == '-') {
         if (strcmp(argv[1], "--descend") == 0) {
             descend = true;
@@ -2137,7 +2017,9 @@ static kdb_status_t kdb_cmd_dentry(int argc, char **argv, kdb_filter_t *filter) 
         idx = 1;
     }
 
+    fs_dentry_t *entry;
     if (idx < argc) {
+        uint64_t val;
         if (kdb_parse_expression(argv[idx], &val, NULL) != KDB_SUCCESS)
             return KDB_FAILURE;
 
@@ -2180,34 +2062,27 @@ static kdb_status_t kdb_cmd_dentry(int argc, char **argv, kdb_filter_t *filter) 
  * @return              String representation of file type. */
 static inline const char *file_type_name(file_type_t type) {
     switch (type) {
-    case FILE_TYPE_REGULAR:
-        return "FILE_TYPE_REGULAR";
-    case FILE_TYPE_DIR:
-        return "FILE_TYPE_DIR";
-    case FILE_TYPE_SYMLINK:
-        return "FILE_TYPE_SYMLINK";
-    case FILE_TYPE_BLOCK:
-        return "FILE_TYPE_BLOCK";
-    case FILE_TYPE_CHAR:
-        return "FILE_TYPE_CHAR";
-    case FILE_TYPE_FIFO:
-        return "FILE_TYPE_FIFO";
-    case FILE_TYPE_SOCKET:
-        return "FILE_TYPE_SOCKET";
-    default:
-        return "Invalid";
+        case FILE_TYPE_REGULAR:
+            return "FILE_TYPE_REGULAR";
+        case FILE_TYPE_DIR:
+            return "FILE_TYPE_DIR";
+        case FILE_TYPE_SYMLINK:
+            return "FILE_TYPE_SYMLINK";
+        case FILE_TYPE_BLOCK:
+            return "FILE_TYPE_BLOCK";
+        case FILE_TYPE_CHAR:
+            return "FILE_TYPE_CHAR";
+        case FILE_TYPE_FIFO:
+            return "FILE_TYPE_FIFO";
+        case FILE_TYPE_SOCKET:
+            return "FILE_TYPE_SOCKET";
+        default:
+            return "Invalid";
     }
 }
 
-/** Print information about a node.
- * @param argc          Argument count.
- * @param argv          Argument array.
- * @return              KDB status code. */
+/** Print information about a node. */
 static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
-    fs_node_t *node = NULL;
-    fs_mount_t *mount;
-    uint64_t val;
-
     if (kdb_help(argc, argv)) {
         kdb_printf("Usage: %s <mount ID>\n", argv[0]);
         kdb_printf("       %s <mount ID> <node ID>\n", argv[0]);
@@ -2223,9 +2098,12 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
         return KDB_FAILURE;
     }
 
+    uint64_t val;
     if (kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS)
         return KDB_FAILURE;
 
+    fs_node_t *node = NULL;
+    fs_mount_t *mount;
     if (val >= KERNEL_BASE) {
         node = (fs_node_t *)((ptr_t)val);
     } else {
@@ -2310,8 +2188,6 @@ void fs_shutdown(void) {
  */
 
 /**
- * Open a handle to a filesystem entry.
- *
  * Opens a handle to an entry in the filesystem, optionally creating it if it
  * doesn't exist. If the entry does not exist and it is specified to create it,
  * it will be created as a regular file.
@@ -2332,17 +2208,17 @@ status_t kern_fs_open(
     const char *path, uint32_t access, uint32_t flags, unsigned create,
     handle_t *_handle)
 {
-    object_handle_t *handle;
-    char *kpath = NULL;
     status_t ret;
 
     if (!path || !_handle)
         return STATUS_INVALID_ARG;
 
+    char *kpath = NULL;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    object_handle_t *handle;
     ret = fs_open(kpath, access, flags, create, &handle);
     if (ret != STATUS_SUCCESS) {
         kfree(kpath);
@@ -2356,8 +2232,6 @@ status_t kern_fs_open(
 }
 
 /**
- * Create a directory.
- *
  * Creates a new directory in the file system. This function cannot open a
  * handle to the created directory. The reason for this is that it is unlikely
  * that anything useful can be done on the new handle, for example reading
@@ -2368,12 +2242,12 @@ status_t kern_fs_open(
  * @return              Status code describing result of the operation.
  */
 status_t kern_fs_create_dir(const char *path) {
-    char *kpath;
     status_t ret;
 
     if (!path)
         return STATUS_INVALID_ARG;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -2384,8 +2258,6 @@ status_t kern_fs_create_dir(const char *path) {
 }
 
 /**
- * Create a FIFO.
- *
  * Creates a new FIFO in the filesystem. A FIFO is a named pipe. Opening it
  * with FILE_ACCESS_READ will give access to the read end, and FILE_ACCESS_WRITE
  * gives access to the write end.
@@ -2395,12 +2267,12 @@ status_t kern_fs_create_dir(const char *path) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_fs_create_fifo(const char *path) {
-    char *kpath;
     status_t ret;
 
     if (!path)
         return STATUS_INVALID_ARG;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -2411,8 +2283,6 @@ status_t kern_fs_create_fifo(const char *path) {
 }
 
 /**
- * Create a symbolic link.
- *
  * Create a new symbolic link in the filesystem. The link target can be on any
  * mount (not just the same one as the link itself), and does not have to exist.
  * If it is a relative path, it is relative to the directory containing the
@@ -2424,16 +2294,17 @@ status_t kern_fs_create_fifo(const char *path) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_fs_create_symlink(const char *path, const char *target) {
-    char *kpath, *ktarget;
     status_t ret;
 
     if (!path || !target)
         return STATUS_INVALID_ARG;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    char *ktarget;
     ret = strndup_from_user(target, FS_PATH_MAX, &ktarget);
     if (ret != STATUS_SUCCESS) {
         kfree(kpath);
@@ -2447,8 +2318,6 @@ status_t kern_fs_create_symlink(const char *path, const char *target) {
 }
 
 /**
- * Get the destination of a symbolic link.
- *
  * Reads the destination of a symbolic link into a buffer. A NULL byte will
  * always be placed at the end of the string.
  *
@@ -2460,8 +2329,6 @@ status_t kern_fs_create_symlink(const char *path, const char *target) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_fs_read_symlink(const char *path, char *buf, size_t size) {
-    char *kpath, *kbuf;
-    size_t len;
     status_t ret;
 
     if (!path || !buf)
@@ -2470,13 +2337,15 @@ status_t kern_fs_read_symlink(const char *path, char *buf, size_t size) {
     if (!size)
         return STATUS_TOO_SMALL;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    char *kbuf;
     ret = fs_read_symlink(kpath, &kbuf);
     if (ret == STATUS_SUCCESS) {
-        len = strlen(kbuf) + 1; 
+        size_t len = strlen(kbuf) + 1; 
         if (len > size) {
             ret = STATUS_TOO_SMALL;
         } else {
@@ -2491,8 +2360,6 @@ status_t kern_fs_read_symlink(const char *path, char *buf, size_t size) {
 }
 
 /**
- * Mount a filesystem.
- *
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
  * Mounting multiple filesystems on one directory at a time is not allowed.
  * The flags argument specifies generic mount options, the opts string is
@@ -2513,11 +2380,12 @@ status_t kern_fs_mount(
     const char *device, const char *path, const char *type, uint32_t flags,
     const char *opts)
 {
-    char *kdevice = NULL, *kpath = NULL, *ktype = NULL, *kopts = NULL;
     status_t ret;
 
     if (!path)
         return STATUS_INVALID_ARG;
+
+    char *kdevice = NULL, *kpath = NULL, *ktype = NULL, *kopts = NULL;
 
     if (device) {
         ret = strndup_from_user(device, FS_PATH_MAX, &kdevice);
@@ -2544,19 +2412,15 @@ status_t kern_fs_mount(
     ret = fs_mount(kdevice, kpath, ktype, flags, kopts);
 
 out:
-    if (kdevice)
-        kfree(kdevice);
-    if (kpath)
-        kfree(kpath);
-    if (ktype)
-        kfree(ktype);
-    if (kopts)
-        kfree(kopts);
+    kfree(kdevice);
+    kfree(kpath);
+    kfree(ktype);
+    kfree(kopts);
 
     return ret;
 }
 
-/** Get information on mounted filesystems.
+/** Gets information on mounted filesystems.
  * @param infos         Array of mount information structures to fill in. If
  *                      NULL, the function will only return the number of
  *                      mounted filesystems.
@@ -2571,8 +2435,6 @@ status_t kern_fs_mount_info(mount_info_t *infos, size_t *_count) {
 }
 
 /**
- * Unmount a filesystem.
- *
  * Flushes all modifications to a filesystem (if it is not read-only) and
  * unmounts it. If any entries in the filesystem are in use, then the operation
  * will fail.
@@ -2584,12 +2446,12 @@ status_t kern_fs_mount_info(mount_info_t *infos, size_t *_count) {
  */
 
 status_t kern_fs_unmount(const char *path, unsigned flags) {
-    char *kpath;
     status_t ret;
 
     if (!path)
         return STATUS_INVALID_ARG;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -2600,11 +2462,9 @@ status_t kern_fs_unmount(const char *path, unsigned flags) {
 }
 
 /**
- * Get the path to a file or directory.
- *
- * Given a handle to a file or directory, this function will return the
- * absolute path that was used to open the handle. If the handle specified is
- * INVALID_HANDLE, the path to the current directory will be returned.
+ * Given a handle to a file or directory, returns the absolute path that was
+ * used to open the handle. If the handle specified is INVALID_HANDLE, the path
+ * to the current directory will be returned.
  *
  * @param handle        Handle to get path from.
  * @param buf           Buffer to write path string to.
@@ -2614,24 +2474,23 @@ status_t kern_fs_unmount(const char *path, unsigned flags) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_fs_path(handle_t handle, char *buf, size_t size) {
-    object_handle_t *khandle = NULL;
-    char *path;
-    size_t len;
     status_t ret;
 
+    object_handle_t *khandle = NULL;
     if (handle >= 0) {
         ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
         if (ret != STATUS_SUCCESS)
             return ret;
     }
 
+    char *path;
     ret = fs_path(khandle, &path);
     if (khandle)
         object_handle_release(khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    len = strlen(path);
+    size_t len = strlen(path);
     if (len < size) {
         ret = memcpy_to_user(buf, path, len + 1);
     } else {
@@ -2642,21 +2501,21 @@ status_t kern_fs_path(handle_t handle, char *buf, size_t size) {
     return ret;
 }
 
-/** Set the current working directory.
+/** Sets the current working directory.
  * @param path          Path to change to.
  * @return              Status code describing result of the operation. */
 status_t kern_fs_set_curr_dir(const char *path) {
-    fs_dentry_t *entry;
-    char *kpath;
     status_t ret;
 
     if (!path)
         return STATUS_INVALID_ARG;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    fs_dentry_t *entry;
     ret = fs_lookup(kpath, FS_LOOKUP_FOLLOW, &entry);
     if (ret != STATUS_SUCCESS) {
         goto out_free;
@@ -2684,8 +2543,6 @@ out_free:
 }
 
 /**
- * Set the root directory.
- *
  * Sets both the current directory and the root directory for the calling
  * process to the directory specified. Any processes spawned by the process
  * after this call will also have the same root directory. Note that this
@@ -2699,8 +2556,6 @@ out_free:
  * @return              Status code describing result of the operation.
  */
 status_t kern_fs_set_root_dir(const char *path) {
-    fs_dentry_t *entry, *curr;
-    char *kpath;
     status_t ret;
 
     if (!path)
@@ -2709,10 +2564,12 @@ status_t kern_fs_set_root_dir(const char *path) {
     if (!security_check_priv(PRIV_FS_SETROOT))
         return STATUS_PERM_DENIED;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    fs_dentry_t *entry;
     ret = fs_lookup(kpath, FS_LOOKUP_FOLLOW, &entry);
     if (ret != STATUS_SUCCESS) {
         goto out_free;
@@ -2729,8 +2586,8 @@ status_t kern_fs_set_root_dir(const char *path) {
 
     /* We set both the root and current directories to this entry, so we need
      * to add another reference. */
-    fs_dentry_retain(entry);
-    curr = entry;
+    fs_dentry_t *curr = entry;
+    fs_dentry_retain(curr);
 
     rwlock_write_lock(&curr_proc->io.lock);
     swap(entry, curr_proc->io.root_dir);
@@ -2747,24 +2604,24 @@ out_free:
     return ret;
 }
 
-/** Get information about a node.
+/** Gets information about a node.
  * @param path          Path to get information on.
  * @param follow        Whether to follow if last path component is a symbolic
  *                      link.
  * @param info          Information structure to fill in.
  * @return              Status code describing result of the operation. */
 status_t kern_fs_info(const char *path, bool follow, file_info_t *info) {
-    file_info_t kinfo;
     status_t ret;
-    char *kpath;
 
     if (!path || !info)
         return STATUS_INVALID_ARG;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    file_info_t kinfo;
     ret = fs_info(kpath, follow, &kinfo);
     if (ret == STATUS_SUCCESS)
         ret = memcpy_to_user(info, &kinfo, sizeof(*info));
@@ -2774,8 +2631,6 @@ status_t kern_fs_info(const char *path, bool follow, file_info_t *info) {
 }
 
 /**
- * Create a link on the filesystem.
- *
  * Creates a new hard link in the filesystem referring to the same underlying
  * node as the source link. Both paths must exist on the same mount. If the
  * source path refers to a symbolic link, the new link will refer to the node
@@ -2787,16 +2642,17 @@ status_t kern_fs_info(const char *path, bool follow, file_info_t *info) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_fs_link(const char *path, const char *source) {
-    char *kpath, *ksource;
     status_t ret;
 
     if (!path || !source)
         return STATUS_INVALID_ARG;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    char *ksource;
     ret = strndup_from_user(source, FS_PATH_MAX, &ksource);
     if (ret != STATUS_SUCCESS) {
         kfree(kpath);
@@ -2810,8 +2666,6 @@ status_t kern_fs_link(const char *path, const char *source) {
 }
 
 /**
- * Decrease the link count of a filesystem node.
- *
  * Decreases the link count of a filesystem node, and removes the directory
  * entry for it. If the link count becomes 0, then the node will be removed
  * from the filesystem once the node's reference count becomes 0. If the given
@@ -2823,11 +2677,11 @@ status_t kern_fs_link(const char *path, const char *source) {
  */
 status_t kern_fs_unlink(const char *path) {
     status_t ret;
-    char *kpath;
 
     if (!path)
         return STATUS_INVALID_ARG;
 
+    char *kpath;
     ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
     if (ret != STATUS_SUCCESS)
         return ret;
@@ -2838,8 +2692,6 @@ status_t kern_fs_unlink(const char *path) {
 }
 
 /**
- * Rename a link on the filesystem.
- *
  * Renames a link on the filesystem. This first creates a new link referring to
  * the same underlying filesystem node as the source link, and then removes
  * the source link. Both paths must exist on the same mount. If the specified
@@ -2851,16 +2703,17 @@ status_t kern_fs_unlink(const char *path) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_fs_rename(const char *source, const char *dest) {
-    char *ksource, *kdest;
     status_t ret;
 
     if (!source || !dest)
         return STATUS_INVALID_ARG;
 
+    char *ksource;
     ret = strndup_from_user(source, FS_PATH_MAX, &ksource);
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    char *kdest;
     ret = strndup_from_user(dest, FS_PATH_MAX, &kdest);
     if (ret != STATUS_SUCCESS) {
         kfree(ksource);
@@ -2874,8 +2727,6 @@ status_t kern_fs_rename(const char *source, const char *dest) {
 }
 
 /**
- * Flush all filesystem caches.
- *
  * Flushes all cached filesystem modifications that have yet to be written to
  * the disk.
  */

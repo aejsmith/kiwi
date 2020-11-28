@@ -29,10 +29,8 @@
 
 /** Add memory ranges to the physical memory manager. */
 __init_text void platform_page_init(void) {
-    phys_ptr_t end;
-
     kboot_tag_foreach(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
-        end = range->start + range->size;
+        phys_ptr_t end = range->start + range->size;
 
         /* Determine which free list pages in the range should be put in. If
          * necessary, split into multiple ranges. */

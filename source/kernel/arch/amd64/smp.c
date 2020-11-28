@@ -53,14 +53,12 @@ void arch_smp_ipi(cpu_id_t dest) {
 
 /** Prepare the SMP boot process. */
 __init_text void x86_smp_boot_prepare(void) {
-    void *mapping;
-
     /* Allocate a low memory page for the trampoline code. */
     phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_BOOT, &ap_bootstrap_page);
 
     /* Copy the trampoline code to the page reserved by the paging
      * initialization code. */
-    mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_BOOT);
+    void *mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_BOOT);
     memcpy(mapping, __ap_trampoline_start, __ap_trampoline_end - __ap_trampoline_start);
     phys_unmap(mapping, PAGE_SIZE, false);
 
@@ -81,8 +79,6 @@ __init_text void x86_smp_boot_prepare(void) {
  * @param id            CPU ID to boot.
  * @return              Whether the CPU responded in time. */
 static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
-    nstime_t delay;
-
     /* Send an INIT IPI to the AP to reset its state and delay 10ms. */
     lapic_ipi(LAPIC_IPI_DEST_SINGLE, id, LAPIC_IPI_INIT, 0x00);
     spin(msecs_to_nsecs(10));
@@ -103,7 +99,7 @@ static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
     /* Send a second SIPI and then check in 10ms intervals to see if it has
      * booted. If it hasn't booted after 5 seconds, fail. */
     lapic_ipi(LAPIC_IPI_DEST_SINGLE, id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
-    for (delay = 0; delay < secs_to_nsecs(5); delay += msecs_to_nsecs(10)) {
+    for (nstime_t delay = 0; delay < secs_to_nsecs(5); delay += msecs_to_nsecs(10)) {
         if (smp_boot_status > SMP_BOOT_INIT)
             return true;
 
@@ -116,8 +112,6 @@ static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
 /** Boot a secondary CPU.
  * @param cpu           CPU to boot. */
 __init_text void x86_smp_boot(cpu_t *cpu) {
-    void *mapping;
-
     kprintf(LOG_DEBUG, "cpu: booting CPU %" PRIu32 "...\n", cpu->id);
     assert(lapic_enabled());
 
@@ -126,7 +120,7 @@ __init_text void x86_smp_boot(cpu_t *cpu) {
     cpu->arch.double_fault_stack = kmem_alloc(KSTACK_SIZE, MM_BOOT);
 
     /* Fill in details required by the bootstrap code. */
-    mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_BOOT);
+    void *mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_BOOT);
     *(uint64_t *)(mapping + 16) = (ptr_t)kmain_secondary;
     *(uint64_t *)(mapping + 24) = (ptr_t)cpu;
     *(uint64_t *)(mapping + 32) = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;

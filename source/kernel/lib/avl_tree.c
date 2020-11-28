@@ -35,45 +35,33 @@
 
 #include <assert.h>
 
-/** Get the height of a subtree. Assumes that child heights are up-to-date.
- * @param node          Root node of subtree.
- * @return              Height of the subtree. */
+/** Get the height of a subtree. Assumes that child heights are up-to-date. */
 static inline int avl_tree_subtree_height(avl_tree_node_t *node) {
-    int left, right;
-
     if (!node)
         return 0;
 
     /* Get the heights of the children and add 1 to account for the node itself. */
-    left = (node->left) ? (node->left->height + 1) : 1;
-    right = (node->right) ? (node->right->height + 1) : 1;
+    int left  = (node->left) ? (node->left->height + 1) : 1;
+    int right = (node->right) ? (node->right->height + 1) : 1;
 
     /* Store the largest of the heights and return it. */
     node->height = (right > left) ? right : left;
     return node->height;
 }
 
-/** Get the balance factor of a node.
- * @param node          Node to get balance factor of.
- * @return              Balance factor of node. */
 static inline int avl_tree_balance_factor(avl_tree_node_t *node) {
     return avl_tree_subtree_height(node->right) - avl_tree_subtree_height(node->left);
 }
 
-/** Perform a left rotation.
- * @param node          Root node of the rotation. */
 static inline void avl_tree_rotate_left(avl_tree_t *tree, avl_tree_node_t *node) {
-    avl_tree_node_t *child;
-
     /* Store the node's current right child. */
-    child = node->right;
+    avl_tree_node_t *child = node->right;
 
     /* Node takes ownership of the child's left child as its right child
      * (replacing the existing right child). */
     node->right = child->left;
-    if (node->right) {
+    if (node->right)
         node->right->parent = node;
-    }
 
     /* Reparent the child to node's parent. */
     child->parent = node->parent;
@@ -89,17 +77,13 @@ static inline void avl_tree_rotate_left(avl_tree_t *tree, avl_tree_node_t *node)
     }
 
     /* Child now takes ownership of the old root node as its left child. */
-    child->left = node;
+    child->left  = node;
     node->parent = child;
 }
 
-/** Perform a right rotation.
- * @param node      Root node of the rotation. */
 static inline void avl_tree_rotate_right(avl_tree_t *tree, avl_tree_node_t *node) {
-    avl_tree_node_t *child;
-
     /* Store the node's current left child. */
-    child = node->left;
+    avl_tree_node_t *child = node->left;
 
     /* Node takes ownership of the child's right child as its left child
      * (replacing the existing left child). */
@@ -125,9 +109,6 @@ static inline void avl_tree_rotate_right(avl_tree_t *tree, avl_tree_node_t *node
     node->parent = child;
 }
 
-/** Balance a node after an insertion.
- * @param node          Node to balance.
- * @param balance       Balance factor of node. */
 static inline void avl_tree_balance_node(avl_tree_t *tree, avl_tree_node_t *node, int balance) {
     /* See "AVL Tree Rotations Tutorial" (in Reference at top of file). */
     if (balance > 1) {
@@ -159,23 +140,21 @@ static inline void avl_tree_balance_node(avl_tree_t *tree, avl_tree_node_t *node
  *                      check if the node is already in another tree: it must
  *                      be removed by the caller if it is. */
 void avl_tree_insert(avl_tree_t *tree, avl_tree_key_t key, avl_tree_node_t *node) {
-    avl_tree_node_t **next, *curr = NULL;
-    int balance;
-
-    node->left = NULL;
-    node->right = NULL;
+    node->left   = NULL;
+    node->right  = NULL;
     node->height = 0;
-    node->key = key;
+    node->key    = key;
 
     /* If tree is currently empty, just insert and finish. */
     if (!tree->root) {
         node->parent = NULL;
-        tree->root = node;
+        tree->root   = node;
         return;
     }
 
     /* Descend to where we want to insert the node. */
-    next = &tree->root;
+    avl_tree_node_t **next = &tree->root;
+    avl_tree_node_t *curr  = NULL;
     while (*next) {
         curr = *next;
 
@@ -192,7 +171,7 @@ void avl_tree_insert(avl_tree_t *tree, avl_tree_key_t key, avl_tree_node_t *node
 
     /* Now go back up the tree and check its balance. */
     while (curr) {
-        balance = avl_tree_balance_factor(curr);
+        int balance = avl_tree_balance_factor(curr);
         if (balance < -1 || balance > 1)
             avl_tree_balance_node(tree, curr, balance);
 
@@ -204,14 +183,13 @@ void avl_tree_insert(avl_tree_t *tree, avl_tree_key_t key, avl_tree_node_t *node
  * @param tree          Tree to remove from.
  * @param node          Node to remove. */
 void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
-    avl_tree_node_t *child, *start;
-    int balance;
+    avl_tree_node_t *start;
 
     /* First we need to detach the node from the tree. */
     if (node->left) {
         /* Left node exists. Descend onto it, and then find the right-most node,
          * which will replace the node that we're removing. */
-        child = node->left;
+        avl_tree_node_t *child = node->left;
         while (child->right)
             child = child->right;
 
@@ -287,7 +265,7 @@ void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
 
     /* Start now points to where we want to start rebalancing from. */
     while (start) {
-        balance = avl_tree_balance_factor(start);
+        int balance = avl_tree_balance_factor(start);
         if (balance < -1 || balance > 1)
             avl_tree_balance_node(tree, start, balance);
 
@@ -300,9 +278,8 @@ void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
  * @param key           Key to look for.
  * @return              Pointer to node if found, NULL if not. */
 avl_tree_node_t *avl_tree_lookup_node(avl_tree_t *tree, avl_tree_key_t key) {
-    avl_tree_node_t *node = tree->root;
-
     /* Descend down the tree to find the required node. */
+    avl_tree_node_t *node = tree->root;
     while (node) {
         if (node->key > key) {
             node = node->left;
@@ -317,8 +294,6 @@ avl_tree_node_t *avl_tree_lookup_node(avl_tree_t *tree, avl_tree_key_t key) {
 }
 
 /**
- * Get the first node in an AVL tree.
- *
  * Gets a pointer to the first node (the one with the lowest key) in an AVL
  * tree by descending down the tree's left-hand side.
  *
@@ -328,22 +303,17 @@ avl_tree_node_t *avl_tree_lookup_node(avl_tree_t *tree, avl_tree_key_t key) {
  */
 avl_tree_node_t *avl_tree_first(avl_tree_t *tree) {
     avl_tree_node_t *node = tree->root;
-
     if (node) {
         /* Descend down the left-hand side of the tree to find the smallest
          * node. */
         while (node->left)
             node = node->left;
-
-        return node;
-    } else {
-        return NULL;
     }
+
+    return node;
 }
 
 /**
- * Get the last node in an AVL tree.
- *
  * Gets a pointer to the last node (the one with the highest key) in an AVL
  * tree by descending down the tree's right-hand side.
  *
@@ -353,17 +323,14 @@ avl_tree_node_t *avl_tree_first(avl_tree_t *tree) {
  */
 avl_tree_node_t *avl_tree_last(avl_tree_t *tree) {
     avl_tree_node_t *node = tree->root;
-
     if (node) {
         /* Descend down the right-hand side of the tree to find the largest
          * node. */
         while (node->right)
             node = node->right;
-
-        return node;
-    } else {
-        return NULL;
     }
+
+    return node;
 }
 
 /** Get the node preceding another node in an AVL tree.

@@ -45,10 +45,8 @@ static volatile nstime_t system_time_sync __init_data;
 /** Get the system time (number of nanoseconds since boot).
  * @return              Number of nanoseconds since system was booted. */
 nstime_t system_time(void) {
-    uint64_t usecs;
-
     preempt_disable();
-    usecs = (x86_rdtsc() - curr_cpu->arch.system_time_offset) / curr_cpu->arch.cycles_per_us;
+    uint64_t usecs = (x86_rdtsc() - curr_cpu->arch.system_time_offset) / curr_cpu->arch.cycles_per_us;
     preempt_enable();
 
     return usecs_to_nsecs(usecs);
@@ -57,21 +55,18 @@ nstime_t system_time(void) {
 /** Spin for a certain amount of time.
  * @param nsecs         Nanoseconds to spin for. */
 void spin(nstime_t nsecs) {
-    uint64_t usecs, start, target, current, cycles_per_us;
-    cpu_id_t id;
-
-    usecs = nsecs_to_usecs(nsecs);
+    uint64_t usecs = nsecs_to_usecs(nsecs);
 
     preempt_disable();
 
     while (true) {
-        id = curr_cpu->id;
-        cycles_per_us = curr_cpu->arch.cycles_per_us;
-        start = x86_rdtsc();
-        target = start + (usecs * cycles_per_us);
+        cpu_id_t id            = curr_cpu->id;
+        uint64_t cycles_per_us = curr_cpu->arch.cycles_per_us;
+        uint64_t start         = x86_rdtsc();
+        uint64_t target        = start + (usecs * cycles_per_us);
 
         while (true) {
-            current = x86_rdtsc();
+            uint64_t current = x86_rdtsc();
             if (current >= target) {
                 preempt_enable();
                 return;

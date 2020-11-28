@@ -31,16 +31,10 @@ typedef struct fixed_heap_tag {
     size_t data;                    /**< Size and whether the tag is allocated. */
 } fixed_heap_tag_t;
 
-/** Check whether a tag is allocated.
- * @param tag           Tag to check.
- * @return              Whether the tag is allocated. */
 static inline bool tag_allocated(fixed_heap_tag_t *tag) {
     return (tag->data & (1 << 0));
 }
 
-/** Get the size of a tag.
- * @param tag           Tag to get size of.
- * @return              Size of the tag. */
 static inline size_t tag_size(fixed_heap_tag_t *tag) {
     return (tag->data & ~(1 << 0));
 }
@@ -50,26 +44,25 @@ static inline size_t tag_size(fixed_heap_tag_t *tag) {
  * @param size          Size of allocation to make.
  * @return              Pointer to allocation, or NULL if no space left. */
 void *fixed_heap_alloc(fixed_heap_t *heap, size_t size) {
-    fixed_heap_tag_t *tag, *other;
-    size_t total;
-
     if (!size)
         return NULL;
 
     /* Minimum size and alignment of 8 bytes. */
-    total = round_up(size, 8) + sizeof(fixed_heap_tag_t);
+    size_t total = round_up(size, 8) + sizeof(fixed_heap_tag_t);
 
     /* Search for a free segment. */
-    for (tag = heap->tags; tag; tag = tag->next) {
+    for (fixed_heap_tag_t *tag = heap->tags; tag; tag = tag->next) {
         if (tag_allocated(tag) || tag_size(tag) < total)
             continue;
 
         /* Found a suitable segment, chop it up if necessary (and if there's
          * enough room to do so). */
         if (tag_size(tag) > total && (tag_size(tag) - total) > (sizeof(fixed_heap_tag_t) + 8)) {
-            other = (fixed_heap_tag_t *)((ptr_t)tag + total);
+            fixed_heap_tag_t *other = (fixed_heap_tag_t *)((ptr_t)tag + total);
+
             other->next = tag->next;
             other->data = tag_size(tag) - total;
+
             tag->next = other;
             tag->data = total;
         }
@@ -86,12 +79,10 @@ void *fixed_heap_alloc(fixed_heap_t *heap, size_t size) {
  * @param heap          Heap to free to.
  * @param ptr           Allocation to free. */
 void fixed_heap_free(fixed_heap_t *heap, void *ptr) {
-    fixed_heap_tag_t *tag, *prev;
-
     if (!ptr)
         return;
 
-    tag = (fixed_heap_tag_t *)((ptr_t)ptr - sizeof(fixed_heap_tag_t));
+    fixed_heap_tag_t *tag = (fixed_heap_tag_t *)((ptr_t)ptr - sizeof(fixed_heap_tag_t));
 
     if (unlikely(!tag_allocated(tag)))
         fatal("Freeing already free segment %p (tag: %p)", ptr, tag);
@@ -107,7 +98,7 @@ void fixed_heap_free(fixed_heap_t *heap, void *ptr) {
 
     /* Find the previous tag and see if we can merge with it. */
     if (tag != heap->tags) {
-        for (prev = heap->tags; prev; prev = prev->next) {
+        for (fixed_heap_tag_t *prev = heap->tags; prev; prev = prev->next) {
             if (prev->next != tag)
                 continue;
 
@@ -134,7 +125,7 @@ void fixed_heap_init(fixed_heap_t *heap, void *mem, size_t size) {
     assert(is_pow2(size));
 
     /* Create an initial free segment covering the entire chunk. */
-    heap->tags = mem;
+    heap->tags       = mem;
     heap->tags->next = NULL;
     heap->tags->data = size;
 }

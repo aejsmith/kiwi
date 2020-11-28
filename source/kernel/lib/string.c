@@ -27,10 +27,8 @@
 #include <mm/malloc.h>
 
 /**
- * Copy data in memory.
- *
- * Copies bytes from a source memory area to a destination memory area,
- * where both areas may not overlap.
+ * Copies bytes from a source memory area to a destination memory area, where
+ * both areas may not overlap.
  *
  * @param dest          The memory area to copy to.
  * @param src           The memory area to copy from.
@@ -136,10 +134,8 @@ void *memset(void *dest, int val, size_t count) {
 }
 
 /**
- * Copy overlapping data in memory.
- *
- * Copies bytes from a source memory area to a destination memory area,
- * where both areas may overlap.
+ * Copies bytes from a source memory area to a destination memory area, where
+ * both areas may overlap.
  *
  * @param dest          The memory area to copy to.
  * @param src           The memory area to copy from.
@@ -295,8 +291,6 @@ int strncasecmp(const char *s1, const char *s2, size_t count) {
 }
 
 /**
- * Separate a string.
- *
  * Finds the first occurrence of a symbol in the string delim in *stringp.
  * If one is found, the delimeter is replaced by a NULL byte and the pointer
  * pointed to by stringp is updated to point past the string. If no delimeter
@@ -393,8 +387,6 @@ char *strstr(const char *s, const char *what) {
 }
 
 /**
- * Strip whitespace from a string.
- *
  * Strips whitespace from the start and end of a string. The string is modified
  * in-place.
  *
@@ -421,10 +413,8 @@ char *strstrip(char *str) {
 }
 
 /**
- * Copy a string.
- *
- * Copies a string from one place to another. Assumes that the destination
- * is big enough to hold the string.
+ * Copies a string from one place to another. Assumes that the destination is
+ * big enough to hold the string.
  *
  * @param dest          Pointer to the destination buffer.
  * @param src           Pointer to the source buffer.
@@ -441,10 +431,8 @@ char *strcpy(char *__restrict dest, const char *__restrict src) {
 }
 
 /**
- * Copy a string with a length limit.
- *
- * Copies a string from one place to another. Will copy at most the number
- * of bytes specified.
+ * Copies a string from one place to another. Will copy at most the number of
+ * bytes specified.
  *
  * @param dest          Pointer to the destination buffer.
  * @param src           Pointer to the source buffer.
@@ -465,8 +453,6 @@ char *strncpy(char *__restrict dest, const char *__restrict src, size_t count) {
 }
 
 /**
- * Concatenate two strings.
- *
  * Appends one string to another. Assumes that the destination string has
  * enough space to store the contents of both strings and the NULL terminator.
  *
@@ -486,8 +472,6 @@ char *strcat(char *__restrict dest, const char *__restrict src) {
 }
 
 /**
- * Duplicate memory.
- *
  * Allocates a block of memory big enough and copies the source to it. The
  * memory returned should be freed with kfree().
  *
@@ -511,8 +495,6 @@ void *kmemdup(const void *src, size_t count, unsigned mmflag) {
 }
 
 /**
- * Duplicate a string.
- *
  * Allocates a buffer big enough to hold the given string and copies the
  * string to it. The memory returned should be freed with kfree().
  *
@@ -533,8 +515,6 @@ char *kstrdup(const char *src, unsigned mmflag) {
 }
 
 /**
- * Duplicate a string with a length limit.
- *
  * Allocates a buffer either as big as the string or the maximum length
  * given, and then copies at most the number of bytes specified of the string
  * to it. If the string is longer than the limit, a null byte will be added
@@ -562,10 +542,8 @@ char *kstrndup(const char *src, size_t n, unsigned mmflag) {
 }
 
 /**
- * Get the last component of a path.
- *
- * Returns an allocated string buffer containing the last component of the
- * given path.
+ * Gets an allocated string buffer containing the last component of the given
+ * path.
  *
  * @param path          Pathname to parse.
  * @param mmflag        Allocation behaviour flags.
@@ -616,9 +594,7 @@ char *kbasename(const char *path, unsigned mmflag) {
 }
 
 /**
- * Get the part of a path preceding the last /.
- *
- * Returns an allocated string buffer containing everything preceding the last
+ * Gets an allocated string buffer containing everything preceding the last
  * component of the given path.
  *
  * @param path          Pathname to parse.
@@ -703,8 +679,6 @@ char *kdirname(const char *path, unsigned mmflag) {
     })
 
 /**
- * Convert a string to an unsigned long.
- *
  * Converts a string to an unsigned long using the specified number base.
  *
  * @param cp            The start of the string.
@@ -718,8 +692,6 @@ unsigned long strtoul(const char *cp, char **endp, unsigned int base) {
 }
 
 /**
- * Convert a string to a signed long.
- *
  * Converts a string to an signed long using the specified number base.
  *
  * @param cp            The start of the string.
@@ -736,8 +708,6 @@ long strtol(const char *cp, char **endp, unsigned int base) {
 }
 
 /**
- * Convert a string to an unsigned long long.
- *
  * Converts a string to an unsigned long long using the specified number base.
  *
  * @param cp            The start of the string.
@@ -751,8 +721,6 @@ unsigned long long strtoull(const char *cp, char **endp, unsigned int base) {
 }
 
 /**
- * Convert a string to an signed long long.
- *
  * Converts a string to an signed long long using the specified number base.
  *
  * @param cp            The start of the string.
@@ -775,10 +743,6 @@ struct vsnprintf_data {
     size_t off;                     /**< Current number of bytes written. */
 };
 
-/** Helper for vsnprintf().
- * @param ch            Character to place in buffer.
- * @param _data         Data.
- * @param total         Pointer to total character count. */
 static void vsnprintf_helper(char ch, void *_data, int *total) {
     struct vsnprintf_data *data = _data;
 
@@ -789,10 +753,8 @@ static void vsnprintf_helper(char ch, void *_data, int *total) {
 }
 
 /**
- * Format a string and place it in a buffer.
- *
- * Places a formatted string in a buffer according to the format and
- * arguments given.
+ * Places a formatted string in a buffer according to the format and arguments
+ * given.
  *
  * @param buf           The buffer to place the result into.
  * @param size          The size of the buffer, including the trailing NULL.
@@ -816,10 +778,8 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args) {
 }
 
 /**
- * Format a string and place it in a buffer.
- *
- * Places a formatted string in a buffer according to the format and
- * arguments given.
+ * Places a formatted string in a buffer according to the format and arguments
+ * given.
  *
  * @param buf           The buffer to place the result into.
  * @param fmt           The format string to use.
@@ -833,10 +793,8 @@ int vsprintf(char *buf, const char *fmt, va_list args) {
 }
 
 /**
- * Format a string and place it in a buffer.
- *
- * Places a formatted string in a buffer according to the format and
- * arguments given.
+ * Places a formatted string in a buffer according to the format and arguments
+ * given.
  *
  * @param buf           The buffer to place the result into.
  * @param size          The size of the buffer, including the trailing NULL.
@@ -857,10 +815,8 @@ int snprintf(char *buf, size_t size, const char *fmt, ...) {
 }
 
 /**
- * Format a string and place it in a buffer.
- *
- * Places a formatted string in a buffer according to the format and
- * arguments given.
+ * Places a formatted string in a buffer according to the format and arguments
+ * given.
  *
  * @param buf           The buffer to place the result into.
  * @param fmt           The format string to use.

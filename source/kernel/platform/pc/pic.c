@@ -35,8 +35,6 @@ static uint8_t pic_mask_slave = 0xff;
 /** Level-triggered interrupts. */
 static uint16_t pic_level_triggered;
 
-/** Acknowledge a PIC interrupt.
- * @param num           IRQ number. */
 static void pic_eoi(unsigned num) {
     if (num >= 8)
         out8(PIC_SLAVE_COMMAND, PIC_COMMAND_EOI);
@@ -45,9 +43,6 @@ static void pic_eoi(unsigned num) {
     out8(PIC_MASTER_COMMAND, PIC_COMMAND_EOI);
 }
 
-/** Pre-handling function.
- * @param num           IRQ number.
- * @return              True if IRQ should be handled. */
 static bool pic_pre_handle(unsigned num) {
     assert(num < 16);
 
@@ -75,23 +70,16 @@ static bool pic_pre_handle(unsigned num) {
     return true;
 }
 
-/** Post-handling function.
- * @param num           IRQ number. */
 static void pic_post_handle(unsigned num) {
     /* Level-triggered interrupts must be acked once all handlers have been run. */
     if (pic_level_triggered & (1 << num))
         pic_eoi(num);
 }
 
-/** Get the trigger mode of an IRQ.
- * @param num           IRQ number.
- * @return              Trigger mode of the IRQ. */
 static irq_mode_t pic_mode(unsigned num) {
     return (pic_level_triggered & (1 << num));
 }
 
-/** Enable an IRQ.
- * @param num           IRQ to enable. */
 static void pic_enable(unsigned num) {
     assert(num < 16);
 
@@ -104,8 +92,6 @@ static void pic_enable(unsigned num) {
     }
 }
 
-/** Disable an IRQ.
- * @param num           IRQ to disable. */
 static void pic_disable(unsigned num) {
     assert(num < 16);
 
@@ -118,13 +104,12 @@ static void pic_disable(unsigned num) {
     }
 }
 
-/** PIC IRQ operations. */
 static irq_controller_t pic_irq_controller = {
-    .pre_handle = pic_pre_handle,
+    .pre_handle  = pic_pre_handle,
     .post_handle = pic_post_handle,
-    .mode = pic_mode,
-    .enable = pic_enable,
-    .disable = pic_disable,
+    .mode        = pic_mode,
+    .enable      = pic_enable,
+    .disable     = pic_disable,
 };
 
 /** Initialize the PIC. */

@@ -108,24 +108,21 @@ static idt_entry_t kernel_idt[IDT_ENTRY_COUNT] __aligned(8);
 /** Set up the GDT for the current CPU.
  * @param cpu           CPU to initialize for. */
 static __init_text void gdt_init(cpu_t *cpu) {
-    gdt_tss_entry_t *desc;
-    size_t size;
-    ptr_t base;
-
     /* Create a copy of the statically allocated GDT. */
     memcpy(cpu->arch.gdt, initial_gdt, sizeof(initial_gdt));
 
     /* Set up the TSS descriptor. */
-    base = (ptr_t)&cpu->arch.tss;
-    size = sizeof(cpu->arch.tss);
-    desc = (gdt_tss_entry_t *)&cpu->arch.gdt[KERNEL_TSS / 0x08];
-    desc->base0 = base & 0xffffff;
-    desc->base1 = ((base) >> 24) & 0xff;
-    desc->base2 = ((base) >> 32);
-    desc->limit0 = size & 0xffff;
-    desc->limit1 = (size >> 16) & 0xf;
+    ptr_t base  = (ptr_t)&cpu->arch.tss;
+    size_t size = sizeof(cpu->arch.tss);
+
+    gdt_tss_entry_t *desc = (gdt_tss_entry_t *)&cpu->arch.gdt[KERNEL_TSS / 0x08];
+    desc->base0   = base & 0xffffff;
+    desc->base1   = ((base) >> 24) & 0xff;
+    desc->base2   = ((base) >> 32);
+    desc->limit0  = size & 0xffff;
+    desc->limit1  = (size >> 16) & 0xf;
     desc->present = 1;
-    desc->type = 0x9;
+    desc->type    = 0x9;
 
     /* Set the GDT pointer. */
     x86_lgdt(cpu->arch.gdt, sizeof(cpu->arch.gdt) - 1);
@@ -180,20 +177,18 @@ __init_text void descriptor_init(cpu_t *cpu) {
 
 /** Initialize the IDT shared by all CPUs. */
 __init_text void idt_init(void) {
-    ptr_t addr;
-    size_t i;
-
     /* Fill out the handlers in the IDT. */
-    for (i = 0; i < IDT_ENTRY_COUNT; i++) {
-        addr = (ptr_t)&isr_array[i];
-        kernel_idt[i].base0 = (addr & 0xffff);
-        kernel_idt[i].base1 = ((addr >> 16) & 0xffff);
-        kernel_idt[i].base2 = ((addr >> 32) & 0xffffffff);
-        kernel_idt[i].ist = 0;
+    for (size_t i = 0; i < IDT_ENTRY_COUNT; i++) {
+        ptr_t addr = (ptr_t)&isr_array[i];
+
+        kernel_idt[i].base0    = (addr & 0xffff);
+        kernel_idt[i].base1    = ((addr >> 16) & 0xffff);
+        kernel_idt[i].base2    = ((addr >> 32) & 0xffffffff);
+        kernel_idt[i].ist      = 0;
         kernel_idt[i].reserved = 0;
-        kernel_idt[i].sel = KERNEL_CS;
-        kernel_idt[i].unused = 0;
-        kernel_idt[i].flags = 0x8e;
+        kernel_idt[i].sel      = KERNEL_CS;
+        kernel_idt[i].unused   = 0;
+        kernel_idt[i].flags    = 0x8e;
     }
 
     /* In tss_init() we point the first IST entry at the double fault stack.

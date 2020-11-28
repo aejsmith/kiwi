@@ -110,16 +110,15 @@ out:
  *                      they will be extracted to the current directory.
  * @return              Status code describing result of the operation. */
 status_t tar_extract(object_handle_t *handle, const char *dest) {
-    tar_header_t *header;
-    offset_t offset = 0;
-    size_t bytes, size;
-    void *data = NULL;
     status_t ret;
 
-    header = kmalloc(sizeof(tar_header_t), MM_KERNEL);
+    tar_header_t *header = kmalloc(sizeof(tar_header_t), MM_KERNEL);
 
+    offset_t offset = 0;
+    void *data = NULL;
     while (true) {
         /* Read in the next header. */
+        size_t bytes;
         ret = file_read(handle, header, sizeof(*header), offset, &bytes);
         if (ret != STATUS_SUCCESS) {
             goto fail;
@@ -140,7 +139,7 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 
         /* All fields in the header are stored as ASCII - convert the size to an
          * integer (base 8). */
-        size = strtoul(header->size, NULL, 8);
+        size_t size = strtoul(header->size, NULL, 8);
 
         /* Read in the entry data. */
         if (size) {

@@ -88,20 +88,20 @@ extern status_t arrcpy_from_user(const char *const src[], char ***_array);
                 sizeof(*(ptr)) == 1, \
             "Unsupported value size"); \
         switch (sizeof(*(ptr))) { \
-        case 8: \
-            __ret = __read_user64((void *)(ptr), (void *)(val)); \
-            break; \
-        case 4: \
-            __ret = __read_user32((void *)(ptr), (void *)(val)); \
-            break; \
-        case 2: \
-            __ret = __read_user16((void *)(ptr), (void *)(val)); \
-            break; \
-        case 1: \
-            __ret = __read_user8((void *)(ptr), (void *)(val)); \
-            break; \
-        } \
-        __ret; \
+            case 8: \
+                __ret = __read_user64((void *)(ptr), (void *)(val)); \
+                break; \
+            case 4: \
+                __ret = __read_user32((void *)(ptr), (void *)(val)); \
+                break; \
+            case 2: \
+                __ret = __read_user16((void *)(ptr), (void *)(val)); \
+                break; \
+            case 1: \
+                __ret = __read_user8((void *)(ptr), (void *)(val)); \
+                break; \
+            } \
+            __ret; \
     })
 
 /** Write a value to userspace.
@@ -119,18 +119,18 @@ extern status_t arrcpy_from_user(const char *const src[], char ***_array);
                 sizeof(*(ptr)) == 1, \
             "Unsupported value size"); \
         switch (sizeof(*(ptr))) { \
-        case 8: \
-            __ret = __write_user64((void *)(ptr), (void *)&__val); \
-            break; \
-        case 4: \
-            __ret = __write_user32((void *)(ptr), (void *)&__val); \
-            break; \
-        case 2: \
-            __ret = __write_user16((void *)(ptr), (void *)&__val); \
-            break; \
-        case 1: \
-            __ret = __write_user8((void *)(ptr), (void *)&__val); \
-            break; \
+            case 8: \
+                __ret = __write_user64((void *)(ptr), (void *)&__val); \
+                break; \
+            case 4: \
+                __ret = __write_user32((void *)(ptr), (void *)&__val); \
+                break; \
+            case 2: \
+                __ret = __write_user16((void *)(ptr), (void *)&__val); \
+                break; \
+            case 1: \
+                __ret = __write_user8((void *)(ptr), (void *)&__val); \
+                break; \
         } \
         __ret; \
     })

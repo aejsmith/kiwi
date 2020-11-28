@@ -37,12 +37,8 @@ bool acpi_supported;
 static acpi_header_t **acpi_tables;
 static size_t acpi_table_count;
 
-/** Map a table, copy it and add it to the table array.
- * @param addr          Address of table. */
 static __init_text void acpi_table_copy(phys_ptr_t addr) {
-    acpi_header_t *source;
-
-    source = phys_map(addr, PAGE_SIZE * 2, MM_BOOT);
+    acpi_header_t *source = phys_map(addr, PAGE_SIZE * 2, MM_BOOT);
 
     /* Check the checksum of the table. */
     if (!checksum_range(source, source->length)) {
@@ -65,20 +61,13 @@ static __init_text void acpi_table_copy(phys_ptr_t addr) {
     phys_unmap(source, PAGE_SIZE * 2, true);
 }
 
-/** Look for the ACPI RSDP in a specific memory range.
- * @param start         Start of range to check.
- * @param size          Size of range to check.
- * @return              Pointer to RSDP if found, NULL if not. */
 static inline acpi_rsdp_t *acpi_find_rsdp(phys_ptr_t start, size_t size) {
-    acpi_rsdp_t *rsdp;
-    size_t i;
-
     assert(!(start % 16));
     assert(!(size % 16));
 
     /* Search through the range on 16-byte boundaries. */
-    for (i = 0; i < size; i += 16) {
-        rsdp = phys_map(start + i, sizeof(*rsdp), MM_BOOT);
+    for (size_t i = 0; i < size; i += 16) {
+        acpi_rsdp_t *rsdp = phys_map(start + i, sizeof(*rsdp), MM_BOOT);
 
         /* Check if the signature and checksum are correct. */
         if (strncmp((char *)rsdp->signature, ACPI_RSDP_SIGNATURE, 8) != 0) {
@@ -108,14 +97,8 @@ static inline acpi_rsdp_t *acpi_find_rsdp(phys_ptr_t start, size_t size) {
     return NULL;
 }
 
-/** Parse the XSDT and create a copy of all its tables.
- * @param addr          Address of XSDT.
- * @return              True if succeeded, false if not. */
 static inline bool acpi_parse_xsdt(uint32_t addr) {
-    acpi_xsdt_t *source;
-    size_t i, count;
-
-    source = phys_map(addr, PAGE_SIZE, MM_BOOT);
+    acpi_xsdt_t *source = phys_map(addr, PAGE_SIZE, MM_BOOT);
 
     /* Check signature and checksum. */
     if (strncmp((char *)source->header.signature, ACPI_XSDT_SIGNATURE, 4) != 0) {
@@ -129,8 +112,8 @@ static inline bool acpi_parse_xsdt(uint32_t addr) {
     }
 
     /* Load each table. */
-    count = (source->header.length - sizeof(source->header)) / sizeof(source->entry[0]);
-    for (i = 0; i < count; i++)
+    size_t count = (source->header.length - sizeof(source->header)) / sizeof(source->entry[0]);
+    for (size_t i = 0; i < count; i++)
         acpi_table_copy((phys_ptr_t)source->entry[i]);
 
     phys_unmap(source, PAGE_SIZE, true);
@@ -139,14 +122,8 @@ static inline bool acpi_parse_xsdt(uint32_t addr) {
     return true;
 }
 
-/** Parse the RSDT and create a copy of all its tables.
- * @param addr          Address of RSDT.
- * @return              True if succeeded, false if not. */
 static inline bool acpi_parse_rsdt(uint32_t addr) {
-    acpi_rsdt_t *source;
-    size_t i, count;
-
-    source = phys_map(addr, PAGE_SIZE, MM_BOOT);
+    acpi_rsdt_t *source = phys_map(addr, PAGE_SIZE, MM_BOOT);
 
     /* Check signature and checksum. */
     if (strncmp((char *)source->header.signature, ACPI_RSDT_SIGNATURE, 4) != 0) {
@@ -160,8 +137,8 @@ static inline bool acpi_parse_rsdt(uint32_t addr) {
     }
 
     /* Load each table. */
-    count = (source->header.length - sizeof(source->header)) / sizeof(source->entry[0]);
-    for (i = 0; i < count; i++)
+    size_t count = (source->header.length - sizeof(source->header)) / sizeof(source->entry[0]);
+    for (size_t i = 0; i < count; i++)
         acpi_table_copy((phys_ptr_t)source->entry[i]);
 
     phys_unmap(source, PAGE_SIZE, true);
@@ -174,9 +151,7 @@ static inline bool acpi_parse_rsdt(uint32_t addr) {
  * @param signature     Signature of table to find.
  * @return              Pointer to table if found, NULL if not. */
 acpi_header_t *acpi_table_find(const char *signature) {
-    size_t i;
-
-    for (i = 0; i < acpi_table_count; i++) {
+    for (size_t i = 0; i < acpi_table_count; i++) {
         if (strncmp((char *)acpi_tables[i]->signature, signature, 4) != 0)
             continue;
 
@@ -188,17 +163,13 @@ acpi_header_t *acpi_table_find(const char *signature) {
 
 /** Detect ACPI presence and find needed tables. */
 __init_text void acpi_init(void) {
-    acpi_rsdp_t *rsdp;
-    uint16_t *mapping;
-    phys_ptr_t ebda;
-
     /* Get the base address of the Extended BIOS Data Area (EBDA). */
-    mapping = phys_map(0x40e, sizeof(uint16_t), MM_BOOT);
-    ebda = (*mapping) << 4;
+    uint16_t *mapping = phys_map(0x40e, sizeof(uint16_t), MM_BOOT);
+    phys_ptr_t ebda   = (*mapping) << 4;
     phys_unmap(mapping, sizeof(uint16_t), true);
 
     /* Search for the RSDP. */
-    rsdp = acpi_find_rsdp(ebda, 0x400);
+    acpi_rsdp_t *rsdp = acpi_find_rsdp(ebda, 0x400);
     if (!rsdp) {
         rsdp = acpi_find_rsdp(0xe0000, 0x20000);
         if (!rsdp)

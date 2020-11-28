@@ -102,9 +102,7 @@ static inline uint64_t calc_table_pte(mmu_context_t *ctx, phys_ptr_t phys) {
  * @param access        Access flags.
  * @return              Flags to map page with. */
 static inline uint64_t calc_page_pte(mmu_context_t *ctx, phys_ptr_t phys, uint32_t access) {
-    uint64_t entry;
-
-    entry = phys | X86_PTE_PRESENT;
+    uint64_t entry = phys | X86_PTE_PRESENT;
     if (access & VM_ACCESS_WRITE)
         entry |= X86_PTE_WRITE;
     if (!(access & VM_ACCESS_EXECUTE) && cpu_features.xd)
@@ -121,9 +119,6 @@ static inline uint64_t calc_page_pte(mmu_context_t *ctx, phys_ptr_t phys, uint32
     return entry;
 }
 
-/** Set a page table entry.
- * @param pte           Page table entry to set.
- * @param val           Page table entry value. */
 static inline void set_pte(uint64_t *pte, uint64_t val) {
     *(volatile uint64_t *)pte = val;
 }
@@ -150,17 +145,11 @@ static inline bool test_and_set_pte(uint64_t *pte, uint64_t cmp, uint64_t val) {
     return atomic_compare_exchange_strong((atomic_uint64_t *)pte, &cmp, val);
 }
 
-/** Get the virtual address of a page structure.
- * @param addr          Address of structure.
- * @return              Pointer to mapping. */
 static uint64_t *map_structure(phys_ptr_t addr) {
     /* Our phys_map() implementation never fails. */
     return phys_map(addr, PAGE_SIZE, MM_BOOT);
 }
 
-/** Allocate a paging structure.
- * @param mmflag        Allocation flags.
- * @return              Address of structure on success, 0 on failure. */
 static phys_ptr_t alloc_structure(unsigned mmflag) {
     page_t *page;
     phys_ptr_t ret;
@@ -183,19 +172,15 @@ static phys_ptr_t alloc_structure(unsigned mmflag) {
  * @return              Pointer to mapped page directory, NULL if not found or
  *                      on allocation failure. */
 static uint64_t *get_pdir(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
-    uint64_t *pml4, *pdp;
-    unsigned pml4e, pdpe;
-    phys_ptr_t page;
-
     /* Get the virtual address of the PML4. */
-    pml4 = map_structure(ctx->arch.pml4);
+    uint64_t *pml4 = map_structure(ctx->arch.pml4);
 
     /* Get the page directory pointer number. A PDP covers 512GB. */
-    pml4e = (virt & 0x0000fffffffff000) / 0x8000000000;
+    unsigned pml4e = (virt & 0x0000fffffffff000) / 0x8000000000;
     if (!(pml4[pml4e] & X86_PTE_PRESENT)) {
         /* Allocate a new PDP if required. */
         if (alloc) {
-            page = alloc_structure(mmflag);
+            phys_ptr_t page = alloc_structure(mmflag);
             if (unlikely(!page))
                 return NULL;
 
@@ -207,14 +192,14 @@ static uint64_t *get_pdir(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
     }
 
     /* Get the PDP from the PML4. */
-    pdp = map_structure(pml4[pml4e] & PHYS_PAGE_MASK);
+    uint64_t *pdp = map_structure(pml4[pml4e] & PHYS_PAGE_MASK);
 
     /* Get the page directory number. A page directory covers 1GB. */
-    pdpe = (virt % 0x8000000000) / 0x40000000;
+    unsigned pdpe = (virt % 0x8000000000) / 0x40000000;
     if (!(pdp[pdpe] & X86_PTE_PRESENT)) {
         /* Allocate a new page directory if required. */
         if (alloc) {
-            page = alloc_structure(mmflag);
+            phys_ptr_t page = alloc_structure(mmflag);
             if (unlikely(!page))
                 return NULL;
 
@@ -237,21 +222,17 @@ static uint64_t *get_pdir(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
  * @return              Pointer to mapped page table, NULL if not found or on
  *                      allocation failure. */
 static uint64_t *get_ptbl(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
-    phys_ptr_t page;
-    uint64_t *pdir;
-    unsigned pde;
-
     /* Get hold of the page directory. */
-    pdir = get_pdir(ctx, virt, alloc, mmflag);
+    uint64_t *pdir = get_pdir(ctx, virt, alloc, mmflag);
     if (!pdir)
         return NULL;
 
     /* Get the page table number. A page table covers 2MB. */
-    pde = (virt % 0x40000000) / 0x200000;
+    unsigned pde = (virt % 0x40000000) / 0x200000;
     if (!(pdir[pde] & X86_PTE_PRESENT)) {
         /* Allocate a new page table if required. */
         if (alloc) {
-            page = alloc_structure(mmflag);
+            phys_ptr_t page = alloc_structure(mmflag);
             if (unlikely(!page))
                 return NULL;
 
@@ -293,18 +274,16 @@ static void invalidate_page(mmu_context_t *ctx, ptr_t virt, bool shared) {
  * @param mmflag        Allocation behaviour flags.
  * @return              Status code describing result of the operation. */
 static status_t amd64_mmu_init(mmu_context_t *ctx, unsigned mmflag) {
-    uint64_t *kpml4, *pml4;
-    unsigned i;
-
     ctx->arch.invalidate_count = 0;
+
     ctx->arch.pml4 = alloc_structure(mmflag);
     if (!ctx->arch.pml4)
         return STATUS_NO_MEMORY;
 
     /* Get the kernel mappings into the new PML4. */
-    kpml4 = map_structure(kernel_mmu_context.arch.pml4);
-    pml4 = map_structure(ctx->arch.pml4);
-    for (i = 256; i < 512; i++)
+    uint64_t *kpml4 = map_structure(kernel_mmu_context.arch.pml4);
+    uint64_t *pml4  = map_structure(ctx->arch.pml4);
+    for (unsigned i = 256; i < 512; i++)
         pml4[i] = kpml4[i] & ~X86_PTE_ACCESSED;
 
     return STATUS_SUCCESS;
@@ -313,22 +292,19 @@ static status_t amd64_mmu_init(mmu_context_t *ctx, unsigned mmflag) {
 /** Destroy a context.
  * @param ctx           Context to destroy. */
 static void amd64_mmu_destroy(mmu_context_t *ctx) {
-    uint64_t *pml4, *pdp, *pdir;
-    unsigned i, j, k;
-
     /* Free all structures in the bottom half of the PML4 (user memory). */
-    pml4 = map_structure(ctx->arch.pml4);
-    for (i = 0; i < 256; i++) {
+    uint64_t *pml4 = map_structure(ctx->arch.pml4);
+    for (unsigned i = 0; i < 256; i++) {
         if (!(pml4[i] & X86_PTE_PRESENT))
             continue;
 
-        pdp = map_structure(pml4[i] & PHYS_PAGE_MASK);
-        for (j = 0; j < 512; j++) {
+        uint64_t *pdp = map_structure(pml4[i] & PHYS_PAGE_MASK);
+        for (unsigned j = 0; j < 512; j++) {
             if (!(pdp[j] & X86_PTE_PRESENT))
                 continue;
 
-            pdir = map_structure(pdp[j] & PHYS_PAGE_MASK);
-            for (k = 0; k < 512; k++) {
+            uint64_t *pdir = map_structure(pdp[j] & PHYS_PAGE_MASK);
+            for (unsigned k = 0; k < 512; k++) {
                 if (!(pdir[k] & X86_PTE_PRESENT))
                     continue;
 
@@ -357,16 +333,13 @@ static status_t amd64_mmu_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t access,
     unsigned mmflag)
 {
-    uint64_t *ptbl;
-    unsigned pte;
-
     /* Find the page table for the entry. */
-    ptbl = get_ptbl(ctx, virt, true, mmflag);
+    uint64_t *ptbl = get_ptbl(ctx, virt, true, mmflag);
     if (!ptbl)
         return STATUS_NO_MEMORY;
 
     /* Check that the mapping doesn't already exist. */
-    pte = (virt % 0x200000) / PAGE_SIZE;
+    unsigned pte = (virt % 0x200000) / PAGE_SIZE;
     if (unlikely(ptbl[pte] & X86_PTE_PRESENT))
         fatal("Mapping %p which is already mapped", virt);
 
@@ -381,15 +354,12 @@ static status_t amd64_mmu_map(
  * @param size          Size of range to update.
  * @param access        New access flags. */
 static void amd64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
-    uint64_t *ptbl = NULL, prev, entry;
-    unsigned pte;
-    ptr_t end;
-
     /* Loop through each page in the range. */
-    end = virt + size - 1;
+    ptr_t end = virt + size - 1;
+    uint64_t *ptbl = NULL;
     while (virt < end) {
-        /* If this is the first address or we have crossed a 2MB
-         * boundary we must look up a new page table. */
+        /* If this is the first address or we have crossed a 2MB boundary we
+         * must look up a new page table. */
         if (!ptbl || !(virt % 0x200000)) {
             ptbl = get_ptbl(ctx, virt, false, 0);
             if (!ptbl) {
@@ -400,14 +370,15 @@ static void amd64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
         }
 
         /* If the mapping doesn't exist we don't need to do anything. */
-        pte = (virt % 0x200000) / PAGE_SIZE;
+        unsigned pte = (virt % 0x200000) / PAGE_SIZE;
         if (ptbl[pte] & X86_PTE_PRESENT) {
             /* Update the entry. Do this atomically to avoid losing accessed or
              * dirty bit modifications. */
+            uint64_t prev;
             while (true) {
                 prev = ptbl[pte];
 
-                entry = (prev & X86_PTE_PROTECT_MASK);
+                uint64_t entry = (prev & X86_PTE_PROTECT_MASK);
                 if (access & VM_ACCESS_WRITE)
                     entry |= X86_PTE_WRITE;
                 if (!(access & VM_ACCESS_EXECUTE) && cpu_features.xd)
@@ -435,24 +406,20 @@ static void amd64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
  * @param _page         Where to pointer to page that was unmapped.
  * @return              Whether a page was mapped at the virtual address. */
 static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
-    uint64_t *ptbl, entry;
-    unsigned pte;
-    page_t *page;
-
     /* Find the page table for the entry. */
-    ptbl = get_ptbl(ctx, virt, false, 0);
+    uint64_t *ptbl = get_ptbl(ctx, virt, false, 0);
     if (!ptbl)
         return false;
 
     /* If the mapping doesn't exist we don't need to do anything. */
-    pte = (virt % 0x200000) / PAGE_SIZE;
+    unsigned pte = (virt % 0x200000) / PAGE_SIZE;
     if (!(ptbl[pte] & X86_PTE_PRESENT))
         return false;
 
     /* Clear the entry. */
-    entry = clear_pte(&ptbl[pte]);
+    uint64_t entry = clear_pte(&ptbl[pte]);
 
-    page = page_lookup(entry & PHYS_PAGE_MASK);
+    page_t *page = page_lookup(entry & PHYS_PAGE_MASK);
 
     /* If the entry is dirty, set the modified flag on the page. */
     if (page && entry & X86_PTE_DIRTY)
@@ -477,16 +444,15 @@ static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t 
  * @param _access       Where to store access flags for the mapping.
  * @return              Whether a page is mapped at the virtual address. */
 static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
-    uint64_t *pdir, *ptbl, entry;
+    uint64_t entry;
     phys_ptr_t phys;
-    unsigned pde, pte;
     bool ret = false;
 
     /* Find the page directory for the entry. */
-    pdir = get_pdir(ctx, virt, false, 0);
+    uint64_t *pdir = get_pdir(ctx, virt, false, 0);
     if (pdir) {
         /* Get the page table number. A page table covers 2MB. */
-        pde = (virt % 0x40000000) / 0x200000;
+        unsigned pde = (virt % 0x40000000) / 0x200000;
         if (pdir[pde] & X86_PTE_PRESENT) {
             /* Handle large pages: parts of the kernel address space may be
              * mapped with large pages, so we must be able to handle queries on
@@ -496,8 +462,8 @@ static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, u
                 phys = (pdir[pde] & 0x000000fffff00000ul) + (virt % 0x200000);
                 ret = true;
             } else {
-                ptbl = map_structure(pdir[pde] & PHYS_PAGE_MASK);
-                pte = (virt % 0x200000) / PAGE_SIZE;
+                uint64_t *ptbl = map_structure(pdir[pde] & PHYS_PAGE_MASK);
+                unsigned pte = (virt % 0x200000) / PAGE_SIZE;
                 if (ptbl[pte] & X86_PTE_PRESENT) {
                     entry = ptbl[pte];
                     phys = ptbl[pte] & PHYS_PAGE_MASK;
@@ -520,12 +486,8 @@ static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, u
     return ret;
 }
 
-/** Remote TLB invalidation handler.
- * @param _ctx          Address of MMU context structure.
- * @return              Always returns STATUS_SUCCESS. */
 static status_t tlb_invalidate_func(void *_ctx) {
     mmu_context_t *ctx = _ctx;
-    size_t i;
 
     /* Don't need to do anything if we aren't using the context - we may have
      * switched address space between the modifying CPU sending the interrupt
@@ -543,7 +505,7 @@ static status_t tlb_invalidate_func(void *_ctx) {
                 x86_write_cr3(x86_read_cr3());
             }
         } else {
-            for (i = 0; i < ctx->arch.invalidate_count; i++)
+            for (size_t i = 0; i < ctx->arch.invalidate_count; i++)
                 x86_invlpg(ctx->arch.pages_to_invalidate[i]);
         }
     }
@@ -554,8 +516,6 @@ static status_t tlb_invalidate_func(void *_ctx) {
 /** Perform remote TLB invalidation.
  * @param ctx           Context to send for. */
 static void amd64_mmu_flush(mmu_context_t *ctx) {
-    cpu_t *cpu;
-
     /* Check if anything needs to be done. */
     if (cpu_count < 2 || !ctx->arch.invalidate_count) {
         ctx->arch.invalidate_count = 0;
@@ -569,7 +529,7 @@ static void amd64_mmu_flush(mmu_context_t *ctx) {
     } else {
         /* TODO: Multicast. */
         list_foreach(&running_cpus, iter) {
-            cpu = list_entry(iter, cpu_t, header);
+            cpu_t *cpu = list_entry(iter, cpu_t, header);
             if (cpu == curr_cpu || !cpu->aspace || ctx != cpu->aspace->mmu)
                 continue;
 
@@ -590,46 +550,36 @@ static void amd64_mmu_load(mmu_context_t *ctx) {
 
 /** AMD64 MMU operations. */
 static mmu_ops_t amd64_mmu_ops = {
-    .init = amd64_mmu_init,
+    .init    = amd64_mmu_init,
     .destroy = amd64_mmu_destroy,
-    .map = amd64_mmu_map,
-    .remap = amd64_mmu_remap,
-    .unmap = amd64_mmu_unmap,
-    .query = amd64_mmu_query,
-    .flush = amd64_mmu_flush,
-    .load = amd64_mmu_load,
+    .map     = amd64_mmu_map,
+    .remap   = amd64_mmu_remap,
+    .unmap   = amd64_mmu_unmap,
+    .query   = amd64_mmu_query,
+    .flush   = amd64_mmu_flush,
+    .load    = amd64_mmu_load,
 };
 
-/** Map a section of the kernel.
- * @param name          Name of the section.
- * @param start         Start of the section.
- * @param end           End of the section.
- * @param access        Mapping access flags. */
 static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t access) {
-    kboot_tag_core_t *core;
-    phys_ptr_t phys, i;
-    uint64_t *pdir, *ptbl, entry;
-    unsigned pde, pte;
-
     /* Get the KBoot core tag which contains the kernel physical address. */
-    core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
+    kboot_tag_core_t *core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
     assert(core);
 
-    phys = (start - KERNEL_VIRT_BASE) + core->kernel_phys;
+    phys_ptr_t phys = (start - KERNEL_VIRT_BASE) + core->kernel_phys;
 
     /* Map using large pages if possible. */
     if (!(start % LARGE_PAGE_SIZE) && !(end % LARGE_PAGE_SIZE)) {
-        for (i = start; i < end; i += LARGE_PAGE_SIZE) {
-            pdir = get_pdir(&kernel_mmu_context, i, true, MM_BOOT);
-            pde = (i % 0x40000000) / LARGE_PAGE_SIZE;
-            entry = calc_page_pte(&kernel_mmu_context, phys + i - start, access) | X86_PTE_LARGE;
+        for (phys_ptr_t i = start; i < end; i += LARGE_PAGE_SIZE) {
+            uint64_t *pdir = get_pdir(&kernel_mmu_context, i, true, MM_BOOT);
+            unsigned pde   = (i % 0x40000000) / LARGE_PAGE_SIZE;
+            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + i - start, access) | X86_PTE_LARGE;
             set_pte(&pdir[pde], entry);
         }
     } else {
-        for (i = start; i < end; i += PAGE_SIZE) {
-            ptbl = get_ptbl(&kernel_mmu_context, i, true, MM_BOOT);
-            pte = (i % 0x200000) / PAGE_SIZE;
-            entry = calc_page_pte(&kernel_mmu_context, phys + i - start, access);
+        for (phys_ptr_t i = start; i < end; i += PAGE_SIZE) {
+            uint64_t *ptbl = get_ptbl(&kernel_mmu_context, i, true, MM_BOOT);
+            unsigned pte   = (i % 0x200000) / PAGE_SIZE;
+            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + i - start, access);
             set_pte(&ptbl[pte], entry);
         }
     }
@@ -639,9 +589,6 @@ static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t access
 
 /** Create the kernel MMU context. */
 __init_text void arch_mmu_init(void) {
-    phys_ptr_t i, j, end, highest_phys = 0;
-    uint64_t *pdir;
-
     mmu_ops = &amd64_mmu_ops;
 
     /* Initialize the kernel MMU context. */
@@ -671,8 +618,9 @@ __init_text void arch_mmu_init(void) {
         VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE);
 
     /* Search for the highest physical address we have in the memory map. */
+    phys_ptr_t highest_phys = 0;
     kboot_tag_foreach(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
-        end = range->start + range->size;
+        phys_ptr_t end = range->start + range->size;
         if (end > highest_phys)
             highest_phys = end;
     }
@@ -682,9 +630,9 @@ __init_text void arch_mmu_init(void) {
     kprintf(LOG_DEBUG, "mmu: mapping physical memory up to 0x%" PRIxPHYS "\n", highest_phys);
 
     /* Create the physical map area. */
-    for (i = 0; i < highest_phys; i += 0x40000000) {
-        pdir = get_pdir(&kernel_mmu_context, i + KERNEL_PMAP_BASE, true, MM_BOOT);
-        for (j = 0; j < 0x40000000; j += LARGE_PAGE_SIZE) {
+    for (phys_ptr_t i = 0; i < highest_phys; i += 0x40000000) {
+        uint64_t *pdir = get_pdir(&kernel_mmu_context, i + KERNEL_PMAP_BASE, true, MM_BOOT);
+        for (phys_ptr_t j = 0; j < 0x40000000; j += LARGE_PAGE_SIZE) {
             pdir[j / LARGE_PAGE_SIZE]
                 = (i + j) | X86_PTE_PRESENT | X86_PTE_WRITE | X86_PTE_GLOBAL | X86_PTE_LARGE;
         }
@@ -698,15 +646,13 @@ __init_text void arch_mmu_init(void) {
 
 /** Initialize the MMU for this CPU. */
 __init_text void arch_mmu_init_percpu(void) {
-    uint64_t pat;
-
     /* Enable NX/XD if supported. */
     if (cpu_features.xd)
         x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
 
     /* Configure the PAT. We do not use the PAT bit in the page table, as
      * conflicts with the large page bit, so we make PAT3 be WC. */
-    pat =
+    uint64_t pat =
         pat_entry(0, 0x06) | pat_entry(1, 0x04) |
         pat_entry(2, 0x07) | pat_entry(3, 0x01) |
         pat_entry(4, 0x06) | pat_entry(5, 0x04) |

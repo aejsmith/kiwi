@@ -46,29 +46,18 @@ typedef struct printf_state {
     int base;                       /**< Base of current item. */
 } printf_state_t;
 
-/** Digits to use for printing numbers. */
 static const char printf_digits_upper[] = "0123456789ABCDEF";
 static const char printf_digits_lower[] = "0123456789abcdef";
 
-/** Print a single character.
- * @param state         Internal state structure.
- * @param ch            Character to write. */
 static void print_char(printf_state_t *state, char ch) {
     state->helper(ch, state->data, &state->total);
 }
 
-/** Helper to print a string of characters.
- * @param state         Internal state structure.
- * @param str           String to write.
- * @param len           Length to print. */
 static void print_string(printf_state_t *state, const char *str, size_t len) {
     for (size_t i = 0; i < len; i++)
         print_char(state, str[i]);
 }
 
-/** Helper to print a number.
- * @param state         Internal state structure.
- * @param num           Number to print. */
 static void print_number(printf_state_t *state, uint64_t num) {
     char buffer[64];
     char sign = 0;
@@ -156,27 +145,19 @@ static void print_number(printf_state_t *state, uint64_t num) {
     }
 }
 
-/** Print a symbol.
- * @param state         Internal state structure.
- * @param ptr           Address of symbol to print.
- * @param ext           Character specifying behaviour. */
 static void print_symbol(printf_state_t *state, void *ptr, char ext) {
-    symbol_t sym;
-    long delta;
-    size_t off;
-    int width;
-    bool ret;
-
     /* Zero pad up to the width of a pointer. */
-    width = (sizeof(void *) * 2) + 2;
+    int width = (sizeof(void *) * 2) + 2;
 
     /* For a backtrace, we want to subtract 1 from the address when looking up
      * the symbol (but not when printing), as backtraces use the return address
      * of a call which may not yield the correct symbol if the compiler has
      * produced a tail call. */
-    delta = (ext == 'B') ? -1 : 0;
+    long delta = (ext == 'B') ? -1 : 0;
 
-    ret = symbol_from_addr((ptr_t)ptr + delta, &sym, &off);
+    symbol_t sym;
+    size_t off;
+    bool ret = symbol_from_addr((ptr_t)ptr + delta, &sym, &off);
     if (isupper(ext)) {
         state->total += do_printf(
             state->helper, state->data,
@@ -190,10 +171,6 @@ static void print_symbol(printf_state_t *state, void *ptr, char ext) {
     }
 }
 
-/** Helper to print a pointer.
- * @param state         Internal state structure.
- * @param fmt           Pointer to format string pointer.
- * @param ptr           Pointer to print. */
 static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
     /* Print lower-case and as though # was specified. */
     state->flags |= PRINTF_LOW_CASE | PRINTF_PREFIX;
@@ -208,25 +185,22 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
      *  - %pB = Print a symbol for a backtrace handling tail calls correctly.
      */
     switch ((*fmt)[1]) {
-    case 'S':
-    case 's':
-    case 'B':
-        print_symbol(state, ptr, *(++(*fmt)));
-        break;
-    default:
-        state->base = 16;
-        print_number(state, (ptr_t)ptr);
-        break;
+        case 'S':
+        case 's':
+        case 'B':
+            print_symbol(state, ptr, *(++(*fmt)));
+            break;
+        default:
+            state->base = 16;
+            print_number(state, (ptr_t)ptr);
+            break;
     }
 }
 
 /**
- * Internal implementation of printf()-style functions.
- *
- * This function does the main work of printf()-style functions. It parses
- * the format string, and uses a supplied helper function to actually put
- * characters in the desired output location (for example the console or a
- * string buffer).
+ * Internal implementation of printf()-style functions. It parses the format
+ * string, and uses a supplied helper function to actually put characters in
+ * the desired output location (for example the console or a string buffer).
  *
  * @note                Floating point values are not supported.
  * @note                The 'n' conversion specifier is not supported.
@@ -241,16 +215,16 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
  */
 int do_vprintf(printf_helper_t helper, void *data, const char *fmt, va_list args) {
     printf_state_t state;
-    unsigned char ch;
-    const char *str;
-    uint64_t num;
-    int32_t len;
-
     state.helper = helper;
-    state.data = data;
-    state.total = 0;
+    state.data   = data;
+    state.total  = 0;
 
     for (; *fmt; fmt++) {
+        unsigned char ch;
+        const char *str;
+        uint64_t num;
+        int32_t len;
+
         if (*fmt != '%') {
             print_char(&state, *fmt);
             continue;
@@ -260,25 +234,26 @@ int do_vprintf(printf_helper_t helper, void *data, const char *fmt, va_list args
         state.flags = 0;
         while (true) {
             switch (*(++fmt)) {
-            case '#':
-                state.flags |= PRINTF_PREFIX;
-                continue;
-            case '0':
-                /* Left justify has greater priority than zero padding. */
-                if (!(state.flags & PRINTF_LEFT_JUSTIFY))
-                    state.flags |= PRINTF_ZERO_PAD;
-                continue;
-            case '-':
-                state.flags &= ~PRINTF_ZERO_PAD;
-                state.flags |= PRINTF_LEFT_JUSTIFY;
-                continue;
-            case ' ':
-                state.flags |= PRINTF_SPACE_CHAR;
-                continue;
-            case '+':
-                state.flags |= PRINTF_SIGN_CHAR;
-                continue;
+                case '#':
+                    state.flags |= PRINTF_PREFIX;
+                    continue;
+                case '0':
+                    /* Left justify has greater priority than zero padding. */
+                    if (!(state.flags & PRINTF_LEFT_JUSTIFY))
+                        state.flags |= PRINTF_ZERO_PAD;
+                    continue;
+                case '-':
+                    state.flags &= ~PRINTF_ZERO_PAD;
+                    state.flags |= PRINTF_LEFT_JUSTIFY;
+                    continue;
+                case ' ':
+                    state.flags |= PRINTF_SPACE_CHAR;
+                    continue;
+                case '+':
+                    state.flags |= PRINTF_SIGN_CHAR;
+                    continue;
             }
+
             break;
         }
 
@@ -321,23 +296,23 @@ int do_vprintf(printf_helper_t helper, void *data, const char *fmt, va_list args
 
         /* Get the length modifier. */
         switch (*fmt) {
-        case 'h':
-        case 'z':
-            len = (uint32_t)*(fmt++);
-            break;
-        case 'l':
-            len = (uint32_t)*(fmt++);
-            if (*fmt == 'l') {
-                len = 'L';
-                fmt++;
-            }
-            break;
-        case 'L':
-            len = (uint32_t)*(fmt++);
-            break;
-        default:
-            len = 0;
-            break;
+            case 'h':
+            case 'z':
+                len = (uint32_t)*(fmt++);
+                break;
+            case 'l':
+                len = (uint32_t)*(fmt++);
+                if (*fmt == 'l') {
+                    len = 'L';
+                    fmt++;
+                }
+                break;
+            case 'L':
+                len = (uint32_t)*(fmt++);
+                break;
+            default:
+                len = 0;
+                break;
         }
 
         /* Get and handle the conversion specifier. For number conversions, we
@@ -345,59 +320,59 @@ int do_vprintf(printf_helper_t helper, void *data, const char *fmt, va_list args
          * anything else, continue to the next iteration of the main loop. */
         state.base = 10;
         switch (*fmt) {
-        case '%':
-            print_char(&state, '%');
-            continue;
-        case 'c':
-            ch = (unsigned char)va_arg(args, int);
-            if (state.flags & PRINTF_LEFT_JUSTIFY) {
-                print_char(&state, ch);
-                while (--state.width > 0)
-                    print_char(&state, ' ');
-            } else {
-                while (--state.width > 0)
-                    print_char(&state, ' ');
-                print_char(&state, ch);
-            }
-            continue;
-        case 'd':
-        case 'i':
-            state.flags |= PRINTF_SIGNED;
-            break;
-        case 'o':
-            state.base = 8;
-            break;
-        case 'p':
-            print_pointer(&state, &fmt, va_arg(args, void *));
-            continue;
-        case 's':
-            /* We won't need the length modifier here, can use the len variable. */
-            str = va_arg(args, const char *);
-            len = strnlen(str, state.precision);
-            if (state.flags & PRINTF_LEFT_JUSTIFY) {
-                print_string(&state, str, len);
-                while (len < state.width--)
-                    print_char(&state, ' ');
-            } else {
-                while (len < state.width--)
-                    print_char(&state, ' ');
-                print_string(&state, str, len);
-            }
-            continue;
-        case 'u':
-            break;
-        case 'x':
-            state.flags |= PRINTF_LOW_CASE;
-        case 'X':
-            state.base = 16;
-            break;
-        default:
-            /* Unknown character, go back and reprint what we skipped over. */
-            print_char(&state, '%');
-            while (fmt[-1] != '%')
-                fmt--;
+            case '%':
+                print_char(&state, '%');
+                continue;
+            case 'c':
+                ch = (unsigned char)va_arg(args, int);
+                if (state.flags & PRINTF_LEFT_JUSTIFY) {
+                    print_char(&state, ch);
+                    while (--state.width > 0)
+                        print_char(&state, ' ');
+                } else {
+                    while (--state.width > 0)
+                        print_char(&state, ' ');
+                    print_char(&state, ch);
+                }
+                continue;
+            case 'd':
+            case 'i':
+                state.flags |= PRINTF_SIGNED;
+                break;
+            case 'o':
+                state.base = 8;
+                break;
+            case 'p':
+                print_pointer(&state, &fmt, va_arg(args, void *));
+                continue;
+            case 's':
+                /* We won't need the length modifier here, can use the len variable. */
+                str = va_arg(args, const char *);
+                len = strnlen(str, state.precision);
+                if (state.flags & PRINTF_LEFT_JUSTIFY) {
+                    print_string(&state, str, len);
+                    while (len < state.width--)
+                        print_char(&state, ' ');
+                } else {
+                    while (len < state.width--)
+                        print_char(&state, ' ');
+                    print_string(&state, str, len);
+                }
+                continue;
+            case 'u':
+                break;
+            case 'x':
+                state.flags |= PRINTF_LOW_CASE;
+            case 'X':
+                state.base = 16;
+                break;
+            default:
+                /* Unknown character, go back and reprint what we skipped over. */
+                print_char(&state, '%');
+                while (fmt[-1] != '%')
+                    fmt--;
 
-            continue;
+                continue;
         }
 
         /* Default precision for numbers should be 1. */
@@ -406,28 +381,28 @@ int do_vprintf(printf_helper_t helper, void *data, const char *fmt, va_list args
 
         /* Perform conversions according to the length modifiers. */
         switch (len & 0xff) {
-        case 'h':
-            num = (unsigned short)va_arg(args, int);
-            if (state.flags & PRINTF_SIGNED)
-                num = (signed short)num;
-            break;
-        case 'l':
-            num = va_arg(args, unsigned long);
-            if (state.flags & PRINTF_SIGNED)
-                num = (signed long)num;
-            break;
-        case 'L':
-            num = va_arg(args, unsigned long long);
-            if (state.flags & PRINTF_SIGNED)
-                num = (signed long long)num;
-            break;
-        case 'z':
-            num = va_arg(args, size_t);
-            break;
-        default:
-            num = va_arg(args, unsigned int);
-            if (state.flags & PRINTF_SIGNED)
-                num = (signed int)num;
+            case 'h':
+                num = (unsigned short)va_arg(args, int);
+                if (state.flags & PRINTF_SIGNED)
+                    num = (signed short)num;
+                break;
+            case 'l':
+                num = va_arg(args, unsigned long);
+                if (state.flags & PRINTF_SIGNED)
+                    num = (signed long)num;
+                break;
+            case 'L':
+                num = va_arg(args, unsigned long long);
+                if (state.flags & PRINTF_SIGNED)
+                    num = (signed long long)num;
+                break;
+            case 'z':
+                num = va_arg(args, size_t);
+                break;
+            default:
+                num = va_arg(args, unsigned int);
+                if (state.flags & PRINTF_SIGNED)
+                    num = (signed int)num;
         }
 
         /* Print the number. */
@@ -438,12 +413,9 @@ int do_vprintf(printf_helper_t helper, void *data, const char *fmt, va_list args
 }
 
 /**
- * Internal implementation of printf()-style functions.
- *
- * This function does the main work of printf()-style functions. It parses
- * the format string, and uses a supplied helper function to actually put
- * characters in the desired output location (for example the console or a
- * string buffer).
+ * Internal implementation of printf()-style functions. It parses the format
+ * string, and uses a supplied helper function to actually put characters in
+ * the desired output location (for example the console or a string buffer).
  *
  * @note                Floating point values are not supported.
  * @note                The 'n' conversion specifier is not supported.
