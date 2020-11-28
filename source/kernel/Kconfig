@@ -20,11 +20,11 @@ config KLOG_SIZE
 	help
 	  Size for the kernel log buffer (in characters).
 
-menu "Architecture configuration"
+menu "Architecture"
 source "arch/Kconfig"
 endmenu
 
-menu "Platform configuration"
+menu "Platform"
 source "platform/Kconfig"
 endmenu
 
@@ -51,3 +51,8 @@ config SLAB_TRACING
 #######
 endmenu
 #######
+
+menu "Device support"
+source "device/Kconfig"
+endmenu
+

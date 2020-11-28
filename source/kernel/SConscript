@@ -90,7 +90,7 @@ sources = FeatureSources(config, [
 ])
 
 module_dirs = FeatureDirs(config, [
-    'device/test',
+    'device/input',
 ])
 
 # Create the kernel environment.

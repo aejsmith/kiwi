@@ -16,23 +16,23 @@
 
 /**
  * @file
- * @brief               Test driver.
+ * @brief               i8042 keyboard/mouse port driver.
  */
+
+#include <device/input.h>
 
 #include <module.h>
 #include <status.h>
 
-static status_t test_init(void) {
-    module_t *module = module_self();
-    kprintf(LOG_DEBUG, "test: loaded %p '%s'\n", module, module->name);
+static status_t i8042_init(void) {
     return STATUS_SUCCESS;
 }
 
-static status_t test_unload(void) {
-    kprintf(LOG_DEBUG, "test: unloaded\n");
+static status_t i8042_unload(void) {
     return STATUS_SUCCESS;
 }
 
-MODULE_NAME("test");
-MODULE_DESC("Test driver");
-MODULE_FUNCS(test_init, test_unload);
+MODULE_NAME("i8042");
+MODULE_DESC("i8042 keyboard/mouse port driver");
+MODULE_DEPS(INPUT_MODULE_NAME);
+MODULE_FUNCS(i8042_init, i8042_unload);

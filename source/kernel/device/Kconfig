@@ -14,8 +14,11 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env')
+comment "Input devices"
 
-env.Module('test', [
-    'test.c',
-])
+config DEVICE_INPUT_I8042
+    bool "i8042 keyboard/mouse port"
+    default y
+    depends on PLATFORM_PC
+    help
+      Enable the i8042 (PS/2) keyboard/mouse port driver.
