@@ -564,8 +564,8 @@ __init_text void module_init(void) {
 
     /* Now all of the modules are partially loaded, we can resolve dependencies
      * and load them all in the correct order. */
-    list_foreach_safe(&boot_module_list, iter) {
-        module_t *module = list_entry(iter, module_t, header);
+    while (!list_empty(&boot_module_list)) {
+        module_t *module = list_first(&boot_module_list, module_t, header);
 
         assert(module_state(module) == MODULE_STATE_LOADING);
         finish_boot_module(module);
