@@ -18,7 +18,7 @@ import SCons.Defaults
 from SCons.Script import *
 from functools import reduce
 
-# Helper for creating source lists with certain files only enabled by config
+# Helpers for creating source lists with certain files only enabled by config
 # settings.
 def FeatureSources(config, files):
     output = []
@@ -28,6 +28,15 @@ def FeatureSources(config, files):
                 output.append(File(f[-1]))
         else:
             output.append(File(f))
+    return output
+def FeatureDirs(config, dirs):
+    output = []
+    for f in dirs:
+        if type(f) is tuple:
+            if reduce(lambda x, y: x or y, [config[x] for x in f[0:-1]]):
+                output.append(Dir(f[-1]))
+        else:
+            output.append(Dir(f))
     return output
 
 # Raise an error if a certain target is not specified.

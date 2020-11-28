@@ -21,6 +21,7 @@ manager.AddVariable('_LIBOUTDIR', Dir('.'))
 
 dirs = [
     'crt',
+    'device',
     'kernel',
     'system',
     'compiler-rt',

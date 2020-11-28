@@ -14,14 +14,19 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('manager')
+Import('manager', 'config')
 
-subdirs = [
-    'test',
-]
+env = manager.Create(libraries = ['kernel'], flags = {
+    'CPPPATH': [
+        Dir('include'),
+    ],
+})
 
-# Add driver include directory to the module environment.
-env = manager['module']
-env['CPPPATH'].append(Dir('include'))
+sources = [File(f) for f in [
+    'dummy.c',
+]]
 
-SConscript(dirs = subdirs, exports = ['env'])
+env.KiwiLibrary('device',
+    sources = sources,
+    include_paths = [Dir('include')],
+)
