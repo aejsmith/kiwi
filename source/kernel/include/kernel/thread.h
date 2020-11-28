@@ -27,9 +27,7 @@
 #include <kernel/object.h>
 #include <kernel/security.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Thread stack information. */
 typedef struct thread_stack {
@@ -101,6 +99,4 @@ extern status_t kern_thread_raise(exception_info_t *info);
 extern status_t kern_thread_sleep(nstime_t nsecs, nstime_t *_rem);
 extern void kern_thread_exit(int status) __attribute__((noreturn));
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

@@ -23,12 +23,8 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

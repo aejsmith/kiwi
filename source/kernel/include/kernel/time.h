@@ -23,9 +23,7 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Event for the timer firing. */
 #define TIMER_EVENT         1
@@ -45,6 +43,4 @@ extern status_t kern_timer_stop(handle_t handle, nstime_t *_rem);
 extern status_t kern_time_get(unsigned source, nstime_t *_time);
 extern status_t kern_time_set(unsigned source, nstime_t time);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

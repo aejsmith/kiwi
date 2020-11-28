@@ -31,6 +31,15 @@
 #   include <stdint.h>
 #endif
 
+#ifdef __cplusplus
+    #define __KERNEL_EXTERN_C_BEGIN extern "C" {
+    #define __KERNEL_EXTERN_C_END   }
+#else
+    #define __KERNEL_EXTERN_C_BEGIN
+    #define __KERNEL_EXTERN_C_END
+#endif
+
+
 /** Type used to store a kernel status code. */
 typedef int32_t status_t;
 

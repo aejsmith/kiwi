@@ -24,9 +24,7 @@
 #include <kernel/file.h>
 #include <kernel/limits.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Start of class-specific event/request numbers. */
 #define DEVICE_CLASS_EVENT_START    32
@@ -38,6 +36,4 @@ extern "C" {
 
 extern status_t kern_device_open(const char *path, uint32_t access, uint32_t flags, handle_t *_handle);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

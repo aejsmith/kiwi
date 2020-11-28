@@ -23,9 +23,7 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 #ifdef __x86_64__
 
@@ -59,6 +57,4 @@ typedef struct cpu_context {
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

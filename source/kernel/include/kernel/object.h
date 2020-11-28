@@ -23,9 +23,7 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 struct thread_context;
 
@@ -94,6 +92,4 @@ extern status_t kern_handle_set_flags(handle_t handle, uint32_t flags);
 extern status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *_new);
 extern status_t kern_handle_close(handle_t handle);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

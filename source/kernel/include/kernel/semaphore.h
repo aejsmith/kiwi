@@ -23,9 +23,7 @@
 
 #include <kernel/object.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Event for the semaphore count becoming non-zero. */
 #define SEMAPHORE_EVENT     1
@@ -34,6 +32,4 @@ extern status_t kern_semaphore_create(size_t count, handle_t *_handle);
 extern status_t kern_semaphore_down(handle_t handle, nstime_t timeout);
 extern status_t kern_semaphore_up(handle_t handle, size_t count);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

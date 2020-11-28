@@ -23,9 +23,7 @@
 
 #include <kernel/thread.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 #ifdef __KERNEL_PRIVATE
 
@@ -50,6 +48,4 @@ extern void _kern_thread_exit(int status) __attribute__((noreturn));
 #endif /* __LIBKERNEL */
 #endif /* __KERNEL_PRIVATE */
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

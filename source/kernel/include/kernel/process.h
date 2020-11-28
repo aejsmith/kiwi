@@ -26,9 +26,7 @@
 #include <kernel/object.h>
 #include <kernel/security.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Extended attributes for process creation. */
 typedef struct process_attrib {
@@ -110,6 +108,4 @@ extern status_t kern_process_set_exception_handler(unsigned code, exception_hand
 
 extern void kern_process_exit(int status) __attribute__((noreturn));
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

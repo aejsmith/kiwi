@@ -74,15 +74,11 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 extern const char *__kernel_status_strings[];
 extern size_t __kernel_status_size;
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END
 
 #endif /* !__KERNEL && !__ASM__ */

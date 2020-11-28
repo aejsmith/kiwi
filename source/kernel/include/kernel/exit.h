@@ -23,15 +23,11 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Process/thread exit reasons. */
 #define EXIT_REASON_NORMAL      0   /**< Normal exit. */
 #define EXIT_REASON_KILLED      1   /**< Process/thread was killed. */
 #define EXIT_REASON_EXCEPTION   2   /**< Unhandled exception. */
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

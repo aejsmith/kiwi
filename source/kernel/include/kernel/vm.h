@@ -23,9 +23,7 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Address specification for kern_vm_map(). */
 #define VM_ADDRESS_ANY      1       /**< Place at any address. */
@@ -47,6 +45,4 @@ extern status_t kern_vm_map(
     uint32_t flags, handle_t handle, offset_t offset, const char *name);
 extern status_t kern_vm_unmap(void *start, size_t size);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

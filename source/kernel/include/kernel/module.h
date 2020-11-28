@@ -24,9 +24,7 @@
 #include <kernel/limits.h>
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Module information structure. */
 typedef struct module_info {
@@ -39,6 +37,4 @@ typedef struct module_info {
 extern status_t kern_module_load(const char *path, char *depbuf);
 extern status_t kern_module_info(module_info_t *_info, size_t *_count);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

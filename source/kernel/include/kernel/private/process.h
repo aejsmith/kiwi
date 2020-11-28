@@ -23,9 +23,7 @@
 
 #include <kernel/process.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 #ifdef __KERNEL_PRIVATE
 
@@ -53,6 +51,4 @@ extern status_t _kern_process_id(handle_t handle, process_id_t *_id);
 #endif /* __LIBKERNEL */
 #endif /* __KERNEL_PRIVATE */
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

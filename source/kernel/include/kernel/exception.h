@@ -23,9 +23,7 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 struct thread_context;
 
@@ -79,6 +77,4 @@ typedef void (*exception_handler_t)(exception_info_t *info, struct thread_contex
 #define EXCEPTION_ABORT                 16  /**< Software abort. */
 #define EXCEPTION_MAX                   17
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

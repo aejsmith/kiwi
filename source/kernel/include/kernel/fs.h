@@ -24,9 +24,7 @@
 #include <kernel/file.h>
 #include <kernel/limits.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Mount information structure. */
 typedef struct mount_info {
@@ -73,6 +71,4 @@ extern status_t kern_fs_unlink(const char *path);
 extern status_t kern_fs_rename(const char *source, const char *dest);
 extern status_t kern_fs_sync(void);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

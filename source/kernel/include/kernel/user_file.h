@@ -46,9 +46,7 @@
 
 #include <kernel/file.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** User file operation message IDs. */
 enum {
@@ -162,6 +160,4 @@ extern status_t kern_user_file_create(
     file_type_t type, uint32_t access, uint32_t flags, handle_t *_conn,
     handle_t *_file);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

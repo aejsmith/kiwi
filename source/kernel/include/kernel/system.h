@@ -23,9 +23,7 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** System information values. */
 #define SYSTEM_INFO_PAGE_SIZE   1   /**< System page size (unsigned long). */
@@ -39,6 +37,4 @@ extern status_t kern_system_info(unsigned what, void *buf);
 extern status_t kern_system_shutdown(unsigned action);
 extern void kern_system_fatal(const char *message);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

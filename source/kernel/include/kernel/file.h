@@ -27,9 +27,7 @@
 
 #include <kernel/object.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Possible file types. */
 typedef enum file_type {
@@ -123,6 +121,4 @@ extern status_t kern_file_request(
     handle_t handle, unsigned request, const void *in, size_t in_size,
     void *out, size_t out_size, size_t *_bytes);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

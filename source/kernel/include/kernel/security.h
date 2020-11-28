@@ -23,9 +23,7 @@
 
 #include <kernel/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Maximum number of groups a process can be in. */
 #define SECURITY_CONTEXT_MAX_GROUPS 32
@@ -170,6 +168,4 @@ static inline void security_context_unset_inherit(security_context_t *ctx, unsig
 extern status_t kern_token_create(const security_context_t *ctx, handle_t *_handle);
 extern status_t kern_token_query(handle_t handle, security_context_t *ctx);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

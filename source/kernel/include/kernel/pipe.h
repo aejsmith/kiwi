@@ -23,12 +23,8 @@
 
 #include <kernel/file.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 extern status_t kern_pipe_create(handle_t handles[2]);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

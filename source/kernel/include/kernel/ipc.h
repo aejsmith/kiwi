@@ -24,9 +24,7 @@
 #include <kernel/object.h>
 #include <kernel/security.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 /** Maximum length of data that can be attached to a message. */
 #define IPC_DATA_MAX                16384
@@ -80,6 +78,4 @@ extern status_t kern_connection_receive(
 extern status_t kern_connection_receive_data(handle_t handle, void *data);
 extern status_t kern_connection_receive_handle(handle_t handle, handle_t *_attached);
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END

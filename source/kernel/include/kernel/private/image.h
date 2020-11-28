@@ -23,9 +23,7 @@
 
 #include <kernel/image.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__KERNEL_EXTERN_C_BEGIN
 
 #ifdef __KERNEL_PRIVATE
 
@@ -45,6 +43,4 @@ extern status_t kern_image_unregister(image_id_t id);
 
 #endif /* __KERNEL_PRIVATE */
 
-#ifdef __cplusplus
-}
-#endif
+__KERNEL_EXTERN_C_END
