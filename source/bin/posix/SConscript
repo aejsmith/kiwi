@@ -17,4 +17,12 @@
 Import('manager')
 
 env = manager.Create()
+
+env.KiwiApplication('cat', ['cat.c'])
+env.KiwiApplication('ln', ['ln.c'])
 env.KiwiApplication('ls', ['ls.c'])
+env.KiwiApplication('mkdir', ['mkdir.c'])
+env.KiwiApplication('mv', ['mv.c'])
+env.KiwiApplication('rm', ['rm.c'])
+env.KiwiApplication('rmdir', ['rmdir.c'])
+env.KiwiApplication('unlink', ['unlink.c'])

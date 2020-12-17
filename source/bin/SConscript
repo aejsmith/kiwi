@@ -16,17 +16,10 @@
 
 dirs = [
     'bash',
-    'cat',
     'dungeon',
-    'ln',
-    'ls',
-    'mkdir',
-    'mv',
-    'rm',
-    'rmdir',
+    'posix',
     'terminal',
     'test',
-    'unlink',
 ]
 
 SConscript(dirs = dirs)
