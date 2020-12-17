@@ -19,7 +19,8 @@
  * @brief               Device manager.
  */
 
-#include <io/device.h>
+#include <device/device.h>
+
 #include <io/request.h>
 
 #include <lib/string.h>

@@ -19,7 +19,8 @@
  * @brief               Kernel initialization functions.
  */
 
-#include <io/device.h>
+#include <device/device.h>
+
 #include <io/fs.h>
 #include <io/memory_file.h>
 

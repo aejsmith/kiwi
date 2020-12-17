@@ -49,7 +49,6 @@
  *    rwlocks.
  */
 
-#include <io/device.h>
 #include <io/fs.h>
 #include <io/request.h>
 

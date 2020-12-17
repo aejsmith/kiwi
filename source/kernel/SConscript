@@ -23,10 +23,10 @@ sources = FeatureSources(config, [
     'console/font.c',
     'console/logo.c',
 
+    'device/device.c',
     'device/irq.c',
 
     'io/context.c',
-    'io/device.c',
     'io/file.c',
     'io/fs.c',
     'io/memory_file.c',
