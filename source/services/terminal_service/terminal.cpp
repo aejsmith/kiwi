@@ -102,7 +102,7 @@ void Terminal::thread() {
     core_log(CORE_LOG_DEBUG, "terminal started");
 
     std::array<object_event_t, 4> events;
-    events[0].handle = core_connection_get_handle(m_connection);
+    events[0].handle = core_connection_handle(m_connection);
     events[0].event  = CONNECTION_EVENT_HANGUP;
     events[1].handle = events[0].handle;
     events[1].event  = CONNECTION_EVENT_MESSAGE;
@@ -137,7 +137,7 @@ void Terminal::thread() {
 }
 
 bool Terminal::handleEvent(object_event_t &event) {
-    if (event.handle == core_connection_get_handle(m_connection)) {
+    if (event.handle == core_connection_handle(m_connection)) {
         switch (event.event) {
             case CONNECTION_EVENT_HANGUP:
                 core_log(CORE_LOG_DEBUG, "client hung up, closing terminal");
@@ -186,11 +186,11 @@ bool Terminal::handleClientMessages() {
             return false;
         }
 
-        assert(core_message_get_type(message) == CORE_MESSAGE_REQUEST);
+        assert(core_message_type(message) == CORE_MESSAGE_REQUEST);
 
         core_message_t *reply = nullptr;
 
-        uint32_t id = core_message_get_id(message);
+        uint32_t id = core_message_id(message);
         switch (id) {
             case TERMINAL_REQUEST_OPEN_HANDLE:
                 reply = handleClientOpenHandle(message);
@@ -217,7 +217,7 @@ bool Terminal::handleClientMessages() {
 }
 
 core_message_t *Terminal::handleClientOpenHandle(core_message_t *request) {
-    auto requestData = reinterpret_cast<const terminal_request_open_handle_t *>(core_message_get_data(request));
+    auto requestData = reinterpret_cast<const terminal_request_open_handle_t *>(core_message_data(request));
 
     core_message_t *reply = core_message_create_reply(request, sizeof(terminal_reply_open_handle_t));
     if (!reply) {
@@ -225,7 +225,7 @@ core_message_t *Terminal::handleClientOpenHandle(core_message_t *request) {
         return nullptr;
     }
 
-    auto replyData = reinterpret_cast<terminal_reply_open_handle_t *>(core_message_get_data(reply));
+    auto replyData = reinterpret_cast<terminal_reply_open_handle_t *>(core_message_data(reply));
     replyData->result = STATUS_SUCCESS;
 
     handle_t handle;
@@ -240,8 +240,8 @@ core_message_t *Terminal::handleClientOpenHandle(core_message_t *request) {
 }
 
 core_message_t *Terminal::handleClientInput(core_message_t *request) {
-    auto requestData   = reinterpret_cast<unsigned char *>(core_message_get_data(request));
-    size_t requestSize = core_message_get_size(request);
+    auto requestData   = reinterpret_cast<unsigned char *>(core_message_data(request));
+    size_t requestSize = core_message_size(request);
 
     for (size_t i = 0; i < requestSize; i++)
         addInput(requestData[i]);
@@ -252,7 +252,7 @@ core_message_t *Terminal::handleClientInput(core_message_t *request) {
         return nullptr;
     }
 
-    auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_get_data(reply));
+    auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_data(reply));
     replyData->result = STATUS_SUCCESS;
 
     return reply;
@@ -501,7 +501,7 @@ status_t Terminal::sendOutput(const void *data, size_t size) {
 
     core_message_t *signal = core_message_create_signal(TERMINAL_SIGNAL_OUTPUT, size);
     if (signal) {
-        memcpy(core_message_get_data(signal), data, size);
+        memcpy(core_message_data(signal), data, size);
 
         ret = core_connection_signal(m_connection, signal);
         if (ret != STATUS_SUCCESS) {

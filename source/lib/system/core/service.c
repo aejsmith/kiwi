@@ -101,7 +101,7 @@ status_t core_service_connect(
         }
 
         service_manager_request_connect_t *request_data =
-            (service_manager_request_connect_t *)core_message_get_data(request);
+            (service_manager_request_connect_t *)core_message_data(request);
 
         request_data->flags = service_flags;
         memcpy(request_data->name, name, name_len);
@@ -109,10 +109,10 @@ status_t core_service_connect(
         core_message_t *reply;
         ret = core_connection_request(service_manager_conn, request, &reply);
         if (ret == STATUS_SUCCESS) {
-            libsystem_assert(core_message_get_size(reply) == sizeof(service_manager_reply_connect_t));
+            libsystem_assert(core_message_size(reply) == sizeof(service_manager_reply_connect_t));
 
             const service_manager_reply_connect_t *reply_data =
-                (const service_manager_reply_connect_t *)core_message_get_data(reply);
+                (const service_manager_reply_connect_t *)core_message_data(reply);
 
             ret = reply_data->result;
 
@@ -172,10 +172,10 @@ status_t core_service_register_port(handle_t port) {
     core_message_t *reply;
     ret = core_connection_request(service_manager_conn, request, &reply);
     if (ret == STATUS_SUCCESS) {
-        libsystem_assert(core_message_get_size(reply) == sizeof(service_manager_reply_register_port_t));
+        libsystem_assert(core_message_size(reply) == sizeof(service_manager_reply_register_port_t));
 
         const service_manager_reply_register_port_t *reply_data =
-            (const service_manager_reply_register_port_t *)core_message_get_data(reply);
+            (const service_manager_reply_register_port_t *)core_message_data(reply);
 
         ret = reply_data->result;
 

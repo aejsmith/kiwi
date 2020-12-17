@@ -219,7 +219,7 @@ void core_connection_destroy(core_connection_t *conn) {
  *
  * @return              Underlying connection handle.
  */
-handle_t core_connection_get_handle(core_connection_t *conn) {
+handle_t core_connection_handle(core_connection_t *conn) {
     libsystem_assert(conn);
 
     return conn->handle;
@@ -241,9 +241,9 @@ handle_t core_connection_get_handle(core_connection_t *conn) {
 status_t core_connection_signal(core_connection_t *conn, core_message_t *signal) {
     libsystem_assert(conn);
     libsystem_assert(signal);
-    libsystem_assert(core_message_get_type(signal) == CORE_MESSAGE_SIGNAL);
+    libsystem_assert(core_message_type(signal) == CORE_MESSAGE_SIGNAL);
 
-    void *data = (is_data_inline(signal)) ? NULL : core_message_get_data(signal);
+    void *data = (is_data_inline(signal)) ? NULL : core_message_data(signal);
 
     return kern_connection_send(conn->handle, &signal->message, data, signal->handle, SEND_TIMEOUT);
 }
@@ -299,7 +299,7 @@ static status_t receive_message(core_connection_t *conn, nstime_t timeout, core_
     message->flags = flags;
 
     if (conn->flags & CORE_CONNECTION_RECEIVE_SECURITY)
-        memcpy((void *)core_message_get_security(message), &security, sizeof(security));
+        memcpy((void *)core_message_security(message), &security, sizeof(security));
 
     /* Check for consistency between user-supplied total size and kernel-
      * reported size. */
@@ -309,7 +309,7 @@ static status_t receive_message(core_connection_t *conn, nstime_t timeout, core_
     }
 
     if (!is_data_inline(message)) {
-        ret = kern_connection_receive_data(conn->handle, core_message_get_data(message));
+        ret = kern_connection_receive_data(conn->handle, core_message_data(message));
         if (ret != STATUS_SUCCESS) {
             free(message);
             return ret;
@@ -352,14 +352,14 @@ static status_t receive_message(core_connection_t *conn, nstime_t timeout, core_
 status_t core_connection_request(core_connection_t *conn, core_message_t *request, core_message_t **_reply) {
     libsystem_assert(conn);
     libsystem_assert(request);
-    libsystem_assert(core_message_get_type(request) == CORE_MESSAGE_REQUEST);
+    libsystem_assert(core_message_type(request) == CORE_MESSAGE_REQUEST);
     libsystem_assert(_reply);
 
     /* Set the serial so we can match reply to request. */
     uint64_t request_serial = conn->next_serial++;
     request->message.args[CORE_MESSAGE_ARG_SERIAL] = request_serial;
 
-    void *data = (is_data_inline(request)) ? NULL : core_message_get_data(request);
+    void *data = (is_data_inline(request)) ? NULL : core_message_data(request);
 
     status_t ret = kern_connection_send(conn->handle, &request->message, data, request->handle, SEND_TIMEOUT);
     if (ret != STATUS_SUCCESS)
@@ -380,7 +380,7 @@ status_t core_connection_request(core_connection_t *conn, core_message_t *reques
 
         /* NULL if we get a malformed message or one we don't care about. */
         if (message) {
-            if (core_message_get_type(message) != CORE_MESSAGE_REPLY ||
+            if (core_message_type(message) != CORE_MESSAGE_REPLY ||
                 message->message.args[CORE_MESSAGE_ARG_SERIAL] != request_serial)
             {
                 /* Not the reply, add to the receive queue to process later. */
@@ -411,9 +411,9 @@ status_t core_connection_request(core_connection_t *conn, core_message_t *reques
 status_t core_connection_reply(core_connection_t *conn, core_message_t *reply) {
     libsystem_assert(conn);
     libsystem_assert(reply);
-    libsystem_assert(core_message_get_type(reply) == CORE_MESSAGE_REPLY);
+    libsystem_assert(core_message_type(reply) == CORE_MESSAGE_REPLY);
 
-    void *data = (is_data_inline(reply)) ? NULL : core_message_get_data(reply);
+    void *data = (is_data_inline(reply)) ? NULL : core_message_data(reply);
 
     return kern_connection_send(conn->handle, &reply->message, data, reply->handle, SEND_TIMEOUT);
 }
@@ -498,7 +498,7 @@ core_message_t *core_message_create_request(uint32_t id, size_t size) {
 core_message_t *core_message_create_reply(const core_message_t *request, size_t size) {
     libsystem_assert(request);
 
-    uint32_t id = core_message_get_id(request);
+    uint32_t id = core_message_id(request);
 
     core_message_t *message = create_message(CORE_MESSAGE_REPLY, id, size, 0);
     if (!message)
@@ -524,7 +524,7 @@ void core_message_destroy(core_message_t *message) {
 /** Get the type of a message.
  * @param message       Message object.
  * @return              Type of the message. */
-core_message_type_t core_message_get_type(const core_message_t *message) {
+core_message_type_t core_message_type(const core_message_t *message) {
     libsystem_assert(message);
 
     return message->message.id >> CORE_MESSAGE_ID_TYPE_SHIFT;
@@ -533,7 +533,7 @@ core_message_type_t core_message_get_type(const core_message_t *message) {
 /** Get the ID of a message.
  * @param message       Message object.
  * @return              ID of the message. */
-uint32_t core_message_get_id(const core_message_t *message) {
+uint32_t core_message_id(const core_message_t *message) {
     libsystem_assert(message);
 
     return message->message.id & ~CORE_MESSAGE_ID_TYPE_MASK;
@@ -542,7 +542,7 @@ uint32_t core_message_get_id(const core_message_t *message) {
 /** Get the data size of a message.
  * @param message       Message object.
  * @return              Data size of the message. */
-size_t core_message_get_size(const core_message_t *message) {
+size_t core_message_size(const core_message_t *message) {
     libsystem_assert(message);
 
     return message->message.args[CORE_MESSAGE_ARG_TOTAL_SIZE];
@@ -556,7 +556,7 @@ size_t core_message_get_size(const core_message_t *message) {
  *
  * @return              Timestamp of the message.
  */
-nstime_t core_message_get_timestamp(const core_message_t *message) {
+nstime_t core_message_timestamp(const core_message_t *message) {
     libsystem_assert(message);
 
     return message->message.timestamp;
@@ -572,7 +572,7 @@ nstime_t core_message_get_timestamp(const core_message_t *message) {
  * @return              Security context of the message.
  *                      NULL if the message has no security context information.
  */
-const security_context_t *core_message_get_security(const core_message_t *message) {
+const security_context_t *core_message_security(const core_message_t *message) {
     libsystem_assert(message);
 
     return (message->flags & CORE_MESSAGE_SECURITY)
@@ -583,7 +583,7 @@ const security_context_t *core_message_get_security(const core_message_t *messag
 /** Get the data pointer for a message.
  * @param message       Message object.
  * @return              Data pointer for the message. */
-void *core_message_get_data(core_message_t *message) {
+void *core_message_data(core_message_t *message) {
     libsystem_assert(message);
 
     void *data;

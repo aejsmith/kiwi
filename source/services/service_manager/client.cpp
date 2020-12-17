@@ -46,7 +46,7 @@ Client::Client(core_connection_t *connection, process_id_t processId) :
     m_processId  (processId),
     m_service    (nullptr)
 {
-    handle_t handle = core_connection_get_handle(m_connection);
+    handle_t handle = core_connection_handle(m_connection);
     g_serviceManager.addEvent(handle, CONNECTION_EVENT_HANGUP, this);
     g_serviceManager.addEvent(handle, CONNECTION_EVENT_MESSAGE, this);
 }
@@ -63,7 +63,7 @@ Client::~Client() {
 }
 
 void Client::handleEvent(const object_event_t *event) {
-    assert(event->handle == core_connection_get_handle(m_connection));
+    assert(event->handle == core_connection_handle(m_connection));
 
     switch (event->event) {
         case CONNECTION_EVENT_HANGUP:
@@ -86,9 +86,9 @@ void Client::handleMessage() {
     if (ret != STATUS_SUCCESS)
         return;
 
-    assert(core_message_get_type(message) == CORE_MESSAGE_REQUEST);
+    assert(core_message_type(message) == CORE_MESSAGE_REQUEST);
 
-    uint32_t id = core_message_get_id(message);
+    uint32_t id = core_message_id(message);
     switch (id) {
         case SERVICE_MANAGER_REQUEST_CONNECT:
             handleConnect(message);
@@ -113,9 +113,9 @@ void Client::handleConnect(core_message_t *request) {
         return;
     }
 
-    auto replyData = reinterpret_cast<service_manager_reply_connect_t *>(core_message_get_data(reply));
+    auto replyData = reinterpret_cast<service_manager_reply_connect_t *>(core_message_data(reply));
 
-    size_t requestSize = core_message_get_size(request);
+    size_t requestSize = core_message_size(request);
 
     Service *service = nullptr;
     bool canReply    = true;
@@ -123,7 +123,7 @@ void Client::handleConnect(core_message_t *request) {
     if (requestSize <= sizeof(service_manager_request_connect_t)) {
         replyData->result = STATUS_INVALID_ARG;
     } else {
-        auto requestData = reinterpret_cast<service_manager_request_connect_t *>(core_message_get_data(request));
+        auto requestData = reinterpret_cast<service_manager_request_connect_t *>(core_message_data(request));
 
         size_t nameSize = requestSize - sizeof(service_manager_request_connect_t);
         requestData->name[nameSize - 1] = 0;
@@ -175,7 +175,7 @@ void Client::handleRegisterPort(core_message_t *request) {
         return;
     }
 
-    auto replyData = reinterpret_cast<service_manager_reply_register_port_t *>(core_message_get_data(reply));
+    auto replyData = reinterpret_cast<service_manager_reply_register_port_t *>(core_message_data(reply));
 
     if (m_service) {
         handle_t handle = core_message_detach_handle(request);

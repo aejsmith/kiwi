@@ -77,7 +77,7 @@ void Terminal::run() {
         core_message_t *request =
             core_message_create_request(TERMINAL_REQUEST_OPEN_HANDLE, sizeof(terminal_request_open_handle_t));
 
-        auto requestData = reinterpret_cast<terminal_request_open_handle_t *>(core_message_get_data(request));
+        auto requestData = reinterpret_cast<terminal_request_open_handle_t *>(core_message_data(request));
         requestData->access = handleAccess[i];
 
         core_message_t *reply;
@@ -90,7 +90,7 @@ void Terminal::run() {
             return;
         }
 
-        auto replyData = reinterpret_cast<terminal_reply_open_handle_t *>(core_message_get_data(reply));
+        auto replyData = reinterpret_cast<terminal_reply_open_handle_t *>(core_message_data(reply));
         ret           = replyData->result;
         m_terminal[i] = core_message_detach_handle(reply);
 
@@ -120,7 +120,7 @@ void Terminal::run() {
         return;
 
     std::array<object_event_t, 4> events;
-    events[0].handle = core_connection_get_handle(m_connection);
+    events[0].handle = core_connection_handle(m_connection);
     events[0].event  = CONNECTION_EVENT_HANGUP;
     events[1].handle = events[0].handle;
     events[1].event  = CONNECTION_EVENT_MESSAGE;
@@ -158,7 +158,7 @@ void Terminal::run() {
 }
 
 bool Terminal::handleEvent(object_event_t &event) {
-    if (event.handle == core_connection_get_handle(m_connection)) {
+    if (event.handle == core_connection_handle(m_connection)) {
         switch (event.event) {
             case CONNECTION_EVENT_HANGUP:
                 core_log(CORE_LOG_ERROR, "lost connection to terminal service, exiting");
@@ -199,7 +199,7 @@ void Terminal::handleMessages() {
             break;
         }
 
-        uint32_t id = core_message_get_id(message);
+        uint32_t id = core_message_id(message);
         switch (id) {
             case TERMINAL_SIGNAL_OUTPUT:
                 handleOutput(message);
@@ -214,8 +214,8 @@ void Terminal::handleMessages() {
 }
 
 void Terminal::handleOutput(core_message_t *message) {
-    const void *data = core_message_get_data(message);
-    size_t size      = core_message_get_size(message) ;
+    const void *data = core_message_data(message);
+    size_t size      = core_message_size(message) ;
 
     kern_file_write(m_device, data, size, -1, nullptr);
 }
@@ -236,7 +236,7 @@ void Terminal::handleInput() {
 
         core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, bytesRead);
 
-        memcpy(core_message_get_data(request), buf, bytesRead);
+        memcpy(core_message_data(request), buf, bytesRead);
 
         core_message_t *reply;
         status_t ret = core_connection_request(m_connection, request, &reply);
@@ -248,7 +248,7 @@ void Terminal::handleInput() {
             break;
         }
 
-        auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_get_data(reply));
+        auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_data(reply));
         ret = replyData->result;
 
         core_message_destroy(reply);

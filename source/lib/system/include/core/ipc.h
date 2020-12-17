@@ -113,7 +113,7 @@ extern status_t core_connection_open(handle_t port, nstime_t timeout, uint32_t f
 extern void core_connection_close(core_connection_t *conn);
 extern void core_connection_destroy(core_connection_t *conn);
 
-extern handle_t core_connection_get_handle(core_connection_t *conn);
+extern handle_t core_connection_handle(core_connection_t *conn);
 
 extern status_t core_connection_signal(core_connection_t *conn, core_message_t *signal);
 extern status_t core_connection_request(core_connection_t *conn, core_message_t *request, core_message_t **_reply);
@@ -125,12 +125,12 @@ extern core_message_t *core_message_create_request(uint32_t id, size_t size);
 extern core_message_t *core_message_create_reply(const core_message_t *request, size_t size);
 extern void core_message_destroy(core_message_t *message);
 
-extern core_message_type_t core_message_get_type(const core_message_t *message);
-extern uint32_t core_message_get_id(const core_message_t *message);
-extern size_t core_message_get_size(const core_message_t *message);
-extern nstime_t core_message_get_timestamp(const core_message_t *message);
-extern const security_context_t *core_message_get_security(const core_message_t *message);
-extern void *core_message_get_data(core_message_t *message);
+extern core_message_type_t core_message_type(const core_message_t *message);
+extern uint32_t core_message_id(const core_message_t *message);
+extern size_t core_message_size(const core_message_t *message);
+extern nstime_t core_message_timestamp(const core_message_t *message);
+extern const security_context_t *core_message_security(const core_message_t *message);
+extern void *core_message_data(core_message_t *message);
 
 extern void core_message_attach_handle(core_message_t *message, handle_t handle, bool own);
 extern handle_t core_message_detach_handle(core_message_t *message);

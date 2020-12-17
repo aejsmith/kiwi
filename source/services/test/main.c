@@ -85,24 +85,24 @@ int main(int argc, char **argv) {
             }
         }
 
-        core_message_type_t type = core_message_get_type(request);
-        uint32_t id              = core_message_get_id(request);
-        size_t size              = core_message_get_size(request);
-        nstime_t timestamp       = core_message_get_timestamp(request);
+        core_message_type_t type = core_message_type(request);
+        uint32_t id              = core_message_id(request);
+        size_t size              = core_message_size(request);
+        nstime_t timestamp       = core_message_timestamp(request);
 
         if (type != CORE_MESSAGE_REQUEST || id != TEST_REQUEST_PING || size != sizeof(test_request_ping_t)) {
             core_log(CORE_LOG_ERROR, "server received invalid message");
             return EXIT_FAILURE;
         }
 
-        test_request_ping_t *ping = (test_request_ping_t *)core_message_get_data(request);
+        test_request_ping_t *ping = (test_request_ping_t *)core_message_data(request);
         ping->string[sizeof(ping->string) - 1] = 0;
 
         core_log(CORE_LOG_NOTICE, "server received: %u '%s' (timestamp: %" PRIu64 ")", ping->index, ping->string, timestamp);
 
         core_message_t *reply = core_message_create_reply(request, sizeof(test_request_ping_t));
 
-        test_request_ping_t *pong = (test_request_ping_t *)core_message_get_data(reply);
+        test_request_ping_t *pong = (test_request_ping_t *)core_message_data(reply);
         pong->index = ping->index;
         snprintf(pong->string, sizeof(pong->string), "PONG %" PRIu64, ping->index);
 

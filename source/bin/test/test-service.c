@@ -53,8 +53,8 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    core_message_type_t type = core_message_get_type(signal);
-    uint32_t id              = core_message_get_id(signal);
+    core_message_type_t type = core_message_type(signal);
+    uint32_t id              = core_message_id(signal);
 
     if (type != CORE_MESSAGE_SIGNAL || id != TEST_SIGNAL_START) {
         fprintf(stderr, "Client received invalid message\n");
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
     while (count < TEST_PING_COUNT) {
         core_message_t *request = core_message_create_request(TEST_REQUEST_PING, sizeof(test_request_ping_t));
 
-        test_request_ping_t *ping = (test_request_ping_t *)core_message_get_data(request);
+        test_request_ping_t *ping = (test_request_ping_t *)core_message_data(request);
         ping->index = count;
         snprintf(ping->string, sizeof(ping->string), "PING %" PRIu64, ping->index);
 
@@ -80,17 +80,17 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
 
-        type               = core_message_get_type(reply);
-        id                 = core_message_get_id(reply);
-        size_t size        = core_message_get_size(reply);
-        nstime_t timestamp = core_message_get_timestamp(reply);
+        type               = core_message_type(reply);
+        id                 = core_message_id(reply);
+        size_t size        = core_message_size(reply);
+        nstime_t timestamp = core_message_timestamp(reply);
 
         if (type != CORE_MESSAGE_REPLY || id != TEST_REQUEST_PING || size != sizeof(test_request_ping_t)) {
             fprintf(stderr, "Client received invalid message\n");
             return EXIT_FAILURE;
         }
 
-        test_request_ping_t *pong = (test_request_ping_t *)core_message_get_data(reply);
+        test_request_ping_t *pong = (test_request_ping_t *)core_message_data(reply);
         pong->string[sizeof(pong->string) - 1] = 0;
 
         printf("Client received: %u '%s' (timestamp: %" PRIu64 ")\n", pong->index, pong->string, timestamp);
