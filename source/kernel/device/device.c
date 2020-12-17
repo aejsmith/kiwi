@@ -273,7 +273,7 @@ status_t device_create_impl(
     radix_tree_insert(&parent->children, device->name, device);
 
     kprintf(
-        LOG_DEBUG, "device: created device %s in %s (ops: %p, data: %p)\n",
+        LOG_DEBUG, "device: created device '%s' in '%s' (ops: %p, data: %p)\n",
         device->name, parent->name, ops, data);
 
     if (_device)
@@ -350,7 +350,7 @@ status_t device_alias_impl(
     mutex_unlock(&dest->lock);
 
     kprintf(
-        LOG_DEBUG, "device: created alias %s in %s to %s\n",
+        LOG_DEBUG, "device: created alias '%s' in '%s' to '%s'\n",
         device->name, parent->name, dest->name);
 
     if (_device)
@@ -824,19 +824,19 @@ __init_text void device_init(void) {
     device_root_dir->time = boot_time();
 
     /* Create standard device directories. */
-    ret = device_create("bus", device_root_dir, NULL, NULL, NULL, 0, &device_bus_dir);
+    ret = device_create_dir("bus", device_root_dir, &device_bus_dir);
     if (ret != STATUS_SUCCESS)
         fatal("Could not create standard device directory (%d)", ret);
 
-    ret = device_create("platform", device_bus_dir, NULL, NULL, NULL, 0, &device_bus_platform_dir);
+    ret = device_create_dir("platform", device_bus_dir, &device_bus_platform_dir);
     if (ret != STATUS_SUCCESS)
         fatal("Could not create standard device directory (%d)", ret);
 
-    ret = device_create("class", device_root_dir, NULL, NULL, NULL, 0, &device_class_dir);
+    ret = device_create_dir("class", device_root_dir, &device_class_dir);
     if (ret != STATUS_SUCCESS)
         fatal("Could not create standard device directory (%d)", ret);
 
-    ret = device_create("virtual", device_root_dir, NULL, NULL, NULL, 0, &device_virtual_dir);
+    ret = device_create_dir("virtual", device_root_dir, &device_virtual_dir);
     if (ret != STATUS_SUCCESS)
         fatal("Could not create standard device directory (%d)", ret);
 

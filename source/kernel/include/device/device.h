@@ -184,6 +184,11 @@ extern status_t device_alias_impl(
 #define device_create(name, parent, ops, data, attrs, count, _device) \
     device_create_impl(module_self(), name, parent, ops, data, attrs, count, _device)
 
+/** Create a device directory.
+ * @see device_create_impl(). */
+#define device_create_dir(name, parent, _device) \
+    device_create_impl(module_self(), name, parent, NULL, NULL, NULL, 0, _device)
+
 /** @see device_alias_impl(). */
 #define device_alias(name, parent, dest, _device) \
     device_alias_impl(module_self(), name, parent, dest, _device)
