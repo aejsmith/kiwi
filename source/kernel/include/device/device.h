@@ -110,6 +110,10 @@ typedef struct device_attr {
 
     /** Attribute value. */
     union {
+        int8_t int8;                /**< DEVICE_ATTR_INT8. */
+        int16_t int16;              /**< DEVICE_ATTR_INT16. */
+        int32_t int32;              /**< DEVICE_ATTR_INT32. */
+        int64_t int64;              /**< DEVICE_ATTR_INT64. */
         uint8_t uint8;              /**< DEVICE_ATTR_UINT8. */
         uint16_t uint16;            /**< DEVICE_ATTR_UINT16. */
         uint32_t uint32;            /**< DEVICE_ATTR_UINT32. */

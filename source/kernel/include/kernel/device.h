@@ -39,11 +39,15 @@ __KERNEL_EXTERN_C_BEGIN
 
 /** Device attribute types. */
 typedef enum device_attr_type {
-    DEVICE_ATTR_UINT8               = 0,        /**< 8-bit unsigned integer value. */
-    DEVICE_ATTR_UINT16              = 1,        /**< 16-bit unsigned integer value. */
-    DEVICE_ATTR_UINT32              = 2,        /**< 32-bit unsigned integer value. */
-    DEVICE_ATTR_UINT64              = 3,        /**< 64-bit unsigned integer value. */
-    DEVICE_ATTR_STRING              = 4,        /**< String value. */
+    DEVICE_ATTR_INT8                = 0,        /**< 8-bit signed integer value. */
+    DEVICE_ATTR_INT16               = 1,        /**< 16-bit signed integer value. */
+    DEVICE_ATTR_INT32               = 2,        /**< 32-bit signed integer value. */
+    DEVICE_ATTR_INT64               = 3,        /**< 64-bit signed integer value. */
+    DEVICE_ATTR_UINT8               = 4,        /**< 8-bit unsigned integer value. */
+    DEVICE_ATTR_UINT16              = 5,        /**< 16-bit unsigned integer value. */
+    DEVICE_ATTR_UINT32              = 6,        /**< 32-bit unsigned integer value. */
+    DEVICE_ATTR_UINT64              = 7,        /**< 64-bit unsigned integer value. */
+    DEVICE_ATTR_STRING              = 8,        /**< String value. */
 } device_attr_type_t;
 
 extern status_t kern_device_open(const char *path, uint32_t access, uint32_t flags, handle_t *_handle);

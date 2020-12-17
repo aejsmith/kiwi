@@ -529,13 +529,13 @@ status_t device_attr(
     if (_written)
         *_written = 0;
 
-    size_t expected_size;
+    size_t expected_size = 0;
     switch (type) {
-        case DEVICE_ATTR_UINT8:  expected_size = 1; break;
-        case DEVICE_ATTR_UINT16: expected_size = 2; break;
-        case DEVICE_ATTR_UINT32: expected_size = 4; break;
-        case DEVICE_ATTR_UINT64: expected_size = 8; break;
-        default:                 expected_size = 0; break;
+        case DEVICE_ATTR_INT8:  case DEVICE_ATTR_UINT8:  expected_size = 1; break;
+        case DEVICE_ATTR_INT16: case DEVICE_ATTR_UINT16: expected_size = 2; break;
+        case DEVICE_ATTR_INT32: case DEVICE_ATTR_UINT32: expected_size = 4; break;
+        case DEVICE_ATTR_INT64: case DEVICE_ATTR_UINT64: expected_size = 8; break;
+        default: break;
     }
 
     if (expected_size > 0 && size != expected_size)
@@ -552,6 +552,18 @@ status_t device_attr(
                 ret = STATUS_SUCCESS;
 
                 switch (type) {
+                    case DEVICE_ATTR_INT8:
+                        *(int8_t *)buf = attr->value.int8;
+                        break;
+                    case DEVICE_ATTR_INT16:
+                        *(int16_t *)buf = attr->value.int16;
+                        break;
+                    case DEVICE_ATTR_INT32:
+                        *(int32_t *)buf = attr->value.int32;
+                        break;
+                    case DEVICE_ATTR_INT64:
+                        *(int64_t *)buf = attr->value.int64;
+                        break;
                     case DEVICE_ATTR_UINT8:
                         *(uint8_t *)buf = attr->value.uint8;
                         break;
@@ -779,6 +791,26 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
     for (size_t i = 0; i < device->attr_count; i++) {
         kdb_printf("  %s - ", device->attrs[i].name);
         switch (device->attrs[i].type) {
+            case DEVICE_ATTR_INT8:
+                kdb_printf(
+                    "int8: %" PRId8 " (0x%" PRIx8 ")\n",
+                    device->attrs[i].value.int8, device->attrs[i].value.int8);
+                break;
+            case DEVICE_ATTR_INT16:
+                kdb_printf(
+                    "int16: %" PRId16 " (0x%" PRIx16 ")\n",
+                    device->attrs[i].value.int16, device->attrs[i].value.int16);
+                break;
+            case DEVICE_ATTR_INT32:
+                kdb_printf(
+                    "int32: %" PRId32 " (0x%" PRIx32 ")\n",
+                    device->attrs[i].value.int32, device->attrs[i].value.int32);
+                break;
+            case DEVICE_ATTR_INT64:
+                kdb_printf(
+                    "int64: %" PRId64 " (0x%" PRIx64 ")\n",
+                    device->attrs[i].value.int64, device->attrs[i].value.int64);
+                break;
             case DEVICE_ATTR_UINT8:
                 kdb_printf(
                     "uint8: %" PRIu8 " (0x%" PRIx8 ")\n",
