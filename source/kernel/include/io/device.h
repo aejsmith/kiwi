@@ -29,6 +29,7 @@
 #include <lib/refcount.h>
 
 #include <sync/mutex.h>
+#include <sync/rwlock.h>
 
 #include <module.h>
 
@@ -105,15 +106,7 @@ typedef struct device_ops {
 /** Device attribute structure. */
 typedef struct device_attr {
     const char *name;               /**< Attribute name. */
-
-    /** Attribute type. */
-    enum {
-        DEVICE_ATTR_UINT8,          /**< 8-bit unsigned integer value. */
-        DEVICE_ATTR_UINT16,         /**< 16-bit unsigned integer value. */
-        DEVICE_ATTR_UINT32,         /**< 32-bit unsigned integer value. */
-        DEVICE_ATTR_UINT64,         /**< 64-bit unsigned integer value. */
-        DEVICE_ATTR_STRING,         /**< String value. */
-    } type;
+    device_attr_type_t type;        /**< Attribute type. */
 
     /** Attribute value. */
     union {
@@ -130,7 +123,7 @@ typedef struct device {
     file_t file;                    /**< File header. */
 
     char *name;                     /**< Name of the device. */
-    mutex_t lock;                   /**< Lock to protect structure. */
+    mutex_t lock;                   /**< Device lock (covers device tree linkage). */
     refcount_t count;               /**< Number of users of the device. */
     module_t *module;               /**< Module that owns the device. */
     nstime_t time;                  /**< Creation time. */
@@ -145,6 +138,8 @@ typedef struct device {
 
     device_ops_t *ops;              /**< Operations structure for the device. */
     void *data;                     /**< Data used by the device's creator. */
+
+    rwlock_t attr_lock;             /**< Lock for attribute access. */
     device_attr_t *attrs;           /**< Array of attribute structures. */
     size_t attr_count;              /**< Number of attributes. */
 } device_t;
@@ -196,7 +191,9 @@ extern status_t device_alias_impl(
 extern status_t device_destroy(device_t *device);
 
 extern void device_iterate(device_t *start, device_iterate_t func, void *data);
-extern const device_attr_t *device_attr(device_t *device, const char *name, int type);
+extern status_t device_attr(
+    device_t *device, const char *name, device_attr_type_t type, void *buf,
+    size_t size, size_t *_written);
 extern char *device_path(device_t *device);
 
 extern status_t device_get(

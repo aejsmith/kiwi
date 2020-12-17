@@ -175,6 +175,16 @@ static file_ops_t device_file_ops = {
     .request = device_file_request,
 };
 
+static void device_ctor(device_t *device) {
+    memset(device, 0, sizeof(*device));
+
+    mutex_init(&device->lock, "device_lock", 0);
+    refcount_set(&device->count, 0);
+    radix_tree_init(&device->children);
+    list_init(&device->aliases);
+    rwlock_init(&device->attr_lock, "device_attr_lock");
+}
+
 /**
  * Creates a new node in the device tree. The device created will not have a
  * reference on it. The device can have no operations, in which case it will
@@ -215,10 +225,7 @@ status_t device_create_impl(
 
     device_t *device = kmalloc(sizeof(device_t), MM_KERNEL);
 
-    mutex_init(&device->lock, "device_lock", 0);
-    refcount_set(&device->count, 0);
-    radix_tree_init(&device->children);
-    list_init(&device->aliases);
+    device_ctor(device);
 
     device->file.ops  = &device_file_ops;
     device->file.type = (ops) ? ops->type : FILE_TYPE_CHAR;
@@ -226,7 +233,6 @@ status_t device_create_impl(
     device->module    = module;
     device->time      = system_time();
     device->parent    = parent;
-    device->dest      = NULL;
     device->ops       = ops;
     device->data      = data;
 
@@ -322,10 +328,7 @@ status_t device_alias_impl(
 
     device_t *device = kmalloc(sizeof(device_t), MM_KERNEL);
 
-    mutex_init(&device->lock, "device_alias_lock", 0);
-    refcount_set(&device->count, 0);
-    radix_tree_init(&device->children);
-    list_init(&device->dest_link);
+    device_ctor(device);
 
     device->file.ops   = &device_file_ops;
     device->file.type  = (dest->ops) ? dest->ops->type : FILE_TYPE_CHAR;
@@ -334,10 +337,6 @@ status_t device_alias_impl(
     device->time       = dest->time;
     device->parent     = parent;
     device->dest       = dest;
-    device->ops        = NULL;
-    device->data       = NULL;
-    device->attrs      = NULL;
-    device->attr_count = 0;
 
     refcount_inc(&parent->count);
     radix_tree_insert(&parent->children, device->name, device);
@@ -453,7 +452,7 @@ void device_iterate(device_t *start, device_iterate_t func, void *data) {
     device_iterate_internal(start, func, data);
 }
 
-/** Look up a device and increase its reference count.
+/** Looks up a device and increase its reference count.
  * @param path          Path to device.
  * @return              Pointer to device if found, NULL if not. */
 static device_t *device_lookup(const char *path) {
@@ -496,37 +495,100 @@ static device_t *device_lookup(const char *path) {
     return device;
 }
 
-/**
- * Gets an attribute from a device, optionally checking that it is the required
- * type.
- *
- * @param device        Device to get from.
- * @param name          Attribute name.
- * @param type          Required type (if -1 will not check).
- *
- * @return              Pointer to attribute structure if found, NULL if not.
+/** Gets the value of a device attribute.
+ * @param device        Device to get attribute from.
+ * @param name          Name of attribute to get.
+ * @param type          Expected type of the attribute. An error will be
+ *                      returned if the attribute is not this type.
+ * @param buf           Buffer to write attribute value to.
+ * @param size          Size of buffer. For integer types, this must be the
+ *                      exact size of the type. For strings, this is the maximum
+ *                      buffer size, and if the buffer cannot fit the null-
+ *                      terminated attribute value, STATUS_TOO_SMALL will be
+ *                      returned. String attributes can be no longer than
+ *                      DEVICE_ATTR_MAX (including null terminator).
+ * @param _written      Where to store actual length of attribute value.
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_INVALID_ARG if type is an integer and size is not
+ *                      the exact size of that type.
+ *                      STATUS_NOT_FOUND if attribute is not found.
+ *                      STATUS_INCORRECT_TYPE if attribute is not the expected
+ *                      type.
+ *                      STATUS_TOO_SMALL if size cannot accomodate the attribute
+ *                      value.
  */
-const device_attr_t *device_attr(device_t *device, const char *name, int type) {
-    // TODO: This should really return a copy, as if we allow attributes to be
-    // changed after device creation then we'd have a thread safety issue from
-    // returning directly.
-
+status_t device_attr(
+    device_t *device, const char *name, device_attr_type_t type, void *buf,
+    size_t size, size_t *_written)
+{
     assert(device);
     assert(name);
+    assert(buf);
 
+    if (_written)
+        *_written = 0;
+
+    size_t expected_size;
+    switch (type) {
+        case DEVICE_ATTR_UINT8:  expected_size = 1; break;
+        case DEVICE_ATTR_UINT16: expected_size = 2; break;
+        case DEVICE_ATTR_UINT32: expected_size = 4; break;
+        case DEVICE_ATTR_UINT64: expected_size = 8; break;
+        default:                 expected_size = 0; break;
+    }
+
+    if (expected_size > 0 && size != expected_size)
+        return STATUS_INVALID_ARG;
+
+    rwlock_read_lock(&device->attr_lock);
+
+    status_t ret = STATUS_NOT_FOUND;
     for (size_t i = 0; i < device->attr_count; i++) {
-        if (strcmp(device->attrs[i].name, name) == 0) {
-            if (type != -1 && (int)device->attrs[i].type != type)
-                return NULL;
+        device_attr_t *attr = &device->attrs[i];
 
-            return &device->attrs[i];
+        if (strcmp(attr->name, name) == 0) {
+            if (attr->type == type) {
+                ret = STATUS_SUCCESS;
+
+                switch (type) {
+                    case DEVICE_ATTR_UINT8:
+                        *(uint8_t *)buf = attr->value.uint8;
+                        break;
+                    case DEVICE_ATTR_UINT16:
+                        *(uint16_t *)buf = attr->value.uint16;
+                        break;
+                    case DEVICE_ATTR_UINT32:
+                        *(uint32_t *)buf = attr->value.uint32;
+                        break;
+                    case DEVICE_ATTR_UINT64:
+                        *(uint64_t *)buf = attr->value.uint64;
+                        break;
+                    case DEVICE_ATTR_STRING:
+                        expected_size = strlen(attr->value.string) + 1;
+                        if (expected_size <= size) {
+                            memcpy(buf, attr->value.string, expected_size);
+                        } else {
+                            ret = STATUS_TOO_SMALL;
+                        }
+
+                        break;
+                }
+            } else {
+                ret = STATUS_INCORRECT_TYPE;
+            }
+
+            break;
         }
     }
 
-    return NULL;
+    if (ret == STATUS_SUCCESS && _written)
+        *_written = expected_size;
+
+    rwlock_unlock(&device->attr_lock);
+    return ret;
 }
 
-/** Get the path to a device.
+/** Gets the path to a device.
  * @param device        Device to get path to.
  * @return              Pointer to kmalloc()'d string containing device path. */
 char *device_path(device_t *device) {
@@ -560,7 +622,7 @@ char *device_path(device_t *device) {
 }
 
 
-/** Create a handle to a device.
+/** Creates a handle to a device.
  * @param device        Device to get handle to.
  * @param access        Requested access rights for the handle.
  * @param flags         Behaviour flags for the handle.
@@ -604,7 +666,7 @@ err:
     return ret;
 }
 
-/** Create a handle to a device.
+/** Creates a handle to a device.
  * @param path          Path to device to open.
  * @param access        Requested access access for the handle.
  * @param flags         Behaviour flags for the handle.
@@ -753,11 +815,9 @@ __init_text void device_init(void) {
     status_t ret;
 
     /* Create the root node of the device tree. */
-    device_root_dir = kcalloc(1, sizeof(device_t), MM_BOOT);
+    device_root_dir = kmalloc(sizeof(device_t), MM_BOOT);
 
-    mutex_init(&device_root_dir->lock, "device_root_lock", 0);
-    refcount_set(&device_root_dir->count, 0);
-    radix_tree_init(&device_root_dir->children);
+    device_ctor(device_root_dir);
 
     device_root_dir->name = (char *)"<root>";
     device_root_dir->time = boot_time();
@@ -783,7 +843,7 @@ __init_text void device_init(void) {
     kdb_register_command("device", "Examine the device tree.", kdb_cmd_device);
 }
 
-/** Open a handle to a device.
+/** Opens a handle to a device.
  * @param path          Device tree path for device to open.
  * @param access        Requested access rights for the handle.
  * @param flags         Behaviour flags for the handle.
@@ -810,5 +870,64 @@ status_t kern_device_open(const char *path, uint32_t access, uint32_t flags, han
     ret = object_handle_attach(handle, NULL, _handle);
     object_handle_release(handle);
     kfree(kpath);
+    return ret;
+}
+
+/** Gets the value of a device attribute.
+ * @param handle        Handle to device.
+ * @param name          Name of attribute to get.
+ * @param type          Expected type of the attribute. An error will be
+ *                      returned if the attribute is not this type.
+ * @param buf           Buffer to write attribute value to.
+ * @param size          Size of buffer. For integer types, this must be the
+ *                      exact size of the type. For strings, this is the maximum
+ *                      buffer size, and if the buffer cannot fit the null-
+ *                      terminated attribute value, STATUS_TOO_SMALL will be
+ *                      returned. String attributes can be no longer than
+ *                      DEVICE_ATTR_MAX (including null terminator).
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_INVALID_ARG if type is an integer and size is not
+ *                      the exact size of that type.
+ *                      STATUS_NOT_FOUND if attribute is not found.
+ *                      STATUS_INCORRECT_TYPE if attribute is not the expected
+ *                      type.
+ *                      STATUS_TOO_SMALL if size cannot accomodate the attribute
+ *                      value. */
+status_t kern_device_attr(handle_t handle, const char* name, device_attr_type_t type, void *buf, size_t size) {
+    status_t ret;
+
+    if (!name || !buf || size > DEVICE_ATTR_MAX)
+        return STATUS_INVALID_ARG;
+
+    char *kname;
+    ret = strndup_from_user(name, DEVICE_NAME_MAX, &kname);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    object_handle_t *khandle;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+    if (ret != STATUS_SUCCESS) {
+        kfree(kname);
+        return ret;
+    }
+
+    file_handle_t *fhandle = khandle->private;
+
+    if (fhandle->file->ops == &device_file_ops) {
+        void *kbuf = kmalloc(size, MM_KERNEL);
+
+        size_t written;
+        ret = device_attr(fhandle->device, kname, type, kbuf, size, &written);
+
+        if (ret == STATUS_SUCCESS)
+            ret = memcpy_to_user(buf, kbuf, written);
+
+        kfree(kbuf);
+    } else {
+        ret = STATUS_NOT_SUPPORTED;
+    }
+
+    object_handle_release(khandle);
+    kfree(kname);
     return ret;
 }

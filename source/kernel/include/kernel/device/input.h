@@ -25,6 +25,18 @@
 
 __KERNEL_EXTERN_C_BEGIN
 
+/** Input device class name. */
+#define INPUT_DEVICE_CLASS_NAME     "input"
+
+/** Input device class attribute names. */
+#define INPUT_DEVICE_ATTR_TYPE      "input.type"
+
+/** INPUT_DEVICE_ATTR_TYPE - Device type (uint8). */
+enum {
+    INPUT_DEVICE_ATTR_TYPE_KEYBOARD = 0,    /**< Keyboard. */
+    INPUT_DEVICE_ATTR_TYPE_MOUSE    = 1,    /**< Mouse. */
+};
+
 /** Input event information structure. */
 typedef struct input_event {
     nstime_t time;                          /**< Time since boot that event occurred at. */
@@ -32,26 +44,20 @@ typedef struct input_event {
     int32_t value;                          /**< Value specific to the event type. */
 } input_event_t;
 
-/** Input device type attribute values. */
-enum {
-    INPUT_ATTR_TYPE_KEYBOARD        = 0,    /**< Keyboard. */
-    INPUT_ATTR_TYPE_MOUSE           = 1,    /**< Mouse. */
-};
-
 /** Input event types. */
 enum {
-    INPUT_EVENT_TYPE_KEY_DOWN       = 0,    /**< Key down (keyboard). */
-    INPUT_EVENT_TYPE_KEY_UP         = 1,    /**< Key up (keyboard). */
-    INPUT_EVENT_TYPE_REL_X          = 2,    /**< Relative X movement (mouse). */
-    INPUT_EVENT_TYPE_REL_Y          = 3,    /**< Relative Y movement (mouse). */
-    INPUT_EVENT_TYPE_BUTTON_DOWN    = 4,    /**< Button down (mouse). */
-    INPUT_EVENT_TYPE_BUTTON_UP      = 5,    /**< Button up (mouse). */
+    INPUT_EVENT_KEY_DOWN            = 0,    /**< Key down (keyboard). */
+    INPUT_EVENT_KEY_UP              = 1,    /**< Key up (keyboard). */
+    INPUT_EVENT_REL_X               = 2,    /**< Relative X movement (mouse). */
+    INPUT_EVENT_REL_Y               = 3,    /**< Relative Y movement (mouse). */
+    INPUT_EVENT_BUTTON_DOWN         = 4,    /**< Button down (mouse). */
+    INPUT_EVENT_BUTTON_UP           = 5,    /**< Button up (mouse). */
 };
 
 #define INPUT_KEY(page, code)   ((page << 16) | code)
 
 /**
- * Keyboard key codes (INPUT_EVENT_TYPE_KEY_*)
+ * Keyboard key codes (INPUT_EVENT_KEY_*)
  *
  * These codes are all based on the USB HID Usage Tables specification 1.21:
  * https://usb.org/document-library/hid-usage-tables-121
@@ -284,7 +290,7 @@ enum {
 
 #undef INPUT_KEY
 
-/** Mouse buttons (INPUT_EVENT_TYPE_BUTTON_*). */
+/** Mouse buttons (INPUT_EVENT_BUTTON_*). */
 enum {
     INPUT_BUTTON_LEFT               = 0,    /**< Left Button. */
     INPUT_BUTTON_RIGHT              = 1,    /**< Right Button. */

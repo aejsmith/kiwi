@@ -78,6 +78,7 @@ syscall kern_fs_rename(ptr_t, ptr_t);
 syscall kern_fs_sync();
 
 syscall kern_device_open(ptr_t, uint32_t, uint32_t, ptr_t);
+syscall kern_device_attr(handle_t, ptr_t, int, ptr_t, size_t);
 
 syscall kern_vm_map(ptr_t, size_t, size_t, uint32_t, uint32_t, uint32_t, handle_t, offset_t, ptr_t);
 syscall kern_vm_unmap(ptr_t, size_t);

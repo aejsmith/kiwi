@@ -23,6 +23,9 @@
 
 #include <kernel/status.h>
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "device.h"
 
 /** Opens an input device by path.
@@ -54,6 +57,22 @@ status_t input_device_open(const char *path, uint32_t access, uint32_t flags, in
  *                      STATUS_INVALID_HANDLE if handle is not a device handle.
  *                      STATUS_INCORRECT_TYPE if device is not an input device. */
 status_t input_device_from_handle(handle_t handle, input_device_t **_device) {
-    // TODO: Query device class.
-    return STATUS_NOT_IMPLEMENTED;
+    char class_name[DEVICE_ATTR_MAX];
+    status_t ret = kern_device_attr(handle, DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, class_name, sizeof(class_name));
+    if (ret != STATUS_SUCCESS) {
+        return ret;
+    } else if (strcmp(class_name, INPUT_DEVICE_CLASS_NAME) != 0) {
+        return STATUS_INCORRECT_TYPE;
+    }
+
+    device_t *device = malloc(sizeof(*device));
+    if (!device)
+        return STATUS_NO_MEMORY;
+
+    device->handle    = handle;
+    device->dev_class = DEVICE_CLASS_INPUT;
+    device->ops       = NULL;
+
+    *_device = device;
+    return STATUS_SUCCESS;
 }
