@@ -20,14 +20,17 @@ Import('manager')
 manager.AddVariable('_LIBOUTDIR', Dir('.'))
 
 dirs = [
+    # Core runtime libraries (must be first).
     'crt',
-    'device',
     'kernel',
     'system',
     'compiler-rt',
     'libm',
     'cxxrt',
     'cxx',
+
+    # Other libraries.
+    'device',
 ]
 
 SConscript(dirs = dirs)

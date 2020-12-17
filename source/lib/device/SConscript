@@ -22,9 +22,10 @@ env = manager.Create(libraries = ['kernel'], flags = {
     ],
 })
 
-sources = [File(f) for f in [
-    'dummy.c',
-]]
+sources = [
+    'device.c',
+    'input.c',
+]
 
 env.KiwiLibrary('device',
     sources = sources,

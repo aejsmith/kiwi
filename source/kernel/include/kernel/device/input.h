@@ -251,7 +251,7 @@ enum {
     INPUT_KEY_KP_AMPERSAND          = INPUT_KEY(0x07, 0xc7),
     INPUT_KEY_KP_DBL_AMPERSAND      = INPUT_KEY(0x07, 0xc8),
     INPUT_KEY_KP_VERTICAL_BAR       = INPUT_KEY(0x07, 0xc9),
-    INPUT_KEY_KP_DBL_VERTICALBAR    = INPUT_KEY(0x07, 0xca),
+    INPUT_KEY_KP_DBL_VERTICAL_BAR   = INPUT_KEY(0x07, 0xca),
     INPUT_KEY_KP_COLON              = INPUT_KEY(0x07, 0xcb),
     INPUT_KEY_KP_HASH               = INPUT_KEY(0x07, 0xcc),
     INPUT_KEY_KP_SPACE              = INPUT_KEY(0x07, 0xcd),

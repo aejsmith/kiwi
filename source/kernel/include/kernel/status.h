@@ -69,6 +69,7 @@
 #define STATUS_IS_DIR               44  /**< Not a directory. */
 #define STATUS_CONN_HUNGUP          45  /**< Connection was hung up. */
 #define STATUS_CANCELLED            46  /**< Operation was cancelled. */
+#define STATUS_INCORRECT_TYPE       47  /**< Object is not of the correct type. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 
