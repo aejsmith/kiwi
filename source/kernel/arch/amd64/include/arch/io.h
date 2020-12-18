@@ -16,84 +16,117 @@
 
 /**
  * @file
- * @brief               x86 port I/O functions.
+ * @brief               x86 I/O functions.
  */
 
 #pragma once
 
 #include <types.h>
 
-/** Read 8 bits from a port.
- * @param port          Port to read from.
- * @return              Value read. */
-static inline uint8_t in8(uint16_t port) {
-    uint8_t rv;
+/**
+ * Port I/O functions.
+ */
 
-    __asm__ volatile("inb %1, %0" : "=a"(rv) : "dN"(port));
-    return rv;
+#define ARCH_HAS_PIO 1
+
+typedef uint16_t pio_addr_t;
+
+/** Reads an 8 bit value from a port. */
+static inline uint8_t in8(pio_addr_t port) {
+    uint8_t ret;
+
+    __asm__ __volatile__("inb %1, %0" : "=a"(ret) : "dN"(port));
+    return ret;
 }
 
-/** Write 8 bits to a port.
- * @param port          Port to write to.
- * @param data          Value to write. */
-static inline void out8(uint16_t port, uint8_t data) {
-    __asm__ volatile("outb %1, %0" : : "dN"(port), "a"(data));
+/** Writes an 8 bit value to a port. */
+static inline void out8(pio_addr_t port, uint8_t val) {
+    __asm__ __volatile__("outb %1, %0" :: "dN"(port), "a"(val));
 }
 
-/** Read 16 bits from a port.
- * @param port          Port to read from.
- * @return              Value read. */
-static inline uint16_t in16(uint16_t port) {
-    uint16_t rv;
+/** Reads a 16 bit value from a port. */
+static inline uint16_t in16(pio_addr_t port) {
+    uint16_t ret;
 
-    __asm__ volatile("inw %1, %0" : "=a"(rv) : "dN"(port));
-    return rv;
+    __asm__ __volatile__("inw %1, %0" : "=a"(ret) : "dN"(port));
+    return ret;
 }
 
-/** Write 16 bits to a port.
- * @param port          Port to write to.
- * @param data          Value to write. */
-static inline void out16(uint16_t port, uint16_t data) {
-    __asm__ volatile("outw %1, %0" : : "dN"(port), "a"(data));
+/** Writes a 16 bit value to a port. */
+static inline void out16(pio_addr_t port, uint16_t val) {
+    __asm__ __volatile__("outw %1, %0" :: "dN"(port), "a"(val));
 }
 
-/** Read 32 bits from a port.
- * @param port          Port to read from.
- * @return              Value read. */
-static inline uint32_t in32(uint16_t port) {
-    uint32_t rv;
+/** Reads a 32 bit value from a port. */
+static inline uint32_t in32(pio_addr_t port) {
+    uint32_t ret;
 
-    __asm__ volatile("inl %1, %0" : "=a"(rv) : "dN"(port));
-    return rv;
+    __asm__ __volatile__("inl %1, %0" : "=a"(ret) : "dN"(port));
+    return ret;
 }
 
-/** Write 32 bits to a port.
- * @param port          Port to write to.
- * @param data          Value to write. */
-static inline void out32(uint16_t port, uint32_t data) {
-    __asm__ volatile("outl %1, %0" : : "dN"(port), "a"(data));
+/** Writes a 32 bit value to a port. */
+static inline void out32(pio_addr_t port, uint32_t val) {
+    __asm__ __volatile__("outl %1, %0" :: "dN"(port), "a"(val));
 }
 
-/** Write an array of 16 bits to a port.
- * @param port          Port to write to.
- * @param count         Number of 16 byte values to write.
- * @param buf           Buffer to write from. */
-static inline void out16s(uint16_t port, size_t count, const uint16_t *buf) {
-    __asm__ volatile(
+/** Writes an array of 16 bits to a port. */
+static inline void out16s(pio_addr_t port, size_t count, const uint16_t *buf) {
+    __asm__ __volatile__(
         "rep outsw"
         : "=c"(count), "=S"(buf)
         : "d"(port), "0"(count), "1"(buf)
         : "memory");
 }
 
-/** Read an array of 16 bits from a port.
- * @param port          Port to read from.
- * @param count         Number of 16 byte values to read.
- * @param buf           Buffer to read into. */
-static inline void in16s(uint16_t port, size_t count, uint16_t *buf) {
-    __asm__ volatile(
+/** Reads an array of 16 bits from a port. */
+static inline void in16s(pio_addr_t port, size_t count, uint16_t *buf) {
+    __asm__ __volatile__(
         "rep insw"
         : "=c"(count), "=D"(buf)
         : "d"(port), "0"(count), "1"(buf)
         : "memory");
+}
+
+/**
+ * Memory mapped I/O functions.
+ */
+
+/** Reads an 8 bit value from a memory mapped register. */
+static inline uint8_t read8(const volatile uint8_t *addr) {
+    uint8_t ret;
+
+    __asm__ __volatile__("movb %1, %0" : "=q"(ret) : "m"(*addr) : "memory");
+    return ret;
+}
+
+/** Writes an 8 bit value to a memory mapped register. */
+static inline void write8(volatile uint8_t *addr, uint8_t val) {
+    __asm__ __volatile__("movb %0, %1" :: "q"(val), "m"(*addr) : "memory");
+}
+
+/** Reads a 16 bit value from a memory mapped register. */
+static inline uint16_t read16(const volatile uint16_t *addr) {
+    uint16_t ret;
+
+    __asm__ __volatile__("movw %1, %0" : "=r"(ret) : "m"(*addr) : "memory");
+    return ret;
+}
+
+/** Writes a 16 bit value to a memory mapped register. */
+static inline void write16(volatile uint16_t *addr, uint16_t val) {
+    __asm__ __volatile__("movw %0, %1" :: "r"(val), "m"(*addr) : "memory");
+}
+
+/** Reads a 32 bit value from a memory mapped register. */
+static inline uint32_t read32(const volatile uint32_t *addr) {
+    uint32_t ret;
+
+    __asm__ __volatile__("movl %1, %0" : "=r"(ret) : "m"(*addr) : "memory");
+    return ret;
+}
+
+/** Writes a 32 bit value to a memory mapped register. */
+static inline void write32(volatile uint32_t *addr, uint32_t val) {
+    __asm__ __volatile__("movl %0, %1" :: "r"(val), "m"(*addr) : "memory");
 }
