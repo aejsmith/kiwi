@@ -24,6 +24,7 @@ sources = FeatureSources(config, [
     'console/logo.c',
 
     'device/device.c',
+    'device/io.c',
     'device/irq.c',
 
     'io/context.c',
