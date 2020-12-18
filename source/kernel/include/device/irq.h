@@ -23,6 +23,8 @@
 
 #include <types.h>
 
+struct device;
+
 /** IRQ handler return status. */
 typedef enum irq_status {
     IRQ_UNHANDLED,              /**< Interrupt was not handled. */
@@ -75,6 +77,10 @@ typedef void (*irq_bottom_t)(unsigned num, void *data);
 
 extern status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *data);
 extern status_t irq_unregister(unsigned num, irq_top_t top, irq_bottom_t bottom, void *data);
+
+extern status_t device_irq_register(
+    struct device *device, unsigned num, irq_top_t top, irq_bottom_t bottom,
+    void *data);
 
 extern void irq_handler(unsigned num);
 

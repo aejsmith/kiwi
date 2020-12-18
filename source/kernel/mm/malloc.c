@@ -36,6 +36,8 @@
  * memory allocator, then the cache pointer will be NULL.
  */
 
+#include <device/device.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -165,6 +167,28 @@ void kfree(void *addr) {
         /* Free to the cache it came from. */
         slab_cache_free(tag->cache, tag);
     }
+}
+
+/**
+ * Allocate a block of memory as a device-managed resource. The memory will be
+ * freed when the device is destroyed. The memory allocated with this function
+ * *cannot* be used with krealloc() or kfree() - the only way it can be freed
+ * is with the device when destroyed.
+ *
+ * @param device        Device to register to.
+ * @param size          Size of block.
+ * @param mmflag        Allocation behaviour flags.
+ *
+ * @return              Pointer to block on success, NULL on failure.
+ */
+void *device_kmalloc(device_t *device, size_t size, unsigned mmflag) {
+    /* We just allocate this directly with the tracking data. */
+    void *mem = device_resource_alloc(size, NULL, mmflag);
+
+    if (mem)
+        device_resource_register(device, mem);
+
+    return mem;
 }
 
 /** Initialize the allocator caches. */

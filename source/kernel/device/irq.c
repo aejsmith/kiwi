@@ -19,6 +19,7 @@
  * @brief               Hardware interrupt handling code.
  */
 
+#include <device/device.h>
 #include <device/irq.h>
 
 #include <lib/string.h>
@@ -205,6 +206,48 @@ status_t irq_unregister(unsigned num, irq_top_t top, irq_bottom_t bottom, void *
 
     spinlock_unlock(&irq_table[num].lock);
     return STATUS_NOT_FOUND;
+}
+
+typedef struct device_irq_resource {
+    unsigned num;
+    irq_top_t top;
+    irq_bottom_t bottom;
+    void *data;
+} device_irq_resource_t;
+
+static void device_irq_resource_release(device_t *device, void *data) {
+    device_irq_resource_t *resource = data;
+
+    irq_unregister(resource->num, resource->top, resource->bottom, resource->data);
+}
+
+/**
+ * Register an IRQ handler as a device-managed resource (will be unregistered
+ * when the device is destroyed).
+ *
+ * @see                 irq_register().
+ *
+ * @param device        Device to register to.
+ */
+status_t device_irq_register(
+    struct device *device, unsigned num, irq_top_t top, irq_bottom_t bottom,
+    void *data)
+{
+    status_t ret = irq_register(num, top, bottom, data);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    device_irq_resource_t *resource = device_resource_alloc(
+        sizeof(device_irq_resource_t), device_irq_resource_release, MM_KERNEL);
+
+    resource->num    = num;
+    resource->top    = top;
+    resource->bottom = bottom;
+    resource->data   = data;
+
+    device_resource_register(device, resource);
+
+    return STATUS_SUCCESS;
 }
 
 /** Hardware interrupt handler.

@@ -35,6 +35,13 @@
 #include <status.h>
 #include <time.h>
 
+/** Managed device resource header, allocated together with tracking data. */
+typedef struct device_resource {
+    list_t header;
+    device_resource_release_t release;
+    size_t data[];
+} device_resource_t;
+
 /** Root of the device tree. */
 device_t *device_root_dir;
 
@@ -184,6 +191,7 @@ static void device_ctor(device_t *device) {
     radix_tree_init(&device->children);
     list_init(&device->aliases);
     rwlock_init(&device->attr_lock, "device_attr_lock");
+    mutex_init(&device->resource_lock, "device_resource_lock", 0);
 }
 
 /**
@@ -388,6 +396,18 @@ status_t device_destroy(device_t *device) {
     if (device->ops && device->ops->destroy)
         device->ops->destroy(device);
 
+    /* Release managed resources. Do this in reverse so we release in reverse
+     * order to what they were registered in. */
+    while (!list_empty(&device->resources)) {
+        device_resource_t *resource = list_last(&device->resources, device_resource_t, header);
+        list_remove(&resource->header);
+
+        if (resource->release)
+            resource->release(device, resource->data);
+
+        kfree(resource);
+    }
+
     /* Remove all aliases to the device. */
     if (!device->dest) {
         list_foreach(&device->aliases, iter) {
@@ -419,81 +439,6 @@ status_t device_destroy(device_t *device) {
     kfree(device);
 
     return STATUS_SUCCESS;
-}
-
-static bool device_iterate_internal(device_t *device, device_iterate_t func, void *data) {
-    switch (func(device, data)) {
-        case DEVICE_ITERATE_END:
-            return false;
-        case DEVICE_ITERATE_DESCEND:
-            radix_tree_foreach(&device->children, iter) {
-                device_t *child = radix_tree_entry(iter, device_t);
-
-                if (!device_iterate_internal(child, func, data))
-                    return false;
-            }
-        case DEVICE_ITERATE_RETURN:
-            return true;
-    }
-
-    return false;
-}
-
-/**
- * Iterates through the device tree. The specified function will be called on a
- * device and all its children (and all their children, etc).
- *
- * @param start         Starting device.
- * @param func          Function to call on devices.
- * @param data          Data argument to pass to function.
- */
-void device_iterate(device_t *start, device_iterate_t func, void *data) {
-    /* TODO: We have small kernel stacks. Recursive lookup probably isn't a
-     * very good idea. Then again, the device tree shouldn't go *too* deep. */
-    device_iterate_internal(start, func, data);
-}
-
-/** Looks up a device and increase its reference count.
- * @param path          Path to device.
- * @return              Pointer to device if found, NULL if not. */
-static device_t *device_lookup(const char *path) {
-    assert(path);
-
-    if (!path[0] || path[0] != '/')
-        return NULL;
-
-    char *dup  = kstrdup(path, MM_KERNEL);
-    char *orig = dup;
-
-    device_t *device = device_root_dir;
-    mutex_lock(&device->lock);
-
-    char *tok;
-    while ((tok = strsep(&dup, "/"))) {
-        if (!tok[0])
-            continue;
-
-        device_t *child = radix_tree_lookup(&device->children, tok);
-        if (!child) {
-            mutex_unlock(&device->lock);
-            kfree(orig);
-            return NULL;
-        }
-
-        /* Move down to the device and then iterate through until we reach an
-         * entry that isn't an alias. */
-        do {
-            mutex_lock(&child->lock);
-            mutex_unlock(&device->lock);
-            device = child;
-        } while ((child = device->dest));
-    }
-
-    refcount_inc(&device->count);
-    mutex_unlock(&device->lock);
-
-    kfree(orig);
-    return device;
 }
 
 /** Gets the value of a device attribute.
@@ -599,6 +544,140 @@ status_t device_attr(
 
     rwlock_unlock(&device->attr_lock);
     return ret;
+}
+
+/**
+ * Allocates a structure for tracking a device managed resource. This structure
+ * should contain everything needed to be able to release the resource later
+ * on. Internally, it is allocated inside another structure.
+ *
+ * @param size          Size of the tracking structure.
+ * @param release       Callback function to release the resource (can be null).
+ * @param mmflag        Allocation flags.
+ *
+ * @return              Allocated structure, or null on failure (if mmflag
+ *                      allows it).
+ */
+void *device_resource_alloc(size_t size, device_resource_release_t release, unsigned mmflag) {
+    assert(release);
+
+    device_resource_t *resource = kmalloc(sizeof(device_resource_t) + size, mmflag);
+    if (!resource)
+        return NULL;
+
+    list_init(&resource->header);
+    resource->release = release;
+
+    return resource->data;
+}
+
+/**
+ * Frees a device resource tracking structure. Only needs to be used if the
+ * structure needs to be freed due to a failure before it is passed to
+ * device_resource_register().
+ *
+ * @param data          Resource tracking structure.
+ */
+void device_resource_free(void *data) {
+    device_resource_t *resource = container_of(data, device_resource_t, data);
+
+    assert(list_empty(&resource->header));
+
+    kfree(resource);
+}
+
+/**
+ * Registers a resource with a device, such that it will be released when the
+ * device is destroyed. Once a tracking structure is passed to this function,
+ * the caller no longer owns it and should not alter or free it.
+ *
+ * When a device is destroyed, resources are released in reverse order to what
+ * they were registered in.
+ *
+ * @param device        Device to register with.
+ * @param data          Resource tracking structure.
+ */
+void device_resource_register(device_t *device, void *data) {
+    device_resource_t *resource = container_of(data, device_resource_t, data);
+
+    mutex_lock(&device->resource_lock);
+    list_append(&device->resources, &resource->header);
+    mutex_unlock(&device->resource_lock);
+}
+
+static bool device_iterate_internal(device_t *device, device_iterate_t func, void *data) {
+    switch (func(device, data)) {
+        case DEVICE_ITERATE_END:
+            return false;
+        case DEVICE_ITERATE_DESCEND:
+            radix_tree_foreach(&device->children, iter) {
+                device_t *child = radix_tree_entry(iter, device_t);
+
+                if (!device_iterate_internal(child, func, data))
+                    return false;
+            }
+        case DEVICE_ITERATE_RETURN:
+            return true;
+    }
+
+    return false;
+}
+
+/**
+ * Iterates through the device tree. The specified function will be called on a
+ * device and all its children (and all their children, etc).
+ *
+ * @param start         Starting device.
+ * @param func          Function to call on devices.
+ * @param data          Data argument to pass to function.
+ */
+void device_iterate(device_t *start, device_iterate_t func, void *data) {
+    /* TODO: We have small kernel stacks. Recursive lookup probably isn't a
+     * very good idea. Then again, the device tree shouldn't go *too* deep. */
+    device_iterate_internal(start, func, data);
+}
+
+/** Looks up a device and increase its reference count.
+ * @param path          Path to device.
+ * @return              Pointer to device if found, NULL if not. */
+static device_t *device_lookup(const char *path) {
+    assert(path);
+
+    if (!path[0] || path[0] != '/')
+        return NULL;
+
+    char *dup  = kstrdup(path, MM_KERNEL);
+    char *orig = dup;
+
+    device_t *device = device_root_dir;
+    mutex_lock(&device->lock);
+
+    char *tok;
+    while ((tok = strsep(&dup, "/"))) {
+        if (!tok[0])
+            continue;
+
+        device_t *child = radix_tree_lookup(&device->children, tok);
+        if (!child) {
+            mutex_unlock(&device->lock);
+            kfree(orig);
+            return NULL;
+        }
+
+        /* Move down to the device and then iterate through until we reach an
+         * entry that isn't an alias. */
+        do {
+            mutex_lock(&child->lock);
+            mutex_unlock(&device->lock);
+            device = child;
+        } while ((child = device->dest));
+    }
+
+    refcount_inc(&device->count);
+    mutex_unlock(&device->lock);
+
+    kfree(orig);
+    return device;
 }
 
 /** Gets the path to a device.

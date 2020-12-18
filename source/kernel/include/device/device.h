@@ -34,6 +34,7 @@
 #include <module.h>
 
 struct device;
+struct device_resource;
 
 /** Structure containing device operations. */
 typedef struct device_ops {
@@ -132,6 +133,7 @@ typedef struct device {
     module_t *module;               /**< Module that owns the device. */
     nstime_t time;                  /**< Creation time. */
 
+    /** Device tree linkage. */
     struct device *parent;          /**< Parent tree entry. */
     radix_tree_t children;          /**< Child devices. */
     struct device *dest;            /**< Destination device if this is an alias. */
@@ -140,13 +142,24 @@ typedef struct device {
         list_t dest_link;           /**< Link to destination's aliases list. */
     };
 
+    /** Operations. */
     device_ops_t *ops;              /**< Operations structure for the device. */
     void *data;                     /**< Data used by the device's creator. */
 
+    /** Attributes. */
     rwlock_t attr_lock;             /**< Lock for attribute access. */
     device_attr_t *attrs;           /**< Array of attribute structures. */
     size_t attr_count;              /**< Number of attributes. */
+
+    /** Resource management. */
+    mutex_t resource_lock;          /**< Lock for resource list. */
+    list_t resources;               /**< List of managed resources. */
 } device_t;
+
+/** Device resource release callback.
+ * @param device        Device that the resource is registered to.
+ * @param data          Tracking data for resource being released. */
+typedef void (*device_resource_release_t)(device_t *device, void *data);
 
 /** Return values from device_iterate_t. */
 enum {
@@ -199,10 +212,16 @@ extern status_t device_alias_impl(
 
 extern status_t device_destroy(device_t *device);
 
-extern void device_iterate(device_t *start, device_iterate_t func, void *data);
 extern status_t device_attr(
     device_t *device, const char *name, device_attr_type_t type, void *buf,
     size_t size, size_t *_written);
+
+extern void *device_resource_alloc(
+    size_t size, device_resource_release_t release, unsigned mmflag) __malloc;
+extern void device_resource_free(void *data);
+extern void device_resource_register(device_t *device, void *data);
+
+extern void device_iterate(device_t *start, device_iterate_t func, void *data);
 extern char *device_path(device_t *device);
 
 extern status_t device_get(
