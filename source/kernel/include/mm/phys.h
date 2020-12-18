@@ -25,6 +25,8 @@
 
 #include <mm/mm.h>
 
+struct device;
+
 /** Memory range types. */
 #define MEMORY_TYPE_NORMAL      0   /**< Normal Memory. */
 #define MEMORY_TYPE_DEVICE      1   /**< Device Memory. */
@@ -35,6 +37,8 @@
 
 extern void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag);
 extern void phys_unmap(void *addr, size_t size, bool shared);
+
+extern void *device_phys_map(struct device *device, phys_ptr_t addr, size_t size, unsigned mmflag);
 
 extern status_t phys_alloc(
     phys_size_t size, phys_ptr_t align, phys_ptr_t boundary, phys_ptr_t minaddr,

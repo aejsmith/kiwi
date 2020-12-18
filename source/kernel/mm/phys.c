@@ -19,6 +19,8 @@
  * @brief               Physical memory handling functions.
  */
 
+#include <device/device.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -76,6 +78,42 @@ void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
     phys_ptr_t end  = round_up(addr + size, PAGE_SIZE);
 
     return kmem_map(base, end - base, mmflag);
+}
+
+typedef struct device_phys_map_resource {
+    void *mapping;
+    size_t size;
+} device_phys_map_resource_t;
+
+static void device_phys_map_resource_release(device_t *device, void *data) {
+    device_phys_map_resource_t *resource = data;
+
+    phys_unmap(resource->mapping, resource->size, true);
+}
+
+/**
+ * Maps physical memory into the kernel address space, as a device-managed
+ * resource (will be unmapped when the device is destroyed).
+ *
+ * @see                 phys_map().
+ *
+ * @param device        Device to register to.
+ */
+void *device_phys_map(device_t *device, phys_ptr_t addr, size_t size, unsigned mmflag) {
+    void *mapping = phys_map(addr, size, mmflag);
+
+    /* We only need to manage this if we had to create a new mapping. */
+    if (mapping && !pmap_contains(addr, size)) {
+        device_phys_map_resource_t *resource = device_resource_alloc(
+            sizeof(device_phys_map_resource_t), device_phys_map_resource_release, MM_KERNEL);
+
+        resource->mapping = mapping;
+        resource->size    = size;
+
+        device_resource_register(device, resource);
+    }
+
+    return mapping;
 }
 
 /** Unmaps memory mapped with phys_map().
