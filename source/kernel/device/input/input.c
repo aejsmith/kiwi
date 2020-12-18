@@ -17,6 +17,12 @@
 /**
  * @file
  * @brief               Input device class manager.
+ *
+ * TODO:
+ *  - Proper handling for dropping events when the queue is full. This is
+ *    necessary for where the client might be tracking state from events which
+ *    give relative state (e.g. tracking button state). See how Linux libevdev
+ *    handles this.
  */
 
 #include <device/input.h>
@@ -24,12 +30,21 @@
 #include <module.h>
 #include <status.h>
 
+// handle nonblock
+// event queue per client
+
+static device_t *input_class_dir;
+
 static status_t input_init(void) {
+    status_t ret = device_create_dir(INPUT_DEVICE_CLASS_NAME, device_class_dir, &input_class_dir);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
     return STATUS_SUCCESS;
 }
 
 static status_t input_unload(void) {
-    return STATUS_SUCCESS;
+    return device_destroy(input_class_dir);
 }
 
 MODULE_NAME(INPUT_MODULE_NAME);

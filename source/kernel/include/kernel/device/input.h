@@ -32,27 +32,27 @@ __KERNEL_EXTERN_C_BEGIN
 #define INPUT_DEVICE_ATTR_TYPE      "input.type"
 
 /** INPUT_DEVICE_ATTR_TYPE - Device type (uint8). */
-enum {
-    INPUT_DEVICE_ATTR_TYPE_KEYBOARD = 0,    /**< Keyboard. */
-    INPUT_DEVICE_ATTR_TYPE_MOUSE    = 1,    /**< Mouse. */
-};
-
-/** Input event information structure. */
-typedef struct input_event {
-    nstime_t time;                          /**< Time since boot that event occurred at. */
-    uint8_t type;                           /**< Event type. */
-    int32_t value;                          /**< Value specific to the event type. */
-} input_event_t;
+typedef enum input_device_type {
+    INPUT_DEVICE_KEYBOARD           = 0,    /**< Keyboard. */
+    INPUT_DEVICE_MOUSE              = 1,    /**< Mouse. */
+} input_device_type_t;
 
 /** Input event types. */
-enum {
+typedef enum input_event_type {
     INPUT_EVENT_KEY_DOWN            = 0,    /**< Key down (keyboard). */
     INPUT_EVENT_KEY_UP              = 1,    /**< Key up (keyboard). */
     INPUT_EVENT_REL_X               = 2,    /**< Relative X movement (mouse). */
     INPUT_EVENT_REL_Y               = 3,    /**< Relative Y movement (mouse). */
     INPUT_EVENT_BUTTON_DOWN         = 4,    /**< Button down (mouse). */
     INPUT_EVENT_BUTTON_UP           = 5,    /**< Button up (mouse). */
-};
+} input_event_type_t;
+
+/** Input event information structure. */
+typedef struct input_event {
+    nstime_t time;                          /**< Time since boot that event occurred at. */
+    input_event_type_t type;                /**< Event type. */
+    int32_t value;                          /**< Value specific to the event type. */
+} input_event_t;
 
 #define INPUT_KEY(page, code)   ((page << 16) | code)
 

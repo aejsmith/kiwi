@@ -21,6 +21,7 @@
 
 #include <device/input.h>
 
+#include <kernel/file.h>
 #include <kernel/status.h>
 
 #include <stdlib.h>
@@ -75,4 +76,17 @@ status_t input_device_from_handle(handle_t handle, input_device_t **_device) {
 
     *_device = device;
     return STATUS_SUCCESS;
+}
+
+/**
+ * Reads the next event from an input device's event queue. If no event is
+ * available this will block, unless the device was opened with FILE_NONBLOCK.
+ *
+ * @param device        Device to read from.
+ * @param _event        Where to store details of event read.
+ *
+ * @return              Status code describing the result of the operation.
+ */
+status_t input_device_read_event(input_device_t *device, input_event_t *_event) {
+    return kern_file_read(device->handle, _event, sizeof(*_event), -1, NULL);
 }

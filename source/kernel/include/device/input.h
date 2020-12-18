@@ -21,6 +21,15 @@
 
 #pragma once
 
+#include <device/device.h>
+
 #include <kernel/device/input.h>
 
 #define INPUT_MODULE_NAME "input"
+
+/** Input device structure. */
+typedef struct input_device {
+    device_t *device;                   /**< Device tree node. */
+    device_t *alias;                    /**< Device class alias. */
+    uint32_t id;                        /**< Device ID. */
+} input_device_t;

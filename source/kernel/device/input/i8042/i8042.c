@@ -24,12 +24,18 @@
 #include <module.h>
 #include <status.h>
 
+static device_t *i8042_controller_dir;
+
 static status_t i8042_init(void) {
+    status_t ret = device_create_dir("i8042", device_bus_platform_dir, &i8042_controller_dir);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
     return STATUS_SUCCESS;
 }
 
 static status_t i8042_unload(void) {
-    return STATUS_SUCCESS;
+    return device_destroy(i8042_controller_dir);
 }
 
 MODULE_NAME("i8042");
