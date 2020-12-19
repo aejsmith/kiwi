@@ -231,4 +231,6 @@ extern status_t device_open(
     const char *path, uint32_t access, uint32_t flags,
     object_handle_t **_handle);
 
+extern int device_kprintf(device_t *device, int level, const char *fmt, ...) __printf(3, 4);
+
 extern void device_init(void);

@@ -810,6 +810,73 @@ err_release:
     return ret;
 }
 
+/*
+ * We need a buffer to build a path for device_kprintf() in, DEVICE_PATH_MAX is
+ * too large to comfortably allocate on a kernel stack, and don't want to
+ * kmalloc() every time we use this. So, allocate a global buffer with a lock.
+ * This should be used infrequently enough that a global lock for it should not
+ * matter.
+ */
+static char device_kprintf_buf[DEVICE_PATH_MAX];
+static SPINLOCK_DEFINE(device_kprintf_lock);
+
+/**
+ * Device-specific version of kprintf() which will prefix messages with the
+ * device module name and path. It is assumed that the device will not be
+ * destroyed for the duration of the function.
+ * 
+ * @param device        Device to log for.
+ * @param level         Log level.
+ * @param fmt           Format string for message.
+ * @param ...           Arguments to substitute into format string.
+ *
+ * @return              Number of characters written.
+ */
+int device_kprintf(device_t *device, int level, const char *fmt, ...) {
+    spinlock_lock(&device_kprintf_lock);
+
+    /* Build device path. No need to lock devices, names are immutable and since
+     * we require the device to remain alive across the function call, the tree
+     * linkage cannot change either. */
+    char *path = &device_kprintf_buf[DEVICE_PATH_MAX - 1];
+    *path = 0;
+    size_t len = 0;
+
+    device_t *iter = device;
+    while (iter != device_root_dir) {
+        size_t name_len = strlen(iter->name);
+
+        len += name_len + 1;
+        if (len >= DEVICE_PATH_MAX)
+            break;
+
+        path -= name_len;
+        memcpy(path, iter->name, name_len);
+
+        path--;
+        *path = '/';
+
+        iter = iter->parent;
+    }
+
+    if (len == 0) {
+        path--;
+        *path = '/';
+    }
+
+    int ret = kprintf(level, "%s: %s: ", device->module->name, path);
+
+    va_list args;
+    va_start(args, fmt);
+
+    ret += kvprintf(level, fmt, args);
+
+    va_end(args);
+
+    spinlock_unlock(&device_kprintf_lock);
+    return ret;
+}
+
 static void dump_children(radix_tree_t *tree, int indent) {
     radix_tree_foreach(tree, iter) {
         device_t *device = radix_tree_entry(iter, device_t);
