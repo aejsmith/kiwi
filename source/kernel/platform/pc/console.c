@@ -17,11 +17,6 @@
 /**
  * @file
  * @brief               PC console code.
- *
- * TODO:
- *  - Move i8042 stuff out to a driver. A simple polling implementation will be
- *    left here though for early use, so that KDB can be used before the proper
- *    driver is loaded.
  */
 
 #include <arch/io.h>
@@ -63,18 +58,6 @@ static uint16_t vga_cols;           /**< Number of columns. */
 static uint16_t vga_lines;          /**< Number of lines. */
 static uint16_t vga_cursor_x;       /**< X position of the cursor. */
 static uint16_t vga_cursor_y;       /**< Y position of the cursor. */
-
-/** Size of the keyboard input buffer. */
-#define I8042_BUFFER_SIZE   16
-
-/** Keyboard implementation details. */
-static CONDVAR_DEFINE(i8042_cvar);
-static SPINLOCK_DEFINE(i8042_lock);
-static NOTIFIER_DEFINE(i8042_notifier, NULL);
-static int i8042_shutdown_action = -1;
-static uint16_t i8042_buffer[I8042_BUFFER_SIZE];
-static size_t i8042_buffer_start;
-static size_t i8042_buffer_size;
 
 #ifdef SERIAL_PORT
 
@@ -202,118 +185,16 @@ static uint16_t i8042_console_poll(void) {
     }
 }
 
-/** Read a character from the keyboard, blocking until it can do so. */
-static status_t i8042_console_getc(bool nonblock, uint16_t *_ch) {
-    bool have_char = false;
-
-    while (true) {
-        spinlock_lock(&i8042_lock);
-
-        have_char = i8042_buffer_size > 0;
-        if (have_char) {
-            *_ch = i8042_buffer[i8042_buffer_start];
-            i8042_buffer_size--;
-            if (++i8042_buffer_start == I8042_BUFFER_SIZE)
-                i8042_buffer_start = 0;
-        }
-
-        spinlock_unlock(&i8042_lock);
-
-        if (have_char) {
-            return STATUS_SUCCESS;
-        } else if (nonblock) {
-            return STATUS_WOULD_BLOCK;
-        }
-
-        status_t ret = condvar_wait_etc(&i8042_cvar, NULL, -1, SLEEP_INTERRUPTIBLE);
-        if (ret != STATUS_SUCCESS)
-            return ret;
-    }
-}
-
-/** Start waiting for input on the keyboard. */
-static void i8042_console_wait(object_event_t *event) {
-    if (i8042_buffer_size > 0) {
-        object_event_signal(event, 0);
-    } else {
-        notifier_register(&i8042_notifier, object_event_notifier, event);
-    }
-}
-
-/** Stop waiting for input on the keyboard. */
-static void i8042_console_unwait(object_event_t *event) {
-    notifier_unregister(&i8042_notifier, object_event_notifier, event);
-}
-
-/** i8042 early console input operations. */
+/** i8042 console input operations. */
 static console_in_ops_t i8042_console_in_ops = {
-    .poll   = i8042_console_poll,
-    .getc   = i8042_console_getc,
-    .wait   = i8042_console_wait,
-    .unwait = i8042_console_unwait,
+    .poll = i8042_console_poll,
 };
-
-/** IRQ handler for i8042 keyboard. */
-static irq_status_t i8042_irq(unsigned num, void *data) {
-    if (!(in8(0x64) & (1 << 0)) || in8(0x64) & (1 << 5))
-        return IRQ_UNHANDLED;
-
-    /* Read the code. */
-    uint8_t code = in8(0x60);
-
-    /* Some debugging hooks to go into KDB, etc. */
-    switch (code) {
-        case 59:
-            /* F1 - Enter KDB. */
-            kdb_enter(KDB_REASON_USER, NULL);
-            break;
-        case 60:
-            /* F2 - Call fatal(). */
-            fatal("User requested fatal error");
-            break;
-        case 61:
-            /* F3 - Reboot. */
-            i8042_shutdown_action = SHUTDOWN_REBOOT;
-            break;
-        case 62:
-            /* F4 - Shutdown. */
-            i8042_shutdown_action = SHUTDOWN_POWEROFF;
-            break;
-    }
-
-    spinlock_lock(&i8042_lock);
-
-    uint16_t ch = i8042_console_translate(code);
-
-    bool has_input = ch && i8042_buffer_size < I8042_BUFFER_SIZE;
-    if (has_input)
-        i8042_buffer[(i8042_buffer_start + i8042_buffer_size++) % I8042_BUFFER_SIZE] = ch;
-
-    spinlock_unlock(&i8042_lock);
-    return (has_input || i8042_shutdown_action >= 0) ? IRQ_RUN_THREAD : IRQ_HANDLED;
-}
-
-/** i8042 IRQ thread. */
-static void i8042_irq_thread(unsigned num, void *data) {
-    if (i8042_shutdown_action >= 0) {
-        system_shutdown(i8042_shutdown_action);
-    } else if (i8042_buffer_size > 0) {
-        condvar_broadcast(&i8042_cvar);
-        notifier_run(&i8042_notifier, NULL, true);
-    }
-}
 
 __init_text void i8042_init(void) {
     /* Empty i8042 buffer. */
     while (in8(0x64) & 1)
         in8(0x60);
 }
-
-static __init_text void i8042_irq_init(void) {
-    irq_register(1, i8042_irq, i8042_irq_thread, NULL, NULL);
-}
-
-INITCALL(i8042_irq_init);
 
 /**
  * VGA console operations.
