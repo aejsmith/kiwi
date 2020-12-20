@@ -622,9 +622,13 @@ void object_thread_cleanup(thread_t *thread) {
     rwlock_unlock(&thread->owner->handles.lock);
 }
 
-/** Signals that an event being waited for has occurred.
+/**
+ * Signals that an event being waited for has occurred. This must not be called
+ * in interrupt context.
+ *
  * @param event         Object event structure.
- * @param data          Event data to return to waiter. */
+ * @param data          Event data to return to waiter.
+ */
 void object_event_signal(object_event_t *event, unsigned long data) {
     object_wait_t *wait = container_of(event, object_wait_t, event);
     

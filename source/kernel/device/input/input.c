@@ -25,6 +25,7 @@
  *    handles this.
  */
 
+#include <device/class.h>
 #include <device/input.h>
 
 #include <module.h>
@@ -33,18 +34,14 @@
 // handle nonblock
 // event queue per client
 
-static device_t *input_class_dir;
+static device_class_t input_device_class;
 
 static status_t input_init(void) {
-    status_t ret = device_create_dir(INPUT_DEVICE_CLASS_NAME, device_class_dir, &input_class_dir);
-    if (ret != STATUS_SUCCESS)
-        return ret;
-
-    return STATUS_SUCCESS;
+    return device_class_init(&input_device_class, INPUT_DEVICE_CLASS_NAME);
 }
 
 static status_t input_unload(void) {
-    return device_destroy(input_class_dir);
+    return device_class_destroy(&input_device_class);
 }
 
 MODULE_NAME(INPUT_MODULE_NAME);
