@@ -43,9 +43,30 @@ typedef struct condvar {
 #define CONDVAR_DEFINE(_var) \
     condvar_t _var = CONDVAR_INITIALIZER(_var, #_var)
 
-extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *lock, nstime_t timeout, unsigned flags);
+extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, unsigned flags);
 extern void condvar_wait(condvar_t *cv, mutex_t *mutex);
 extern bool condvar_signal(condvar_t *cv);
 extern bool condvar_broadcast(condvar_t *cv);
+
+/** Wait for a condition to become true.
+ * @see                 condvar_wait().
+ * @param cond          Condition to wait for (evaluated each iteration). */
+#define condvar_wait_cond(cv, mutex, cond) \
+    do { \
+        condvar_wait(cv, mutex); \
+    } while (!(cond))
+
+/** Wait for a condition to become true.
+ * @see                 condvar_wait_etc().
+ * @param cond          Condition to wait for (evaluated each iteration). */
+#define condvar_wait_cond_etc(cv, mutex, timeout, flags, cond) \
+    __extension__ \
+    ({ \
+        status_t __ret; \
+        do { \
+            __ret = condvar_wait_etc(cv, mutex, timeout, flags); \
+        } while (__ret == STATUS_SUCCESS && !(cond)); \
+        __ret; \
+    })
 
 extern void condvar_init(condvar_t *cv, const char *name);
