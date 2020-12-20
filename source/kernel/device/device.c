@@ -212,7 +212,7 @@ static void device_ctor(device_t *device) {
  *
  * @return              Status code describing result of the operation.
  */
-status_t device_create_impl(
+status_t device_create_etc(
     module_t *module, const char *name, device_t *parent, device_ops_t *ops,
     void *data, device_attr_t *attrs, size_t count, device_t **_device)
 {
@@ -313,7 +313,7 @@ err_free:
  *
  * @return              Status code describing result of the operation.
  */
-status_t device_alias_impl(
+status_t device_alias_etc(
     module_t *module, const char *name, device_t *parent, device_t *dest,
     device_t **_device)
 {
@@ -883,8 +883,8 @@ static void dump_children(radix_tree_t *tree, int indent) {
         device_t *device = radix_tree_entry(iter, device_t);
 
         kdb_printf(
-            "%*s%-*s %-18p %-18p %d\n", indent, "",
-            24 - indent, device->name, device, device->parent,
+            "%*s%-*s %-18p %-16s %d\n", indent, "",
+            24 - indent, device->name, device, device->module->name,
             refcount_get(&device->count));
 
         if (device->dest) {
@@ -908,8 +908,8 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
     }
 
     if (argc == 1) {
-        kdb_printf("Name                     Address            Parent             Count\n");
-        kdb_printf("====                     =======            ======             =====\n");
+        kdb_printf("Name                     Address            Module           Count\n");
+        kdb_printf("====                     =======            ======           =====\n");
 
         dump_children(&device_root_dir->children, 0);
         return KDB_SUCCESS;
@@ -927,6 +927,7 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
     kdb_printf("Parent:      %p\n", device->parent);
     if (device->dest)
         kdb_printf("Destination: %p(%s)\n", device->dest, device->dest->name);
+    kdb_printf("Module:      %s\n", device->module->name);
     kdb_printf("Ops:         %p\n", device->ops);
     kdb_printf("Data:        %p\n", device->data);
 

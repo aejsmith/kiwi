@@ -190,25 +190,25 @@ static inline const char *device_name(object_handle_t *_handle) {
     return device->name;
 }
 
-extern status_t device_create_impl(
+extern status_t device_create_etc(
     module_t *module, const char *name, device_t *parent, device_ops_t *ops,
     void *data, device_attr_t *attrs, size_t count, device_t **_device);
-extern status_t device_alias_impl(
+extern status_t device_alias_etc(
     module_t *module, const char *name, device_t *parent, device_t *dest,
     device_t **_device);
 
-/** @see device_create_impl(). */
+/** @see device_create_etc(). */
 #define device_create(name, parent, ops, data, attrs, count, _device) \
-    device_create_impl(module_self(), name, parent, ops, data, attrs, count, _device)
+    device_create_etc(module_self(), name, parent, ops, data, attrs, count, _device)
 
 /** Create a device directory.
- * @see device_create_impl(). */
+ * @see device_create_etc(). */
 #define device_create_dir(name, parent, _device) \
-    device_create_impl(module_self(), name, parent, NULL, NULL, NULL, 0, _device)
+    device_create_etc(module_self(), name, parent, NULL, NULL, NULL, 0, _device)
 
-/** @see device_alias_impl(). */
+/** @see device_alias_etc(). */
 #define device_alias(name, parent, dest, _device) \
-    device_alias_impl(module_self(), name, parent, dest, _device)
+    device_alias_etc(module_self(), name, parent, dest, _device)
 
 extern status_t device_destroy(device_t *device);
 

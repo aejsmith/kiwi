@@ -36,11 +36,7 @@ typedef struct device_class {
 extern status_t device_class_init(device_class_t *class, const char *name);
 extern status_t device_class_destroy(device_class_t *class);
 
-extern status_t device_class_create_device_impl(
-    module_t *module, device_class_t *class, const char *name, device_t *parent,
+extern status_t device_class_create_device(
+    device_class_t *class, module_t *module, const char *name, device_t *parent,
     device_ops_t *ops, void *data, device_attr_t *attrs, size_t count,
     device_t **_device);
-
-/** @see device_class_create_device_impl(). */
-#define device_class_create_device(class, name, parent, ops, data, attrs, count, _device) \
-    device_class_create_device_impl(module_self(), class, name, parent, ops, data, attrs, count, _device)

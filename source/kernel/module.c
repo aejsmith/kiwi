@@ -167,9 +167,18 @@ module_t *module_for_addr(void *addr) {
     return &kernel_module;
 }
 
-/** Find the module containing the calling function. */
+/**
+ * Finds the module containing the function that it is used within, for example:
+ *
+ *   void foo() { module_self(); }
+ *
+ * foo will receive the module containing itself.
+ * 
+ * Note that function inlining will cause unexpected results, so do not use
+ * this in functions that might be inlined.
+ */
 __noinline module_t *module_self(void) {
-    return module_for_addr(__builtin_return_address(0));
+    return module_caller();
 }
 
 /** Find a module in the module list.

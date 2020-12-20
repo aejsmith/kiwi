@@ -26,6 +26,7 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
+#include <module.h>
 #include <status.h>
 
 /** Initialises a device class.
@@ -36,7 +37,7 @@ status_t device_class_init(device_class_t *class, const char *name) {
     class->name    = name;
     class->next_id = 0;
 
-    return device_create_dir(name, device_class_dir, &class->dir);
+    return device_create_etc(module_caller(), name, device_class_dir, NULL, NULL, NULL, 0, &class->dir);
 }
 
 /** Destroys a device class.
@@ -59,8 +60,8 @@ status_t device_class_destroy(device_class_t *class) {
  *
  * @param class         Class to create device under.
  */
-status_t device_class_create_device_impl(
-    module_t *module, device_class_t *class, const char *name, device_t *parent,
+status_t device_class_create_device(
+    device_class_t *class, module_t *module, const char *name, device_t *parent,
     device_ops_t *ops, void *data, device_attr_t *attrs, size_t count,
     device_t **_device)
 {
@@ -77,7 +78,7 @@ status_t device_class_create_device_impl(
     new_attrs[0].value.string = class->name;
 
     device_t *device;
-    ret = device_create_impl(module, name, parent, ops, data, new_attrs, new_attr_count, &device);
+    ret = device_create_etc(module, name, parent, ops, data, new_attrs, new_attr_count, &device);
 
     kfree(new_attrs);
 
@@ -90,7 +91,7 @@ status_t device_class_create_device_impl(
     /* This should always succeed as the ID/name should be unique. */
     char alias[16];
     sprintf(alias, "%" PRId32, id);
-    ret = device_alias(alias, class->dir, device, NULL);
+    ret = device_alias_etc(module_caller(), alias, class->dir, device, NULL);
     assert(ret == STATUS_SUCCESS);
 
     if (_device)

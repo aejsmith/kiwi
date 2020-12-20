@@ -119,6 +119,21 @@ extern void module_release(module_t *module);
 extern module_t *module_for_addr(void *addr);
 extern module_t *module_self(void);
 
+/**
+ * Finds the module containing the caller of the function that it is used
+ * within, for example:
+ *
+ *   void foo() { module_caller(); }
+ *   void bar() { foo(); }
+ *
+ * for a call to bar, foo will receive the module containing bar.
+ *
+ * Note that function inlining will cause unexpected results, so do not use
+ * this in functions that might be inlined.
+ */
+#define module_caller() \
+    module_for_addr(__builtin_return_address(0))
+
 extern status_t module_load(const char *path, char *depbuf);
 extern status_t module_unload(const char *name);
 
