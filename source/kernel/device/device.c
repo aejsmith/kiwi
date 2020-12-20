@@ -192,6 +192,7 @@ static void device_ctor(device_t *device) {
     list_init(&device->aliases);
     rwlock_init(&device->attr_lock, "device_attr_lock");
     mutex_init(&device->resource_lock, "device_resource_lock", 0);
+    list_init(&device->resources);
 }
 
 /**
