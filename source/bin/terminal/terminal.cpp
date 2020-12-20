@@ -41,7 +41,8 @@ extern const char *const *environ;
 
 Terminal::Terminal() :
     m_connection   (nullptr),
-    m_device       (INVALID_HANDLE),
+    m_outputDevice (INVALID_HANDLE),
+    m_inputDevice  (nullptr),
     m_childProcess (INVALID_HANDLE),
     m_terminal     {INVALID_HANDLE, INVALID_HANDLE}
 {}
@@ -50,8 +51,11 @@ Terminal::~Terminal() {
     if (m_connection)
         core_connection_close(m_connection);
 
-    if (m_device != INVALID_HANDLE)
-        kern_handle_close(m_device);
+    if (m_outputDevice != INVALID_HANDLE)
+        kern_handle_close(m_outputDevice);
+
+    if (m_inputDevice)
+        device_close(m_inputDevice);
 
     if (m_childProcess != INVALID_HANDLE)
         kern_handle_close(m_childProcess);
@@ -106,10 +110,15 @@ void Terminal::run() {
         kern_handle_set_flags(m_terminal[i], HANDLE_INHERITABLE);
     }
 
-    /* Open a non-blocking kernel console device handle (temporary, once we
-     * have drivers implemented this will go away and we'll go directly to the
-     * input/framebuffer devices, and then to a GUI once that's implemented). */
-    ret = kern_device_open("/virtual/kconsole", FILE_ACCESS_READ | FILE_ACCESS_WRITE, FILE_NONBLOCK, &m_device);
+    /* Open a device handles. TODO: Use framebuffer directly once available,
+     * input device enumeration. */
+    ret = kern_device_open("/virtual/kconsole", FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &m_outputDevice);
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_ERROR, "failed to open output device: %" PRId32, ret);
+        return;
+    }
+
+    ret = input_device_open("/class/input/0", FILE_ACCESS_READ, FILE_NONBLOCK, &m_inputDevice);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to open input device: %" PRId32, ret);
         return;
@@ -126,7 +135,7 @@ void Terminal::run() {
     events[1].event  = CONNECTION_EVENT_MESSAGE;
     events[2].handle = m_childProcess;
     events[2].event  = PROCESS_EVENT_DEATH;
-    events[3].handle = m_device;
+    events[3].handle = device_handle(m_inputDevice);
     events[3].event  = FILE_EVENT_READABLE;
 
     bool exit = false;
@@ -177,7 +186,7 @@ bool Terminal::handleEvent(object_event_t &event) {
 
         core_log(CORE_LOG_NOTICE, "child process exited, exiting");
         return true;
-    } else if (event.handle == m_device) {
+    } else if (event.handle == device_handle(m_inputDevice)) {
         assert(event.event == FILE_EVENT_READABLE);
 
         handleInput();
@@ -217,10 +226,12 @@ void Terminal::handleOutput(core_message_t *message) {
     const void *data = core_message_data(message);
     size_t size      = core_message_size(message) ;
 
-    kern_file_write(m_device, data, size, -1, nullptr);
+    kern_file_write(m_outputDevice, data, size, -1, nullptr);
 }
 
 void Terminal::handleInput() {
+    core_log(CORE_LOG_WARN, "TODO");
+#if 0
     /* Read as much as we can in 128 byte batches, so that we're not repeatedly
      * doing syscalls and sending messages for 1 byte at a time. TODO: Could
      * provide a resize API on core_message to shrink the message and read
@@ -258,6 +269,7 @@ void Terminal::handleInput() {
             break;
         }
     }
+#endif
 }
 
 /** Spawn a process attached to the terminal. */

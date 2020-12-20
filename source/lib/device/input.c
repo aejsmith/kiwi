@@ -29,6 +29,12 @@
 
 #include "device.h"
 
+typedef struct input_device_impl {
+    device_t header;
+
+    input_device_type_t type;
+} input_device_impl_t;
+
 /** Opens an input device by path.
  * @param path          Path to device to open.
  * @param access        Requested access access for the handle.
@@ -58,24 +64,40 @@ status_t input_device_open(const char *path, uint32_t access, uint32_t flags, in
  *                      STATUS_INVALID_HANDLE if handle is not a device handle.
  *                      STATUS_INCORRECT_TYPE if device is not an input device. */
 status_t input_device_from_handle(handle_t handle, input_device_t **_device) {
+    status_t ret;
+
     char class_name[DEVICE_ATTR_MAX];
-    status_t ret = kern_device_attr(handle, DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, class_name, sizeof(class_name));
+    ret = kern_device_attr(handle, DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, class_name, sizeof(class_name));
     if (ret != STATUS_SUCCESS) {
         return ret;
     } else if (strcmp(class_name, INPUT_DEVICE_CLASS_NAME) != 0) {
         return STATUS_INCORRECT_TYPE;
     }
 
-    device_t *device = malloc(sizeof(*device));
-    if (!device)
+    input_device_impl_t *impl = malloc(sizeof(*impl));
+    if (!impl)
         return STATUS_NO_MEMORY;
 
-    device->handle    = handle;
-    device->dev_class = DEVICE_CLASS_INPUT;
-    device->ops       = NULL;
+    impl->header.handle    = handle;
+    impl->header.dev_class = DEVICE_CLASS_INPUT;
+    impl->header.ops       = NULL;
 
-    *_device = device;
+    ret = kern_device_attr(handle, INPUT_DEVICE_ATTR_TYPE, DEVICE_ATTR_INT32, &impl->type, sizeof(impl->type));
+    if (ret != STATUS_SUCCESS) {
+        free(impl);
+        return ret;
+    }
+
+    *_device = &impl->header;
     return STATUS_SUCCESS;
+}
+
+/** Get the type of an input device.
+ * @param device        Device to get type of.
+ * @return              Input device type. */
+input_device_type_t input_device_type(input_device_t *device) {
+    input_device_impl_t *impl = (input_device_impl_t *)device;
+    return impl->type;
 }
 
 /**

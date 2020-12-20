@@ -23,6 +23,8 @@
 
 #include <core/ipc.h>
 
+#include <device/input.h>
+
 class Terminal {
 public:
     Terminal();
@@ -40,7 +42,8 @@ private:
 
 private:
     core_connection_t *m_connection;        /**< Connection to terminal service. */
-    handle_t m_device;                      /**< Target device. */
+    handle_t m_outputDevice;                /**< Output device. */
+    input_device_t *m_inputDevice;          /**< Input device. */
     handle_t m_childProcess;                /**< Main child process. */
     handle_t m_terminal[2];                 /**< Terminal handles (read/write). */
 };

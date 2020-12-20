@@ -31,7 +31,7 @@ __KERNEL_EXTERN_C_BEGIN
 /** Input device class attribute names. */
 #define INPUT_DEVICE_ATTR_TYPE      "input.type"
 
-/** INPUT_DEVICE_ATTR_TYPE - Device type (uint8). */
+/** INPUT_DEVICE_ATTR_TYPE - Device type (int32). */
 typedef enum input_device_type {
     INPUT_DEVICE_KEYBOARD           = 0,    /**< Keyboard. */
     INPUT_DEVICE_MOUSE              = 1,    /**< Mouse. */

@@ -33,6 +33,8 @@ typedef device_t input_device_t;
 extern status_t input_device_open(const char *path, uint32_t access, uint32_t flags, input_device_t **_device);
 extern status_t input_device_from_handle(handle_t handle, input_device_t **_device);
 
+extern input_device_type_t input_device_type(input_device_t *device);
+
 extern status_t input_device_read_event(input_device_t *device, input_event_t *_event);
 
 __SYS_EXTERN_C_END
