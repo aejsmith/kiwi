@@ -55,5 +55,5 @@ static timer_device_t pit_timer_device = {
 __init_text void pit_init(void) {
     timer_device_set(&pit_timer_device);
     pit_disable();
-    irq_register(0, pit_irq, NULL, NULL);
+    irq_register(0, pit_irq, NULL, NULL, NULL);
 }

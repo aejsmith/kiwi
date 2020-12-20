@@ -310,7 +310,7 @@ __init_text void i8042_init(void) {
 }
 
 static __init_text void i8042_irq_init(void) {
-    irq_register(1, i8042_irq, i8042_irq_thread, NULL);
+    irq_register(1, i8042_irq, i8042_irq_thread, NULL, NULL);
 }
 
 INITCALL(i8042_irq_init);

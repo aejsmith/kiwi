@@ -25,12 +25,32 @@
 
 struct device;
 
-/** IRQ handler return status. */
+/** IRQ early handler return status. */
 typedef enum irq_status {
-    IRQ_UNHANDLED,              /**< Interrupt was not handled. */
-    IRQ_HANDLED,                /**< Interrupt was handled. */
-    IRQ_PREEMPT,                /**< Interrupt was handled, current thread should be preempted. */
-    IRQ_RUN_THREAD,             /**< Interrupt was handled, threaded handler should be run. */
+    /**
+     * The IRQ was unrecognised and should be passed on to other handlers, if
+     * any. The threaded handler will not be run.
+     */
+    IRQ_UNHANDLED,
+
+    /**
+     * The IRQ was handled by the early handler. The threaded handler will not
+     * be run.
+     */
+    IRQ_HANDLED,
+
+    /**
+     * The IRQ was handled by the early handler. The threaded handler will not
+     * be run. The current thread should be preempted. Should only be used by
+     * timer devices.
+     */
+    IRQ_PREEMPT,
+
+    /**
+     * The IRQ was recognised but not handled. The threaded handler should be
+     * run.
+     */
+    IRQ_RUN_THREAD,
 } irq_status_t;
 
 /** IRQ trigger modes. */
@@ -41,14 +61,24 @@ typedef enum irq_mode {
 
 /** IRQ controller structure. */
 typedef struct irq_controller {
-    /** Pre-handling function.
+    /**
+     * Pre-handling function. Called at the start of the hardware IRQ handler
+     * before any handlers are called.
+     *
      * @param num           IRQ number.
-     * @return              True if IRQ should be handled. */
+     *
+     * @return              True if IRQ should be handled.
+     */
     bool (*pre_handle)(unsigned num);
 
-    /** Post-handling function.
-     * @param num           IRQ number. */
-    void (*post_handle)(unsigned num);
+    /**
+     * Post-early handling function. Called at the end of the hardware IRQ
+     * handler, after any early handlers have been called.
+     *
+     * @param num           IRQ number.
+     * @param disable       Whether the IRQ should be disabled.
+     */
+    void (*post_handle)(unsigned num, bool disable);
 
     /** Get IRQ trigger mode.
      * @param num           IRQ number.
@@ -64,24 +94,46 @@ typedef struct irq_controller {
     void (*disable)(unsigned num);
 } irq_controller_t;
 
-/** IRQ top-half handler function type.
+/**
+ * IRQ early handler function type. This is run in interrupt context directly
+ * from the hardware IRQ handler and is therefore limited in what it can do. It
+ * is optional, and if not present then a threaded irq_func_t must be present.
+ * 
+ * An early handler can be used to do filtering of IRQs or some pre-processing,
+ * or even handle the IRQ entirely if this is possible within interrupt context.
+ * In general it is recommended to use a threaded handler, however, as this is
+ * less restrictive and minimises the amount of time we are running with other
+ * interrupts disabled.
+ *
  * @param num           IRQ number.
  * @param data          Data pointer associated with the handler.
- * @return              IRQ status code. */
-typedef irq_status_t (*irq_top_t)(unsigned num, void *data);
+ *
+ * @return              IRQ status code.
+ */
+typedef irq_status_t (*irq_early_func_t)(unsigned num, void *data);
 
-/** IRQ bottom-half handler function type.
+/**
+ * IRQ handler function type. This is run in a handler thread and is therefore
+ * not limited in what it can do, although it should avoid sleeping for long
+ * periods where possible.
+ *
  * @param num           IRQ number.
- * @param data          Data pointer associated with the handler. */
-typedef void (*irq_bottom_t)(unsigned num, void *data);
+ * @param data          Data pointer associated with the handler.
+ */
+typedef void (*irq_func_t)(unsigned num, void *data);
 
-extern status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *data);
-extern status_t irq_unregister(unsigned num, irq_top_t top, irq_bottom_t bottom, void *data);
+/** IRQ handler type (opaque). */
+typedef struct irq_handler irq_handler_t;
+
+extern status_t irq_register(
+    unsigned num, irq_early_func_t early_func, irq_func_t func, void *data,
+    irq_handler_t **_handler);
+extern void irq_unregister(irq_handler_t *handler);
 
 extern status_t device_irq_register(
-    struct device *device, unsigned num, irq_top_t top, irq_bottom_t bottom,
-    void *data);
+    struct device *device, unsigned num, irq_early_func_t early_func,
+    irq_func_t func, void *data);
 
 extern void irq_handler(unsigned num);
 
-extern void irq_init(irq_controller_t *ctrlr);
+extern void irq_init(irq_controller_t *controller);

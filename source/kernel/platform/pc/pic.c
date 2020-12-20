@@ -28,6 +28,9 @@
 #include <assert.h>
 #include <kernel.h>
 
+/** Lock to protect access to PIC. */
+static SPINLOCK_DEFINE(pic_lock);
+
 /** IRQ masks - disable all by default, apart from IRQ2 (cascade). */
 static uint8_t pic_mask_master = 0xfb;
 static uint8_t pic_mask_slave = 0xff;
@@ -43,8 +46,22 @@ static void pic_eoi(unsigned num) {
     out8(PIC_MASTER_COMMAND, PIC_COMMAND_EOI);
 }
 
+static void pic_disable_locked(unsigned num) {
+    if (num >= 8) {
+        pic_mask_slave |= (1<<(num - 8));
+        out8(PIC_SLAVE_DATA, pic_mask_slave);
+    } else {
+        pic_mask_master |= (1<<num);
+        out8(PIC_MASTER_DATA, pic_mask_master);
+    }
+}
+
 static bool pic_pre_handle(unsigned num) {
     assert(num < 16);
+
+    spinlock_lock(&pic_lock);
+
+    bool handle = true;
 
     /* Check for spurious IRQs. */
     if (num == 7) {
@@ -52,28 +69,36 @@ static bool pic_pre_handle(unsigned num) {
         out8(0x23, 3);
         if ((in8(0x20) & 0x80) == 0) {
             kprintf(LOG_DEBUG, "pic: spurious IRQ7 (master), ignoring...\n");
-            return false;
+            handle = false;
         }
     } else if (num == 15) {
         /* Read the In-Service Register, check the high bit. */
         out8(0xa3, 3);
         if ((in8(0xa0) & 0x80) == 0) {
             kprintf(LOG_DEBUG, "pic: spurious IRQ15 (slave), ignoring...\n");
-            return false;
+            handle = false;
         }
     }
 
     /* Edge-triggered interrupts must be acked before we handle. */
-    if (!(pic_level_triggered & (1 << num)))
+    if (handle && !(pic_level_triggered & (1 << num)))
         pic_eoi(num);
 
-    return true;
+    spinlock_unlock(&pic_lock);
+    return handle;
 }
 
-static void pic_post_handle(unsigned num) {
+static void pic_post_handle(unsigned num, bool disable) {
+    spinlock_lock(&pic_lock);
+
+    if (disable)
+        pic_disable_locked(num);
+
     /* Level-triggered interrupts must be acked once all handlers have been run. */
     if (pic_level_triggered & (1 << num))
         pic_eoi(num);
+
+    spinlock_unlock(&pic_lock);
 }
 
 static irq_mode_t pic_mode(unsigned num) {
@@ -83,6 +108,8 @@ static irq_mode_t pic_mode(unsigned num) {
 static void pic_enable(unsigned num) {
     assert(num < 16);
 
+    spinlock_lock(&pic_lock);
+
     if (num >= 8) {
         pic_mask_slave &= ~(1 << (num - 8));
         out8(PIC_SLAVE_DATA, pic_mask_slave);
@@ -90,18 +117,16 @@ static void pic_enable(unsigned num) {
         pic_mask_master &= ~(1<<num);
         out8(PIC_MASTER_DATA, pic_mask_master);
     }
+
+    spinlock_unlock(&pic_lock);
 }
 
 static void pic_disable(unsigned num) {
     assert(num < 16);
 
-    if (num >= 8) {
-        pic_mask_slave |= (1<<(num - 8));
-        out8(PIC_SLAVE_DATA, pic_mask_slave);
-    } else {
-        pic_mask_master |= (1<<num);
-        out8(PIC_MASTER_DATA, pic_mask_master);
-    }
+    spinlock_lock(&pic_lock);
+    pic_disable_locked(num);
+    spinlock_unlock(&pic_lock);
 }
 
 static irq_controller_t pic_irq_controller = {
