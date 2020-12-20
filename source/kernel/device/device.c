@@ -204,7 +204,7 @@ static void device_ctor(device_t *device) {
  * @param name          Name of device to create (will be copied).
  * @param parent        Parent device. Must not be an alias.
  * @param ops           Pointer to operations for the device (can be NULL).
- * @param data          Implementation-specific data pointer.
+ * @param private       Implementation private data.
  * @param attrs         Optional array of attributes for the device (will be
  *                      duplicated).
  * @param count         Number of attributes.
@@ -214,7 +214,7 @@ static void device_ctor(device_t *device) {
  */
 status_t device_create_etc(
     module_t *module, const char *name, device_t *parent, device_ops_t *ops,
-    void *data, device_attr_t *attrs, size_t count, device_t **_device)
+    void *private, device_attr_t *attrs, size_t count, device_t **_device)
 {
     status_t ret;
 
@@ -244,7 +244,7 @@ status_t device_create_etc(
     device->time      = system_time();
     device->parent    = parent;
     device->ops       = ops;
-    device->data      = data;
+    device->private   = private;
 
     if (attrs) {
         /* Ensure the attribute structures are valid. Do validity checking
@@ -282,8 +282,8 @@ status_t device_create_etc(
     radix_tree_insert(&parent->children, device->name, device);
 
     kprintf(
-        LOG_DEBUG, "device: created device '%s' in '%s' (ops: %p, data: %p)\n",
-        device->name, parent->name, ops, data);
+        LOG_DEBUG, "device: created device '%s' in '%s' (module: %s)\n",
+        device->name, parent->name, module->name);
 
     if (_device)
         *_device = device;
@@ -929,7 +929,7 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
         kdb_printf("Destination: %p(%s)\n", device->dest, device->dest->name);
     kdb_printf("Module:      %s\n", device->module->name);
     kdb_printf("Ops:         %p\n", device->ops);
-    kdb_printf("Data:        %p\n", device->data);
+    kdb_printf("Private:     %p\n", device->private);
 
     if (!device->attrs)
         return KDB_SUCCESS;

@@ -48,9 +48,9 @@ typedef struct device_ops {
      * @note                Called with device lock held.
      * @param device        Device being opened.
      * @param flags         Flags being opened with.
-     * @param _data         Where to store handle-specific data pointer.
+     * @param _private      Where to store handle-specific private pointer.
      * @return              Status code describing result of operation. */
-    status_t (*open)(struct device *device, uint32_t flags, void **_data);
+    status_t (*open)(struct device *device, uint32_t flags, void **_private);
 
     /** Handler for close calls.
      * @note                Called with device lock held.
@@ -144,7 +144,7 @@ typedef struct device {
 
     /** Operations. */
     device_ops_t *ops;              /**< Operations structure for the device. */
-    void *data;                     /**< Data used by the device's creator. */
+    void *private;                  /**< Implementation private data. */
 
     /** Attributes. */
     rwlock_t attr_lock;             /**< Lock for attribute access. */
@@ -192,14 +192,14 @@ static inline const char *device_name(object_handle_t *_handle) {
 
 extern status_t device_create_etc(
     module_t *module, const char *name, device_t *parent, device_ops_t *ops,
-    void *data, device_attr_t *attrs, size_t count, device_t **_device);
+    void *private, device_attr_t *attrs, size_t count, device_t **_device);
 extern status_t device_alias_etc(
     module_t *module, const char *name, device_t *parent, device_t *dest,
     device_t **_device);
 
 /** @see device_create_etc(). */
-#define device_create(name, parent, ops, data, attrs, count, _device) \
-    device_create_etc(module_self(), name, parent, ops, data, attrs, count, _device)
+#define device_create(name, parent, ops, private, attrs, count, _device) \
+    device_create_etc(module_self(), name, parent, ops, private, attrs, count, _device)
 
 /** Create a device directory.
  * @see device_create_etc(). */
