@@ -43,21 +43,7 @@
 #include <kernel.h>
 #include <status.h>
 
-/** VGA character attributes to use. */
-#define VGA_ATTRIB          0x0f00
-
-/* Support both VGA and framebuffer consoles, let KBoot choose a mode. */
-KBOOT_VIDEO(KBOOT_VIDEO_LFB | KBOOT_VIDEO_VGA, 0, 0, 0);
-
-/** VGA console lock. */
-static SPINLOCK_DEFINE(vga_lock);
-
-/** VGA console details. */
-static uint16_t *vga_mapping;       /**< VGA memory mapping. */
-static uint16_t vga_cols;           /**< Number of columns. */
-static uint16_t vga_lines;          /**< Number of lines. */
-static uint16_t vga_cursor_x;       /**< X position of the cursor. */
-static uint16_t vga_cursor_y;       /**< Y position of the cursor. */
+KBOOT_VIDEO(KBOOT_VIDEO_LFB, 0, 0, 0);
 
 #ifdef SERIAL_PORT
 
@@ -197,110 +183,6 @@ __init_text void i8042_init(void) {
 }
 
 /**
- * VGA console operations.
- */
-
-/** Write a character to the VGA memory.
- * @param idx           Index to write to.
- * @param ch            Character to write. */
-static inline void vga_write(size_t idx, uint16_t ch) {
-    vga_mapping[idx] = ch | VGA_ATTRIB;
-}
-
-/** Write to the console without taking any locks (for fatal/KDB).
- * @param ch            Character to print. */
-static void vga_console_putc_unsafe(char ch) {
-    switch (ch) {
-        case '\b':
-            /* Backspace, move back one character if we can. */
-            if (vga_cursor_x != 0) {
-                vga_cursor_x--;
-            } else {
-                vga_cursor_x = vga_cols - 1;
-                vga_cursor_y--;
-            }
-
-            break;
-        case '\r':
-            /* Carriage return, move to the start of the line. */
-            vga_cursor_x = 0;
-            break;
-        case '\n':
-            /* Newline, treat it as if a carriage return was also there. */
-            vga_cursor_x = 0;
-            vga_cursor_y++;
-            break;
-        case '\t':
-            vga_cursor_x += 8 - (vga_cursor_x % 8);
-            break;
-        default:
-            /* If it is a non-printing character, ignore it. */
-            if (ch < ' ')
-                break;
-
-            vga_write((vga_cursor_y * vga_cols) + vga_cursor_x, ch);
-            vga_cursor_x++;
-            break;
-    }
-
-    /* If we have reached the edge of the screen insert a new line. */
-    if (vga_cursor_x >= vga_cols) {
-        vga_cursor_x = 0;
-        vga_cursor_y++;
-    }
-
-    /* If we have reached the bottom of the screen, scroll. */
-    if (vga_cursor_y >= vga_lines) {
-        memmove(vga_mapping, vga_mapping + vga_cols, (vga_lines - 1) * vga_cols * 2);
-
-        for (uint16_t i = 0; i < vga_cols; i++)
-            vga_write(((vga_lines - 1) * vga_cols) + i, ' ');
-
-        vga_cursor_y = vga_lines - 1;
-    }
-
-    /* Move the hardware cursor to the new position. */
-    out8(VGA_CRTC_INDEX, 14);
-    out8(VGA_CRTC_DATA, ((vga_cursor_y * vga_cols) + vga_cursor_x) >> 8);
-    out8(VGA_CRTC_INDEX, 15);
-    out8(VGA_CRTC_DATA, (vga_cursor_y * vga_cols) + vga_cursor_x);
-}
-
-/** Write a character to the VGA console.
- * @param ch            Character to print. */
-static void vga_console_putc(char ch) {
-    spinlock_lock(&vga_lock);
-    vga_console_putc_unsafe(ch);
-    spinlock_unlock(&vga_lock);
-}
-
-/** Early initialization of the VGA console.
- * @param video         KBoot video tag. */
-static void vga_console_early_init(kboot_tag_video_t *video) {
-    vga_mapping = (uint16_t *)((ptr_t)video->vga.mem_virt);
-    vga_cols = video->vga.cols;
-    vga_lines = video->vga.lines;
-    vga_cursor_x = video->vga.x;
-    vga_cursor_y = video->vga.y;
-
-    vga_console_putc('\n');
-}
-
-/** Late initialization of the VGA console.
- * @param video         KBoot video tag. */
-static void vga_console_init(kboot_tag_video_t *video) {
-    /* Create our own mapping of VGA memory to replace KBoot's mapping. */
-    vga_mapping = phys_map(video->vga.mem_phys, vga_cols * vga_lines * 2, MM_BOOT);
-}
-
-/** VGA console output operations. */
-static console_out_ops_t vga_console_out_ops = {
-    .init = vga_console_init,
-    .putc = vga_console_putc,
-    .putc_unsafe = vga_console_putc_unsafe,
-};
-
-/**
  * Serial console operations.
  */
 
@@ -394,12 +276,6 @@ __init_text void platform_console_early_init(kboot_tag_video_t *video) {
             debug_console.in = &serial_console_in_ops;
         }
     #endif
-
-    /* If we have a VGA console, enable it. */
-    if (video && video->type == KBOOT_VIDEO_VGA) {
-        vga_console_early_init(video);
-        main_console.out = &vga_console_out_ops;
-    }
 
     /* Register the early keyboard input operations. */
     main_console.in = &i8042_console_in_ops;
