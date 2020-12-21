@@ -21,11 +21,17 @@
  * References:
  *  - https://wiki.osdev.org/%228042%22_PS/2_Controller
  *  - https://wiki.osdev.org/Mouse_Input
+ *
+ * This driver only really handles what you'd find on a modern PC with an
+ * emulated i8042 controller - keyboard (translated to scan code set 1) in the
+ * first port and mouse in the second port.
  */
 
 #include <device/input.h>
 #include <device/io.h>
 #include <device/irq.h>
+
+#include <lib/utility.h>
 
 #include <kdb.h>
 #include <module.h>
@@ -59,9 +65,18 @@ typedef struct i8042_controller {
     input_device_t *mouse;
 
     io_region_t io;
+
+    /** Keyboard state. */
+    unsigned extended;
+    unsigned pause_index;
+    bool ralt_down;
 } i8042_controller_t;
 
 static i8042_controller_t i8042_controller;
+
+static const uint8_t pause_sequence[] = { 0x1d, 0x45 };
+
+extern int32_t i8042_keycode_table[128][2];
 
 /** Waits until data is available in the output buffer. */
 static void i8042_wait_data(i8042_controller_t *controller) {
@@ -126,34 +141,74 @@ static void i8042_keyboard_irq(unsigned num, void *data) {
 
     uint8_t code = i8042_read_data(controller, false);
 
-    /* Some debugging hooks to go into KDB, etc. */
-    switch (code) {
-        case 59:
-            /* F1 - Enter KDB. */
-            kdb_enter(KDB_REASON_USER, NULL);
-            break;
-        case 60:
-            /* F2 - Call fatal(). */
-            fatal("User requested fatal error");
-            break;
-        case 61:
-            /* F3 - Reboot. */
-            system_shutdown(SHUTDOWN_REBOOT);
-            break;
-        case 62:
-            /* F4 - Shutdown. */
-            system_shutdown(SHUTDOWN_POWEROFF);
-            break;
-    }
+    if (code == 0xe0 || code == 0xe1) {
+        controller->extended    = (code == 0xe1) ? 2 : 1;
+        controller->pause_index = 0;
+    } else {
+        input_event_type_t type = (code & 0x80) ? INPUT_EVENT_KEY_UP : INPUT_EVENT_KEY_DOWN;
+        code &= 0x7f;
 
-    device_kprintf(controller->device, LOG_DEBUG, "got code 0x%x\n", code);
+        int32_t key = INPUT_KEY_UNKNOWN;
+
+        /* Special case for the weird pause key sequence (only thing on 0xe1 we
+         * need to handle). */
+        if (controller->extended == 2) {
+            if (pause_sequence[controller->pause_index] == code) {
+                if (++controller->pause_index == array_size(pause_sequence)) {
+                    key = INPUT_KEY_PAUSE;
+                    controller->extended = 0;
+                }
+            } else {
+                controller->extended = 0;
+            }
+        } else {
+            key = i8042_keycode_table[code][controller->extended];
+            controller->extended = 0;
+        }
+
+        /* RAlt + F* - debugging hooks to go into KDB, etc. */
+        if (key == INPUT_KEY_RIGHT_ALT)
+            controller->ralt_down = type == INPUT_EVENT_KEY_DOWN;
+        if (controller->ralt_down) {
+            switch (key) {
+                case INPUT_KEY_F1:
+                    /* F1 - Enter KDB. */
+                    kdb_enter(KDB_REASON_USER, NULL);
+                    break;
+                case INPUT_KEY_F2:
+                    /* F2 - Call fatal(). */
+                    fatal("User requested fatal error");
+                    break;
+                case INPUT_KEY_F3:
+                    /* F3 - Reboot. */
+                    system_shutdown(SHUTDOWN_REBOOT);
+                    break;
+                case INPUT_KEY_F4:
+                    /* F4 - Shutdown. */
+                    system_shutdown(SHUTDOWN_POWEROFF);
+                    break;
+            }
+        }
+
+        if (key != INPUT_KEY_UNKNOWN) {
+            input_event_t event;
+            event.time  = system_time();
+            event.type  = type;
+            event.value = key;
+
+            input_device_event(controller->keyboard, &event);
+        }
+    }
 }
 
 static status_t i8042_controller_init(i8042_controller_t *controller) {
     status_t ret;
 
-    controller->keyboard = NULL;
-    controller->mouse    = NULL;
+    controller->keyboard    = NULL;
+    controller->mouse       = NULL;
+    controller->extended    = 0;
+    controller->pause_index = 0;
+    controller->ralt_down   = false;
 
     ret = device_create_dir("i8042", device_bus_platform_dir, &controller->device);
     if (ret != STATUS_SUCCESS)

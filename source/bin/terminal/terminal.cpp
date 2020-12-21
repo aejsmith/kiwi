@@ -231,6 +231,15 @@ void Terminal::handleOutput(core_message_t *message) {
 
 void Terminal::handleInput() {
     core_log(CORE_LOG_WARN, "TODO");
+
+    input_event_t event;
+    status_t ret = input_device_read_event(m_inputDevice, &event);
+    if (ret != STATUS_SUCCESS) {
+        if (ret != STATUS_WOULD_BLOCK)
+            core_log(CORE_LOG_ERROR, "failed to read input device: %" PRId32, ret);
+
+        return;
+    }
 #if 0
     /* Read as much as we can in 128 byte batches, so that we're not repeatedly
      * doing syscalls and sending messages for 1 byte at a time. TODO: Could

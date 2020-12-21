@@ -102,7 +102,8 @@ input_device_type_t input_device_type(input_device_t *device) {
 
 /**
  * Reads the next event from an input device's event queue. If no event is
- * available this will block, unless the device was opened with FILE_NONBLOCK.
+ * available this will block, unless the device was opened with FILE_NONBLOCK,
+ * in which case this will return STATUS_WOULD_BLOCK.
  *
  * @param device        Device to read from.
  * @param _event        Where to store details of event read.
