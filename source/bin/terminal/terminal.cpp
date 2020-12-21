@@ -110,7 +110,7 @@ void Terminal::run() {
         kern_handle_set_flags(m_terminal[i], HANDLE_INHERITABLE);
     }
 
-    /* Open a device handles. TODO: Use framebuffer directly once available,
+    /* Open device handles. TODO: Use framebuffer directly once available,
      * input device enumeration. */
     ret = kern_device_open("/virtual/kconsole", FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &m_outputDevice);
     if (ret != STATUS_SUCCESS) {
@@ -121,6 +121,9 @@ void Terminal::run() {
     ret = input_device_open("/class/input/0", FILE_ACCESS_READ, FILE_NONBLOCK, &m_inputDevice);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to open input device: %" PRId32, ret);
+        return;
+    } else if (input_device_type(m_inputDevice) != INPUT_DEVICE_KEYBOARD) {
+        core_log(CORE_LOG_ERROR, "input deivce is not a keyboard", ret);
         return;
     }
 
@@ -230,55 +233,55 @@ void Terminal::handleOutput(core_message_t *message) {
 }
 
 void Terminal::handleInput() {
-    core_log(CORE_LOG_WARN, "TODO");
+    status_t ret;
 
-    input_event_t event;
-    status_t ret = input_device_read_event(m_inputDevice, &event);
-    if (ret != STATUS_SUCCESS) {
-        if (ret != STATUS_WOULD_BLOCK)
-            core_log(CORE_LOG_ERROR, "failed to read input device: %" PRId32, ret);
-
-        return;
-    }
-#if 0
-    /* Read as much as we can in 128 byte batches, so that we're not repeatedly
-     * doing syscalls and sending messages for 1 byte at a time. TODO: Could
-     * provide a resize API on core_message to shrink the message and read
-     * directly into it. */
+    /* Batch up events if we can to reduce number of messages. TODO: Provide a
+     * resize API on core_message and write directly into it. */
     static constexpr size_t kBatchSize = 128;
-    char buf[kBatchSize];
+    uint8_t buf[kBatchSize];
 
-    while (true) {
-        size_t bytesRead = 0;
-        kern_file_read(m_device, buf, kBatchSize, -1, &bytesRead);
-        if (bytesRead == 0)
-            break;
+    size_t len = 0;
+    bool done  = false;
+    while (!done) {
+        input_event_t event;
+        ret = input_device_read_event(m_inputDevice, &event);
+        if (ret == STATUS_SUCCESS) {
+            len += m_keymap.map(event, &buf[len]);
+        } else {
+            if (ret != STATUS_WOULD_BLOCK)
+                core_log(CORE_LOG_ERROR, "failed to read input device: %" PRId32, ret);
 
-        core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, bytesRead);
-
-        memcpy(core_message_data(request), buf, bytesRead);
-
-        core_message_t *reply;
-        status_t ret = core_connection_request(m_connection, request, &reply);
-
-        core_message_destroy(request);
-
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_ERROR, "failed to make terminal input request: %" PRId32, ret);
-            break;
+            done = true;
         }
 
-        auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_data(reply));
-        ret = replyData->result;
+        if (len > 0 && (done || kBatchSize - len < 4)) {
+            core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, len);
 
-        core_message_destroy(reply);
+            memcpy(core_message_data(request), buf, len);
 
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_ERROR, "failed to send terminal input: %" PRId32, ret);
-            break;
+            core_message_t *reply;
+            status_t ret = core_connection_request(m_connection, request, &reply);
+
+            core_message_destroy(request);
+
+            if (ret != STATUS_SUCCESS) {
+                core_log(CORE_LOG_ERROR, "failed to make terminal input request: %" PRId32, ret);
+                break;
+            }
+
+            auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_data(reply));
+            ret = replyData->result;
+
+            core_message_destroy(reply);
+
+            if (ret != STATUS_SUCCESS) {
+                core_log(CORE_LOG_ERROR, "failed to send terminal input: %" PRId32, ret);
+                break;
+            }
+
+            len = 0;
         }
     }
-#endif
 }
 
 /** Spawn a process attached to the terminal. */
