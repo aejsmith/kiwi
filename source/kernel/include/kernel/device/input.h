@@ -17,6 +17,20 @@
 /**
  * @file
  * @brief               Input device class interface.
+ *
+ * This device class provides access to input devices such as keyboards and
+ * mice. Reading from an input device provides a stream of events
+ * (input_event_t) describing input on the device. Each input device handle
+ * has its own event buffer, events get delivered to all open handles.
+ *
+ * Supported operations:
+ *  - kern_file_read():
+ *    Returns the next event from the device's event buffer. Read sizes must
+ *    be a multiple of sizeof(input_event_t). If no events are available, and
+ *    the handle does not have FILE_NONBLOCK set, will block until an event
+ *    occurs. 
+ *  - kern_object_wait(FILE_EVENT_READABLE):
+ *    Waits until an input event occurs on the device.
  */
 
 #pragma once
