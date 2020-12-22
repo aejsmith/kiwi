@@ -88,7 +88,7 @@ typedef struct device_ops {
      * @param handle        File handle structure.
      * @param region        Region being mapped.
      * @return              Status code describing result of the operation. */
-    status_t (*map)(struct device *device, struct file_handle *handle, struct vm_region *region);
+    status_t (*map)(struct device *device, file_handle_t *handle, struct vm_region *region);
 
     /** Handler for device-specific requests.
      * @param device        Device request is being made on.

@@ -712,6 +712,41 @@ static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
 }
 
 /**
+ * Maps physical memory for a region. This can be used for doing up-front
+ * mappings in implementations of map() functions for devices.
+ *
+ * @param region        Region to map for.
+ * @param base          Base address of the object's physical memory. The
+ *                      region's object offset will be added on to this.
+ * @param size          Total size of the object's physical memory. If the
+ *                      region goes out of bounds, only pages within bounds will
+ *                      be mapped, and if the out of bounds region is accessed,
+ *                      a fault will occur.
+ * @param mmflag        Allocation behaviour flags.
+ *
+ * @return              Status code describing the result of the operation.
+ */
+status_t vm_region_map(vm_region_t *region, phys_ptr_t base, phys_size_t size, unsigned mmflag) {
+    assert(!(base % PAGE_SIZE));
+    assert(!(size % PAGE_SIZE));
+    assert(base + size >= base);
+
+    phys_ptr_t end      = base + size;
+    phys_ptr_t map_base = base + min(region->obj_offset, (offset_t)size);
+    size_t map_size     = min(region->size, end - map_base);
+
+    for (size_t offset = 0; offset < map_size; offset += PAGE_SIZE) {
+        status_t ret = mmu_context_map(
+            region->as->mmu, region->start + offset, map_base + offset,
+            region->access, mmflag);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+/**
  * This function is called whenever part of a region is going to be removed. It
  * unmaps pages covering the area, and updates the region's anonymous map (if it
  * has one). Does not release the anonymous map and object if the entire region

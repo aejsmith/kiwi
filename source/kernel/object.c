@@ -639,8 +639,8 @@ void object_event_signal(object_event_t *event, unsigned long data) {
         case OBJECT_WAIT_NORMAL: {
             spinlock_lock(&wait->waiter->lock);
 
-            /* Don't decrement the count if its already 0, only wake if thread is
-            * actually sleeping. */
+            /* Don't decrement the count if its already 0, only wake if thread
+             * is actually sleeping. */
             if (wait->waiter->count && --wait->waiter->count == 0 && wait->waiter->thread) {
                 thread_wake(wait->waiter->thread);
                 wait->waiter->thread = NULL;

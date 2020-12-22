@@ -139,6 +139,8 @@ extern void vm_unlock_page(vm_aspace_t *as, ptr_t addr);
 
 extern bool vm_fault(struct frame *frame, ptr_t addr, int reason, uint32_t access);
 
+extern status_t vm_region_map(vm_region_t *region, phys_ptr_t base, phys_size_t size, unsigned mmflag);
+
 extern status_t vm_map(
     vm_aspace_t *as, ptr_t *_addr, size_t size, size_t align, unsigned spec,
     uint32_t access, uint32_t flags, object_handle_t *handle, offset_t offset,
