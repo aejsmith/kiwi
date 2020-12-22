@@ -46,7 +46,7 @@ public:
     void addEvent(handle_t handle, unsigned id, EventHandler *handler);
     void removeEvents(EventHandler *handler);
 
-    void handleEvent(const object_event_t *event) override;
+    void handleEvent(const object_event_t &event) override;
 
 private:
     void addService(std::string name, std::string path, uint32_t flags);

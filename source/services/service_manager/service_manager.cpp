@@ -90,7 +90,7 @@ int ServiceManager::run() {
                 core_log(CORE_LOG_WARN, "error flagged on event %u for handle %u", event.event, event.handle);
             } else if (flags & OBJECT_EVENT_SIGNALLED) {
                 auto handler = reinterpret_cast<EventHandler *>(event.udata);
-                handler->handleEvent(&event);
+                handler->handleEvent(event);
             }
 
             /* Calling the handler may change the event array, so we have to
@@ -141,11 +141,11 @@ status_t ServiceManager::spawnProcess(const char *path, handle_t *_handle) const
     return ret;
 }
 
-void ServiceManager::handleEvent(const object_event_t *event) {
+void ServiceManager::handleEvent(const object_event_t &event) {
     status_t ret;
 
-    assert(event->handle == m_port);
-    assert(event->event == PORT_EVENT_CONNECTION);
+    assert(event.handle == m_port);
+    assert(event.event == PORT_EVENT_CONNECTION);
 
     handle_t handle;
     ipc_client_t ipcClient;

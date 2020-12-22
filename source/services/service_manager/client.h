@@ -39,7 +39,7 @@ public:
 
     void setService(Service *service) { m_service = service; }
 
-    void handleEvent(const object_event_t *event) override;
+    void handleEvent(const object_event_t &event) override;
 
     void finishConnect(Service *service, core_message_t *reply);
 

@@ -113,9 +113,9 @@ bool Service::start() {
     return true;
 }
 
-void Service::handleEvent(const object_event_t *event) {
-    assert(event->handle == m_process);
-    assert(event->event == PROCESS_EVENT_DEATH);
+void Service::handleEvent(const object_event_t &event) {
+    assert(event.handle == m_process);
+    assert(event.event == PROCESS_EVENT_DEATH);
 
     handleDeath();
 }

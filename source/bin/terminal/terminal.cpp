@@ -19,6 +19,7 @@
  * @brief               Terminal class.
  */
 
+#include "terminal_app.h"
 #include "terminal.h"
 
 #include <core/log.h>
@@ -42,20 +43,19 @@ extern const char *const *environ;
 Terminal::Terminal() :
     m_connection   (nullptr),
     m_outputDevice (INVALID_HANDLE),
-    m_inputDevice  (nullptr),
     m_childProcess (INVALID_HANDLE),
     m_terminal     {INVALID_HANDLE, INVALID_HANDLE}
 {}
 
 Terminal::~Terminal() {
+    g_terminalApp.removeEvents(this);
+    g_terminalApp.removeTerminal(this);
+
     if (m_connection)
         core_connection_close(m_connection);
 
     if (m_outputDevice != INVALID_HANDLE)
         kern_handle_close(m_outputDevice);
-
-    if (m_inputDevice)
-        device_close(m_inputDevice);
 
     if (m_childProcess != INVALID_HANDLE)
         kern_handle_close(m_childProcess);
@@ -66,13 +66,13 @@ Terminal::~Terminal() {
     }
 }
 
-void Terminal::run() {
+bool Terminal::init() {
     status_t ret;
 
     ret = core_service_connect(TERMINAL_SERVICE_NAME, 0, CORE_CONNECTION_RECEIVE_SIGNALS, &m_connection);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to open connection to terminal service: %" PRId32, ret);
-        return;
+        return false;
     }
 
     /* Request handles to the terminal. */
@@ -91,18 +91,18 @@ void Terminal::run() {
 
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_ERROR, "failed to make terminal handle request: %" PRId32, ret);
-            return;
+            return false;
         }
 
         auto replyData = reinterpret_cast<terminal_reply_open_handle_t *>(core_message_data(reply));
-        ret           = replyData->result;
-        m_terminal[i] = core_message_detach_handle(reply);
+        ret            = replyData->result;
+        m_terminal[i]  = core_message_detach_handle(reply);
 
         core_message_destroy(reply);
 
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_ERROR, "failed to open terminal handle: %" PRId32, ret);
-            return;
+            return false;
         }
 
         assert(m_terminal[i] != INVALID_HANDLE);
@@ -115,66 +115,29 @@ void Terminal::run() {
     ret = kern_device_open("/virtual/kconsole", FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &m_outputDevice);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to open output device: %" PRId32, ret);
-        return;
-    }
-
-    ret = input_device_open("/class/input/0", FILE_ACCESS_READ, FILE_NONBLOCK, &m_inputDevice);
-    if (ret != STATUS_SUCCESS) {
-        core_log(CORE_LOG_ERROR, "failed to open input device: %" PRId32, ret);
-        return;
-    } else if (input_device_type(m_inputDevice) != INPUT_DEVICE_KEYBOARD) {
-        core_log(CORE_LOG_ERROR, "input deivce is not a keyboard", ret);
-        return;
+        return false;
     }
 
     /* Spawn a process attached to the terminal. */
     if (spawnProcess("/system/bin/bash", m_childProcess) != STATUS_SUCCESS)
-        return;
+        return false;
 
-    std::array<object_event_t, 4> events;
-    events[0].handle = core_connection_handle(m_connection);
-    events[0].event  = CONNECTION_EVENT_HANGUP;
-    events[1].handle = events[0].handle;
-    events[1].event  = CONNECTION_EVENT_MESSAGE;
-    events[2].handle = m_childProcess;
-    events[2].event  = PROCESS_EVENT_DEATH;
-    events[3].handle = device_handle(m_inputDevice);
-    events[3].event  = FILE_EVENT_READABLE;
+    g_terminalApp.addEvent(core_connection_handle(m_connection), CONNECTION_EVENT_HANGUP, this);
+    g_terminalApp.addEvent(core_connection_handle(m_connection), CONNECTION_EVENT_MESSAGE, this);
+    g_terminalApp.addEvent(m_childProcess, PROCESS_EVENT_DEATH, this);
 
-    bool exit = false;
-
-    while (!exit) {
-        /* Process any internally queued messages on the connection (if any
-         * messages were queued internally while waiting for a request response,
-         * these won't be picked up by kern_object_wait()). TODO: Better
-         * solution for this, e.g. core_connection provides an event object to
-         * signal. */
-        handleMessages();
-
-        ret = kern_object_wait(events.data(), events.size(), 0, -1);
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_WARN, "failed to wait for events: %" PRId32, ret);
-            continue;
-        }
-
-        for (object_event_t &event : events) {
-            if (event.flags & OBJECT_EVENT_SIGNALLED) {
-                exit = handleEvent(event);
-            } else if (event.flags & OBJECT_EVENT_ERROR) {
-                core_log(CORE_LOG_WARN, "error signalled on event %" PRId32 "/%" PRId32, event.handle, event.event);
-            }
-
-            event.flags &= ~(OBJECT_EVENT_SIGNALLED | OBJECT_EVENT_ERROR);
-        }
-    }
+    return true;
 }
 
-bool Terminal::handleEvent(object_event_t &event) {
+void Terminal::handleEvent(const object_event_t &event) {
+    bool close = false;
+
     if (event.handle == core_connection_handle(m_connection)) {
         switch (event.event) {
             case CONNECTION_EVENT_HANGUP:
                 core_log(CORE_LOG_ERROR, "lost connection to terminal service, exiting");
-                return true;
+                close = true;
+                break;
 
             case CONNECTION_EVENT_MESSAGE:
                 handleMessages();
@@ -188,16 +151,13 @@ bool Terminal::handleEvent(object_event_t &event) {
         assert(event.event == PROCESS_EVENT_DEATH);
 
         core_log(CORE_LOG_NOTICE, "child process exited, exiting");
-        return true;
-    } else if (event.handle == device_handle(m_inputDevice)) {
-        assert(event.event == FILE_EVENT_READABLE);
-
-        handleInput();
+        close = true;
     } else {
         core_unreachable();
     }
 
-    return false;
+    if (close)
+        delete this;
 }
 
 void Terminal::handleMessages() {
@@ -232,56 +192,28 @@ void Terminal::handleOutput(core_message_t *message) {
     kern_file_write(m_outputDevice, data, size, -1, nullptr);
 }
 
-void Terminal::handleInput() {
-    status_t ret;
+void Terminal::sendInput(const uint8_t *buf, size_t len) {
+    core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, len);
 
-    /* Batch up events if we can to reduce number of messages. TODO: Provide a
-     * resize API on core_message and write directly into it. */
-    static constexpr size_t kBatchSize = 128;
-    uint8_t buf[kBatchSize];
+    memcpy(core_message_data(request), buf, len);
 
-    size_t len = 0;
-    bool done  = false;
-    while (!done) {
-        input_event_t event;
-        ret = input_device_read_event(m_inputDevice, &event);
-        if (ret == STATUS_SUCCESS) {
-            len += m_keymap.map(event, &buf[len]);
-        } else {
-            if (ret != STATUS_WOULD_BLOCK)
-                core_log(CORE_LOG_ERROR, "failed to read input device: %" PRId32, ret);
+    core_message_t *reply;
+    status_t ret = core_connection_request(m_connection, request, &reply);
 
-            done = true;
-        }
+    core_message_destroy(request);
 
-        if (len > 0 && (done || kBatchSize - len < 4)) {
-            core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, len);
-
-            memcpy(core_message_data(request), buf, len);
-
-            core_message_t *reply;
-            status_t ret = core_connection_request(m_connection, request, &reply);
-
-            core_message_destroy(request);
-
-            if (ret != STATUS_SUCCESS) {
-                core_log(CORE_LOG_ERROR, "failed to make terminal input request: %" PRId32, ret);
-                break;
-            }
-
-            auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_data(reply));
-            ret = replyData->result;
-
-            core_message_destroy(reply);
-
-            if (ret != STATUS_SUCCESS) {
-                core_log(CORE_LOG_ERROR, "failed to send terminal input: %" PRId32, ret);
-                break;
-            }
-
-            len = 0;
-        }
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_ERROR, "failed to make terminal input request: %" PRId32, ret);
+        return;
     }
+
+    auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_data(reply));
+    ret = replyData->result;
+
+    core_message_destroy(reply);
+
+    if (ret != STATUS_SUCCESS)
+        core_log(CORE_LOG_ERROR, "failed to send terminal input: %" PRId32, ret);
 }
 
 /** Spawn a process attached to the terminal. */

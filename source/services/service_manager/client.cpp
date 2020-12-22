@@ -62,10 +62,10 @@ Client::~Client() {
     core_connection_close(m_connection);
 }
 
-void Client::handleEvent(const object_event_t *event) {
-    assert(event->handle == core_connection_handle(m_connection));
+void Client::handleEvent(const object_event_t &event) {
+    assert(event.handle == core_connection_handle(m_connection));
 
-    switch (event->event) {
+    switch (event.event) {
         case CONNECTION_EVENT_HANGUP:
             delete this;
             break;

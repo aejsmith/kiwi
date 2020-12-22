@@ -57,7 +57,7 @@ public:
 
     bool start();
 
-    void handleEvent(const object_event_t *event) override;
+    void handleEvent(const object_event_t &event) override;
 
 private:
     struct PendingConnect {

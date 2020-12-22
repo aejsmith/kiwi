@@ -21,7 +21,10 @@
 
 #pragma once
 
-#include <memory>
+#include "event_handler.h"
+#include "keyboard.h"
+
+#include <vector>
 
 class Terminal;
 
@@ -30,11 +33,26 @@ public:
     TerminalApp();
     ~TerminalApp();
 
+    Terminal *activeTerminal() const { return m_terminals[m_activeTerminal]; }
+
     int run();
 
-private:
-    std::unique_ptr<Terminal> m_terminal;
+    void addEvent(handle_t handle, unsigned id, EventHandler *handler);
+    void removeEvents(EventHandler *handler);
 
+    void removeTerminal(Terminal *terminal);
+
+private:
+    using TerminalArray = std::vector<Terminal *>;
+    using EventArray    = std::vector<object_event_t>;
+
+private:
+    TerminalArray m_terminals;
+    size_t m_activeTerminal;
+
+    Keyboard m_keyboard;
+
+    EventArray m_events;
 };
 
 extern TerminalApp g_terminalApp;

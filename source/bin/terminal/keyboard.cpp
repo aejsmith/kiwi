@@ -16,28 +16,89 @@
 
 /**
  * @file
- * @brief               Keyboard map.
+ * @brief               Keyboard input class.
  */
 
-#include "keymap.h"
+#include "keyboard.h"
+#include "terminal_app.h"
+#include "terminal.h"
 
+#include <core/log.h>
 #include <core/utility.h>
 
+#include <kernel/status.h>
+
+#include <assert.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 extern uint8_t g_keyTable[256];
 extern uint8_t g_keyTableShift[256];
 extern uint8_t g_keyTableCtrl[256];
 
-Keymap::Keymap() :
+Keyboard::Keyboard() :
+    m_device    (nullptr),
     m_modifiers (0)
 {}
 
+Keyboard::~Keyboard() {
+    g_terminalApp.removeEvents(this);
+
+    if (m_device)
+        device_close(m_device);
+}
+
+bool Keyboard::init(const char *path) {
+    status_t ret = input_device_open(path, FILE_ACCESS_READ, FILE_NONBLOCK, &m_device);
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_ERROR, "failed to open input device: %" PRId32, ret);
+        return false;
+    } else if (input_device_type(m_device) != INPUT_DEVICE_KEYBOARD) {
+        core_log(CORE_LOG_ERROR, "input device is not a keyboard", ret);
+        return false;
+    }
+
+    g_terminalApp.addEvent(device_handle(m_device), FILE_EVENT_READABLE, this);
+
+    return true;
+}
+
+void Keyboard::handleEvent(const object_event_t &event) {
+    status_t ret;
+
+    assert(event.handle == device_handle(m_device));
+    assert(event.event == FILE_EVENT_READABLE);
+
+    /* Batch up events if we can to reduce number of messages. */
+    static constexpr size_t kBatchSize = 128;
+    uint8_t buf[kBatchSize];
+
+    size_t len = 0;
+    bool done  = false;
+    while (!done) {
+        input_event_t event;
+        ret = input_device_read_event(m_device, &event);
+        if (ret == STATUS_SUCCESS) {
+            len += map(event, &buf[len]);
+        } else {
+            if (ret != STATUS_WOULD_BLOCK)
+                core_log(CORE_LOG_ERROR, "failed to read input device: %" PRId32, ret);
+
+            done = true;
+        }
+
+        if (len > 0 && (done || kBatchSize - len < 4)) {
+            g_terminalApp.activeTerminal()->sendInput(buf, len);
+            len = 0;
+        }
+    }
+}
+
 /** Map an input event to a UTF-8 character.
- * @param event         Event to handle.
- * @param buf           Output buffer.
  * @return              Character length (0 if no corresponding character). */
-size_t Keymap::map(input_event_t &event, uint8_t buf[4]) {
+size_t Keyboard::map(const input_event_t &event, uint8_t buf[4]) {
+    // TODO: This will eventually be handled by the window server.
+
     // TODO: Actually support UTF multibyte characters when we have a need for
     // it.
 

@@ -16,25 +16,27 @@
 
 /**
  * @file
- * @brief               Keyboard map.
+ * @brief               Keyboard input class.
  */
 
 #pragma once
 
+#include "event_handler.h"
+
 #include <device/input.h>
 
-/**
- * Class to map input device key events to characters.
- *
- * TODO: This functionality will eventually be handled by the window service,
- * when we have a proper GUI.
- * TODO: Keyboard layout support.
- */
-class Keymap {
+/** Class handling keyboard input. */
+class Keyboard : public EventHandler {
 public:
-    Keymap();
+    Keyboard();
+    ~Keyboard();
 
-    size_t map(input_event_t &event, uint8_t buf[4]);
+    bool init(const char *path);
+
+    void handleEvent(const object_event_t &event) override;
+
+private:
+    size_t map(const input_event_t &event, uint8_t buf[4]);
 
 private:
     enum Modifiers : uint32_t {
@@ -57,5 +59,6 @@ private:
     };
 
 private:
+    input_device_t *m_device;
     uint32_t m_modifiers;
 };
