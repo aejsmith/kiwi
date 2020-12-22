@@ -735,15 +735,23 @@ status_t vm_region_map(vm_region_t *region, phys_ptr_t base, phys_size_t size, u
     phys_ptr_t map_base = base + min(region->obj_offset, (offset_t)size);
     size_t map_size     = min(region->size, end - map_base);
 
-    for (size_t offset = 0; offset < map_size; offset += PAGE_SIZE) {
-        status_t ret = mmu_context_map(
-            region->as->mmu, region->start + offset, map_base + offset,
-            region->access, mmflag);
-        if (ret != STATUS_SUCCESS)
-            return ret;
+    status_t ret = STATUS_SUCCESS;
+
+    if (map_size > 0) {
+        mmu_context_lock(region->as->mmu);
+
+        for (size_t offset = 0; offset < map_size; offset += PAGE_SIZE) {
+            ret = mmu_context_map(
+                region->as->mmu, region->start + offset, map_base + offset,
+                region->access, mmflag);
+            if (ret != STATUS_SUCCESS)
+                break;
+        }
+
+        mmu_context_unlock(region->as->mmu);
     }
 
-    return STATUS_SUCCESS;
+    return ret;
 }
 
 /**

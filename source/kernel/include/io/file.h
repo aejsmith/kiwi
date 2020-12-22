@@ -111,7 +111,7 @@ typedef struct file_ops {
      * @param request       Request number.
      * @param in            Input buffer.
      * @param in_size       Input buffer size.
-     * @param _out          Where to store pointer to output buffer.
+     * @param _out          Where to store pointer to kmalloc()'d output buffer.
      * @param _out_size     Where to store output buffer size.
      * @return              Status code describing result of operation. */
     status_t (*request)(

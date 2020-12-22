@@ -23,7 +23,7 @@
  * (input_event_t) describing input on the device. Each input device handle
  * has its own event buffer, events get delivered to all open handles.
  *
- * Supported operations:
+ * Supported standard operations:
  *  - kern_file_read():
  *    Returns the next event from the device's event buffer. Read sizes must
  *    be a multiple of sizeof(input_event_t). If no events are available, and

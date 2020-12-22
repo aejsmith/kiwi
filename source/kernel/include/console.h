@@ -99,8 +99,8 @@ extern void console_init(void);
 typedef struct fb_info {
     uint16_t width;                 /**< Width of the framebuffer. */
     uint16_t height;                /**< Height of the framebuffer. */
-    uint8_t depth;                  /**< Colour depth of the framebuffer (bits per pixel). */
     uint8_t bytes_per_pixel;        /**< Bytes per pixel. */
+    uint32_t pitch;                 /**< Number of bytes per line of the framebuffer. */
     uint8_t red_position;           /**< Red field position. */
     uint8_t red_size;               /**< Red field size. */
     uint8_t green_position;         /**< Green field position. */
@@ -112,6 +112,4 @@ typedef struct fb_info {
 
 extern void fb_console_info(fb_info_t *info);
 extern status_t fb_console_configure(const fb_info_t *info, unsigned mmflag);
-extern void fb_console_acquire(void);
-extern void fb_console_release(void);
 extern void fb_console_early_init(struct kboot_tag_video *video);

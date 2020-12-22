@@ -19,6 +19,10 @@
  * @brief               Framebuffer console.
  */
 
+#include <device/device.h>
+
+#include <kernel/device/kfb.h>
+
 #include <lib/ctype.h>
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -26,9 +30,11 @@
 #include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/phys.h>
+#include <mm/vm.h>
 
 #include <sync/spinlock.h>
 
+#include <assert.h>
 #include <console.h>
 #include <kboot.h>
 #include <kdb.h>
@@ -57,16 +63,16 @@ extern unsigned char logo_ppm[];
 #define SPLASH_PROGRESS_HEIGHT  3
 
 /** Get red colour from RGB value. */
-#define RED(x, bits)            ((x >> (24 - bits)) & ((1 << bits) - 1))
+#define RED(x, bits)            (((x) >> (24 - bits)) & ((1 << bits) - 1))
 
 /** Get green colour from RGB value. */
-#define GREEN(x, bits)          ((x >> (16 - bits)) & ((1 << bits) - 1))
+#define GREEN(x, bits)          (((x) >> (16 - bits)) & ((1 << bits) - 1))
 
 /** Get blue colour from RGB value. */
-#define BLUE(x, bits)           ((x >> (8  - bits)) & ((1 << bits) - 1))
+#define BLUE(x, bits)           (((x) >> (8  - bits)) & ((1 << bits) - 1))
 
 /** Get the byte offset of a pixel. */
-#define OFFSET(x, y)            (((y * fb_info.width) + x) * fb_info.bytes_per_pixel)
+#define OFFSET(x, y)            (((y) * fb_info.pitch) + ((x) * fb_info.bytes_per_pixel))
 
 /** Lock for the framebuffer console. */
 static SPINLOCK_DEFINE(fb_lock);
@@ -84,6 +90,14 @@ static uint16_t fb_console_x;
 static uint16_t fb_console_y;
 static bool fb_console_acquired;
 static bool fb_was_acquired;
+
+/** Kernel FB device state. */
+static MUTEX_DEFINE(kfb_device_lock, 0);
+static NOTIFIER_DEFINE(kfb_reconfigure_notifier, NULL);
+static NOTIFIER_DEFINE(kfb_redraw_notifier, NULL);
+static file_handle_t *kfb_exclusive_handle;
+static bool kfb_need_reconfigure;
+static bool kfb_need_redraw;
 
 /** Boot splash information. */
 static bool splash_enabled;
@@ -141,12 +155,12 @@ static void fb_fillrect(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
         memset(
             fb_backbuffer + OFFSET(0, y),
             (uint8_t)rgb,
-            width * height * fb_info.bytes_per_pixel);
+            height * fb_info.pitch);
         if (fb_backbuffer != fb_mapping) {
             memset(
                 fb_mapping + OFFSET(0, y),
                 (uint8_t)rgb,
-                width * height * fb_info.bytes_per_pixel);
+                height * fb_info.pitch);
         }
     } else {
         for (uint16_t i = 0; i < height; i++) {
@@ -169,14 +183,14 @@ static void fb_copyrect(
         memmove(
             fb_backbuffer + dest_offset,
             fb_backbuffer + src_offset,
-            fb_info.width * height * fb_info.bytes_per_pixel);
+            height * fb_info.pitch);
 
         if (fb_backbuffer != fb_mapping) {
             /* Copy the updated backbuffer onto the framebuffer. */
             memcpy(
                 fb_mapping + dest_offset,
                 fb_backbuffer + dest_offset,
-                fb_info.width * height * fb_info.bytes_per_pixel);
+                height * fb_info.pitch);
         }
     } else {
         /* Copy line by line. */
@@ -344,6 +358,8 @@ static void fb_console_reset(void) {
 
 /** Enable the framebuffer console upon KDB entry/fatal(). */
 static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
+    /* No locking needed, only run while other CPUs are halted. */
+
     if (main_console.out == &fb_console_out_ops) {
         fb_was_acquired = fb_console_acquired;
         if (fb_was_acquired) {
@@ -355,8 +371,16 @@ static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
 
 /** Disable the framebuffer console upon KDB exit. */
 static void fb_console_disable(void *arg1, void *arg2, void *arg3) {
-    if (main_console.out == &fb_console_out_ops)
+    /* No locking needed, only run while other CPUs are halted. */
+
+    if (main_console.out == &fb_console_out_ops) {
         fb_console_acquired = fb_was_acquired;
+
+        if (fb_console_acquired && kfb_exclusive_handle) {
+            if (!notifier_run_unsafe(&kfb_redraw_notifier, NULL, false))
+                kfb_need_redraw = true;
+        }
+    }
 }
 
 /**
@@ -377,9 +401,9 @@ void fb_console_info(fb_info_t *info) {
  * @return              Status code describing the result of the operation. */
 status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
     /* Map in the framebuffer and allocate a backbuffer. */
-    size_t size      = info->width * info->height * info->bytes_per_pixel;
+    size_t size      = info->height * info->pitch;
     size             = round_up(size, PAGE_SIZE);
-    uint8_t *mapping = phys_map(fb_info.addr, size, mmflag);
+    uint8_t *mapping = phys_map(info->addr, size, mmflag);
     if (!mapping)
         return STATUS_NO_MEMORY;
 
@@ -404,7 +428,7 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
     bool was_boot  = fb_backbuffer == fb_mapping;
     bool have_prev = main_console.out == &fb_console_out_ops && !was_boot;
 
-    size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
+    size = fb_info.height * fb_info.pitch;
     size = round_up(size, PAGE_SIZE);
 
     /* Swap out the old framebuffer for the new one. */
@@ -447,6 +471,15 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
         notifier_register(&kdb_exit_notifier, fb_console_disable, NULL);
     }
 
+    mutex_lock(&kfb_device_lock);
+
+    if (fb_console_acquired && kfb_exclusive_handle) {
+        if (!notifier_run_unsafe(&kfb_reconfigure_notifier, NULL, false))
+            kfb_need_reconfigure = true;
+    }
+
+    mutex_unlock(&kfb_device_lock);
+
     return STATUS_SUCCESS;
 }
 
@@ -455,27 +488,29 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
  * and prevents kernel output to the framebuffer. It can be used if KDB is
  * entered or a fatal error occurs.
  */
-void fb_console_acquire(void) {
+static bool fb_console_acquire(void) {
     spinlock_lock(&fb_lock);
 
-    if (fb_console_acquired && !splash_enabled)
-        fatal("Framebuffer console already acquired");
-
-    fb_console_acquired = true;
-    splash_enabled = false;
+    /* Splash screen acquires but we can override that here. */
+    bool can_acquire = !fb_console_acquired || splash_enabled;
+    if (can_acquire) {
+        fb_console_acquired = true;
+        splash_enabled = false;
+    }
 
     spinlock_unlock(&fb_lock);
+
+    return can_acquire;
 }
 
 /**
  * Releases the framebuffer after it has been acquired with fb_console_acquire()
  * and re-enables kernel output to it.
  */
-void fb_console_release(void) {
+static void fb_console_release(void) {
     spinlock_lock(&fb_lock);
 
-    if (!fb_console_acquired)
-        fatal("Framebuffer console not acquired");
+    assert(fb_console_acquired);
 
     fb_console_acquired = false;
     fb_console_reset();
@@ -559,6 +594,8 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
 /** Update the progress on the boot splash.
  * @param percent       Boot progress percentage. */
 void update_boot_progress(int percent) {
+    spinlock_lock(&fb_lock);
+
     if (splash_enabled) {
         fb_fillrect(
             splash_progress_x, splash_progress_y,
@@ -569,6 +606,8 @@ void update_boot_progress(int percent) {
             (SPLASH_PROGRESS_WIDTH * percent) / 100,
             SPLASH_PROGRESS_HEIGHT, SPLASH_PROGRESS_FG);
     }
+
+    spinlock_unlock(&fb_lock);
 }
 
 /**
@@ -581,8 +620,8 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
     /* Copy the information from the video tag. */
     fb_info.width           = video->lfb.width;
     fb_info.height          = video->lfb.height;
-    fb_info.depth           = video->lfb.bpp;
     fb_info.bytes_per_pixel = round_up(video->lfb.bpp, 8) / 8;
+    fb_info.pitch           = video->lfb.pitch;
     fb_info.addr            = video->lfb.fb_phys;
     fb_info.red_position    = video->lfb.red_pos;
     fb_info.red_size        = video->lfb.red_size;
@@ -630,3 +669,189 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
         update_boot_progress(0);
     }
 }
+
+/**
+ * Kernel FB device.
+ */
+
+/** Closes a handle to the KFB device. */
+static void kfb_device_close(device_t *device, file_handle_t *handle) {
+    mutex_lock(&kfb_device_lock);
+
+    if (kfb_exclusive_handle == handle) {
+        fb_console_release();
+
+        kfb_exclusive_handle = NULL;
+        kfb_need_reconfigure = false;
+        kfb_need_redraw      = false;
+    }
+
+    mutex_unlock(&kfb_device_lock);
+}
+
+/** Signals that a KFB device event is being waited for. */
+static status_t kfb_device_wait(device_t *device, file_handle_t *handle, object_event_t *event) {
+    mutex_lock(&kfb_device_lock);
+
+    status_t ret = STATUS_SUCCESS;
+
+    switch (event->event) {
+        case KFB_DEVICE_EVENT_RECONFIGURE:
+            if (kfb_exclusive_handle != handle) {
+                ret = STATUS_PERM_DENIED;
+            } else if (kfb_need_reconfigure) {
+                kfb_need_reconfigure = false;
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&kfb_reconfigure_notifier, object_event_notifier, event);
+            }
+
+            break;
+
+        case KFB_DEVICE_EVENT_REDRAW:
+            if (kfb_exclusive_handle != handle) {
+                ret = STATUS_PERM_DENIED;
+            } else if (kfb_need_redraw) {
+                kfb_need_redraw = false;
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&kfb_redraw_notifier, object_event_notifier, event);
+            }
+
+            break;
+
+        default:
+            ret = STATUS_NOT_SUPPORTED;
+            break;
+    }
+
+    mutex_unlock(&kfb_device_lock);
+    return ret;
+}
+
+/** Stops waiting for a KFB device event. */
+static void kfb_device_unwait(device_t *device, file_handle_t *handle, object_event_t *event) {
+    switch (event->event) {
+        case KFB_DEVICE_EVENT_RECONFIGURE:
+            notifier_unregister(&kfb_reconfigure_notifier, object_event_notifier, event);
+            break;
+
+        case KFB_DEVICE_EVENT_REDRAW:
+            notifier_unregister(&kfb_redraw_notifier, object_event_notifier, event);
+            break;
+    }
+}
+
+/** Maps the KFB device into memory. */
+static status_t kfb_device_map(device_t *device, file_handle_t *handle, vm_region_t *region) {
+    status_t ret;
+
+    mutex_lock(&kfb_device_lock);
+
+    if (kfb_exclusive_handle == handle) {
+        spinlock_lock(&fb_lock);
+
+        phys_ptr_t phys  = fb_info.addr;
+        phys_size_t size = round_up(fb_info.height * fb_info.pitch, PAGE_SIZE);
+
+        spinlock_unlock(&fb_lock);
+
+        ret = vm_region_map(region, phys, size, MM_KERNEL);
+    } else {
+        ret = STATUS_PERM_DENIED;
+    }
+
+    mutex_unlock(&kfb_device_lock);
+    return ret;
+}
+
+/** Handles KFB device-specific requests. */
+static status_t kfb_device_request(
+    device_t *device, file_handle_t *handle, unsigned request, const void *in,
+    size_t in_size, void **_out, size_t *_out_size)
+{
+    status_t ret = STATUS_SUCCESS;
+
+    mutex_lock(&kfb_device_lock);
+
+    switch (request) {
+        case KFB_DEVICE_REQUEST_MODE: {
+            kfb_mode_t *mode = kcalloc(1, sizeof(*mode), MM_KERNEL);
+
+            spinlock_lock(&fb_lock);
+
+            mode->width           = fb_info.width;
+            mode->height          = fb_info.height;
+            mode->bytes_per_pixel = fb_info.bytes_per_pixel;
+            mode->pitch           = fb_info.pitch;
+            mode->red_position    = fb_info.red_position;
+            mode->red_size        = fb_info.red_size;
+            mode->green_position  = fb_info.green_position;
+            mode->green_size      = fb_info.green_size;
+            mode->blue_position   = fb_info.blue_position;
+            mode->blue_size       = fb_info.blue_size;
+
+            spinlock_unlock(&fb_lock);
+
+            *_out      = mode;
+            *_out_size = sizeof(*mode);
+            break;
+        }
+        case KFB_DEVICE_REQUEST_BOOT_PROGRESS: {
+            if (in_size == sizeof(uint32_t)) {
+                uint32_t progress = *(uint32_t *)in;
+
+                if (progress <= 100) {
+                    update_boot_progress(progress);
+                } else {
+                    ret = STATUS_INVALID_ARG;
+                }
+            } else {
+                ret = STATUS_INVALID_ARG;
+            }
+
+            break;
+        }
+        case KFB_DEVICE_REQUEST_ACQUIRE: {
+            if (kfb_exclusive_handle != handle) {
+                if (!kfb_exclusive_handle && fb_console_acquire()) {
+                    kfb_exclusive_handle = handle;
+                } else {
+                    ret = STATUS_IN_USE;
+                }
+            }
+
+            break;
+        }
+    }
+
+    mutex_unlock(&kfb_device_lock);
+    return ret;
+}
+
+/** Kernel FB device operations structure. */
+static device_ops_t kfb_device_ops = {
+    .type    = FILE_TYPE_CHAR,
+    .close   = kfb_device_close,
+    .wait    = kfb_device_wait,
+    .unwait  = kfb_device_unwait,
+    .map     = kfb_device_map,
+    .request = kfb_device_request,
+};
+
+/** Register the kernel FB device. */
+static __init_text void kfb_device_init(void) {
+    if (main_console.out == &fb_console_out_ops) {
+        device_attr_t attrs[] = {
+            { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = KFB_DEVICE_CLASS_NAME } },
+        };
+
+        status_t ret = device_create(
+            "kfb", device_virtual_dir, &kfb_device_ops, NULL, attrs,
+            array_size(attrs), NULL);
+        if (ret != STATUS_SUCCESS)
+            fatal("Failed to register kernel FB device (%d)", ret);
+    }
+}
+
+INITCALL(kfb_device_init);
