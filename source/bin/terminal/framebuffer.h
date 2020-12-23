@@ -16,47 +16,35 @@
 
 /**
  * @file
- * @brief               Terminal application.
+ * @brief               Framebuffer device class.
  */
 
 #pragma once
 
 #include "event_handler.h"
-#include "framebuffer.h"
-#include "keyboard.h"
 
-#include <vector>
+#include <kernel/device/kfb.h>
 
-class Terminal;
-
-class TerminalApp {
+/** Class for drawing to a framebuffer. */
+class Framebuffer : public EventHandler {
 public:
-    TerminalApp();
-    ~TerminalApp();
+    Framebuffer();
+    ~Framebuffer();
 
-    Terminal *activeTerminal() const { return m_terminals[m_activeTerminal]; }
+    bool init();
 
-    int run();
+    void handleEvent(const object_event_t &event) override;
 
-    void addEvent(handle_t handle, unsigned id, EventHandler *handler);
-    void removeEvents(EventHandler *handler);
-
-    void removeTerminal(Terminal *terminal);
-
-    void redraw();
-
-private:
-    using TerminalArray = std::vector<Terminal *>;
-    using EventArray    = std::vector<object_event_t>;
+    void putPixel(uint16_t x, uint16_t y, uint32_t rgb);
+    void fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb);
+    void copyRect(
+        uint16_t destX, uint16_t destY, uint16_t srcX, uint16_t srcY,
+        uint16_t width, uint16_t height);
 
 private:
-    TerminalArray m_terminals;
-    size_t m_activeTerminal;
-
-    Framebuffer m_framebuffer;
-    Keyboard m_keyboard;
-
-    EventArray m_events;
+    handle_t m_handle;
+    kfb_mode_t m_mode;
+    uint8_t *m_mapping;
+    uint8_t *m_backbuffer;
+    size_t m_size;
 };
-
-extern TerminalApp g_terminalApp;

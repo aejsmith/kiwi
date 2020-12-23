@@ -19,6 +19,7 @@ Import('manager')
 env = manager.Create(libraries = ['device', 'kernel'])
 
 env.KiwiApplication('terminal', [
+    'framebuffer.cpp',
     'keyboard.cpp',
     'keys.c',
     'terminal_app.cpp',

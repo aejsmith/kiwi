@@ -38,10 +38,6 @@ TerminalApp::TerminalApp() :
 TerminalApp::~TerminalApp() {}
 
 int TerminalApp::run() {
-    // TODO: Input device enumeration.
-    if (!m_keyboard.init("/class/input/0"))
-        return EXIT_FAILURE;
-
     auto terminal = new Terminal;
     if (!terminal->init()) {
         delete terminal;
@@ -49,6 +45,13 @@ int TerminalApp::run() {
     }
 
     m_terminals.emplace_back(terminal);
+
+    // TODO: Input device enumeration.
+    if (!m_keyboard.init("/class/input/0"))
+        return EXIT_FAILURE;
+
+    if (!m_framebuffer.init())
+        return EXIT_FAILURE;
 
     while (!m_terminals.empty()) {
         /* Process any internally queued messages on the terminal connections
@@ -121,6 +124,10 @@ void TerminalApp::removeTerminal(Terminal *terminal) {
             break;
         }
     }
+}
+
+void TerminalApp::redraw() {
+    
 }
 
 int main(int argc, char **argv) {
