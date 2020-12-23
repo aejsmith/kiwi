@@ -968,7 +968,21 @@ static void fs_file_close(file_handle_t *handle) {
 static char *fs_file_name(file_handle_t *handle) {
     char *path;
     status_t ret = fs_dentry_path(handle->entry, &path);
-    return (ret == STATUS_SUCCESS) ? path : NULL;
+    if (ret != STATUS_SUCCESS)
+        return NULL;
+
+    const char *prefix = "fs:";
+    size_t path_len    = strlen(path);
+    size_t prefix_len  = strlen(prefix);
+    size_t size        = path_len + prefix_len + 1;
+
+    char *name = kmalloc(size, MM_KERNEL);
+    memcpy(name, prefix, prefix_len);
+    memcpy(name + prefix_len, path, path_len);
+    name[size - 1] = 0;
+
+    kfree(path);
+    return name;
 }
 
 /** Signal that a file event is being waited for. */

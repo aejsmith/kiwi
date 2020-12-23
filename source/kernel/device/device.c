@@ -99,6 +99,26 @@ static void device_file_close(file_handle_t *handle) {
     refcount_dec(&handle->device->count);
 }
 
+/** Get the name of a device object. */
+static char *device_file_name(file_handle_t *handle) {
+    char *path = device_path(handle->device);
+    if (!path)
+        return NULL;
+
+    const char *prefix = "device:";
+    size_t path_len    = strlen(path);
+    size_t prefix_len  = strlen(prefix);
+    size_t size        = path_len + prefix_len + 1;
+
+    char *name = kmalloc(size, MM_KERNEL);
+    memcpy(name, prefix, prefix_len);
+    memcpy(name + prefix_len, path, path_len);
+    name[size - 1] = 0;
+
+    kfree(path);
+    return name;
+}
+
 /** Signal that a device event is being waited for. */
 static status_t device_file_wait(file_handle_t *handle, object_event_t *event) {
     device_t *device = handle->device;
@@ -175,6 +195,7 @@ static status_t device_file_request(
 static file_ops_t device_file_ops = {
     .open    = device_file_open,
     .close   = device_file_close,
+    .name    = device_file_name,
     .wait    = device_file_wait,
     .unwait  = device_file_unwait,
     .io      = device_file_io,
