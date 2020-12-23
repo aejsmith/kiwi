@@ -44,7 +44,7 @@
 #define core_round_up(val, nearest) \
     __extension__ \
     ({ \
-        typeof(val) __n = val; \
+        __typeof__(val) __n = val; \
         if (__n % (nearest)) { \
             __n -= __n % (nearest); \
             __n += nearest; \
@@ -59,7 +59,7 @@
 #define core_round_down(val, nearest) \
     __extension__ \
     ({ \
-        typeof(val) __n = val; \
+        __typeof__(val) __n = val; \
         if (__n % (nearest)) \
             __n -= __n % (nearest); \
         __n; \
@@ -82,7 +82,7 @@
 /** Swap two values. */
 #define core_swap(a, b) \
     { \
-        typeof(a) __tmp = a; \
+        __typeof__(a) __tmp = a; \
         a = b; \
         b = __tmp; \
     }
@@ -95,6 +95,6 @@
 #define core_container_of(ptr, type, member) \
     __extension__ \
     ({ \
-        const typeof(((type *)0)->member) *__mptr = ptr; \
+        const __typeof__(((type *)0)->member) *__mptr = ptr; \
         (type *)((char *)__mptr - offsetof(type, member)); \
     })

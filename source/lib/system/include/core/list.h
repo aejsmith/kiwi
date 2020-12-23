@@ -93,7 +93,7 @@ typedef struct core_list {
  * @param member        Name of the list node member in the structure.
  * @return              Pointer to the next structure. */
 #define core_list_next(entry, member) \
-    (core_list_entry((entry)->member.next, typeof(*(entry)), member))
+    (core_list_entry((entry)->member.next, __typeof__(*(entry)), member))
 
 /** Get a pointer to the previous structure in a list.
  * @note                Does not check if the previous entry is the head.
@@ -101,7 +101,7 @@ typedef struct core_list {
  * @param member        Name of the list node member in the structure.
  * @return              Pointer to the previous structure. */
 #define core_list_prev(entry, member) \
-    (core_list_entry((entry)->member.prev, typeof(*(entry)), member))
+    (core_list_entry((entry)->member.prev, __typeof__(*(entry)), member))
 
 /** Get a pointer to the first structure in a list.
  * @note                Does not check if the list is empty.
