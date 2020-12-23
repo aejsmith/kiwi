@@ -84,8 +84,12 @@ static status_t kconsole_device_io(device_t *device, file_handle_t *handle, io_r
     if (ret != STATUS_SUCCESS)
         goto out;
 
-    for (size_t i = 0; i < request->total; i++)
-        main_console.out->putc(buf[i]);
+    for (size_t i = 0; i < request->total; i++) {
+        if (main_console.out)
+            main_console.out->putc(buf[i]);
+        if (debug_console.out)
+            debug_console.out->putc(buf[i]);
+    }
 
 out:
     kfree(buf);
