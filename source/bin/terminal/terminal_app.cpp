@@ -20,6 +20,7 @@
  */
 
 #include "terminal_app.h"
+#include "terminal_window.h"
 #include "terminal.h"
 
 #include <core/log.h>
@@ -32,20 +33,12 @@
 TerminalApp g_terminalApp;
 
 TerminalApp::TerminalApp() :
-    m_activeTerminal (0)
+    m_activeWindow (0)
 {}
 
 TerminalApp::~TerminalApp() {}
 
 int TerminalApp::run() {
-    auto terminal = new Terminal;
-    if (!terminal->init()) {
-        delete terminal;
-        return EXIT_FAILURE;
-    }
-
-    m_terminals.emplace_back(terminal);
-
     // TODO: Input device enumeration.
     if (!m_keyboard.init("/class/input/0"))
         return EXIT_FAILURE;
@@ -53,14 +46,22 @@ int TerminalApp::run() {
     if (!m_framebuffer.init())
         return EXIT_FAILURE;
 
-    while (!m_terminals.empty()) {
+    auto window = new TerminalWindow;
+    if (!window->init()) {
+        delete window;
+        return EXIT_FAILURE;
+    }
+
+    m_windows.emplace_back(window);
+
+    while (!m_windows.empty()) {
         /* Process any internally queued messages on the terminal connections
          * (if any messages were queued internally while waiting for a request
          * response, these won't be picked up by kern_object_wait()). TODO:
          * Better solution for this, e.g. core_connection provides an event
          * object to signal. */
-        for (Terminal *terminal : m_terminals)
-            terminal->handleMessages();
+        for (TerminalWindow *window : m_windows)
+            window->terminal().handleMessages();
 
         status_t ret = kern_object_wait(m_events.data(), m_events.size(), 0, -1);
         if (ret != STATUS_SUCCESS) {
@@ -117,17 +118,17 @@ void TerminalApp::removeEvents(EventHandler *handler) {
     }
 }
 
-void TerminalApp::removeTerminal(Terminal *terminal) {
-    for (auto it = m_terminals.begin(); it != m_terminals.end(); ++it) {
-        if (*it == terminal) {
-            m_terminals.erase(it);
+void TerminalApp::removeWindow(TerminalWindow *window) {
+    for (auto it = m_windows.begin(); it != m_windows.end(); ++it) {
+        if (*it == window) {
+            m_windows.erase(it);
             break;
         }
     }
 }
 
 void TerminalApp::redraw() {
-    
+    activeWindow().redraw();
 }
 
 int main(int argc, char **argv) {

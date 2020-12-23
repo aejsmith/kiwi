@@ -16,48 +16,41 @@
 
 /**
  * @file
- * @brief               Terminal application.
+ * @brief               Terminal window class.
  */
 
 #pragma once
 
-#include "event_handler.h"
-#include "framebuffer.h"
-#include "keyboard.h"
+#include "terminal_buffer.h"
 
-#include <vector>
+#include <memory>
 
-class TerminalWindow;
+class Terminal;
 
-class TerminalApp {
+/**
+ * Class implementing a terminal window. This handles rendering the contents of
+ * a terminal, currently to the framebuffer.
+ */
+class TerminalWindow {
 public:
-    TerminalApp();
-    ~TerminalApp();
+    TerminalWindow();
+    ~TerminalWindow();
 
-    TerminalWindow &activeWindow() const { return *m_windows[m_activeWindow]; }
-    Framebuffer &framebuffer()           { return m_framebuffer; }
+    Terminal &terminal() const      { return *m_terminal; }
+    uint16_t cols() const           { return m_cols; }
+    uint16_t rows() const           { return m_rows; }
 
-    int run();
-
-    void addEvent(handle_t handle, unsigned id, EventHandler *handler);
-    void removeEvents(EventHandler *handler);
-
-    void removeWindow(TerminalWindow *window);
+    bool init();
+    void close();
 
     void redraw();
+    void bufferUpdated(uint16_t x, uint16_t y, uint16_t width, uint16_t height);
+    void bufferScrolled(uint16_t top, uint16_t bottom, bool up);
 
 private:
-    using WindowArray = std::vector<TerminalWindow *>;
-    using EventArray  = std::vector<object_event_t>;
+    void drawCharacter(uint16_t x, uint16_t y, TerminalBuffer::Character ch);
 
-private:
-    WindowArray m_windows;
-    size_t m_activeWindow;
-
-    Framebuffer m_framebuffer;
-    Keyboard m_keyboard;
-
-    EventArray m_events;
+    std::unique_ptr<Terminal> m_terminal;
+    uint16_t m_cols;
+    uint16_t m_rows;
 };
-
-extern TerminalApp g_terminalApp;

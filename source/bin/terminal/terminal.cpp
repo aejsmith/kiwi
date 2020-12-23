@@ -20,13 +20,13 @@
  */
 
 #include "terminal_app.h"
+#include "terminal_window.h"
 #include "terminal.h"
 
 #include <core/log.h>
 #include <core/service.h>
 #include <core/utility.h>
 
-#include <kernel/device.h>
 #include <kernel/file.h>
 #include <kernel/process.h>
 #include <kernel/status.h>
@@ -40,22 +40,18 @@
 
 extern const char *const *environ;
 
-Terminal::Terminal() :
+Terminal::Terminal(TerminalWindow &window) :
+    m_window       (window),
     m_connection   (nullptr),
-    m_outputDevice (INVALID_HANDLE),
     m_childProcess (INVALID_HANDLE),
     m_terminal     {INVALID_HANDLE, INVALID_HANDLE}
 {}
 
 Terminal::~Terminal() {
     g_terminalApp.removeEvents(this);
-    g_terminalApp.removeTerminal(this);
 
     if (m_connection)
         core_connection_close(m_connection);
-
-    if (m_outputDevice != INVALID_HANDLE)
-        kern_handle_close(m_outputDevice);
 
     if (m_childProcess != INVALID_HANDLE)
         kern_handle_close(m_childProcess);
@@ -110,14 +106,6 @@ bool Terminal::init() {
         kern_handle_set_flags(m_terminal[i], HANDLE_INHERITABLE);
     }
 
-    /* Open device handles. TODO: Use framebuffer directly once available,
-     * input device enumeration. */
-    ret = kern_device_open("/virtual/kconsole", FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &m_outputDevice);
-    if (ret != STATUS_SUCCESS) {
-        core_log(CORE_LOG_ERROR, "failed to open output device: %" PRId32, ret);
-        return false;
-    }
-
     /* Spawn a process attached to the terminal. */
     if (spawnProcess("/system/bin/bash", m_childProcess) != STATUS_SUCCESS)
         return false;
@@ -156,8 +144,10 @@ void Terminal::handleEvent(const object_event_t &event) {
         core_unreachable();
     }
 
-    if (close)
-        delete this;
+    if (close) {
+        /* This will delete us - do this last. */
+        m_window.close();
+    }
 }
 
 void Terminal::handleMessages() {
@@ -186,10 +176,11 @@ void Terminal::handleMessages() {
 }
 
 void Terminal::handleOutput(core_message_t *message) {
-    const void *data = core_message_data(message);
-    size_t size      = core_message_size(message) ;
+    const uint8_t *data = reinterpret_cast<uint8_t *>(core_message_data(message));
+    size_t size         = core_message_size(message);
 
-    kern_file_write(m_outputDevice, data, size, -1, nullptr);
+    for (size_t i = 0; i < size; i++)
+        output(data[i]);
 }
 
 void Terminal::sendInput(const uint8_t *buf, size_t len) {

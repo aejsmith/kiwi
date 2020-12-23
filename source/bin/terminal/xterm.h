@@ -16,38 +16,24 @@
 
 /**
  * @file
- * @brief               Framebuffer device class.
+ * @brief               Xterm emulator class.
  */
 
 #pragma once
 
-#include "event_handler.h"
+#include "terminal_buffer.h"
+#include "terminal.h"
 
-#include <kernel/device/kfb.h>
-
-/** Class for drawing to a framebuffer. */
-class Framebuffer : public EventHandler {
+/** Implementation of an Xterm-compatible terminal. */
+class Xterm final : public Terminal {
 public:
-    Framebuffer();
-    ~Framebuffer();
+    Xterm(TerminalWindow &window);
+    ~Xterm();
 
-    uint16_t width() const  { return m_mode.width; }
-    uint16_t height() const { return m_mode.height; }
-
-    bool init();
-
-    void handleEvent(const object_event_t &event) override;
-
-    void putPixel(uint16_t x, uint16_t y, uint32_t rgb);
-    void fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb);
-    void copyRect(
-        uint16_t destX, uint16_t destY, uint16_t srcX, uint16_t srcY,
-        uint16_t width, uint16_t height);
+    TerminalBuffer &activeBuffer() override;
+    void output(uint8_t raw) override;
 
 private:
-    handle_t m_handle;
-    kfb_mode_t m_mode;
-    uint8_t *m_mapping;
-    uint8_t *m_backbuffer;
-    size_t m_size;
+    TerminalBuffer m_buffer;
+    TerminalBuffer::Character m_attributes;
 };

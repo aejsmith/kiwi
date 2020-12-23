@@ -53,9 +53,6 @@ Framebuffer::~Framebuffer() {
 }
 
 bool Framebuffer::init() {
-    // TODO
-    return true;
-
     status_t ret;
 
     ret = kern_device_open(kKfbDevicePath, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &m_handle);
@@ -76,10 +73,10 @@ bool Framebuffer::init() {
         return false;
     }
 
-    size_t page_size;
-    kern_system_info(SYSTEM_INFO_PAGE_SIZE, &page_size);
+    size_t pageSize;
+    kern_system_info(SYSTEM_INFO_PAGE_SIZE, &pageSize);
 
-    m_size = core_round_up(m_mode.pitch * m_mode.height, page_size);
+    m_size = core_round_up(m_mode.pitch * m_mode.height, pageSize);
 
     ret = kern_vm_map(
         reinterpret_cast<void **>(&m_mapping), m_size, 0, VM_ADDRESS_ANY,
@@ -109,6 +106,9 @@ bool Framebuffer::init() {
 void Framebuffer::handleEvent(const object_event_t &event) {
     assert(event.handle == m_handle);
     assert(event.event == KFB_DEVICE_EVENT_REDRAW);
+
+    memset(m_mapping, 0, m_size);
+    memset(m_backbuffer, 0, m_size);
 
     g_terminalApp.redraw();
 }

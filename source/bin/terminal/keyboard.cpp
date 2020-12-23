@@ -21,6 +21,7 @@
 
 #include "keyboard.h"
 #include "terminal_app.h"
+#include "terminal_window.h"
 #include "terminal.h"
 
 #include <core/log.h>
@@ -88,7 +89,7 @@ void Keyboard::handleEvent(const object_event_t &event) {
         }
 
         if (len > 0 && (done || kBatchSize - len < 4)) {
-            g_terminalApp.activeTerminal()->sendInput(buf, len);
+            g_terminalApp.activeWindow().terminal().sendInput(buf, len);
             len = 0;
         }
     }

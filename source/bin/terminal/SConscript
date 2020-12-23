@@ -23,5 +23,8 @@ env.KiwiApplication('terminal', [
     'keyboard.cpp',
     'keys.c',
     'terminal_app.cpp',
+    'terminal_buffer.cpp',
+    'terminal_window.cpp',
     'terminal.cpp',
+    'xterm.cpp',
 ])

@@ -25,26 +25,36 @@
 
 #include <core/ipc.h>
 
-class Terminal final : public EventHandler {
+class TerminalBuffer;
+
+class Terminal : public EventHandler {
 public:
-    Terminal();
-    ~Terminal();
+    Terminal(TerminalWindow &window);
+    virtual ~Terminal();
 
     bool init();
 
-    void handleEvent(const object_event_t &event) override;
+    void handleEvent(const object_event_t &event) final override;
     void handleMessages();
 
     void sendInput(const uint8_t *buf, size_t len);
+
+    /** Get the active buffer. */
+    virtual TerminalBuffer &activeBuffer() = 0;
+
+    /** Output to the terminal. */
+    virtual void output(uint8_t ch) = 0;
 
 private:
     void handleOutput(core_message_t *message);
 
     status_t spawnProcess(const char *path, handle_t &handle);
 
+protected:
+    TerminalWindow& m_window;
+
 private:
     core_connection_t *m_connection;        /**< Connection to terminal service. */
-    handle_t m_outputDevice;                /**< Output device. */
     handle_t m_childProcess;                /**< Main child process. */
     handle_t m_terminal[2];                 /**< Terminal handles (read/write). */
 };
