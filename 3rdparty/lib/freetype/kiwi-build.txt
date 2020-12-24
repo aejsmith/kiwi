@@ -8,3 +8,7 @@ Copy auto-generated headers into include/freetype/config:
   ftconfig.h
   ftmodule.h
   ftoption.h
+
+Enable additional options in ftconfig.h:
+
+  FT_CONFIG_OPTION_SUBPIXEL_RENDERING
