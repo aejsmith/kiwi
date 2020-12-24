@@ -1,8 +1,9 @@
+/* ftconfig.h.  Generated from ftconfig.h.in by configure.  */
 /****************************************************************************
  *
- * ftconfig.h
+ * ftconfig.h.in
  *
- *   ANSI-specific configuration file (specification only).
+ *   UNIX-specific configuration file (specification only).
  *
  * Copyright (C) 1996-2020 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
@@ -30,8 +31,6 @@
    * system-specific files that are always included first when building the
    * library.
    *
-   * This ANSI version should stay in `include/config/`.
-   *
    */
 
 #ifndef FTCONFIG_H_
@@ -40,6 +39,19 @@
 #include <ft2build.h>
 #include FT_CONFIG_OPTIONS_H
 #include FT_CONFIG_STANDARD_LIBRARY_H
+
+#define HAVE_UNISTD_H 1
+#define HAVE_FCNTL_H 1
+
+/* #undef FT_USE_AUTOCONF_SIZEOF_TYPES */
+#ifdef FT_USE_AUTOCONF_SIZEOF_TYPES
+
+#define SIZEOF_INT 4
+#define SIZEOF_LONG 8
+#define FT_SIZEOF_INT  SIZEOF_INT
+#define FT_SIZEOF_LONG SIZEOF_LONG
+
+#endif /* FT_USE_AUTOCONF_SIZEOF_TYPES */
 
 #include <freetype/config/integer-types.h>
 #include <freetype/config/public-macros.h>

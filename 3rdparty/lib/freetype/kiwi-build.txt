@@ -1,0 +1,10 @@
+Build with autotools:
+
+  ../freetype-2.10.4/configure --host=x86_64-kiwi --prefix=/system --with-zlib=yes --with-bzip2=no --with-png=no --with-harfbuzz=no --with-brotli=no
+  make
+
+Copy auto-generated headers into include/freetype/config:
+
+  ftconfig.h
+  ftmodule.h
+  ftoption.h
