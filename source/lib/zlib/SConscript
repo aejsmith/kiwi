@@ -14,24 +14,39 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('manager')
+Import('manager', 'config')
 
-# Set the library output directory.
-manager.AddVariable('_LIBOUTDIR', Dir('.'))
+zconf = File('include/zconf.h')
 
-dirs = [
-    # Core runtime libraries (must be first).
-    'crt',
-    'kernel',
-    'system',
-    'compiler-rt',
-    'libm',
-    'cxxrt',
-    'cxx',
+env = manager.Create(
+    flags = {
+        'CFLAGS': ['-include', '%s' % (zconf.path)],
+        'CPPDEFINES': {'PIC': None},
+    }
+)
 
-    # Other libraries.
-    'device',
-    'zlib',
+sources = [
+    'src/adler32.c',
+    'src/crc32.c',
+    'src/deflate.c',
+    'src/infback.c',
+    'src/inffast.c',
+    'src/inflate.c',
+    'src/inftrees.c',
+    'src/trees.c',
+    'src/zutil.c',
+    'src/compress.c',
+    'src/uncompr.c',
+    'src/gzclose.c',
+    'src/gzlib.c',
+    'src/gzread.c',
+    'src/gzwrite.c',
 ]
 
-SConscript(dirs = dirs)
+objects = [env.SharedObject(f) for f in sources]
+Depends(objects, zconf)
+
+env.KiwiLibrary('z',
+    include_paths = [Dir('include')],
+    sources = objects,
+)
