@@ -1,0 +1,81 @@
+#
+# Copyright (C) 2009-2020 Alex Smith
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+Import('manager', 'config')
+
+# FreeType refer to all of its headers through defines which SCons can't deal
+# with. Work around this by just using the original include tree rather than the
+# build tree.
+include_dir = Dir('#source/lib/freetype/include')
+
+env = manager.Create(
+    libraries = ['z'],
+    flags = {
+        'CPPPATH': [include_dir],
+        'CPPDEFINES': {
+            'FT2_BUILD_LIBRARY': None,
+        }
+    }
+)
+
+sources = [
+    'src/base/ftsystem.c',
+    'src/base/ftdebug.c',
+    'src/base/ftinit.c',
+    'src/base/ftbase.c',
+    'src/base/ftbbox.c',
+    'src/base/ftbdf.c',
+    'src/base/ftbitmap.c',
+    'src/base/ftcid.c',
+    'src/base/ftfstype.c',
+    'src/base/ftgasp.c',
+    'src/base/ftglyph.c',
+    'src/base/ftgxval.c',
+    'src/base/ftmm.c',
+    'src/base/ftotval.c',
+    'src/base/ftpatent.c',
+    'src/base/ftpfr.c',
+    'src/base/ftstroke.c',
+    'src/base/ftsynth.c',
+    'src/base/fttype1.c',
+    'src/base/ftwinfnt.c',
+    'src/truetype/truetype.c',
+    'src/type1/type1.c',
+    'src/cff/cff.c',
+    'src/cid/type1cid.c',
+    'src/pfr/pfr.c',
+    'src/type42/type42.c',
+    'src/winfonts/winfnt.c',
+    'src/pcf/pcf.c',
+    'src/bdf/bdf.c',
+    'src/sfnt/sfnt.c',
+    'src/autofit/autofit.c',
+    'src/pshinter/pshinter.c',
+    'src/raster/raster.c',
+    'src/smooth/smooth.c',
+    'src/cache/ftcache.c',
+    'src/gzip/ftgzip.c',
+    'src/lzw/ftlzw.c',
+    'src/bzip2/ftbzip2.c',
+    'src/psaux/psaux.c',
+    'src/psnames/psnames.c',
+]
+
+# FIXME: Should use symbol export list like the real build does.
+env.KiwiLibrary('freetype',
+    include_paths = [include_dir],
+    sources = sources,
+)
