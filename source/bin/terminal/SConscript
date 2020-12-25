@@ -16,9 +16,10 @@
 
 Import('manager')
 
-env = manager.Create(libraries = ['device', 'kernel'])
+env = manager.Create(libraries = ['device', 'freetype', 'kernel'])
 
 env.KiwiApplication('terminal', [
+    'font.cpp',
     'framebuffer.cpp',
     'keyboard.cpp',
     'keys.c',

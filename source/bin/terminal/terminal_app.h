@@ -22,6 +22,7 @@
 #pragma once
 
 #include "event_handler.h"
+#include "font.h"
 #include "framebuffer.h"
 #include "keyboard.h"
 
@@ -34,8 +35,9 @@ public:
     TerminalApp();
     ~TerminalApp();
 
-    TerminalWindow &activeWindow() const { return *m_windows[m_activeWindow]; }
-    Framebuffer &framebuffer()           { return m_framebuffer; }
+    TerminalWindow &activeWindow() const    { return *m_windows[m_activeWindow]; }
+    Framebuffer &framebuffer()              { return m_framebuffer; }
+    Font &font()                            { return m_font; }
 
     int run();
 
@@ -56,6 +58,7 @@ private:
 
     Framebuffer m_framebuffer;
     Keyboard m_keyboard;
+    Font m_font;
 
     EventArray m_events;
 };

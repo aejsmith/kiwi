@@ -19,15 +19,11 @@
  * @brief               Terminal window class.
  */
 
+#include "font.h"
 #include "framebuffer.h"
 #include "terminal_app.h"
 #include "terminal_window.h"
 #include "xterm.h"
-
-#include "../../kernel/console/font.c"
-
-static constexpr uint16_t kFontWidth  = 7;
-static constexpr uint16_t kFontHeight = 14;
 
 /* Tango colour scheme. */
 
@@ -57,8 +53,8 @@ static constexpr uint32_t kColourTable[8] = {
 };
 
 TerminalWindow::TerminalWindow() :
-    m_cols (g_terminalApp.framebuffer().width() / kFontWidth),
-    m_rows (g_terminalApp.framebuffer().height() / kFontHeight)
+    m_cols (g_terminalApp.framebuffer().width() / g_terminalApp.font().width()),
+    m_rows (g_terminalApp.framebuffer().height() / g_terminalApp.font().height())
 {}
 
 TerminalWindow::~TerminalWindow() {
@@ -110,19 +106,35 @@ void TerminalWindow::bufferUpdated(uint16_t x, uint16_t y, uint16_t width, uint1
 
 void TerminalWindow::bufferScrolled(uint16_t top, uint16_t bottom, bool up) {
     Framebuffer &fb = g_terminalApp.framebuffer();
+    Font &font      = g_terminalApp.font();
 
-    uint16_t y      = top * kFontHeight;
-    uint16_t height = (bottom - top) * kFontHeight;
+    uint16_t y      = top * font.height();
+    uint16_t height = (bottom - top) * font.height();
 
     if (up) {
         /* Scroll up - move the contents down. */
-        fb.copyRect(0, y + kFontHeight, 0, y, fb.width(), height);
-        fb.fillRect(0, y, fb.width(), kFontHeight, 0);
+        fb.copyRect(0, y + font.height(), 0, y, fb.width(), height);
+        fb.fillRect(0, y, fb.width(), font.height(), 0);
     } else {
         /* Scroll down - move the contents up. */
-        fb.copyRect(0, y, 0, y + kFontHeight, fb.width(), height);
-        fb.fillRect(0, y + height, fb.width(), kFontHeight, 0);
+        fb.copyRect(0, y, 0, y + font.height(), fb.width(), height);
+        fb.fillRect(0, y + height, fb.width(), font.height(), 0);
     }
+}
+
+static inline uint32_t blend(uint32_t fg, uint32_t bg, uint8_t alpha) {
+    auto r = [] (uint32_t v) { return ((v >> 16) & 0xff); };
+    auto g = [] (uint32_t v) { return ((v >> 8) & 0xff); };
+    auto b = [] (uint32_t v) { return (v & 0xff); };
+
+    uint32_t a = alpha + 1;
+    uint32_t inv_a = 256 - alpha;
+
+    uint32_t result;
+    result  = (((a * r(fg)) + (inv_a * r(bg))) & 0x00ff00) << 8;
+    result |= (((a * g(fg)) + (inv_a * g(bg))) & 0x00ff00);
+    result |= (((a * b(fg)) + (inv_a * b(bg))) & 0x00ff00) >> 8;
+    return result;
 }
 
 void TerminalWindow::drawCharacter(uint16_t x, uint16_t y, TerminalBuffer::Character ch) {
@@ -130,18 +142,22 @@ void TerminalWindow::drawCharacter(uint16_t x, uint16_t y, TerminalBuffer::Chara
         ? kColourTableBold
         : kColourTable;
 
+    uint32_t fg = colours[ch.fg];
+    uint32_t bg = colours[ch.bg];
+
     Framebuffer &fb = g_terminalApp.framebuffer();
+    Font &font      = g_terminalApp.font();
 
-    x *= kFontWidth;
-    y *= kFontHeight;
+    x *= font.width();
+    y *= font.height();
 
-    for (uint16_t i = 0; i < kFontHeight; i++) {
-        for (uint16_t j = 0; j < kFontWidth; j++) {
-            if (console_font[(ch.ch * kFontHeight) + i] & (1 << (7 - j))) {
-                fb.putPixel(x + j, y + i, colours[ch.fg]);
-            } else {
-                fb.putPixel(x + j, y + i, colours[ch.bg]);
-            }
+    const uint8_t *data = font.charData(ch.ch);
+
+    for (uint16_t i = 0; i < font.height(); i++) {
+        for (uint16_t j = 0; j < font.width(); j++) {
+            uint32_t result = blend(fg, bg, *data);
+            ++data;
+            fb.putPixel(x + j, y + i, result);
         }
     }
 }

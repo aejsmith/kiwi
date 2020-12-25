@@ -19,6 +19,7 @@
  * @brief               Terminal application.
  */
 
+#include "font.h"
 #include "terminal_app.h"
 #include "terminal_window.h"
 #include "terminal.h"
@@ -44,6 +45,9 @@ int TerminalApp::run() {
         return EXIT_FAILURE;
 
     if (!m_framebuffer.init())
+        return EXIT_FAILURE;
+
+    if (!m_font.init("/system/fonts/source-code-pro/SourceCodePro-Medium.ttf", 9))
         return EXIT_FAILURE;
 
     auto window = new TerminalWindow;
