@@ -23,6 +23,8 @@
 
 #include "terminal_buffer.h"
 
+#include <device/input.h>
+
 #include <memory>
 
 class Terminal;
@@ -43,6 +45,8 @@ public:
     bool init();
     void close();
 
+    void handleInput(const input_event_t &event);
+
     void redraw();
     void bufferUpdated(uint16_t x, uint16_t y, uint16_t width, uint16_t height);
     void bufferScrolled(uint16_t top, uint16_t bottom, bool up);
@@ -50,6 +54,7 @@ public:
 private:
     void drawCharacter(uint16_t x, uint16_t y, TerminalBuffer::Character ch);
 
+private:
     std::unique_ptr<Terminal> m_terminal;
     uint16_t m_cols;
     uint16_t m_rows;

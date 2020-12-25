@@ -28,35 +28,36 @@
 /** Class handling keyboard input. */
 class Keyboard : public EventHandler {
 public:
+    enum Modifiers : uint32_t {
+        kModifier_LeftCtrl      = (1<<0),
+        kModifier_RightCtrl     = (1<<1),
+
+        kModifiers_Ctrl         = kModifier_LeftCtrl | kModifier_RightCtrl,
+
+        kModifier_LeftAlt       = (1<<2),
+        kModifier_RightAlt      = (1<<3),
+
+        kModifiers_Alt          = kModifier_LeftAlt | kModifier_RightAlt,
+
+        kModifier_LeftShift     = (1<<4),
+        kModifier_RightShift    = (1<<5),
+
+        kModifiers_Shift        = kModifier_LeftShift | kModifier_RightShift,
+
+        kModifier_CapsLock      = (1<<6),
+    };
+
+public:
     Keyboard();
     ~Keyboard();
+
+    uint32_t modifiers() const { return m_modifiers; }
 
     bool init(const char *path);
 
     void handleEvent(const object_event_t &event) override;
 
-private:
     size_t map(const input_event_t &event, uint8_t buf[4]);
-
-private:
-    enum Modifiers : uint32_t {
-        kLeftCtrlModifier   = (1<<0),
-        kRightCtrlModifier  = (1<<1),
-
-        kCtrlModifiers      = kLeftCtrlModifier | kRightCtrlModifier,
-
-        kLeftAltModifier    = (1<<2),
-        kRightAltModifier   = (1<<3),
-
-        kAltModifiers       = kLeftAltModifier | kRightAltModifier,
-
-        kLeftShiftModifier  = (1<<4),
-        kRightShiftModifier = (1<<5),
-
-        kShiftModifiers     = kLeftShiftModifier | kRightShiftModifier,
-
-        kCapsLockModifier   = (1<<6),
-    };
 
 private:
     input_device_t *m_device;

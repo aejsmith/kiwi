@@ -70,27 +70,34 @@ void Keyboard::handleEvent(const object_event_t &event) {
     assert(event.handle == device_handle(m_device));
     assert(event.event == FILE_EVENT_READABLE);
 
-    /* Batch up events if we can to reduce number of messages. */
-    static constexpr size_t kBatchSize = 128;
-    uint8_t buf[kBatchSize];
-
-    size_t len = 0;
-    bool done  = false;
+    bool done = false;
     while (!done) {
         input_event_t event;
         ret = input_device_read_event(m_device, &event);
         if (ret == STATUS_SUCCESS) {
-            len += map(event, &buf[len]);
+            auto handleModifier = [&] (int32_t key, uint32_t modifier) {
+                if (event.value == key) {
+                    if (event.type == INPUT_EVENT_KEY_DOWN) {
+                        m_modifiers |= modifier;
+                    } else {
+                        m_modifiers &= ~modifier;
+                    }
+                }
+            };
+
+            handleModifier(INPUT_KEY_LEFT_CTRL,   kModifier_LeftCtrl);
+            handleModifier(INPUT_KEY_RIGHT_CTRL,  kModifier_RightCtrl);
+            handleModifier(INPUT_KEY_LEFT_ALT,    kModifier_LeftAlt);
+            handleModifier(INPUT_KEY_RIGHT_ALT,   kModifier_RightAlt);
+            handleModifier(INPUT_KEY_LEFT_SHIFT,  kModifier_LeftShift);
+            handleModifier(INPUT_KEY_RIGHT_SHIFT, kModifier_RightShift);
+
+            g_terminalApp.handleInput(event);
         } else {
             if (ret != STATUS_WOULD_BLOCK)
                 core_log(CORE_LOG_ERROR, "failed to read input device: %" PRId32, ret);
 
             done = true;
-        }
-
-        if (len > 0 && (done || kBatchSize - len < 4)) {
-            g_terminalApp.activeWindow().terminal().sendInput(buf, len);
-            len = 0;
         }
     }
 }
@@ -103,40 +110,23 @@ size_t Keyboard::map(const input_event_t &event, uint8_t buf[4]) {
     // TODO: Actually support UTF multibyte characters when we have a need for
     // it.
 
-    auto handleModifier = [&] (int32_t key, uint32_t modifier) {
-        if (event.value == key) {
-            if (event.type == INPUT_EVENT_KEY_DOWN) {
-                m_modifiers |= modifier;
-            } else {
-                m_modifiers &= ~modifier;
-            }
-        }
-    };
-
-    handleModifier(INPUT_KEY_LEFT_CTRL,   kLeftCtrlModifier);
-    handleModifier(INPUT_KEY_RIGHT_CTRL,  kRightCtrlModifier);
-    handleModifier(INPUT_KEY_LEFT_ALT,    kLeftAltModifier);
-    handleModifier(INPUT_KEY_RIGHT_ALT,   kRightAltModifier);
-    handleModifier(INPUT_KEY_LEFT_SHIFT,  kLeftShiftModifier);
-    handleModifier(INPUT_KEY_RIGHT_SHIFT, kRightShiftModifier);
-
     size_t len = 0;
 
     if (event.type == INPUT_EVENT_KEY_DOWN) {
         if (event.value == INPUT_KEY_CAPS_LOCK)
-            m_modifiers ^= kCapsLockModifier;
+            m_modifiers ^= kModifier_CapsLock;
 
         uint8_t page   = event.value >> 16;
         uint16_t usage = event.value & 0xffff;
 
         /* Ignore other pages for now. */
         if (page == 0x07 && usage <= core_array_size(g_keyTable)) {
-            uint8_t *table = (m_modifiers & kShiftModifiers) ? g_keyTableShift : g_keyTable;
+            uint8_t *table = (m_modifiers & kModifiers_Shift) ? g_keyTableShift : g_keyTable;
 
-            if (m_modifiers & kCtrlModifiers && g_keyTableCtrl[usage]) {
-            buf[len++] = g_keyTableCtrl[usage];
+            if (m_modifiers & kModifiers_Ctrl && g_keyTableCtrl[usage]) {
+                buf[len++] = g_keyTableCtrl[usage];
             } else if (table[usage]) {
-                if (m_modifiers & kCapsLockModifier && isalpha(table[usage])) {
+                if (m_modifiers & kModifier_CapsLock && isalpha(table[usage])) {
                     buf[len++] = toupper(table[usage]);
                 } else {
                     buf[len++] = table[usage];

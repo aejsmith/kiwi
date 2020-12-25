@@ -26,6 +26,8 @@
 #include "framebuffer.h"
 #include "keyboard.h"
 
+#include <device/input.h>
+
 #include <vector>
 
 class TerminalWindow;
@@ -37,6 +39,7 @@ public:
 
     TerminalWindow &activeWindow() const    { return *m_windows[m_activeWindow]; }
     Framebuffer &framebuffer()              { return m_framebuffer; }
+    Keyboard &keyboard()                    { return m_keyboard; }
     Font &font()                            { return m_font; }
 
     int run();
@@ -46,6 +49,7 @@ public:
 
     void removeWindow(TerminalWindow *window);
 
+    void handleInput(const input_event_t &event);
     void redraw();
 
 private:

@@ -41,10 +41,11 @@
 extern const char *const *environ;
 
 Terminal::Terminal(TerminalWindow &window) :
-    m_window       (window),
-    m_connection   (nullptr),
-    m_childProcess (INVALID_HANDLE),
-    m_terminal     {INVALID_HANDLE, INVALID_HANDLE}
+    m_window         (window),
+    m_connection     (nullptr),
+    m_childProcess   (INVALID_HANDLE),
+    m_terminal       {INVALID_HANDLE, INVALID_HANDLE},
+    m_inputBatchSize (0)
 {}
 
 Terminal::~Terminal() {
@@ -183,10 +184,45 @@ void Terminal::handleOutput(core_message_t *message) {
         output(data[i]);
 }
 
-void Terminal::sendInput(const uint8_t *buf, size_t len) {
-    core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, len);
+void Terminal::sendInput(char ch) {
+    /* Input is batched if possible to reduce number of messages. */
+    m_inputBatch[m_inputBatchSize] = ch;
 
-    memcpy(core_message_data(request), buf, len);
+    m_inputBatchSize++;
+    if (m_inputBatchSize == kInputBatchMax)
+        flushInput();
+}
+
+void Terminal::sendInput(const char *str) {
+    /* Input is batched if possible to reduce number of messages. */
+    while (str[0]) {
+        sendInput(str[0]);
+        str++;
+    }
+}
+
+void Terminal::sendInput(const uint8_t *buf, size_t len) {
+    while (len) {
+        size_t size = std::min(kInputBatchMax - m_inputBatchSize, len);
+
+        memcpy(&m_inputBatch[m_inputBatchSize], buf, size);
+
+        m_inputBatchSize += size;
+        if (m_inputBatchSize == kInputBatchMax)
+            flushInput();
+
+        buf += size;
+        len -= size;
+    }
+}
+
+void Terminal::flushInput() {
+    if (m_inputBatchSize == 0)
+        return;
+
+    core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, m_inputBatchSize);
+
+    memcpy(core_message_data(request), m_inputBatch, m_inputBatchSize);
 
     core_message_t *reply;
     status_t ret = core_connection_request(m_connection, request, &reply);
@@ -205,6 +241,8 @@ void Terminal::sendInput(const uint8_t *buf, size_t len) {
 
     if (ret != STATUS_SUCCESS)
         core_log(CORE_LOG_ERROR, "failed to send terminal input: %" PRId32, ret);
+
+    m_inputBatchSize = 0;
 }
 
 /** Spawn a process attached to the terminal. */

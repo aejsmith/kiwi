@@ -59,13 +59,17 @@ int TerminalApp::run() {
     m_windows.emplace_back(window);
 
     while (!m_windows.empty()) {
-        /* Process any internally queued messages on the terminal connections
-         * (if any messages were queued internally while waiting for a request
-         * response, these won't be picked up by kern_object_wait()). TODO:
-         * Better solution for this, e.g. core_connection provides an event
-         * object to signal. */
-        for (TerminalWindow *window : m_windows)
+        for (TerminalWindow *window : m_windows) {
+            /* Flush any buffered input. */
+            window->terminal().flushInput();
+
+            /* Process any internally queued messages on the terminal
+             * connections (if any messages were queued internally while waiting
+             * for a request response, these won't be picked up by
+             * kern_object_wait()). TODO: Better solution for this, e.g.
+             * core_connection provides an event object to signal. */
             window->terminal().handleMessages();
+        }
 
         status_t ret = kern_object_wait(m_events.data(), m_events.size(), 0, -1);
         if (ret != STATUS_SUCCESS) {
@@ -133,6 +137,10 @@ void TerminalApp::removeWindow(TerminalWindow *window) {
 
 void TerminalApp::redraw() {
     activeWindow().redraw();
+}
+
+void TerminalApp::handleInput(const input_event_t &event) {
+    activeWindow().handleInput(event);
 }
 
 int main(int argc, char **argv) {

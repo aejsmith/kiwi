@@ -37,7 +37,10 @@ public:
     void handleEvent(const object_event_t &event) final override;
     void handleMessages();
 
+    void sendInput(char ch);
+    void sendInput(const char *str);
     void sendInput(const uint8_t *buf, size_t len);
+    void flushInput();
 
     /** Get the active buffer. */
     virtual TerminalBuffer &activeBuffer() = 0;
@@ -57,4 +60,8 @@ private:
     core_connection_t *m_connection;        /**< Connection to terminal service. */
     handle_t m_childProcess;                /**< Main child process. */
     handle_t m_terminal[2];                 /**< Terminal handles (read/write). */
+
+    static constexpr uint32_t kInputBatchMax = 128;
+    uint8_t m_inputBatch[kInputBatchMax];
+    size_t m_inputBatchSize;
 };

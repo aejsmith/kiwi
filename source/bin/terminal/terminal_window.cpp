@@ -70,6 +70,107 @@ void TerminalWindow::close() {
     delete this;
 }
 
+void TerminalWindow::handleInput(const input_event_t &event) {
+    Keyboard &keyboard = g_terminalApp.keyboard();
+
+    if (event.type == INPUT_EVENT_KEY_DOWN && keyboard.modifiers() == 0) {
+        switch (event.value) {
+            case INPUT_KEY_INSERT:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[2~");
+                return;
+            case INPUT_KEY_HOME:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[H");
+                return;
+            case INPUT_KEY_PAGE_UP:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[5~");
+                return;
+            case INPUT_KEY_PAGE_DOWN:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[6~");
+                return;
+            case INPUT_KEY_END:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[F");
+                return;
+            case INPUT_KEY_DELETE:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[3~");
+                return;
+            case INPUT_KEY_UP:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[A");
+                return;
+            case INPUT_KEY_DOWN:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[B");
+                return;
+            case INPUT_KEY_LEFT:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[D");
+                return;
+            case INPUT_KEY_RIGHT:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[C");
+                return;
+            case INPUT_KEY_F1:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("OP");
+                return;
+            case INPUT_KEY_F2:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("OQ");
+                return;
+            case INPUT_KEY_F3:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("OR");
+                return;
+            case INPUT_KEY_F4:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("OS");
+                return;
+            case INPUT_KEY_F5:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[15~");
+                return;
+            case INPUT_KEY_F6:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[17~");
+                return;
+            case INPUT_KEY_F7:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[18~");
+                return;
+            case INPUT_KEY_F8:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[19~");
+                return;
+            case INPUT_KEY_F9:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[20~");
+                return;
+            case INPUT_KEY_F10:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[21~");
+                return;
+            case INPUT_KEY_F11:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[23~");
+                return;
+            case INPUT_KEY_F12:
+                m_terminal->sendInput(0x1b);
+                m_terminal->sendInput("[24~");
+                return;
+        }
+    }
+
+    uint8_t buf[4];
+    size_t len = keyboard.map(event, buf);
+    m_terminal->sendInput(buf, len);
+}
+
 void TerminalWindow::redraw() {
     // TODO: When history scrollback support is added this needs to handle our
     // current offset.
