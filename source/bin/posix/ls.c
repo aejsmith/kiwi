@@ -413,7 +413,8 @@ int main(int argc, char *argv[]) {
     if (isatty(STDOUT_FILENO)) {
         is_terminal = true;
 
-        // TODO: Colour - detect compatible terminal type.
+        // TODO: Detect compatible terminal type.
+        use_colour = true;
     }
 
     int ret = EXIT_SUCCESS;
