@@ -18,7 +18,6 @@
  * @file
  * @brief               Terminal application.
  */
-
 #include "font.h"
 #include "terminal_app.h"
 #include "terminal_window.h"
@@ -40,6 +39,9 @@ TerminalApp::TerminalApp() :
 TerminalApp::~TerminalApp() {}
 
 int TerminalApp::run() {
+    /* Set the TERM value for clients to inherit. */
+    setenv("TERM", "xterm-color", 1);
+
     // TODO: Input device enumeration.
     if (!m_keyboard.init("/class/input/0"))
         return EXIT_FAILURE;

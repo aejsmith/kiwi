@@ -34,6 +34,21 @@ public:
     void output(uint8_t raw) override;
 
 private:
-    TerminalBuffer m_buffer;
+    /** Main and alternate buffers. */
+    TerminalBuffer m_mainBuffer;
+    TerminalBuffer m_altBuffer;
+    bool m_usingAltBuffer;
+
+    /** Current character attributes. */
     TerminalBuffer::Character m_attributes;
+
+    /** Escape code state. */
+    int m_escState;
+    int m_escParams[8];
+    int m_escParamSize;
+    std::string m_escString;
+
+    /** Saved cursor position. */
+    uint16_t m_savedX;
+    uint16_t m_savedY;
 };

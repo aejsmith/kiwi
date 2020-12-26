@@ -191,16 +191,23 @@ void TerminalWindow::bufferUpdated(uint16_t x, uint16_t y, uint16_t width, uint1
 
             TerminalBuffer::Character ch = buffer.charAt(currX, currY);
 
-            if (ch.fg == TerminalBuffer::kColour_Default)
-                ch.fg = kDefaultForegroundColour;
-            if (ch.bg == TerminalBuffer::kColour_Default)
-                ch.bg = kDefaultBackgroundColour;
+            uint32_t fg = kColourTable[kDefaultForegroundColour];
+            uint32_t bg = kColourTable[kDefaultBackgroundColour];
+
+            const uint32_t *colours = (ch.attributes & TerminalBuffer::kAttribute_Bold)
+                ? kColourTableBold
+                : kColourTable;
+
+            if (ch.fg != TerminalBuffer::kColour_Default)
+                fg = colours[ch.fg];
+            if (ch.bg != TerminalBuffer::kColour_Default)
+                bg = colours[ch.bg];
 
             /* Swap colours for the cursor. */
             if (currX == buffer.cursorX() && currY == buffer.cursorY())
-                std::swap(ch.fg, ch.bg);
+                std::swap(fg, bg);
 
-            drawCharacter(currX, currY, ch);
+            drawCharacter(currX, currY, ch.ch, fg, bg);
         }
     }
 }
@@ -238,21 +245,14 @@ static inline uint32_t blend(uint32_t fg, uint32_t bg, uint8_t alpha) {
     return result;
 }
 
-void TerminalWindow::drawCharacter(uint16_t x, uint16_t y, TerminalBuffer::Character ch) {
-    const uint32_t *colours = (ch.attributes & TerminalBuffer::kAttribute_Bold)
-        ? kColourTableBold
-        : kColourTable;
-
-    uint32_t fg = colours[ch.fg];
-    uint32_t bg = colours[ch.bg];
-
+void TerminalWindow::drawCharacter(uint16_t x, uint16_t y, uint8_t ch, uint32_t fg, uint32_t bg) {
     Framebuffer &fb = g_terminalApp.framebuffer();
     Font &font      = g_terminalApp.font();
 
     x *= font.width();
     y *= font.height();
 
-    const uint8_t *data = font.charData(ch.ch);
+    const uint8_t *data = font.charData(ch);
 
     for (uint16_t i = 0; i < font.height(); i++) {
         for (uint16_t j = 0; j < font.width(); j++) {

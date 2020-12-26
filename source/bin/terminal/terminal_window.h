@@ -52,7 +52,7 @@ public:
     void bufferScrolled(uint16_t top, uint16_t bottom, bool up);
 
 private:
-    void drawCharacter(uint16_t x, uint16_t y, TerminalBuffer::Character ch);
+    void drawCharacter(uint16_t x, uint16_t y, uint8_t ch, uint32_t fg, uint32_t bg);
 
 private:
     std::unique_ptr<Terminal> m_terminal;
