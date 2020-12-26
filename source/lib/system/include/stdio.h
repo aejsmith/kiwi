@@ -55,9 +55,9 @@ struct __fstream_internal;
 #define P_tmpdir        "/tmp"
 
 /** Actions for fseek(). */
-#define SEEK_SET        1           /**< Set the offset to the exact position specified. */
-#define SEEK_CUR        2           /**< Add the supplied value to the current offset. */
-#define SEEK_END        3           /**< Set the offset to the end of the file plus the supplied value. */
+#define SEEK_SET        0           /**< Set the offset to the exact position specified. */
+#define SEEK_CUR        1           /**< Add the supplied value to the current offset. */
+#define SEEK_END        2           /**< Set the offset to the end of the file plus the supplied value. */
 
 /** Type describing an open file stream. */
 typedef struct __fstream_internal FILE;
