@@ -133,7 +133,7 @@ static inline void writePixel(void *dest, uint8_t bytes, uint32_t value) {
     }
 }
 
-void Framebuffer::putPixel(uint16_t x, uint16_t y, uint32_t rgb) {
+void Framebuffer::putPixel(uint16_t x, uint16_t y, uint32_t rgb, bool flush) {
     uint32_t value =
         (((rgb >> (24 - m_mode.red_size))   & ((1 << m_mode.red_size) - 1))   << m_mode.red_position) |
         (((rgb >> (16 - m_mode.green_size)) & ((1 << m_mode.green_size) - 1)) << m_mode.green_position) |
@@ -142,7 +142,9 @@ void Framebuffer::putPixel(uint16_t x, uint16_t y, uint32_t rgb) {
     size_t offset = pixelOffset(m_mode, x, y);
 
     writePixel(m_backbuffer + offset, m_mode.bytes_per_pixel, value);
-    writePixel(m_mapping + offset,    m_mode.bytes_per_pixel, value);
+
+    if (flush)
+        writePixel(m_mapping + offset, m_mode.bytes_per_pixel, value);
 }
 
 void Framebuffer::fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb) {
@@ -158,8 +160,14 @@ void Framebuffer::fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t heig
             height * m_mode.pitch);
     } else {
         for (uint16_t i = 0; i < height; i++) {
+            /* Fill on the backbuffer then copy in bulk to the framebuffer. */
             for (uint16_t j = 0; j < width; j++)
-                putPixel(x + j, y + i, rgb);
+                putPixel(x + j, y + i, rgb, false);
+
+            memcpy(
+                m_mapping + pixelOffset(m_mode, x, y + i),
+                m_backbuffer + pixelOffset(m_mode, x, y + i),
+                width * m_mode.bytes_per_pixel);
         }
     }
 }

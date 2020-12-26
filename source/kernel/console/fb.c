@@ -54,7 +54,7 @@ extern unsigned char logo_ppm[];
 #define FONT_WIDTH              7
 #define FONT_HEIGHT             14
 #define FONT_FG                 0xffffff
-#define FONT_BG                 0x000000
+#define FONT_BG                 0x000020
 
 /** Colour and size of the splash progress bar. */
 #define SPLASH_PROGRESS_FG      0x78cc00
@@ -108,7 +108,7 @@ static uint16_t splash_progress_y;
  * Framebuffer drawing functions.
  */
 
-static void fb_putpixel(uint16_t x, uint16_t y, uint32_t rgb) {
+static void fb_put_pixel(uint16_t x, uint16_t y, uint32_t rgb, bool flush) {
     uint32_t value =
         (RED(rgb, fb_info.red_size) << fb_info.red_position) |
         (GREEN(rgb, fb_info.green_size) << fb_info.green_position) |
@@ -130,7 +130,7 @@ static void fb_putpixel(uint16_t x, uint16_t y, uint32_t rgb) {
             break;
     }
 
-    if (fb_backbuffer != fb_mapping) {
+    if (flush && fb_backbuffer != fb_mapping) {
         dest = fb_mapping + offset;
 
         switch (fb_info.bytes_per_pixel) {
@@ -149,7 +149,7 @@ static void fb_putpixel(uint16_t x, uint16_t y, uint32_t rgb) {
     }
 }
 
-static void fb_fillrect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb) {
+static void fb_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb) {
     if (x == 0 && width == fb_info.width && (rgb == 0 || rgb == 0xffffff)) {
         /* Fast path where we can fill a block quickly. */
         memset(
@@ -164,13 +164,21 @@ static void fb_fillrect(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
         }
     } else {
         for (uint16_t i = 0; i < height; i++) {
+            /* Fill on the backbuffer then copy in bulk to the framebuffer. */
             for (uint16_t j = 0; j < width; j++)
-                fb_putpixel(x + j, y + i, rgb);
+                fb_put_pixel(x + j, y + i, rgb, false);
+
+            if (fb_backbuffer != fb_mapping) {
+                memcpy(
+                    fb_mapping + OFFSET(x, y + i),
+                    fb_backbuffer + OFFSET(x, y + i),
+                    width * fb_info.bytes_per_pixel);
+            }
         }
     }
 }
 
-static void fb_copyrect(
+static void fb_copy_rect(
     uint16_t dest_x, uint16_t dest_y, uint16_t src_x, uint16_t src_y,
     uint16_t width, uint16_t height)
 {
@@ -229,9 +237,9 @@ static void fb_console_draw_glyph(char ch, uint16_t x, uint16_t y, uint32_t fg, 
     for (uint16_t i = 0; i < FONT_HEIGHT; i++) {
         for (uint16_t j = 0; j < FONT_WIDTH; j++) {
             if (console_font[(ch * FONT_HEIGHT) + i] & (1 << (7 - j))) {
-                fb_putpixel(x + j, y + i, fg);
+                fb_put_pixel(x + j, y + i, fg, true);
             } else {
-                fb_putpixel(x + j, y + i, bg);
+                fb_put_pixel(x + j, y + i, bg, true);
             }
         }
     }
@@ -301,7 +309,7 @@ static void fb_console_putc_unsafe(char ch) {
     if (fb_console_x >= fb_console_cols) {
         fb_console_x = 0;
         if (++fb_console_y < fb_console_rows)
-            fb_fillrect(0, FONT_HEIGHT * fb_console_y, fb_info.width, FONT_HEIGHT, FONT_BG);
+            fb_fill_rect(0, FONT_HEIGHT * fb_console_y, fb_info.width, FONT_HEIGHT, FONT_BG);
     }
 
     /* If we have reached the bottom of the screen, scroll. */
@@ -318,8 +326,8 @@ static void fb_console_putc_unsafe(char ch) {
                 fb_console_cols);
         }
 
-        fb_copyrect(0, 0, 0, FONT_HEIGHT, fb_info.width, (fb_console_rows - 1) * FONT_HEIGHT);
-        fb_fillrect(0, FONT_HEIGHT * (fb_console_rows - 1), fb_info.width, FONT_HEIGHT, FONT_BG);
+        fb_copy_rect(0, 0, 0, FONT_HEIGHT, fb_info.width, (fb_console_rows - 1) * FONT_HEIGHT);
+        fb_fill_rect(0, FONT_HEIGHT * (fb_console_rows - 1), fb_info.width, FONT_HEIGHT, FONT_BG);
 
         /* Update the cursor position. */
         fb_console_y = fb_console_rows - 1;
@@ -351,7 +359,7 @@ static console_out_ops_t fb_console_out_ops = {
 static void fb_console_reset(void) {
     /* Reset the cursor position and clear the console. */
     fb_console_x = fb_console_y = 0;
-    fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
+    fb_fill_rect(0, 0, fb_info.width, fb_info.height, FONT_BG);
     memset(fb_console_glyphs, ' ', fb_console_cols * fb_console_rows);
     fb_console_enable_cursor();
 }
@@ -449,7 +457,7 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
         fb_console_x = fb_console_y = 0;
 
         /* Clear to the font background colour. */
-        fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
+        fb_fill_rect(0, 0, fb_info.width, fb_info.height, FONT_BG);
         fb_console_enable_cursor();
     }
 
@@ -586,7 +594,7 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
             colour |= (*(ppm++) * coef) << 16;
             colour |= (*(ppm++) * coef) << 8;
             colour |= *(ppm++) * coef;
-            fb_putpixel(x + j, y + i, colour);
+            fb_put_pixel(x + j, y + i, colour, true);
         }
     }
 }
@@ -597,11 +605,11 @@ void update_boot_progress(int percent) {
     spinlock_lock(&fb_lock);
 
     if (splash_enabled) {
-        fb_fillrect(
+        fb_fill_rect(
             splash_progress_x, splash_progress_y,
             SPLASH_PROGRESS_WIDTH, SPLASH_PROGRESS_HEIGHT,
             SPLASH_PROGRESS_BG);
-        fb_fillrect(
+        fb_fill_rect(
             splash_progress_x, splash_progress_y,
             (SPLASH_PROGRESS_WIDTH * percent) / 100,
             SPLASH_PROGRESS_HEIGHT, SPLASH_PROGRESS_FG);
@@ -637,7 +645,7 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
     fb_backbuffer = fb_mapping;
 
     /* Clear the framebuffer. */
-    fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
+    fb_fill_rect(0, 0, fb_info.width, fb_info.height, FONT_BG);
 
     /* Configure the console. */
     fb_console_x = fb_console_y = 0;
