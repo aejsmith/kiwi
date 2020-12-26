@@ -35,6 +35,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <termios.h>
 
 #include <array>
 
@@ -106,6 +107,15 @@ bool Terminal::init() {
 
         kern_handle_set_flags(m_terminal[i], HANDLE_INHERITABLE);
     }
+
+    /* Configure window size. */
+    struct winsize ws;
+    ws.ws_col = m_window.cols();
+    ws.ws_row = m_window.rows();
+
+    ret = kern_file_request(m_terminal[1], TIOCSWINSZ, &ws, sizeof(ws), NULL, 0, NULL);
+    if (ret != STATUS_SUCCESS)
+        core_log(CORE_LOG_WARN, "failed to set window size: %" PRId32, ret);
 
     /* Spawn a process attached to the terminal. */
     if (spawnProcess("/system/bin/bash", m_childProcess) != STATUS_SUCCESS)
