@@ -1075,11 +1075,6 @@ status_t kern_process_exec(
             return STATUS_PERM_DENIED;
     }
 
-    if (curr_proc->threads.next->next != &curr_proc->threads) {
-        kprintf(LOG_WARN, "kern_process_exec: TODO: Terminate other threads\n");
-        return STATUS_NOT_IMPLEMENTED;
-    }
-
     process_load_t load;
     ret = copy_process_args(path, args, env, attrib, &load);
     if (ret != STATUS_SUCCESS)
@@ -1089,6 +1084,45 @@ status_t kern_process_exec(
     ret = process_load(&load, curr_proc);
     if (ret != STATUS_SUCCESS)
         goto err_free_args;
+
+    mutex_lock(&curr_proc->lock);
+
+    /* Kill other threads in the process. TODO: Should not do this until we're
+     * past the point of no return - needs to be after object_process_exec()
+     * has successfully created the new handle table, but before it replaces
+     * the old one (as old threads may be using it). */
+    bool undead = false;
+    list_foreach_safe(&curr_proc->threads, iter) {
+        thread_t *thread = list_entry(iter, thread_t, owner_link);
+
+        if (thread != curr_thread && thread->state != THREAD_DEAD) {
+            thread_kill(thread);
+            undead = true;
+        }
+    }
+
+    /* Wait until threads have exited, need to be sure they aren't using the
+     * old process state. */
+    while (undead) {
+        undead = false;
+
+        list_foreach(&curr_proc->threads, iter) {
+            thread_t *thread = list_entry(iter, thread_t, owner_link);
+
+            if (thread != curr_thread && thread->state != THREAD_DEAD) {
+                undead = true;
+                break;
+            }
+        }
+
+        if (undead) {
+            mutex_unlock(&curr_proc->lock);
+            thread_yield();
+            mutex_lock(&curr_proc->lock);
+        }
+    }
+
+    mutex_unlock(&curr_proc->lock);
 
     /* Create the entry thread to finish loading the program. */
     thread_t *thread;
