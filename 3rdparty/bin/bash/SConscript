@@ -19,9 +19,6 @@
 
 Import('manager', 'config')
 
-env = manager.Create()
-host = manager['host']
-
 # Definitions for building for both the target and the host.
 defines = {
 	'PACKAGE': '\'"bash"\'',
@@ -36,15 +33,25 @@ defines = {
 	'RECYCLES_PIDS': None,
 }
 
+# Include paths.
+include_paths = ['.', 'include', 'lib', 'lib/sh', 'lib/termcap', 'builtins']
+
+env = manager.Create(
+    flags = {
+		'CPPDEFINES': defines,
+		'CCFLAGS':    ['-w'],
+		'CPPPATH':    include_paths,
+    }
+)
+
+host = manager['host']
+
 # Definitions for building for the host.
-host_defines = defines
+host_defines = dict(defines)
 host_defines.update({
 	'BUILDTOOL': None,
 	'CROSS_COMPILING': None,
 })
-
-# Include paths.
-include_paths = ['.', 'include', 'lib', 'lib/sh', 'lib/termcap', 'builtins', Dir('#/')]
 
 # Target source files.
 sources = [
@@ -266,8 +273,7 @@ mkbuiltins = host.Program(
 target = env.Command(
 	['builtins/builtins.c', 'builtins/builtext.h'],
 	builtins + ['builtins/reserved.def'],
-	Action('$MKB -externfile ${TARGETS[1]} -structfile ${TARGETS[0]} -noproduction $SOURCES', '$GENCOMSTR'),
-	MKB = mkbuiltins)
+	Action('sh -c "cd ${SOURCES[0].dir}; ../mkbuiltins -externfile ${TARGETS[1].file} -structfile ${TARGETS[0].file} -noproduction $SOURCES.file"', '$GENCOMSTR'))
 env.Depends(target, mkbuiltins)
 
 # Generate the code for all of the builtins.
@@ -281,12 +287,6 @@ for builtin in builtins:
 	env.Depends(target, mkbuiltins)
 
 # Build the program itself.
-target = env.KiwiApplication('bash',
-	sources = sources,
-	flags = {
-		'CPPDEFINES': defines,
-		'CCFLAGS': ['-w'],
-		'CPPPATH': include_paths,
-	})
+target = env.KiwiApplication('bash', sources = sources)
 
 manager['dist'].AddLink('bash', '/system/bin/sh')

@@ -16,7 +16,23 @@
 
 Import('manager')
 
-env = manager.Create()
+env = manager.Create(
+    flags = {
+		# Definitions controlling features.
+		'CPPDEFINES': {
+			'MORE_24': None,
+			#'ALLOW_GDT': None,
+			'TEXTFILE': '\\\"/system/data/dungeon/dtextc.dat\\\"'
+		},
+
+		# Override build flags - it won't compile with our warning flags.
+		'CCFLAGS': [
+			'-Wno-format', '-Wno-missing-braces', '-Wno-parentheses',
+			'-Wno-redundant-decls', '-Wno-unused-variable',
+		],
+	}
+)
+
 target = env.KiwiApplication('dungeon',
 	sources = [
 		'actors.c',
@@ -52,21 +68,7 @@ target = env.KiwiApplication('dungeon',
 		'sverbs.c',
 		'verbs.c',
 		'villns.c',
-	],
-	flags = {
-		# Definitions controlling features.
-		'CPPDEFINES': {
-			'MORE_24': None,
-			#'ALLOW_GDT': None,
-			'TEXTFILE': '\\\"/system/data/dungeon/dtextc.dat\\\"'
-		},
-
-		# Override build flags - it won't compile with our warning flags.
-		'CCFLAGS': [
-			'-Wno-format', '-Wno-missing-braces', '-Wno-parentheses',
-			'-Wno-redundant-decls', '-Wno-unused-variable',
-		],
-	}
+	]
 )
 
 # Build the data file.

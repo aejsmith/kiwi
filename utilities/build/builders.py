@@ -24,7 +24,7 @@ ld_script_builder = Builder(action = Action(
 
 # Custom method to build a Kiwi application.
 def kiwi_application_method(env, name, sources, **kwargs):
-    flags = kwargs['flags'] if 'flags' in kwargs else {}
+    override_flags = kwargs['override_flags'] if 'override_flags' in kwargs else {}
 
     target = File(name)
 
@@ -33,11 +33,11 @@ def kiwi_application_method(env, name, sources, **kwargs):
     dist.AddFile(target, 'system/bin/%s' % (name))
 
     # Build the application.
-    return env.Program(target, sources, **flags)
+    return env.Program(target, sources, **override_flags)
 
 # Custom method to build a Kiwi service.
 def kiwi_service_method(env, name, sources, **kwargs):
-    flags = kwargs['flags'] if 'flags' in kwargs else {}
+    override_flags = kwargs['flags'] if 'flags' in kwargs else {}
 
     target = File(name)
 
@@ -46,7 +46,7 @@ def kiwi_service_method(env, name, sources, **kwargs):
     dist.AddFile(target, 'system/services/%s' % (name))
 
     # Build the application.
-    return env.Program(target, sources, **flags)
+    return env.Program(target, sources, **override_flags)
 
 # Custom method to build a Kiwi library.
 def kiwi_library_method(env, name, sources, **kwargs):
@@ -54,7 +54,7 @@ def kiwi_library_method(env, name, sources, **kwargs):
 
     build_libraries = kwargs['build_libraries'] if 'build_libraries' in kwargs else []
     include_paths = kwargs['include_paths'] if 'include_paths' in kwargs else []
-    flags = kwargs['flags'] if 'flags' in kwargs else {}
+    override_flags = kwargs['override_flags'] if 'override_flags' in kwargs else {}
 
     # Register this library with the build manager.
     manager.AddLibrary(name, build_libraries, include_paths)
@@ -68,4 +68,4 @@ def kiwi_library_method(env, name, sources, **kwargs):
     dist.AddFile(target, 'system/lib/lib%s.so' % (name))
 
     # Build the library.
-    return env.SharedLibrary(target, sources, **flags)
+    return env.SharedLibrary(target, sources, **override_flags)
