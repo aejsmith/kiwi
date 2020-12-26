@@ -369,7 +369,7 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
      * prevent end from going onto the next page when the offset plus the count
      * is an exact multiple of PAGE_SIZE. */
     offset_t start = round_down(request->offset, PAGE_SIZE);
-    offset_t end   = round_down((request->offset + (request->total - 1)), PAGE_SIZE);
+    offset_t end   = round_down((request->offset + (total - 1)), PAGE_SIZE);
 
     void *mapping;
     bool shared;
@@ -384,7 +384,7 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
 
         size_t count = (start != end)
             ? (size_t)(PAGE_SIZE - (request->offset % PAGE_SIZE))
-            : request->total;
+            : total;
 
         io_request_copy(request, mapping + (request->offset % PAGE_SIZE), count);
         vm_cache_unmap_page(cache, mapping, start, false, shared);
