@@ -38,15 +38,13 @@ public:
 
     void handleEvent(const object_event_t &event) override;
 
-    void putPixel(uint16_t x, uint16_t y, uint32_t rgb) { putPixel(x, y, rgb, true); }
+    void putPixel(uint16_t x, uint16_t y, uint32_t rgb);
     void fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb);
     void copyRect(
         uint16_t destX, uint16_t destY, uint16_t srcX, uint16_t srcY,
         uint16_t width, uint16_t height);
 
 private:
-    void putPixel(uint16_t x, uint16_t y, uint32_t rgb, bool flush);
-
     handle_t m_handle;
     kfb_mode_t m_mode;
     uint8_t *m_mapping;

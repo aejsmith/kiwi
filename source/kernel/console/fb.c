@@ -62,18 +62,6 @@ extern unsigned char logo_ppm[];
 #define SPLASH_PROGRESS_WIDTH   250
 #define SPLASH_PROGRESS_HEIGHT  3
 
-/** Get red colour from RGB value. */
-#define RED(x, bits)            (((x) >> (24 - bits)) & ((1 << bits) - 1))
-
-/** Get green colour from RGB value. */
-#define GREEN(x, bits)          (((x) >> (16 - bits)) & ((1 << bits) - 1))
-
-/** Get blue colour from RGB value. */
-#define BLUE(x, bits)           (((x) >> (8  - bits)) & ((1 << bits) - 1))
-
-/** Get the byte offset of a pixel. */
-#define OFFSET(x, y)            (((y) * fb_info.pitch) + ((x) * fb_info.bytes_per_pixel))
-
 /** Lock for the framebuffer console. */
 static SPINLOCK_DEFINE(fb_lock);
 
@@ -108,14 +96,18 @@ static uint16_t splash_progress_y;
  * Framebuffer drawing functions.
  */
 
-static void fb_put_pixel(uint16_t x, uint16_t y, uint32_t rgb, bool flush) {
-    uint32_t value =
-        (RED(rgb, fb_info.red_size) << fb_info.red_position) |
-        (GREEN(rgb, fb_info.green_size) << fb_info.green_position) |
-        (BLUE(rgb, fb_info.blue_size) << fb_info.blue_position);
-    size_t offset = OFFSET(x, y);
-    void *dest = fb_backbuffer + offset;
+static inline size_t fb_pixel_offset(uint16_t x, uint16_t y) {
+    return (y * fb_info.pitch) + (x * fb_info.bytes_per_pixel);
+}
 
+static inline uint32_t fb_conv_pixel(uint32_t rgb) {
+    return
+        (((rgb >> (24 - fb_info.red_size))   & ((1 << fb_info.red_size) - 1))   << fb_info.red_position) |
+        (((rgb >> (16 - fb_info.green_size)) & ((1 << fb_info.green_size) - 1)) << fb_info.green_position) |
+        (((rgb >> (8  - fb_info.blue_size))  & ((1 << fb_info.blue_size) - 1))  << fb_info.blue_position);
+}
+
+static inline void fb_write_pixel(void *dest, uint32_t value) {
     switch (fb_info.bytes_per_pixel) {
         case 2:
             *(uint16_t *)dest = (uint16_t)value;
@@ -129,49 +121,67 @@ static void fb_put_pixel(uint16_t x, uint16_t y, uint32_t rgb, bool flush) {
             *(uint32_t *)dest = value;
             break;
     }
+}
 
-    if (flush && fb_backbuffer != fb_mapping) {
-        dest = fb_mapping + offset;
+static void fb_put_pixel(uint16_t x, uint16_t y, uint32_t rgb) {
+    uint32_t value = fb_conv_pixel(rgb);
+    size_t offset  = fb_pixel_offset(x, y);
 
-        switch (fb_info.bytes_per_pixel) {
-            case 2:
-                *(uint16_t *)dest = (uint16_t)value;
-                break;
-            case 3:
-                ((uint8_t *)dest)[0] = value & 0xff;
-                ((uint8_t *)dest)[1] = (value >> 8) & 0xff;
-                ((uint8_t *)dest)[2] = (value >> 16) & 0xff;
-                break;
-            case 4:
-                *(uint32_t *)dest = value;
-                break;
-        }
-    }
+    fb_write_pixel(fb_backbuffer + offset, value);
+
+    if (fb_backbuffer != fb_mapping)
+        fb_write_pixel(fb_mapping + offset, value);
 }
 
 static void fb_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb) {
     if (x == 0 && width == fb_info.width && (rgb == 0 || rgb == 0xffffff)) {
         /* Fast path where we can fill a block quickly. */
         memset(
-            fb_backbuffer + OFFSET(0, y),
+            fb_backbuffer + fb_pixel_offset(0, y),
             (uint8_t)rgb,
             height * fb_info.pitch);
+
         if (fb_backbuffer != fb_mapping) {
             memset(
-                fb_mapping + OFFSET(0, y),
+                fb_mapping + fb_pixel_offset(0, y),
                 (uint8_t)rgb,
                 height * fb_info.pitch);
         }
     } else {
+        uint32_t value = fb_conv_pixel(rgb);
+
         for (uint16_t i = 0; i < height; i++) {
             /* Fill on the backbuffer then copy in bulk to the framebuffer. */
-            for (uint16_t j = 0; j < width; j++)
-                fb_put_pixel(x + j, y + i, rgb, false);
+            size_t offset = fb_pixel_offset(x, y + i);
+            uint8_t *dest = fb_backbuffer + offset;
+
+            switch (fb_info.bytes_per_pixel) {
+                case 2:
+                    for (uint16_t j = 0; j < width; j++) {
+                        *(uint16_t *)dest = (uint16_t)value;
+                        dest += 2;
+                    }
+                    break;
+                case 3:
+                    for (uint16_t j = 0; j < width; j++) {
+                        ((uint8_t *)dest)[0] = value & 0xff;
+                        ((uint8_t *)dest)[1] = (value >> 8) & 0xff;
+                        ((uint8_t *)dest)[2] = (value >> 16) & 0xff;
+                        dest += 3;
+                    }
+                    break;
+                case 4:
+                    for (uint16_t j = 0; j < width; j++) {
+                        *(uint32_t *)dest = value;
+                        dest += 4;
+                    }
+                    break;
+            }
 
             if (fb_backbuffer != fb_mapping) {
                 memcpy(
-                    fb_mapping + OFFSET(x, y + i),
-                    fb_backbuffer + OFFSET(x, y + i),
+                    fb_mapping + offset,
+                    fb_backbuffer + offset,
                     width * fb_info.bytes_per_pixel);
             }
         }
@@ -184,8 +194,8 @@ static void fb_copy_rect(
 {
     if (dest_x == 0 && src_x == 0 && width == fb_info.width) {
         /* Fast path where we can copy everything in one go. */
-        size_t dest_offset = OFFSET(0, dest_y);
-        size_t src_offset  = OFFSET(0, src_y);
+        size_t dest_offset = fb_pixel_offset(0, dest_y);
+        size_t src_offset  = fb_pixel_offset(0, src_y);
 
         /* Copy everything on the backbuffer. */
         memmove(
@@ -203,8 +213,8 @@ static void fb_copy_rect(
     } else {
         /* Copy line by line. */
         for (uint16_t i = 0; i < height; i++) {
-            size_t dest_offset = OFFSET(dest_x, dest_y + i);
-            size_t src_offset  = OFFSET(src_x, src_y + i);
+            size_t dest_offset = fb_pixel_offset(dest_x, dest_y + i);
+            size_t src_offset  = fb_pixel_offset(src_x, src_y + i);
 
             /* Copy everything on the backbuffer. */
             memmove(
@@ -237,9 +247,9 @@ static void fb_console_draw_glyph(char ch, uint16_t x, uint16_t y, uint32_t fg, 
     for (uint16_t i = 0; i < FONT_HEIGHT; i++) {
         for (uint16_t j = 0; j < FONT_WIDTH; j++) {
             if (console_font[(ch * FONT_HEIGHT) + i] & (1 << (7 - j))) {
-                fb_put_pixel(x + j, y + i, fg, true);
+                fb_put_pixel(x + j, y + i, fg);
             } else {
-                fb_put_pixel(x + j, y + i, bg, true);
+                fb_put_pixel(x + j, y + i, bg);
             }
         }
     }
@@ -594,7 +604,7 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
             colour |= (*(ppm++) * coef) << 16;
             colour |= (*(ppm++) * coef) << 8;
             colour |= *(ppm++) * coef;
-            fb_put_pixel(x + j, y + i, colour, true);
+            fb_put_pixel(x + j, y + i, colour);
         }
     }
 }

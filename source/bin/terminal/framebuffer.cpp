@@ -117,8 +117,15 @@ static inline size_t pixelOffset(const kfb_mode_t &mode, uint16_t x, uint16_t y)
     return (y * mode.pitch) + (x * mode.bytes_per_pixel);
 }
 
-static inline void writePixel(void *dest, uint8_t bytes, uint32_t value) {
-    switch (bytes) {
+static inline uint32_t convPixel(const kfb_mode_t &mode, uint32_t rgb) {
+    return
+        (((rgb >> (24 - mode.red_size))   & ((1 << mode.red_size) - 1))   << mode.red_position) |
+        (((rgb >> (16 - mode.green_size)) & ((1 << mode.green_size) - 1)) << mode.green_position) |
+        (((rgb >> (8  - mode.blue_size))  & ((1 << mode.blue_size) - 1))  << mode.blue_position);
+}
+
+static inline void writePixel(const kfb_mode_t &mode, void *dest, uint32_t value) {
+    switch (mode.bytes_per_pixel) {
         case 2:
             reinterpret_cast<uint16_t *>(dest)[0] = value;
             break;
@@ -133,18 +140,12 @@ static inline void writePixel(void *dest, uint8_t bytes, uint32_t value) {
     }
 }
 
-void Framebuffer::putPixel(uint16_t x, uint16_t y, uint32_t rgb, bool flush) {
-    uint32_t value =
-        (((rgb >> (24 - m_mode.red_size))   & ((1 << m_mode.red_size) - 1))   << m_mode.red_position) |
-        (((rgb >> (16 - m_mode.green_size)) & ((1 << m_mode.green_size) - 1)) << m_mode.green_position) |
-        (((rgb >> (8  - m_mode.blue_size))  & ((1 << m_mode.blue_size) - 1))  << m_mode.blue_position);
+void Framebuffer::putPixel(uint16_t x, uint16_t y, uint32_t rgb) {
+    uint32_t value = convPixel(m_mode, rgb);
+    size_t offset  = pixelOffset(m_mode, x, y);
 
-    size_t offset = pixelOffset(m_mode, x, y);
-
-    writePixel(m_backbuffer + offset, m_mode.bytes_per_pixel, value);
-
-    if (flush)
-        writePixel(m_mapping + offset, m_mode.bytes_per_pixel, value);
+    writePixel(m_mode, m_backbuffer + offset, value);
+    writePixel(m_mode, m_mapping + offset, value);
 }
 
 void Framebuffer::fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb) {
@@ -159,14 +160,39 @@ void Framebuffer::fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t heig
             static_cast<uint8_t>(rgb),
             height * m_mode.pitch);
     } else {
+        uint32_t value = convPixel(m_mode, rgb);
+
         for (uint16_t i = 0; i < height; i++) {
             /* Fill on the backbuffer then copy in bulk to the framebuffer. */
-            for (uint16_t j = 0; j < width; j++)
-                putPixel(x + j, y + i, rgb, false);
+            size_t offset = pixelOffset(m_mode, x, y + i);
+            uint8_t *dest = m_backbuffer + offset;
+
+            switch (m_mode.bytes_per_pixel) {
+                case 2:
+                    for (uint16_t j = 0; j < width; j++) {
+                        reinterpret_cast<uint16_t *>(dest)[0] = (uint16_t)value;
+                        dest += 2;
+                    }
+                    break;
+                case 3:
+                    for (uint16_t j = 0; j < width; j++) {
+                        (reinterpret_cast<uint8_t *>(dest))[0] = value & 0xff;
+                        (reinterpret_cast<uint8_t *>(dest))[1] = (value >> 8) & 0xff;
+                        (reinterpret_cast<uint8_t *>(dest))[2] = (value >> 16) & 0xff;
+                        dest += 3;
+                    }
+                    break;
+                case 4:
+                    for (uint16_t j = 0; j < width; j++) {
+                        reinterpret_cast<uint32_t *>(dest)[0] = value;
+                        dest += 4;
+                    }
+                    break;
+            }
 
             memcpy(
-                m_mapping + pixelOffset(m_mode, x, y + i),
-                m_backbuffer + pixelOffset(m_mode, x, y + i),
+                m_mapping + offset,
+                m_backbuffer + offset,
                 width * m_mode.bytes_per_pixel);
         }
     }
