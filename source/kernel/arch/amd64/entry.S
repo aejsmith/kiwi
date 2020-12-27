@@ -245,18 +245,24 @@ FUNCTION_START(syscall_entry)
     movq    FRAME_OFF_R9(%rsp), %r9
     call    *syscall_table(,%rbx,1)
 .Lreturn:
-    /* Save the return value of the system call. */
-    movq    %rax, FRAME_OFF_AX(%rsp)
+    movq    %gs:ARCH_THREAD_OFF_FLAGS, %rdi
 
+    /* Save the return value of the system call, unless we're returning out of
+     * kern_thread_restore(), in which case we shouldn't clobber the restored
+     * RAX value. */
+    testq   $ARCH_THREAD_FRAME_RESTORED, %rdi
+    jnz     1f
+    movq    %rax, FRAME_OFF_AX(%rsp)
+1:
     /* Disable interrupts and perform kernel exit work. */
     cli
     call    thread_at_kernel_exit
 
-    /* If we're going to execute a user-mode signal handler, or we have returned
-     * from a signal handler, the signal frame setup code will have set the
+    /* If we're going to execute a user-mode interrupt handler, or we have
+     * returned from one, the interrupt frame setup code will have set the
      * ARCH_THREAD_FRAME_MODIFIED flag. When this flag is set, we return via
      * IRET as it doesn't clobber certain registers. */
-    testl   $ARCH_THREAD_FRAME_MODIFIED, %gs:ARCH_THREAD_OFF_FLAGS
+    testq   $ARCH_THREAD_FRAME_MODIFIED, %rdi
     jnz     .Liret
 
     /* Restore saved registers, RFLAGS/RIP for SYSRET, and the userspace stack
@@ -303,8 +309,8 @@ FUNCTION_START(syscall_entry)
     movq    %r12, %rsp
     jmp     .Lreturn
 .Liret:
-    /* Clear the modified flag. */
-    andl    $~ARCH_THREAD_FRAME_MODIFIED, %gs:ARCH_THREAD_OFF_FLAGS
+    /* Clear the modified/restored flags. */
+    andq    $~(ARCH_THREAD_FRAME_MODIFIED | ARCH_THREAD_FRAME_RESTORED), %gs:ARCH_THREAD_OFF_FLAGS
 
     /* Restore the registers, get rid of interrupt/error code. */
     POP_REGS

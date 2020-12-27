@@ -70,8 +70,9 @@ static inline struct thread *arch_curr_thread(void) {
 
 /** Flags for arch_thread_t. */
 #define ARCH_THREAD_FRAME_MODIFIED  (1 << 0)    /**< Interrupt frame was modified. */
-#define ARCH_THREAD_HAVE_FPU        (1 << 1)    /**< Thread has an FPU state saved. */
-#define ARCH_THREAD_FREQUENT_FPU    (1 << 2)    /**< FPU is frequently used by the thread. */
+#define ARCH_THREAD_FRAME_RESTORED  (1 << 1)    /**< A pre-interrupt frame was restored. */
+#define ARCH_THREAD_HAVE_FPU        (1 << 2)    /**< Thread has an FPU state saved. */
+#define ARCH_THREAD_FREQUENT_FPU    (1 << 3)    /**< FPU is frequently used by the thread. */
 
 /** Offsets in arch_thread_t. */
 #define ARCH_THREAD_OFF_KERNEL_RSP  0x10

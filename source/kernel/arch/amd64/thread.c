@@ -269,6 +269,7 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
     /* We must return from system calls via the IRET path because we have
      * modified the frame. */
     curr_thread->arch.flags |= ARCH_THREAD_FRAME_MODIFIED;
+
     return STATUS_SUCCESS;
 }
 
@@ -311,6 +312,7 @@ status_t arch_thread_interrupt_restore(unsigned *_ipl) {
     frame->ip     = context.cpu.rip;
 
     /* Same as above. */
-    curr_thread->arch.flags |= ARCH_THREAD_FRAME_MODIFIED;
+    curr_thread->arch.flags |= ARCH_THREAD_FRAME_MODIFIED | ARCH_THREAD_FRAME_RESTORED;
+
     return STATUS_SUCCESS;
 }
