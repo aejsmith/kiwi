@@ -72,7 +72,7 @@ env.Syscalls('syscalls.S', manager['kernel']['SYSCALLS'])
 env.Command(
     'status_list.c',
     ['include/kernel/status.h'],
-    Action('$GENERRLIST $SOURCE __kernel_status_strings __kernel_status_size > $TARGET', '$GENCOMSTR'))
+    Action('$GENERRLIST $SOURCE __kern_status_strings __kern_status_size > $TARGET', '$GENCOMSTR'))
 
 # Get a list of architecture-specific source files.
 arch_sources = SConscript(dirs = ['arch/%s' % (config['ARCH'])], exports = ['env'])
