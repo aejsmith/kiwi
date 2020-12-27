@@ -69,6 +69,9 @@ void spinlock_lock(spinlock_t *lock) {
 
     spinlock_lock_internal(lock);
     lock->state = irq_state;
+
+    /* We enter interrupt context when a spinlock is held. */
+    enter_interrupt();
 }
 
 /**
@@ -92,6 +95,9 @@ void spinlock_lock_noirq(spinlock_t *lock) {
     assert(!local_irq_state());
 
     spinlock_lock_internal(lock);
+
+    /* We enter interrupt context when a spinlock is held. */
+    enter_interrupt();
 }
 
 /**
@@ -104,6 +110,8 @@ void spinlock_lock_noirq(spinlock_t *lock) {
 void spinlock_unlock(spinlock_t *lock) {
     if (unlikely(!spinlock_held(lock)))
         fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
+
+    leave_interrupt();
 
     bool irq_state = lock->state;
     atomic_store(&lock->value, 1);
@@ -119,6 +127,8 @@ void spinlock_unlock(spinlock_t *lock) {
 void spinlock_unlock_noirq(spinlock_t *lock) {
     if (unlikely(!spinlock_held(lock)))
         fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
+
+    leave_interrupt();
 
     atomic_store(&lock->value, 1);
 }

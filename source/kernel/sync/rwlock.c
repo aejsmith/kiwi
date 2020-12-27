@@ -26,6 +26,8 @@
 
 #include <sync/rwlock.h>
 
+#include <assert.h>
+#include <cpu.h>
 #include <status.h>
 
 /**
@@ -86,6 +88,8 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  *                      SLEEP_INTERRUPTIBLE flag is set.
  */
 status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) {
+    assert(!in_interrupt());
+
     spinlock_lock(&lock->lock);
 
     if (lock->held) {
@@ -128,6 +132,8 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) 
  *                      SLEEP_INTERRUPTIBLE flag is set.
  */
 status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) {
+    assert(!in_interrupt());
+
     status_t ret = STATUS_SUCCESS;
 
     spinlock_lock(&lock->lock);

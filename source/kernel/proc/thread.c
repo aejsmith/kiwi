@@ -497,6 +497,8 @@ void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
 status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsigned flags) {
     status_t ret;
 
+    assert(curr_cpu->in_interrupt == ((lock) ? 1 : 0));
+
     /* Convert an absolute target time to a relative time. */
     if (flags & SLEEP_ABSOLUTE && timeout > 0) {
         timeout = timeout - system_time();

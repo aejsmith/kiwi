@@ -113,8 +113,12 @@ static void unknown_exception(frame_t *frame) {
 /** Hardware interrupt wrapper.
  * @param frame         Interrupt stack frame. */
 static void hardware_interrupt(frame_t *frame) {
+    enter_interrupt();
+
     /* Hardware IRQs start at 32. */
     irq_handler(frame->num - 32);
+
+    leave_interrupt();
 }
 
 /** Unhandled interrupt function.

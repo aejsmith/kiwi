@@ -24,6 +24,7 @@
 #include <sync/condvar.h>
 
 #include <assert.h>
+#include <cpu.h>
 
 /**
  * Atomically releases a mutex and then blocks until a condition becomes true.
@@ -49,6 +50,8 @@
  *                      SLEEP_INTERRUPTIBLE flag is set.
  */
 status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, unsigned flags) {
+    assert(!in_interrupt());
+
     spinlock_lock(&cv->lock);
 
     /* Release the specfied lock. */

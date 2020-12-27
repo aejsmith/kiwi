@@ -87,6 +87,51 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
     return cpu;
 }
 
+/**
+ * Returns whether the current CPU is in interrupt context - this is when
+ * servicing a hardware interrupt, and also when a spinlock is held.
+ *
+ * In interrupt context, it is illegal to perform any operation which might
+ * take any locks which do not disable interrupts (i.e. anything other than
+ * spinlocks), or cause a thread switch.
+ *
+ * The reason for this is that interrupts may occur inside a region where such
+ * a lock is already held. If the interrupt handler tries to take that lock
+ * again, it will fail if the lock is non-recursive, or possibly lead to some
+ * corruption of state if it is recursive (this would be effectively the same
+ * as a second thread being able to enter the protected region, ignoring the
+ * lock).
+ *
+ * Regions where spinlocks are held are also considered to be interrupt context,
+ * as if a thread switch occurs while a spinlock is held and the thread that we
+ * switch to attempts to take the same lock, it will deadlock.
+ *
+ * Generally this function should only be used as a debugging aid (e.g. in
+ * assertions) to ensure that we are not in interrupt context when performing
+ * an operation that is unsafe there.
+ */
+bool in_interrupt(void) {
+    if (likely(cpu_count != 0)) {
+        return curr_cpu->in_interrupt > 0;
+    } else {
+        return false;
+    }
+}
+
+/** Enter an interrupt. */
+void enter_interrupt(void) {
+    if (likely(cpu_count != 0))
+        curr_cpu->in_interrupt++;
+}
+
+/** Leave an interrupt. */
+void leave_interrupt(void) {
+    if (likely(cpu_count != 0)) {
+        assert(curr_cpu->in_interrupt > 0);
+        curr_cpu->in_interrupt--;
+    }
+}
+
 /** Perform early CPU subsystem initialization. */
 __init_text void cpu_early_init(void) {
     /* The boot CPU is initially assigned an ID of 0. It is later corrected once

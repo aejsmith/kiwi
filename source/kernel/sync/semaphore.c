@@ -29,6 +29,8 @@
 
 #include <sync/semaphore.h>
 
+#include <assert.h>
+#include <cpu.h>
 #include <object.h>
 #include <kernel.h>
 #include <status.h>
@@ -54,6 +56,8 @@ typedef struct user_semaphore {
  *                      is only possible if the timeout is not -1, or if the
  *                      SLEEP_INTERRUPTIBLE flag is set. */
 status_t semaphore_down_etc(semaphore_t *sem, nstime_t timeout, unsigned flags) {
+    assert(!in_interrupt());
+
     spinlock_lock(&sem->lock);
 
     if (sem->count) {

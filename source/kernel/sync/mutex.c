@@ -24,6 +24,7 @@
 #include <sync/mutex.h>
 
 #include <assert.h>
+#include <cpu.h>
 #include <status.h>
 
 static inline void mutex_recursive_error(mutex_t *lock) {
@@ -38,6 +39,8 @@ static inline void mutex_recursive_error(mutex_t *lock) {
 }
 
 static inline status_t mutex_lock_internal(mutex_t *lock, nstime_t timeout, unsigned flags) {
+    assert(!in_interrupt());
+
     unsigned expected = 0;
     if (!atomic_compare_exchange_strong(&lock->value, &expected, 1)) {
         if (lock->holder == curr_thread) {

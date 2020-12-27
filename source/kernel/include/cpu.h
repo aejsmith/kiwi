@@ -44,6 +44,7 @@ typedef struct cpu {
     } state;
 
     /** Scheduler information. */
+    uint32_t in_interrupt;          /**< Count of nested interrupts. */
     struct sched_cpu *sched;        /**< Scheduler run queues/timers. */
     struct thread *thread;          /**< Currently executing thread. */
     struct vm_aspace *aspace;       /**< Address space currently in use. */
@@ -77,6 +78,10 @@ extern size_t highest_cpu_id;
 extern size_t cpu_count;
 extern list_t running_cpus;
 extern cpu_t **cpus;
+
+extern bool in_interrupt(void);
+extern void enter_interrupt(void);
+extern void leave_interrupt(void);
 
 extern cpu_t *cpu_register(cpu_id_t id, int state);
 
