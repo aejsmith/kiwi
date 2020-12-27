@@ -67,10 +67,10 @@ void fatal_etc(frame_t *frame, const char *fmt, ...) {
     local_irq_disable();
 
     if (atomic_fetch_add(&in_fatal, 1) == 0) {
+        arch_kdb_trap_cpus();
+
         /* Run callback functions registered. */
         notifier_run_unsafe(&fatal_notifier, NULL, false);
-
-        arch_kdb_trap_cpus();
 
         do_printf(fatal_printf_helper, NULL, "\nFATAL: ");
 
