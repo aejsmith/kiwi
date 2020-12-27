@@ -179,7 +179,12 @@ static void thread_cleanup(thread_t *thread) {
         thread_interrupt_t *interrupt = list_entry(iter, thread_interrupt_t, header);
 
         list_remove(&interrupt->header);
-        kfree(interrupt);
+
+        if (interrupt->post_cb) {
+            interrupt->post_cb(interrupt);
+        } else {
+            kfree(interrupt);
+        }
     }
 }
 
@@ -423,16 +428,13 @@ void thread_kill(thread_t *thread) {
  * interruptible sleep, it will be woken.
  *
  * @param thread        Thread to interrupt.
- * @param interrupt     Interrupt to queue to the thread. Should be allocated
- *                      with kmalloc(), will be freed after the interrupt has
- *                      been handled.
+ * @param interrupt     Interrupt to queue to the thread. If post_cb is set,
+ *                      that will be called to handle clean up of the structure,
+ *                      otherwise this should be allocated with kmalloc() and
+ *                      will be freed after the interrupt has been handled.
  */
 void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
-    if (thread->owner == kernel_proc) {
-        kfree(interrupt);
-        return;
-    }
-
+    assert(thread->owner != kernel_proc);
     assert(interrupt->priority <= THREAD_IPL_MAX);
     assert(is_user_address((void *)interrupt->handler));
 
@@ -597,14 +599,19 @@ void thread_exception(exception_info_t *info) {
         process_exit();
     }
 
-    thread_interrupt_t *interrupt = kmalloc(sizeof(*interrupt) + sizeof(*info), MM_KERNEL);
+    thread_interrupt_t *interrupt = kcalloc(1, sizeof(*interrupt) + sizeof(*info), MM_KERNEL);
 
-    memcpy(interrupt + 1, info, sizeof(*info));
     memcpy(&interrupt->stack, &curr_thread->exception_stack, sizeof(interrupt->stack));
 
     interrupt->priority = THREAD_IPL_EXCEPTION;
     interrupt->handler  = (ptr_t)handler;
     interrupt->size     = sizeof(*info);
+
+    /* Manually copy member-wise, the structure has padding. */
+    exception_info_t *dest_info = (exception_info_t *)(interrupt + 1);
+    dest_info->code   = info->code;
+    dest_info->addr   = info->addr;
+    dest_info->status = info->status;
 
     thread_interrupt(curr_thread, interrupt);
     assert(curr_thread->flags & THREAD_INTERRUPTED);
@@ -657,6 +664,13 @@ void thread_at_kernel_exit(void) {
         spinlock_unlock(&curr_thread->lock);
 
         status_t ret = arch_thread_interrupt_setup(interrupt, ipl);
+
+        if (interrupt->post_cb) {
+            interrupt->post_cb(interrupt);
+        } else {
+            kfree(interrupt);
+        }
+
         if (unlikely(ret != STATUS_SUCCESS)) {
             /* TODO: Once there is a way to use an alternate stack for an
              * exception handler we should queue up an exception and retry to
@@ -666,8 +680,6 @@ void thread_at_kernel_exit(void) {
             curr_proc->reason = EXIT_REASON_KILLED;
             process_exit();
         }
-
-        kfree(interrupt);
     }
 
     /* Update accounting information. */
@@ -1362,7 +1374,6 @@ status_t kern_thread_ipl(unsigned *_ipl) {
  *                      STATUS_INVALID_ARG if the new IPL is invalid.
  */
 status_t kern_thread_set_ipl(unsigned ipl) {
-
     if (ipl > THREAD_IPL_MAX)
         return STATUS_INVALID_ARG;
 

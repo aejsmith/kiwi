@@ -28,11 +28,9 @@ __KERNEL_EXTERN_C_BEGIN
 struct thread_context;
 
 /**
- * Value used to refer to an invalid handle.
- *
- * This is used to mean various things, for example with thread/process
- * functions it refers to the current thread/process rather than one referred
- * to by a handle.
+ * Value used to refer to an invalid handle. This is used to mean various
+ * things, for example with thread/process functions it refers to the current
+ * thread/process rather than one referred to by a handle.
  */
 #define INVALID_HANDLE          (-1)
 
@@ -70,8 +68,6 @@ typedef struct object_event {
 #define OBJECT_WAIT_ALL         (1<<0)  /**< Wait for all the specified events to occur. */
 
 /**
- * Object event callback function.
- *
  * Type of an object event callback function. The function will be called via
  * a thread interrupt when the event that is registered for occurs. While the
  * function is executing, the thread's IPL will be raised to 1 above the

@@ -89,6 +89,19 @@ typedef struct object_wait {
             object_callback_t callback;
 
             unsigned priority;      /**< Callback priority. */
+
+            /** Pre-allocated interrupt structure. */
+            thread_interrupt_t *interrupt;
+
+            /**
+             * Interrupt state:
+             *  - 0 = Not pending, active.
+             *  - 1 = Pending.
+             *  - 2 = Removing (used to arbitrate who frees the wait if the
+             *        process attempts to remove the callback while it is
+             *        pending).
+             */
+            atomic_uint32_t interrupt_state;
         };
     };
 } object_wait_t;
@@ -239,13 +252,22 @@ static status_t attach_handle(object_handle_t *handle, handle_t *_id, handle_t *
     return STATUS_SUCCESS;
 }
 
+static void free_callback(object_wait_t *wait) {
+    kfree(wait->interrupt);
+    slab_cache_free(object_wait_cache, wait);
+}
+
 /** Removes a callback (handle table must be locked). */
 static void remove_callback(object_wait_t *wait) {
     wait->handle->type->unwait(wait->handle, &wait->event);
 
     list_remove(&wait->handle_link);
     list_remove(&wait->thread_link);
-    slab_cache_free(object_wait_cache, wait);
+
+    /* Only free if it wasn't pending, otherwise the interrupt will clear up. */
+    uint32_t prev_state = atomic_exchange(&wait->interrupt_state, 2);
+    if (prev_state == 0)
+        free_callback(wait);
 }
 
 /** Detaches a handle from the current process' handle table. */
@@ -622,9 +644,34 @@ void object_thread_cleanup(thread_t *thread) {
     rwlock_unlock(&thread->owner->handles.lock);
 }
 
+static void post_object_event_interrupt(thread_interrupt_t *interrupt) {
+    object_wait_t *wait = interrupt->cb_data;
+
+    assert(atomic_load(&wait->interrupt_state) > 0);
+
+    if (wait->event.flags & OBJECT_EVENT_ONESHOT) {
+        rwlock_write_lock(&curr_proc->handles.lock);
+
+        /* The wait is one-shot. If the callback hasn't already been removed,
+         * remove it. This won't free since we're still marked as pending. */
+        if (atomic_load(&wait->interrupt_state) != 2)
+            remove_callback(wait);
+
+        rwlock_unlock(&curr_proc->handles.lock);
+    }
+
+    uint32_t expected = 1;
+    if (!atomic_compare_exchange_strong(&wait->interrupt_state, &expected, 0)) {
+        /* Must have been removed. We must take care of freeing it. */
+        assert(expected == 2);
+
+        free_callback(wait);
+    }
+}
+
 /**
- * Signals that an event being waited for has occurred. This must not be called
- * in interrupt context.
+ * Signals that an event being waited for has occurred. This is safe to call in
+ * interrupt context.
  *
  * @param event         Object event structure.
  * @param data          Event data to return to waiter.
@@ -650,22 +697,37 @@ void object_event_signal(object_event_t *event, unsigned long data) {
             break;
         }
         case OBJECT_WAIT_CALLBACK: {
-            thread_interrupt_t *interrupt = kmalloc(sizeof(*interrupt) + sizeof(*event), MM_KERNEL);
+            /*
+             * We only allow one pending interrupt at a time. There are 2
+             * reasons for this:
+             *  - It prevents pending interrupts from piling up if an event is
+             *    repeatedly firing but the thread's IPL currently blocks the
+             *    interrupt.
+             *  - It means we only need to have one thread_interrupt_t allocated
+             *    at a time, which allows us to pre-allocate it with the
+             *    object_wait_t. Otherwise, we would have to allocate here,
+             *    which would prevent usage of this function from interrupt
+             *    context.
+             */
+            unsigned expected = 0;
+            if (atomic_compare_exchange_strong(&wait->interrupt_state, &expected, 1)) {
+                wait->interrupt->priority   = wait->priority;
+                wait->interrupt->post_cb    = post_object_event_interrupt;
+                wait->interrupt->cb_data    = wait;
+                wait->interrupt->handler    = (ptr_t)wait->callback;
+                wait->interrupt->stack.base = NULL;
+                wait->interrupt->stack.size = 0;
+                wait->interrupt->size       = sizeof(*event);
 
-            memcpy(interrupt + 1, event, sizeof(*event));
+                /* Manually copy member-wise, the structure has padding. */
+                object_event_t *dest_event = (object_event_t *)(wait->interrupt + 1);
+                dest_event->handle = event->handle;
+                dest_event->event  = event->event;
+                dest_event->flags  = event->flags;
+                dest_event->data   = event->data;
+                dest_event->udata  = event->udata;
 
-            interrupt->stack.base = NULL;
-            interrupt->stack.size = 0;
-            interrupt->priority   = wait->priority;
-            interrupt->handler    = (ptr_t)wait->callback;
-            interrupt->size       = sizeof(*event);
-
-            thread_interrupt(wait->thread, interrupt);
-
-            if (event->flags & OBJECT_EVENT_ONESHOT) {
-                rwlock_write_lock(&curr_proc->handles.lock);
-                remove_callback(wait);
-                rwlock_unlock(&curr_proc->handles.lock);
+                thread_interrupt(wait->thread, wait->interrupt);
             }
 
             break;
@@ -980,10 +1042,12 @@ status_t kern_object_callback(object_event_t *event, object_callback_t callback,
     list_init(&wait->thread_link);
     memcpy(&wait->event, &kevent, sizeof(wait->event));
 
-    wait->type     = OBJECT_WAIT_CALLBACK;
-    wait->thread   = curr_thread;
-    wait->callback = callback;
-    wait->priority = priority;
+    wait->type            = OBJECT_WAIT_CALLBACK;
+    wait->thread          = curr_thread;
+    wait->callback        = callback;
+    wait->priority        = priority;
+    wait->interrupt       = kcalloc(1, sizeof(*wait->interrupt) + sizeof(kevent), MM_KERNEL);
+    wait->interrupt_state = 0;
 
     /* Table is already locked. */
     ret = lookup_handle(wait->event.handle, -1, &wait->handle);
@@ -1008,7 +1072,9 @@ err_release_handle:
     object_handle_release(wait->handle);
 
 err_free:
+    kfree(wait->interrupt);
     slab_cache_free(object_wait_cache, wait);
+
     rwlock_unlock(&curr_proc->handles.lock);
 
     /* Not strictly necessary - there's only one event that could have had an

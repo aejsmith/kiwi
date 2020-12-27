@@ -41,6 +41,7 @@
 struct cpu;
 struct frame;
 struct process;
+struct thread_interrupt;
 
 /** Entry function for a thread. */
 typedef void (*thread_func_t)(void *, void *);
@@ -60,8 +61,6 @@ typedef struct thread {
     } state;
 
     /**
-     * Lock for the thread.
-     *
      * This lock protects data in the thread that may be modified by other
      * threads. Some data members are only ever accessed by the thread itself,
      * and therefore it is not necessary to take the lock when accessing these.
@@ -99,11 +98,9 @@ typedef struct thread {
     jmp_buf usermem_context;            /**< Context to restore upon user memory access fault. */
 
     /**
-     * Reference count for the thread.
-     *
-     * A running thread always has at least 1 reference on it. Handles and
-     * pointers to a thread create an extra reference to it. When the count
-     * reaches 0, the thread is destroyed.
+     * Reference count for the thread. A running thread always has at least 1
+     * reference on it. Handles and pointers to a thread create an extra
+     * reference to it. When the count reaches 0, the thread is destroyed.
      */
     refcount_t count;
 
@@ -120,14 +117,12 @@ typedef struct thread {
     token_t *token;
 
     /**
-     * Active token for the thread.
-     *
-     * When a thread calls token_current(), we save the current token here.
-     * Subsequent calls to token_current() return the saved token. The saved
-     * token is cleared when the thread returns to userspace. This behaviour
-     * means that a thread's identity effectively remains constant for the
-     * entire time that it is in the kernel, and won't change if another thread
-     * changes the process-wide security token.
+     * Active token for the thread. When a thread calls token_current(), we
+     * save the current token here. Subsequent calls to token_current() return
+     * the saved token. The saved token is cleared when the thread returns to
+     * userspace. This behaviour means that a thread's identity effectively
+     * remains constant for the entire time that it is in the kernel, and won't
+     * change if another thread changes the process-wide security token.
      */
     token_t *active_token;
 
@@ -156,14 +151,25 @@ typedef struct thread {
 #define THREAD_PREEMPTED        (1<<3)  /**< Thread was preempted while preemption disabled. */
 #define THREAD_RWLOCK_WRITER    (1<<3)  /**< Thread is blocked on an rwlock for writing. */
 
+/**
+ * Function called after a thread interrupt has been set up. This can be used
+ * for some deferred cleanup work (see e.g. object_event_signal()). If not
+ * NULL, this function is responsible for making sure the structure is freed,
+ * otherwise structure will be freed with kfree().
+ *
+ * This is executed during return to user mode and therefore is not considered
+ * to be in interrupt context.
+ */
+typedef void (*thread_post_interrupt_cb_t)(struct thread_interrupt *interrupt);
+
 /** User mode thread interrupt structure. */
 typedef struct thread_interrupt {
     list_t header;                      /**< Link to interrupt list. */
     unsigned priority;                  /**< Interrupt priority. */
+    thread_post_interrupt_cb_t post_cb; /**< Post-setup callback. */
+    void *cb_data;                      /**< Argument for callback. */
 
     /**
-     * Address of user handler function.
-     *
      * Address of the user-mode interrupt handler function. The function will
      * be called with a pointer to the interrupt data as its first argument,
      * and a pointer to the saved thread state as its second argument.
@@ -174,11 +180,12 @@ typedef struct thread_interrupt {
     thread_stack_t stack;
 
     /**
-     * Size of interrupt data.
-     *
      * Size of the interrupt data to pass to the handler, which should
      * immediately follow this structure. The data will be copied onto the
-     * thread's user stack and the handler will receive a pointer to it.
+     * thread's user stack and the handler will receive a pointer to it. For
+     * this reason, users of this must exercise caution to ensure that kernel
+     * memory is not accidentally leaked to user mode e.g. through uninitialized
+     * padding in structures.
      */
     size_t size;
 } thread_interrupt_t;
