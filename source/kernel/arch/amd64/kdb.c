@@ -416,8 +416,16 @@ void arch_kdb_dump_registers(void) {
 /** Trap all other CPUs to wait for KDB to exit. */
 void arch_kdb_trap_cpus(void) {
     if (cpu_count > 1) {
-        /* The NMI handler checks kdb_running and spins until it is 0. */
-        lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
+        /*
+         * The NMI handler checks kdb_running and spins until it is 0.
+         *
+         * It is not safe to use LAPIC_IPI_DEST_ALL here in case a CPU is not
+         * currently running - this will cause a triple fault.
+         */
+        for (size_t i = 0; i <= highest_cpu_id; i++) {
+            if (cpus[i] && cpus[i] != curr_cpu && cpus[i]->state == CPU_RUNNING)
+                lapic_ipi(LAPIC_IPI_DEST_SINGLE, (uint32_t)i, LAPIC_IPI_NMI, 0);
+        }
     }
 }
 
