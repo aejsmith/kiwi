@@ -218,6 +218,10 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
     ptr_t context_addr = round_down(data_addr - sizeof(thread_context_t), 16);
     ptr_t ret_addr = context_addr - 8;
 
+    /* Check for underflow. */
+    if (ret_addr >= frame->sp)
+        return STATUS_INVALID_ADDR;
+
     if (interrupt->size) {
         /* Copy interrupt data. */
         ret = memcpy_to_user((void *)data_addr, interrupt + 1, interrupt->size);
