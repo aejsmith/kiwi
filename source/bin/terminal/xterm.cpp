@@ -255,7 +255,7 @@ void Xterm::output(uint8_t raw) {
                                 break;
                             case 40 ... 47:
                                 /* Set background colour. */
-                                m_attributes.fg = static_cast<TerminalBuffer::Colour>(m_escParams[i] - 40);
+                                m_attributes.bg = static_cast<TerminalBuffer::Colour>(m_escParams[i] - 40);
                                 break;
                             case 49:
                                 /* Reset background to default. */
