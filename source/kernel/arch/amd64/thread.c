@@ -48,6 +48,11 @@
 extern void amd64_context_switch(ptr_t new_rsp, ptr_t *_old_rsp);
 extern void amd64_context_restore(ptr_t new_rsp);
 
+static_assert(offsetof(arch_thread_t, kernel_rsp) == ARCH_THREAD_OFF_KERNEL_RSP, "Incorrect thread offset definitions");
+static_assert(offsetof(arch_thread_t, user_rsp)   == ARCH_THREAD_OFF_USER_RSP,   "Incorrect thread offset definitions");
+static_assert(offsetof(arch_thread_t, user_frame) == ARCH_THREAD_OFF_USER_FRAME, "Incorrect thread offset definitions");
+static_assert(offsetof(arch_thread_t, flags)      == ARCH_THREAD_OFF_FLAGS,      "Incorrect thread offset definitions");
+
 /** Initialize AMD64-specific thread data.
  * @param thread        Thread to initialize. */
 void arch_thread_init(thread_t *thread) {
