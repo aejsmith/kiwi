@@ -37,7 +37,6 @@
 #include <sync/spinlock.h>
 
 #include <console.h>
-#include <dpc.h>
 #include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>

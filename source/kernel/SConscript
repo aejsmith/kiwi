@@ -75,7 +75,6 @@ sources = FeatureSources(config, [
     'sync/spinlock.c',
 
     'cpu.c',
-    'dpc.c',
     'elf.c',
     'fatal.c',
     'info.c',

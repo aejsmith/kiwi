@@ -46,7 +46,6 @@
 #include <assert.h>
 #include <console.h>
 #include <cpu.h>
-#include <dpc.h>
 #include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
@@ -120,7 +119,6 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
     process_init();
     thread_init();
     time_late_init();
-    dpc_init();
     vm_init();
 
     /* Create the second stage initialization thread. */
