@@ -94,7 +94,10 @@ static timer_device_t lapic_timer_device = {
 /** Timer interrupt handler.
  * @param frame         Interrupt stack frame. */
 static void lapic_timer_interrupt(frame_t *frame) {
+    enter_interrupt();
     curr_cpu->should_preempt = timer_tick();
+    leave_interrupt();
+
     lapic_eoi();
 }
 
