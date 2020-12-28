@@ -29,43 +29,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if CONFIG_64BIT
-#   define __PRI_64     "l"
-#else
-#   define __PRI_64     "ll"
-#endif
-
-/** Format character definitions for printf(). */
-#define PRIu8           "u"             /**< Format for uint8_t. */
-#define PRIu16          "u"             /**< Format for uint16_t. */
-#define PRIu32          "u"             /**< Format for uint32_t. */
-#define PRIu64          __PRI_64 "u"    /**< Format for uint64_t. */
-#define PRId8           "d"             /**< Format for int8_t. */
-#define PRId16          "d"             /**< Format for int16_t. */
-#define PRId32          "d"             /**< Format for int32_t. */
-#define PRId64          __PRI_64 "d"    /**< Format for int64_t. */
-#define PRIx8           "x"             /**< Format for (u)int8_t (hexadecimal). */
-#define PRIx16          "x"             /**< Format for (u)int16_t (hexadecimal). */
-#define PRIx32          "x"             /**< Format for (u)int32_t (hexadecimal). */
-#define PRIx64          __PRI_64 "x"    /**< Format for (u)int64_t (hexadecimal). */
-#define PRIo8           "o"             /**< Format for (u)int8_t (octal). */
-#define PRIo16          "o"             /**< Format for (u)int16_t (octal). */
-#define PRIo32          "o"             /**< Format for (u)int32_t (octal). */
-#define PRIo64          __PRI_64 "o"    /**< Format for (u)int64_t (octal). */
-
-/** More atomic type definitions. */
-typedef _Atomic(int8_t) atomic_int8_t;
-typedef _Atomic(uint8_t) atomic_uint8_t;
-typedef _Atomic(int16_t) atomic_int16_t;
-typedef _Atomic(uint16_t) atomic_uint16_t;
-typedef _Atomic(int32_t) atomic_int32_t;
-typedef _Atomic(uint32_t) atomic_uint32_t;
-typedef _Atomic(int64_t) atomic_int64_t;
-typedef _Atomic(uint64_t) atomic_uint64_t;
-
-/** Internal kernel integer types. */
-typedef uint32_t page_num_t;            /**< Integer type representing a number of pages. */
-
 /** Number of bits in a char. */
 #define CHAR_BIT        8
 
@@ -112,6 +75,74 @@ typedef uint32_t page_num_t;            /**< Integer type representing a number 
 
 /** Maximum value an unsigned long long can hold. */
 #define ULLONG_MAX      ((LLONG_MAX * 2ULL) + 1ULL)
+
+#if CONFIG_64BIT
+#   define __PRI_64     "l"
+#else
+#   define __PRI_64     "ll"
+#endif
+
+/** Format character definitions for printf(). */
+#define PRIu8           "u"             /**< Format for uint8_t. */
+#define PRIu16          "u"             /**< Format for uint16_t. */
+#define PRIu32          "u"             /**< Format for uint32_t. */
+#define PRIu64          __PRI_64 "u"    /**< Format for uint64_t. */
+#define PRId8           "d"             /**< Format for int8_t. */
+#define PRId16          "d"             /**< Format for int16_t. */
+#define PRId32          "d"             /**< Format for int32_t. */
+#define PRId64          __PRI_64 "d"    /**< Format for int64_t. */
+#define PRIx8           "x"             /**< Format for (u)int8_t (hexadecimal). */
+#define PRIx16          "x"             /**< Format for (u)int16_t (hexadecimal). */
+#define PRIx32          "x"             /**< Format for (u)int32_t (hexadecimal). */
+#define PRIx64          __PRI_64 "x"    /**< Format for (u)int64_t (hexadecimal). */
+#define PRIo8           "o"             /**< Format for (u)int8_t (octal). */
+#define PRIo16          "o"             /**< Format for (u)int16_t (octal). */
+#define PRIo32          "o"             /**< Format for (u)int32_t (octal). */
+#define PRIo64          __PRI_64 "o"    /**< Format for (u)int64_t (octal). */
+
+/** More atomic type definitions. */
+typedef _Atomic(int8_t) atomic_int8_t;
+typedef _Atomic(uint8_t) atomic_uint8_t;
+typedef _Atomic(int16_t) atomic_int16_t;
+typedef _Atomic(uint16_t) atomic_uint16_t;
+typedef _Atomic(int32_t) atomic_int32_t;
+typedef _Atomic(uint32_t) atomic_uint32_t;
+typedef _Atomic(int64_t) atomic_int64_t;
+typedef _Atomic(uint64_t) atomic_uint64_t;
+
+/** Internal kernel integer types. */
+typedef uint32_t page_num_t;            /**< Integer type representing a number of pages. */
+
+/** Endianness conversion macros. */
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#   define be16_to_cpu(v)   __builtin_bswap16(v)
+#   define be32_to_cpu(v)   __builtin_bswap32(v)
+#   define be64_to_cpu(v)   __builtin_bswap64(v)
+#   define le16_to_cpu(v)   (v)
+#   define le32_to_cpu(v)   (v)
+#   define le64_to_cpu(v)   (v)
+#   define cpu_to_be16(v)   __builtin_bswap16(v)
+#   define cpu_to_be32(v)   __builtin_bswap32(v)
+#   define cpu_to_be64(v)   __builtin_bswap64(v)
+#   define cpu_to_le16(v)   (v)
+#   define cpu_to_le32(v)   (v)
+#   define cpu_to_le64(v)   (v)
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#   define be16_to_cpu(v)   (v)
+#   define be32_to_cpu(v)   (v)
+#   define be64_to_cpu(v)   (v)
+#   define le16_to_cpu(v)   __builtin_bswap16(v)
+#   define le32_to_cpu(v)   __builtin_bswap32(v)
+#   define le64_to_cpu(v)   __builtin_bswap64(v)
+#   define cpu_to_be16(v)   (v)
+#   define cpu_to_be32(v)   (v)
+#   define cpu_to_be64(v)   (v)
+#   define cpu_to_le16(v)   __builtin_bswap16(v)
+#   define cpu_to_le32(v)   __builtin_bswap32(v)
+#   define cpu_to_le64(v)   __builtin_bswap64(v)
+#else
+#   error "__BYTE_ORDER__ is not defined"
+#endif
 
 #include <arch/types.h>
 
