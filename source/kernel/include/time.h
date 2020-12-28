@@ -95,19 +95,22 @@ typedef struct timer_device {
     void (*prepare)(nstime_t nsecs);
 } timer_device_t;
 
-/** Callback function for timers.
- * @warning             Unless TIMER_THREAD is specified in the timer's flags,
- *                      this function is called in interrupt context. Be
- *                      careful!
+/**
+ * Callback function for timers. Unless TIMER_THREAD is specified in the
+ * timer's flags, this function is called in interrupt context.
+ *
  * @param data          Data argument from timer creator.
+ *
  * @return              Whether to preempt the current thread after handling.
  *                      This is ignored if the function is run in thread
- *                      context. */
+ *                      context.
+ */
 typedef bool (*timer_func_t)(void *data);
 
 /** Structure containing details of a timer. */
 typedef struct timer {
-    list_t header;                  /**< Link to timers list. */
+    list_t cpu_link;                /**< Link to CPU timer list. */
+    list_t thread_link;             /**< Link to thread timer link. */
 
     nstime_t target;                /**< Time at which the timer will fire. */
     struct cpu *cpu;                /**< CPU that the timer was started on. */
@@ -120,7 +123,13 @@ typedef struct timer {
 } timer_t;
 
 /** Behaviour flags for timers. */
-#define TIMER_THREAD        (1<<0)  /**< Run the handler in thread (DPC) context. */
+enum {
+    /** Run the handler in thread context. */
+    TIMER_THREAD            = (1<<0),
+
+    /** (Internal) thread is currently running the handler. */
+    TIMER_THREAD_RUNNING    = (1<<1),
+};
 
 extern nstime_t time_to_unix(
     unsigned year, unsigned month, unsigned day, unsigned hour, unsigned min,
@@ -145,4 +154,5 @@ extern void spin(nstime_t nsecs);
 extern nstime_t platform_time_from_hardware(void);
 
 extern void time_init(void);
+extern void time_late_init(void);
 extern void time_init_percpu(void);

@@ -119,9 +119,8 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
     ipc_init();
     process_init();
     thread_init();
+    time_late_init();
     dpc_init();
-
-    /* Bring up the VM system. */
     vm_init();
 
     /* Create the second stage initialization thread. */
@@ -141,10 +140,10 @@ __init_text void kmain_secondary(cpu_t *cpu) {
 
     /* Initialize everything. */
     cpu_early_init_percpu(cpu);
-    time_init_percpu();
     mmu_init_percpu();
     cpu_init_percpu();
     sched_init_percpu();
+    time_init_percpu();
 
     /* Signal that we're up. */
     smp_boot_status = SMP_BOOT_BOOTED;

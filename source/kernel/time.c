@@ -19,7 +19,7 @@
  * @brief               Time handling functions.
  *
  * TODO:
- *  - Timers are tied to the CPU that they are created on. This is the right
+ *  - Timers are tied to the CPU that they are started on. This is the right
  *    thing to do with, e.g. the scheduler timers, but what should we do with
  *    user timers? Load balance them? They'll probably get balanced reasonably
  *    due to thread load balancing. Does it matter that much?
@@ -34,17 +34,28 @@
 
 #include <proc/thread.h>
 
+#include <sync/semaphore.h>
+
 #include <assert.h>
 #include <cpu.h>
-#include <dpc.h>
 #include <kdb.h>
 #include <kernel.h>
 #include <object.h>
 #include <status.h>
 #include <time.h>
 
+/** Timer thread state. */
+typedef struct timer_thread {
+    thread_t *thread;               /**< Thread to execute timers. */
+    semaphore_t sem;                /**< Semaphore to wait on. */
+
+    /** List of timers pending execution (protected by cpu_t::timer_lock). */
+    list_t timers;
+} timer_thread_t;
+
 /** Userspace timer structure. */
 typedef struct user_timer {
+    mutex_t lock;                   /**< Lock for timer. */
     uint32_t flags;                 /**< Flags for the timer. */
     timer_t timer;                  /**< Kernel timer. */
     notifier_t notifier;            /**< Notifier for the timer event. */
@@ -170,7 +181,7 @@ void timer_device_set(timer_device_t *device) {
 
 /** Start a timer, with CPU timer lock held. */
 static void timer_start_unsafe(timer_t *timer) {
-    assert(list_empty(&timer->header));
+    assert(list_empty(&timer->cpu_link));
 
     /* Work out the absolute completion time. */
     timer->target = system_time() + timer->initial;
@@ -179,7 +190,7 @@ static void timer_start_unsafe(timer_t *timer) {
      * nearest expiration time first. */
     list_t *pos = curr_cpu->timers.next;
     while (pos != &curr_cpu->timers) {
-        timer_t *exist = list_entry(pos, timer_t, header);
+        timer_t *exist = list_entry(pos, timer_t, cpu_link);
 
         if (exist->target > timer->target)
             break;
@@ -187,12 +198,36 @@ static void timer_start_unsafe(timer_t *timer) {
         pos = pos->next;
     }
 
-    list_add_before(pos, &timer->header);
+    list_add_before(pos, &timer->cpu_link);
 }
 
-static void timer_dpc_request(void *_timer) {
-    timer_t *timer = _timer;
-    timer->func(timer->data);
+static void timer_thread(void *arg1, void *arg2) {
+    timer_thread_t *thread = curr_cpu->timer_thread;
+
+    while (true) {
+        semaphore_down(&thread->sem);
+
+        spinlock_lock(&curr_cpu->timer_lock);
+
+        /* Timers can be removed before we get a chance to run them. */
+        if (!list_empty(&thread->timers)) {
+            timer_t *timer = list_first(&thread->timers, timer_t, thread_link);
+
+            /* This prevents it from being freed underneath us. */
+            timer->flags |= TIMER_THREAD_RUNNING;
+            list_remove(&timer->thread_link);
+
+            spinlock_unlock(&curr_cpu->timer_lock);
+
+            timer->func(timer->data);
+
+            spinlock_lock(&curr_cpu->timer_lock);
+
+            timer->flags &= ~TIMER_THREAD_RUNNING;
+        }
+
+        spinlock_unlock(&curr_cpu->timer_lock);
+    }
 }
 
 /** Handles a timer tick.
@@ -212,7 +247,7 @@ bool timer_tick(void) {
 
     /* Iterate the list and check for expired timers. */
     list_foreach_safe(&curr_cpu->timers, iter) {
-        timer_t *timer = list_entry(iter, timer_t, header);
+        timer_t *timer = list_entry(iter, timer_t, cpu_link);
 
         /* Since the list is ordered soonest expiry first, we can break if the
          * current timer has not expired. */
@@ -220,11 +255,12 @@ bool timer_tick(void) {
             break;
 
         /* This timer has expired, remove it from the list. */
-        list_remove(&timer->header);
+        list_remove(&timer->cpu_link);
 
         /* Perform its timeout action. */
         if (timer->flags & TIMER_THREAD) {
-            dpc_request(timer_dpc_request, timer);
+            list_append(&curr_cpu->timer_thread->timers, &timer->thread_link);
+            semaphore_up(&curr_cpu->timer_thread->sem, 1);
         } else {
             if (timer->func(timer->data))
                 preempt = true;
@@ -239,7 +275,7 @@ bool timer_tick(void) {
         case TIMER_DEVICE_ONESHOT:
             /* Prepare the next tick if there is still a timer in the list. */
             if (!list_empty(&curr_cpu->timers))
-                timer_device_prepare(list_first(&curr_cpu->timers, timer_t, header));
+                timer_device_prepare(list_first(&curr_cpu->timers, timer_t, cpu_link));
 
             break;
         case TIMER_DEVICE_PERIODIC:
@@ -262,7 +298,8 @@ bool timer_tick(void) {
  * @param data          Data argument to pass to timer.
  * @param flags         Behaviour flags for the timer. */
 void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data, uint32_t flags) {
-    list_init(&timer->header);
+    list_init(&timer->cpu_link);
+    list_init(&timer->thread_link);
 
     timer->func  = func;
     timer->data  = data;
@@ -296,7 +333,7 @@ void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
             /* If the new timer is at the beginning of the list, then it has
              * the shortest remaining time, so we need to adjust the device to
              * tick for it. */
-            if (timer == list_first(&curr_cpu->timers, timer_t, header))
+            if (timer == list_first(&curr_cpu->timers, timer_t, cpu_link))
                 timer_device_prepare(timer);
 
             break;
@@ -313,14 +350,14 @@ void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
 /** Cancel a running timer.
  * @param timer         Timer to stop. */
 void timer_stop(timer_t *timer) {
-    if (!list_empty(&timer->header)) {
+    if (!list_empty(&timer->cpu_link)) {
         assert(timer->cpu);
 
         spinlock_lock(&timer->cpu->timer_lock);
 
-        timer_t *first = list_first(&timer->cpu->timers, timer_t, header);
+        timer_t *first = list_first(&timer->cpu->timers, timer_t, cpu_link);
 
-        list_remove(&timer->header);
+        list_remove(&timer->cpu_link);
 
         /* If the timer is running on this CPU, adjust the tick length or
          * disable the device if required. If the timer is on another CPU, it's
@@ -329,7 +366,7 @@ void timer_stop(timer_t *timer) {
             switch (timer_device->type) {
                 case TIMER_DEVICE_ONESHOT:
                     if (first == timer && !list_empty(&curr_cpu->timers)) {
-                        first = list_first(&curr_cpu->timers, timer_t, header);
+                        first = list_first(&curr_cpu->timers, timer_t, cpu_link);
                         timer_device_prepare(first);
                     }
 
@@ -340,6 +377,16 @@ void timer_stop(timer_t *timer) {
 
                     break;
             }
+        }
+
+        /* If it's pending execution on thread we need to remove it, but make
+         * sure we do not return if the thread is currently executing the
+         * handler, as the timer owner might free it once we return. */
+        list_remove(&timer->thread_link);
+        while (timer->flags & TIMER_THREAD_RUNNING) {
+            spinlock_unlock(&timer->cpu->timer_lock);
+            thread_yield();
+            spinlock_lock(&timer->cpu->timer_lock);
         }
 
         spinlock_unlock(&timer->cpu->timer_lock);
@@ -403,7 +450,7 @@ static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) 
     kdb_printf("====                 ======           ========           ====\n");
 
     list_foreach(&cpu->timers, iter) {
-        timer_t *timer = list_entry(iter, timer_t, header);
+        timer_t *timer = list_entry(iter, timer_t, cpu_link);
 
         kdb_printf(
             "%-20s %-16llu %-18p %p\n",
@@ -437,10 +484,30 @@ __init_text void time_init(void) {
     kdb_register_command("uptime", "Display the system uptime.", kdb_cmd_uptime);
 }
 
-/** Initialise per-CPU time state. */
+/** Perform late timing system initialization. */
+__init_text void time_late_init(void) {
+    time_init_percpu();
+}
+
+/** Initialize per-CPU time state. */
 __init_text void time_init_percpu(void) {
     if (timer_device->type == TIMER_DEVICE_ONESHOT)
         curr_cpu->timer_enabled = true;
+
+    curr_cpu->timer_thread = kmalloc(sizeof(*curr_cpu->timer_thread), MM_BOOT);
+
+    list_init(&curr_cpu->timer_thread->timers);
+    semaphore_init(&curr_cpu->timer_thread->sem, "timer_thread_sem", 0);
+
+    char name[THREAD_NAME_MAX];
+    sprintf(name, "timer-%u", curr_cpu->id);
+
+    status_t ret = thread_create(name, NULL, 0, timer_thread, NULL, NULL, &curr_cpu->timer_thread->thread);
+    if (ret != STATUS_SUCCESS)
+        fatal("Failed to create timer thread: %d", ret);
+
+    thread_wire(curr_cpu->timer_thread->thread);
+    thread_run(curr_cpu->timer_thread->thread);
 }
 
 /**
@@ -451,6 +518,7 @@ __init_text void time_init_percpu(void) {
 static void timer_object_close(object_handle_t *handle) {
     user_timer_t *timer = handle->private;
 
+    timer_stop(&timer->timer);
     notifier_clear(&timer->notifier);
     kfree(timer);
 }
@@ -513,7 +581,8 @@ status_t kern_timer_create(uint32_t flags, handle_t *_handle) {
 
     user_timer_t *timer = kmalloc(sizeof(*timer), MM_KERNEL);
 
-    timer_init(&timer->timer, "timer_object", user_timer_func, timer, TIMER_THREAD);
+    mutex_init(&timer->lock, "user_timer", 0);
+    timer_init(&timer->timer, "user_timer", user_timer_func, timer, TIMER_THREAD);
     notifier_init(&timer->notifier, timer);
 
     timer->flags = flags;
@@ -555,9 +624,13 @@ status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode) {
 
     user_timer_t *timer = khandle->private;
 
+    mutex_lock(&timer->lock);
+
     timer_stop(&timer->timer);
     timer->fired = false;
     timer_start(&timer->timer, interval, mode);
+
+    mutex_unlock(&timer->lock);
 
     object_handle_release(khandle);
     return STATUS_SUCCESS;
@@ -577,7 +650,9 @@ status_t kern_timer_stop(handle_t handle, nstime_t *_rem) {
 
     user_timer_t *timer = khandle->private;
 
-    if (!list_empty(&timer->timer.header)) {
+    mutex_lock(&timer->lock);
+
+    if (!list_empty(&timer->timer.cpu_link)) {
         timer_stop(&timer->timer);
         timer->fired = false;
 
@@ -588,6 +663,8 @@ status_t kern_timer_stop(handle_t handle, nstime_t *_rem) {
     } else if (_rem) {
         ret = write_user(_rem, 0);
     }
+
+    mutex_unlock(&timer->lock);
 
     object_handle_release(khandle);
     return ret;

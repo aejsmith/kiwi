@@ -28,39 +28,41 @@
 struct sched_cpu;
 struct smp_call;
 struct thread;
+struct timer_thread;
 struct vm_aspace;
 
 /** Structure describing a CPU. */
 typedef struct cpu {
-    list_t header;                  /**< Link to running CPUs list. */
+    list_t header;                      /**< Link to running CPUs list. */
 
-    cpu_id_t id;                    /**< ID of the CPU. */
-    arch_cpu_t arch;                /**< Architecture-specific information. */
+    cpu_id_t id;                        /**< ID of the CPU. */
+    arch_cpu_t arch;                    /**< Architecture-specific information. */
 
     /** Current state of the CPU. */
     enum {
-        CPU_OFFLINE,                /**< Offline. */
-        CPU_RUNNING,                /**< Running. */
+        CPU_OFFLINE,                    /**< Offline. */
+        CPU_RUNNING,                    /**< Running. */
     } state;
 
     /** Scheduler information. */
-    uint32_t in_interrupt;          /**< Count of nested interrupts. */
-    struct sched_cpu *sched;        /**< Scheduler run queues/timers. */
-    struct thread *thread;          /**< Currently executing thread. */
-    struct vm_aspace *aspace;       /**< Address space currently in use. */
-    bool should_preempt;            /**< Whether the CPU should be preempted. */
-    bool idle;                      /**< Whether the CPU is idle. */
+    uint32_t in_interrupt;              /**< Count of nested interrupts. */
+    struct sched_cpu *sched;            /**< Scheduler run queues/timers. */
+    struct thread *thread;              /**< Currently executing thread. */
+    struct vm_aspace *aspace;           /**< Address space currently in use. */
+    bool should_preempt;                /**< Whether the CPU should be preempted. */
+    bool idle;                          /**< Whether the CPU is idle. */
 
     /** Timer information. */
-    list_t timers;                  /**< List of active timers. */
-    bool timer_enabled;             /**< Whether the timer device is enabled. */
-    spinlock_t timer_lock;          /**< Timer list lock. */
+    list_t timers;                      /**< List of active timers. */
+    bool timer_enabled;                 /**< Whether the timer device is enabled. */
+    spinlock_t timer_lock;              /**< Timer list lock. */
+    struct timer_thread *timer_thread;  /**< Timer thread. */
 
     /** SMP call information. */
-    list_t call_queue;              /**< List of calls queued to this CPU. */
-    bool ipi_sent;                  /**< Whether an IPI has been sent to the CPU. */
-    struct smp_call *curr_call;     /**< SMP call currently being handled. */
-    spinlock_t call_lock;           /**< Lock to protect call queue. */
+    list_t call_queue;                  /**< List of calls queued to this CPU. */
+    bool ipi_sent;                      /**< Whether an IPI has been sent to the CPU. */
+    struct smp_call *curr_call;         /**< SMP call currently being handled. */
+    spinlock_t call_lock;               /**< Lock to protect call queue. */
 } cpu_t;
 
 /**
