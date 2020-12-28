@@ -329,9 +329,15 @@ void irq_handler(unsigned num) {
     assert(irq_controller);
     assert(num < IRQ_COUNT);
 
+    /* IRQs can happen during a user memory operation. Force the flag to off
+     * while handling an IRQ so that we don't incorrectly treat faults during
+     * the handler as a user memory violation. */
+    bool in_usermem = curr_thread->in_usermem;
+    curr_thread->in_usermem = false;
+
     /* Execute any pre-handling function. */
     if (irq_controller->pre_handle && !irq_controller->pre_handle(num))
-        return;
+        goto out;
 
     /* Get the trigger mode. */
     irq_mode_t mode = irq_controller->mode(num);
@@ -363,7 +369,7 @@ void irq_handler(unsigned num) {
              * because multiple interrupt pulses can be merged if they occur
              * close together. */
             if (mode == IRQ_MODE_LEVEL && ret != IRQ_UNHANDLED)
-                goto out;
+                goto out_handled;
         }
     }
 
@@ -376,13 +382,16 @@ void irq_handler(unsigned num) {
             disable |= wake_irq_thread(irq, handler);
     }
 
-out:
+out_handled:
     spinlock_unlock(&irq->handlers_lock);
 
     /* Perform post-handling actions. IRQ is disabled until the thread completes
      * execution of all handlers. */
     if (irq_controller->post_handle)
         irq_controller->post_handle(num, disable);
+
+out:
+    curr_thread->in_usermem = in_usermem;
 }
 
 /** Initialize the IRQ handling system.
