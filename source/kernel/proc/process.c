@@ -405,15 +405,29 @@ static status_t process_load(process_load_t *load, process_t *parent) {
     semaphore_init(&load->sem, "process_load_sem", 0);
     load->aspace = vm_aspace_create();
 
+    char *path = (load->path) ? load->path : load->args[0];
+
+    object_handle_t *handle;
+    ret = fs_open(path, FILE_ACCESS_READ | FILE_ACCESS_EXECUTE, 0, 0, &handle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    /* Get a normalized path to the binary. We use this to name processes. */
+    ret = fs_path(handle, &path);
+    if (ret != STATUS_SUCCESS) {
+        object_handle_release(handle);
+        return ret;
+    }
+
+    assert(path);
+
+    swap(load->path, path);
+    kfree(path);
+
     /* Reserve space for the binary being loaded in the address space. The
      * actual loading of it is done by the kernel library's loader, however we
      * must reserve space to ensure that the mappings we create below for the
      * arguments/stack don't end up placed where the binary wants to be. */
-    object_handle_t *handle;
-    ret = fs_open(load->path, FILE_ACCESS_READ | FILE_ACCESS_EXECUTE, 0, 0, &handle);
-    if (ret != STATUS_SUCCESS)
-        return ret;
-
     ret = elf_binary_reserve(handle, load->aspace);
     object_handle_release(handle);
     if (ret != STATUS_SUCCESS)
@@ -560,7 +574,6 @@ status_t process_create(
     assert(priority >= 0 && priority <= PRIORITY_CLASS_MAX);
 
     process_load_t load = {};
-    load.path = (char *)args[0];
     load.args = (char **)args;
     load.env  = (char **)env;
 
@@ -573,7 +586,7 @@ status_t process_create(
 
     /* Create the new process. */
     process_t *process;
-    ret = process_alloc(args[0], -1, NULL, priority, load.aspace, system_token, NULL, &process);
+    ret = process_alloc(load.path, -1, NULL, priority, load.aspace, system_token, NULL, &process);
     if (ret != STATUS_SUCCESS)
         goto err;
 
@@ -978,7 +991,7 @@ status_t kern_process_create(
     /* Create the new process. */
     process_t *process;
     ret = process_alloc(
-        args[0], -1, curr_proc, curr_proc->priority, load.aspace, load.token,
+        load.path, -1, curr_proc, curr_proc->priority, load.aspace, load.token,
         load.root_port, &process);
     if (ret != STATUS_SUCCESS)
         goto out_free_args;
