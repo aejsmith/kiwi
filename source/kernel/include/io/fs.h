@@ -222,7 +222,7 @@ typedef struct fs_node_ops {
 
     /** Get information about a node.
      * @param node          Node to get information on.
-     * @param info          Information structure to fill in. */
+     * @param info          Information structure to fill in (pre-zeroed). */
     void (*info)(struct fs_node *node, file_info_t *info);
 
     /** Modify the size of a file.

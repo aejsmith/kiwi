@@ -280,11 +280,9 @@ static void fs_node_release(fs_node_t *node) {
 }
 
 /** Gets information about a node.
- * @param node          Node to get information for.
+ * @param node          Node to get information for (should be zeroed).
  * @param info          Structure to store information in. */
 static void fs_node_info(fs_node_t *node, file_info_t *info) {
-    memset(info, 0, sizeof(*info));
-
     assert(node->ops->info);
     node->ops->info(node, info);
 
@@ -1658,6 +1656,8 @@ status_t fs_info(const char *path, bool follow, file_info_t *info) {
     status_t ret = fs_lookup(path, (follow) ? FS_LOOKUP_FOLLOW : 0, &entry);
     if (ret != STATUS_SUCCESS)
         return ret;
+
+    memset(info, 0, sizeof(*info));
 
     fs_node_info(entry->node, info);
     fs_dentry_release(entry);

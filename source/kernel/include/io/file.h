@@ -98,7 +98,7 @@ typedef struct file_ops {
 
     /** Get information about a file.
      * @param handle        File handle structure.
-     * @param info          Information structure to fill in. */
+     * @param info          Information structure to fill in (pre-zeroed). */
     void (*info)(struct file_handle *handle, file_info_t *info);
 
     /** Flush changes to a file.

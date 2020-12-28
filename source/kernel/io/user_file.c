@@ -329,8 +329,6 @@ static void user_file_info(file_handle_t *handle, file_info_t *info) {
     user_file_t *file = handle->user_file;
     status_t ret;
 
-    memset(info, 0, sizeof(*info));
-
     mutex_lock(&file->lock);
 
     user_file_op_t *op = user_file_op_alloc(file, USER_FILE_OP_INFO, 0);
