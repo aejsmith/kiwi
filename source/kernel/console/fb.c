@@ -57,6 +57,7 @@ extern unsigned char logo_ppm[];
 #define FONT_BG                 0x000020
 
 /** Colour and size of the splash progress bar. */
+#define SPLASH_BG               0x000000
 #define SPLASH_PROGRESS_FG      0x78cc00
 #define SPLASH_PROGRESS_BG      0x555555
 #define SPLASH_PROGRESS_WIDTH   250
@@ -654,8 +655,10 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
     fb_mapping = (uint8_t *)((ptr_t)video->lfb.fb_virt);
     fb_backbuffer = fb_mapping;
 
+    bool splash = !kboot_boolean_option("splash_disabled");
+
     /* Clear the framebuffer. */
-    fb_fill_rect(0, 0, fb_info.width, fb_info.height, FONT_BG);
+    fb_fill_rect(0, 0, fb_info.width, fb_info.height, (splash) ? SPLASH_BG : FONT_BG);
 
     /* Configure the console. */
     fb_console_x = fb_console_y = 0;
@@ -665,7 +668,7 @@ __init_text void fb_console_early_init(kboot_tag_video_t *video) {
     main_console.out = &fb_console_out_ops;
 
     /* If the splash is enabled, acquire the console so output is ignored. */
-    if (!kboot_boolean_option("splash_disabled")) {
+    if (splash) {
         splash_enabled = true;
         fb_console_acquired = true;
 
