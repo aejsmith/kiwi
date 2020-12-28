@@ -79,7 +79,7 @@ static status_t device_file_open(file_handle_t *handle) {
 
     status_t ret = STATUS_SUCCESS;
     if (device->ops && device->ops->open)
-        ret = device->ops->open(device, handle->flags, &handle->private);
+        ret = device->ops->open(device, file_handle_flags(handle), &handle->private);
 
     if (ret == STATUS_SUCCESS) {
         refcount_inc(&device->count);

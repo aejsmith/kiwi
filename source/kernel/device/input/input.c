@@ -158,10 +158,11 @@ static status_t input_device_io(device_t *_device, file_handle_t *handle, io_req
 
     status_t ret = STATUS_SUCCESS;
 
-    size_t count = request->total / sizeof(input_event_t);
+    uint32_t flags = file_handle_flags(handle);
+    size_t count   = request->total / sizeof(input_event_t);
     for (size_t i = 0; i < count; i++) {
         if (client->size == 0) {
-            if (handle->flags & FILE_NONBLOCK) {
+            if (flags & FILE_NONBLOCK) {
                 ret = STATUS_WOULD_BLOCK;
                 break;
             }

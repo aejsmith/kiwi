@@ -271,7 +271,7 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
             op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_OFFSET] = offset;
         }
 
-        op->msg->msg.args[USER_FILE_MESSAGE_ARG_FLAGS] = handle->flags;
+        op->msg->msg.args[USER_FILE_MESSAGE_ARG_FLAGS] = file_handle_flags(handle);
 
         ret = user_file_op_send(file, op);
         if (ret != STATUS_SUCCESS)
@@ -374,7 +374,7 @@ static status_t user_file_request(
     if (in_size > 0)
         memcpy(op->msg->data, in, in_size);
 
-    op->msg->msg.args[USER_FILE_MESSAGE_ARG_FLAGS]       = handle->flags;
+    op->msg->msg.args[USER_FILE_MESSAGE_ARG_FLAGS]       = file_handle_flags(handle);
     op->msg->msg.args[USER_FILE_MESSAGE_ARG_REQUEST_NUM] = request;
 
     ret = user_file_op_send(file, op);

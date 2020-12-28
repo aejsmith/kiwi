@@ -135,7 +135,7 @@ typedef struct file_handle {
     };
 
     uint32_t access;                    /**< Access rights the handle was opened with. */
-    uint32_t flags;                     /**< Flags modifying handle behaviour. */
+    atomic_uint32_t _flags;             /**< FILE_* flags (access with file_handle_flags()). */
     void *private;                      /**< Implementation data pointer. */
     mutex_t lock;                       /**< Lock to protect offset. */
     offset_t offset;                    /**< Current file offset. */
@@ -152,6 +152,19 @@ extern file_handle_t *file_handle_alloc(file_t *file, uint32_t access, uint32_t 
 extern void file_handle_free(file_handle_t *fhandle);
 extern object_handle_t *file_handle_create(file_handle_t *fhandle);
 extern status_t file_handle_attach(file_t *file, uint32_t access, uint32_t flags, handle_t *_id, handle_t *_uid);
+
+/**
+ * Gets the current flags for a file handle. This uses atomic access, and the
+ * flags can change between subsequent calls to this due to calls to
+ * kern_file_set_flags() - nothing prevents the flags from being changed by
+ * another thread while an operation on a handle is in progress. For this
+ * reason, operations that need to check flags should only read the flags once
+ * and save the relevant bits to use throughout the operation, as reading flags
+ * multiple times could lead to inconsistent operation.
+ */
+static inline uint32_t file_handle_flags(file_handle_t *fhandle) {
+    return atomic_load_explicit(&fhandle->_flags, memory_order_relaxed);
+}
 
 /**
  * Public kernel interface.

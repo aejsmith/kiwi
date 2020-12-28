@@ -134,7 +134,7 @@ file_handle_t *file_handle_alloc(file_t *file, uint32_t access, uint32_t flags) 
 
     fhandle->file    = file;
     fhandle->access  = access;
-    fhandle->flags   = flags;
+    fhandle->_flags  = flags;
     fhandle->private = NULL;
     fhandle->offset  = 0;
 
@@ -244,13 +244,15 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
         goto out;
     }
 
+    uint32_t flags = file_handle_flags(fhandle);
+
     /* Determine the offset to perform the I/O at and handle the FILE_APPEND
      * flag. TODO: We don't handle atomicity at all here. For regular files,
      * should we lock the handle across the operation so that nothing else can
      * do I/O while this is in progress? */
     if (is_seekable(fhandle->file)) {
         if (request->offset < 0) {
-            if (request->op == IO_OP_WRITE && fhandle->flags & FILE_APPEND) {
+            if (request->op == IO_OP_WRITE && flags & FILE_APPEND) {
                 mutex_lock(&fhandle->lock);
 
                 file_info_t info;
@@ -580,7 +582,7 @@ status_t file_state(object_handle_t *handle, uint32_t *_access, uint32_t *_flags
         *_access = fhandle->access;
 
     if (_flags)
-        *_flags = fhandle->flags;
+        *_flags = file_handle_flags(fhandle);
 
     if (_offset) {
         if (!is_seekable(fhandle->file))
@@ -603,10 +605,10 @@ status_t file_set_flags(object_handle_t *handle, uint32_t flags) {
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    /* TODO: We'll need an underlying FS call for certain flag changes, e.g.
-     * FILE_DIRECT. */
+    /* TODO: We might need an underlying FS call for certain flag changes, e.g.
+     * FILE_DIRECT, or perhaps just disallow changing these. */
     file_handle_t *fhandle = handle->private;
-    fhandle->flags = flags;
+    atomic_store(&fhandle->_flags, flags);
     return STATUS_SUCCESS;
 }
 
