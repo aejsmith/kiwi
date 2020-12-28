@@ -1633,4 +1633,7 @@ void kern_thread_restore(void) {
         curr_proc->reason = EXIT_REASON_KILLED;
         process_exit();
     }
+
+    /* The architecture code should have set things up such that we return into
+     * the pre-interrupt state. */
 }

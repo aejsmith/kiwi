@@ -97,15 +97,20 @@ void __assert_fail(const char *cond, const char *file, int line) {
  * have the PRIV_FATAL privilege.
  *
  * @param message       Message to print.
+ *
+ * @return              STATUS_PERM_DENIED if the caller does not have
+ *                      PRIV_FATAL.
+ *                      STATUS_INVALID_ADDR if message is an invalid address.
  */
-void kern_system_fatal(const char *message) {
+status_t kern_system_fatal(const char *message) {
     char *kmessage;
 
     if (!security_check_priv(PRIV_FATAL))
-        return;
+        return STATUS_PERM_DENIED;
 
-    if (strdup_from_user(message, &kmessage) != STATUS_SUCCESS)
-        return;
+    status_t ret = strdup_from_user(message, &kmessage);
+    if (ret != STATUS_SUCCESS)
+        return ret;
 
     fatal("%s", message);
 }

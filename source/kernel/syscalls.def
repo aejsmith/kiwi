@@ -14,6 +14,16 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+##
+# IMPORTANT: System calls must have a non-void return value, with the exception
+# of kern_thread_restore() and calls that cannot return (must be marked noreturn
+# in the function declaration). This is because architecture system call handler
+# code assumes that functions have a return value and will pass the return value
+# register back to user mode. If the function return type is void, the compiler
+# will likely not initialize the return register and this could leak kernel
+# information back to user mode.
+##
+
 type status_t int32_t;
 type handle_t int32_t;
 type process_id_t int32_t;

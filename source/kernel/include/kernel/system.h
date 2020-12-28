@@ -35,6 +35,6 @@ extern status_t kern_system_info(unsigned what, void *buf);
 #define SHUTDOWN_POWEROFF       2   /**< Power off the system. */
 
 extern status_t kern_system_shutdown(unsigned action);
-extern void kern_system_fatal(const char *message);
+extern status_t kern_system_fatal(const char *message);
 
 __KERNEL_EXTERN_C_END
