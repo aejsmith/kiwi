@@ -239,17 +239,18 @@ class LLVMToolchain(Toolchain):
 # Class to manage building and updating the toolchain.
 class ToolchainManager:
     def __init__(self, config):
-        self.arch = config['ARCH']
-        self.platform = config['PLATFORM']
-        self.destdir = config['TOOLCHAIN_DIR']
-        self.target = config['TOOLCHAIN_TARGET']
+        self.arch           = config['ARCH']
+        self.platform       = config['PLATFORM']
+        self.build          = config['BUILD']
+        self.destdir        = config['TOOLCHAIN_DIR']
+        self.target         = config['TOOLCHAIN_TARGET']
         self.toolchain_arch = config['TOOLCHAIN_ARCH']
-        self.makejobs = config['TOOLCHAIN_MAKE_JOBS']
+        self.makejobs       = config['TOOLCHAIN_MAKE_JOBS']
 
-        self.srcdir = os.path.join(os.getcwd(), 'utilities', 'toolchain')
+        self.srcdir     = os.path.join(os.getcwd(), 'utilities', 'toolchain')
         self.genericdir = os.path.join(self.destdir, 'generic')
-        self.targetdir = os.path.join(self.destdir, self.target)
-        self.builddir = os.path.join(self.destdir, 'build-tmp')
+        self.targetdir  = os.path.join(self.destdir, self.target)
+        self.builddir   = os.path.join(self.destdir, 'build-tmp')
 
         self.totaltime = 0
 
@@ -258,9 +259,9 @@ class ToolchainManager:
     # Set up the toolchain sysroot.
     def update_sysroot(self, manager):
         sysrootdir = os.path.join(self.targetdir, 'sysroot')
-        libdir = os.path.join(sysrootdir, 'lib')
+        libdir     = os.path.join(sysrootdir, 'lib')
         includedir = os.path.join(sysrootdir, 'include')
-        builddir = os.path.join(os.getcwd(), 'build', '%s-%s' % (self.arch, self.platform))
+        builddir   = os.path.join(os.getcwd(), 'build', '%s-%s-%s' % (self.arch, self.platform, self.build))
 
         # Remove any existing sysroot.
         remove(sysrootdir)

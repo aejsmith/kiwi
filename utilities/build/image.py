@@ -121,9 +121,9 @@ def iso_image_func(target, source, env):
     verbose = '' if (ARGUMENTS.get('V') == '1') else '>> /dev/null 2>&1'
     config = env['_CONFIG']
     ret = os.system(
-        '%s --bin-dir=build/%s-%s/boot/bin --targets="%s" --label="Kiwi CDROM" %s %s %s' %
-            (env['KBOOT_MKISO'], config['ARCH'], config['PLATFORM'], config['KBOOT_TARGETS'],
-                target[0], tmpdir, verbose))
+        '%s --bin-dir=build/%s-%s-%s/boot/bin --targets="%s" --label="Kiwi CDROM" %s %s %s' %
+            (env['KBOOT_MKISO'], config['ARCH'], config['PLATFORM'], config['BUILD'],
+                config['KBOOT_TARGETS'], target[0], tmpdir, verbose))
 
     shutil.rmtree(tmpdir)
     return ret

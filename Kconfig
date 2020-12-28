@@ -17,8 +17,51 @@
 mainmenu "Kiwi Configuration"
 
 config KERNELVERSION
-        string
+	string
 	option env="KERNELVERSION"
+
+config DEBUG
+	bool
+
+choice
+	prompt "Build type"
+	default BUILD_DEBUGOPT
+
+config BUILD_DEBUG
+	bool "debug"
+	select DEBUG
+	help
+	  Build without optimization, and enable various sections of debugging code
+	  and extra checks. For the kernel, this enables assertions and messages
+	  with the LOG_DEBUG log level. It also disables the boot splash screen by
+	  default.
+	  
+	  The built system will generally be very slow, so don't use it unless you
+	  really need it.
+
+config BUILD_DEBUGOPT
+	bool "debugopt"
+	select DEBUG
+	help
+	  Like debug, but enables compiler optimization.
+	  
+	  The built system will be slower than release due to assertions and
+	  additional debugging checks, but much better than debug. This is the
+	  typical configuration for development.
+
+config BUILD_RELEASE
+	bool "release"
+	help
+	  This builds a standard, optimized system, without kernel assertions or
+	  extra debugging code.
+
+endchoice
+
+config BUILD
+	string
+	default "debug" if BUILD_DEBUG
+	default "debugopt" if BUILD_DEBUGOPT
+	default "release" if BUILD_RELEASE
 
 ####################
 menu "Build options"
@@ -38,7 +81,7 @@ config TOOLCHAIN_MAKE_JOBS
 
 config EXTRA_CCFLAGS
 	string "Extra CCFLAGS"
-	default "-O2"
+	default ""
 	help
 	  Extra compiler options for both C and C++ code.
 
@@ -58,13 +101,13 @@ config QEMU_BINARY
 	string "QEMU binary"
 	default "qemu-system-x86_64"
 	help
-	  Path to the QEMU binary to use for the qtest build target.
+	  Path to the QEMU binary to use for the "qemu" build target.
 
 config QEMU_OPTS
 	string "Extra QEMU options"
 	default "-monitor vc:1024x768 -serial stdio -vga std -s -rtc base=localtime -m 1024 -enable-kvm -smp cpus=4,cores=4"
 	help
-	  Extra options to pass to QEMU.
+	  Extra options to pass to QEMU for the "qemu" build target.
 
 config EXTRA_FSIMAGE
 	string "Extra filesystem image contents"
@@ -77,7 +120,7 @@ config FORCE_VIDEO_MODE
 	string "Force a video mode to be used"
 	default ""
 	help
-	  If set, the bootloader configuration file will be generated with the
+	  If set, the boot loader configuration file will be generated with the
 	  video_mode option set to this value.
 
 #######
@@ -90,16 +133,6 @@ source "config/Kconfig.arch"
 source "config/Kconfig.platform"
 
 comment "System configuration"
-
-config DEBUG
-	bool "Debug build"
-	default y
-	help
-	  Enable various sections of debugging code and extra checks. For the
-	  kernel, this enables assertions and messages with the LOG_DEBUG log
-	  level. It also disables the boot splash screen by default. The built
-	  system will generally be slower, so don't enable it unless you are
-	  doing kernel development or have another reason to.
 
 menu "Kernel configuration"
 source "source/kernel/Kconfig"

@@ -34,11 +34,28 @@ cxx_warning_flags = [
 ]
 
 # Variables to set in target environments.
+#
+# TODO: -fno-omit-frame-pointer should really be restricted to kernel builds
+# but for now we use it everywhere since that's all we have for doing
+# backtraces.
 target_flags = {
-    'CCFLAGS': cc_warning_flags + ['-gdwarf-2', '-pipe', '-fno-omit-frame-pointer'],
+    'CCFLAGS': cc_warning_flags + ['-pipe', '-fno-omit-frame-pointer'],
     'CFLAGS': ['-std=gnu11'],
     'CXXFLAGS': cxx_warning_flags + ['-std=c++17'],
     'ASFLAGS': ['-D__ASM__'],
+}
+
+# Per-build-type target flags.
+target_type_flags = {
+    'debug': {
+        'CCFLAGS': ['-gdwarf-2', '-O0'],
+    },
+    'debugopt': {
+        'CCFLAGS': ['-gdwarf-2', '-O2'],
+    },
+    'release': {
+        'CCFLAGS': ['-O2'],
+    },
 }
 
 # Variables to set in host environments. Don't build C code with our normal
@@ -146,12 +163,14 @@ if toolchain.check() or 'toolchain' in COMMAND_LINE_TARGETS:
 # Now set up the target template environment.
 for (k, v) in target_flags.items():
     target_env[k] = v
+for (k, v) in target_type_flags[config['BUILD']].items():
+    target_env[k] += v
 
 # Clang's integrated assembler doesn't support 16-bit code.
 target_env['ASFLAGS'] = ['-D__ASM__', '-no-integrated-as']
 
 # Set correct shared library link flags.
-target_env['SHCCFLAGS'] = '$CCFLAGS -fPIC -DSHARED'
+target_env['SHCCFLAGS']   = '$CCFLAGS -fPIC -DSHARED'
 target_env['SHLINKFLAGS'] = '$LINKFLAGS -shared -Wl,-soname,${TARGET.name}'
 
 # Override default assembler - it uses as directly, we want to go through the
@@ -172,8 +191,9 @@ if 'PLATFORM_ASFLAGS' in config:
     target_env['CCFLAGS'] += config['PLATFORM_ASFLAGS'].split()
 if 'PLATFORM_CCFLAGS' in config:
     target_env['CCFLAGS'] += config['PLATFORM_CCFLAGS'].split()
-target_env['CCFLAGS'] += config['EXTRA_CCFLAGS'].split()
-target_env['CFLAGS'] += config['EXTRA_CFLAGS'].split()
+
+target_env['CCFLAGS']  += config['EXTRA_CCFLAGS'].split()
+target_env['CFLAGS']   += config['EXTRA_CFLAGS'].split()
 target_env['CXXFLAGS'] += config['EXTRA_CXXFLAGS'].split()
 
 # Set paths to toolchain components.
@@ -202,7 +222,7 @@ target_env['RANLIB']  = toolchain.tool_path('ranlib')
 target_env['OBJCOPY'] = toolchain.tool_path('objcopy')
 target_env['LD']      = toolchain.tool_path('ld')
 
-build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM']))
+build_dir = os.path.join('build', '%s-%s-%s' % (config['ARCH'], config['PLATFORM'], config['BUILD']))
 
 # Build the target system.
 SConscript('source/SConscript', variant_dir = build_dir)

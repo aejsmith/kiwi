@@ -1,14 +1,14 @@
 {
     "configurations": [
         {
-            "name": "amd64-pc",
+            "name": "amd64-pc-debugopt",
             "browse": {
                 "path": [
                     "${workspaceFolder}"
                 ],
                 "limitSymbolsToIncludedHeaders": true
             },
-            "compileCommands": "${workspaceFolder}/build/amd64-pc/compile_commands.json",
+            "compileCommands": "${workspaceFolder}/build/amd64-pc-debugopt/compile_commands.json",
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c11",
             "cppStandard": "c++17",

@@ -53,7 +53,8 @@ for kboot_target in config['KBOOT_TARGETS'].split(','):
     kboot_config = kboot_configs[kboot_target]['config']
 
     # Set the debug flag.
-    kboot_config['DEBUG'] = config['DEBUG']
+    if config['DEBUG']:
+        kboot_config['DEBUG'] = True
 
     # Create a build environment.
     kboot_env = manager.CreateBare(
