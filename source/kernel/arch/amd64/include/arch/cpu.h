@@ -68,6 +68,15 @@ static inline struct cpu *arch_curr_cpu(void) {
     return addr;
 }
 
+/** Get the current CPU structure pointer (volatile, forces compiler to reload).
+ * @return              Pointer to current CPU structure. */
+static inline struct cpu *arch_curr_cpu_volatile(void) {
+    struct cpu *addr;
+
+    __asm__ volatile("mov %%gs:0, %0" : "=r"(addr));
+    return addr;
+}
+
 /** Halt the current CPU. */
 static inline __noreturn void arch_cpu_halt(void) {
     while (true)

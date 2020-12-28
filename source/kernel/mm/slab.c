@@ -44,6 +44,7 @@
 #include <mm/slab.h>
 
 #include <proc/process.h>
+#include <proc/sched.h>
 #include <proc/thread.h>
 
 #include <assert.h>
@@ -398,9 +399,11 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
     void *ret = NULL;
 
     /* We do not need locking on the per-CPU cache as it will not be used by
-     * any other CPUs. We do however need to disable interrupts to prevent a
-     * thread switch from occurring mid-operation. */
-    bool irq_state = local_irq_disable();
+     * any other CPUs. We do however need to disable preemption to avoid a
+     * thread switch or CPU migration from occurring mid-operation. Disabling
+     * IRQs is not sufficient: even with them disabled, slab_magazine_get_full()
+     * can result in a CPU migration as it can block. */
+    preempt_disable();
 
     slab_percpu_t *cc = &cache->cpu_caches[curr_cpu->id];
 
@@ -420,14 +423,14 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 
     /* Try to get a full magazine from the depot. */
     slab_magazine_t *mag = slab_magazine_get_full(cache);
-    assert(!local_irq_state());
+    assert(cc == &cache->cpu_caches[arch_curr_cpu_volatile()->id]);
     if (unlikely(!mag))
         goto out;
 
     /* Return previous to the depot. */
     if (cc->previous) {
         slab_magazine_put_empty(cache, cc->previous);
-        assert(!local_irq_state());
+        assert(cc == &cache->cpu_caches[arch_curr_cpu_volatile()->id]);
     }
 
     cc->previous = cc->loaded;
@@ -436,13 +439,14 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
     ret = cc->loaded->objects[--cc->loaded->rounds];
 
 out:
-    local_irq_restore(irq_state);
+    preempt_enable();
     return ret;
 }
 
 /** Free an object to the magazine layer. */
 static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
-    bool irq_state = local_irq_disable();
+    /* See slab_cpu_obj_alloc(). */
+    preempt_disable();
 
     slab_percpu_t *cc = &cache->cpu_caches[curr_cpu->id];
 
@@ -462,16 +466,16 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 
     /* Get a new empty magazine. */
     slab_magazine_t *mag = slab_magazine_get_empty(cache);
-    assert(!local_irq_state());
+    assert(cc == &cache->cpu_caches[arch_curr_cpu_volatile()->id]);
     if (unlikely(!mag)) {
-        local_irq_restore(irq_state);
+        preempt_enable();
         return false;
     }
 
     /* Load the new magazine, and free the previous. */
     if (likely(cc->previous)) {
         slab_magazine_put_full(cache, cc->previous);
-        assert(!local_irq_state());
+        assert(cc == &cache->cpu_caches[arch_curr_cpu_volatile()->id]);
     }
 
     cc->previous = cc->loaded;
@@ -480,7 +484,7 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
     cc->loaded->objects[cc->loaded->rounds++] = obj;
 
 success:
-    local_irq_restore(irq_state);
+    preempt_enable();
     return true;
 }
 
@@ -532,6 +536,7 @@ static __always_inline void *trace_return_address(slab_cache_t *cache) {
  * @return              Pointer to allocated object or NULL if unable to
  *                      allocate.  */
 void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
+    assert(!in_interrupt());
     assert(cache);
 
     void *ret;
@@ -576,6 +581,7 @@ void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
  * @param cache         Cache to free to.
  * @param obj           Object to free. */
 void slab_cache_free(slab_cache_t *cache, void *obj) {
+    assert(!in_interrupt());
     assert(cache);
 
     if (!(cache->flags & SLAB_CACHE_NOMAG)) {
