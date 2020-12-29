@@ -33,7 +33,7 @@ static struct passwd stub_pwd = {
     .pw_uid = 0,
     .pw_gid = 0,
     .pw_dir = (char *)"/users/admin",
-    .pw_shell = (char *)"/system/binaries/bash",
+    .pw_shell = (char *)"/system/bin/bash",
     .pw_gecos = (char *)"Administrator",
 };
 
