@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief               POSIX program execution function.
+ * @brief               POSIX program execution functions.
  */
 
 #include <kernel/process.h>
@@ -25,13 +25,18 @@
 #include <errno.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "posix/posix.h"
 
-#define INTERP_MAX 256
+#define ARGV_MAX    512
+#define INTERP_MAX  256
+
+extern char **environ;
 
 /** Execute a file with an interpreter. */
 static int do_interp(int fd, const char *path, char *const argv[], char *const envp[]) {
@@ -163,4 +168,134 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     status_t ret = kern_process_exec(path, (const char *const *)argv, (const char *const *)envp, 0, NULL);
     libsystem_status_to_errno(ret);
     return -1;
+}
+
+/**
+ * Executes a binary with the given arguments and a copy of the calling
+ * process' environment.
+ *
+ * @param path          Path to binary to execute.
+ * @param argv          Arguments for process (NULL-terminated array).
+ *
+ * @return              Does not return on success, -1 on failure.
+ */
+int execv(const char *path, char *const argv[]) {
+    return execve(path, argv, environ);
+}
+
+/**
+ * Executes a binary with PATH lookup. If the given path contains a / character,
+ * this function will simply call execve() with the given arguments and the
+ * current process' environment. Otherwise, it will search the PATH for the
+ * name given and execute it if found.
+ *
+ * @param file          Name of binary to execute.
+ * @param argv          Arguments for process (NULL-terminated array).
+ *
+ * @return              Does not return on success, -1 on failure.
+ */
+int execvp(const char *file, char *const argv[]) {
+    /* If file contains a /, just run it */
+    if (strchr(file, '/'))
+        return execve(file, argv, environ);
+
+    /* Use the default path if PATH is not set in the environment */
+    const char *path = getenv("PATH");
+    if (!path)
+        path = "/system/bin";
+
+    char buf[PATH_MAX];
+
+    for (char *cur = (char *)path, *next; cur; cur = next) {
+        next = strchr(cur, ':');
+        if (!next)
+            next = cur + strlen(cur);
+
+        if (next == cur) {
+            buf[0] = '.';
+            cur--;
+        } else {
+            if ((next - cur) >= (PATH_MAX - 3)) {
+                errno = EINVAL;
+                return -1;
+            }
+
+            memmove(buf, cur, (size_t)(next - cur));
+        }
+
+        buf[next - cur] = '/';
+
+        size_t len = strlen(file);
+        if (len + (next - cur) >= (PATH_MAX - 2)) {
+            errno = EINVAL;
+            return -1;
+        }
+
+        memmove(&buf[next - cur + 1], file, len + 1);
+        if (execve(buf, argv, environ) == -1) {
+            if ((errno != EACCES) && (errno != ENOENT) && (errno != ENOTDIR))
+                return -1;
+        }
+
+        if (!*next)
+            break;
+
+        next++;
+    }
+
+    return -1;
+}
+
+/**
+ * Executes a binary with the given arguments and a copy of the calling
+ * process' environment.
+ *
+ * @param path          Path to binary to execute.
+ * @param arg...        Arguments for process (NULL-terminated argument list).
+ *
+ * @return              Does not return on success, -1 on failure.
+ */
+int execl(const char *path, const char *arg, ...) {
+    const char *argv[ARGV_MAX];
+    argv[0] = arg;
+
+    va_list ap;
+    va_start(ap, arg);
+
+    for (unsigned i = 1; i < ARGV_MAX; i++) {
+        argv[i] = va_arg(ap, const char *);
+        if (!argv[i])
+            break;
+    }
+
+    va_end(ap);
+    return execv(path, (char *const *)argv);
+}
+
+/**
+ * Executes a binary with PATH lookup. If the given path contains a / character,
+ * this function will simply call execve() with the given arguments and the
+ * current process' environment. Otherwise, it will search the PATH for the
+ * name given and execute it if found.
+ *
+ * @param file          Name of binary to execute.
+ * @param arg...        Arguments for process (NULL-terminated argument list).
+ *
+ * @return              Does not return on success, -1 on failure.
+ */
+int execlp(const char *file, const char *arg, ...) {
+    const char *argv[ARGV_MAX];
+    argv[0] = arg;
+
+    va_list ap;
+    va_start(ap, arg);
+
+    for (unsigned i = 1; i < ARGV_MAX; i++) {
+        argv[i] = va_arg(ap, const char *);
+        if (!argv[i])
+            break;
+    }
+
+    va_end(ap);
+    return execvp(file, (char *const *)argv);
 }
