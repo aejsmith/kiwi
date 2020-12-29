@@ -60,6 +60,12 @@ static status_t file_object_wait(object_handle_t *handle, object_event_t *event)
     if (!fhandle->file->ops->wait)
         return STATUS_NOT_SUPPORTED;
 
+    if (event->event == FILE_EVENT_READABLE && !(fhandle->access & FILE_ACCESS_READ)) {
+        return STATUS_ACCESS_DENIED;
+    } else if (event->event == FILE_EVENT_WRITABLE && !(fhandle->access & FILE_ACCESS_WRITE)) {
+        return STATUS_ACCESS_DENIED;
+    }
+
     return fhandle->file->ops->wait(fhandle, event);
 }
 
