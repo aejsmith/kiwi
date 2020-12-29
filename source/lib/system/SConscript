@@ -57,6 +57,7 @@ sources = [File(f) for f in [
     #'posix/poll.c',
     'posix/process.c',
     'posix/pwd.c',
+    'posix/signal.c',
     'posix/termios.c',
     'posix/time.c',
     'posix/uidgid.c',
@@ -66,15 +67,6 @@ sources = [File(f) for f in [
     'pthread/once.c',
     'pthread/pthread.c',
     'pthread/specific.c',
-
-    'signal/kill.c',
-    'signal/sigaction.c',
-    'signal/sigaltstack.c',
-    'signal/sigprocmask.c',
-    'signal/sigset.c',
-    'signal/sigsetjmp.c',
-    'signal/sigsuspend.c',
-    'signal/strsignal.c',
 
     'stdio/buffer.c',
     'stdio/do_printf.c',
