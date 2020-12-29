@@ -30,8 +30,6 @@
 #include "libsystem.h"
 
 /**
- * Create a virtual memory mapping.
- *
  * Creates a new virtual memory mapping in the calling process' address space.
  * If MAP_ANONYMOUS is specified in flags, the mapping will be backed with
  * anonymous pages. Otherwise, it will be backed by the file referred to by the
@@ -51,9 +49,6 @@
  *                      (with errno set appropriately).
  */
 void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) {
-    unsigned kspec, type;
-    uint32_t kaccess = 0;
-    uint32_t kflags = 0;
     status_t ret;
 
     if (!size) {
@@ -62,14 +57,16 @@ void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) 
     }
 
     /* Through the POSIX interface, only allow files to be mapped. */
+    unsigned type;
     ret = kern_object_type(fd, &type);
     if (ret != STATUS_SUCCESS || type != OBJECT_TYPE_FILE) {
         errno = EBADF;
         return MAP_FAILED;
     }
 
-    kspec = (flags & MAP_FIXED) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY;
+    unsigned kspec = (flags & MAP_FIXED) ? VM_ADDRESS_EXACT : VM_ADDRESS_ANY;
 
+    uint32_t kaccess = 0;
     if (prot & PROT_READ)
         kaccess |= VM_ACCESS_READ;
     if (prot & PROT_WRITE)
@@ -77,6 +74,7 @@ void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) 
     if (prot & PROT_EXEC)
         kaccess |= VM_ACCESS_EXECUTE;
 
+    uint32_t kflags = 0;
     if ((flags & (MAP_PRIVATE | MAP_SHARED)) == MAP_PRIVATE) {
         kflags |= VM_MAP_PRIVATE;
     } else if ((flags & (MAP_PRIVATE | MAP_SHARED)) != MAP_SHARED) {
@@ -93,14 +91,12 @@ void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset) 
     return start;
 }
 
-/** Unmap a region of virtual memory.
+/** Unmaps a region of virtual memory.
  * @param start         Start of the mapping.
  * @param size          Size of the mapping.
  * @return              0 on success, -1 on failure (with errno set appropriately). */
 int munmap(void *start, size_t size) {
-    status_t ret;
-
-    ret = kern_vm_unmap(start, size);
+    status_t ret = kern_vm_unmap(start, size);
     if (ret != STATUS_SUCCESS) {
         libsystem_status_to_errno(ret);
         return -1;

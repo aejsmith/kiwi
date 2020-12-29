@@ -28,27 +28,22 @@ char *optarg;
 int optind = 1, opterr = 1, optopt;
 
 /**
- * Parse command line options.
- *
- * Parses command line options according to the provided option string.
- * The option string should be a string of valid option characters. If an
- * option requires an argument, the character should be followed by a :
- * character in the string.
+ * Parses command line options according to the provided option string. The
+ * option string should be a string of valid option characters. If an option
+ * requires an argument, the character should be followed by a : * character in
+ * the string.
  *
  * @param argc          Argument count.
  * @param argv          Argument array.
  * @param opts          Argument string.
  *
- * @return              Option character found, '?' if unknown character,
- *                      ':' if missing an argument and the first character
- *                      of opts was a colon ('?' if missing and first
- *                      character was not a colon), and -1 when option
- *                      parsing is finished.
+ * @return              Option character found, '?' if unknown character, ':'
+ *                      if missing an argument and the first character of opts
+ *                      was a colon ('?' if missing and first character was not
+ *                      a colon), and -1 when option parsing is finished.
  */
 int getopt(int argc, char *const argv[], const char *opts) {
     static int offset = 1;
-    char *ptr, *tmp;
-    int ret;
 
     if (optind >= argc || !argv[optind] || *argv[optind] != '-' || strcmp(argv[optind], "-") == 0) {
         return -1;
@@ -57,9 +52,9 @@ int getopt(int argc, char *const argv[], const char *opts) {
         return -1;
     }
 
-    tmp = argv[optind] + offset++;
-    ret = *tmp++;
-    ptr = strchr(opts, ret);
+    char *tmp = argv[optind] + offset++;
+    int ret   = *tmp++;
+    char *ptr = strchr(opts, ret);
     if (!ptr) {
         optopt = ret;
         if (opterr != 0)
