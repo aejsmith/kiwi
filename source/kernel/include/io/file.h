@@ -151,7 +151,7 @@ extern bool file_access(file_t *file, uint32_t access);
 extern file_handle_t *file_handle_alloc(file_t *file, uint32_t access, uint32_t flags);
 extern void file_handle_free(file_handle_t *fhandle);
 extern object_handle_t *file_handle_create(file_handle_t *fhandle);
-extern status_t file_handle_attach(file_t *file, uint32_t access, uint32_t flags, handle_t *_id, handle_t *_uid);
+extern status_t file_handle_open(file_t *file, uint32_t access, uint32_t flags, handle_t *_id, handle_t *_uid);
 
 /**
  * Gets the current flags for a file handle. This uses atomic access, and the

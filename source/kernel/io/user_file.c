@@ -230,11 +230,17 @@ static void user_file_close(file_handle_t *handle) {
     user_file_t *file = handle->user_file;
 
     if (refcount_dec(&file->count) == 0) {
+        mutex_lock(&file->lock);
+
         /* This will prevent any more messages from being sent on the connection
          * if the other side still has a handle open, which means our callbacks
          * won't be called so it is safe to free the file after this. */
-        if (file->endpoint)
+        if (file->endpoint) {
             ipc_connection_close(file->endpoint);
+            file->endpoint = NULL;
+        }
+
+        mutex_unlock(&file->lock);
 
         assert(list_empty(&file->ops));
 
@@ -446,23 +452,35 @@ status_t kern_user_file_create(
 
     file->file.ops    = &user_file_ops;
     file->file.type   = type;
+    file->endpoint    = NULL;
     file->next_serial = 0;
 
     // TODO: Initialize ACL. To what?
 
+    /*
+     * Have to be a bit careful here as the user process could theoretically
+     * use the connection handle between attaching that and attaching the file
+     * handle. The endpoint is left NULL initially, so that if the process
+     * manages to call into user_file_endpoint_close by closing the handle
+     * before we end up on the err_close_conn path, we can't end up doing a
+     * double call to ipc_connection_close() on the endpoint.
+     */
+    ipc_endpoint_t *endpoint;
     handle_t conn;
-    ret = ipc_connection_create(0, &user_file_endpoint_ops, file, &file->endpoint, &conn, _conn);
+    ret = ipc_connection_create(0, &user_file_endpoint_ops, file, &endpoint, &conn, _conn);
     if (ret != STATUS_SUCCESS)
         goto err_free;
 
-    ret = file_handle_attach(&file->file, access, flags, NULL, _file);
+    ret = file_handle_open(&file->file, access, flags, NULL, _file);
     if (ret != STATUS_SUCCESS)
         goto err_close_conn;
+
+    file->endpoint = endpoint;
 
     return STATUS_SUCCESS;
 
 err_close_conn:
-    ipc_connection_close(file->endpoint);
+    ipc_connection_close(endpoint);
     object_handle_detach(conn);
 
 err_free:

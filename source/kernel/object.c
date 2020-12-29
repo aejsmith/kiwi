@@ -356,7 +356,7 @@ status_t object_handle_detach(handle_t id) {
  * handle table. This is a shortcut for creating a new handle with
  * object_handle_create() and then attaching it with object_handle_attach().
  * The behaviour of this function also differs slightly from doing that: if
- * attaching the handle fails, the object type's release method will not be
+ * attaching the handle fails, the object type's close method will not be
  * called. Note that as soon as this function succeeds, it is possible for the
  * process to close the handle and cause it to be released.
  *

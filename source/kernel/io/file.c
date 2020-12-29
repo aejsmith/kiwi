@@ -154,19 +154,27 @@ object_handle_t *file_handle_create(file_handle_t *fhandle) {
     return object_handle_create(&file_object_type, fhandle);
 }
 
-/** Shortcut for file_handle_alloc/create() + object_handle_attach().
+/**
+ * Shortcut for file_handle_alloc() + object_handle_open(). Like
+ * object_handle_open(), if attaching the handle fails, the file's close method
+ * will *not* be called. Note that as soon as this function succeeds, it is
+ * possible for the process to close the handle and cause it to be released.
+ *
  * @param file          File that handle is to.
  * @param access        Access rights for the handle.
  * @param flags         Flags for the handle.
  * @param _id           If not NULL, a kernel location to store handle ID in.
  * @param _uid          If not NULL, a user location to store handle ID in.
- * @return              Status code describing result of the operation. */
-status_t file_handle_attach(file_t *file, uint32_t access, uint32_t flags, handle_t *_id, handle_t *_uid) {
-    file_handle_t *fhandle  = file_handle_alloc(file, access, flags);
-    object_handle_t *handle = file_handle_create(fhandle);
+ *
+ * @return              Status code describing result of the operation.
+ */
+status_t file_handle_open(file_t *file, uint32_t access, uint32_t flags, handle_t *_id, handle_t *_uid) {
+    file_handle_t *fhandle = file_handle_alloc(file, access, flags);
 
-    status_t ret = object_handle_attach(handle, _id, _uid);
-    object_handle_release(handle);
+    status_t ret = object_handle_open(&file_object_type, fhandle, _id, _uid);
+    if (ret != STATUS_SUCCESS)
+        file_handle_free(fhandle);
+
     return ret;
 }
 
