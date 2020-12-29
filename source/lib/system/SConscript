@@ -57,8 +57,8 @@ sources = [File(f) for f in [
     #'posix/poll.c',
     'posix/process.c',
     'posix/pwd.c',
-    'posix/sleep.c',
     'posix/termios.c',
+    'posix/time.c',
     'posix/uidgid.c',
 
     'pthread/cond.c',
@@ -136,11 +136,9 @@ sources = [File(f) for f in [
     'string/strtok.c',
 
     'time/asctime.c',
-    'time/gettimeofday.c',
     'time/gmtime.c',
     'time/localtime.c',
     'time/mktime.c',
-    'time/nanosleep.c',
     'time/strftime.c',
     'time/time.c',
 

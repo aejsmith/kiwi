@@ -16,40 +16,70 @@
 
 /**
  * @file
- * @brief               POSIX nanosecond sleep function.
+ * @brief               POSIX time functions.
  */
 
 #include <kernel/status.h>
 #include <kernel/thread.h>
+#include <kernel/time.h>
+
+#include <sys/time.h>
 
 #include <errno.h>
 #include <time.h>
+#include <unistd.h>
+
+/** Gets the current time.
+ * @param tv            Structure to fill with time since epoch.
+ * @param tz            Pointer to timezone (ignored).
+ * @return              0 on success, -1 on failure. */
+int gettimeofday(struct timeval *tv, void *tz) {
+    nstime_t ktime;
+    kern_time_get(TIME_REAL, &ktime);
+
+    tv->tv_sec  = ktime / 1000000000;
+    tv->tv_usec = (ktime % 1000000000) / 1000;
+
+    return 0;
+}
 
 /** High resolution sleep.
  * @param rqtp          Requested sleep time.
  * @param rmtp          Where to store remaining time if interrupted.
  * @return              0 on success, -1 on failure. */
 int nanosleep(const struct timespec *rqtp, struct timespec *rmtp) {
-    nstime_t ns, rem;
-    status_t ret;
-
     if (rqtp->tv_sec < 0 || rqtp->tv_nsec < 0 || rqtp->tv_nsec >= 1000000000) {
         errno = EINVAL;
         return -1;
     }
 
-    ns = ((nstime_t)rqtp->tv_sec * 1000000000) + rqtp->tv_nsec;
+    nstime_t ns = ((nstime_t)rqtp->tv_sec * 1000000000) + rqtp->tv_nsec;
 
-    ret = kern_thread_sleep(ns, &rem);
+    nstime_t rem;
+    status_t ret = kern_thread_sleep(ns, &rem);
     if (ret == STATUS_INTERRUPTED) {
         if (rmtp) {
             rmtp->tv_nsec = rem % 1000000000;
-            rmtp->tv_sec = rem / 1000000000;
+            rmtp->tv_sec  = rem / 1000000000;
         }
 
         errno = EINTR;
         return -1;
     }
+
+    return 0;
+}
+
+/** Sleep for a certain interval.
+ * @param secs          Number of seconds to sleep for.
+ * @return              0, or number of seconds remaining if interrupted. */
+unsigned int sleep(unsigned int secs) {
+    struct timespec ts;
+    ts.tv_sec  = secs;
+    ts.tv_nsec = 0;
+
+    if (nanosleep(&ts, &ts) == -1 && errno == EINTR)
+        return ts.tv_sec;
 
     return 0;
 }
