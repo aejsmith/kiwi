@@ -35,73 +35,81 @@ struct user_file;
 
 /** Operations for a file. */
 typedef struct file_ops {
-    /** Open a file (via file_reopen).
+    /** Opens a file (via file_reopen).
      * @param handle        File handle structure.
      * @return              Status code describing the result of the operation. */
     status_t (*open)(struct file_handle *handle);
 
-    /** Close a file.
-     * @param handle        File handle structure. All data allocated for
-     *                      the handle should be freed. */
+    /** Closes a file.
+     * @param handle        File handle structure. All data allocated for the
+     *                      handle should be freed. */
     void (*close)(struct file_handle *handle);
 
-    /** Get the name of a file.
+    /** Gets the name of a file.
      * @param handle        File handle structure.
      * @return              Pointer to allocated name string. */
     char *(*name)(struct file_handle *handle);
 
-    /** Signal that a file event is being waited for.
-     * @note                If the event being waited for has occurred
-     *                      already, this function should call the callback
-     *                      function and return success.
+    /**
+     * Signals that a file event is being waited for. If the event being waited
+     * for has occurred already, this function should call the callback function
+     * and return success.
+     *
+     * For FILE_EVENT_{READABLE,WRITABLE}, access flag checks are performed
+     * before calling this function. For any other file-specific events, this
+     * function should perform any appropriate access checks.
+     *
      * @param handle        File handle structure.
      * @param event         Event that is being waited for.
-     * @return              Status code describing result of the operation. */
+     *
+     * @return              Status code describing result of the operation.
+     */
     status_t (*wait)(struct file_handle *handle, object_event_t *event);
 
-    /** Stop waiting for a file event.
+    /** Stops waiting for a file event.
      * @param handle        File handle structure.
      * @param event         Event that is being waited for. */
     void (*unwait)(struct file_handle *handle, object_event_t *event);
 
-    /** Perform I/O on a file.
+    /** Performs I/O on a file.
      * @param handle        File handle structure.
      * @param request       I/O request.
      * @return              Status code describing result of the operation. */
     status_t (*io)(struct file_handle *handle, struct io_request *request);
 
-    /** Map a file into memory.
-     * @note                See object_type_t::map() for more details on the
-     *                      behaviour of this function.
+    /** Maps a file into memory.
+     * @see                 object_type_t::map().
      * @param handle        File handle structure.
      * @param region        Region being mapped.
      * @return              Status code describing result of the operation. */
     status_t (*map)(struct file_handle *handle, struct vm_region *region);
 
-    /** Read the next directory entry.
-     * @note                The implementation can make use of the offset field
-     *                      in the handle to store whatever it needs to
-     *                      implement this function. It will be set to 0 when
-     *                      the handle is initially opened, and when
-     *                      rewind_dir() is called on the handle.
+    /**
+     * Reads the next directory entry. The implementation can make use of the
+     * offset field in the handle to store whatever it needs to implement this
+     * function. It will be set to 0 when the handle is initially opened, and
+     * when rewind_dir() is called on the handle.
+     *
      * @param handle        File handle structure.
      * @param _entry        Where to store pointer to directory entry structure
      *                      (must be allocated using a kmalloc()-based function).
-     * @return              Status code describing result of the operation. */
+     *
+     * @return              Status code describing result of the operation.
+     */
     status_t (*read_dir)(struct file_handle *handle, dir_entry_t **_entry);
 
-    /** Modify the size of a file.
+    /** Modifies the size of a file.
      * @param handle        File handle structure.
      * @param size          New size of the file.
      * @return              Status code describing result of the operation. */
     status_t (*resize)(struct file_handle *handle, offset_t size);
 
-    /** Get information about a file.
+    /** Gets information about a file.
      * @param handle        File handle structure.
      * @param info          Information structure to fill in (pre-zeroed). */
     void (*info)(struct file_handle *handle, file_info_t *info);
 
-    /** Flush changes to a file.
+    /** Flushes changes to a file.
      * @param handle        File handle structure.
      * @return              Status code describing result of the operation. */
     status_t (*sync)(struct file_handle *handle);

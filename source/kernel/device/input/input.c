@@ -129,7 +129,7 @@ static status_t input_device_wait(device_t *_device, file_handle_t *handle, obje
         mutex_unlock(&client->lock);
         return STATUS_SUCCESS;
     } else {
-        return STATUS_NOT_SUPPORTED;
+        return STATUS_INVALID_EVENT;
     }
 }
 

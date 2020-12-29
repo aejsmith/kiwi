@@ -742,7 +742,7 @@ static status_t kfb_device_wait(device_t *device, file_handle_t *handle, object_
             break;
 
         default:
-            ret = STATUS_NOT_SUPPORTED;
+            ret = STATUS_INVALID_EVENT;
             break;
     }
 

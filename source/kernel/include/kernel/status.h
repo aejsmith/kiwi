@@ -33,7 +33,7 @@
 #define STATUS_INVALID_HANDLE       8   /**< Non-existant handle or handle with incorrect type. */
 #define STATUS_INVALID_ADDR         9   /**< Invalid memory location specified. */
 #define STATUS_INVALID_REQUEST      10  /**< Invalid file request specified. */
-#define STATUS_INVALID_EVENT        11  /**< Invalid object event specified. */
+#define STATUS_INVALID_EVENT        11  /**< Invalid/unsupported object event specified. */
 #define STATUS_OVERFLOW             12  /**< Integer overflow. */
 #define STATUS_NO_MEMORY            13  /**< Out of memory. */
 #define STATUS_NO_HANDLES           14  /**< No handles are available. */
