@@ -16,12 +16,7 @@
 
 /**
  * @file
- * @brief               POSIX read functions.
- *
- * @fixme               When a failure occurs after partially reading the data
- *                      the kernel updates the handle's offset by the number of
- *                      bytes that were successfully read. This is possibly
- *                      incorrect for POSIX.
+ * @brief               POSIX I/O functions.
  */
 
 #include <kernel/device.h>
@@ -35,8 +30,6 @@
 #include "libsystem.h"
 
 /**
- * Read from a particular position in a file.
- *
  * Reads from the specified position in a file. The file descriptor's current
  * offset will be ignored, and will not be updated after the read.
  *
@@ -49,16 +42,14 @@
  *                      will be set appropriately).
  */
 ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
-    size_t bytes;
-    status_t ret;
-
     if (offset < 0) {
         errno = EINVAL;
         return -1;
     }
 
-    ret = kern_file_read(fd, buf, count, offset, &bytes);
-    if (ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
+    size_t bytes;
+    status_t ret = kern_file_read(fd, buf, count, offset, &bytes);
+    if (ret != STATUS_SUCCESS && bytes == 0) {
         if (ret == STATUS_ACCESS_DENIED) {
             errno = EBADF;
         } else {
@@ -72,10 +63,8 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
 }
 
 /**
- * Read from a file.
- *
  * Reads from a file. After the read, the file descriptor's offset will be
- * updated by the number of bytes written.
+ * updated by the number of bytes read.
  *
  * @param fd            File descriptor to read from.
  * @param buf           Buffer to read into.
@@ -86,10 +75,68 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
  */
 ssize_t read(int fd, void *buf, size_t count) {
     size_t bytes;
-    status_t ret;
+    status_t ret = kern_file_read(fd, buf, count, -1, &bytes);
+    if (ret != STATUS_SUCCESS && bytes == 0) {
+        if (ret == STATUS_ACCESS_DENIED) {
+            errno = EBADF;
+        } else {
+            libsystem_status_to_errno(ret);
+        }
 
-    ret = kern_file_read(fd, buf, count, -1, &bytes);
-    if (ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
+        return -1;
+    }
+
+    return (ssize_t)bytes;
+}
+
+/**
+ * Writes to the specified position in a file. The file descriptor's current
+ * offset will be ignored, and will not be updated after the write.
+ *
+ * @param fd            File descriptor to write to.
+ * @param buf           Buffer containing data to write.
+ * @param count         Number of bytes to write.
+ * @param offset        Offset into the file to write to.
+ *
+ * @return              Number of bytes written on success, -1 on failure (errno
+ *                      will be set appropriately).
+ */
+ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset) {
+    if (offset < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    size_t bytes;
+    status_t ret = kern_file_write(fd, buf, count, offset, &bytes);
+    if (ret != STATUS_SUCCESS && bytes == 0) {
+        if (ret == STATUS_ACCESS_DENIED) {
+            errno = EBADF;
+        } else {
+            libsystem_status_to_errno(ret);
+        }
+
+        return -1;
+    }
+
+    return (ssize_t)bytes;
+}
+
+/**
+ * Writes to a file. After the write, the file descriptor's offset will be
+ * updated by the number of bytes written.
+ *
+ * @param fd            File descriptor to write to.
+ * @param buf           Buffer containing data to write.
+ * @param count         Number of bytes to write.
+ *
+ * @return              Number of bytes written on success, -1 on failure (errno
+ *                      will be set appropriately).
+ */
+ssize_t write(int fd, const void *buf, size_t count) {
+    size_t bytes;
+    status_t ret = kern_file_write(fd, buf, count, -1, &bytes);
+    if (ret != STATUS_SUCCESS && bytes == 0) {
         if (ret == STATUS_ACCESS_DENIED) {
             errno = EBADF;
         } else {

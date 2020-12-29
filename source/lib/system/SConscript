@@ -57,6 +57,7 @@ sources = [File(f) for f in [
     'posix/getcwd.c',
     'posix/getopt.c',
     'posix/getpid.c',
+    'posix/io.c',
     'posix/link.c',
     'posix/mkdir.c',
     'posix/mknod.c',
@@ -64,7 +65,6 @@ sources = [File(f) for f in [
     'posix/pipe.c',
     #'posix/poll.c',
     'posix/pwd.c',
-    'posix/read.c',
     'posix/readlink.c',
     'posix/rmdir.c',
     'posix/sleep.c',
@@ -77,7 +77,6 @@ sources = [File(f) for f in [
     'posix/unlink.c',
     'posix/utime.c',
     'posix/wait.c',
-    'posix/write.c',
 
     'pthread/cond.c',
     'pthread/mutex.c',
