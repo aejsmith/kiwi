@@ -48,6 +48,10 @@ config ARCH
 	string
 	default "amd64" if ARCH_AMD64
 
+config GDB_ARCH
+	string
+	default "i386:x86-64:intel" if ARCH_AMD64
+
 config TOOLCHAIN_TARGET
 	string
 	default "x86_64-kiwi" if ARCH_AMD64

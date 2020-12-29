@@ -125,3 +125,10 @@ if config['PLATFORM'] == 'pc':
 else:
     Default(dist['KERNEL'])
     Default(dist['KBOOT'])
+
+# Helper to run GDB attached to QEMU with the appropriate options for the
+# current configuration.
+Alias('qgdb', dist.Command('__qgdb', [], Action(
+    'gdb --eval-command="symbol-file %s" --eval-command="set architecture %s" --eval-command="target remote localhost:1234"' %
+        ('build/%s-%s-%s/kernel/kernel-unstripped' % (config['ARCH'], config['PLATFORM'], config['BUILD']), config['GDB_ARCH']),
+    None)))
