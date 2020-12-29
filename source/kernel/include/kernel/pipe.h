@@ -25,6 +25,8 @@
 
 __KERNEL_EXTERN_C_BEGIN
 
-extern status_t kern_pipe_create(handle_t handles[2]);
+extern status_t kern_pipe_create(
+    uint32_t read_flags, uint32_t write_flags, handle_t *_read,
+    handle_t *_write);
 
 __KERNEL_EXTERN_C_END

@@ -72,7 +72,7 @@ syscall kern_file_request(handle_t, uint, ptr_t, size_t, ptr_t, size_t, ptr_t);
 
 syscall kern_fs_open(ptr_t, uint32_t, uint32_t, uint, ptr_t);
 syscall kern_fs_create_dir(ptr_t);
-syscall kern_fs_create_fifo(ptr_t);
+syscall kern_fs_create_pipe(ptr_t);
 syscall kern_fs_create_symlink(ptr_t, ptr_t);
 syscall kern_fs_read_symlink(ptr_t, ptr_t, size_t);
 syscall kern_fs_mount(ptr_t, ptr_t, ptr_t, uint32_t, ptr_t);
@@ -160,3 +160,5 @@ syscall kern_image_register(image_id_t, ptr_t) hidden;
 syscall kern_image_unregister(image_id_t) hidden;
 
 syscall kern_user_file_create(int, uint32_t, uint32_t, ptr_t, ptr_t);
+
+syscall kern_pipe_create(uint32_t, uint32_t, ptr_t, ptr_t);

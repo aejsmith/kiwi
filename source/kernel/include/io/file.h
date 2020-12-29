@@ -31,6 +31,7 @@ struct device;
 struct file_handle;
 struct fs_node;
 struct io_request;
+struct pipe;
 struct user_file;
 
 /** Operations for a file. */
@@ -139,6 +140,7 @@ typedef struct file_handle {
         file_t *file;                   /**< File object. */
         struct fs_node *node;           /**< Filesystem node. */
         struct device *device;          /**< Device node. */
+        struct pipe *pipe;              /**< Pipe. */
         struct user_file *user_file;    /**< User file. */
     };
 

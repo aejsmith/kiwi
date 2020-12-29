@@ -21,35 +21,43 @@
 
 #pragma once
 
+#include <io/file.h>
+
+#include <kernel/pipe.h>
+
 #include <lib/notifier.h>
 
 #include <sync/mutex.h>
-#include <sync/semaphore.h>
+#include <sync/condvar.h>
 
 struct io_request;
 
 /** Size of a pipe's data buffer. */
-#define PIPE_SIZE       4096
+#define PIPE_SIZE       PAGE_SIZE
 
 /** Structure containing a pipe. */
 typedef struct pipe {
-    mutex_t lock;                   /**< Lock to protect buffer. */
+    file_t file;                    /**< File header. */
 
-    semaphore_t space_sem;          /**< Semaphore counting available space. */
+    mutex_t lock;                   /**< Lock to protect pipe. */
+
+    bool read_open : 1;             /**< Whether the read end is open. */
+    bool write_open : 1;            /**< Whether the write end is open. */
+
+    condvar_t space_cvar;           /**< Condition to wait for space on. */
+    condvar_t data_cvar;            /**< Condition to wait for data on. */
+
     notifier_t space_notifier;      /**< Notifier for space availability. */
-    semaphore_t data_sem;           /**< Semaphore counting available data. */
     notifier_t data_notifier;       /**< Notifier for data availability. */
 
-    char *buf;                      /**< Circular data buffer. */
+    uint8_t *buf;                   /**< Circular data buffer. */
     size_t start;                   /**< Start position of buffer. */
-    size_t end;                     /**< End position of buffer. */
+    size_t count;                   /**< Number of bytes in buffer. */
 } pipe_t;
 
-extern status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *_bytes);
-extern status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_t *_bytes);
 extern status_t pipe_io(pipe_t *pipe, struct io_request *request, bool nonblock);
 extern void pipe_wait(pipe_t *pipe, bool write, object_event_t *event);
 extern void pipe_unwait(pipe_t *pipe, bool write, object_event_t *event);
 
-extern pipe_t *pipe_create(void);
+extern pipe_t *pipe_create(unsigned mmflag);
 extern void pipe_destroy(pipe_t *pipe);

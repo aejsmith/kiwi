@@ -167,11 +167,13 @@ static status_t device_file_map(file_handle_t *handle, vm_region_t *region) {
 static void device_file_info(file_handle_t *handle, file_info_t *info) {
     device_t *device = handle->device;
 
+    /* TODO. */
+    info->block_size = 1;
+    info->size       = 0;
+
     info->id         = 0;
     info->mount      = 0;
     info->type       = handle->file->type;
-    info->block_size = 0;
-    info->size       = 0;
     info->links      = 1;
     info->created    = device->time;
     info->accessed   = device->time;

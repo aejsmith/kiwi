@@ -50,7 +50,7 @@ extern status_t kern_fs_open(
     handle_t *_handle);
 
 extern status_t kern_fs_create_dir(const char *path);
-extern status_t kern_fs_create_fifo(const char *path);
+extern status_t kern_fs_create_pipe(const char *path);
 extern status_t kern_fs_create_symlink(const char *path, const char *target);
 
 extern status_t kern_fs_read_symlink(const char *path, char *buf, size_t size);

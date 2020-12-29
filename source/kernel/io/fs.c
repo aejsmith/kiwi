@@ -1146,7 +1146,7 @@ status_t fs_open(
     } else {
         node = entry->node;
 
-        /* FIXME: We should handle other types here too as well. Devices will
+        /* TODO: We should handle other types here too as well. Devices will
          * eventually be redirected to the device layer, pipes should be
          * openable and get directed into the pipe implementation. */
         switch (node->file.type) {
@@ -1204,16 +1204,16 @@ status_t fs_create_dir(const char *path) {
 }
 
 /**
- * Creates a new FIFO in the filesystem. A FIFO is a named pipe. Opening it
- * with FILE_ACCESS_READ will give access to the read end, and FILE_ACCESS_WRITE
- * gives access to the write end.
+ * Creates a new named pipe in the filesystem. Opening it with FILE_ACCESS_READ
+ * will give access to the read end, and FILE_ACCESS_WRITE gives access to the
+ * write end.
  *
- * @param path          Path to FIFO to create.
+ * @param path          Path to pipe to create.
  *
  * @return              Status code describing result of the operation.
  */
-status_t fs_create_fifo(const char *path) {
-    return fs_create(path, FILE_TYPE_FIFO, NULL, NULL);
+status_t fs_create_pipe(const char *path) {
+    return fs_create(path, FILE_TYPE_PIPE, NULL, NULL);
 }
 
 /**
@@ -2085,8 +2085,8 @@ static inline const char *file_type_name(file_type_t type) {
             return "FILE_TYPE_BLOCK";
         case FILE_TYPE_CHAR:
             return "FILE_TYPE_CHAR";
-        case FILE_TYPE_FIFO:
-            return "FILE_TYPE_FIFO";
+        case FILE_TYPE_PIPE:
+            return "FILE_TYPE_PIPE";
         case FILE_TYPE_SOCKET:
             return "FILE_TYPE_SOCKET";
         default:
@@ -2271,15 +2271,15 @@ status_t kern_fs_create_dir(const char *path) {
 }
 
 /**
- * Creates a new FIFO in the filesystem. A FIFO is a named pipe. Opening it
- * with FILE_ACCESS_READ will give access to the read end, and FILE_ACCESS_WRITE
- * gives access to the write end.
+ * Creates a new named pipe in the filesystem. Opening it with FILE_ACCESS_READ
+ * will give access to the read end, and FILE_ACCESS_WRITE gives access to the
+ * write end.
  *
- * @param path          Path to FIFO to create.
+ * @param path          Path to pipe to create.
  *
  * @return              Status code describing result of the operation.
  */
-status_t kern_fs_create_fifo(const char *path) {
+status_t kern_fs_create_pipe(const char *path) {
     status_t ret;
 
     if (!path)
@@ -2290,7 +2290,7 @@ status_t kern_fs_create_fifo(const char *path) {
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    ret = fs_create_fifo(kpath);
+    ret = fs_create_pipe(kpath);
     kfree(kpath);
     return ret;
 }

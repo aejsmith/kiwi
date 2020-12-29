@@ -380,7 +380,7 @@ extern status_t fs_open(
     object_handle_t **_handle);
 
 extern status_t fs_create_dir(const char *path);
-extern status_t fs_create_fifo(const char *path);
+extern status_t fs_create_pipe(const char *path);
 extern status_t fs_create_symlink(const char *path, const char *target);
 
 extern status_t fs_read_symlink(const char *path, char **_target);

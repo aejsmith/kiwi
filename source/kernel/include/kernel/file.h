@@ -36,7 +36,7 @@ typedef enum file_type {
     FILE_TYPE_SYMLINK,                  /**< Symbolic link. */
     FILE_TYPE_BLOCK,                    /**< Block device. */
     FILE_TYPE_CHAR,                     /**< Character device. */
-    FILE_TYPE_FIFO,                     /**< FIFO (pipe). */
+    FILE_TYPE_PIPE,                     /**< Pipe. */
     FILE_TYPE_SOCKET,                   /**< Socket. */
 } file_type_t;
 

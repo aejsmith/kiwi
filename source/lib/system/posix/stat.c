@@ -85,7 +85,7 @@ static void file_info_to_stat(file_info_t *info, struct stat *restrict st) {
     case FILE_TYPE_CHAR:
         st->st_mode = S_IFCHR;
         break;
-    case FILE_TYPE_FIFO:
+    case FILE_TYPE_PIPE:
         st->st_mode = S_IFIFO;
         break;
     case FILE_TYPE_SOCKET:

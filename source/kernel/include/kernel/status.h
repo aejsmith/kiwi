@@ -70,6 +70,7 @@
 #define STATUS_CONN_HUNGUP          45  /**< Connection was hung up. */
 #define STATUS_CANCELLED            46  /**< Operation was cancelled. */
 #define STATUS_INCORRECT_TYPE       47  /**< Object is not of the correct type. */
+#define STATUS_PIPE_CLOSED          48  /**< Read end of pipe has been closed. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 
