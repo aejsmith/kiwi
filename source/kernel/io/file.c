@@ -711,7 +711,7 @@ status_t file_info(object_handle_t *handle, file_info_t *info) {
     if (handle->type->id != OBJECT_TYPE_FILE)
         return STATUS_INVALID_HANDLE;
 
-    memset(&info, 0, sizeof(*info));
+    memset(info, 0, sizeof(*info));
 
     file_handle_t *fhandle = handle->private;
 
