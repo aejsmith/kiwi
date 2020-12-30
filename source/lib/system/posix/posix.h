@@ -43,3 +43,5 @@ extern core_mutex_t __sys_hidden child_processes_lock;
 extern mode_t __sys_hidden current_umask;
 
 extern void register_fork_handler(void (*func)(void)) __sys_hidden;
+
+extern int exception_to_signal(unsigned code) __sys_hidden;

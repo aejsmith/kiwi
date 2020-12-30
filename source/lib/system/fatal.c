@@ -59,7 +59,7 @@ void libsystem_stub(const char *name, bool fatal) {
     if (fatal) {
         libsystem_fatal("unimplemented function: %s", name);
     } else {
-        fprintf(stderr, "STUB: %s\n", name);
+        libsystem_log(CORE_LOG_ERROR, "%s unimplemented", name);
         errno = ENOSYS;
     }
 }

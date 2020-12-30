@@ -32,6 +32,7 @@
 #include <sys/wait.h>
 
 #include <errno.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -138,8 +139,13 @@ static inline int convert_exit_status(int status, int reason) {
     switch (reason) {
         case EXIT_REASON_NORMAL:
             return (status << 8) | __WEXITED;
+        case EXIT_REASON_KILLED:
+            return (SIGKILL << 8) | __WSIGNALED;
+        case EXIT_REASON_EXCEPTION:
+            return (exception_to_signal(status) << 8) | __WSIGNALED;
         default:
-            libsystem_fatal("unhandled exit reason %d", reason);
+            libsystem_log(CORE_LOG_WARN, "unhandled exit reason %d", reason);
+            return __WEXITED;
     }
 }
 

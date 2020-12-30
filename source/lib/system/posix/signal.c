@@ -19,6 +19,8 @@
  * @brief               POSIX signal functions.
  */
 
+#include <kernel/exception.h>
+
 #include <errno.h>
 #include <setjmp.h>
 #include <signal.h>
@@ -26,6 +28,31 @@
 #include <string.h>
 
 #include "libsystem.h"
+
+/** Convert a kernel exception code to a signal number. */
+int exception_to_signal(unsigned code) {
+    switch (code) {
+        case EXCEPTION_ADDR_UNMAPPED:       return SIGSEGV;
+        case EXCEPTION_ACCESS_VIOLATION:    return SIGSEGV;
+        case EXCEPTION_STACK_OVERFLOW:      return SIGSEGV;
+        case EXCEPTION_PAGE_ERROR:          return SIGBUS;
+        case EXCEPTION_INVALID_ALIGNMENT:   return SIGBUS;
+        case EXCEPTION_INVALID_INSTRUCTION: return SIGILL;
+        case EXCEPTION_INT_DIV_ZERO:        return SIGFPE;
+        case EXCEPTION_INT_OVERFLOW:        return SIGFPE;
+        case EXCEPTION_FLOAT_DIV_ZERO:      return SIGFPE;
+        case EXCEPTION_FLOAT_OVERFLOW:      return SIGFPE;
+        case EXCEPTION_FLOAT_UNDERFLOW:     return SIGFPE;
+        case EXCEPTION_FLOAT_PRECISION:     return SIGFPE;
+        case EXCEPTION_FLOAT_DENORMAL:      return SIGFPE;
+        case EXCEPTION_FLOAT_INVALID:       return SIGFPE;
+        case EXCEPTION_BREAKPOINT:          return SIGTRAP;
+        case EXCEPTION_ABORT:               return SIGABRT;
+        default:
+            libsystem_log(CORE_LOG_WARN, "unhandled exception code %u", code);
+            return SIGKILL;
+    }
+}
 
 /** Sends a signal to a process.
  * @param pid           ID of process.
