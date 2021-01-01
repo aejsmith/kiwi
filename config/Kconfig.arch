@@ -57,8 +57,8 @@ config TOOLCHAIN_TARGET
 	default "x86_64-kiwi" if ARCH_AMD64
 
 config TOOLCHAIN_ARCH
-    string
-    default "x86_64" if ARCH_AMD64
+	string
+	default "x86_64" if ARCH_AMD64
 
 config ARCH_ASFLAGS
 	string

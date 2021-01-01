@@ -14,22 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-choice
-	prompt "Platform"
-	default PLATFORM_PC if ARCH_X86
+comment "Bus managers"
 
-config PLATFORM_PC
-	bool "Standard PC"
-	depends on ARCH_X86
+config DEVICE_BUS_PCI
+	bool "PCI bus manager"
+	default y
 	help
-	  Target the built system to standard PCs (nearly all x86 computers).
-
-endchoice
-
-config PLATFORM
-	string
-	default "pc" if PLATFORM_PC
-
-config KBOOT_TARGETS
-	string
-	default "bios,efi-amd64,efi-ia32" if PLATFORM_PC
+	  Enable the PCI bus manager.

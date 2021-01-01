@@ -24,8 +24,7 @@ kern_sources += FeatureSources(config, [
     'irq.c',
 ])
 
-dirs = FeatureDirs(config, [
+SConscript(dirs = FeatureDirs(config, [
+    'bus',
     'input',
-])
-
-SConscript(dirs = dirs)
+]))

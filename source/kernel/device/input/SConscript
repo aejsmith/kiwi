@@ -21,8 +21,6 @@ mod_env.Module('input', [
     'input.c',
 ])
 
-dirs = FeatureDirs(config, [
+SConscript(dirs = FeatureDirs(config, [
     ('DEVICE_INPUT_I8042', 'i8042'),
-])
-
-SConscript(dirs = dirs)
+]))
