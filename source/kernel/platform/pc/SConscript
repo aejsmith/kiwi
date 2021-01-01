@@ -14,10 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+Import('config', 'kern_sources')
 from util import FeatureSources
-Import('config')
 
-sources = FeatureSources(config, [
+kern_sources += FeatureSources(config, [
     'acpi.c',
     'console.c',
     'page.c',
@@ -27,5 +27,3 @@ sources = FeatureSources(config, [
     'rtc.c',
     'smp.c',
 ])
-
-Return('sources')

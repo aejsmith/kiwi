@@ -14,9 +14,18 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('mod_env')
+Import('config', 'kern_env', 'kern_sources')
+from util import FeatureSources
 
-mod_env.Module('i8042', [
-    'i8042.c',
-    'keycodes.c',
+kern_sources += FeatureSources(config, [
+    'console.c',
+    'fb.c',
+    'font.c',
+    'logo.c',
 ])
+
+# Generate the boot splash image files.
+kern_env.Command(
+    'logo.c',
+    ['logo.ppm'],
+    Action('$BIN2HEX $SOURCE logo_ppm > $TARGET', '$GENCOMSTR'))

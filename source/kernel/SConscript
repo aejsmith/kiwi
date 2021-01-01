@@ -17,63 +17,7 @@
 Import('config', 'manager', 'version')
 from util import FeatureSources, FeatureDirs
 
-sources = FeatureSources(config, [
-    'console/console.c',
-    'console/fb.c',
-    'console/font.c',
-    'console/logo.c',
-
-    'device/class.c',
-    'device/device.c',
-    'device/io.c',
-    'device/irq.c',
-
-    'io/context.c',
-    'io/file.c',
-    'io/fs.c',
-    'io/memory_file.c',
-    'io/ramfs.c',
-    'io/request.c',
-    'io/user_file.c',
-
-    'ipc/ipc.c',
-    'ipc/pipe.c',
-
-    'lib/ansi_parser.c',
-    'lib/avl_tree.c',
-    'lib/bitmap.c',
-    'lib/fixed_heap.c',
-    'lib/id_allocator.c',
-    'lib/notifier.c',
-    'lib/printf.c',
-    'lib/qsort.c',
-    'lib/radix_tree.c',
-    'lib/string.c',
-    'lib/tar.c',
-
-    'mm/kmem.c',
-    'mm/malloc.c',
-    'mm/mmu.c',
-    'mm/page.c',
-    'mm/phys.c',
-    'mm/safe.c',
-    'mm/slab.c',
-    'mm/vm.c',
-    'mm/vm_cache.c',
-
-    'proc/process.c',
-    'proc/sched.c',
-    'proc/thread.c',
-
-    'security/token.c',
-
-    'sync/condvar.c',
-    'sync/futex.c',
-    'sync/mutex.c',
-    'sync/rwlock.c',
-    'sync/semaphore.c',
-    'sync/spinlock.c',
-
+base_sources = FeatureSources(config, [
     'cpu.c',
     'elf.c',
     'fatal.c',
@@ -90,12 +34,34 @@ sources = FeatureSources(config, [
     'version.c',
 ])
 
-module_dirs = FeatureDirs(config, [
-    'device/input',
+dirs = FeatureDirs(config, [
+    # Architecture/platform must be first as they may change build flags which
+    # must apply to all other subdirectories.
+    'arch/%s' % (config['ARCH']),
+    'platform/%s' % (config['PLATFORM']),
+
+    'console',
+    'device',
+    'io',
+    'ipc',
+    'lib',
+    'mm',
+    'proc',
+    'security',
+    'sync',
 ])
 
+###############
+# Build setup #
+###############
+
+kern_sources = []
+
+dist_env = manager['dist']
+dist_env['MODULES'] = []
+
 # Create the kernel environment.
-env = manager.CreateBare(name = 'kernel', flags = {
+kern_env = manager.CreateBare(name = 'kernel', flags = {
     'LIBS': [],
     'CPPPATH': [
         Dir('include'),
@@ -125,9 +91,34 @@ env = manager.CreateBare(name = 'kernel', flags = {
 
 # Add the compiler include directory for some standard headers.
 from subprocess import Popen, PIPE
-incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip().decode('utf-8')
-env['CCFLAGS'] += ['-isystem', incdir]
-env['ASFLAGS'] += ['-isystem', incdir]
+incdir = Popen([kern_env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip().decode('utf-8')
+kern_env['CCFLAGS'] += ['-isystem', incdir]
+kern_env['ASFLAGS'] += ['-isystem', incdir]
+
+# Create the module environment.
+mod_env = manager.Clone(kern_env, name = 'module', flags = {
+    # Modules default to not exporting symbols.
+    'CCFLAGS': ['-fno-common', '-fvisibility=hidden'],
+})
+
+# The emitter adds all modules to the distribution environment's module list.
+def mod_emitter(target, source, env):
+    manager['dist']['MODULES'].append(target[0])
+    return target, source
+mod_env['BUILDERS']['Module'] = Builder(
+    action = [
+        Action('$LD -r -o $TARGET $SOURCES', '$LINKCOMSTR'),
+        Action('$STRIP --strip-debug $TARGET', None),
+    ],
+    suffix      = '.km',
+    src_suffix  = '$OBJSUFFIX',
+    src_builder = 'Object',
+    emitter     = mod_emitter)
+
+# Visit subdirectories.
+Export('kern_env', 'kern_sources', 'mod_env')
+SConscript(dirs = dirs)
+kern_sources += base_sources
 
 # Generate the version information file.
 def gen_version_c(target, source, env):
@@ -137,31 +128,22 @@ def gen_version_c(target, source, env):
     f.write('int kiwi_ver_revision = %d;\n' % (version['KIWI_VER_REVISION']))
     f.write('const char *kiwi_ver_string = "%s";\n' % (version['KIWI_VER_STRING']))
     f.close()
-AlwaysBuild(env.Command('version.c', [], env.Action(gen_version_c, None)))
-
-# Generate the boot splash image files.
-env.Command('console/logo.c', ['console/logo.ppm'],
-    Action('$BIN2HEX $SOURCE logo_ppm > $TARGET', '$GENCOMSTR'))
+AlwaysBuild(kern_env.Command('version.c', [], Action(gen_version_c, None)))
 
 # Generate the system call table.
-env['SYSCALLS'] = File('syscalls.def')
-env.SyscallTable('syscall_table.c', env['SYSCALLS'], TABLE = 'syscall_table')
-env.SyscallHeader('include/syscall_table.h', env['SYSCALLS'], GUARD = '__SYSCALL_TABLE_H')
-
-# Get the list of source files from the architecture/platform.
-arch_sources = SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])
-platform_sources = SConscript(dirs = ['platform/' + config['PLATFORM']], exports = ['env'])
-sources = arch_sources + platform_sources + sources
+kern_env['SYSCALLS'] = File('syscalls.def')
+kern_env.SyscallTable('syscall_table.c', kern_env['SYSCALLS'], TABLE = 'syscall_table')
+kern_env.SyscallHeader('include/syscall_table.h', kern_env['SYSCALLS'], GUARD = '__SYSCALL_TABLE_H')
 
 # Link the kernel image.
-env.Program(
+kern_env.Program(
     'kernel-unstripped',
-    [env.Object(f) for f in sources],
-    LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
-Depends('kernel-unstripped', env['LDSCRIPT'])
+    [kern_env.Object(f) for f in kern_sources],
+    LINKFLAGS = kern_env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+Depends('kernel-unstripped', kern_env['LDSCRIPT'])
 
 # Generate various information files and the stripped kernel image.
-env.Command(['kernel', 'kernel.lst', 'kernel.rde', 'kernel.sym'], 'kernel-unstripped', [
+kern_env.Command(['kernel', 'kernel.lst', 'kernel.rde', 'kernel.sym'], 'kernel-unstripped', [
     Action('$STRIP --strip-debug $SOURCE -o ${TARGETS[0]}', '$GENCOMSTR'),
     Action('$OBJDUMP -d $SOURCE > ${TARGETS[1]}', None),
     Action('$READELF -aW $SOURCE > ${TARGETS[2]}', None),
@@ -169,32 +151,4 @@ env.Command(['kernel', 'kernel.lst', 'kernel.rde', 'kernel.sym'], 'kernel-unstri
 ])
 
 # Let the distribution environment know where the kernel is.
-dist = manager['dist']
-dist['KERNEL'] = File('kernel')
-
-# Create the module environment.
-module_env = manager.Clone(env, name = 'module', flags = {
-    # Modules default to not exporting symbols.
-    'CCFLAGS': ['-fno-common', '-fvisibility=hidden'],
-})
-
-dist['MODULES'] = []
-
-# The emitter adds all modules to the distribution environment's module list.
-def module_emitter(target, source, env):
-    manager['dist']['MODULES'].append(target[0])
-    return target, source
-module_env['BUILDERS']['Module'] = Builder(
-    action = [
-        Action('$LD -r -o $TARGET $SOURCES', '$LINKCOMSTR'),
-        Action('$STRIP --strip-debug $TARGET', None),
-    ],
-    suffix = '.km',
-    src_suffix = '$OBJSUFFIX',
-    src_builder = 'Object',
-    emitter = module_emitter
-)
-
-# Build modules.
-env = module_env
-SConscript(dirs = module_dirs, exports = ['env'])
+dist_env['KERNEL'] = File('kernel')

@@ -14,9 +14,17 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('mod_env')
+Import('config', 'kern_sources')
+from util import FeatureSources
 
-mod_env.Module('i8042', [
-    'i8042.c',
-    'keycodes.c',
+kern_sources += FeatureSources(config, [
+    'kmem.c',
+    'malloc.c',
+    'mmu.c',
+    'page.c',
+    'phys.c',
+    'safe.c',
+    'slab.c',
+    'vm.c',
+    'vm_cache.c',
 ])

@@ -14,10 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'env')
+Import('config', 'mod_env')
 from util import FeatureDirs
 
-env.Module('input', [
+mod_env.Module('input', [
     'input.c',
 ])
 
@@ -25,4 +25,4 @@ dirs = FeatureDirs(config, [
     ('DEVICE_INPUT_I8042', 'i8042'),
 ])
 
-SConscript(dirs = dirs, exports = ['env'])
+SConscript(dirs = dirs)

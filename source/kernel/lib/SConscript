@@ -14,9 +14,19 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('mod_env')
+Import('config', 'kern_sources')
+from util import FeatureSources
 
-mod_env.Module('i8042', [
-    'i8042.c',
-    'keycodes.c',
+kern_sources += FeatureSources(config, [
+    'ansi_parser.c',
+    'avl_tree.c',
+    'bitmap.c',
+    'fixed_heap.c',
+    'id_allocator.c',
+    'notifier.c',
+    'printf.c',
+    'qsort.c',
+    'radix_tree.c',
+    'string.c',
+    'tar.c',
 ])
