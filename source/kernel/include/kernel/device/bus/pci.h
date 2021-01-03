@@ -16,25 +16,16 @@
 
 /**
  * @file
- * @brief               PCI bus manager.
+ * @brief               PCI bus interface.
  */
 
 #pragma once
 
-#include <device/bus.h>
+#include <kernel/device.h>
 
-#include <kernel/device/bus/pci.h>
+__KERNEL_EXTERN_C_BEGIN
 
-#define PCI_MODULE_NAME "pci"
+/** PCI device class name. */
+#define PCI_DEVICE_CLASS_NAME       "pci_device"
 
-extern bus_t pci_bus;
-
-/** PCI driver structure. */
-typedef struct pci_driver {
-    bus_driver_t bus;
-} pci_driver_t;
-
-/** Define module init/unload functions for a PCI driver.
- * @param driver        Driver to register. */
-#define MODULE_PCI_DRIVER(driver) \
-    MODULE_BUS_DRIVER(pci_bus, driver)
+__KERNEL_EXTERN_C_END

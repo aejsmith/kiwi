@@ -640,7 +640,7 @@ static bool device_iterate_internal(device_t *device, device_iterate_t func, voi
                 if (!device_iterate_internal(child, func, data))
                     return false;
             }
-        case DEVICE_ITERATE_RETURN:
+        case DEVICE_ITERATE_CONTINUE:
             return true;
     }
 

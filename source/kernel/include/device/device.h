@@ -165,7 +165,7 @@ typedef void (*device_resource_release_t)(device_t *device, void *data);
 enum {
     DEVICE_ITERATE_END,             /**< Finish iteration. */
     DEVICE_ITERATE_DESCEND,         /**< Descend onto children. */
-    DEVICE_ITERATE_RETURN,          /**< Return to parent. */
+    DEVICE_ITERATE_CONTINUE,        /**< Continue iteration without descending. */
 };
 
 /** Device tree iteration callback.

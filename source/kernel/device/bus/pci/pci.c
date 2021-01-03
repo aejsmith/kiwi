@@ -24,12 +24,32 @@
 #include <module.h>
 #include <status.h>
 
+/** PCI device bus. */
+__export bus_t pci_bus;
+
+/** Match a PCI device to a driver. */
+static bool pci_bus_match_device(device_t *device, bus_driver_t *driver) {
+    return false;
+}
+
+/** Initialize a PCI device. */
+static status_t pci_bus_init_device(device_t *device, bus_driver_t *driver) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static bus_type_t pci_bus_type = {
+    .name         = "pci",
+    .device_class = PCI_DEVICE_CLASS_NAME,
+    .match_device = pci_bus_match_device,
+    .init_device  = pci_bus_init_device,
+};
+
 static status_t pci_init(void) {
-    return STATUS_SUCCESS;
+    return bus_init(&pci_bus, &pci_bus_type);
 }
 
 static status_t pci_unload(void) {
-    return STATUS_SUCCESS;
+    return bus_destroy(&pci_bus);
 }
 
 MODULE_NAME(PCI_MODULE_NAME);
