@@ -159,4 +159,5 @@ void bus_add_device(bus_t *bus, device_t *device) {
  * @param device        Device to initialize. */
 void bus_device_init(bus_device_t *device) {
     device->driver = NULL;
+    device->device = NULL;
 }

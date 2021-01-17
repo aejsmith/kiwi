@@ -84,6 +84,7 @@ typedef struct bus_driver {
  */
 typedef struct bus_device {
     bus_driver_t *driver;               /**< Driver which manages the device. */
+    device_t *device;                   /**< Device tree node. */
 } bus_device_t;
 
 extern status_t bus_init(bus_t *bus, bus_type_t *type);

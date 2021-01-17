@@ -14,8 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('mod_env')
+Import('config', 'mod_env')
 
 mod_env.Module('pci', [
+    'platform/%s.c' % (config['PLATFORM']),
     'pci.c',
 ])
