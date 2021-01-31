@@ -136,7 +136,7 @@ class ToolchainComponent:
 # Component definition for binutils.
 class BinutilsComponent(ToolchainComponent):
     name = 'binutils'
-    version = '2.35'
+    version = '2.36'
     generic = False
     source = [
         'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
@@ -186,7 +186,7 @@ class LLVMComponent(ToolchainComponent):
         # Work out CMake options to use.
         cmakeopts  = '-G "Unix Makefiles" '
         cmakeopts += '-DCMAKE_BUILD_TYPE=Release '
-        cmakeopts += '-DLLVM_TARGETS_TO_BUILD=X86 '
+        cmakeopts += '-DLLVM_TARGETS_TO_BUILD="X86;AArch64" '
         cmakeopts += '-DCMAKE_INSTALL_PREFIX="%s" ' % (self.destdir)
 
         # Build and install it.
