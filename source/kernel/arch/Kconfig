@@ -17,3 +17,7 @@
 if ARCH_AMD64
 source "amd64/Kconfig"
 endif
+
+if ARCH_ARM64
+source "arm64/Kconfig"
+endif

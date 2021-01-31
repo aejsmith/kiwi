@@ -17,6 +17,15 @@
 choice
 	prompt "Platform"
 	default PLATFORM_PC if ARCH_X86
+	default PLATFORM_DT if ARCH_ARM64
+
+config PLATFORM_DT
+	bool "Device Tree"
+	depends on ARCH_ARM64
+	help
+	  Generic platform which uses a Device Tree to describe the hardware.
+	  This platform currently supports the following ARM64 hardware:
+	   - Raspberry Pi 4
 
 config PLATFORM_PC
 	bool "Standard PC"
@@ -29,7 +38,9 @@ endchoice
 config PLATFORM
 	string
 	default "pc" if PLATFORM_PC
+	default "dt" if PLATFORM_DT
 
 config KBOOT_TARGETS
 	string
 	default "bios,efi-amd64,efi-ia32" if PLATFORM_PC
+	default "dt-arm64" if PLATFORM_DT

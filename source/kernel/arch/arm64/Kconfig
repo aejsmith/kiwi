@@ -14,10 +14,5 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-if PLATFORM_DT
-source "dt/Kconfig"
-endif
-
-if PLATFORM_PC
-source "pc/Kconfig"
-endif
+config KERNEL_ARCH_ARM64
+	def_bool y

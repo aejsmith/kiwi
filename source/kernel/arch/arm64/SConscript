@@ -14,10 +14,15 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-if PLATFORM_DT
-source "dt/Kconfig"
-endif
+from util import FeatureSources
+Import('config', 'kern_env', 'kern_sources', 'mod_env')
 
-if PLATFORM_PC
-source "pc/Kconfig"
-endif
+kern_sources += FeatureSources(config, [
+])
+
+for env in [kern_env, mod_env]:
+    # TODO: Flags...
+    pass
+
+# Set the linker script path.
+kern_env['LDSCRIPT'] = kern_env.LDScript('link.ld', 'link.ld.in')

@@ -26,10 +26,14 @@ config SYS_SUPPORTS_LITTLE_ENDIAN
 config SYS_SUPPORTS_BIG_ENDIAN
 	bool
 
+# Flag which can be used to disable userspace build while bringing up a new
+# platform.
+config SYS_SUPPORTS_USERSPACE
+	bool
+
 # For KBoot compatibility.
 config ARCH_X86
 	bool
-	select SYS_SUPPORTS_LITTLE_ENDIAN
 
 choice
 	prompt "Architecture"
@@ -39,26 +43,39 @@ config ARCH_AMD64
 	bool "AMD64"
 	select 64BIT
 	select ARCH_X86
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select SYS_SUPPORTS_USERSPACE
 	help
 	  Target the built system to 64-bit x86 processors.
+
+config ARCH_ARM64
+	bool "ARM64"
+	select 64BIT
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	help
+	  Target the built system to 64-bit ARM processors.
 
 endchoice
 
 config ARCH
 	string
 	default "amd64" if ARCH_AMD64
+	default "arm64" if ARCH_ARM64
 
 config GDB_ARCH
 	string
 	default "i386:x86-64:intel" if ARCH_AMD64
+	default "aarch64" if ARCH_ARM64
 
 config TOOLCHAIN_TARGET
 	string
 	default "x86_64-kiwi" if ARCH_AMD64
+	default "aarch64-kiwi" if ARCH_ARM64
 
 config TOOLCHAIN_ARCH
 	string
 	default "x86_64" if ARCH_AMD64
+	default "aarch64" if ARCH_ARM64
 
 config ARCH_ASFLAGS
 	string

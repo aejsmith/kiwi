@@ -98,7 +98,8 @@ for kboot_target in config['KBOOT_TARGETS'].split(','):
 ####################
 
 # Build userspace.
-SConscript(dirs = ['lib', 'services', 'bin'])
+if config['SYS_SUPPORTS_USERSPACE']:
+    SConscript(dirs = ['lib', 'services', 'bin'])
 
 ###############
 # Image build #
