@@ -1,11 +1,17 @@
 Kiwi
 ====
 
-Kiwi is an open source operating system currently supporting 64-bit x86 PCs.
-The main branch is undergoing a pretty major redesign and does not do much
-interesting on the face of it, but it aims to have a better underlying design.
-The old branch has a GUI and is capable of running various bits of UNIX
-software.
+Kiwi is an open source operating system supporting 64-bit x86 PCs. It uses a
+custom kernel design/API, taking inspiration from both POSIX and Windows NT.
+Some POSIX/UNIX compatibility is implemented by userspace libraries on top of
+the native kernel API, which is currently capable of running some UNIX command
+line software such as Bash.
+
+Screenshots
+-----------
+
+![Terminal](documentation/screenshots/1.png)
+![Kernel Debugger](documentation/screenshots/2.png)
 
 Building
 --------
