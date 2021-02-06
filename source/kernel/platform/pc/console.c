@@ -234,7 +234,7 @@ static bool serial_console_early_init(void) {
 
     out8(SERIAL_PORT + 1, 0x00);  /* Disable all interrupts */
     out8(SERIAL_PORT + 3, 0x80);  /* Enable DLAB (set baud rate divisor) */
-    out8(SERIAL_PORT + 0, 0x03);  /* Set divisor to 3 (lo byte) 38400 baud */
+    out8(SERIAL_PORT + 0, 0x01);  /* Set divisor to 1 (lo byte) 115200 baud */
     out8(SERIAL_PORT + 1, 0x00);  /*                  (hi byte) */
     out8(SERIAL_PORT + 3, 0x03);  /* 8 bits, no parity, one stop bit */
     out8(SERIAL_PORT + 2, 0xc7);  /* Enable FIFO, clear them, with 14-byte threshold */

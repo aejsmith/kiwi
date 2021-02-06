@@ -97,7 +97,7 @@ static bool open_serial(const char *path) {
         return false;
     }
 
-    cfsetspeed(&tio, B38400);
+    cfsetspeed(&tio, B115200);
     tio.c_cflag |= CS8;
     tio.c_iflag &= ~ICRNL;
     tio.c_oflag = 0;
