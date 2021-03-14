@@ -97,15 +97,31 @@ config EXTRA_CXXFLAGS
 	help
 	  Extra compiler options for C++ code.
 
-config QEMU_BINARY
+config QEMU_BINARY_AMD64
 	string "QEMU binary"
+	depends on ARCH_AMD64
 	default "qemu-system-x86_64"
 	help
 	  Path to the QEMU binary to use for the "qemu" build target.
 
-config QEMU_OPTS
+config QEMU_BINARY_ARM64
+	string "QEMU binary"
+	depends on ARCH_ARM64
+	default "qemu-system-aarch64"
+	help
+	  Path to the QEMU binary to use for the "qemu" build target.
+
+config QEMU_OPTS_AMD64
 	string "Extra QEMU options"
+	depends on ARCH_AMD64
 	default "-monitor vc:1024x768 -serial stdio -vga std -s -rtc base=localtime -m 1024 -enable-kvm -smp cpus=4,cores=4"
+	help
+	  Extra options to pass to QEMU for the "qemu" build target.
+
+config QEMU_OPTS_ARM64
+	string "Extra QEMU options"
+	depends on ARCH_ARM64
+	default "-monitor vc:1024x768 -serial stdio -s -m 1024 -M virt -cpu cortex-a72"
 	help
 	  Extra options to pass to QEMU for the "qemu" build target.
 

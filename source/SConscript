@@ -116,12 +116,14 @@ Alias('fsimage', fsimage)
 Alias('kboot', dist['KBOOT'])
 
 # Add platform-specific targets to generate bootable images.
+qemu_binary = config['QEMU_BINARY_' + config['ARCH'].upper()]
+qemu_opts   = config['QEMU_OPTS_' + config['ARCH'].upper()]
 if config['PLATFORM'] == 'pc':
     Default(Alias('cdrom', dist.ISOImage('cdrom.iso', fsimage)))
 
     # Target to run in QEMU.
     Alias('qemu', dist.Command('__qemu', ['cdrom.iso'], Action(
-        config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'],
+        qemu_binary + ' -cdrom $SOURCE -boot d ' + qemu_opts,
         None)))
 else:
     Default(dist['KERNEL'])
