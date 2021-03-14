@@ -51,7 +51,7 @@
 KBOOT_LOAD(0, 0x1000000, 0x200000, KERNEL_KMEM_BASE, KERNEL_KMEM_SIZE);
 
 /* Map in 8GB initially, arch_mmu_init() will map all available RAM. */
-KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000);
+KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000, KBOOT_CACHE_DEFAULT);
 
 /** Table mapping memory types to page table flags. */
 static uint64_t memory_type_flags[] = {
