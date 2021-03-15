@@ -59,9 +59,8 @@
  *  - Alter timeslice based on priority?
  */
 
-#include <arch/bitops.h>
-
 #include <lib/string.h>
+#include <lib/utility.h>
 
 #include <mm/malloc.h>
 #include <mm/vm.h>
@@ -180,7 +179,7 @@ static thread_t *sched_pick_thread(sched_cpu_t *cpu) {
     }
 
     /* Get the thread to run. */
-    int i = fls(cpu->active->bitmap);
+    int i = fls(cpu->active->bitmap) - 1;
     thread_t *thread = list_first(&cpu->active->threads[i], thread_t, runq_link);
     sched_queue_remove(cpu->active, thread);
     return thread;

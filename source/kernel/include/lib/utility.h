@@ -116,12 +116,29 @@
         (type *)((char *)__mptr - offsetof(type, member)); \
     })
 
-/** Implementation for native-sized values. */
-static inline int highbit_native(unsigned long val) {
-    if (!val)
+/** Find first set bit in a native-sized value.
+ * @param value         Value to test.
+ * @return              Position of first set bit plus 1, or 0 if value is 0. */
+static inline unsigned long ffs(unsigned long value) {
+    return __builtin_ffsl(value);
+}
+
+/** Find first zero bit in a native-sized value.
+ * @param value         Value to test.
+ * @return              Position of first zero bit plus 1, or 0 if all bits are
+ *                      set. */
+static inline unsigned long ffz(unsigned long value) {
+    return __builtin_ffsl(~value);
+}
+
+/** Find last set bit in a native-sized value.
+ * @param value     Value to test.
+ * @return          Position of last set bit plus 1, or 0 if value is 0. */
+static inline unsigned long fls(unsigned long value) {
+    if (!value)
         return 0;
 
-    return fls(val) + 1;
+    return type_bits(unsigned long) - __builtin_clzl(value);
 }
 
 #if CONFIG_32BIT
@@ -136,9 +153,9 @@ static inline int highbit_ll(unsigned long long val) {
     high = (unsigned long)((val >> 32) & 0xffffffff);
     low = (unsigned long)(val & 0xffffffff);
     if (high) {
-        return fls(high) + 32 + 1;
+        return fls(high) + 32;
     } else {
-        return fls(low) + 1;
+        return fls(low);
     }
 }
 
@@ -151,9 +168,9 @@ static inline int highbit_ll(unsigned long long val) {
 #   define highbit(val)   _Generic((val), \
         unsigned long long: highbit_ll, \
         long long: highbit_ll, \
-        default: highbit_native)(val)
+        default: fls)(val)
 #else
-#   define highbit(val)   highbit_native(val)
+#   define highbit(val)   fls(val)
 #endif
 
 /** Checksum a memory range.

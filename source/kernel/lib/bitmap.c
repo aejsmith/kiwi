@@ -19,8 +19,6 @@
  * @brief               Bitmap data type.
  */
 
-#include <arch/bitops.h>
-
 #include <lib/bitmap.h>
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -96,7 +94,7 @@ long bitmap_ffs(const unsigned long *bitmap, size_t nbits) {
     while (nbits >= type_bits(unsigned long)) {
         value = *(bitmap++);
         if (value)
-            return result + ffs(value);
+            return result + ffs(value) - 1;
 
         nbits  -= type_bits(unsigned long);
         result += type_bits(unsigned long);
@@ -107,7 +105,7 @@ long bitmap_ffs(const unsigned long *bitmap, size_t nbits) {
          * the bitmap. */
         value = (*bitmap) & (~0ul >> (type_bits(unsigned long) - nbits));
         if (value)
-            return result + ffs(value);
+            return result + ffs(value) - 1;
     }
 
     return -1;
@@ -124,7 +122,7 @@ long bitmap_ffz(const unsigned long *bitmap, size_t nbits) {
     while (nbits >= type_bits(unsigned long)) {
         value = *(bitmap++);
         if (value != ~0ul)
-            return result + ffz(value);
+            return result + ffz(value) - 1;
 
         nbits  -= type_bits(unsigned long);
         result += type_bits(unsigned long);
@@ -135,7 +133,7 @@ long bitmap_ffz(const unsigned long *bitmap, size_t nbits) {
          * the bitmap. */
         value = (*bitmap) | (~0ul << nbits);
         if (value != ~0ul)
-            return result + ffz(value);
+            return result + ffz(value) - 1;
     }
 
     return -1;
@@ -158,7 +156,7 @@ long bitmap_next(const unsigned long *bitmap, size_t nbits, unsigned long curren
         if (current < type_bits(unsigned long)) {
             value &= ~0ul << current;
             if (value)
-                return result + ffs(value);
+                return result + ffs(value) - 1;
 
             current = 0;
         } else {
@@ -174,7 +172,7 @@ long bitmap_next(const unsigned long *bitmap, size_t nbits, unsigned long curren
         value = (*bitmap) & (~0ul >> (type_bits(unsigned long) - nbits));
         value &= ~0ul << current;
         if (value)
-            return result + ffs(value);
+            return result + ffs(value) - 1;
     }
 
     return -1;
