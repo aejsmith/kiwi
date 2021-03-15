@@ -19,14 +19,12 @@
  * @brief               ARM64 kernel linker script.
  */
 
-/* TODO... */
-
 #include <arch/aspace.h>
 #include <arch/page.h>
 
 ENTRY(kmain)
-OUTPUT_ARCH("i386:x86-64")
-OUTPUT_FORMAT("elf64-x86-64")
+OUTPUT_ARCH("aarch64")
+OUTPUT_FORMAT("elf64-littleaarch64")
 
 PHDRS {
     text PT_LOAD FILEHDR PHDRS FLAGS(5);    /* R_X - Code + read-only data. */
@@ -107,11 +105,6 @@ SECTIONS {
         __initcall_start = .;
         *(.init.initcalls)
         __initcall_end = .;
-
-        . = ALIGN(32);
-        __ap_trampoline_start = .;
-        *(.init.trampoline)
-        __ap_trampoline_end = .;
 
         . = ALIGN(PAGE_SIZE);
     } :init
