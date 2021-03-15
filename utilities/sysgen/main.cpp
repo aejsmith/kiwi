@@ -26,6 +26,7 @@
 #include <map>
 
 #include "amd64_target.h"
+#include "arm64_target.h"
 #include "sysgen.h"
 
 using namespace std;
@@ -258,6 +259,8 @@ int main(int argc, char **argv) {
     Target *target;
     if (strcmp(argv[i], "amd64") == 0) {
         target = new AMD64Target();
+    } else if (strcmp(argv[i], "arm64") == 0) {
+        target = new ARM64Target();
     } else {
         cerr << "Unrecognised target `" << argv[i] << "'." << endl;
         return 1;
