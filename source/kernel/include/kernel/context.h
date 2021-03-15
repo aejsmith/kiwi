@@ -51,6 +51,13 @@ typedef struct cpu_context {
     // TODO: FPU state...
 } cpu_context_t;
 
+#elif defined(__aarch64__)
+
+/** Structure describing a CPU execution context. */
+typedef struct cpu_context {
+    unsigned long todo;
+} cpu_context_t;
+
 #else
 
 #error "No cpu_context_t defined for this architecture"
