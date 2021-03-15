@@ -18,6 +18,14 @@ from util import FeatureSources
 Import('config', 'kern_env', 'kern_sources', 'mod_env')
 
 kern_sources += FeatureSources(config, [
+    'cpu.c',
+    'elf.c',
+    'entry.S',
+    'kdb.c',
+    'mmu.c',
+    'setjmp.S',
+    'thread.c',
+    'time.c',
 ])
 
 for env in [kern_env, mod_env]:
