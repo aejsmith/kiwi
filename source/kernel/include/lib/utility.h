@@ -21,8 +21,6 @@
 
 #pragma once
 
-#include <arch/bitops.h>
-
 #include <types.h>
 
 /** Get the number of bits in a type. */

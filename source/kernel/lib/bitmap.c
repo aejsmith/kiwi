@@ -65,14 +65,14 @@ void bitmap_zero(unsigned long *bitmap, size_t nbits) {
  * @param bitmap        Bitmap to set in.
  * @param bit           Index of the bit to set. */
 void bitmap_set(unsigned long *bitmap, unsigned long bit) {
-    set_bit(&bitmap[bit_index(bit)], bit_offset(bit));
+    atomic_fetch_or((atomic_ulong *)&bitmap[bit_index(bit)], (1ul << bit_offset(bit)));
 }
 
 /** Atomically clear a bit in a bitmap.
  * @param bitmap        Bitmap to clear in.
  * @param bit           Index of the bit to clear. */
 void bitmap_clear(unsigned long *bitmap, unsigned long bit) {
-    clear_bit(&bitmap[bit_index(bit)], bit_offset(bit));
+    atomic_fetch_and((atomic_ulong *)&bitmap[bit_index(bit)], ~(1ul << bit_offset(bit)));
 }
 
 /** Test whether a bit is set in a bitmap.
