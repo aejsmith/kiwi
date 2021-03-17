@@ -231,6 +231,6 @@ SConscript('source/SConscript', variant_dir = build_dir)
 toolchain.update_sysroot(manager)
 
 # Generation compilation database.
-compile_commands = env.CompilationDatabase(os.path.join(build_dir, 'compile_commands.json'))
+compile_commands = env.CompilationDatabase(os.path.join('build', 'compile_commands.json'))
 env.Default(compile_commands)
 env.Alias("compiledb", compile_commands)
