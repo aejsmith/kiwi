@@ -108,26 +108,29 @@ if config['SYS_SUPPORTS_USERSPACE']:
 # Always build the filesystem image to make sure new stuff is copied into it.
 fsimage = dist.FSImage('fsimage.tar', [])
 AlwaysBuild(fsimage)
+dist['FSIMAGE'] = File('fsimage.tar')
 
 # Add aliases and set the default target.
 Alias('kernel', dist['KERNEL'])
 Alias('modules', dist['MODULES'])
-Alias('fsimage', fsimage)
+Alias('fsimage', dist['FSIMAGE'])
 Alias('kboot', dist['KBOOT'])
 
 # Add platform-specific targets to generate bootable images.
 qemu_binary = config['QEMU_BINARY_' + config['ARCH'].upper()]
 qemu_opts   = config['QEMU_OPTS_' + config['ARCH'].upper()]
 if config['PLATFORM'] == 'pc':
-    Default(Alias('cdrom', dist.ISOImage('cdrom.iso', fsimage)))
+    Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
 
-    # Target to run in QEMU.
     Alias('qemu', dist.Command('__qemu', ['cdrom.iso'], Action(
         qemu_binary + ' -cdrom $SOURCE -boot d ' + qemu_opts,
         None)))
 else:
-    Default(dist['KERNEL'])
-    Default(dist['KBOOT'])
+    Default(Alias('bootimage', dist.BootImage('boot.img', [])))
+
+    Alias('qemu', dist.Command('__qemu', [dist['KBOOT'][0], 'boot.img'], Action(
+        qemu_binary + ' -kernel ${SOURCES[0]} -initrd ${SOURCES[1]} ' + qemu_opts,
+        None)))
 
 # Helper to run GDB attached to QEMU with the appropriate options for the
 # current configuration.

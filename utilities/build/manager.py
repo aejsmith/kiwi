@@ -74,6 +74,7 @@ class BuildManager:
 
         # Add image builders.
         dist['BUILDERS']['FSImage'] = image.fs_image_builder
+        dist['BUILDERS']['BootImage'] = image.boot_image_builder
         dist['BUILDERS']['ISOImage'] = image.iso_image_builder
 
     def __getitem__(self, key):
