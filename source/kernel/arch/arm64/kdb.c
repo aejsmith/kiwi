@@ -23,6 +23,7 @@
 #include <arch/kdb.h>
 
 #include <arm64/cpu.h>
+#include <arm64/kdb.h>
 
 #include <proc/thread.h>
 
@@ -168,6 +169,16 @@ static void kdb_enter_internal(kdb_reason_t reason, frame_t *frame, unsigned ind
     kdb_main(reason, frame, index);
 }
 
+/** BRK exception handler. */
+void arm64_kdb_brk_handler(frame_t *frame) {
+    /* See below - reason is stored in X0. */
+    kdb_enter_internal((kdb_reason_t)frame->x0, frame, 0);
+
+    /* ELR for a BRK instruction points to the instruction. Advance over it
+     * when we return. */
+    frame->ip += 4;
+}
+
 /** Enter the kernel debugger.
  * @param reason        Reason for entry.
  * @param frame         Interrupt frame that caused entry (if NULL one will be
@@ -176,8 +187,10 @@ void kdb_enter(kdb_reason_t reason, frame_t *frame) {
     if (frame) {
         kdb_enter_internal(reason, frame, 0);
     } else {
-        kdb_printf("KDB TODO!");
-        arch_cpu_halt();
+        /* Breakpoint so that we can get into the debugger with an interrupt
+         * frame. Store the entry reason in X0, which will be picked up in the
+         * handler. */
+        __asm__ __volatile__("mov x0, %0; brk #0" :: "r"((unsigned long)reason) : "x0");
     }
 }
 

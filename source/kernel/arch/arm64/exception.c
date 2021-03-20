@@ -21,6 +21,7 @@
 
 #include <arm64/cpu.h>
 #include <arm64/exception.h>
+#include <arm64/kdb.h>
 
 #include <kernel.h>
 
@@ -31,8 +32,17 @@ void arm64_sync_exception_handler(frame_t *frame) {
     unsigned long esr   = arm64_read_sysreg(esr_el1);
     unsigned long class = ARM64_ESR_EC(esr);
 
-    /* TODO: Proper exception handling. */
-    fatal_etc(frame, "Unhandled synchronous exception (class %lu)", class);
+    switch (class) {
+        case 0b111100:
+            /* BRK instruction (AArch64). */
+            // TODO: Should not enter KDB if this came from EL0.
+            arm64_kdb_brk_handler(frame);
+            break;
+        default:
+            /* TODO: Proper exception handling. */
+            fatal_etc(frame, "Unhandled synchronous exception (class %lu)", class);
+            break;
+    }
 }
 
 /** Set up exception handling. */

@@ -16,13 +16,11 @@
 
 /**
  * @file
- * @brief               ARM64 exception handling.
+ * @brief               ARM64 KDB definitions.
  */
 
 #pragma once
 
-#include <arch/frame.h>
+#include <kdb.h>
 
-extern void arm64_sync_exception_handler(frame_t *frame);
-
-extern void arm64_exception_init(void);
+extern void arm64_kdb_brk_handler(frame_t *frame);
