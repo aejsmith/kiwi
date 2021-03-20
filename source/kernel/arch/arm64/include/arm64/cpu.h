@@ -89,7 +89,11 @@
 #define arm64_write_sysreg(r, v) \
     do { \
         unsigned long __v = (unsigned long)(v); \
-        __asm__ __volatile__("msr " STRINGIFY(r) ", %x0" :: "rZ"(__v)); \
+        __asm__ __volatile__("msr " STRINGIFY(r) ", %x0" :: "r"(__v)); \
     } while (0)
+
+/** ISB instruction. */
+#define arm64_isb() \
+    __asm__ __volatile__("isb");
 
 #endif /* __ASM__ */

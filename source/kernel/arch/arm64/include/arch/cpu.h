@@ -37,15 +37,17 @@ typedef struct arch_cpu {
 /** Get the current CPU structure pointer.
  * @return              Pointer to current CPU structure. */
 static inline struct cpu *arch_curr_cpu(void) {
-    // TODO
-    return NULL;
+    struct cpu *addr;
+    __asm__("mrs %0, tpidr_el1" : "=r"(addr));
+    return addr;
 }
 
 /** Get the current CPU structure pointer (volatile, forces compiler to reload).
  * @return              Pointer to current CPU structure. */
 static inline struct cpu *arch_curr_cpu_volatile(void) {
-    // TODO
-    return NULL;
+    struct cpu *addr;
+    __asm__ __volatile__("mrs %0, tpidr_el1" : "=r"(addr));
+    return addr;
 }
 
 /** Halt the current CPU. */
