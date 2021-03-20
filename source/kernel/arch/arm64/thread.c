@@ -27,7 +27,7 @@
 /** Initialize ARM64-specific thread data.
  * @param thread        Thread to initialize. */
 void arch_thread_init(thread_t *thread) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Clean up ARM64-specific thread data.
@@ -41,20 +41,20 @@ void arch_thread_destroy(thread_t *thread) {
  * @param frame         Frame to prepare for new thread to enter user mode with
  *                      arch_thread_user_enter(). */
 void arch_thread_clone(thread_t *thread, frame_t *frame) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Switch to another thread.
  * @param thread        Thread to switch to.
  * @param prev          Thread that was previously running. */
 void arch_thread_switch(thread_t *thread, thread_t *prev) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Set the TLS address for the current thread.
  * @param addr          TLS address. */
 void arch_thread_set_tls_addr(ptr_t addr) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Prepare an interrupt frame to enter user mode.
@@ -63,7 +63,7 @@ void arch_thread_set_tls_addr(ptr_t addr) {
  * @param sp            Stack pointer.
  * @param arg           First argument to function. */
 void arch_thread_user_setup(frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Prepare to execute a user mode interrupt.
@@ -71,12 +71,12 @@ void arch_thread_user_setup(frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
  * @param ipl           Previous IPL.
  * @return              Status code describing result of the operation. */
 status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Restore previous state after returning from a user mode interrupt.
  * @param _ipl          Where to store previous IPL.
  * @return              Status code describing result of the operation. */
 status_t arch_thread_interrupt_restore(unsigned *_ipl) {
-    fatal("TODO");
+    fatal_todo();
 }

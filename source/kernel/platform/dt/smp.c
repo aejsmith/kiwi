@@ -23,21 +23,21 @@
 
 /** Detect all secondary CPUs in the system. */
 void platform_smp_detect(void) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Prepare the SMP boot process. */
 __init_text void platform_smp_boot_prepare(void) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Boot a secondary CPU.
  * @param cpu           CPU to boot. */
 __init_text void platform_smp_boot(cpu_t *cpu) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Clean up after secondary CPUs have been booted. */
 __init_text void platform_smp_boot_cleanup(void) {
-    fatal("TODO");
+    fatal_todo();
 }

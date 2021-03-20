@@ -72,6 +72,8 @@ extern void fatal_etc(struct frame *frame, const char *fmt, ...) __noreturn __pr
  * @param ...           Arguments to substitute into format string. */
 #define fatal(fmt...)   fatal_etc(NULL, fmt)
 
+#define fatal_todo() fatal("TODO: %s", __func__)
+
 extern int kvprintf(int level, const char *fmt, va_list args);
 extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);
 

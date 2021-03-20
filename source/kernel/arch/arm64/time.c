@@ -25,11 +25,11 @@
 /** Get the system time (number of nanoseconds since boot).
  * @return              Number of nanoseconds since system was booted. */
 nstime_t system_time(void) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Spin for a certain amount of time.
  * @param nsecs         Nanoseconds to spin for. */
 void spin(nstime_t nsecs) {
-    fatal("TODO");
+    fatal_todo();
 }

@@ -45,7 +45,7 @@ KBOOT_LOAD(0, LARGE_PAGE_SIZE, LARGE_PAGE_SIZE, KERNEL_KMEM_BASE, KERNEL_KMEM_SI
  * @param mmflag        Allocation behaviour flags.
  * @return              Status code describing result of the operation. */
 static status_t arm64_mmu_init(mmu_context_t *ctx, unsigned mmflag) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Destroy a context.
@@ -65,7 +65,7 @@ static status_t arm64_mmu_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t access,
     unsigned mmflag)
 {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Remap a range with different access flags.
@@ -74,7 +74,7 @@ static status_t arm64_mmu_map(
  * @param size          Size of range to update.
  * @param access        New access flags. */
 static void arm64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Unmap a page in a context.
@@ -86,7 +86,7 @@ static void arm64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
  * @param _page         Where to pointer to page that was unmapped.
  * @return              Whether a page was mapped at the virtual address. */
 static bool arm64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Query details about a mapping.
@@ -96,19 +96,19 @@ static bool arm64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t 
  * @param _access       Where to store access flags for the mapping.
  * @return              Whether a page is mapped at the virtual address. */
 static bool arm64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Perform remote TLB invalidation.
  * @param ctx           Context to send for. */
 static void arm64_mmu_flush(mmu_context_t *ctx) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Switch to another MMU context.
  * @param ctx           Context to switch to. */
 static void arm64_mmu_load(mmu_context_t *ctx) {
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** ARM64 MMU operations. */
@@ -127,7 +127,7 @@ static mmu_ops_t arm64_mmu_ops = {
 __init_text void arch_mmu_init(void) {
     mmu_ops = &arm64_mmu_ops;
 
-    fatal("TODO");
+    fatal_todo();
 }
 
 /** Get a PAT entry. */
@@ -135,5 +135,5 @@ __init_text void arch_mmu_init(void) {
 
 /** Initialize the MMU for this CPU. */
 __init_text void arch_mmu_init_percpu(void) {
-    fatal("TODO");
+    fatal_todo();
 }

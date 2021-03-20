@@ -26,5 +26,5 @@
 /** Add memory ranges to the physical memory manager. */
 __init_text void platform_page_init(void) {
     /* TODO: This should be arch-specific I think? */
-    fatal("TODO");
+    fatal_todo();
 }
