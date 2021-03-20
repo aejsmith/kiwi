@@ -764,10 +764,10 @@ __init_text void page_early_init(void) {
         free_page_lists[i].maxaddr = 0;
     }
 
-    /* First step is to call into platform-specific code to parse the memory map
+    /* First step is to call into arch-specific code to parse the memory map
      * provided by the loader and separate it further as required (i.e. into
      * different free lists). */
-    platform_page_init();
+    arch_page_init();
 
     /* And here we have the fun of early memory management bringup. We want to
      * map pages during our initialization, but to do that the MMU code needs to

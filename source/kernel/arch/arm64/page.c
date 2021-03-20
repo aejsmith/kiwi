@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief               DT physical memory management.
+ * @brief               ARM64 physical memory management.
  */
 
 #include <mm/page.h>
@@ -24,7 +24,7 @@
 #include <kernel.h>
 
 /** Add memory ranges to the physical memory manager. */
-__init_text void platform_page_init(void) {
+__init_text void arch_page_init(void) {
     /* TODO: This should be arch-specific I think? */
     fatal_todo();
 }

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief               PC physical memory management.
+ * @brief               AMD64 physical memory management.
  */
 
 #include <mm/page.h>
@@ -28,7 +28,7 @@
 #define A16M        0x1000000ll
 
 /** Add memory ranges to the physical memory manager. */
-__init_text void platform_page_init(void) {
+__init_text void arch_page_init(void) {
     kboot_tag_foreach(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
         phys_ptr_t end = range->start + range->size;
 

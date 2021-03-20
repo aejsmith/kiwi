@@ -19,7 +19,6 @@ from util import FeatureSources
 
 kern_sources += FeatureSources(config, [
     'console.c',
-    'page.c',
     'platform.c',
     'smp.c',
     'time.c',

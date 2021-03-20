@@ -29,8 +29,6 @@
 
 #include <mm/mm.h>
 
-#include <platform/page.h>
-
 #include <sync/spinlock.h>
 
 struct page;
@@ -96,7 +94,7 @@ extern void page_add_memory_range(phys_ptr_t start, phys_ptr_t end, unsigned fre
 
 extern phys_ptr_t page_early_alloc(void);
 
-extern void platform_page_init(void);
+extern void arch_page_init(void);
 
 extern void page_early_init(void);
 extern void page_init(void);

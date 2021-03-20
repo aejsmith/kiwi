@@ -24,6 +24,7 @@ kern_sources += FeatureSources(config, [
     'exception.c',
     'kdb.c',
     'mmu.c',
+    'page.c',
     'setjmp.S',
     'thread.c',
     'time.c',
