@@ -73,17 +73,18 @@
 #define NS16550_LSR_TEMT        (1<<6)  /**< Transmitter empty. */
 #define NS16550_LSR_ERR         (1<<7)  /**< Error. */
 
+static phys_ptr_t ns16550_registers_phys;
 static io_region_t ns16550_registers = IO_REGION_INVALID;
-static unsigned ns16550_register_shift;
+static unsigned ns16550_registers_shift;
 
 /** Read a UART register. */
 static inline uint32_t ns16550_read(unsigned reg) {
-    return io_read8(ns16550_registers, reg << ns16550_register_shift);
+    return io_read8(ns16550_registers, reg << ns16550_registers_shift);
 }
 
 /** Write a UART register. */
 static inline void ns16550_write(unsigned reg, uint32_t value) {
-    io_write8(ns16550_registers, reg << ns16550_register_shift, value);
+    io_write8(ns16550_registers, reg << ns16550_registers_shift, value);
 }
 
 static bool ns16550_serial_port_early_init(kboot_tag_serial_t *serial) {
@@ -97,13 +98,14 @@ static bool ns16550_serial_port_early_init(kboot_tag_serial_t *serial) {
 
     switch (serial->io_type) {
         case KBOOT_IO_TYPE_MMIO:
-            ns16550_registers      = mmio_early_map(serial->addr_virt);
-            ns16550_register_shift = 2;
+            ns16550_registers       = mmio_early_map(serial->addr_virt);
+            ns16550_registers_phys  = serial->addr;
+            ns16550_registers_shift = 2;
             break;
         #if ARCH_HAS_PIO
         case KBOOT_IO_TYPE_PIO:
             ns16550_registers      = pio_map(serial->addr, NS16550_REG_COUNT);
-            ns16550_register_shift = 0;
+            ns16550_registers_shift = 0;
             break;
         #endif
         default:
@@ -114,7 +116,10 @@ static bool ns16550_serial_port_early_init(kboot_tag_serial_t *serial) {
 }
 
 static void ns16550_serial_port_init(void) {
-    fatal("TODO");
+    if (ns16550_registers_phys != 0) {
+        ns16550_registers = mmio_map(
+            ns16550_registers_phys, NS16550_REG_COUNT << ns16550_registers_shift, MM_BOOT);
+    }
 }
 
 static bool ns16550_serial_port_rx_empty(void) {

@@ -37,6 +37,11 @@ static serial_port_ops_t *serial_ops;
 static ansi_parser_t serial_ansi_parser;
 static SPINLOCK_DEFINE(serial_lock);
 
+static void serial_console_init(void) {
+    if (serial_ops->init)
+        serial_ops->init();
+}
+
 static void serial_console_putc_unsafe(char ch) {
     if (ch == '\n')
         serial_console_putc_unsafe('\r');
@@ -74,6 +79,7 @@ static uint16_t serial_console_poll(void) {
 }
 
 static console_out_ops_t serial_console_out_ops = {
+    .init        = serial_console_init,
     .putc        = serial_console_putc,
     .putc_unsafe = serial_console_putc_unsafe,
 };

@@ -41,6 +41,7 @@
 #define PL011_REG_MIS           16  /**< Masked Interrupt Status Register. */
 #define PL011_REG_ICR           17  /**< Interrupt Clear Register. */
 #define PL011_REG_DMACR         18  /**< DMA Control Register. */
+#define PL011_REG_COUNT         19
 
 /** PL011 flag register bits. */
 #define PL011_FR_TXFF           (1<<5)  /**< Transmit FIFO full. */
@@ -62,6 +63,7 @@
 #define PL011_CR_TXE            (1<<8)  /**< Transmit enable. */
 #define PL011_CR_RXE            (1<<9)  /**< Receive enable. */
 
+static phys_ptr_t pl011_registers_phys;
 static io_region_t pl011_registers;
 
 /** Read a UART register. */
@@ -78,12 +80,14 @@ static bool pl011_serial_port_early_init(kboot_tag_serial_t *serial) {
     if (serial->type != KBOOT_SERIAL_TYPE_PL011)
         return false;
 
-    pl011_registers = mmio_early_map(serial->addr_virt);
+    pl011_registers      = mmio_early_map(serial->addr_virt);
+    pl011_registers_phys = serial->addr;
+
     return true;
 }
 
 static void pl011_serial_port_init(void) {
-    fatal("TODO");
+    pl011_registers = mmio_map(pl011_registers_phys, PL011_REG_COUNT << 2, MM_BOOT);
 }
 
 static bool pl011_serial_port_rx_empty(void) {
