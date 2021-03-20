@@ -21,6 +21,7 @@ kern_sources += FeatureSources(config, [
     'cpu.c',
     'elf.c',
     'entry.S',
+    'exception.c',
     'kdb.c',
     'mmu.c',
     'setjmp.S',

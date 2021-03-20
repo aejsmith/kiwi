@@ -21,6 +21,23 @@
 
 #pragma once
 
+#ifdef __ASM__
+    #define SUFFIX(x, y)    x
+#else
+    #define _SUFFIX(x, y)   (x##y)
+    #define SUFFIX(x, y)    _SUFFIX(x, y)
+#endif
+
+/**
+ * Helpers for adding type suffixes to constants in headers shared with
+ * assembly code. We cannot use 'ul' and 'ull' suffixes in assembly but they
+ * may be needed for C for large constants.
+ */
+#define UL(x)               (SUFFIX(x, ul))
+#define ULL(x)              (SUFFIX(x, ull))
+
+#ifndef __ASM__
+
 #include <compiler.h>
 #include <stdalign.h>
 #include <stdarg.h>
@@ -147,3 +164,5 @@ typedef uint32_t page_num_t;            /**< Integer type representing a number 
 #include <arch/types.h>
 
 #include <kernel/types.h>
+
+#endif /* !__ASM__ */

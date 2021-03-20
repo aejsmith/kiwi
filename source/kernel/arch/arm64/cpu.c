@@ -19,6 +19,8 @@
  * @brief               ARM64 CPU management.
  */
 
+#include <arm64/exception.h>
+
 #include <cpu.h>
 #include <kdb.h>
 #include <kernel.h>
@@ -52,13 +54,13 @@ void arch_smp_ipi(cpu_id_t dest) {
 
 /** Perform early initialization common to all CPUs. */
 __init_text void arch_cpu_early_init(void) {
-    fatal_todo();
+    /* Nothing happens. */
 }
 
 /** Detect and set up the current CPU.
  * @param cpu           CPU structure for the current CPU. */
 __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
-    /* TODO. */
+    arm64_exception_init();
 }
 
 /** Display a list of running CPUs. */
