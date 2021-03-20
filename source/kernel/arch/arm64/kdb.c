@@ -22,10 +22,18 @@
 #include <arch/frame.h>
 #include <arch/kdb.h>
 
+#include <arm64/cpu.h>
+
 #include <proc/thread.h>
 
 #include <cpu.h>
 #include <kdb.h>
+
+/** Structure containing a stack frame. */
+typedef struct stack_frame {
+    ptr_t next;                 /**< Address of next stack frame. */
+    ptr_t addr;                 /**< Function return address. */
+} stack_frame_t;
 
 /** Install a kernel breakpoint.
  * @param addr          Address of the breakpoint.
@@ -84,7 +92,22 @@ bool arch_kdb_get_watchpoint(unsigned index, ptr_t *_addr, size_t *_size, bool *
  * @param thread        Thread to trace. If NULL, use the current frame.
  * @param cb            Backtrace callback. */
 void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
-    kdb_printf("Backtrace TODO\n");
+    ptr_t fp;
+    if (thread) {
+        kdb_printf("Thread backtrace TODO\n");
+        return;
+    } else {
+        fp = curr_kdb_frame->x29;
+    }
+
+    while (fp) {
+        stack_frame_t *frame = (stack_frame_t *)fp;
+
+        if (frame->addr)
+            cb(frame->addr);
+
+        fp = frame->next;
+    }
 }
 
 /** Get the value of a register.
@@ -99,7 +122,36 @@ bool arch_kdb_register_value(const char *name, size_t len, unsigned long *_reg) 
 
 /** Print out all registers. */
 void arch_kdb_dump_registers(void) {
-    kdb_printf("TODO");
+    frame_t *frame = curr_kdb_frame;
+
+    unsigned long far = arm64_read_sysreg(far_el1);
+    unsigned long esr = arm64_read_sysreg(esr_el1);
+
+    kdb_printf(
+        "X0:   0x%016lx  X1:  0x%016lx  X2:  0x%016lx\n"
+        "X3:   0x%016lx  X4:  0x%016lx  X5:  0x%016lx\n"
+        "X6:   0x%016lx  X7:  0x%016lx  X8:  0x%016lx\n"
+        "X9:   0x%016lx  X10: 0x%016lx  X11: 0x%016lx\n"
+        "X12:  0x%016lx  X13: 0x%016lx  X14: 0x%016lx\n"
+        "X15:  0x%016lx  X16: 0x%016lx  X17: 0x%016lx\n"
+        "X18:  0x%016lx  X19: 0x%016lx  X20: 0x%016lx\n"
+        "X21:  0x%016lx  X22: 0x%016lx  X23: 0x%016lx\n"
+        "X24:  0x%016lx  X25: 0x%016lx  X26: 0x%016lx\n"
+        "X27:  0x%016lx  X28: 0x%016lx  X29: 0x%016lx\n"
+        "X30:  0x%016lx  SP:  0x%016lx  ELR: 0x%016lx\n"
+        "SPSR: 0x%016lx  FAR: 0x%016lx  ESR: 0x%08lx\n",
+        frame->x0,  frame->x1,  frame->x2,
+        frame->x3,  frame->x4,  frame->x5,
+        frame->x6,  frame->x7,  frame->x8,
+        frame->x9,  frame->x10, frame->x11,
+        frame->x12, frame->x13, frame->x14,
+        frame->x15, frame->x16, frame->x17,
+        frame->x18, frame->x19, frame->x20,
+        frame->x21, frame->x22, frame->x23,
+        frame->x24, frame->x25, frame->x26,
+        frame->x27, frame->x28, frame->x29,
+        frame->x30, frame->sp,  frame->ip,
+        frame->spsr, far, esr);
 }
 
 /** Trap all other CPUs to wait for KDB to exit. */
