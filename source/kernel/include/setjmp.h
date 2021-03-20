@@ -24,13 +24,6 @@
 #include <arch/setjmp.h>
 #include <types.h>
 
-/** Initialize a jump buffer.
- * @param buf           Buffer to initialize.
- * @param func          Function that should be called.
- * @param stack         Base of stack to use.
- * @param size          Size of stack. */
-extern void initjmp(jmp_buf buf, void (*func)(void), void *stack, size_t size);
-
 /** Save the current execution state.
  * @param buf           Buffer to save to.
  * @return              Non-zero if returning through longjmp(), 0 otherwise. */

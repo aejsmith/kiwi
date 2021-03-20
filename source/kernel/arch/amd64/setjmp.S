@@ -31,20 +31,6 @@
 #define JMP_OFF_R14     48      /**< R14 offset. */
 #define JMP_OFF_R15     56      /**< R15 offset. */
 
-FUNCTION_START(initjmp)
-    movq    %rsi, JMP_OFF_IP(%rdi)
-
-    /* Save the stack pointer, minus 8 to maintain ABI alignment requirements:
-     * upon entry to a function, (RSP + 8) % 16 == 0. */
-    addq    %rcx, %rdx
-    subq    $8, %rdx
-    movq    %rdx, JMP_OFF_SP(%rdi)
-
-    /* Clear frame pointer. */
-    movq    $0, JMP_OFF_BP(%rdi)
-    ret
-FUNCTION_END(initjmp)
-
 FUNCTION_START(setjmp)
     /* Save instruction/stack pointers. */
     movq    (%rsp), %rax
