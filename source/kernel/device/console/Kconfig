@@ -14,6 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-source "bus/Kconfig"
-source "console/Kconfig"
-source "input/Kconfig"
+config DEVICE_CONSOLE_NS16550
+	depends on PLATFORM_DT || PLATFORM_PC
+    def_bool y
+
+config DEVICE_CONSOLE_PL011
+	depends on PLATFORM_DT
+    def_bool y

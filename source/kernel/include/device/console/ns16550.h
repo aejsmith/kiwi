@@ -16,17 +16,15 @@
 
 /**
  * @file
- * @brief               PC console code.
+ * @brief               NS16550 console implementation.
  */
 
 #pragma once
 
-/** Keyboard code definitions */
-#define LEFT_CTRL           0x1d
-#define RIGHT_CTRL          0x1d
-#define LEFT_ALT            0x38
-#define RIGHT_ALT           0x38
-#define LEFT_SHIFT          0x2a
-#define RIGHT_SHIFT         0x36
+#include <device/console/serial.h>
 
-extern void i8042_init(void);
+#if CONFIG_DEVICE_CONSOLE_NS16550
+extern serial_port_ops_t ns16550_serial_port_ops;
+#endif
+
+extern void ns16550_serial_configure(struct kboot_tag_serial *serial, uint32_t clock_rate);

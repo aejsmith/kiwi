@@ -27,5 +27,6 @@ kern_sources += FeatureSources(config, [
 
 SConscript(dirs = FeatureDirs(config, [
     'bus',
+    'console',
     'input',
 ]))

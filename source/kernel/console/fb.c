@@ -355,7 +355,7 @@ static void fb_console_putc(char ch) {
 }
 
 /** Properly initialize the framebuffer console. */
-static void fb_console_init(kboot_tag_video_t *video) {
+static void fb_console_init(void) {
     fb_console_configure(&fb_info, MM_BOOT);
 }
 

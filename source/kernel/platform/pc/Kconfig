@@ -14,33 +14,3 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-choice
-	prompt "Serial port"
-	default PC_SERIAL_PORT_COM1
-	help
-	  Which serial port to use for kernel console output.
-
-config PC_SERIAL_PORT_DISABLED
-	bool "Disabled"
-
-config PC_SERIAL_PORT_COM1
-	bool "COM1"
-
-config PC_SERIAL_PORT_COM2
-	bool "COM2"
-
-config PC_SERIAL_PORT_COM3
-	bool "COM3"
-
-config PC_SERIAL_PORT_COM4
-	bool "COM4"
-
-endchoice
-
-config PC_SERIAL_PORT
-	int
-	default 0 if PC_SERIAL_PORT_DISABLED
-	default 1 if PC_SERIAL_PORT_COM1
-	default 2 if PC_SERIAL_PORT_COM2
-	default 3 if PC_SERIAL_PORT_COM3
-	default 4 if PC_SERIAL_PORT_COM4

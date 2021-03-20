@@ -52,6 +52,7 @@ void arch_smp_ipi(cpu_id_t dest) {
 
 /** Perform early initialization common to all CPUs. */
 __init_text void arch_cpu_early_init(void) {
+    fatal("TODO");
     /* TODO. */
 }
 

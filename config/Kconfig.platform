@@ -25,7 +25,8 @@ config PLATFORM_DT
 	help
 	  Generic platform which uses a Device Tree to describe the hardware.
 	  This platform currently supports the following ARM64 hardware:
-	   - Raspberry Pi 4
+	   - QEMU 'virt' machine
+	   - Raspberry Pi 3 & 4
 
 config PLATFORM_PC
 	bool "Standard PC"

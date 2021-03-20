@@ -21,39 +21,19 @@
 
 #include <arch/io.h>
 
-#include <device/irq.h>
+#include <device/console/ns16550.h>
 
-#include <lib/ansi_parser.h>
-#include <lib/notifier.h>
 #include <lib/string.h>
 
-#include <mm/phys.h>
-
 #include <pc/console.h>
-
-#include <proc/thread.h>
-
-#include <sync/condvar.h>
-#include <sync/spinlock.h>
 
 #include <console.h>
 #include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
-#include <status.h>
 
-KBOOT_VIDEO(KBOOT_VIDEO_LFB, 0, 0, 0);
-
-#ifdef SERIAL_PORT
-
-/** Serial port ANSI escape parser. */
-static ansi_parser_t serial_ansi_parser;
-
-#endif
-
-/**
- * i8042 input functions.
- */
+#define SERIAL_PORT     0x3f8
+#define SERIAL_CLOCK    1843200
 
 /** Lower case keyboard layout - United Kingdom. */
 static const unsigned char kbd_layout[128] = {
@@ -181,100 +161,28 @@ __init_text void i8042_init(void) {
         in8(0x60);
 }
 
-/**
- * Serial console operations.
- */
-
-#if SERIAL_PORT
-
-/** Write a character to the serial console.
- * @param ch            Character to print. */
-static void serial_console_putc(char ch) {
-    if (ch == '\n')
-        serial_console_putc('\r');
-
-    out8(SERIAL_PORT, ch);
-
-    while (!(in8(SERIAL_PORT + 5) & (1 << 5)))
-        ;
-}
-
-/** Read a character from the serial console.
- * @return              Character read, or 0 if none available. */
-static uint16_t serial_console_poll(void) {
-    unsigned char ch = in8(SERIAL_PORT + 6);
-    if ((ch & ((1 << 4) | (1 << 5))) && ch != 0xff) {
-        if (in8(SERIAL_PORT + 5) & 0x01) {
-            ch = in8(SERIAL_PORT);
-
-            /* Convert CR to NL, and DEL to Backspace. */
-            if (ch == '\r') {
-                ch = '\n';
-            } else if (ch == 0x7f) {
-                ch = '\b';
-            }
-
-            /* Handle escape sequences. */
-            uint16_t converted = ansi_parser_filter(&serial_ansi_parser, ch);
-            if (converted)
-                return converted;
-        }
-    }
-
-    return 0;
-}
-
-/** Early initialization of the serial console.
- * @return              Whether the serial console is present. */
-static bool serial_console_early_init(void) {
-    /* Check whether the port is present. */
-    uint8_t status = in8(SERIAL_PORT + 6);
-    if (!(status & ((1 << 4) | (1 << 5))) || status == 0xff)
-        return false;
-
-    out8(SERIAL_PORT + 1, 0x00);  /* Disable all interrupts */
-    out8(SERIAL_PORT + 3, 0x80);  /* Enable DLAB (set baud rate divisor) */
-    out8(SERIAL_PORT + 0, 0x01);  /* Set divisor to 1 (lo byte) 115200 baud */
-    out8(SERIAL_PORT + 1, 0x00);  /*                  (hi byte) */
-    out8(SERIAL_PORT + 3, 0x03);  /* 8 bits, no parity, one stop bit */
-    out8(SERIAL_PORT + 2, 0xc7);  /* Enable FIFO, clear them, with 14-byte threshold */
-    out8(SERIAL_PORT + 4, 0x0b);  /* IRQs enabled, RTS/DSR set */
-
-    /* Wait for transmit to be empty. */
-    while (!(in8(SERIAL_PORT + 5) & (1 << 5)))
-        ;
-
-    ansi_parser_init(&serial_ansi_parser);
-    return true;
-}
-
-/** Serial port console output operations. */
-static console_out_ops_t serial_console_out_ops = {
-    .putc        = serial_console_putc,
-    .putc_unsafe = serial_console_putc,
-};
-
-/** Serial console input operations. */
-static console_in_ops_t serial_console_in_ops = {
-    .poll = serial_console_poll,
-};
-
-#endif
-
 /*
  * Initialization functions.
  */
 
-/** Set up the debug console.
- * @param video         KBoot video tag. */
-__init_text void platform_console_early_init(kboot_tag_video_t *video) {
-    #ifdef SERIAL_PORT
-        /* Register the serial console for debug output. */
-        if (serial_console_early_init()) {
-            debug_console.out = &serial_console_out_ops;
-            debug_console.in = &serial_console_in_ops;
-        }
-    #endif
+/** Set up the debug console. */
+__init_text void platform_console_early_init(kboot_tag_video_t *video, kboot_tag_serial_t *serial) {
+    if (!serial) {
+        /* Initialize and configure a serial port if the boot loader didn't
+         * give us one. */
+        kboot_tag_serial_t default_serial = {};
+        default_serial.addr      = SERIAL_PORT;
+        default_serial.io_type   = KBOOT_IO_TYPE_PIO;
+        default_serial.type      = KBOOT_SERIAL_TYPE_NS16550;
+        default_serial.baud_rate = 115200;
+        default_serial.data_bits = 8;
+        default_serial.stop_bits = 1;
+        default_serial.parity    = KBOOT_SERIAL_PARITY_NONE;
+
+        serial_console_early_init(&default_serial);
+
+        ns16550_serial_configure(&default_serial, SERIAL_CLOCK);
+    }
 
     /* Register the early keyboard input operations. */
     main_console.in = &i8042_console_in_ops;

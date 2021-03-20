@@ -23,9 +23,7 @@
 #include <kboot.h>
 #include <kernel.h>
 
-KBOOT_VIDEO(KBOOT_VIDEO_LFB, 0, 0, 0);
-/** Set up the debug console.
- * @param video         KBoot video tag. */
-__init_text void platform_console_early_init(kboot_tag_video_t *video) {
-    fatal("TODO");
-}   
+/** Set up the debug console. */
+__init_text void platform_console_early_init(kboot_tag_video_t *video, kboot_tag_serial_t *serial) {
+    /* We rely on generic code to set everything up from what KBoot gave us. */
+}

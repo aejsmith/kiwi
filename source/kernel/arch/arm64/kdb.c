@@ -124,7 +124,7 @@ void kdb_enter(kdb_reason_t reason, frame_t *frame) {
     if (frame) {
         kdb_enter_internal(reason, frame, 0);
     } else {
-        kdb_printf("TODO!");
+        kdb_printf("KDB TODO!");
         arch_cpu_halt();
     }
 }

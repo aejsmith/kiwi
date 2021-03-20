@@ -19,11 +19,14 @@
  * @brief               Kernel console functions.
  */
 
+#include <device/console/serial.h>
+
 #include <device/device.h>
 
 #include <io/request.h>
 
 #include <lib/string.h>
+#include <lib/utility.h>
 
 #include <mm/malloc.h>
 
@@ -35,6 +38,8 @@
 #include <kernel.h>
 #include <status.h>
 
+KBOOT_VIDEO(KBOOT_VIDEO_LFB, 0, 0, 0);
+
 /** Main console. */
 console_t main_console;
 
@@ -43,26 +48,27 @@ console_t debug_console;
 
 /** Initialize the debug console. */
 __init_text void console_early_init(void) {
-    kboot_tag_video_t *video = kboot_tag_iterate(KBOOT_TAG_VIDEO, NULL);
+    kboot_tag_video_t *video   = kboot_tag_iterate(KBOOT_TAG_VIDEO, NULL);
+    kboot_tag_serial_t *serial = kboot_tag_iterate(KBOOT_TAG_SERIAL, NULL);
 
-    platform_console_early_init(video);
+    platform_console_early_init(video, serial);
 
-    if (!main_console.out) {
-        /* Look for a framebuffer console. */
-        if (video && video->type == KBOOT_VIDEO_LFB)
-            fb_console_early_init(video);
-    }
+    /* Try to set up a serial port if the platform didn't. */
+    if (!debug_console.out && serial)
+        serial_console_early_init(serial);
+
+    /* Set up a framebuffer console if the platform didn't. */
+    if (!main_console.out && video && video->type == KBOOT_VIDEO_LFB)
+        fb_console_early_init(video);
 }
 
 /** Initialize the primary console. */
 __init_text void console_init(void) {
-    kboot_tag_video_t *video = kboot_tag_iterate(KBOOT_TAG_VIDEO, NULL);
-
     if (debug_console.out && debug_console.out->init)
-        debug_console.out->init(video);
+        debug_console.out->init();
 
     if (main_console.out && main_console.out->init)
-        main_console.out->init(video);
+        main_console.out->init();
 }
 
 /*

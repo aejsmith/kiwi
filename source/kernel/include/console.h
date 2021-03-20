@@ -21,24 +21,15 @@
 
 #pragma once
 
-#include <lib/list.h>
+#include <types.h>
 
+struct kboot_tag_serial;
 struct kboot_tag_video;
-struct object_event;
 
-/**
- * Kernel console output operations.
- *
- * This structure defines operations used for kernel console output. Console
- * output should be possible under any circumstance and therefore these
- * functions must be usable in interrupt context. While for normal kernel
- * output they are called with the kernel log lock held, they can also be
- * called without, so they should perform locking themselves.
- */
+/** Kernel console output operations. */
 typedef struct console_out_ops {
-    /** Properly initialize the console after memory management setup.
-     * @param video         KBoot video tag. */
-    void (*init)(struct kboot_tag_video *video);
+    /** Properly initialize the console after memory management setup. */
+    void (*init)(void);
 
     /** Write a character to the console.
      * @param ch            Character to write. */
@@ -90,7 +81,7 @@ typedef struct console {
 extern console_t main_console;
 extern console_t debug_console;
 
-extern void platform_console_early_init(struct kboot_tag_video *video);
+extern void platform_console_early_init(struct kboot_tag_video *video, struct kboot_tag_serial *serial);
 
 extern void console_early_init(void);
 extern void console_init(void);

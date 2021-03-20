@@ -38,6 +38,18 @@ typedef ptr_t io_region_t;
 /** Invalid I/O region value. */
 #define IO_REGION_INVALID 0
 
+/**
+ * Creates an MMIO handle for early use from a pre-existing mapping. Should be
+ * replaced with a handle from mmio_map() when possible.
+ *
+ * @param addr          Virtual mapping.
+ *
+ * @return              I/O region handle.
+ */
+static inline io_region_t mmio_early_map(ptr_t addr) {
+    return (io_region_t)addr;
+}
+
 extern io_region_t mmio_map(phys_ptr_t addr, size_t size, unsigned mmflag);
 extern io_region_t device_mmio_map(struct device *device, phys_ptr_t addr, size_t size, unsigned mmflag);
 
