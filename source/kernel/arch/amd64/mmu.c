@@ -353,7 +353,7 @@ void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
             uint64_t prev;
             while (true) {
                 prev = ptbl[pte];
-                uint64_t entry = (prev & X86_PTE_PROTECT_MASK);
+                uint64_t entry = (prev & ~X86_PTE_PROTECT_MASK);
                 if (access & MMU_ACCESS_WRITE)
                     entry |= X86_PTE_WRITE;
                 if (!(access & MMU_ACCESS_EXECUTE) && cpu_features.xd)
