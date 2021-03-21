@@ -362,17 +362,39 @@ void kmem_raw_free(ptr_t addr, size_t size) {
 
 /**
  * Allocates a range of kernel memory and backs it with anonymous pages from
- * the physical memory manager. All pages required to cover the range are
- * allocated immediately, so this function should not be used to make very
- * large allocations. The allocated pages are not contiguous in physical
- * memory.
+ * the physical memory manager.
+ * 
+ * All pages required to cover the range are allocated immediately, so this
+ * function should not be used to make very large allocations. The allocated
+ * pages are not guaranteed to be contiguous in physical memory.
  *
+ * This function maps the pages as (MMU_ACCESS_RW | MMU_CACHE_NORMAL). For
+ * other flags, use kmem_alloc_etc().
+ * 
  * @param size          Size of allocation to make (multiple of page size).
  * @param mmflag        Allocation behaviour flags.
  *
  * @return              Address of allocation on success, 0 on failure.
  */
 void *kmem_alloc(size_t size, unsigned mmflag) {
+    return kmem_alloc_etc(size, MMU_ACCESS_RW | MMU_CACHE_NORMAL, mmflag);
+}
+
+/**
+ * Allocates a range of kernel memory and backs it with anonymous pages from
+ * the physical memory manager.
+ * 
+ * All pages required to cover the range are allocated immediately, so this
+ * function should not be used to make very large allocations. The allocated
+ * pages are not guaranteed to be contiguous in physical memory.
+ *
+ * @param size          Size of allocation to make (multiple of page size).
+ * @param mmu_flags     MMU mapping flags.
+ * @param mmflag        Allocation behaviour flags.
+ *
+ * @return              Address of allocation on success, 0 on failure.
+ */
+void *kmem_alloc_etc(size_t size, uint32_t mmu_flags, unsigned mmflag) {
     /* Allocate a range to map into. */
     ptr_t addr = kmem_raw_alloc(size, mmflag);
     if (unlikely(!addr))
@@ -391,8 +413,7 @@ void *kmem_alloc(size_t size, unsigned mmflag) {
 
         /* Map the page into the kernel address space. */
         status_t ret = mmu_context_map(
-            &kernel_mmu_context, addr + i, page->addr,
-            MMU_ACCESS_READ | MMU_ACCESS_WRITE | MMU_ACCESS_EXECUTE,
+            &kernel_mmu_context, addr + i, page->addr, mmu_flags,
             mmflag & MM_FLAG_MASK);
         if (ret != STATUS_SUCCESS) {
             kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n", page->addr, addr + i);

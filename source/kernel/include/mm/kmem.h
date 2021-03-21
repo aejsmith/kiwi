@@ -29,6 +29,7 @@ extern ptr_t kmem_raw_alloc(size_t size, unsigned mmflag);
 extern void kmem_raw_free(ptr_t addr, size_t size);
 
 extern void *kmem_alloc(size_t size, unsigned mmflag);
+extern void *kmem_alloc_etc(size_t size, uint32_t mmu_flags, unsigned mmflag);
 extern void kmem_free(void *addr, size_t size);
 
 extern void *kmem_map(phys_ptr_t base, size_t size, uint32_t flags, unsigned mmflag);

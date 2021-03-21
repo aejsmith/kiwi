@@ -81,8 +81,7 @@ ptr_t module_mem_alloc(size_t size) {
         page_t *page = page_alloc(MM_BOOT);
         mmu_context_map(
             &kernel_mmu_context, addr + i, page->addr,
-            MMU_ACCESS_READ | MMU_ACCESS_WRITE | MMU_ACCESS_EXECUTE,
-            MM_BOOT);
+            MMU_ACCESS_RW | MMU_ACCESS_EXECUTE, MM_BOOT);
     }
 
     mmu_context_unlock(&kernel_mmu_context);
@@ -106,7 +105,9 @@ void module_mem_free(ptr_t base, size_t size) {
  * @param size          Size of the allocation.
  * @return              Address allocated or 0 if no available memory. */
 ptr_t module_mem_alloc(size_t size) {
-    return kmem_alloc(round_up(size, PAGE_SIZE), MM_NOWAIT);
+    return kmem_alloc_etc(
+        round_up(size, PAGE_SIZE),
+        MMU_ACCESS_RW | MMU_ACCESS_EXECUTE, MM_NOWAIT);
 }
 
 /** Free memory holding a module.
