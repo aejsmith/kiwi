@@ -47,9 +47,6 @@
 /** Kernel MMU context. */
 mmu_context_t kernel_mmu_context;
 
-/** Architecture defined MMU context operations. */
-mmu_ops_t *mmu_ops;
-
 /**
  * Locks the specified MMU context. This must be done before performing any
  * operations on it, and the context must be unlocked with mmu_context_unlock()
@@ -69,7 +66,7 @@ void mmu_context_unlock(mmu_context_t *ctx) {
     /* If the lock is being released (recursion count currently 1), flush
      * changes to the context. */
     if (mutex_recursion(&ctx->lock) == 1)
-        mmu_ops->flush(ctx);
+        arch_mmu_context_flush(ctx);
 
     preempt_enable();
     mutex_unlock(&ctx->lock);
@@ -100,7 +97,7 @@ status_t mmu_context_map(
         "mmu: mmu_context_map(%p, %p, 0x%" PRIxPHYS ", 0x%x, 0x%x)\n",
         ctx, virt, phys, access, mmflag);
 
-    return mmu_ops->map(ctx, virt, phys, access, mmflag);
+    return arch_mmu_context_map(ctx, virt, phys, access, mmflag);
 }
 
 /** Remaps a range with different access flags.
@@ -121,7 +118,7 @@ void mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t acc
 
     dprintf("mmu: mmu_context_remap(%p, %p, 0x%zx, 0x%x)\n", ctx, virt, size, access);
 
-    return mmu_ops->remap(ctx, virt, size, access);
+    return arch_mmu_context_remap(ctx, virt, size, access);
 }
 
 /** Unmaps a page in an MMU context.
@@ -146,7 +143,7 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_pa
 
     dprintf("mmu: mmu_context_unmap(%p, %p, %d)\n", ctx, virt, shared);
 
-    return mmu_ops->unmap(ctx, virt, shared, _page);
+    return arch_mmu_context_unmap(ctx, virt, shared, _page);
 }
 
 /** Queries details about a mapping.
@@ -166,10 +163,10 @@ bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32
      * ensure the kernel context is locked if querying a kernel address. */
     if (virt >= KERNEL_BASE && ctx != &kernel_mmu_context) {
         mmu_context_lock(&kernel_mmu_context);
-        ret = mmu_ops->query(&kernel_mmu_context, virt, _phys, _access);
+        ret = arch_mmu_context_query(&kernel_mmu_context, virt, _phys, _access);
         mmu_context_unlock(&kernel_mmu_context);
     } else {
-        ret = mmu_ops->query(ctx, virt, _phys, _access);
+        ret = arch_mmu_context_query(ctx, virt, _phys, _access);
     }
 
     return ret;
@@ -185,7 +182,7 @@ bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32
 void mmu_context_load(mmu_context_t *ctx) {
     assert(!local_irq_state());
 
-    mmu_ops->load(ctx);
+    arch_mmu_context_load(ctx);
 }
 
 /** Unloads an MMU context.
@@ -193,8 +190,7 @@ void mmu_context_load(mmu_context_t *ctx) {
 void mmu_context_unload(mmu_context_t *ctx) {
     assert(!local_irq_state());
 
-    if (mmu_ops->unload)
-        mmu_ops->unload(ctx);
+    arch_mmu_context_unload(ctx);
 }
 
 /** Creates an MMU context.
@@ -207,7 +203,7 @@ mmu_context_t *mmu_context_create(unsigned mmflag) {
 
     mutex_init(&ctx->lock, "mmu_context_lock", MUTEX_RECURSIVE);
 
-    status_t ret = mmu_ops->init(ctx, mmflag);
+    status_t ret = arch_mmu_context_init(ctx, mmflag);
     if (ret != STATUS_SUCCESS) {
         kfree(ctx);
         return NULL;
@@ -219,7 +215,7 @@ mmu_context_t *mmu_context_create(unsigned mmflag) {
 /** Destroys an MMU context.
  * @param ctx           Context to destroy. */
 void mmu_context_destroy(mmu_context_t *ctx) {
-    mmu_ops->destroy(ctx);
+    arch_mmu_context_destroy(ctx);
     kfree(ctx);
 }
 

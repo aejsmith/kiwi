@@ -44,13 +44,13 @@ KBOOT_LOAD(0, LARGE_PAGE_SIZE, LARGE_PAGE_SIZE, KERNEL_KMEM_BASE, KERNEL_KMEM_SI
  * @param ctx           Context to initialize.
  * @param mmflag        Allocation behaviour flags.
  * @return              Status code describing result of the operation. */
-static status_t arm64_mmu_init(mmu_context_t *ctx, unsigned mmflag) {
+status_t arch_mmu_context_init(mmu_context_t *ctx, unsigned mmflag) {
     fatal_todo();
 }
 
 /** Destroy a context.
  * @param ctx           Context to destroy. */
-static void arm64_mmu_destroy(mmu_context_t *ctx) {
+void arch_mmu_context_destroy(mmu_context_t *ctx) {
     /* TODO */
 }
 
@@ -61,7 +61,7 @@ static void arm64_mmu_destroy(mmu_context_t *ctx) {
  * @param access        Mapping access flags.
  * @param mmflag        Allocation behaviour flags.
  * @return              Status code describing result of the operation. */
-static status_t arm64_mmu_map(
+status_t arch_mmu_context_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t access,
     unsigned mmflag)
 {
@@ -73,7 +73,7 @@ static status_t arm64_mmu_map(
  * @param virt          Start of range to update.
  * @param size          Size of range to update.
  * @param access        New access flags. */
-static void arm64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
+void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
     fatal_todo();
 }
 
@@ -85,7 +85,7 @@ static void arm64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
  *                      invalidations if not necessary.
  * @param _page         Where to pointer to page that was unmapped.
  * @return              Whether a page was mapped at the virtual address. */
-static bool arm64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
+bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
     fatal_todo();
 }
 
@@ -95,43 +95,32 @@ static bool arm64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t 
  * @param _phys         Where to store physical address the page is mapped to.
  * @param _access       Where to store access flags for the mapping.
  * @return              Whether a page is mapped at the virtual address. */
-static bool arm64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
+bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
     fatal_todo();
 }
 
 /** Perform remote TLB invalidation.
  * @param ctx           Context to send for. */
-static void arm64_mmu_flush(mmu_context_t *ctx) {
+void arch_mmu_context_flush(mmu_context_t *ctx) {
     fatal_todo();
 }
 
 /** Switch to another MMU context.
  * @param ctx           Context to switch to. */
-static void arm64_mmu_load(mmu_context_t *ctx) {
+void arch_mmu_context_load(mmu_context_t *ctx) {
     fatal_todo();
 }
 
-/** ARM64 MMU operations. */
-static mmu_ops_t arm64_mmu_ops = {
-    .init    = arm64_mmu_init,
-    .destroy = arm64_mmu_destroy,
-    .map     = arm64_mmu_map,
-    .remap   = arm64_mmu_remap,
-    .unmap   = arm64_mmu_unmap,
-    .query   = arm64_mmu_query,
-    .flush   = arm64_mmu_flush,
-    .load    = arm64_mmu_load,
-};
+/** Unloads an MMU context.
+ * @param ctx           Context to unload. */
+void arch_mmu_context_unload(mmu_context_t *ctx) {
+    /* Nothing happens. */
+}
 
 /** Create the kernel MMU context. */
 __init_text void arch_mmu_init(void) {
-    mmu_ops = &arm64_mmu_ops;
-
     fatal_todo();
 }
-
-/** Get a PAT entry. */
-#define pat_entry(e, t) ((uint64_t)t << ((e) * 8))
 
 /** Initialize the MMU for this CPU. */
 __init_text void arch_mmu_init_percpu(void) {

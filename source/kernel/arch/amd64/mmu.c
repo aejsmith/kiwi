@@ -273,7 +273,7 @@ static void invalidate_page(mmu_context_t *ctx, ptr_t virt, bool shared) {
  * @param ctx           Context to initialize.
  * @param mmflag        Allocation behaviour flags.
  * @return              Status code describing result of the operation. */
-static status_t amd64_mmu_init(mmu_context_t *ctx, unsigned mmflag) {
+status_t arch_mmu_context_init(mmu_context_t *ctx, unsigned mmflag) {
     ctx->arch.invalidate_count = 0;
 
     ctx->arch.pml4 = alloc_structure(mmflag);
@@ -291,7 +291,7 @@ static status_t amd64_mmu_init(mmu_context_t *ctx, unsigned mmflag) {
 
 /** Destroy a context.
  * @param ctx           Context to destroy. */
-static void amd64_mmu_destroy(mmu_context_t *ctx) {
+void arch_mmu_context_destroy(mmu_context_t *ctx) {
     /* Free all structures in the bottom half of the PML4 (user memory). */
     uint64_t *pml4 = map_structure(ctx->arch.pml4);
     for (unsigned i = 0; i < 256; i++) {
@@ -329,7 +329,7 @@ static void amd64_mmu_destroy(mmu_context_t *ctx) {
  * @param access        Mapping access flags.
  * @param mmflag        Allocation behaviour flags.
  * @return              Status code describing result of the operation. */
-static status_t amd64_mmu_map(
+status_t arch_mmu_context_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t access,
     unsigned mmflag)
 {
@@ -353,7 +353,7 @@ static status_t amd64_mmu_map(
  * @param virt          Start of range to update.
  * @param size          Size of range to update.
  * @param access        New access flags. */
-static void amd64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
+void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
     /* Loop through each page in the range. */
     ptr_t end = virt + size - 1;
     uint64_t *ptbl = NULL;
@@ -405,7 +405,7 @@ static void amd64_mmu_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
  *                      invalidations if not necessary.
  * @param _page         Where to pointer to page that was unmapped.
  * @return              Whether a page was mapped at the virtual address. */
-static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
+bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
     /* Find the page table for the entry. */
     uint64_t *ptbl = get_ptbl(ctx, virt, false, 0);
     if (!ptbl)
@@ -443,7 +443,7 @@ static bool amd64_mmu_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t 
  * @param _phys         Where to store physical address the page is mapped to.
  * @param _access       Where to store access flags for the mapping.
  * @return              Whether a page is mapped at the virtual address. */
-static bool amd64_mmu_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
+bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
     uint64_t entry;
     phys_ptr_t phys;
     bool ret = false;
@@ -515,7 +515,7 @@ static status_t tlb_invalidate_func(void *_ctx) {
 
 /** Perform remote TLB invalidation.
  * @param ctx           Context to send for. */
-static void amd64_mmu_flush(mmu_context_t *ctx) {
+void arch_mmu_context_flush(mmu_context_t *ctx) {
     /* Check if anything needs to be done. */
     if (cpu_count < 2 || !ctx->arch.invalidate_count) {
         ctx->arch.invalidate_count = 0;
@@ -544,21 +544,15 @@ static void amd64_mmu_flush(mmu_context_t *ctx) {
 
 /** Switch to another MMU context.
  * @param ctx           Context to switch to. */
-static void amd64_mmu_load(mmu_context_t *ctx) {
+void arch_mmu_context_load(mmu_context_t *ctx) {
     x86_write_cr3(ctx->arch.pml4);
 }
 
-/** AMD64 MMU operations. */
-static mmu_ops_t amd64_mmu_ops = {
-    .init    = amd64_mmu_init,
-    .destroy = amd64_mmu_destroy,
-    .map     = amd64_mmu_map,
-    .remap   = amd64_mmu_remap,
-    .unmap   = amd64_mmu_unmap,
-    .query   = amd64_mmu_query,
-    .flush   = amd64_mmu_flush,
-    .load    = amd64_mmu_load,
-};
+/** Unloads an MMU context.
+ * @param ctx           Context to unload. */
+void arch_mmu_context_unload(mmu_context_t *ctx) {
+    /* Nothing happens. */
+}
 
 static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t access) {
     /* Get the KBoot core tag which contains the kernel physical address. */
@@ -589,8 +583,6 @@ static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t access
 
 /** Create the kernel MMU context. */
 __init_text void arch_mmu_init(void) {
-    mmu_ops = &amd64_mmu_ops;
-
     /* Initialize the kernel MMU context. */
     kernel_mmu_context.arch.invalidate_count = 0;
     kernel_mmu_context.arch.pml4 = alloc_structure(MM_BOOT);

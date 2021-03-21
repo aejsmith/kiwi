@@ -448,7 +448,6 @@ void kmem_free(void *addr, size_t size) {
  * @return              Pointer to mapped range.
  */
 void *kmem_map(phys_ptr_t base, size_t size, unsigned mmflag) {
-
     assert(!(base % PAGE_SIZE));
 
     ptr_t addr = kmem_raw_alloc(size, mmflag);
