@@ -77,11 +77,22 @@ ptr_t module_mem_alloc(size_t size) {
 
     mmu_context_lock(&kernel_mmu_context);
 
-    for (size_t i = 0; i < size; i += PAGE_SIZE) {
-        page_t *page = page_alloc(MM_BOOT);
-        mmu_context_map(
+    size_t i;
+    for (i = 0; i < size; i += PAGE_SIZE) {
+        page_t *page = page_alloc(MM_USER);
+        if (!page) {
+            kprintf(LOG_DEBUG, "module: unable to allocate pages to back allocation\n");
+            goto fail;
+        }
+
+        status_t ret = mmu_context_map(
             &kernel_mmu_context, addr + i, page->addr,
-            MMU_ACCESS_RW | MMU_ACCESS_EXECUTE, MM_BOOT);
+            MMU_ACCESS_RW | MMU_ACCESS_EXECUTE, MM_USER);
+        if (ret != STATUS_SUCCESS) {
+            kprintf(LOG_DEBUG, "module: failed to map page 0x%" PRIxPHYS " to %p\n", page->addr, addr + i);
+            page_free(page);
+            goto fail;
+        }
     }
 
     mmu_context_unlock(&kernel_mmu_context);
@@ -90,6 +101,17 @@ ptr_t module_mem_alloc(size_t size) {
     remaining_module_size -= size;
 
     return addr;
+
+fail:
+    /* Go back and reverse what we have done. */
+    for (; i; i -= PAGE_SIZE) {
+        page_t *page;
+        mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), true, &page);
+        page_free(page);
+    }
+
+    mmu_context_unlock(&kernel_mmu_context);
+    return 0;
 }
 
 /** Free memory holding a module.
