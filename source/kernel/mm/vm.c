@@ -724,11 +724,17 @@ static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
  *                      region goes out of bounds, only pages within bounds will
  *                      be mapped, and if the out of bounds region is accessed,
  *                      a fault will occur.
+ * @param flags         MMU mapping flags. Access flags are ignored from here,
+ *                      only cacheability flags are used. Access flags are taken
+ *                      from the region.
  * @param mmflag        Allocation behaviour flags.
  *
  * @return              Status code describing the result of the operation.
  */
-status_t vm_region_map(vm_region_t *region, phys_ptr_t base, phys_size_t size, unsigned mmflag) {
+status_t vm_region_map(
+    vm_region_t *region, phys_ptr_t base, phys_size_t size, uint32_t flags,
+    unsigned mmflag)
+{
     assert(!(base % PAGE_SIZE));
     assert(!(size % PAGE_SIZE));
     assert(base + size >= base);
@@ -736,6 +742,8 @@ status_t vm_region_map(vm_region_t *region, phys_ptr_t base, phys_size_t size, u
     phys_ptr_t end      = base + size;
     phys_ptr_t map_base = base + min(region->obj_offset, (offset_t)size);
     size_t map_size     = min(region->size, end - map_base);
+
+    flags = (flags & MMU_CACHE_MASK) | region->access;
 
     status_t ret = STATUS_SUCCESS;
 
@@ -745,7 +753,7 @@ status_t vm_region_map(vm_region_t *region, phys_ptr_t base, phys_size_t size, u
         for (size_t offset = 0; offset < map_size; offset += PAGE_SIZE) {
             ret = mmu_context_map(
                 region->as->mmu, region->start + offset, map_base + offset,
-                region->access, mmflag);
+                flags, mmflag);
             if (ret != STATUS_SUCCESS)
                 break;
         }

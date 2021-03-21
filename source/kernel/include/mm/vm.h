@@ -28,6 +28,7 @@
 #include <lib/avl_tree.h>
 #include <lib/utility.h>
 
+#include <mm/mmu.h>
 #include <mm/page.h>
 
 #include <sync/condvar.h>
@@ -37,7 +38,6 @@
 #include <object.h>
 
 struct frame;
-struct mmu_context;
 struct vm_aspace;
 struct vm_region;
 
@@ -120,7 +120,7 @@ typedef struct vm_aspace {
     avl_tree_t tree;                /**< Tree of mapped regions for address lookups. */
 
     /** Underlying MMU context for address space. */
-    struct mmu_context *mmu;
+    mmu_context_t *mmu;
 
     /** Free region allocation. */
     list_t free[VM_FREELISTS];      /**< Power of 2 free lists. */
@@ -139,7 +139,9 @@ extern void vm_unlock_page(vm_aspace_t *as, ptr_t addr);
 
 extern bool vm_fault(struct frame *frame, ptr_t addr, int reason, uint32_t access);
 
-extern status_t vm_region_map(vm_region_t *region, phys_ptr_t base, phys_size_t size, unsigned mmflag);
+extern status_t vm_region_map(
+    vm_region_t *region, phys_ptr_t base, phys_size_t size, uint32_t flags,
+    unsigned mmflag);
 
 extern status_t vm_map(
     vm_aspace_t *as, ptr_t *_addr, size_t size, size_t align, unsigned spec,

@@ -22,6 +22,8 @@
 #include <device/device.h>
 #include <device/io.h>
 
+#include <mm/mmu.h>
+
 #include <assert.h>
 
 typedef struct device_io_resource {
@@ -52,10 +54,16 @@ typedef struct device_io_resource {
 
 #endif
 
+#define MMIO_MAP_MMU_FLAGS (MMU_ACCESS_RW | MMU_CACHE_DEVICE)
+
 /**
  * Maps physical memory for memory-mapped I/O. The returned handle can be used
  * with io_{read,write}* functions to perform I/O (it must not be used
  * directly).
+ *
+ * This function is a shorthand which maps the memory as
+ * (MMU_ACCESS_RW | MMU_CACHE_DEVICE), which is appropriate for most device
+ * memory mappings. Use mmio_map_etc() if other flags are desired.
  *
  * @param addr          Physical address to map.
  * @param size          Size of address to map.
@@ -64,9 +72,25 @@ typedef struct device_io_resource {
  * @return              I/O region handle, or IO_REGION_INVALID on failure.
  */
 io_region_t mmio_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
+    return mmio_map_etc(addr, size, MMIO_MAP_MMU_FLAGS, mmflag);
+}
+
+/**
+ * Maps physical memory for memory-mapped I/O. The returned handle can be used
+ * with io_{read,write}* functions to perform I/O (it must not be used
+ * directly).
+ *
+ * @param addr          Physical address to map.
+ * @param size          Size of address to map.
+ * @param flags         MMU mapping flags.
+ * @param mmflag        Memory allocation flags.
+ *
+ * @return              I/O region handle, or IO_REGION_INVALID on failure.
+ */
+io_region_t mmio_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, unsigned mmflag) {
     assert(size > 0);
 
-    return (io_region_t)phys_map(addr, size, mmflag);
+    return (io_region_t)phys_map_etc(addr, size, flags, mmflag);
 }
 
 /**
@@ -78,7 +102,22 @@ io_region_t mmio_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
  * @param device        Device to register to.
  */
 io_region_t device_mmio_map(device_t *device, phys_ptr_t addr, size_t size, unsigned mmflag) {
-    return (io_region_t)device_phys_map(device, addr, size, mmflag);
+    return device_mmio_map_etc(device, addr, size, MMIO_MAP_MMU_FLAGS, mmflag);
+}
+
+/**
+ * Maps physical memory for memory-mapped I/O, as a device-managed resource
+ * (will be unmapped when the device is destroyed).
+ *
+ * @see                 mmio_map().
+ *
+ * @param device        Device to register to.
+ */
+io_region_t device_mmio_map_etc(
+    device_t *device, phys_ptr_t addr, size_t size, uint32_t flags,
+    unsigned mmflag)
+{
+    return (io_region_t)device_phys_map_etc(device, addr, size, flags, mmflag);
 }
 
 #if ARCH_HAS_PIO

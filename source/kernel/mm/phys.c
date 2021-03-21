@@ -35,7 +35,31 @@
 #include <assert.h>
 #include <kernel.h>
 
-static inline bool pmap_contains(phys_ptr_t addr, size_t size) {
+/**
+ * Maps physical memory into the kernel address space. If possible it will use
+ * a pre-existing mapping of the memory in the physical map area.
+ *
+ * This function is a shorthand which maps the memory as
+ * (MMU_ACCESS_RW | MMU_CACHE_NORMAL). Use phys_map_etc() if other flags are
+ * needed - this function should be avoided for mapping device memory, as
+ * MMU_CACHE_NORMAL is likely inappropriate.
+ *
+ * @param addr          Physical address to map.
+ * @param size          Size of range to map.
+ * @param mmflag        Allocation flags.
+ *
+ * @return              Pointer to mapped data, or NULL on failure.
+ */
+void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
+    return phys_map_etc(addr, size, PMAP_MMU_FLAGS, mmflag);
+}
+
+static inline bool pmap_accessible(phys_ptr_t addr, size_t size, uint32_t flags) {
+    /* The physical map area is mapped as PMAP_MMU_FLAGS, can't use it for
+     * anything else. */
+    if (flags != PMAP_MMU_FLAGS)
+        return false;
+
     #if KERNEL_PMAP_OFFSET > 0
         if (addr < KERNEL_PMAP_OFFSET)
             return false;
@@ -44,25 +68,31 @@ static inline bool pmap_contains(phys_ptr_t addr, size_t size) {
     return ((addr + size) <= (KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE));
 }
 
-/** Maps physical memory into the kernel address space.
+/**
+ * Maps physical memory into the kernel address space. If possible it will use
+ * a pre-existing mapping of the memory in the physical map area (flags must
+ * be PMAP_MMU_FLAGS to do so).
+ *
  * @param addr          Physical address to map.
  * @param size          Size of range to map.
+ * @param flags         MMU mapping flags.
  * @param mmflag        Allocation flags.
- * @return              Pointer to mapped data. */
-void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
+ *
+ * @return              Pointer to mapped data, or NULL on failure.
+ */
+void *phys_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, unsigned mmflag) {
     if (unlikely(!size))
         return NULL;
 
-    /* Use the physical map area if the range lies within it. */
-    if (pmap_contains(addr, size))
+    /* Use the physical map area if possible. */
+    if (pmap_accessible(addr, size, flags))
         return (void *)(KERNEL_PMAP_BASE + (addr - KERNEL_PMAP_OFFSET));
 
-    /* Outside the physical map area. Must instead allocate some kernel memory
-     * space and map there. */
+    /* Otherwise allocate some kernel memory space and map there. */
     phys_ptr_t base = round_down(addr, PAGE_SIZE);
     phys_ptr_t end  = round_up(addr + size, PAGE_SIZE);
 
-    return kmem_map(base, end - base, mmflag);
+    return kmem_map(base, end - base, flags, mmflag);
 }
 
 typedef struct device_phys_map_resource {
@@ -85,10 +115,26 @@ static void device_phys_map_resource_release(device_t *device, void *data) {
  * @param device        Device to register to.
  */
 void *device_phys_map(device_t *device, phys_ptr_t addr, size_t size, unsigned mmflag) {
+    return device_phys_map_etc(device, addr, size, PMAP_MMU_FLAGS, mmflag);
+}
+
+/**
+ * Maps physical memory into the kernel address space, as a device-managed
+ * resource (will be unmapped when the device is destroyed).
+ *
+ * @see                 phys_map().
+ *
+ * @param device        Device to register to.
+ */
+void *device_phys_map_etc(
+    device_t *device, phys_ptr_t addr, size_t size, uint32_t flags,
+    unsigned mmflag)
+{
     void *mapping = phys_map(addr, size, mmflag);
 
     /* We only need to manage this if we had to create a new mapping. */
-    if (mapping && !pmap_contains(addr, size)) {
+    ptr_t ptr = (ptr_t)mapping;
+    if (ptr && (ptr < KERNEL_PMAP_BASE || ptr > KERNEL_PMAP_END)) {
         device_phys_map_resource_t *resource = device_resource_alloc(
             sizeof(device_phys_map_resource_t), device_phys_map_resource_release, MM_KERNEL);
 
@@ -106,10 +152,9 @@ void *device_phys_map(device_t *device, phys_ptr_t addr, size_t size, unsigned m
  * @param size          Size of range.
  * @param shared        Whether the mapping was used by other CPUs. */
 void phys_unmap(void *addr, size_t size, bool shared) {
-    ptr_t ptr = (ptr_t)addr;
-
     /* If the range lies within the physical map area, don't need to do
      * anything. Otherwise, unmap and free from kernel memory. */
+    ptr_t ptr = (ptr_t)addr;
     if (ptr < KERNEL_PMAP_BASE || ptr > KERNEL_PMAP_END) {
         ptr_t base = round_down(ptr, PAGE_SIZE);
         ptr_t end  = round_up(ptr + size, PAGE_SIZE);

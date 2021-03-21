@@ -437,17 +437,19 @@ void kmem_free(void *addr, size_t size) {
 
 /**
  * Allocates kernel memory space and maps the specified page range into it.
- * The mapping must later be unmapped and freed using kmem_unmap(). For
- * mapping physical memory, phys_map() should be used instead, as it will
+ * The mapping must later be unmapped and freed using kmem_unmap().
+ *
+ * In general, phys_map() or mmio_map() should be used instead, as these will
  * use the physical map area where possible.
  *
  * @param base          Base address of the page range.
  * @param size          Size of range to map (must be multiple of PAGE_SIZE).
+ * @param flags         MMU mapping flags.
  * @param mmflag        Allocation flags.
  *
  * @return              Pointer to mapped range.
  */
-void *kmem_map(phys_ptr_t base, size_t size, unsigned mmflag) {
+void *kmem_map(phys_ptr_t base, size_t size, uint32_t flags, unsigned mmflag) {
     assert(!(base % PAGE_SIZE));
 
     ptr_t addr = kmem_raw_alloc(size, mmflag);
@@ -460,8 +462,7 @@ void *kmem_map(phys_ptr_t base, size_t size, unsigned mmflag) {
     size_t i;
     for (i = 0; i < size; i += PAGE_SIZE) {
         status_t ret = mmu_context_map(
-            &kernel_mmu_context, addr + i, base + i,
-            MMU_ACCESS_READ | MMU_ACCESS_WRITE | MMU_ACCESS_EXECUTE,
+            &kernel_mmu_context, addr + i, base + i, flags,
             mmflag & MM_FLAG_MASK);
         if (ret != STATUS_SUCCESS) {
             kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n", base + i, addr + i);

@@ -34,8 +34,6 @@
 #include <arch/mmu.h>
 #include <arch/page.h>
 
-#include <kernel/vm.h>
-
 #include <mm/page.h>
 
 #include <sync/mutex.h>
@@ -58,6 +56,9 @@ enum {
     MMU_ACCESS_READ         = (1<<0),   /**< Mapping should be readable. */
     MMU_ACCESS_WRITE        = (1<<1),   /**< Mapping should be writable. */
     MMU_ACCESS_EXECUTE      = (1<<2),   /**< Mapping should be executable. */
+
+    /** Shortcut for (MMU_ACCESS_READ | MMU_ACCESS_WRITE). */
+    MMU_ACCESS_RW           = MMU_ACCESS_READ | MMU_ACCESS_WRITE,
 
     /**
      * Caching behaviour flags.

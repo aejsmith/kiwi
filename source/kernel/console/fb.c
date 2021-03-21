@@ -777,7 +777,7 @@ static status_t kfb_device_map(device_t *device, file_handle_t *handle, vm_regio
 
         spinlock_unlock(&fb_lock);
 
-        ret = vm_region_map(region, phys, size, MM_KERNEL);
+        ret = vm_region_map(region, phys, size, MMU_CACHE_WRITE_COMBINE, MM_KERNEL);
     } else {
         ret = STATUS_PERM_DENIED;
     }
