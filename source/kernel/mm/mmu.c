@@ -151,7 +151,11 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_pa
  * @param ctx           Context to query.
  * @param virt          Virtual address to query.
  * @param _phys         Where to store physical address the page is mapped to.
- * @param _flags        Where to store flags for the mapping.
+ * @param _flags        Where to store flags for the mapping. Note that this
+ *                      can return different flags to what the mapping was
+ *                      created with, depending on what the architecture
+ *                      supports - it is determined based on what was stored in
+ *                      the page tables upon mapping.
  * @return              Whether a page is mapped at the virtual address. */
 bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags) {
     bool ret;

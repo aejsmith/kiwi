@@ -53,29 +53,6 @@ KBOOT_LOAD(0, 0x1000000, 0x200000, KERNEL_KMEM_BASE, KERNEL_KMEM_SIZE);
 /* Map in 8GB initially, arch_mmu_init() will map all available RAM. */
 KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000, KBOOT_CACHE_DEFAULT);
 
-#if 0
-/** Table mapping memory types to page table flags. */
-static uint64_t memory_type_flags[] = {
-    /** Normal Memory - Standard behaviour. */
-    [MEMORY_TYPE_NORMAL] = 0,
-
-    /** Device Memory - Assume MTRRs are set up correctly. */
-    [MEMORY_TYPE_DEVICE] = 0,
-
-    /** Uncacheable. */
-    [MEMORY_TYPE_UC] = X86_PTE_PCD,
-
-    /** Write Combining - PAT configured for WC if these both set. */
-    [MEMORY_TYPE_WC] = X86_PTE_PCD | X86_PTE_PWT,
-
-    /** Write-through. */
-    [MEMORY_TYPE_WT] = X86_PTE_PWT,
-
-    /** Write-back - Standard behaviour. */
-    [MEMORY_TYPE_WB] = 0,
-};
-#endif
-
 /** Check if a context is the kernel context. */
 static inline bool is_kernel_context(mmu_context_t *ctx) {
     return ctx == &kernel_mmu_context;
@@ -86,9 +63,7 @@ static inline bool is_current_context(mmu_context_t *ctx) {
     return is_kernel_context(ctx) || (curr_cpu->aspace && ctx == curr_cpu->aspace->mmu);
 }
 
-/** Get the flags to map a PDP/page directory/page table with.
- * @param phys          Physical address of page table.
- * @return              Calculated page table entry. */
+/** Get the flags to map a PDP/page directory/page table with. */
 static inline uint64_t calc_table_pte(mmu_context_t *ctx, phys_ptr_t phys) {
     uint64_t entry = phys | X86_PTE_PRESENT | X86_PTE_WRITE;
 
@@ -98,21 +73,38 @@ static inline uint64_t calc_table_pte(mmu_context_t *ctx, phys_ptr_t phys) {
     return entry;
 }
 
-/** Calculate a PTE for a page mapping.
- * @param ctx           Context being mapped in.
- * @param phys          Physical address being mapped.
- * @param access        Access flags.
- * @return              Flags to map page with. */
-static inline uint64_t calc_page_pte(mmu_context_t *ctx, phys_ptr_t phys, uint32_t access) {
+/** Calculate a PTE for a page mapping. */
+static inline uint64_t calc_page_pte(mmu_context_t *ctx, phys_ptr_t phys, uint32_t flags) {
     uint64_t entry = phys | X86_PTE_PRESENT;
-    if (access & MMU_ACCESS_WRITE)
+
+    if (flags & MMU_ACCESS_WRITE)
         entry |= X86_PTE_WRITE;
-    if (!(access & MMU_ACCESS_EXECUTE) && cpu_features.xd)
+
+    if (!(flags & MMU_ACCESS_EXECUTE) && cpu_features.xd)
         entry |= X86_PTE_NOEXEC;
+
     if (is_kernel_context(ctx)) {
         entry |= X86_PTE_GLOBAL;
     } else {
         entry |= X86_PTE_USER;
+    }
+
+    /* This will need handling separately for small/large pages if the PAT bit
+     * (high bit of selector) is used at any point in future, since it is in
+     * a different position for PTEs/PDEs. */
+    switch (flags & MMU_CACHE_MASK) {
+        case MMU_CACHE_NORMAL:
+            entry |= X86_PAT_SELECT_NORMAL;
+            break;
+        case MMU_CACHE_DEVICE:
+        case MMU_CACHE_UNCACHED:
+            entry |= X86_PAT_SELECT_UNCACHED;
+            break;
+        case MMU_CACHE_WRITE_COMBINE:
+            entry |= X86_PAT_SELECT_WRITE_COMBINE;
+            break;
+        default:
+            unreachable();
     }
 
     return entry;
@@ -126,10 +118,12 @@ static inline void set_pte(uint64_t *pte, uint64_t val) {
  * @param pte       Page table entry to clear.
  * @return          Previous value of the PTE. */
 static inline uint64_t clear_pte(uint64_t *pte) {
-    /* We must atomically swap the PTE in order to accurately get the old value
+    /*
+     * We must atomically swap the PTE in order to accurately get the old value
      * so we can get the accessed/dirty bits. A non-atomic update could allow a
      * CPU to access the page between reading and clearing the PTE and lose the
-     * accessed/dirty bit updates. */
+     * accessed/dirty bit updates.
+     */
     return atomic_exchange((atomic_uint64_t *)pte, 0);
 }
 
@@ -247,10 +241,7 @@ static uint64_t *get_ptbl(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
     return map_structure(pdir[pde] & PHYS_PAGE_MASK);
 }
 
-/** Invalidate a TLB entry for an MMU context.
- * @param ctx           Context to invalidate for.
- * @param virt          Virtual address to invalidate.
- * @param shared        Whether the mapping was shared between multiple CPUs. */
+/** Invalidate a TLB entry for an MMU context. */
 static void invalidate_page(mmu_context_t *ctx, ptr_t virt, bool shared) {
     /* Invalidate on the current CPU if we're using this context. */
     if (is_current_context(ctx))
@@ -268,10 +259,7 @@ static void invalidate_page(mmu_context_t *ctx, ptr_t virt, bool shared) {
     }
 }
 
-/** Initialize a new context.
- * @param ctx           Context to initialize.
- * @param mmflag        Allocation behaviour flags.
- * @return              Status code describing result of the operation. */
+/** Initialize a new context. */
 status_t arch_mmu_context_init(mmu_context_t *ctx, unsigned mmflag) {
     ctx->arch.invalidate_count = 0;
 
@@ -288,8 +276,7 @@ status_t arch_mmu_context_init(mmu_context_t *ctx, unsigned mmflag) {
     return STATUS_SUCCESS;
 }
 
-/** Destroy a context.
- * @param ctx           Context to destroy. */
+/** Destroy a context. */
 void arch_mmu_context_destroy(mmu_context_t *ctx) {
     /* Free all structures in the bottom half of the PML4 (user memory). */
     uint64_t *pml4 = map_structure(ctx->arch.pml4);
@@ -321,15 +308,9 @@ void arch_mmu_context_destroy(mmu_context_t *ctx) {
     phys_free(ctx->arch.pml4, PAGE_SIZE);
 }
 
-/** Map a page in a context.
- * @param ctx           Context to map in.
- * @param virt          Virtual address to map.
- * @param phys          Physical address to map to.
- * @param access        Mapping access flags.
- * @param mmflag        Allocation behaviour flags.
- * @return              Status code describing result of the operation. */
+/** Map a page in a context. */
 status_t arch_mmu_context_map(
-    mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t access,
+    mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t flags,
     unsigned mmflag)
 {
     /* Find the page table for the entry. */
@@ -343,15 +324,11 @@ status_t arch_mmu_context_map(
         fatal("Mapping %p which is already mapped", virt);
 
     /* Set the PTE. */
-    set_pte(&ptbl[pte], calc_page_pte(ctx, phys, access));
+    set_pte(&ptbl[pte], calc_page_pte(ctx, phys, flags));
     return STATUS_SUCCESS;
 }
 
-/** Remap a range with different access flags.
- * @param ctx           Context to modify.
- * @param virt          Start of range to update.
- * @param size          Size of range to update.
- * @param access        New access flags. */
+/** Remap a range with different access flags. */
 void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
     /* Loop through each page in the range. */
     ptr_t end = virt + size - 1;
@@ -376,7 +353,6 @@ void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
             uint64_t prev;
             while (true) {
                 prev = ptbl[pte];
-
                 uint64_t entry = (prev & X86_PTE_PROTECT_MASK);
                 if (access & MMU_ACCESS_WRITE)
                     entry |= X86_PTE_WRITE;
@@ -396,14 +372,7 @@ void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
     }
 }
 
-/** Unmap a page in a context.
- * @param ctx           Context to unmap in.
- * @param virt          Virtual address to unmap.
- * @param shared        Whether the mapping was shared across multiple CPUs.
- *                      Used as an optimisation to not perform remote TLB
- *                      invalidations if not necessary.
- * @param _page         Where to pointer to page that was unmapped.
- * @return              Whether a page was mapped at the virtual address. */
+/** Unmap a page in a context. */
 bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
     /* Find the page table for the entry. */
     uint64_t *ptbl = get_ptbl(ctx, virt, false, 0);
@@ -436,13 +405,8 @@ bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t 
     return true;
 }
 
-/** Query details about a mapping.
- * @param ctx           Context to query.
- * @param virt          Virtual address to query.
- * @param _phys         Where to store physical address the page is mapped to.
- * @param _access       Where to store access flags for the mapping.
- * @return              Whether a page is mapped at the virtual address. */
-bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
+/** Query details about a mapping. */
+bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags) {
     uint64_t entry;
     phys_ptr_t phys;
     bool ret = false;
@@ -475,10 +439,31 @@ bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, u
     if (ret) {
         if (_phys)
             *_phys = phys;
-        if (_access) {
-            *_access = MMU_ACCESS_READ |
-                ((entry & X86_PTE_WRITE) ? MMU_ACCESS_WRITE : 0) |
-                ((entry & X86_PTE_NOEXEC) ? 0 : MMU_ACCESS_EXECUTE);
+
+        if (_flags) {
+            uint32_t flags = MMU_ACCESS_READ;
+
+            if (entry & X86_PTE_WRITE)
+                flags |= MMU_ACCESS_WRITE;
+
+            if (!(entry & X86_PTE_NOEXEC))
+                flags |= MMU_ACCESS_EXECUTE;
+
+            switch (entry & X86_PTE_CACHE_MASK) {
+                case X86_PAT_SELECT_NORMAL:
+                    flags |= MMU_CACHE_NORMAL;
+                    break;
+                case X86_PAT_SELECT_WRITE_COMBINE:
+                    flags |= MMU_CACHE_WRITE_COMBINE;
+                    break;
+                case X86_PAT_SELECT_UNCACHED:
+                    flags |= MMU_CACHE_UNCACHED;
+                    break;
+                default:
+                    unreachable();
+            }
+
+            *_flags = flags;
         }
     }
 
@@ -512,8 +497,7 @@ static status_t tlb_invalidate_func(void *_ctx) {
     return STATUS_SUCCESS;
 }
 
-/** Perform remote TLB invalidation.
- * @param ctx           Context to send for. */
+/** Perform remote TLB invalidation. */
 void arch_mmu_context_flush(mmu_context_t *ctx) {
     /* Check if anything needs to be done. */
     if (cpu_count < 2 || !ctx->arch.invalidate_count) {
@@ -541,19 +525,17 @@ void arch_mmu_context_flush(mmu_context_t *ctx) {
     ctx->arch.invalidate_count = 0;
 }
 
-/** Switch to another MMU context.
- * @param ctx           Context to switch to. */
+/** Switch to another MMU context. */
 void arch_mmu_context_load(mmu_context_t *ctx) {
     x86_write_cr3(ctx->arch.pml4);
 }
 
-/** Unloads an MMU context.
- * @param ctx           Context to unload. */
+/** Unloads an MMU context. */
 void arch_mmu_context_unload(mmu_context_t *ctx) {
     /* Nothing happens. */
 }
 
-static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t access) {
+static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t flags) {
     /* Get the KBoot core tag which contains the kernel physical address. */
     kboot_tag_core_t *core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
     assert(core);
@@ -565,19 +547,19 @@ static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t access
         for (phys_ptr_t i = start; i < end; i += LARGE_PAGE_SIZE) {
             uint64_t *pdir = get_pdir(&kernel_mmu_context, i, true, MM_BOOT);
             unsigned pde   = (i % 0x40000000) / LARGE_PAGE_SIZE;
-            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + i - start, access) | X86_PTE_LARGE;
+            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + i - start, flags) | X86_PTE_LARGE;
             set_pte(&pdir[pde], entry);
         }
     } else {
         for (phys_ptr_t i = start; i < end; i += PAGE_SIZE) {
             uint64_t *ptbl = get_ptbl(&kernel_mmu_context, i, true, MM_BOOT);
             unsigned pte   = (i % 0x200000) / PAGE_SIZE;
-            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + i - start, access);
+            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + i - start, flags);
             set_pte(&ptbl[pte], entry);
         }
     }
 
-    kprintf(LOG_NOTICE, " %s: [%p,%p) -> 0x%" PRIxPHYS" (0x%x)\n", name, start, end, phys, access);
+    kprintf(LOG_NOTICE, " %s: [%p,%p) -> 0x%" PRIxPHYS" (0x%x)\n", name, start, end, phys, flags);
 }
 
 /** Create the kernel MMU context. */
@@ -632,21 +614,22 @@ __init_text void arch_mmu_init(void) {
     mmu_context_unlock(&kernel_mmu_context);
 }
 
-/** Get a PAT entry. */
-#define pat_entry(e, t) ((uint64_t)t << ((e) * 8))
-
 /** Initialize the MMU for this CPU. */
 __init_text void arch_mmu_init_percpu(void) {
     /* Enable NX/XD if supported. */
     if (cpu_features.xd)
         x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
 
-    /* Configure the PAT. We do not use the PAT bit in the page table, as
-     * conflicts with the large page bit, so we make PAT3 be WC. */
-    uint64_t pat =
-        pat_entry(0, 0x06) | pat_entry(1, 0x04) |
-        pat_entry(2, 0x07) | pat_entry(3, 0x01) |
-        pat_entry(4, 0x06) | pat_entry(5, 0x04) |
-        pat_entry(6, 0x07) | pat_entry(7, 0x00);
-    x86_write_msr(X86_MSR_CR_PAT, pat);
+    /*
+     * Configure the PAT matching our X86_PAT_SELECT definitions.
+     *
+     * We're about to switch to our new kernel MMU context, so we should ensure
+     * that there are no stale references to any old PAT configuration (e.g.
+     * from KBoot).
+     *
+     * This is done by invalidating the caches and TLB. TLB invalidation is
+     * done when the kernel MMU context is loaded, so invalidate caches here.
+     */
+    arch_cpu_invalidate_caches();
+    x86_write_msr(X86_MSR_CR_PAT, X86_PAT);
 }

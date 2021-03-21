@@ -505,9 +505,6 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *_ph
     phys_ptr_t phys;
     uint32_t flags;
     if (mmu_context_query(region->as->mmu, addr, &phys, &flags)) {
-        /* Should always have the correct mapping flags. */
-        assert((flags & MMU_ACCESS_MASK) == region->access);
-
         if (_phys)
             *_phys = phys;
 
