@@ -81,7 +81,7 @@ ptr_t module_mem_alloc(size_t size) {
         page_t *page = page_alloc(MM_BOOT);
         mmu_context_map(
             &kernel_mmu_context, addr + i, page->addr,
-            VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
+            MMU_ACCESS_READ | MMU_ACCESS_WRITE | MMU_ACCESS_EXECUTE,
             MM_BOOT);
     }
 

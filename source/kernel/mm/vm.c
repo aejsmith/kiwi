@@ -99,6 +99,11 @@
 #   define dprintf(fmt...)
 #endif
 
+/* This allows for using the VM flags in MMU functions without conversion. */
+static_assert(VM_ACCESS_READ    == MMU_ACCESS_READ,    "Mismatched VM/MMU flag definitions");
+static_assert(VM_ACCESS_WRITE   == MMU_ACCESS_WRITE,   "Mismatched VM/MMU flag definitions");
+static_assert(VM_ACCESS_EXECUTE == MMU_ACCESS_EXECUTE, "Mismatched VM/MMU flag definitions");
+
 /** Slab caches used for VM structures. */
 static slab_cache_t *vm_aspace_cache;
 static slab_cache_t *vm_region_cache;
@@ -330,9 +335,9 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t requeste
     /* Check if the page is already mapped. If it is and the access flags
      * include the requested acesss, we don't need to do anything. */
     phys_ptr_t phys;
-    uint32_t access;
-    bool exist = mmu_context_query(region->as->mmu, addr, &phys, &access);
-    if (exist && (access & requested) == requested) {
+    uint32_t flags;
+    bool exist = mmu_context_query(region->as->mmu, addr, &phys, &flags);
+    if (exist && (flags & requested) == requested) {
         if (_phys)
             *_phys = phys;
 
@@ -341,7 +346,7 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t requeste
 
     /* Access flags to map with. The write flag is cleared later on if the page
      * needs to be mapped read only. */
-    access = region->access;
+    uint32_t access = region->access;
 
     /* Work out the offset into the object. */
     offset_t offset = region->amap_offset + (addr - region->start);
@@ -498,10 +503,10 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *_ph
 
     /* Check if the page is already mapped. */
     phys_ptr_t phys;
-    uint32_t access;
-    if (mmu_context_query(region->as->mmu, addr, &phys, &access)) {
+    uint32_t flags;
+    if (mmu_context_query(region->as->mmu, addr, &phys, &flags)) {
         /* Should always have the correct mapping flags. */
-        assert((access & region->access) == region->access);
+        assert((flags & MMU_ACCESS_MASK) == region->access);
 
         if (_phys)
             *_phys = phys;

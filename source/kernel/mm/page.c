@@ -839,7 +839,7 @@ __init_text void page_init(void) {
     for (size_t i = 0; i < pages_size; i += PAGE_SIZE) {
         mmu_context_map(
             &kernel_mmu_context, KERNEL_PDB_BASE + i, page_early_alloc(),
-            VM_ACCESS_READ | VM_ACCESS_WRITE, MM_BOOT);
+            MMU_ACCESS_READ | MMU_ACCESS_WRITE, MM_BOOT);
     }
 
     mmu_context_unlock(&kernel_mmu_context);

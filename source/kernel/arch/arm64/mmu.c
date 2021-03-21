@@ -58,11 +58,11 @@ void arch_mmu_context_destroy(mmu_context_t *ctx) {
  * @param ctx           Context to map in.
  * @param virt          Virtual address to map.
  * @param phys          Physical address to map to.
- * @param access        Mapping access flags.
+ * @param flags         Mapping flags.
  * @param mmflag        Allocation behaviour flags.
  * @return              Status code describing result of the operation. */
 status_t arch_mmu_context_map(
-    mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t access,
+    mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t flags,
     unsigned mmflag)
 {
     fatal_todo();
@@ -93,9 +93,9 @@ bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t 
  * @param ctx           Context to query.
  * @param virt          Virtual address to query.
  * @param _phys         Where to store physical address the page is mapped to.
- * @param _access       Where to store access flags for the mapping.
+ * @param _flags        Where to store flags for the mapping.
  * @return              Whether a page is mapped at the virtual address. */
-bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
+bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags) {
     fatal_todo();
 }
 

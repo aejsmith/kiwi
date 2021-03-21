@@ -103,9 +103,9 @@ static inline uint64_t calc_table_pte(mmu_context_t *ctx, phys_ptr_t phys) {
  * @return              Flags to map page with. */
 static inline uint64_t calc_page_pte(mmu_context_t *ctx, phys_ptr_t phys, uint32_t access) {
     uint64_t entry = phys | X86_PTE_PRESENT;
-    if (access & VM_ACCESS_WRITE)
+    if (access & MMU_ACCESS_WRITE)
         entry |= X86_PTE_WRITE;
-    if (!(access & VM_ACCESS_EXECUTE) && cpu_features.xd)
+    if (!(access & MMU_ACCESS_EXECUTE) && cpu_features.xd)
         entry |= X86_PTE_NOEXEC;
     if (is_kernel_context(ctx)) {
         entry |= X86_PTE_GLOBAL;
@@ -379,9 +379,9 @@ void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
                 prev = ptbl[pte];
 
                 uint64_t entry = (prev & X86_PTE_PROTECT_MASK);
-                if (access & VM_ACCESS_WRITE)
+                if (access & MMU_ACCESS_WRITE)
                     entry |= X86_PTE_WRITE;
-                if (!(access & VM_ACCESS_EXECUTE) && cpu_features.xd)
+                if (!(access & MMU_ACCESS_EXECUTE) && cpu_features.xd)
                     entry |= X86_PTE_NOEXEC;
 
                 if (test_and_set_pte(&ptbl[pte], prev, entry))
@@ -477,9 +477,9 @@ bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, u
         if (_phys)
             *_phys = phys;
         if (_access) {
-            *_access = VM_ACCESS_READ |
-                ((entry & X86_PTE_WRITE) ? VM_ACCESS_WRITE : 0) |
-                ((entry & X86_PTE_NOEXEC) ? 0 : VM_ACCESS_EXECUTE);
+            *_access = MMU_ACCESS_READ |
+                ((entry & X86_PTE_WRITE) ? MMU_ACCESS_WRITE : 0) |
+                ((entry & X86_PTE_NOEXEC) ? 0 : MMU_ACCESS_EXECUTE);
         }
     }
 
@@ -597,17 +597,17 @@ __init_text void arch_mmu_init(void) {
         "text",
         round_down((ptr_t)__text_seg_start, LARGE_PAGE_SIZE),
         round_up((ptr_t)__text_seg_end, LARGE_PAGE_SIZE),
-        VM_ACCESS_READ | VM_ACCESS_EXECUTE);
+        MMU_ACCESS_READ | MMU_ACCESS_EXECUTE);
     map_kernel(
         "data",
         round_down((ptr_t)__data_seg_start, LARGE_PAGE_SIZE),
         round_up((ptr_t)__data_seg_end, LARGE_PAGE_SIZE),
-        VM_ACCESS_READ | VM_ACCESS_WRITE);
+        MMU_ACCESS_READ | MMU_ACCESS_WRITE);
     map_kernel(
         "init",
         round_down((ptr_t)__init_seg_start, PAGE_SIZE),
         round_up((ptr_t)__init_seg_end, PAGE_SIZE),
-        VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE);
+        MMU_ACCESS_READ | MMU_ACCESS_WRITE | MMU_ACCESS_EXECUTE);
 
     /* Search for the highest physical address we have in the memory map. */
     phys_ptr_t highest_phys = 0;

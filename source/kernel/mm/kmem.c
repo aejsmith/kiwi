@@ -392,7 +392,7 @@ void *kmem_alloc(size_t size, unsigned mmflag) {
         /* Map the page into the kernel address space. */
         status_t ret = mmu_context_map(
             &kernel_mmu_context, addr + i, page->addr,
-            VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
+            MMU_ACCESS_READ | MMU_ACCESS_WRITE | MMU_ACCESS_EXECUTE,
             mmflag & MM_FLAG_MASK);
         if (ret != STATUS_SUCCESS) {
             kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n", page->addr, addr + i);
@@ -461,7 +461,7 @@ void *kmem_map(phys_ptr_t base, size_t size, unsigned mmflag) {
     for (i = 0; i < size; i += PAGE_SIZE) {
         status_t ret = mmu_context_map(
             &kernel_mmu_context, addr + i, base + i,
-            VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
+            MMU_ACCESS_READ | MMU_ACCESS_WRITE | MMU_ACCESS_EXECUTE,
             mmflag & MM_FLAG_MASK);
         if (ret != STATUS_SUCCESS) {
             kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n", base + i, addr + i);

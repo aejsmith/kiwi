@@ -70,7 +70,7 @@ __init_text void x86_smp_boot_prepare(void) {
         ap_mmu_context,
         (ptr_t)ap_bootstrap_page,
         ap_bootstrap_page,
-        VM_ACCESS_READ | VM_ACCESS_WRITE | VM_ACCESS_EXECUTE,
+        MMU_ACCESS_READ | MMU_ACCESS_WRITE | MMU_ACCESS_EXECUTE,
         MM_BOOT);
     mmu_context_unlock(ap_mmu_context);
 }

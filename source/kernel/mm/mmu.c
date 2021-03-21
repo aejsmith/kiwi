@@ -76,11 +76,11 @@ void mmu_context_unlock(mmu_context_t *ctx) {
  * @param ctx           Context to map in.
  * @param virt          Virtual address to map.
  * @param phys          Physical address to map to.
- * @param access        Mapping access flags.
+ * @param flags         Mapping flags.
  * @param mmflag        Allocation behaviour flags.
  * @return              Status code describing the result of the operation. */
 status_t mmu_context_map(
-    mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t access,
+    mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t flags,
     unsigned mmflag)
 {
     assert(mutex_held(&ctx->lock));
@@ -95,9 +95,9 @@ status_t mmu_context_map(
 
     dprintf(
         "mmu: mmu_context_map(%p, %p, 0x%" PRIxPHYS ", 0x%x, 0x%x)\n",
-        ctx, virt, phys, access, mmflag);
+        ctx, virt, phys, flags, mmflag);
 
-    return arch_mmu_context_map(ctx, virt, phys, access, mmflag);
+    return arch_mmu_context_map(ctx, virt, phys, flags, mmflag);
 }
 
 /** Remaps a range with different access flags.
@@ -107,6 +107,7 @@ status_t mmu_context_map(
  * @param access        New access flags. */
 void mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
     assert(mutex_held(&ctx->lock));
+    assert(!(access & MMU_CACHE_MASK));
     assert(!(virt % PAGE_SIZE));
     assert(!(size % PAGE_SIZE));
 
@@ -150,9 +151,9 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_pa
  * @param ctx           Context to query.
  * @param virt          Virtual address to query.
  * @param _phys         Where to store physical address the page is mapped to.
- * @param _access       Where to store access flags for the mapping.
+ * @param _flags        Where to store flags for the mapping.
  * @return              Whether a page is mapped at the virtual address. */
-bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_access) {
+bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags) {
     bool ret;
 
     assert(mutex_held(&ctx->lock));
@@ -163,10 +164,10 @@ bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32
      * ensure the kernel context is locked if querying a kernel address. */
     if (virt >= KERNEL_BASE && ctx != &kernel_mmu_context) {
         mmu_context_lock(&kernel_mmu_context);
-        ret = arch_mmu_context_query(&kernel_mmu_context, virt, _phys, _access);
+        ret = arch_mmu_context_query(&kernel_mmu_context, virt, _phys, _flags);
         mmu_context_unlock(&kernel_mmu_context);
     } else {
-        ret = arch_mmu_context_query(ctx, virt, _phys, _access);
+        ret = arch_mmu_context_query(ctx, virt, _phys, _flags);
     }
 
     return ret;
@@ -241,7 +242,7 @@ __init_text void mmu_init(void) {
         for (ptr_t i = 0; i < range->size; i += PAGE_SIZE) {
             mmu_context_map(
                 &kernel_mmu_context, range->start + i, range->phys + i,
-                VM_ACCESS_READ | VM_ACCESS_WRITE,
+                MMU_ACCESS_READ | MMU_ACCESS_WRITE,
                 MM_BOOT);
         }
     }
