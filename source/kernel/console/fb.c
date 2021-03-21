@@ -422,7 +422,7 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
     /* Map in the framebuffer and allocate a backbuffer. */
     size_t size      = info->height * info->pitch;
     size             = round_up(size, PAGE_SIZE);
-    uint8_t *mapping = phys_map(info->addr, size, mmflag);
+    uint8_t *mapping = phys_map_etc(info->addr, size, MMU_ACCESS_RW | MMU_CACHE_WRITE_COMBINE, mmflag);
     if (!mapping)
         return STATUS_NO_MEMORY;
 
