@@ -243,10 +243,26 @@ __init_text void mmu_init(void) {
             continue;
         }
 
+        uint32_t flags = MMU_ACCESS_RW;
+
+        switch (range->cache) {
+            case KBOOT_CACHE_UC:
+                /* This is used for device mappings (e.g. UART). */
+                flags |= MMU_CACHE_DEVICE;
+                break;
+            case KBOOT_CACHE_WT:
+                /* This is used for the framebuffer. */
+                flags |= MMU_CACHE_WRITE_COMBINE;
+                break;
+            default:
+                flags |= MMU_CACHE_NORMAL;
+                break;
+        }
+
         for (ptr_t i = 0; i < range->size; i += PAGE_SIZE) {
             mmu_context_map(
                 &kernel_mmu_context, range->start + i, range->phys + i,
-                MMU_ACCESS_RW, MM_BOOT);
+                flags, MM_BOOT);
         }
     }
 
