@@ -606,8 +606,13 @@ __init_text void arch_mmu_init(void) {
     for (phys_ptr_t i = 0; i < highest_phys; i += 0x40000000) {
         uint64_t *pdir = get_pdir(&kernel_mmu_context, i + KERNEL_PMAP_BASE, true, MM_BOOT);
         for (phys_ptr_t j = 0; j < 0x40000000; j += LARGE_PAGE_SIZE) {
-            pdir[j / LARGE_PAGE_SIZE]
-                = (i + j) | X86_PTE_PRESENT | X86_PTE_WRITE | X86_PTE_GLOBAL | X86_PTE_LARGE;
+            uint64_t pde =
+                (i + j) | X86_PTE_PRESENT | X86_PTE_WRITE | X86_PTE_GLOBAL | X86_PTE_LARGE;
+
+            if (cpu_features.xd)
+                pde |= X86_PTE_NOEXEC;
+
+            pdir[j / LARGE_PAGE_SIZE] = pde;
         }
     }
 
