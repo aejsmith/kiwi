@@ -53,6 +53,7 @@ KBOOT_LOAD(0, 0x1000000, 0x200000, KERNEL_KMEM_BASE, KERNEL_KMEM_SIZE);
 /* Map in 8GB initially, arch_mmu_init() will map all available RAM. */
 KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000, KBOOT_CACHE_DEFAULT);
 
+#if 0
 /** Table mapping memory types to page table flags. */
 static uint64_t memory_type_flags[] = {
     /** Normal Memory - Standard behaviour. */
@@ -73,6 +74,7 @@ static uint64_t memory_type_flags[] = {
     /** Write-back - Standard behaviour. */
     [MEMORY_TYPE_WB] = 0,
 };
+#endif
 
 /** Check if a context is the kernel context. */
 static inline bool is_kernel_context(mmu_context_t *ctx) {
@@ -112,9 +114,6 @@ static inline uint64_t calc_page_pte(mmu_context_t *ctx, phys_ptr_t phys, uint32
     } else {
         entry |= X86_PTE_USER;
     }
-
-    /* Get the memory type of the address and set flags accordingly. */
-    entry |= memory_type_flags[phys_memory_type(phys)];
 
     return entry;
 }

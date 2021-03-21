@@ -87,7 +87,7 @@ enum {
     /**
      * Write-combined memory (uncached, writes can be combined into single
      * transactions). The meaning of this is somewhat architecture-specific,
-     * and not all architectures supported. Where unsupported it behaves as
+     * and not all architectures support it. Where unsupported it behaves as
      * uncached.
      */
     MMU_CACHE_WRITE_COMBINE = (3<<3),

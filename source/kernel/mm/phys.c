@@ -35,21 +35,6 @@
 #include <assert.h>
 #include <kernel.h>
 
-/** Structure containing a memory type range. */
-typedef struct memory_type_range {
-    phys_ptr_t start;               /**< Start of range. */
-    phys_ptr_t end;                 /**< End of range. */
-    unsigned type;                  /**< Type of the range. */
-} memory_type_range_t;
-
-/** Maximum number of memory type ranges. */
-#define MEMORY_TYPE_RANGE_MAX   64
-
-/** Memory type ranges. */
-static memory_type_range_t memory_types[MEMORY_TYPE_RANGE_MAX];
-static size_t memory_types_count;
-static SPINLOCK_DEFINE(memory_types_lock);
-
 static inline bool pmap_contains(phys_ptr_t addr, size_t size) {
     #if KERNEL_PMAP_OFFSET > 0
         if (addr < KERNEL_PMAP_OFFSET)
@@ -165,44 +150,4 @@ bool phys_copy(phys_ptr_t dest, phys_ptr_t source, unsigned mmflag) {
 
     preempt_enable();
     return true;
-}
-
-/** Gets the memory type of a certain physical address.
- * @param addr          Physical address to get type of.
- * @return              Type of the address. If no type has been specifically
- *                      defined, MEMORY_TYPE_NORMAL will be returned. */
-unsigned phys_memory_type(phys_ptr_t addr) {
-    /* We do not take the lock here: doing so would mean an additional spinlock
-     * acquisition for every memory mapping operation. Instead we just take the
-     * current count and iterate up to that. */
-    for (size_t count = memory_types_count, i = 0; i < count; i++) {
-        if (addr >= memory_types[i].start && addr < (memory_types[i].end))
-            return memory_types[i].type;
-    }
-
-    return MEMORY_TYPE_NORMAL;
-}
-
-/** Sets the type of a range of physical memory.
- * @warning             Does not currently handle overlaps with previously
- *                      added ranges.
- * @param addr          Start address of of range.
- * @param size          Size of range.
- * @param type          Type to give the range. */
-void phys_set_memory_type(phys_ptr_t addr, phys_size_t size, unsigned type) {
-    assert(!(addr & PAGE_SIZE));
-    assert(!(size & PAGE_SIZE));
-
-    spinlock_lock(&memory_types_lock);
-
-    if (memory_types_count >= MEMORY_TYPE_RANGE_MAX)
-        fatal("Too many phys_set_memory_type() calls");
-
-    memory_types[memory_types_count].start = addr;
-    memory_types[memory_types_count].end   = addr + size;
-    memory_types[memory_types_count].type  = type;
-
-    memory_types_count++;
-
-    spinlock_unlock(&memory_types_lock);
 }
