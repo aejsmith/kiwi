@@ -92,7 +92,12 @@ void *phys_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, unsigned mmflag
     phys_ptr_t base = round_down(addr, PAGE_SIZE);
     phys_ptr_t end  = round_up(addr + size, PAGE_SIZE);
 
-    return kmem_map(base, end - base, flags, mmflag);
+    void *mapping = kmem_map(base, end - base, flags, mmflag);
+    if (!mapping)
+        return NULL;
+
+    size_t offset = addr - base;
+    return (void *)((ptr_t)mapping + offset);
 }
 
 typedef struct device_phys_map_resource {

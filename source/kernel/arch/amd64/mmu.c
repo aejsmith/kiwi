@@ -139,7 +139,7 @@ static inline bool test_and_set_pte(uint64_t *pte, uint64_t cmp, uint64_t val) {
 }
 
 static uint64_t *map_structure(phys_ptr_t addr) {
-    /* Our phys_map() implementation never fails. */
+    /* phys_map() should never fail for normal memory on AMD64. */
     return phys_map(addr, PAGE_SIZE, MM_BOOT);
 }
 
