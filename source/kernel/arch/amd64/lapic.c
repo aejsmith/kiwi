@@ -49,14 +49,14 @@ static phys_ptr_t lapic_base;
  * @param reg           Register to read from.
  * @return              Value read from register. */
 static inline uint32_t lapic_read(unsigned reg) {
-    return lapic_mapping[reg];
+    return read32(&lapic_mapping[reg]);
 }
 
 /** Write to a register in the current CPU's local APIC.
  * @param reg           Register to write to.
  * @param value         Value to write to register. */
 static inline void lapic_write(unsigned reg, uint32_t value) {
-    lapic_mapping[reg] = value;
+    write32(&lapic_mapping[reg], value);
 }
 
 /** Send an EOI to the local APIC. */
@@ -202,7 +202,7 @@ __init_text void lapic_init(void) {
 
     /* Map the LAPIC into virtual memory and register interrupt handlers. */
     lapic_base = base;
-    lapic_mapping = phys_map(base, PAGE_SIZE, MM_BOOT);
+    lapic_mapping = phys_map_etc(base, PAGE_SIZE, MMU_ACCESS_RW | MMU_CACHE_DEVICE, MM_BOOT);
     kprintf(
         LOG_NOTICE, "lapic: physical location 0x%" PRIxPHYS ", mapped to %p\n",
         base, lapic_mapping);
