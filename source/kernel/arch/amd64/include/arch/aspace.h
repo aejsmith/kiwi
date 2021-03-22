@@ -20,12 +20,19 @@
  *
  * This file contains definitions for the virtual address space layout. The
  * layout on AMD64 is as follows:
+ *
  *  0x0000000000000000-0x00007fffffffffff - 128TB - User address space.
  *   ... non-canonical address space ...
  *  0xffff800000000000-0xfffffeffffffffff - 127TB - Physical map area.
  *  0xffffff0000000000-0xffffff7fffffffff - 512GB - Page database.
  *  0xffffff8000000000-0xffffffff7fffffff - 510GB - Kernel allocation area.
  *  0xffffffff80000000-0xffffffffffffffff - 2GB   - Kernel image/modules.
+ *
+ * Note that MMU context implementation currently assumes that kernel context
+ * PML4 entries cannot be changed after boot, which is true with the current
+ * address space layout. If address space layout changes such that this is no
+ * longer the case (e.g. some regions are expanded to take more than 1 PML4
+ * entry), we will need to account for this.
  */
 
 #pragma once

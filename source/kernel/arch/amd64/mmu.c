@@ -144,17 +144,17 @@ static uint64_t *map_structure(phys_ptr_t addr) {
 }
 
 static phys_ptr_t alloc_structure(unsigned mmflag) {
-    page_t *page;
     phys_ptr_t ret;
 
-    if (page_init_done) {
-        page = page_alloc(mmflag | MM_ZERO);
-        return (page) ? page->addr : 0;
+    if (likely(page_init_done)) {
+        page_t *page = page_alloc(mmflag | MM_ZERO);
+        ret = (page) ? page->addr : 0;
     } else {
         ret = page_early_alloc();
         memset(map_structure(ret), 0, PAGE_SIZE);
-        return ret;
     }
+
+    return ret;
 }
 
 /** Get the page directory containing a virtual address.
@@ -267,7 +267,12 @@ status_t arch_mmu_context_init(mmu_context_t *ctx, unsigned mmflag) {
     if (!ctx->arch.pml4)
         return STATUS_NO_MEMORY;
 
-    /* Get the kernel mappings into the new PML4. */
+    /*
+     * Get the kernel mappings into the new PML4. See arch/aspace.h - with our
+     * current address space layout, kernel PML4 entries will not be changed
+     * after initial MMU init, so just copying these over when creating a new
+     * context is fine.
+     */
     uint64_t *kpml4 = map_structure(kernel_mmu_context.arch.pml4);
     uint64_t *pml4  = map_structure(ctx->arch.pml4);
     for (unsigned i = 256; i < 512; i++)
@@ -544,17 +549,17 @@ static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t flags)
 
     /* Map using large pages if possible. */
     if (!(start % LARGE_PAGE_SIZE) && !(end % LARGE_PAGE_SIZE)) {
-        for (phys_ptr_t i = start; i < end; i += LARGE_PAGE_SIZE) {
-            uint64_t *pdir = get_pdir(&kernel_mmu_context, i, true, MM_BOOT);
-            unsigned pde   = (i % 0x40000000) / LARGE_PAGE_SIZE;
-            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + i - start, flags) | X86_PTE_LARGE;
+        for (phys_ptr_t addr = start; addr < end; addr += LARGE_PAGE_SIZE) {
+            uint64_t *pdir = get_pdir(&kernel_mmu_context, addr, true, MM_BOOT);
+            unsigned pde   = (addr % 0x40000000) / LARGE_PAGE_SIZE;
+            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + addr - start, flags) | X86_PTE_LARGE;
             set_pte(&pdir[pde], entry);
         }
     } else {
-        for (phys_ptr_t i = start; i < end; i += PAGE_SIZE) {
-            uint64_t *ptbl = get_ptbl(&kernel_mmu_context, i, true, MM_BOOT);
-            unsigned pte   = (i % 0x200000) / PAGE_SIZE;
-            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + i - start, flags);
+        for (phys_ptr_t addr = start; addr < end; addr += PAGE_SIZE) {
+            uint64_t *ptbl = get_ptbl(&kernel_mmu_context, addr, true, MM_BOOT);
+            unsigned pte   = (addr % 0x200000) / PAGE_SIZE;
+            uint64_t entry = calc_page_pte(&kernel_mmu_context, phys + addr - start, flags);
             set_pte(&ptbl[pte], entry);
         }
     }
