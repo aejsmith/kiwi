@@ -19,6 +19,8 @@
  * @brief               ARM64 MMU context implementation.
  */
 
+#include <arm64/mmu.h>
+
 #include <mm/aspace.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
@@ -36,9 +38,12 @@
 
 KBOOT_LOAD(0, LARGE_PAGE_SIZE, LARGE_PAGE_SIZE, KERNEL_KMEM_BASE, KERNEL_KMEM_SIZE);
 
-/* Map in 8GB initially, arch_mmu_init() will map all available RAM. */
-// TODO: Need to deal with caching here.
-//KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000, KBOOT_CACHE_DEFAULT);
+/*
+ * Map in 8GB initially, arch_mmu_init() will map all available RAM. We only
+ * use the physical map area for cached phys_map() mappings, therefore we can
+ * set it as cached here.
+ */
+KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000, KBOOT_CACHE_DEFAULT);
 
 /** Initialize a new context.
  * @param ctx           Context to initialize.
@@ -124,5 +129,6 @@ __init_text void arch_mmu_init(void) {
 
 /** Initialize the MMU for this CPU. */
 __init_text void arch_mmu_init_percpu(void) {
+    // Set MAIR, invalidate TLB and caches (after setting kernel context?)
     fatal_todo();
 }

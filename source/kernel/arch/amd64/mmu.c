@@ -94,14 +94,14 @@ static inline uint64_t calc_page_pte(mmu_context_t *ctx, phys_ptr_t phys, uint32
      * a different position for PTEs/PDEs. */
     switch (flags & MMU_CACHE_MASK) {
         case MMU_CACHE_NORMAL:
-            entry |= X86_PAT_SELECT_NORMAL;
+            entry |= X86_PTE_PAT_NORMAL;
             break;
         case MMU_CACHE_DEVICE:
         case MMU_CACHE_UNCACHED:
-            entry |= X86_PAT_SELECT_UNCACHED;
+            entry |= X86_PTE_PAT_UNCACHED;
             break;
         case MMU_CACHE_WRITE_COMBINE:
-            entry |= X86_PAT_SELECT_WRITE_COMBINE;
+            entry |= X86_PTE_PAT_WRITE_COMBINE;
             break;
         default:
             unreachable();
@@ -450,13 +450,13 @@ bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, u
                 flags |= MMU_ACCESS_EXECUTE;
 
             switch (entry & X86_PTE_CACHE_MASK) {
-                case X86_PAT_SELECT_NORMAL:
+                case X86_PTE_PAT_NORMAL:
                     flags |= MMU_CACHE_NORMAL;
                     break;
-                case X86_PAT_SELECT_WRITE_COMBINE:
+                case X86_PTE_PAT_WRITE_COMBINE:
                     flags |= MMU_CACHE_WRITE_COMBINE;
                     break;
-                case X86_PAT_SELECT_UNCACHED:
+                case X86_PTE_PAT_UNCACHED:
                     flags |= MMU_CACHE_UNCACHED;
                     break;
                 default:
@@ -626,7 +626,7 @@ __init_text void arch_mmu_init_percpu(void) {
         x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
 
     /*
-     * Configure the PAT matching our X86_PAT_SELECT definitions.
+     * Configure the PAT matching our X86_PAT_INDEX definitions.
      *
      * We're about to switch to our new kernel MMU context, so we should ensure
      * that there are no stale references to any old PAT configuration (e.g.

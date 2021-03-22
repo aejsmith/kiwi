@@ -25,5 +25,5 @@
 
 /** ARM64 MMU context structure. */
 typedef struct arch_mmu_context {
-    unsigned long todo;
+    phys_ptr_t ttl0;                /**< Physical address of level 0 translation table. */
 } arch_mmu_context_t;
