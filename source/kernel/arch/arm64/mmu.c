@@ -23,6 +23,9 @@
  *    atomic TTE updates like AMD64, but hardware support may not be there.
  */
 
+#include <arch/barrier.h>
+
+#include <arm64/cpu.h>
 #include <arm64/mmu.h>
 
 #include <lib/string.h>
@@ -70,17 +73,22 @@ static phys_ptr_t alloc_table(unsigned mmflag) {
         memset(map_table(ret), 0, PAGE_SIZE);
     }
 
+    /* Ensure writes to zero the page have completed before making it visible
+     * to the translation table walker. */
+    if (ret)
+        write_barrier();
+
     return ret;
 }
 
-/** Get the level 2 table containing a virtual address.
+/** Get the level 1 table containing a virtual address.
  * @param ctx           Context to get from.
  * @param virt          Virtual address.
  * @param alloc         Whether new entries should be allocated if non-existant.
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to mapped table, NULL if not found or on
  *                      allocation failure. */
-static uint64_t *get_ttl2(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
+static uint64_t *get_ttl1(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
     uint64_t *ttl0 = map_table(ctx->arch.ttl0);
 
     unsigned ttl0e = (virt / ARM64_TTL1_RANGE) % 512;
@@ -92,7 +100,21 @@ static uint64_t *get_ttl2(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
         ttl0[ttl0e] = addr | ARM64_TTE_PRESENT | ARM64_TTE_TABLE;
     }
 
-    uint64_t *ttl1 = map_table(ttl0[ttl0e] & ARM64_TTE_ADDR_MASK);
+    assert(ttl0[ttl0e] & ARM64_TTE_TABLE);
+    return map_table(ttl0[ttl0e] & ARM64_TTE_ADDR_MASK);
+}
+
+/** Get the level 2 table containing a virtual address.
+ * @param ctx           Context to get from.
+ * @param virt          Virtual address.
+ * @param alloc         Whether new entries should be allocated if non-existant.
+ * @param mmflag        Allocation behaviour flags.
+ * @return              Pointer to mapped table, NULL if not found or on
+ *                      allocation failure. */
+static uint64_t *get_ttl2(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
+    uint64_t *ttl1 = get_ttl1(ctx, virt, alloc, mmflag);
+    if (!ttl1)
+        return NULL;
 
     unsigned ttl1e = (virt % ARM64_TTL1_RANGE) / ARM64_TTL2_RANGE;
     if (!(ttl1[ttl1e] & ARM64_TTE_PRESENT)) {
@@ -103,6 +125,8 @@ static uint64_t *get_ttl2(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
         ttl1[ttl1e] = addr | ARM64_TTE_PRESENT | ARM64_TTE_TABLE;
     }
 
+    /* If this function is being used it should not be a large 1GB page. */
+    assert(ttl1[ttl1e] & ARM64_TTE_TABLE);
     return map_table(ttl1[ttl1e] & ARM64_TTE_ADDR_MASK);
 }
 
@@ -127,7 +151,7 @@ static uint64_t *get_ttl3(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
         ttl2[ttl2e] = addr | ARM64_TTE_PRESENT | ARM64_TTE_TABLE;
     }
 
-    /* If this function is being used it should not be a large page. */
+    /* If this function is being used it should not be a large 2MB page. */
     assert(ttl2[ttl2e] & ARM64_TTE_TABLE);
     return map_table(ttl2[ttl2e] & ARM64_TTE_ADDR_MASK);
 }
@@ -182,12 +206,13 @@ static inline uint64_t calc_tte_flags(mmu_context_t *ctx, uint32_t flags) {
 
 /** Initialize a new context. */
 status_t arch_mmu_context_init(mmu_context_t *ctx, unsigned mmflag) {
+    /* TODO: Will need to allocate ASIDs for user contexts. */ 
     fatal_todo();
 }
 
 /** Destroy a context. */
 void arch_mmu_context_destroy(mmu_context_t *ctx) {
-    /* TODO */
+    fatal_todo();
 }
 
 /** Map a page in a context. */
@@ -195,16 +220,31 @@ status_t arch_mmu_context_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t flags,
     unsigned mmflag)
 {
-    fatal_todo();
+    uint64_t *ttl3 = get_ttl3(ctx, virt, true, mmflag);
+    if (!ttl3)
+        return STATUS_NO_MEMORY;
+
+    unsigned ttl3e = (virt % ARM64_TTL3_RANGE) / PAGE_SIZE;
+    if (unlikely(ttl3[ttl3e] & ARM64_TTE_PRESENT))
+        fatal("Mapping %p which is already mapped", virt);
+
+    ttl3[ttl3e] = phys | ARM64_TTE_PAGE | calc_tte_flags(ctx, flags);
+    return STATUS_SUCCESS;
 }
 
 /** Remap a range with different access flags. */
 void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
+    // TODO: See unmap for TLB invalidation.
     fatal_todo();
 }
 
 /** Unmap a page in a context. */
 bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
+    // TODO: TLB invalidation:
+    //  - Need DSB before and after.
+    //  - Seems we don't need manual remote TLB invalidation? Use IS operations
+    //    to apply to all TLBs in the same inner shareability domain.
+    //  - Batch TLB operations together.
     fatal_todo();
 }
 
@@ -215,7 +255,7 @@ bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, u
 
 /** Perform remote TLB invalidation. */
 void arch_mmu_context_flush(mmu_context_t *ctx) {
-    fatal_todo();
+    // TODO: TLB
 }
 
 /** Switch to another MMU context. */
@@ -261,6 +301,39 @@ static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t flags)
     kprintf(LOG_NOTICE, " %s: [%p,%p) -> 0x%" PRIxPHYS" (0x%x)\n", name, start, end, phys, flags);
 }
 
+static void map_pmap(void) {
+    /* Search for the highest physical address we have in the memory map. */
+    phys_ptr_t highest_phys = 0;
+    kboot_tag_foreach(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
+        phys_ptr_t end = range->start + range->size;
+        if (end > highest_phys)
+            highest_phys = end;
+    }
+
+    /* We always map at least 8GB, and align to a 1GB boundary so that we can
+     * use 1GB blocks. */
+    highest_phys = round_up(max(0x200000000ul, highest_phys), ARM64_TTL2_RANGE);
+    kprintf(LOG_DEBUG, "mmu: mapping physical memory up to 0x%" PRIxPHYS "\n", highest_phys);
+
+    size_t l1_count    = round_up(highest_phys, ARM64_TTL1_RANGE) / ARM64_TTL1_RANGE;
+    uint64_t tte_flags = calc_tte_flags(&kernel_mmu_context, MMU_ACCESS_RW | MMU_CACHE_NORMAL);
+    phys_ptr_t phys    = 0;
+
+    for (size_t i = 0; i < l1_count; i++) {
+        uint64_t *ttl1 = get_ttl1(&kernel_mmu_context, KERNEL_PMAP_BASE + phys, true, MM_BOOT);
+
+        size_t page_count = (i == l1_count - 1)
+            ? (highest_phys % ARM64_TTL1_RANGE) / ARM64_TTL2_RANGE
+            : 512;
+
+        for (size_t j = 0; j < page_count; j++) {
+            ttl1[j] = phys | tte_flags;
+
+            phys += ARM64_TTL2_RANGE;
+        }
+    }
+}
+
 /** Create the kernel MMU context. */
 __init_text void arch_mmu_init(void) {
     kernel_mmu_context.arch.ttl0 = alloc_table(MM_BOOT);
@@ -285,11 +358,23 @@ __init_text void arch_mmu_init(void) {
         round_up((ptr_t)__init_seg_end, PAGE_SIZE),
         MMU_ACCESS_READ | MMU_ACCESS_WRITE | MMU_ACCESS_EXECUTE);
 
-    fatal_todo();
+    /* Map the physical map area. */
+    map_pmap();
 }
 
 /** Initialize the MMU for this CPU. */
 __init_text void arch_mmu_init_percpu(void) {
-    // Set MAIR, invalidate TLB and caches (after setting kernel context?)
-    fatal_todo();
+    /* Set our MAIR value. */
+    arm64_write_sysreg(mair_el1, ARM64_MAIR);
+
+    /* Load the kernel translation tables (TTBR1 for high half of address space). */
+    arm64_write_sysreg(ttbr1_el1, kernel_mmu_context.arch.ttl0);
+
+    /* Invalidate the TLB - things might have changed a bit from what KBoot set
+     * up. */
+    memory_barrier();
+    __asm__ __volatile__("tlbi vmalle1");
+    memory_barrier();
+
+    // TODO: Invalidate the caches since we've changed MAIR.
 }

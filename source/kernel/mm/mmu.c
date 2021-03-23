@@ -274,8 +274,6 @@ __init_text void mmu_init(void) {
 
 /** Perform per-CPU MMU initialization. */
 __init_text void mmu_init_percpu(void) {
+    /* This should switch to the kernel context. */
     arch_mmu_init_percpu();
-
-    /* Switch to the kernel context. */
-    mmu_context_load(&kernel_mmu_context);
 }

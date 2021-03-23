@@ -642,4 +642,7 @@ __init_text void arch_mmu_init_percpu(void) {
      */
     arch_cpu_invalidate_caches();
     x86_write_msr(X86_MSR_CR_PAT, X86_PAT);
+
+    /* Switch to the kernel context. */
+    arch_mmu_context_load(&kernel_mmu_context);
 }
