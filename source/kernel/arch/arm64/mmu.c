@@ -366,15 +366,18 @@ __init_text void arch_mmu_init(void) {
 __init_text void arch_mmu_init_percpu(void) {
     /* Set our MAIR value. */
     arm64_write_sysreg(mair_el1, ARM64_MAIR);
+    arm64_isb();
 
     /* Load the kernel translation tables (TTBR1 for high half of address space). */
     arm64_write_sysreg(ttbr1_el1, kernel_mmu_context.arch.ttl0);
+    arm64_isb();
 
     /* Invalidate the TLB - things might have changed a bit from what KBoot set
      * up. */
     memory_barrier();
-    __asm__ __volatile__("tlbi vmalle1");
+    arm64_tlbi(vmalle1);
     memory_barrier();
 
     // TODO: Invalidate the caches since we've changed MAIR.
+    // TODO: Disable TTBR0.
 }

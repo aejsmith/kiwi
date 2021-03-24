@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <types.h>
+#include <arm64/cpu.h>
 
 /** Definitions of paging structure bits. */
 #define ARM64_TTE_PRESENT               (1ul<<0)    /**< Entry is present. */
@@ -68,3 +68,20 @@
     ARM64_MAIR_ENTRY(1, 0b01000100) | \
     ARM64_MAIR_ENTRY(2, 0b00000000) | \
     ARM64_MAIR_ENTRY(3, 0b00000100))
+
+/** TLBI instruction with no address.
+ * @param op            Operation to perform. */
+#define arm64_tlbi(op) \
+    do { \
+        __asm__ volatile("tlbi " STRINGIFY(op)); \
+        arm64_isb(); \
+    } while (0)
+
+/** TLBI instruction with address.
+ * @param op            Operation to perform.
+ * @param addr          Address to operate on. */
+#define arm64_tlbi_addr(op, addr) \
+    do { \
+        __asm__ volatile("tlbi " STRINGIFY(op) ", %0" :: "r"((unsigned long)(addr))); \
+        arm64_isb(); \
+    } while (0)
