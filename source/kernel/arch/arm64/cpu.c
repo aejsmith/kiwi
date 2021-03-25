@@ -63,8 +63,11 @@ __init_text void arch_cpu_early_init(void) {
  * @param cpu           CPU structure for the current CPU. */
 __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
     /* Set TPIDR_EL1 to point to the current CPU. This is what arch_curr_cpu()
-     * uses. */
-    arm64_write_sysreg(tpidr_el1, cpu);
+     * uses, until we do the first thread switch, at which point arch_thread_t
+     * takes over. */
+    cpu->arch.parent = cpu;
+    cpu->arch.thread = NULL;
+    arm64_write_sysreg(tpidr_el1, &cpu->arch);
     arm64_isb();
 
     arm64_exception_init();

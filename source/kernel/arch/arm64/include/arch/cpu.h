@@ -31,23 +31,25 @@ typedef uint32_t cpu_id_t;
 
 /** Architecture-specific CPU structure. */
 typedef struct arch_cpu {
-    unsigned long todo;
+    /** Temporary per-CPU data (TPIDR) used before scheduler init. */
+    struct cpu *parent;                 /**< Current CPU pointer. */
+    struct thread *thread;              /**< Current thread pointer. */
 } arch_cpu_t;
 
 /** Get the current CPU structure pointer.
  * @return              Pointer to current CPU structure. */
 static inline struct cpu *arch_curr_cpu(void) {
-    struct cpu *addr;
-    __asm__("mrs %0, tpidr_el1" : "=r"(addr));
-    return addr;
+    void **data;
+    __asm__("mrs %0, tpidr_el1" : "=r"(data));
+    return data[0];
 }
 
 /** Get the current CPU structure pointer (volatile, forces compiler to reload).
  * @return              Pointer to current CPU structure. */
 static inline struct cpu *arch_curr_cpu_volatile(void) {
-    struct cpu *addr;
-    __asm__ __volatile__("mrs %0, tpidr_el1" : "=r"(addr));
-    return addr;
+    void **data;
+    __asm__ __volatile__("mrs %0, tpidr_el1" : "=r"(data));
+    return data[0];
 }
 
 /** Halt the current CPU. */

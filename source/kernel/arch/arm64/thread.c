@@ -27,7 +27,26 @@
 /** Initialize ARM64-specific thread data.
  * @param thread        Thread to initialize. */
 void arch_thread_init(thread_t *thread) {
-    fatal_todo();
+    thread->arch.parent = thread;
+
+    /* Initialize the kernel stack. */
+    ptr_t entry = (ptr_t)thread_trampoline;
+    unsigned long *sp = (unsigned long *)((ptr_t)thread->kstack + KSTACK_SIZE);
+    *--sp = entry;  /* LR. */
+    *--sp = 0;      /* FP. */
+    *--sp = 0;      /* X28. */
+    *--sp = 0;      /* X27. */
+    *--sp = 0;      /* X26. */
+    *--sp = 0;      /* X25. */
+    *--sp = 0;      /* X24. */
+    *--sp = 0;      /* X23. */
+    *--sp = 0;      /* X22. */
+    *--sp = 0;      /* X21. */
+    *--sp = 0;      /* X20. */
+    *--sp = 0;      /* X19. */
+
+    /* Save the stack pointer for arch_thread_switch(). */
+    thread->arch.saved_sp = (ptr_t)sp;
 }
 
 /** Clean up ARM64-specific thread data.
@@ -48,6 +67,7 @@ void arch_thread_clone(thread_t *thread, frame_t *frame) {
  * @param thread        Thread to switch to.
  * @param prev          Thread that was previously running. */
 void arch_thread_switch(thread_t *thread, thread_t *prev) {
+    // TODO: Point TPIDR to arch_thread.
     fatal_todo();
 }
 

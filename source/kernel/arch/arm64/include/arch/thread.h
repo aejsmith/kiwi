@@ -31,15 +31,20 @@ struct thread;
 
 /** x86-specific thread structure. */
 typedef struct arch_thread {
-    // TODO
-    unsigned long todo;
+    /** Current CPU/thread information. TPIDR_EL1 points here. */
+    struct cpu *cpu;                /**< Current CPU pointer, for curr_cpu. */
+    struct thread *parent;          /**< Pointer to containing thread, for curr_thread. */
+
+    /** Saved context switch stack pointer. */
+    ptr_t saved_sp;
 } arch_thread_t;
 
 /** Get the current thread structure pointer.
  * @return              Pointer to current thread structure. */
 static inline struct thread *arch_curr_thread(void) {
-    // TODO
-    return NULL;
+    void **data;
+    __asm__("mrs %0, tpidr_el1" : "=r"(data));
+    return data[1];
 }
 
 #endif /* __ASM__ */
