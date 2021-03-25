@@ -120,6 +120,53 @@ nstime_t time_to_unix(
     return secs_to_nsecs(seconds);
 }
 
+static uint64_t tick_conv(uint64_t value, uint32_t multiplier, uint32_t divisor) {
+    uint64_t high = multiplier * (value >> 32);
+    uint64_t low  = multiplier * (value & UINT32_MAX);
+
+    /* ((high << 32) + low) / divisor */
+
+    high += low >> 32;
+    low &= UINT32_MAX;
+
+    uint64_t high_div = high / divisor;
+    uint64_t high_mod = high % divisor;
+
+    if (high_div > UINT32_MAX)
+        return UINT64_MAX;
+
+    low |= high_mod << 32;
+    return (high_div << 32) | (low / divisor);
+}
+
+/**
+ * Helper function to convert from hardware ticks to nanoseconds. This uses
+ * fixed-point arithmetic to retain precision. Note that only 32-bit frequency
+ * values are supported.
+ *
+ * @param ticks         Hardware ticks.
+ * @param freq          Tick frequency.
+ *
+ * @return              Time in nanoseconds.
+ */
+nstime_t time_from_ticks(uint64_t ticks, uint32_t freq) {
+    return tick_conv(ticks, secs_to_nsecs(1), freq);
+}
+
+/**
+ * Helper function to convert from nanoseconds to hardware ticks. This uses
+ * fixed-point arithmetic to retain precision. Note that only 32-bit frequency
+ * values are supported.
+ *
+ * @param time          Time in nanoseconds.
+ * @param freq          Tick frequency.
+ *
+ * @return              Hardware ticks.
+ */
+uint64_t time_to_ticks(nstime_t time, uint32_t freq) {
+    return tick_conv(time, freq, secs_to_nsecs(1));
+}
+
 /**
  * Gets the number of nanoseconds that have passed since the Unix Epoch,
  * 00:00:00 UTC, January 1st, 1970.

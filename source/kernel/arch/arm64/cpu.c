@@ -21,6 +21,7 @@
 
 #include <arm64/cpu.h>
 #include <arm64/exception.h>
+#include <arm64/time.h>
 
 #include <cpu.h>
 #include <kdb.h>
@@ -87,7 +88,7 @@ static kdb_status_t kdb_cmd_cpus(int argc, char **argv, kdb_filter_t *filter) {
 __init_text void arch_cpu_init() {
     kdb_register_command("cpus", "Display a list of CPUs.", kdb_cmd_cpus);
 
-    /* TODO. */
+    arm64_time_init();
 }
 
 /** Perform additional initialization of the current CPU. */
