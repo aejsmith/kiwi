@@ -23,7 +23,7 @@
 
 /** Detect all secondary CPUs in the system. */
 void platform_smp_detect(void) {
-    fatal_todo();
+    /* TODO */
 }
 
 /** Prepare the SMP boot process. */
