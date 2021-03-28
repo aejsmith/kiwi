@@ -393,7 +393,7 @@ status_t device_alias_etc(
 
 /**
  * Removes a device from the device tree. The device must have no users. All
- * aliases of the device should be destroyed before the device itself.
+ * aliases of the device will be removed.
  *
  * @todo                Sometime we'll need to allow devices to be removed when
  *                      they have users, for example for hotplugging.
@@ -630,6 +630,9 @@ void device_resource_register(device_t *device, void *data) {
 }
 
 static bool device_iterate_internal(device_t *device, device_iterate_t func, void *data) {
+    while (device->dest)
+        device = device->dest;
+
     switch (func(device, data)) {
         case DEVICE_ITERATE_END:
             return false;
