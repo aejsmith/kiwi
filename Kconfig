@@ -114,7 +114,7 @@ config QEMU_BINARY_ARM64
 config QEMU_OPTS_AMD64
 	string "Extra QEMU options"
 	depends on ARCH_AMD64
-	default "-monitor vc:1024x768 -serial stdio -vga std -s -rtc base=localtime -m 1024 -enable-kvm -smp cpus=4,cores=4"
+	default "-monitor vc:1024x768 -serial stdio -vga std -s -rtc base=localtime -m 1024 -enable-kvm -smp cpus=4,cores=4 -nic user,model=virtio-net-pci"
 	help
 	  Extra options to pass to QEMU for the "qemu" build target.
 
