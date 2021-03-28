@@ -36,6 +36,51 @@ static SPINLOCK_DEFINE(pci_config_lock);
 
 static void scan_bus(uint16_t domain, uint8_t bus, int indent);
 
+/** Read an 8-bit value from a PCI device's configuration space. */
+__export uint8_t pci_config_read8(pci_device_t *device, uint8_t reg) {
+    spinlock_lock(&pci_config_lock);
+    uint8_t ret = platform_pci_config_read8(&device->addr, reg);
+    spinlock_unlock(&pci_config_lock);
+    return ret;
+}
+
+/** Write an 8-bit value to a PCI device's configuration space. */
+__export void pci_config_write8(pci_device_t *device, uint8_t reg, uint8_t val) {
+    spinlock_lock(&pci_config_lock);
+    platform_pci_config_write8(&device->addr, reg, val);
+    spinlock_unlock(&pci_config_lock);
+}
+
+/** Read a 16-bit value from a PCI device's configuration space. */
+__export uint16_t pci_config_read16(pci_device_t *device, uint8_t reg) {
+    spinlock_lock(&pci_config_lock);
+    uint16_t ret = platform_pci_config_read16(&device->addr, reg);
+    spinlock_unlock(&pci_config_lock);
+    return ret;
+}
+
+/** Write a 16-bit value to a PCI device's configuration space. */
+__export void pci_config_write16(pci_device_t *device, uint8_t reg, uint16_t val) {
+    spinlock_lock(&pci_config_lock);
+    platform_pci_config_write16(&device->addr, reg, val);
+    spinlock_unlock(&pci_config_lock);
+}
+
+/** Read a 32-bit value from a PCI device's configuration space. */
+__export uint32_t pci_config_read32(pci_device_t *device, uint8_t reg) {
+    spinlock_lock(&pci_config_lock);
+    uint32_t ret = platform_pci_config_read32(&device->addr, reg);
+    spinlock_unlock(&pci_config_lock);
+    return ret;
+}
+
+/** Write a 32-bit value to a PCI device's configuration space. */
+__export void pci_config_write32(pci_device_t *device, uint8_t reg, uint32_t val) {
+    spinlock_lock(&pci_config_lock);
+    platform_pci_config_write32(&device->addr, reg, val);
+    spinlock_unlock(&pci_config_lock);
+}
+
 /** Generate a PCI device name.
  * @param addr          Address of device.
  * @param str           Name buffer (PCI_NAME_MAX). */

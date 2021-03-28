@@ -95,7 +95,7 @@ typedef struct pci_driver {
     pci_match_table_t matches;          /**< Devices that the driver supports. */
 
     /** Initialize a device that matched against this driver.
-     * @param device        Device to match.
+     * @param device        Device to initialize.
      * @return              Status code describing the result of the operation. */
     status_t (*init_device)(struct pci_device *device);
 } pci_driver_t;
@@ -132,11 +132,6 @@ typedef struct pci_device {
     uint8_t interrupt_pin;
 } pci_device_t;
 
-/** Get the device tree node for a PCI device. */
-static inline device_t *pci_device_node(pci_device_t *device) {
-    return device->bus.node;
-}
-
 /** Common PCI configuration offsets. */
 #define PCI_CONFIG_VENDOR_ID            0x00    /**< Vendor ID        (16-bit). */
 #define PCI_CONFIG_DEVICE_ID            0x02    /**< Device ID        (16-bit). */
@@ -169,3 +164,10 @@ static inline device_t *pci_device_node(pci_device_t *device) {
 
 /** PCI-to-PCI bridge configuration offsets (header type = 0x01). */
 #define PCI_CONFIG_P2P_SUBORDINATE_BUS  0x19    /**< Subordinate bus  (8-bit). */
+
+extern uint8_t pci_config_read8(pci_device_t *device, uint8_t reg);
+extern void pci_config_write8(pci_device_t *device, uint8_t reg, uint8_t val);
+extern uint16_t pci_config_read16(pci_device_t *device, uint8_t reg);
+extern void pci_config_write16(pci_device_t *device, uint8_t reg, uint16_t val);
+extern uint32_t config_read32(pci_device_t *device, uint8_t reg);
+extern void pci_config_write32(pci_device_t *device, uint8_t reg, uint32_t val);
