@@ -25,6 +25,7 @@
 
 #include <mm/malloc.h>
 
+#include <assert.h>
 #include <status.h>
 
 /** Initializes a bus.
@@ -47,18 +48,16 @@ status_t bus_destroy(bus_t *bus) {
     return STATUS_NOT_IMPLEMENTED;
 }
 
-static bool match_device(bus_t *bus, device_t *device, bus_driver_t *driver) {
-    bus_device_t *bus_device = device->private;
-
+static bool match_device(bus_t *bus, bus_device_t *device, bus_driver_t *driver) {
     bool match = bus->type->match_device(device, driver);
     if (match) {
-        bus_device->driver = driver;
+        device->driver = driver;
 
         status_t ret = bus->type->init_device(device, driver);
         if (ret != STATUS_SUCCESS) {
             kprintf(
                 LOG_WARN, "bus: failed to initialize device '%s': %" PRId32 "\n",
-                device->name, ret);
+                device->node->name, ret);
         }
     }
 
@@ -86,7 +85,7 @@ static int match_tree_device(device_t *device, void *_data) {
         /* This is a bus device node. Probe it if not already claimed. */
         bus_device_t *bus_device = device->private;
         if (!bus_device->driver)
-            match_device(data->bus, device, data->driver);
+            match_device(data->bus, bus_device, data->driver);
 
         /* Don't descend into bus device nodes. We don't care about any device
          * nodes that existing drivers have created under their bus device. */
@@ -139,10 +138,14 @@ status_t bus_unregister_driver(bus_t *bus, bus_driver_t *driver) {
  * currently loaded drivers to find one which supports the device.
  *
  * @param bus           Bus that the device is added to.
- * @param device        Device that has been added. The device's private pointer
- *                      should point to a bus_device_t.
+ * @param device        Device that has been added. The device tree node should
+ *                      have been created. Its private pointer will be set to
+ *                      the bus_device_t.
  */
-void bus_add_device(bus_t *bus, device_t *device) {
+void bus_add_device(bus_t *bus, bus_device_t *device) {
+    assert(device->node);
+    device->node->private = device;
+
     mutex_lock(&bus->lock);
 
     list_foreach(&bus->drivers, iter) {
@@ -159,5 +162,5 @@ void bus_add_device(bus_t *bus, device_t *device) {
  * @param device        Device to initialize. */
 void bus_device_init(bus_device_t *device) {
     device->driver = NULL;
-    device->device = NULL;
+    device->node   = NULL;
 }

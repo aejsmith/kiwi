@@ -84,15 +84,14 @@ static pci_device_t *scan_device(pci_address_t *addr, int indent) {
         device->sub_class);
 
     device_attr_t attrs[] = {
-        { PCI_DEVICE_ATTR_VENDOR_ID,  DEVICE_ATTR_UINT16, { .uint16 = device->vendor_id  } },
-        { PCI_DEVICE_ATTR_DEVICE_ID,  DEVICE_ATTR_UINT16, { .uint16 = device->device_id  } },
-        { PCI_DEVICE_ATTR_BASE_CLASS, DEVICE_ATTR_UINT8,  { .uint8  = device->base_class } },
-        { PCI_DEVICE_ATTR_SUB_CLASS,  DEVICE_ATTR_UINT8,  { .uint8  = device->sub_class  } },
+        { DEVICE_ATTR_CLASS,          DEVICE_ATTR_STRING, { .string = PCI_DEVICE_CLASS_NAME } },
+        { PCI_DEVICE_ATTR_VENDOR_ID,  DEVICE_ATTR_UINT16, { .uint16 = device->vendor_id     } },
+        { PCI_DEVICE_ATTR_DEVICE_ID,  DEVICE_ATTR_UINT16, { .uint16 = device->device_id     } },
+        { PCI_DEVICE_ATTR_BASE_CLASS, DEVICE_ATTR_UINT8,  { .uint8  = device->base_class    } },
+        { PCI_DEVICE_ATTR_SUB_CLASS,  DEVICE_ATTR_UINT8,  { .uint8  = device->sub_class     } },
     };
 
-    status_t ret = device_create(
-        name, pci_bus.dir, NULL, device, attrs, array_size(attrs),
-        &device->bus.device);
+    status_t ret = bus_create_device(&pci_bus, &device->bus, name, NULL, attrs, array_size(attrs));
     if (ret != STATUS_SUCCESS) {
         kprintf(LOG_WARN, "pci: failed to create device %s: %" PRId32, name, ret);
         kfree(device);
@@ -138,13 +137,42 @@ void pci_bus_scan(uint16_t domain, uint8_t bus) {
 }
 
 /** Match a PCI device to a driver. */
-static bool pci_bus_match_device(device_t *device, bus_driver_t *driver) {
+static bool pci_bus_match_device(bus_device_t *_device, bus_driver_t *_driver) {
+    pci_device_t *device = container_of(_device, pci_device_t, bus);
+    pci_driver_t *driver = container_of(_driver, pci_driver_t, bus);
+
+    for (size_t i = 0; i < driver->matches.count; i++) {
+        pci_match_t *match = &driver->matches.array[i];
+
+        bool matches = true;
+
+        if (match->vendor_id != PCI_MATCH_ANY_ID)
+            matches &= device->vendor_id == match->vendor_id;
+
+        if (match->device_id != PCI_MATCH_ANY_ID)
+            matches &= device->device_id == match->device_id;
+
+        if (match->base_class != PCI_MATCH_ANY_ID)
+            matches &= device->base_class == match->base_class;
+
+        if (match->sub_class != PCI_MATCH_ANY_ID)
+            matches &= device->sub_class == match->sub_class;
+
+        if (matches) {
+            device->match = match;
+            return true;
+        }
+    }
+
     return false;
 }
 
 /** Initialize a PCI device. */
-static status_t pci_bus_init_device(device_t *device, bus_driver_t *driver) {
-    return STATUS_NOT_IMPLEMENTED;
+static status_t pci_bus_init_device(bus_device_t *_device, bus_driver_t *_driver) {
+    pci_device_t *device = container_of(_device, pci_device_t, bus);
+    pci_driver_t *driver = container_of(_driver, pci_driver_t, bus);
+
+    return driver->init_device(device);
 }
 
 static bus_type_t pci_bus_type = {
