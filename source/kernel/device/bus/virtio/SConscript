@@ -14,20 +14,14 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'kern_sources')
-from util import FeatureSources, FeatureDirs
+Import('config', 'mod_env')
+from util import FeatureDirs
 
-kern_sources += FeatureSources(config, [
-    'bus.c',
-    'class.c',
-    'device.c',
-    'io.c',
-    'irq.c',
+mod_env.Module('virtio', [
+    'virtio.c',
 ])
 
-SConscript(dirs = FeatureDirs(config, [
-    'bus',
-    'console',
-    'input',
-    'net',
-]))
+if config['DEVICE_BUS_VIRTIO_PCI']:
+    mod_env.Module('virtio_pci', [
+        'virtio_pci.c',
+    ])

@@ -22,3 +22,18 @@ config DEVICE_BUS_PCI
     depends on PLATFORM_PC
 	help
 	  Enable the PCI bus manager.
+
+config DEVICE_BUS_VIRTIO
+    bool "VirtIO bus manager"
+    default y
+    help
+	  Enable support for VirtIO devices. This is just the core VirtIO bus
+	  manager - to be useful, a transport driver and device drivers must also
+	  be enabled.
+
+config DEVICE_BUS_VIRTIO_PCI
+	bool "VirtIO PCI transport driver"
+	default y
+	depends on DEVICE_BUS_PCI && DEVICE_BUS_VIRTIO
+	help
+	  Enable support for VirtIO over PCI.

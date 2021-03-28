@@ -19,4 +19,5 @@ from util import FeatureDirs
 
 SConscript(dirs = FeatureDirs(config, [
     ('DEVICE_BUS_PCI', 'pci'),
+    ('DEVICE_BUS_VIRTIO', 'virtio'),
 ]))

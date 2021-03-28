@@ -55,9 +55,9 @@ static bool match_device(bus_t *bus, bus_device_t *device, bus_driver_t *driver)
 
         status_t ret = bus->type->init_device(device, driver);
         if (ret != STATUS_SUCCESS) {
-            kprintf(
-                LOG_WARN, "bus: failed to initialize device '%s': %" PRId32 "\n",
-                device->node->name, ret);
+            device_kprintf(
+                device->node, LOG_WARN, "failed to initialize device: %" PRId32 "\n",
+                ret);
         }
     }
 

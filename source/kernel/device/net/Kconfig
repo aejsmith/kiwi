@@ -14,20 +14,13 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'kern_sources')
-from util import FeatureSources, FeatureDirs
+comment "Network devices"
 
-kern_sources += FeatureSources(config, [
-    'bus.c',
-    'class.c',
-    'device.c',
-    'io.c',
-    'irq.c',
-])
+config DEVICE_NET_VIRTIO_NET
+	bool "VirtIO network device"
+	default y
+    depends on DEVICE_BUS_VIRTIO
+	help
+	  Enable support for VirtIO network devices implemented by virtual machines
+	  such as QEMU and VirtualBox.
 
-SConscript(dirs = FeatureDirs(config, [
-    'bus',
-    'console',
-    'input',
-    'net',
-]))
