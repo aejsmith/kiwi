@@ -146,7 +146,7 @@ def boot_image_func(target, source, env):
     tar.finish()
     return 0
 def boot_image_emitter(target, source, env):
-    return (target, [env['KERNEL'], env['FSIMAGE']] + env['KBOOT'] + env['MODULES'])
+    return (target, [env['KERNEL']] + env['MODULES'] + env['KBOOT'] + [env['FSIMAGE']])
 boot_image_builder = Builder(action = Action(boot_image_func, '$GENCOMSTR'), emitter = boot_image_emitter)
 
 # Function to generate an ISO image.
@@ -188,5 +188,5 @@ def iso_image_func(target, source, env):
     shutil.rmtree(tmpdir)
     return ret
 def iso_image_emitter(target, source, env):
-    return (target, [env['KERNEL'], env['FSIMAGE'], env['KBOOT_MKISO']] + env['KBOOT'] + env['MODULES'])
+    return (target, [env['KERNEL']] + env['MODULES'] + env['KBOOT'] + [env['FSIMAGE']] + [env['KBOOT_MKISO']])
 iso_image_builder = Builder(action = Action(iso_image_func, '$GENCOMSTR'), emitter = iso_image_emitter)
