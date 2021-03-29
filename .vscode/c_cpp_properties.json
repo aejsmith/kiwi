@@ -9,7 +9,7 @@
                 "limitSymbolsToIncludedHeaders": true
             },
             "compileCommands": "${workspaceFolder}/build/compile_commands.json",
-            "compilerPath": "/usr/bin/clang",
+            "compilerPath": "${workspaceFolder}/utilities/config-clang",
             "cStandard": "c11",
             "cppStandard": "c++17",
             "intelliSenseMode": "clang-x64"
