@@ -20,25 +20,49 @@
  */
 
 #include <device/bus/pci.h>
+
+#include <device/bus/virtio/virtio_pci.h>
 #include <device/bus/virtio/virtio.h>
 
 #include <mm/malloc.h>
 
 #include <kernel.h>
 
-/** PCI device revisions. */
-#define VIRTIO_PCI_REVISION_LEGACY  0
-#define VIRTIO_PCI_REVISION_MODERN  1
-
 /** VirtIO PCI device structure. */
 typedef struct virtio_pci_device {
     virtio_device_t virtio;
     pci_device_t *pci;
+    io_region_t io;
 } virtio_pci_device_t;
 
+static uint8_t virtio_pci_get_status(virtio_device_t *_device) {
+    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+
+    return io_read8(device->io, VIRTIO_PCI_STATUS);
+}
+
+static void virtio_pci_set_status(virtio_device_t *_device, uint8_t status) {
+    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+
+    if (status == 0) {
+        io_write8(device->io, VIRTIO_PCI_STATUS, status);
+    } else {
+        uint8_t val = io_read8(device->io, VIRTIO_PCI_STATUS);
+        val |= status;
+        io_write8(device->io, VIRTIO_PCI_STATUS, val);
+    }
+}
+
+static virtio_transport_ops_t virtio_pci_transport_ops = {
+    .get_status = virtio_pci_get_status,
+    .set_status = virtio_pci_set_status,
+};
+
 static status_t virtio_pci_init_device(pci_device_t *pci) {
+    status_t ret;
+
     /* We only support legacy for now as this what most implementations are. */
-    if (pci->revision != VIRTIO_PCI_REVISION_LEGACY) {
+    if (pci->revision != VIRTIO_PCI_ABI_VERSION) {
         kprintf(
             LOG_WARN, "virtio_pci: %s: non-legacy devices are not currently supported\n",
             pci->bus.node->name);
@@ -64,11 +88,27 @@ static status_t virtio_pci_init_device(pci_device_t *pci) {
     virtio_pci_device_t *device = kmalloc(sizeof(*device), MM_KERNEL);
 
     device->virtio.device_id = device_id;
+    device->virtio.transport = &virtio_pci_transport_ops;
     device->pci              = pci;
 
-    status_t ret = virtio_create_device(pci->bus.node, &device->virtio);
-    if (ret != STATUS_SUCCESS)
+    ret = virtio_create_device(pci->bus.node, &device->virtio);
+    if (ret != STATUS_SUCCESS) {
         kfree(device);
+        return ret;
+    }
+
+    /* Map the I/O region in BAR 0. */
+    ret = device_pci_bar_map(device->virtio.bus.node, pci, 0, MM_KERNEL, &device->io);
+    if (ret != STATUS_SUCCESS) {
+        kprintf(
+            LOG_NOTICE, "virtio_pci: %s: failed to map BAR 0: %" PRId32 "\n",
+            pci->bus.node->name, ret);
+        virtio_device_destroy(&device->virtio);
+        return ret;
+    }
+
+    /* Search for a driver. */
+    virtio_add_device(&device->virtio);
 
     return ret;
 }

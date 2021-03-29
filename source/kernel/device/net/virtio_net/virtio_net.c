@@ -26,6 +26,7 @@
 
 static status_t virtio_net_init_device(virtio_device_t *device) {
     kprintf(LOG_DEBUG, "virtio_net: initializing device...\n");
+// FIXME: Locking for VirtIO register access!
     return STATUS_SUCCESS;
 }
 

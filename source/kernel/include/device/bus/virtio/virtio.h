@@ -51,16 +51,40 @@ typedef struct virtio_driver {
 #define MODULE_VIRTIO_DRIVER(driver) \
     MODULE_BUS_DRIVER(virtio_bus, driver)
 
+/** Implementation of a VirtIO transport. */
+typedef struct virtio_transport_ops {
+    /** Get device status.
+     * @param device        Device to get status of.
+     * @return              Current device status. */
+    uint8_t (*get_status)(struct virtio_device *device);
+
+    /** Set device status bits or reset device.
+     * @param device        Device to set status of.
+     * @param status        Status bits to set. If 0, resets the device.*/
+    void (*set_status)(struct virtio_device *device, uint8_t status);
+} virtio_transport_ops_t;
+
 /** VirtIO device structure. */
 typedef struct virtio_device {
     bus_device_t bus;
 
     /** To be filled in by the transport on initialization. */
     uint16_t device_id;                     /**< Device ID. */
+    virtio_transport_ops_t *transport;      /**< Transport operations. */
 } virtio_device_t;
+
+/** Destroy a VirtIO device. */
+static inline void virtio_device_destroy(virtio_device_t *device) {
+    bus_device_destroy(&device->bus);
+}
 
 extern status_t virtio_create_device_impl(module_t *module, device_t *parent, virtio_device_t *device);
 
 /** @see virtio_create_device_impl() */
 #define virtio_create_device(parent, device) \
     virtio_create_device_impl(module_self(), parent, device)
+
+/** Search for a driver for a newly-added VirtIO device. */
+static inline void virtio_add_device(virtio_device_t *device) {
+    bus_add_device(&virtio_bus, &device->bus);
+}

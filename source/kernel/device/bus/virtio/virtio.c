@@ -17,8 +17,15 @@
 /**
  * @file
  * @brief               VirtIO bus manager.
+ *
+ * Reference:
+ *  - Virtual I/O Device (VIRTIO) Version 1.1
+ *    https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html
+ *  - Virtio PCI Card Specification v0.9.5
+ *    https://ozlabs.org/~rusty/virtio-spec/virtio-0.9.5.pdf
  */
 
+#include <device/bus/virtio/virtio_config.h>
 #include <device/bus/virtio/virtio.h>
 
 #include <lib/string.h>
@@ -41,7 +48,8 @@ static atomic_uint32_t next_virtio_node_id = 0;
 /**
  * Create a new VirtIO device. Called by the transport driver to create the
  * VirtIO device node under the device node on the bus that the device was
- * found on.
+ * found on. This does not search for and initialize a driver for the device,
+ * this is done by virtio_add_device().
  *
  * @param module        Owning module (transport driver).
  * @param parent        Parent device node.
@@ -65,6 +73,7 @@ __export status_t virtio_create_device_impl(module_t *module, device_t *parent, 
     };
 
     /* Create the device under the parent bus (physical location). */
+    // TODO: destruction: needs ops to destroy the virtio_device_t.
     ret = device_create_etc(
         module, module->name, parent, NULL, &device->bus, attrs, array_size(attrs),
         &device->bus.node);
@@ -77,11 +86,11 @@ __export status_t virtio_create_device_impl(module_t *module, device_t *parent, 
     ret = device_alias_etc(module, name, virtio_bus.dir, device->bus.node, NULL);
     if (ret != STATUS_SUCCESS) {
         kprintf(LOG_WARN, "virtio: failed to create alias %s: %" PRId32, name, ret);
+        // TODO: destruction - this is wrong since it would free virtio_device
+        // but caller expects it to not be freed on failure.
         device_destroy(device->bus.node);
         return ret;
     }
-
-    bus_add_device(&virtio_bus, &device->bus);
 
     return STATUS_SUCCESS;
 }
@@ -99,7 +108,25 @@ static status_t virtio_bus_init_device(bus_device_t *_device, bus_driver_t *_dri
     virtio_device_t *device = container_of(_device, virtio_device_t, bus);
     virtio_driver_t *driver = container_of(_driver, virtio_driver_t, bus);
 
-    return driver->init_device(device);
+    /* Reset the device and acknowledge it. */
+    device->transport->set_status(device, 0);
+    device->transport->set_status(device, VIRTIO_CONFIG_S_ACKNOWLEDGE | VIRTIO_CONFIG_S_DRIVER);
+
+    /* Try to initialize the driver. */
+    status_t ret = driver->init_device(device);
+
+    /* Set status accordingly. */
+    if (ret == STATUS_SUCCESS) {
+        device->transport->set_status(device, VIRTIO_CONFIG_S_DRIVER_OK);
+    } else {
+        /* Set failed, but reset it immediately after. This should hopefully
+         * stop the device from touching any rings that might have been set up
+         * and allow us to free them. */
+        device->transport->set_status(device, VIRTIO_CONFIG_S_FAILED);
+        device->transport->set_status(device, 0);
+    }
+
+    return ret;
 }
 
 static bus_type_t virtio_bus_type = {

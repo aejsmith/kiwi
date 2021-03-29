@@ -135,6 +135,11 @@ static inline __always_inline status_t bus_create_device(
 
 extern void bus_device_init(bus_device_t *device);
 
+/** Destroy a bus device. */
+static inline void bus_device_destroy(bus_device_t *device) {
+    fatal("TODO");
+}
+
 /** Define module init/unload functions for a bus driver.
  * @param bus           Bus to register to.
  * @param driver        Driver to register. */
