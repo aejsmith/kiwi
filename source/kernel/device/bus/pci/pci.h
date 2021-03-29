@@ -36,4 +36,4 @@ extern void platform_pci_config_write32(pci_address_t *addr, uint8_t reg, uint32
 extern status_t platform_pci_init(void);
 extern void platform_pci_unload(void);
 
-extern void pci_bus_scan(uint16_t domain, uint8_t bus);
+extern void pci_scan_bus(uint16_t domain, uint8_t bus);

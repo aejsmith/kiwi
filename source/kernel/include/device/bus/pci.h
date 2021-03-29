@@ -22,6 +22,7 @@
 #pragma once
 
 #include <device/bus.h>
+#include <device/io.h>
 
 #include <kernel/device/bus/pci.h>
 
@@ -113,6 +114,16 @@ typedef struct pci_address {
     uint8_t func;
 } pci_address_t;
 
+#define PCI_MAX_BARS 6
+
+/** PCI BAR details. */
+typedef struct pci_bar {
+    phys_ptr_t base;
+    phys_size_t size;
+    bool is_pio : 1;
+    bool prefetchable : 1;
+} pci_bar_t;
+
 /** PCI device structure. */
 typedef struct pci_device {
     bus_device_t bus;
@@ -130,6 +141,8 @@ typedef struct pci_device {
     uint8_t header_type;
     uint8_t interrupt_line;
     uint8_t interrupt_pin;
+
+    pci_bar_t bars[PCI_MAX_BARS];       /**< Saved details of BARs. */
 } pci_device_t;
 
 /** Common PCI configuration offsets. */
@@ -171,3 +184,19 @@ extern uint16_t pci_config_read16(pci_device_t *device, uint8_t reg);
 extern void pci_config_write16(pci_device_t *device, uint8_t reg, uint16_t val);
 extern uint32_t config_read32(pci_device_t *device, uint8_t reg);
 extern void pci_config_write32(pci_device_t *device, uint8_t reg, uint32_t val);
+
+extern status_t pci_bar_map(pci_device_t *device, uint8_t index, unsigned mmflag, io_region_t *_region);
+extern status_t pci_bar_map_etc(
+    pci_device_t *device, uint8_t index, phys_ptr_t offset, phys_size_t size,
+    uint32_t flags, unsigned mmflag, io_region_t *_region);
+extern void pci_bar_unmap(pci_device_t *device, uint8_t index, io_region_t region);
+extern void pci_bar_unmap_etc(
+    pci_device_t *device, uint8_t index, io_region_t region, phys_ptr_t offset,
+    phys_size_t size);
+
+extern status_t device_pci_bar_map(
+    device_t *owner, pci_device_t *device, uint8_t index, unsigned mmflag,
+    io_region_t *_region);
+extern status_t device_pci_bar_map_etc(
+    device_t *owner, pci_device_t *device, uint8_t index, phys_ptr_t offset,
+    phys_size_t size, uint32_t flags, unsigned mmflag, io_region_t *_region);

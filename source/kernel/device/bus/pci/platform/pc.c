@@ -79,7 +79,7 @@ status_t platform_pci_init(void) {
         return STATUS_NOT_SUPPORTED;
     }
 
-    pci_bus_scan(0, 0);
+    pci_scan_bus(0, 0);
     return STATUS_SUCCESS;
 }
 
