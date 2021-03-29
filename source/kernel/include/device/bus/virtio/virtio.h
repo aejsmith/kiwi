@@ -23,6 +23,9 @@
 
 #include <device/bus.h>
 
+#include <device/bus/virtio/virtio_ids.h>
+#include <device/bus/virtio/virtio_ring.h>
+
 #include <kernel/device/bus/virtio.h>
 
 struct virtio_device;
@@ -30,31 +33,6 @@ struct virtio_device;
 #define VIRTIO_MODULE_NAME "virtio"
 
 extern bus_t virtio_bus;
-
-/** Device IDs. */
-#define VIRTIO_DEVICE_ID_RESERVED       0
-#define VIRTIO_DEVICE_ID_NET            1
-#define VIRTIO_DEVICE_ID_BLOCK          2
-#define VIRTIO_DEVICE_ID_CONSOLE        3
-#define VIRTIO_DEVICE_ID_ENTROPY        4
-#define VIRTIO_DEVICE_ID_BALLOON_TRAD   5
-#define VIRTIO_DEVICE_ID_IOMEMORY       6
-#define VIRTIO_DEVICE_ID_RPMSG          7
-#define VIRTIO_DEVICE_ID_SCSI           8
-#define VIRTIO_DEVICE_ID_9P             9
-#define VIRTIO_DEVICE_ID_MAC80211       10
-#define VIRTIO_DEVICE_ID_RPROC          11
-#define VIRTIO_DEVICE_ID_CAIF           12
-#define VIRTIO_DEVICE_ID_BALLOON        13
-#define VIRTIO_DEVICE_ID_GPU            16
-#define VIRTIO_DEVICE_ID_TIMER          17
-#define VIRTIO_DEVICE_ID_INPUT          18
-#define VIRTIO_DEVICE_ID_SOCKET         19
-#define VIRTIO_DEVICE_ID_CRYPTO         20
-#define VIRTIO_DEVICE_ID_SDM            21
-#define VIRTIO_DEVICE_ID_PSTORE         22
-#define VIRTIO_DEVICE_ID_IOMMU          23
-#define VIRTIO_DEVICE_ID_MEM            24
 
 /** VirtIO driver structure. */
 typedef struct virtio_driver {

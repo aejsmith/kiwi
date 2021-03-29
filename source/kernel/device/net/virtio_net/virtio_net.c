@@ -20,6 +20,7 @@
  */
 
 #include <device/bus/virtio/virtio.h>
+#include <device/bus/virtio/virtio_net.h>
 
 #include <kernel.h>
 
@@ -29,7 +30,7 @@ static status_t virtio_net_init_device(virtio_device_t *device) {
 }
 
 static virtio_driver_t virtio_net_driver = {
-    .device_id   = VIRTIO_DEVICE_ID_NET,
+    .device_id   = VIRTIO_ID_NET,
     .init_device = virtio_net_init_device,
 };
 
