@@ -64,7 +64,7 @@ static atomic_uint32_t next_virtio_node_id = 0;
  * @param queue         Queue to allocate for.
  * @param _desc_index   Where to store descriptor index.
  * @return              Pointer to descriptor, or NULL if none free. */
-struct vring_desc *virtio_queue_alloc(virtio_queue_t *queue, uint16_t *_desc_index) {
+__export struct vring_desc *virtio_queue_alloc(virtio_queue_t *queue, uint16_t *_desc_index) {
     if (queue->free_count == 0)
         return NULL;
 
@@ -85,7 +85,9 @@ struct vring_desc *virtio_queue_alloc(virtio_queue_t *queue, uint16_t *_desc_ind
  * @param count         Number of descriptors to allocate.
  * @param _start_index  Where to store start descriptor index.
  * @return              Pointer to descriptor, or NULL if none free. */
-struct vring_desc *virtio_queue_alloc_chain(virtio_queue_t *queue, uint16_t count, uint16_t *_start_index) {
+__export struct vring_desc *virtio_queue_alloc_chain(
+    virtio_queue_t *queue, uint16_t count, uint16_t *_start_index)
+{
     if (queue->free_count < count)
         return NULL;
 
@@ -114,7 +116,7 @@ struct vring_desc *virtio_queue_alloc_chain(virtio_queue_t *queue, uint16_t coun
  * @param queue         Queue to free for.
  * @param index         Queue index.
  * @param desc          Descriptor index. */
-void virtio_queue_free(virtio_queue_t *queue, uint16_t desc_index) {
+__export void virtio_queue_free(virtio_queue_t *queue, uint16_t desc_index) {
     queue->ring.desc[desc_index].next = queue->free_list;
     queue->free_list                  = desc_index;
 
@@ -124,7 +126,7 @@ void virtio_queue_free(virtio_queue_t *queue, uint16_t desc_index) {
 /** Submit a descriptor into a queue's available ring.
  * @param queue         Queue to submit to.
  * @param desc_index    Descriptor index. */
-void virtio_queue_submit(virtio_queue_t *queue, uint16_t desc_index) {
+__export void virtio_queue_submit(virtio_queue_t *queue, uint16_t desc_index) {
     struct vring_avail *avail = queue->ring.avail;
 
     avail->ring[avail->idx % queue->ring.num] = desc_index;
@@ -137,12 +139,21 @@ void virtio_queue_submit(virtio_queue_t *queue, uint16_t desc_index) {
  * Device methods.
  */
 
-/** Notify the device of new buffers in a queue.
- * @param device        Device to notify.
- * @param index         Queue index. */
-void virtio_device_notify(virtio_device_t *device, uint16_t index) {
+/**
+ * Sets the features supported by the driver. This must be a subset of the host
+ * supported features. It must only be called during device init.
+ *
+ * @param device        Device to set for.
+ * @param features      Features to enable.
+ */
+__export void virtio_device_set_features(virtio_device_t *device, uint32_t features) {
     mutex_lock(&device->lock);
-    device->transport->notify(device, index);
+
+    assert((features & ~device->host_features) == 0);
+    assert(!(device->transport->get_status(device) & VIRTIO_CONFIG_S_DRIVER_OK));
+
+    device->transport->set_features(device, features);
+
     mutex_unlock(&device->lock);
 }
 
@@ -151,7 +162,7 @@ void virtio_device_notify(virtio_device_t *device, uint16_t index) {
  * @param index         Queue index. The driver must not have previously
  *                      allocated this queue.
  * @return              Allocated queue, or NULL if the queue doesn't exist. */
-virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint16_t index) {
+__export virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint16_t index) {
     assert(index < VIRTIO_MAX_QUEUES);
 
     mutex_lock(&device->lock);
@@ -192,6 +203,15 @@ virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint16_t inde
     return queue;
 }
 
+/** Notify the device of new buffers in a queue.
+ * @param device        Device to notify.
+ * @param index         Queue index. */
+__export void virtio_device_notify(virtio_device_t *device, uint16_t index) {
+    mutex_lock(&device->lock);
+    device->transport->notify(device, index);
+    mutex_unlock(&device->lock);
+}
+
 /**
  * Bus methods.
  */
@@ -213,7 +233,7 @@ __export status_t virtio_create_device(device_t *parent, virtio_device_t *device
     assert(device->device_id != 0);
 
     bus_device_init(&device->bus);
-    mutex_init(&device->lock, "virtio_device_lock", 0);
+    mutex_init(&device->lock, "virtio_device_lock", MUTEX_RECURSIVE);
 
     memset(device->queues, 0, sizeof(device->queues));
 
@@ -270,6 +290,8 @@ static status_t virtio_bus_init_device(bus_device_t *_device, bus_driver_t *_dri
     /* Reset the device and acknowledge it. */
     device->transport->set_status(device, 0);
     device->transport->set_status(device, VIRTIO_CONFIG_S_ACKNOWLEDGE | VIRTIO_CONFIG_S_DRIVER);
+
+    device->host_features = device->transport->get_features(device);
 
     /* Try to initialize the driver. */
     status_t ret = driver->init_device(device);

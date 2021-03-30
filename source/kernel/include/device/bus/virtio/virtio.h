@@ -68,6 +68,16 @@ typedef struct virtio_transport {
      * @param status        Status bits to set. If 0, resets the device.*/
     void (*set_status)(struct virtio_device *device, uint8_t status);
 
+    /** Get supported host features.
+     * @param device        Device to get features of.
+     * @return              Supported host features. */
+    uint32_t (*get_features)(struct virtio_device *device);
+
+    /** Set supported driver features.
+     * @param device        Device to set features of.
+     * @param features      Supported driver features. */
+    void (*set_features)(struct virtio_device *device, uint32_t features);
+
     /** Get the size of a queue.
      * @param device        Device to get from.
      * @param index         Queue index.
@@ -85,7 +95,7 @@ typedef struct virtio_transport {
     void (*notify)(struct virtio_device *device, uint16_t index);
 } virtio_transport_t;
 
-#define VIRTIO_MAX_QUEUES   2
+#define VIRTIO_MAX_QUEUES   4
 
 /** VirtIO queue structure. */
 typedef struct virtio_queue {
@@ -132,18 +142,22 @@ typedef struct virtio_device {
      */
     mutex_t lock;
 
+    uint32_t host_features;             /**< Supported host features. */
+
     /** Device virtqueues. */
     virtio_queue_t queues[VIRTIO_MAX_QUEUES];
 } virtio_device_t;
+
+#define VIRTIO_F(bit)   (1u << bit)
 
 /** Destroy a VirtIO device. */
 static inline void virtio_device_destroy(virtio_device_t *device) {
     bus_device_destroy(&device->bus);
 }
 
-extern void virtio_device_notify(virtio_device_t *device, uint16_t index);
-
+extern void virtio_device_set_features(virtio_device_t *device, uint32_t features);
 extern virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint16_t index);
+extern void virtio_device_notify(virtio_device_t *device, uint16_t index);
 
 extern status_t virtio_create_device(device_t *parent, virtio_device_t *device);
 

@@ -21,12 +21,14 @@
 
 #include <device/bus/pci.h>
 
-#include <device/bus/virtio/virtio_pci.h>
 #include <device/bus/virtio/virtio.h>
 
 #include <mm/malloc.h>
 
+#include <assert.h>
 #include <kernel.h>
+
+#include "virtio_pci.h"
 
 /** VirtIO PCI device structure. */
 typedef struct virtio_pci_device {
@@ -51,6 +53,18 @@ static void virtio_pci_set_status(virtio_device_t *_device, uint8_t status) {
         val |= status;
         io_write8(device->io, VIRTIO_PCI_STATUS, val);
     }
+}
+
+static uint32_t virtio_pci_get_features(virtio_device_t *_device) {
+    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+
+    return io_read32(device->io, VIRTIO_PCI_HOST_FEATURES);
+}
+
+static void virtio_pci_set_features(virtio_device_t *_device, uint32_t features) {
+    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+
+    io_write32(device->io, VIRTIO_PCI_GUEST_FEATURES, features);
 }
 
 static uint16_t virtio_pci_get_queue_size(virtio_device_t *_device, uint16_t index) {
@@ -79,6 +93,8 @@ static virtio_transport_t virtio_pci_transport = {
 
     .get_status       = virtio_pci_get_status,
     .set_status       = virtio_pci_set_status,
+    .get_features     = virtio_pci_get_features,
+    .set_features     = virtio_pci_set_features,
     .get_queue_size   = virtio_pci_get_queue_size,
     .enable_queue     = virtio_pci_enable_queue,
     .notify           = virtio_pci_notify,
