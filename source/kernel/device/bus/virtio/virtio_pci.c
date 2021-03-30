@@ -87,6 +87,13 @@ static void virtio_pci_notify(virtio_device_t *_device, uint16_t index) {
     io_write16(device->io, VIRTIO_PCI_QUEUE_NOTIFY, index);
 }
 
+static uint8_t virtio_pci_get_config(virtio_device_t *_device, uint32_t offset) {
+    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+
+    // TODO: MSI
+    return io_read8(device->io, VIRTIO_PCI_CONFIG_OFF(false) + offset);
+}
+
 static virtio_transport_t virtio_pci_transport = {
     .queue_align      = VIRTIO_PCI_VRING_ALIGN,
     .queue_addr_width = 32 + VIRTIO_PCI_QUEUE_ADDR_SHIFT,
@@ -98,6 +105,7 @@ static virtio_transport_t virtio_pci_transport = {
     .get_queue_size   = virtio_pci_get_queue_size,
     .enable_queue     = virtio_pci_enable_queue,
     .notify           = virtio_pci_notify,
+    .get_config       = virtio_pci_get_config,
 };
 
 static status_t virtio_pci_init_device(pci_device_t *pci) {

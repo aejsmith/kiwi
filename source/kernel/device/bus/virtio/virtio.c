@@ -139,6 +139,18 @@ __export void virtio_queue_submit(virtio_queue_t *queue, uint16_t desc_index) {
  * Device methods.
  */
 
+/** Read from the device-specific configuration space.
+ * @param device        Device to read from.
+ * @param buf           Buffer to read into.
+ * @param offset        Byte offset to read from.
+ * @param size          Number of bytes to read. */
+__export void virtio_device_get_config(virtio_device_t *device, void *buf, uint32_t offset, uint32_t size) {
+    uint8_t *data = buf;
+
+    for (uint32_t i = 0; i < size; i++)
+        data[i] = device->transport->get_config(device, offset + i);
+}
+
 /**
  * Sets the features supported by the driver. This must be a subset of the host
  * supported features. It must only be called during device init.
@@ -147,14 +159,10 @@ __export void virtio_queue_submit(virtio_queue_t *queue, uint16_t desc_index) {
  * @param features      Features to enable.
  */
 __export void virtio_device_set_features(virtio_device_t *device, uint32_t features) {
-    mutex_lock(&device->lock);
-
     assert((features & ~device->host_features) == 0);
     assert(!(device->transport->get_status(device) & VIRTIO_CONFIG_S_DRIVER_OK));
 
     device->transport->set_features(device, features);
-
-    mutex_unlock(&device->lock);
 }
 
 /** Allocate and enable a queue (ring) for a VirtIO device.
@@ -164,8 +172,6 @@ __export void virtio_device_set_features(virtio_device_t *device, uint32_t featu
  * @return              Allocated queue, or NULL if the queue doesn't exist. */
 __export virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint16_t index) {
     assert(index < VIRTIO_MAX_QUEUES);
-
-    mutex_lock(&device->lock);
 
     virtio_queue_t *queue = &device->queues[index];
     assert(queue->mem_size == 0);
@@ -199,17 +205,7 @@ __export virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint
     /* Enable the queue. */
     device->transport->enable_queue(device, index);
 
-    mutex_unlock(&device->lock);
     return queue;
-}
-
-/** Notify the device of new buffers in a queue.
- * @param device        Device to notify.
- * @param index         Queue index. */
-__export void virtio_device_notify(virtio_device_t *device, uint16_t index) {
-    mutex_lock(&device->lock);
-    device->transport->notify(device, index);
-    mutex_unlock(&device->lock);
 }
 
 /**
@@ -233,7 +229,6 @@ __export status_t virtio_create_device(device_t *parent, virtio_device_t *device
     assert(device->device_id != 0);
 
     bus_device_init(&device->bus);
-    mutex_init(&device->lock, "virtio_device_lock", MUTEX_RECURSIVE);
 
     memset(device->queues, 0, sizeof(device->queues));
 
@@ -285,8 +280,6 @@ static status_t virtio_bus_init_device(bus_device_t *_device, bus_driver_t *_dri
     virtio_device_t *device = container_of(_device, virtio_device_t, bus);
     virtio_driver_t *driver = container_of(_driver, virtio_driver_t, bus);
 
-    mutex_lock(&device->lock);
-
     /* Reset the device and acknowledge it. */
     device->transport->set_status(device, 0);
     device->transport->set_status(device, VIRTIO_CONFIG_S_ACKNOWLEDGE | VIRTIO_CONFIG_S_DRIVER);
@@ -307,7 +300,6 @@ static status_t virtio_bus_init_device(bus_device_t *_device, bus_driver_t *_dri
         device->transport->set_status(device, 0);
     }
 
-    mutex_unlock(&device->lock);
     return ret;
 }
 

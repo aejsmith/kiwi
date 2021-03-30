@@ -79,8 +79,15 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
         return STATUS_DEVICE_ERROR;
     }
 
+    uint8_t mac[6];
+    virtio_device_get_config(virtio, mac, offsetof(struct virtio_net_config, mac), sizeof(mac));
+
+    device_kprintf(
+        node, LOG_NOTICE, "MAC address is %02x:%02x:%02x:%02x:%02x:%02x\n",
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
 // TODO: Synchronization for VirtIO queue access. Probably need a lock on each
-// queue.
+// queue?
 
     return STATUS_SUCCESS;
 }

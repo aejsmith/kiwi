@@ -28,8 +28,6 @@
 
 #include <kernel/device/bus/virtio.h>
 
-#include <sync/mutex.h>
-
 struct virtio_device;
 
 #define VIRTIO_MODULE_NAME "virtio"
@@ -93,6 +91,12 @@ typedef struct virtio_transport {
      * @param device        Device to notify.
      * @param index         Queue index. */
     void (*notify)(struct virtio_device *device, uint16_t index);
+
+    /** Read from the device-specific configuration space.
+     * @param device        Device to read from.
+     * @param offset        Byte offset to read from.
+     * @return              Value read. */
+    uint8_t (*get_config)(struct virtio_device *device, uint32_t offset);
 } virtio_transport_t;
 
 #define VIRTIO_MAX_QUEUES   4
@@ -127,20 +131,17 @@ extern struct vring_desc *virtio_queue_alloc_chain(virtio_queue_t *queue, uint16
 extern void virtio_queue_free(virtio_queue_t *queue, uint16_t desc_index);
 extern void virtio_queue_submit(virtio_queue_t *queue, uint16_t desc_index);
 
-/** VirtIO device structure. */
+/**
+ * VirtIO device structure. Access to the device is not synchronized by generic
+ * VirtIO functions - it is the responsibility of the device driver to implement
+ * appropriate synchronization.
+ */
 typedef struct virtio_device {
     bus_device_t bus;
 
     /** To be filled in by the transport on initialization. */
     uint16_t device_id;                 /**< Device ID. */
     virtio_transport_t *transport;      /**< Transport implementation. */
-
-    /**
-     * Synchronizes access to the device registers - all transport operations
-     * will be called with this held. This does not synchronize access to any
-     * queues.
-     */
-    mutex_t lock;
 
     uint32_t host_features;             /**< Supported host features. */
 
@@ -155,9 +156,17 @@ static inline void virtio_device_destroy(virtio_device_t *device) {
     bus_device_destroy(&device->bus);
 }
 
+/** Notify the device of new buffers in a queue.
+ * @param device        Device to notify.
+ * @param index         Queue index. */
+static inline void virtio_device_notify(virtio_device_t *device, uint16_t index) {
+    device->transport->notify(device, index);
+}
+
+extern void virtio_device_get_config(virtio_device_t *device, void *buf, uint32_t offset, uint32_t size);
+
 extern void virtio_device_set_features(virtio_device_t *device, uint32_t features);
 extern virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint16_t index);
-extern void virtio_device_notify(virtio_device_t *device, uint16_t index);
 
 extern status_t virtio_create_device(device_t *parent, virtio_device_t *device);
 
