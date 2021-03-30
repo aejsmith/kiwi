@@ -69,7 +69,14 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
     uint32_t features = virtio->host_features & VIRTIO_NET_SUPPORTED_FEATURES;
     virtio_device_set_features(virtio, features);
 
+    uint8_t mac[6];
+    virtio_device_get_config(virtio, mac, offsetof(struct virtio_net_config, mac), sizeof(mac));
+
+    device_kprintf(node, LOG_NOTICE, "MAC address is %pM\n", mac);
+
     /* Create virtqueues. */
+    // TODO: Should probably only have these created while the network device is
+    // up?
     device->rx_queue = virtio_device_alloc_queue(virtio, VIRTIO_NET_QUEUE_RX);
     device->tx_queue = virtio_device_alloc_queue(virtio, VIRTIO_NET_QUEUE_TX);
 
@@ -78,13 +85,6 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
         device_destroy(node);
         return STATUS_DEVICE_ERROR;
     }
-
-    uint8_t mac[6];
-    virtio_device_get_config(virtio, mac, offsetof(struct virtio_net_config, mac), sizeof(mac));
-
-    device_kprintf(
-        node, LOG_NOTICE, "MAC address is %02x:%02x:%02x:%02x:%02x:%02x\n",
-        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 // TODO: Synchronization for VirtIO queue access. Probably need a lock on each
 // queue?

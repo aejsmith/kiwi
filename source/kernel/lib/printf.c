@@ -145,6 +145,19 @@ static void print_number(printf_state_t *state, uint64_t num) {
     }
 }
 
+static void print_mac_addr(printf_state_t *state, const uint8_t *addr) {
+    state->base = 16;
+    state->flags = PRINTF_ZERO_PAD | PRINTF_LOW_CASE;
+
+    for (unsigned i = 0; i < 6; i++) {
+        state->width = 2;
+        state->precision = 1;
+        print_number(state, addr[i]);
+        if (i != 5)
+            print_char(state, ':');
+    }
+}
+
 static void print_symbol(printf_state_t *state, void *ptr, char ext) {
     /* Zero pad up to the width of a pointer. */
     int width = (sizeof(void *) * 2) + 2;
@@ -180,11 +193,16 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
     /*
      * Extensions for certain useful things. Idea borrowed from the Linux
      * kernel. The following formats are implemented:
+     *  - %pB = Print a symbol for a backtrace handling tail calls correctly.
+     *  - %pM = Print a 6 byte MAC address, arg is pointer to 6 byte buffer.
      *  - %pS = Print a symbol: [<addr>] <name>+<offset>
      *  - %ps = Print a symbol: [<addr>] <name>
-     *  - %pB = Print a symbol for a backtrace handling tail calls correctly.
      */
     switch ((*fmt)[1]) {
+        case 'M':
+            print_mac_addr(state, (const uint8_t *)ptr);
+            (*fmt)++;
+            return;
         case 'S':
         case 's':
         case 'B':
