@@ -35,6 +35,10 @@ __export bus_t pci_bus;
 
 static SPINLOCK_DEFINE(pci_config_lock);
 
+/**
+ * Public API.
+ */
+
 /** Read an 8-bit value from a PCI device's configuration space.
  * @param device        Device to read from.
  * @param reg           Offset to read from.
@@ -310,6 +314,29 @@ __export status_t device_pci_bar_map_etc(
     return STATUS_SUCCESS;
 }
 
+/** Set whether bus mastering is enabled on a PCI device.
+ * @param device        Device to enable for.
+ * @param enable        Whether to enable bus mastering. */
+__export void pci_enable_master(pci_device_t *device, bool enable) {
+    spinlock_lock(&pci_config_lock);
+
+    uint16_t cmd = platform_pci_config_read16(&device->addr, PCI_CONFIG_COMMAND);
+
+    if (enable) {
+        cmd |= PCI_COMMAND_BUS_MASTER;
+    } else {
+        cmd &= ~PCI_COMMAND_BUS_MASTER;
+    }
+
+    platform_pci_config_write16(&device->addr, PCI_CONFIG_COMMAND, cmd);
+
+    spinlock_unlock(&pci_config_lock);
+}
+
+/**
+ * Device detection and bus implementation.
+ */
+
 static void make_device_name(pci_address_t *addr, char *str) {
     snprintf(
         str, PCI_NAME_MAX, "%04x:%02x:%02x.%x",
@@ -318,6 +345,8 @@ static void make_device_name(pci_address_t *addr, char *str) {
 
 static void scan_bars(pci_device_t *device) {
     memset(device->bars, 0, sizeof(device->bars));
+
+    uint16_t cmd_bits = 0;
 
     for (size_t i = 0; i < PCI_MAX_BARS; i++) {
         uint8_t reg  = PCI_CONFIG_BAR0 + (i * 4);
@@ -377,16 +406,26 @@ static void scan_bars(pci_device_t *device) {
         device->bars[i].size = (~(size & mask) + 1) & mask;
 
         if (device->bars[i].is_pio) {
+            cmd_bits |= PCI_COMMAND_IO;
+
             kprintf(
                 LOG_NOTICE, "pci:   BAR %zu PIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS "\n",
                 i, device->bars[i].base, device->bars[i].size);
         } else {
+            cmd_bits |= PCI_COMMAND_MEMORY;
+
             kprintf(
                 LOG_NOTICE, "pci:   BAR %zu MMIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS " (%" PRIu8 "-bit%s)\n",
                 i, device->bars[i].base, device->bars[i].size,
                 width, (device->bars[i].prefetchable) ? ", prefetchable" : "");
         }
     }
+
+    /* Make sure the I/O and memory space bits are set correctly. */
+    uint16_t cmd = platform_pci_config_read16(&device->addr, PCI_CONFIG_COMMAND);
+    cmd &= ~(PCI_COMMAND_IO | PCI_COMMAND_MEMORY);
+    cmd |= cmd_bits;
+    platform_pci_config_write16(&device->addr, PCI_CONFIG_COMMAND, cmd);
 }
 
 static pci_device_t *scan_device(pci_address_t *addr) {

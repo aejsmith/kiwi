@@ -178,6 +178,19 @@ typedef struct pci_device {
 /** PCI-to-PCI bridge configuration offsets (header type = 0x01). */
 #define PCI_CONFIG_P2P_SUBORDINATE_BUS  0x19    /**< Subordinate bus  (8-bit). */
 
+/** Bits in the PCI command register. */
+#define PCI_COMMAND_IO                  (1<<0)  /**< I/O Space enable. */
+#define PCI_COMMAND_MEMORY              (1<<1)  /**< Memory Space enable. */
+#define PCI_COMMAND_BUS_MASTER          (1<<2)  /**< Bus Mastering enable. */
+#define PCI_COMMAND_SPECIAL             (1<<3)  /**< Special Cycles enable. */
+#define PCI_COMMAND_MWI                 (1<<4)  /**< Memory Write & Invalidate enable. */
+#define PCI_COMMAND_VGA_SNOOP           (1<<5)  /**< VGA Pallette Snoop enable. */
+#define PCI_COMMAND_PARITY              (1<<6)  /**< Parity Check enable. */
+#define PCI_COMMAND_STEPPING            (1<<7)  /**< Stepping enable. */
+#define PCI_COMMAND_SERR                (1<<8)  /**< SERR enable. */
+#define PCI_COMMAND_FASTB2B             (1<<9)  /**< Fast Back-to-Back enable. */
+#define PCI_COMMAND_INT_DISABLE         (1<<10) /**< I/O interrupt disable. */
+
 extern uint8_t pci_config_read8(pci_device_t *device, uint8_t reg);
 extern void pci_config_write8(pci_device_t *device, uint8_t reg, uint8_t val);
 extern uint16_t pci_config_read16(pci_device_t *device, uint8_t reg);
@@ -200,3 +213,5 @@ extern status_t device_pci_bar_map(
 extern status_t device_pci_bar_map_etc(
     device_t *owner, pci_device_t *device, uint8_t index, phys_ptr_t offset,
     phys_size_t size, uint32_t flags, unsigned mmflag, io_region_t *_region);
+
+extern void pci_enable_master(pci_device_t *device, bool enable);
