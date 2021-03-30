@@ -134,6 +134,41 @@ status_t bus_unregister_driver(bus_t *bus, bus_driver_t *driver) {
 }
 
 /**
+ * Initializes a new bus device and creates the device tree node for it under
+ * the bus root. This should be called only by the bus manager driver.
+ *
+ * This is equivalent to calling bus_device_init() followed by device_create().
+ * If the bus manager needs more flexibility in creating the device (e.g.
+ * different parent), it can call bus_device_init() and then device_create()
+ * itself. When doing so, the device private pointer must be set to the
+ * bus_device_t, and the device node must be stored in bus_device_t::node.
+ *
+ * @param bus           Bus to create on.
+ * @param device        Bus device to add.
+ * @param name          Name for the device tree node.
+ * @param ops           Pointer to operations for the device (can be NULL).
+ * @param attrs         Optional array of attributes for the device (will be
+ *                      duplicated).
+ * @param count         Number of attributes.
+ * 
+ * @see                 device_create_etc().
+ *
+ * @return              Status code describing the result of the operation.
+ */
+status_t bus_create_device(
+    bus_t *bus, bus_device_t *device, const char *name, device_ops_t *ops,
+    device_attr_t *attrs, size_t count)
+{
+    bus_device_init(device);
+
+    status_t ret = device_create_etc(module_caller(), name, bus->dir, ops, device, attrs, count, &device->node);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    return STATUS_SUCCESS;
+}
+
+/**
  * Indicates that a new device has been added to the bus. This will search
  * currently loaded drivers to find one which supports the device.
  *
@@ -142,7 +177,7 @@ status_t bus_unregister_driver(bus_t *bus, bus_driver_t *driver) {
  *                      have been created. Its private pointer will be set to
  *                      the bus_device_t.
  */
-void bus_add_device(bus_t *bus, bus_device_t *device) {
+void bus_match_device(bus_t *bus, bus_device_t *device) {
     assert(device->node);
     device->node->private = device;
 

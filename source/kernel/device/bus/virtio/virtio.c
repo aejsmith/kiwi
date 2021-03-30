@@ -51,21 +51,24 @@ static atomic_uint32_t next_virtio_node_id = 0;
  * found on. This does not search for and initialize a driver for the device,
  * this is done by virtio_add_device().
  *
- * @param module        Owning module (transport driver).
  * @param parent        Parent device node.
  * @param device        VirtIO device structure created by the transport.
  *
  * @return              Status code describing the result of the operation.
  */
-__export status_t virtio_create_device_impl(module_t *module, device_t *parent, virtio_device_t *device) {
+__export status_t virtio_create_device(device_t *parent, virtio_device_t *device) {
     status_t ret;
 
     assert(device->device_id != 0);
+
+    bus_device_init(&device->bus);
 
     /* Allocate a node ID to give it a name. */
     uint32_t node_id = atomic_fetch_add(&next_virtio_node_id, 1);
     char name[16];
     snprintf(name, sizeof(name), "%" PRIu32, node_id);
+
+    module_t *module = module_caller();
 
     device_attr_t attrs[] = {
         { DEVICE_ATTR_CLASS,            DEVICE_ATTR_STRING, { .string = VIRTIO_DEVICE_CLASS_NAME } },

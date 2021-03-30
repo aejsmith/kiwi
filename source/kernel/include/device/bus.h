@@ -96,42 +96,10 @@ extern status_t bus_destroy(bus_t *bus);
 extern status_t bus_register_driver(bus_t *bus, bus_driver_t *driver);
 extern status_t bus_unregister_driver(bus_t *bus, bus_driver_t *driver);
 
-extern void bus_add_device(bus_t *bus, bus_device_t *device);
-
-/**
- * Create a new device on a bus and then searches for a driver to support the
- * device. The device node's private pointer will be set to the bus_device_t
- * (required by bus devices).
- *
- * This is equivalent to calling device_create() followed by bus_add_device().
- * The device tree node pointer will be stored in bus_device_t::node.
- *
- * @param bus           Bus to create on.
- * @param device        Bus device to add.
- * @param name          Name for the device tree node.
- * @param ops           Pointer to operations for the device (can be NULL).
- * @param attrs         Optional array of attributes for the device (will be
- *                      duplicated).
- * @param count         Number of attributes.
- * 
- * @see                 device_create_etc().
- * @see                 bus_add_device().
- *
- * @return              Status code describing the result of the operation.
- */
-static inline __always_inline status_t bus_create_device(
+extern status_t bus_create_device(
     bus_t *bus, bus_device_t *device, const char *name, device_ops_t *ops,
-    device_attr_t *attrs, size_t count)
-{
-    /* always_inline is required to ensure module_self() in device_create()
-     * gives the correct module. */
-    status_t ret = device_create(name, bus->dir, ops, device, attrs, count, &device->node);
-    if (ret != STATUS_SUCCESS)
-        return ret;
-
-    bus_add_device(bus, device);
-    return STATUS_SUCCESS;
-}
+    device_attr_t *attrs, size_t count);
+extern void bus_match_device(bus_t *bus, bus_device_t *device);
 
 extern void bus_device_init(bus_device_t *device);
 

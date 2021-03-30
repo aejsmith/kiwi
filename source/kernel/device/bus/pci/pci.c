@@ -279,7 +279,7 @@ __export status_t device_pci_bar_map(
  * Maps a PCI device BAR, as a device-managed resource (will be unmapped when
  * the device is destroyed).
  *
- * @see                 pci_bar_map().
+ * @see                 pci_bar_map_etc().
  *
  * @param owner         Device to register to.
  */
@@ -400,8 +400,6 @@ static pci_device_t *scan_device(pci_address_t *addr) {
 
     pci_device_t *device = kmalloc(sizeof(pci_device_t), MM_KERNEL);
 
-    bus_device_init(&device->bus);
-
     device->addr = *addr;
 
     spinlock_lock(&pci_config_lock);
@@ -444,6 +442,8 @@ static pci_device_t *scan_device(pci_address_t *addr) {
         kfree(device);
         return NULL;
     }
+
+    bus_match_device(&pci_bus, &device->bus);
 
     /* Check for a PCI-to-PCI bridge. */
     if (device->base_class == 0x06 && device->sub_class == 0x04) {

@@ -108,7 +108,7 @@ static status_t virtio_pci_init_device(pci_device_t *pci) {
     }
 
     /* Search for a driver. */
-    virtio_add_device(&device->virtio);
+    virtio_match_device(&device->virtio);
 
     return ret;
 }

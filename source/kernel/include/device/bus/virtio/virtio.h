@@ -78,13 +78,10 @@ static inline void virtio_device_destroy(virtio_device_t *device) {
     bus_device_destroy(&device->bus);
 }
 
-extern status_t virtio_create_device_impl(module_t *module, device_t *parent, virtio_device_t *device);
+extern status_t virtio_create_device(device_t *parent, virtio_device_t *device);
 
-/** @see virtio_create_device_impl() */
-#define virtio_create_device(parent, device) \
-    virtio_create_device_impl(module_self(), parent, device)
-
-/** Search for a driver for a newly-added VirtIO device. */
-static inline void virtio_add_device(virtio_device_t *device) {
-    bus_add_device(&virtio_bus, &device->bus);
+/** Search for a driver for a newly-added VirtIO device.
+ * @param device        Device that has been added. */
+static inline void virtio_match_device(virtio_device_t *device) {
+    bus_match_device(&virtio_bus, &device->bus);
 }
