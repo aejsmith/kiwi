@@ -53,9 +53,35 @@ static void virtio_pci_set_status(virtio_device_t *_device, uint8_t status) {
     }
 }
 
-static virtio_transport_ops_t virtio_pci_transport_ops = {
-    .get_status = virtio_pci_get_status,
-    .set_status = virtio_pci_set_status,
+static uint16_t virtio_pci_get_queue_size(virtio_device_t *_device, uint16_t index) {
+    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+
+    return io_read16(device->io, VIRTIO_PCI_QUEUE_NUM);
+}
+
+static void virtio_pci_enable_queue(virtio_device_t *_device, uint16_t index) {
+    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+    virtio_queue_t *queue = &device->virtio.queues[index];
+
+    io_write16(device->io, VIRTIO_PCI_QUEUE_SEL, index);
+    io_write32(device->io, VIRTIO_PCI_QUEUE_PFN, queue->mem_phys >> VIRTIO_PCI_QUEUE_ADDR_SHIFT);
+}
+
+static void virtio_pci_notify(virtio_device_t *_device, uint16_t index) {
+    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+
+    io_write16(device->io, VIRTIO_PCI_QUEUE_NOTIFY, index);
+}
+
+static virtio_transport_t virtio_pci_transport = {
+    .queue_align      = VIRTIO_PCI_VRING_ALIGN,
+    .queue_addr_width = 32 + VIRTIO_PCI_QUEUE_ADDR_SHIFT,
+
+    .get_status       = virtio_pci_get_status,
+    .set_status       = virtio_pci_set_status,
+    .get_queue_size   = virtio_pci_get_queue_size,
+    .enable_queue     = virtio_pci_enable_queue,
+    .notify           = virtio_pci_notify,
 };
 
 static status_t virtio_pci_init_device(pci_device_t *pci) {
@@ -88,7 +114,7 @@ static status_t virtio_pci_init_device(pci_device_t *pci) {
     virtio_pci_device_t *device = kmalloc(sizeof(*device), MM_KERNEL);
 
     device->virtio.device_id = device_id;
-    device->virtio.transport = &virtio_pci_transport_ops;
+    device->virtio.transport = &virtio_pci_transport;
     device->pci              = pci;
 
     ret = virtio_create_device(pci->bus.node, &device->virtio);

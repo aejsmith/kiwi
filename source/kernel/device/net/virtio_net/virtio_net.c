@@ -26,7 +26,8 @@
 
 static status_t virtio_net_init_device(virtio_device_t *device) {
     kprintf(LOG_DEBUG, "virtio_net: initializing device...\n");
-// FIXME: Locking for VirtIO register access!
+// TODO: Synchronization for VirtIO queue access. Probably need a lock on each
+// queue.
     return STATUS_SUCCESS;
 }
 

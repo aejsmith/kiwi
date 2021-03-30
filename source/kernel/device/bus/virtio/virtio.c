@@ -23,13 +23,24 @@
  *    https://docs.oasis-open.org/virtio/virtio/v1.1/csprd01/virtio-v1.1-csprd01.html
  *  - Virtio PCI Card Specification v0.9.5
  *    https://ozlabs.org/~rusty/virtio-spec/virtio-0.9.5.pdf
+ *
+ * TODO:
+ *  - Implement proper support for destruction:
+ *    - Ensure that the virtio_device_t gets destroyed when the parent (e.g.
+ *      PCI) device gets removed.
+ *    - Destroy queues and make sure the device is shut down when the child
+ *      device gets destroyed.
  */
+
+#include <arch/barrier.h>
 
 #include <device/bus/virtio/virtio_config.h>
 #include <device/bus/virtio/virtio.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
+
+#include <mm/phys.h>
 
 #include <assert.h>
 #include <kernel.h>
@@ -44,6 +55,146 @@ __export bus_t virtio_bus;
  * transport bus they were found on.
  */
 static atomic_uint32_t next_virtio_node_id = 0;
+
+/**
+ * Queue management methods.
+ */
+
+/** Allocate a single descriptor from a queue.
+ * @param queue         Queue to allocate for.
+ * @param _desc_index   Where to store descriptor index.
+ * @return              Pointer to descriptor, or NULL if none free. */
+struct vring_desc *virtio_queue_alloc(virtio_queue_t *queue, uint16_t *_desc_index) {
+    if (queue->free_count == 0)
+        return NULL;
+
+    uint16_t desc_index = queue->free_list;
+
+    struct vring_desc *desc = &queue->ring.desc[desc_index];
+    queue->free_list = desc->next;
+    queue->free_count--;
+
+    if (_desc_index)
+        *_desc_index = desc_index;
+
+    return desc;
+}
+
+/** Allocate a descriptor chain from a queue.
+ * @param queue         Queue to allocate for.
+ * @param count         Number of descriptors to allocate.
+ * @param _start_index  Where to store start descriptor index.
+ * @return              Pointer to descriptor, or NULL if none free. */
+struct vring_desc *virtio_queue_alloc_chain(virtio_queue_t *queue, uint16_t count, uint16_t *_start_index) {
+    if (queue->free_count < count)
+        return NULL;
+
+    struct vring_desc *prev = NULL;
+    uint16_t prev_index = 0;
+    while (count > 0) {
+        uint16_t desc_index;
+        struct vring_desc *desc = virtio_queue_alloc(queue, &desc_index);
+
+        desc->flags = (prev) ? VRING_DESC_F_NEXT : 0;
+        desc->next  = (prev) ? prev_index : 0;
+
+        prev       = desc;
+        prev_index = desc_index;
+
+        count--;
+    }
+
+    if (_start_index)
+        *_start_index = prev_index;
+
+    return prev;
+}
+
+/** Free a descriptor to a queue.
+ * @param queue         Queue to free for.
+ * @param index         Queue index.
+ * @param desc          Descriptor index. */
+void virtio_queue_free(virtio_queue_t *queue, uint16_t desc_index) {
+    queue->ring.desc[desc_index].next = queue->free_list;
+    queue->free_list                  = desc_index;
+
+    queue->free_count++;
+}
+
+/** Submit a descriptor into a queue's available ring.
+ * @param queue         Queue to submit to.
+ * @param desc_index    Descriptor index. */
+void virtio_queue_submit(virtio_queue_t *queue, uint16_t desc_index) {
+    struct vring_avail *avail = queue->ring.avail;
+
+    avail->ring[avail->idx % queue->ring.num] = desc_index;
+    memory_barrier();
+    avail->idx++;
+    memory_barrier();
+}
+
+/**
+ * Device methods.
+ */
+
+/** Notify the device of new buffers in a queue.
+ * @param device        Device to notify.
+ * @param index         Queue index. */
+void virtio_device_notify(virtio_device_t *device, uint16_t index) {
+    mutex_lock(&device->lock);
+    device->transport->notify(device, index);
+    mutex_unlock(&device->lock);
+}
+
+/** Allocate and enable a queue (ring) for a VirtIO device.
+ * @param device        Device to allocate for.
+ * @param index         Queue index. The driver must not have previously
+ *                      allocated this queue.
+ * @return              Allocated queue, or NULL if the queue doesn't exist. */
+virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint16_t index) {
+    assert(index < VIRTIO_MAX_QUEUES);
+
+    mutex_lock(&device->lock);
+
+    virtio_queue_t *queue = &device->queues[index];
+    assert(queue->mem_size == 0);
+
+    uint16_t num_descs = device->transport->get_queue_size(device, index);
+    if (num_descs == 0)
+        return NULL;
+
+    size_t align        = device->transport->queue_align;
+    size_t mem_align    = round_up(align, PAGE_SIZE);
+    phys_ptr_t max_addr = (phys_ptr_t)1 << device->transport->queue_addr_width;
+    queue->mem_size     = round_up(vring_size(num_descs, align), mem_align);
+
+    // TODO: Should we not use MM_WAIT here? Could be quite large.
+    phys_alloc(queue->mem_size, mem_align, 0, 0, max_addr, MM_KERNEL, &queue->mem_phys);
+    void *mem = phys_map_etc(
+        queue->mem_phys, queue->mem_size,
+        MMU_ACCESS_RW | MMU_CACHE_NORMAL, MM_KERNEL);
+
+    memset(mem, 0, queue->mem_size);
+    vring_init(&queue->ring, num_descs, mem, align);
+
+    queue->last_used = 0;
+
+    /* Add all descriptors to free list. */
+    queue->free_list  = 0xffff;
+    queue->free_count = 0;
+    for (uint16_t i = 0; i < num_descs; i++)
+        virtio_queue_free(queue, i);
+
+    /* Enable the queue. */
+    device->transport->enable_queue(device, index);
+
+    mutex_unlock(&device->lock);
+    return queue;
+}
+
+/**
+ * Bus methods.
+ */
 
 /**
  * Create a new VirtIO device. Called by the transport driver to create the
@@ -62,6 +213,9 @@ __export status_t virtio_create_device(device_t *parent, virtio_device_t *device
     assert(device->device_id != 0);
 
     bus_device_init(&device->bus);
+    mutex_init(&device->lock, "virtio_device_lock", 0);
+
+    memset(device->queues, 0, sizeof(device->queues));
 
     /* Allocate a node ID to give it a name. */
     uint32_t node_id = atomic_fetch_add(&next_virtio_node_id, 1);
@@ -111,6 +265,8 @@ static status_t virtio_bus_init_device(bus_device_t *_device, bus_driver_t *_dri
     virtio_device_t *device = container_of(_device, virtio_device_t, bus);
     virtio_driver_t *driver = container_of(_driver, virtio_driver_t, bus);
 
+    mutex_lock(&device->lock);
+
     /* Reset the device and acknowledge it. */
     device->transport->set_status(device, 0);
     device->transport->set_status(device, VIRTIO_CONFIG_S_ACKNOWLEDGE | VIRTIO_CONFIG_S_DRIVER);
@@ -129,6 +285,7 @@ static status_t virtio_bus_init_device(bus_device_t *_device, bus_driver_t *_dri
         device->transport->set_status(device, 0);
     }
 
+    mutex_unlock(&device->lock);
     return ret;
 }
 
