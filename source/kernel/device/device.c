@@ -707,6 +707,44 @@ static device_t *device_lookup(const char *path) {
     return device;
 }
 
+/**
+ * Constructs a device path in-place in a buffer. Buffer must be DEVICE_PATH_MAX
+ * bytes. It will be constructed backwards and a pointer to the start of the
+ * string will be returned.
+ */
+static char *device_path_inplace(device_t *device, char *buf) {
+    /* Build device path backwards. No need to lock devices, names are immutable
+     * and since we require the device to remain alive across the function call,
+     * the tree linkage cannot change either. */
+    char *path = &buf[DEVICE_PATH_MAX - 1];
+    *path = 0;
+    size_t len = 0;
+
+    device_t *iter = device;
+    while (iter != device_root_dir) {
+        size_t name_len = strlen(iter->name);
+
+        len += name_len + 1;
+        if (len >= DEVICE_PATH_MAX)
+            break;
+
+        path -= name_len;
+        memcpy(path, iter->name, name_len);
+
+        path--;
+        *path = '/';
+
+        iter = iter->parent;
+    }
+
+    if (len == 0) {
+        path--;
+        *path = '/';
+    }
+
+    return path;
+}
+
 /** Gets the path to a device.
  * @param device        Device to get path to.
  * @return              Pointer to kmalloc()'d string containing device path. */
@@ -862,34 +900,7 @@ static SPINLOCK_DEFINE(device_kprintf_lock);
 int device_kprintf(device_t *device, int level, const char *fmt, ...) {
     spinlock_lock(&device_kprintf_lock);
 
-    /* Build device path. No need to lock devices, names are immutable and since
-     * we require the device to remain alive across the function call, the tree
-     * linkage cannot change either. */
-    char *path = &device_kprintf_buf[DEVICE_PATH_MAX - 1];
-    *path = 0;
-    size_t len = 0;
-
-    device_t *iter = device;
-    while (iter != device_root_dir) {
-        size_t name_len = strlen(iter->name);
-
-        len += name_len + 1;
-        if (len >= DEVICE_PATH_MAX)
-            break;
-
-        path -= name_len;
-        memcpy(path, iter->name, name_len);
-
-        path--;
-        *path = '/';
-
-        iter = iter->parent;
-    }
-
-    if (len == 0) {
-        path--;
-        *path = '/';
-    }
+    char *path = device_path_inplace(device, device_kprintf_buf);
 
     int ret = kprintf(level, "%s: %s: ", device->module->name, path);
 
@@ -904,20 +915,24 @@ int device_kprintf(device_t *device, int level, const char *fmt, ...) {
     return ret;
 }
 
+/** Same as with device_kprintf() for KDB. */
+static char kdb_device_path_buf[DEVICE_PATH_MAX];
+
 static void dump_children(radix_tree_t *tree, int indent) {
     radix_tree_foreach(tree, iter) {
         device_t *device = radix_tree_entry(iter, device_t);
 
-        kdb_printf(
-            "%*s%-*s %-18p %-16s %d\n", indent, "",
-            24 - indent, device->name, device, device->module->name,
-            refcount_get(&device->count));
+        const char *dest = (device->dest)
+            ? device_path_inplace(device->dest, kdb_device_path_buf)
+            : "<none>";
 
-        if (device->dest) {
-            dump_children(&device->dest->children, indent + 2);
-        } else {
+        kdb_printf(
+            "%*s%-*s %-18p %-16s %-6d %s\n", indent, "",
+            24 - indent, device->name, device, device->module->name,
+            refcount_get(&device->count), dest);
+
+        if (!device->dest)
             dump_children(&device->children, indent + 2);
-        }
     }
 }
 
@@ -934,8 +949,8 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
     }
 
     if (argc == 1) {
-        kdb_printf("Name                     Address            Module           Count\n");
-        kdb_printf("====                     =======            ======           =====\n");
+        kdb_printf("Name                     Address            Module           Count  Destination\n");
+        kdb_printf("====                     =======            ======           =====  ===========\n");
 
         dump_children(&device_root_dir->children, 0);
         return KDB_SUCCESS;
@@ -947,12 +962,17 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
 
     device_t *device = (device_t *)((ptr_t)val);
 
-    kdb_printf("Device %p (%s)\n", device, device->name);
+    const char *path = device_path_inplace(device, kdb_device_path_buf);
+
+    kdb_printf("Device %p \"%s\"\n", device, path);
     kdb_printf("=================================================\n");
     kdb_printf("Count:       %d\n", refcount_get(&device->count));
     kdb_printf("Parent:      %p\n", device->parent);
-    if (device->dest)
-        kdb_printf("Destination: %p(%s)\n", device->dest, device->dest->name);
+
+    if (device->dest) {
+        const char *dest = device_path_inplace(device->dest, kdb_device_path_buf);
+        kdb_printf("Destination: %p \"%s\"\n", device->dest, dest);
+    }
     kdb_printf("Module:      %s\n", device->module->name);
     kdb_printf("Ops:         %p\n", device->ops);
     kdb_printf("Private:     %p\n", device->private);

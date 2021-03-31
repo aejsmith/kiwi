@@ -254,7 +254,7 @@ __export status_t virtio_create_device(device_t *parent, virtio_device_t *device
     }
 
     /* Alias it into the VirtIO bus. */
-    ret = device_alias_etc(module, name, virtio_bus.dir, device->bus.node, NULL);
+    ret = device_alias_etc(module_self(), name, virtio_bus.dir, device->bus.node, NULL);
     if (ret != STATUS_SUCCESS) {
         kprintf(LOG_WARN, "virtio: failed to create alias %s: %" PRId32, name, ret);
         // TODO: destruction - this is wrong since it would free virtio_device
