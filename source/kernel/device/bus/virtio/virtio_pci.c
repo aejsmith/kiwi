@@ -37,14 +37,16 @@ typedef struct virtio_pci_device {
     io_region_t io;
 } virtio_pci_device_t;
 
+DEFINE_CLASS_CAST(virtio_pci_device, virtio_device, virtio);
+
 static uint8_t virtio_pci_get_status(virtio_device_t *_device) {
-    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+    virtio_pci_device_t *device = cast_virtio_pci_device(_device);
 
     return io_read8(device->io, VIRTIO_PCI_STATUS);
 }
 
 static void virtio_pci_set_status(virtio_device_t *_device, uint8_t status) {
-    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+    virtio_pci_device_t *device = cast_virtio_pci_device(_device);
 
     if (status == 0) {
         io_write8(device->io, VIRTIO_PCI_STATUS, status);
@@ -56,25 +58,25 @@ static void virtio_pci_set_status(virtio_device_t *_device, uint8_t status) {
 }
 
 static uint32_t virtio_pci_get_features(virtio_device_t *_device) {
-    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+    virtio_pci_device_t *device = cast_virtio_pci_device(_device);
 
     return io_read32(device->io, VIRTIO_PCI_HOST_FEATURES);
 }
 
 static void virtio_pci_set_features(virtio_device_t *_device, uint32_t features) {
-    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+    virtio_pci_device_t *device = cast_virtio_pci_device(_device);
 
     io_write32(device->io, VIRTIO_PCI_GUEST_FEATURES, features);
 }
 
 static uint16_t virtio_pci_get_queue_size(virtio_device_t *_device, uint16_t index) {
-    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+    virtio_pci_device_t *device = cast_virtio_pci_device(_device);
 
     return io_read16(device->io, VIRTIO_PCI_QUEUE_NUM);
 }
 
 static void virtio_pci_enable_queue(virtio_device_t *_device, uint16_t index) {
-    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+    virtio_pci_device_t *device = cast_virtio_pci_device(_device);
     virtio_queue_t *queue = &device->virtio.queues[index];
 
     io_write16(device->io, VIRTIO_PCI_QUEUE_SEL, index);
@@ -82,13 +84,13 @@ static void virtio_pci_enable_queue(virtio_device_t *_device, uint16_t index) {
 }
 
 static void virtio_pci_notify(virtio_device_t *_device, uint16_t index) {
-    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+    virtio_pci_device_t *device = cast_virtio_pci_device(_device);
 
     io_write16(device->io, VIRTIO_PCI_QUEUE_NOTIFY, index);
 }
 
 static uint8_t virtio_pci_get_config(virtio_device_t *_device, uint32_t offset) {
-    virtio_pci_device_t *device = container_of(_device, virtio_pci_device_t, virtio);
+    virtio_pci_device_t *device = cast_virtio_pci_device(_device);
 
     // TODO: MSI
     return io_read8(device->io, VIRTIO_PCI_CONFIG_OFF(false) + offset);

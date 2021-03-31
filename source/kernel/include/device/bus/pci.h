@@ -101,6 +101,8 @@ typedef struct pci_driver {
     status_t (*init_device)(struct pci_device *device);
 } pci_driver_t;
 
+DEFINE_CLASS_CAST(pci_driver, bus_driver, bus);
+
 /** Define module init/unload functions for a PCI driver.
  * @param driver        Driver to register. */
 #define MODULE_PCI_DRIVER(driver) \
@@ -144,6 +146,8 @@ typedef struct pci_device {
 
     pci_bar_t bars[PCI_MAX_BARS];       /**< Saved details of BARs. */
 } pci_device_t;
+
+DEFINE_CLASS_CAST(pci_device, bus_device, bus);
 
 /** Common PCI configuration offsets. */
 #define PCI_CONFIG_VENDOR_ID            0x00    /**< Vendor ID        (16-bit). */

@@ -38,7 +38,6 @@
 #include <device/bus/virtio/virtio.h>
 
 #include <lib/string.h>
-#include <lib/utility.h>
 
 #include <mm/phys.h>
 
@@ -269,16 +268,16 @@ __export status_t virtio_create_device(device_t *parent, virtio_device_t *device
 
 /** Match a VirtIO device to a driver. */
 static bool virtio_bus_match_device(bus_device_t *_device, bus_driver_t *_driver) {
-    virtio_device_t *device = container_of(_device, virtio_device_t, bus);
-    virtio_driver_t *driver = container_of(_driver, virtio_driver_t, bus);
+    virtio_device_t *device = cast_virtio_device(_device);
+    virtio_driver_t *driver = cast_virtio_driver(_driver);
 
     return driver->device_id == device->device_id;
 }
 
 /** Initialize a VirtIO device. */
 static status_t virtio_bus_init_device(bus_device_t *_device, bus_driver_t *_driver) {
-    virtio_device_t *device = container_of(_device, virtio_device_t, bus);
-    virtio_driver_t *driver = container_of(_driver, virtio_driver_t, bus);
+    virtio_device_t *device = cast_virtio_device(_device);
+    virtio_driver_t *driver = cast_virtio_driver(_driver);
 
     /* Reset the device and acknowledge it. */
     device->transport->set_status(device, 0);

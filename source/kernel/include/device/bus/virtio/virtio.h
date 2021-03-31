@@ -28,6 +28,8 @@
 
 #include <kernel/device/bus/virtio.h>
 
+#include <lib/utility.h>
+
 struct virtio_device;
 
 #define VIRTIO_MODULE_NAME "virtio"
@@ -45,6 +47,8 @@ typedef struct virtio_driver {
      * @return              Status code describing the result of the operation. */
     status_t (*init_device)(struct virtio_device *device);
 } virtio_driver_t;
+
+DEFINE_CLASS_CAST(virtio_driver, bus_driver, bus);
 
 /** Define module init/unload functions for a VirtIO driver.
  * @param driver        Driver to register. */
@@ -148,6 +152,8 @@ typedef struct virtio_device {
     /** Device virtqueues. */
     virtio_queue_t queues[VIRTIO_MAX_QUEUES];
 } virtio_device_t;
+
+DEFINE_CLASS_CAST(virtio_device, bus_device, bus);
 
 #define VIRTIO_F(bit)   (1u << bit)
 

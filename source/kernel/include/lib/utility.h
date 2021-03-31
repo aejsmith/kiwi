@@ -114,6 +114,47 @@
         (type *)((char *)__mptr - offsetof(type, member)); \
     })
 
+/**
+ * Define an inline helper function to cast a base "class" structure pointer
+ * to a derived "class". This is used where a derived class structure has its
+ * base class structure embedded inside it as a member.
+ *
+ * For example, given the following:
+ *
+ *     typedef struct my_base {
+ *         ...
+ *     } my_base_t;
+ *
+ *     typedef struct my_derived {
+ *         ...
+ *         my_base_t base;
+ *         ...
+ *     } my_derived_t;
+ *
+ *     DEFINE_CLASS_CAST(my_derived, my_base, base);
+ *
+ * You can then do:
+ *
+ *     void my_derived_func(my_base_t *_obj) {
+ *          my_derived_t *obj = cast_my_derived(_obj);
+ *          ...
+ *     }
+ *
+ * The base class structure can be anywhere within the derived structure, since
+ * container_of is used to offset the pointer correctly.
+ *
+ * @param type          Derived class structure name. The struct name is used
+ *                      rather than the _t typedef here, so that the _t part can
+ *                      be omitted from the function name.
+ * @param base          Base class structure name. Again, struct name rather
+ *                      than the _t typedef.
+ * @param member        Name of base class member within derived.
+ */
+#define DEFINE_CLASS_CAST(type, base, member) \
+    static inline struct type *cast_##type(struct base *p) { \
+        return container_of(p, struct type, member); \
+    }
+
 /** Find first set bit in a native-sized value.
  * @param value         Value to test.
  * @return              Position of first set bit plus 1, or 0 if value is 0. */

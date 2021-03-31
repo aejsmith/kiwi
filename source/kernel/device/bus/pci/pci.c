@@ -520,8 +520,8 @@ void pci_scan_bus(uint16_t domain, uint8_t bus) {
 
 /** Match a PCI device to a driver. */
 static bool pci_bus_match_device(bus_device_t *_device, bus_driver_t *_driver) {
-    pci_device_t *device = container_of(_device, pci_device_t, bus);
-    pci_driver_t *driver = container_of(_driver, pci_driver_t, bus);
+    pci_device_t *device = cast_pci_device(_device);
+    pci_driver_t *driver = cast_pci_driver(_driver);
 
     for (size_t i = 0; i < driver->matches.count; i++) {
         pci_match_t *match = &driver->matches.array[i];
@@ -551,8 +551,8 @@ static bool pci_bus_match_device(bus_device_t *_device, bus_driver_t *_driver) {
 
 /** Initialize a PCI device. */
 static status_t pci_bus_init_device(bus_device_t *_device, bus_driver_t *_driver) {
-    pci_device_t *device = container_of(_device, pci_device_t, bus);
-    pci_driver_t *driver = container_of(_driver, pci_driver_t, bus);
+    pci_device_t *device = cast_pci_device(_device);
+    pci_driver_t *driver = cast_pci_driver(_driver);
 
     return driver->init_device(device);
 }
