@@ -19,6 +19,8 @@
  * @brief               VirtIO network device driver.
  */
 
+#include <device/net.h>
+
 #include <device/bus/virtio/virtio.h>
 
 #include <mm/malloc.h>
@@ -99,5 +101,5 @@ static virtio_driver_t virtio_net_driver = {
 
 MODULE_NAME("virtio_net");
 MODULE_DESC("VirtIO network device driver");
-MODULE_DEPS(VIRTIO_MODULE_NAME);
+MODULE_DEPS(NET_MODULE_NAME, VIRTIO_MODULE_NAME);
 MODULE_VIRTIO_DRIVER(virtio_net_driver);

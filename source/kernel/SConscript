@@ -46,6 +46,7 @@ dirs = FeatureDirs(config, [
     'ipc',
     'lib',
     'mm',
+    'net',
     'proc',
     'security',
     'sync',
