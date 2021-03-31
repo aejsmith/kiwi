@@ -16,19 +16,12 @@
 
 /**
  * @file
- * @brief               Network device class interface.
+ * @brief               Ethernet link layer support.
  */
 
 #pragma once
 
-#include <kernel/device.h>
+#include <net/net.h>
 
-__KERNEL_EXTERN_C_BEGIN
-
-/** Network device class name. */
-#define NET_DEVICE_CLASS_NAME       "net"
-
-/** Maximum hardware address (MAC) length. */
-#define NET_DEVICE_ADDR_MAX         6
-
-__KERNEL_EXTERN_C_END
+#define ETHERNET_ADDR_LEN   6
+#define ETHERNET_MTU        1500

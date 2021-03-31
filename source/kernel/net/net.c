@@ -19,13 +19,15 @@
  * @brief               Network stack module main functions.
  */
 
+#include <device/net.h>
+
 #include <net/net.h>
 
 #include <module.h>
 #include <status.h>
 
 static status_t net_init(void) {
-    return STATUS_SUCCESS;
+    return net_device_class_init();
 }
 
 static status_t net_unload(void) {

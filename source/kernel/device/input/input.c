@@ -68,6 +68,8 @@ static void input_device_destroy_impl(device_t *_device) {
 
     assert(list_empty(&device->clients));
 
+    // TODO: Need destruction for derived...
+
     kfree(device);
 }
 
@@ -224,7 +226,7 @@ __export void input_device_event(input_device_t *device, input_event_t *event) {
             notifier_run(&client->notifier, NULL, true);
         } else {
             /* TODO. */
-            device_kprintf(device->device, LOG_WARN, "buffer full, dropping event\n");
+            device_kprintf(device->node, LOG_WARN, "buffer full, dropping event\n");
         }
 
         mutex_unlock(&client->lock);
@@ -256,7 +258,7 @@ __export status_t input_device_create(
 
     status_t ret = device_class_create_device(
         &input_device_class, module_caller(), name, parent, &input_device_ops,
-        device, attrs, array_size(attrs), &device->device);
+        device, attrs, array_size(attrs), &device->node);
     if (ret != STATUS_SUCCESS) {
         kfree(device);
         return ret;
