@@ -365,7 +365,7 @@ static void scan_bars(pci_device_t *device) {
                 width = 32;
                 mask  = 0xfffffffcul;
             #else
-                kprintf(LOG_WARN, "pci:   BAR %zu is PIO but PIO is unsupported, ignoring...\n");
+                device_kprintf(device->bus.node, LOG_WARN, "  BAR %zu is PIO but PIO is unsupported, ignoring...\n");
                 continue;
             #endif
         } else {
@@ -378,7 +378,7 @@ static void scan_bars(pci_device_t *device) {
                 width = 64;
                 mask  = 0xfffffffffffffff0ul;
             } else {
-                kprintf(LOG_WARN, "pci:   BAR %zu has unrecognized memory type, ignoring...\n");
+                device_kprintf(device->bus.node, LOG_WARN, "  BAR %zu has unrecognized memory type, ignoring...\n");
                 continue;
             }
 
@@ -408,14 +408,14 @@ static void scan_bars(pci_device_t *device) {
         if (device->bars[i].is_pio) {
             cmd_bits |= PCI_COMMAND_IO;
 
-            kprintf(
-                LOG_NOTICE, "pci:   BAR %zu PIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS "\n",
+            device_kprintf(
+                device->bus.node, LOG_NOTICE, "  BAR %zu PIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS "\n",
                 i, device->bars[i].base, device->bars[i].size);
         } else {
             cmd_bits |= PCI_COMMAND_MEMORY;
 
-            kprintf(
-                LOG_NOTICE, "pci:   BAR %zu MMIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS " (%" PRIu8 "-bit%s)\n",
+            device_kprintf(
+                device->bus.node, LOG_NOTICE, "  BAR %zu MMIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS " (%" PRIu8 "-bit%s)\n",
                 i, device->bars[i].base, device->bars[i].size,
                 width, (device->bars[i].prefetchable) ? ", prefetchable" : "");
         }
@@ -454,18 +454,10 @@ static pci_device_t *scan_device(pci_address_t *addr) {
     device->interrupt_line = platform_pci_config_read8(addr, PCI_CONFIG_INTERRUPT_LINE);
     device->interrupt_pin  = platform_pci_config_read8(addr, PCI_CONFIG_INTERRUPT_PIN);
 
+    spinlock_unlock(&pci_config_lock);
+
     char name[PCI_NAME_MAX];
     make_device_name(addr, name);
-
-    kprintf(
-        LOG_NOTICE, "pci: device %s ID %04x:%04x class %02x%02x\n",
-        name, device->vendor_id, device->device_id, device->base_class,
-        device->sub_class);
-
-    /* Get BAR information. */
-    scan_bars(device);
-
-    spinlock_unlock(&pci_config_lock);
 
     device_attr_t attrs[] = {
         { DEVICE_ATTR_CLASS,          DEVICE_ATTR_STRING, { .string = PCI_DEVICE_CLASS_NAME } },
@@ -482,6 +474,16 @@ static pci_device_t *scan_device(pci_address_t *addr) {
         return NULL;
     }
 
+    device_kprintf(
+        device->bus.node, LOG_NOTICE, "ID %04x:%04x class %02x%02x\n",
+        device->vendor_id, device->device_id, device->base_class,
+        device->sub_class);
+
+    /* Get BAR information. */
+    spinlock_lock(&pci_config_lock);
+    scan_bars(device);
+    spinlock_unlock(&pci_config_lock);
+
     bus_match_device(&pci_bus, &device->bus);
 
     /* Check for a PCI-to-PCI bridge. */
@@ -490,7 +492,8 @@ static pci_device_t *scan_device(pci_address_t *addr) {
         uint8_t dest = platform_pci_config_read8(addr, PCI_CONFIG_P2P_SUBORDINATE_BUS);
         spinlock_unlock(&pci_config_lock);
 
-        kprintf(LOG_NOTICE, "pci: PCI-to-PCI bridge to %02x\n", dest);
+        device_kprintf(device->bus.node, LOG_NOTICE, "PCI-to-PCI bridge to %02x\n", dest);
+
         pci_scan_bus(addr->domain, dest);
     }
 

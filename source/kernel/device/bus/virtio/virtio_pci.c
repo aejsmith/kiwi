@@ -132,10 +132,6 @@ static status_t virtio_pci_init_device(pci_device_t *pci) {
         return STATUS_SUCCESS;
     }
 
-    kprintf(
-        LOG_NOTICE, "virtio_pci: %s: detected device ID %" PRIu16 "\n",
-        pci->bus.node->name, device_id);
-
     /* Create a VirtIO device. */
     virtio_pci_device_t *device = kmalloc(sizeof(*device), MM_KERNEL);
 
@@ -149,12 +145,12 @@ static status_t virtio_pci_init_device(pci_device_t *pci) {
         return ret;
     }
 
+    device_kprintf(device->virtio.bus.node, LOG_NOTICE, "detected device ID %" PRIu16 "\n", device_id);
+
     /* Map the I/O region in BAR 0. */
     ret = device_pci_bar_map(device->virtio.bus.node, pci, 0, MM_KERNEL, &device->io);
     if (ret != STATUS_SUCCESS) {
-        kprintf(
-            LOG_NOTICE, "virtio_pci: %s: failed to map BAR 0: %" PRId32 "\n",
-            pci->bus.node->name, ret);
+        device_kprintf(device->virtio.bus.node, LOG_ERROR, "failed to map BAR 0: %" PRId32 "\n", ret);
         virtio_device_destroy(&device->virtio);
         return ret;
     }
