@@ -19,9 +19,13 @@
  * @brief               Formatted output function.
  */
 
+#include <device/device.h>
+
 #include <lib/ctype.h>
 #include <lib/string.h>
 #include <lib/printf.h>
+
+#include <sync/spinlock.h>
 
 #include <module.h>
 #include <types.h>
@@ -145,19 +149,6 @@ static void print_number(printf_state_t *state, uint64_t num) {
     }
 }
 
-static void print_mac_addr(printf_state_t *state, const uint8_t *addr) {
-    state->base = 16;
-    state->flags = PRINTF_ZERO_PAD | PRINTF_LOW_CASE;
-
-    for (unsigned i = 0; i < 6; i++) {
-        state->width = 2;
-        state->precision = 1;
-        print_number(state, addr[i]);
-        if (i != 5)
-            print_char(state, ':');
-    }
-}
-
 static void print_symbol(printf_state_t *state, void *ptr, char ext) {
     /* Zero pad up to the width of a pointer. */
     int width = (sizeof(void *) * 2) + 2;
@@ -184,6 +175,37 @@ static void print_symbol(printf_state_t *state, void *ptr, char ext) {
     }
 }
 
+/*
+ * We need a buffer to build a device path string in. DEVICE_PATH_MAX is too
+ * large to comfortably allocate on a kernel stack, and can't kmalloc() every
+ * time we use this. So, allocate a global buffer with a lock. This should be
+ * used infrequently enough that a global lock for it should not matter.
+ */
+static char device_printf_buf[DEVICE_PATH_MAX];
+static SPINLOCK_DEFINE(device_printf_lock);
+
+static void print_device_path(printf_state_t *state, device_t *device) {
+    spinlock_lock(&device_printf_lock);
+
+    char *path = device_path_inplace(device, device_printf_buf);
+    state->total += do_printf(state->helper, state->data, "%s", path);
+
+    spinlock_unlock(&device_printf_lock);
+}
+
+static void print_mac_addr(printf_state_t *state, const uint8_t *addr) {
+    state->base = 16;
+    state->flags = PRINTF_ZERO_PAD | PRINTF_LOW_CASE;
+
+    for (unsigned i = 0; i < 6; i++) {
+        state->width = 2;
+        state->precision = 1;
+        print_number(state, addr[i]);
+        if (i != 5)
+            print_char(state, ':');
+    }
+}
+
 static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
     /* Print lower-case and as though # was specified. */
     state->flags |= PRINTF_LOW_CASE | PRINTF_PREFIX;
@@ -194,19 +216,24 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
      * Extensions for certain useful things. Idea borrowed from the Linux
      * kernel. The following formats are implemented:
      *  - %pB = Print a symbol for a backtrace handling tail calls correctly.
+     *  - %pD = Print a device path string given a device_t (not safe in KDB).
      *  - %pM = Print a 6 byte MAC address, arg is pointer to 6 byte buffer.
      *  - %pS = Print a symbol: [<addr>] <name>+<offset>
      *  - %ps = Print a symbol: [<addr>] <name>
      */
     switch ((*fmt)[1]) {
+        case 'B':
+        case 'S':
+        case 's':
+            print_symbol(state, ptr, *(++(*fmt)));
+            break;
+        case 'D':
+            print_device_path(state, (device_t *)ptr);
+            (*fmt)++;
+            break;
         case 'M':
             print_mac_addr(state, (const uint8_t *)ptr);
             (*fmt)++;
-            return;
-        case 'S':
-        case 's':
-        case 'B':
-            print_symbol(state, ptr, *(++(*fmt)));
             break;
         default:
             state->base = 16;

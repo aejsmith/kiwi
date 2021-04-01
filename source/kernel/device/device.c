@@ -304,9 +304,7 @@ status_t device_create_etc(
     refcount_inc(&parent->count);
     radix_tree_insert(&parent->children, device->name, device);
 
-    kprintf(
-        LOG_DEBUG, "device: created device '%s' in '%s' (module: %s)\n",
-        device->name, parent->name, module->name);
+    kprintf(LOG_DEBUG, "device: created device %pD (module: %s)\n", device, module->name);
 
     if (_device)
         *_device = device;
@@ -381,9 +379,7 @@ status_t device_alias_etc(
     list_append(&dest->aliases, &device->dest_link);
     mutex_unlock(&dest->lock);
 
-    kprintf(
-        LOG_DEBUG, "device: created alias '%s' in '%s' to '%s'\n",
-        device->name, parent->name, dest->name);
+    kprintf(LOG_DEBUG, "device: created alias %pD to %pD\n", device, dest);
 
     if (_device)
         *_device = device;
@@ -708,11 +704,17 @@ static device_t *device_lookup(const char *path) {
 }
 
 /**
- * Constructs a device path in-place in a buffer. Buffer must be DEVICE_PATH_MAX
- * bytes. It will be constructed backwards and a pointer to the start of the
- * string will be returned.
+ * Constructs a device path string in-place in a buffer. Buffer must be
+ * DEVICE_PATH_MAX bytes. It will be constructed backwards and a pointer to the
+ * start of the string will be returned.
+ *
+ * @param device        Device to get path to. Must be guaranteed to be alive
+ *                      through the call (e.g. caller holds a reference).
+ * @param buf           Buffer to construct into (DEVICE_PATH_MAX bytes).
+ *
+ * @return              Pointer to start of string.
  */
-static char *device_path_inplace(device_t *device, char *buf) {
+char *device_path_inplace(device_t *device, char *buf) {
     /* Build device path backwards. No need to lock devices, names are immutable
      * and since we require the device to remain alive across the function call,
      * the tree linkage cannot change either. */
@@ -875,16 +877,6 @@ err_release:
     return ret;
 }
 
-/*
- * We need a buffer to build a path for device_kprintf() in, DEVICE_PATH_MAX is
- * too large to comfortably allocate on a kernel stack, and don't want to
- * kmalloc() every time we use this. So, allocate a global buffer with a lock.
- * This should be used infrequently enough that a global lock for it should not
- * matter.
- */
-static char device_kprintf_buf[DEVICE_PATH_MAX];
-static SPINLOCK_DEFINE(device_kprintf_lock);
-
 /**
  * Device-specific version of kprintf() which will prefix messages with the
  * device module name and path. It is assumed that the device will not be
@@ -898,11 +890,7 @@ static SPINLOCK_DEFINE(device_kprintf_lock);
  * @return              Number of characters written.
  */
 int device_kprintf(device_t *device, int level, const char *fmt, ...) {
-    spinlock_lock(&device_kprintf_lock);
-
-    char *path = device_path_inplace(device, device_kprintf_buf);
-
-    int ret = kprintf(level, "%s: %s: ", device->module->name, path);
+    int ret = kprintf(level, "%s: %pD: ", device->module->name, device);
 
     va_list args;
     va_start(args, fmt);
@@ -910,12 +898,10 @@ int device_kprintf(device_t *device, int level, const char *fmt, ...) {
     ret += kvprintf(level, fmt, args);
 
     va_end(args);
-
-    spinlock_unlock(&device_kprintf_lock);
     return ret;
 }
 
-/** Same as with device_kprintf() for KDB. */
+/** Device path buffer to avoid using stack or dynamic allocation. */
 static char kdb_device_path_buf[DEVICE_PATH_MAX];
 
 static void dump_children(radix_tree_t *tree, int indent) {

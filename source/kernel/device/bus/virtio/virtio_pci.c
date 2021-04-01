@@ -116,8 +116,8 @@ static status_t virtio_pci_init_device(pci_device_t *pci) {
     /* We only support legacy for now as this what most implementations are. */
     if (pci->revision != VIRTIO_PCI_ABI_VERSION) {
         kprintf(
-            LOG_WARN, "virtio_pci: %s: non-legacy devices are not currently supported\n",
-            pci->bus.node->name);
+            LOG_WARN, "virtio_pci: %pD: non-legacy devices are not currently supported\n",
+            pci->bus.node);
         return STATUS_NOT_SUPPORTED;
     }
 
