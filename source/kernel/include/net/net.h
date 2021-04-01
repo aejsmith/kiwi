@@ -21,5 +21,7 @@
 
 #pragma once
 
+#include <types.h>
+
 /** Name of the network stack module. */
 #define NET_MODULE_NAME "net"

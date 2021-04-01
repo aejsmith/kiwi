@@ -26,6 +26,7 @@
 #include <mm/malloc.h>
 
 #include <net/ethernet.h>
+#include <net/packet.h>
 
 #include <kernel.h>
 #include <status.h>
@@ -51,13 +52,15 @@ typedef struct virtio_net_device {
 
 DEFINE_CLASS_CAST(virtio_net_device, net_device, net);
 
-static void virtio_net_device_destroy(net_device_t *device) {
+static void virtio_net_device_destroy(net_device_t *net) {
     // TODO. Must handle partial destruction (init failure)
     fatal("TODO");
 }
 
-static status_t virtio_net_device_transmit(net_device_t *net, struct packet *packet) {
-    // TODO. packet_t...
+static status_t virtio_net_device_transmit(net_device_t *net, net_packet_t *packet) {
+    virtio_net_device_t *device = cast_virtio_net_device(net);
+
+    (void)device;
     return STATUS_NOT_IMPLEMENTED;
 }
 

@@ -23,4 +23,5 @@ mod_env.Module('net', [
     '../device/net/net.c',
 
     'net.c',
+    'packet.c',
 ])

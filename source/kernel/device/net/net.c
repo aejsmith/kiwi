@@ -107,6 +107,8 @@ __export status_t net_device_publish(net_device_t *device) {
 }
 
 /** Initialize the network device class. */
-status_t net_device_class_init(void) {
-    return device_class_init(&net_device_class, NET_DEVICE_CLASS_NAME);
+void net_device_class_init(void) {
+    status_t ret = device_class_init(&net_device_class, NET_DEVICE_CLASS_NAME);
+    if (ret != STATUS_SUCCESS)
+        fatal("Failed to initialize net device class: %d", ret);
 }

@@ -22,12 +22,16 @@
 #include <device/net.h>
 
 #include <net/net.h>
+#include <net/packet.h>
 
 #include <module.h>
 #include <status.h>
 
 static status_t net_init(void) {
-    return net_device_class_init();
+    net_packet_cache_init();
+    net_device_class_init();
+
+    return STATUS_SUCCESS;
 }
 
 static status_t net_unload(void) {

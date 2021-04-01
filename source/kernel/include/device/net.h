@@ -28,7 +28,7 @@
 #include <net/net.h>
 
 struct net_device;
-struct packet;
+struct net_packet;
 
 /** Type of a network device. */
 typedef enum net_device_type {
@@ -45,7 +45,7 @@ typedef struct net_device_ops {
      * @param device        Device to transmit on.
      * @param packet        Packet to transmit.
      * @return              Status code describing the result of the operation. */
-    status_t (*transmit)(struct net_device *device, struct packet *packet);
+    status_t (*transmit)(struct net_device *device, struct net_packet *packet);
 } net_device_ops_t;
 
 /** Network device structure. */
@@ -77,4 +77,4 @@ extern status_t net_device_create_etc(net_device_t *device, const char *name, de
 extern status_t net_device_create(net_device_t *device, device_t *parent);
 extern status_t net_device_publish(net_device_t *device);
 
-extern status_t net_device_class_init(void);
+extern void net_device_class_init(void);
