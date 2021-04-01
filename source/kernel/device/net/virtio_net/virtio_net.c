@@ -19,7 +19,7 @@
  * @brief               VirtIO network device driver.
  */
 
-#include <device/net.h>
+#include <device/net/net.h>
 
 #include <device/bus/virtio/virtio.h>
 

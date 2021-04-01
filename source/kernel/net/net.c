@@ -19,7 +19,7 @@
  * @brief               Network stack module main functions.
  */
 
-#include <device/net.h>
+#include <device/net/net.h>
 
 #include <net/net.h>
 #include <net/packet.h>

@@ -19,8 +19,9 @@
  * @brief               Network device class.
  */
 
+#include <device/net/net.h>
+
 #include <device/class.h>
-#include <device/net.h>
 
 #include <lib/string.h>
 

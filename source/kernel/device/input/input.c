@@ -25,8 +25,9 @@
  *    handles this.
  */
 
+#include <device/input/input.h>
+
 #include <device/class.h>
-#include <device/input.h>
 
 #include <io/request.h>
 

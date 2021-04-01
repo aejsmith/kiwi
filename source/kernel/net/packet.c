@@ -347,9 +347,9 @@ __export void net_packet_prepend(net_packet_t *packet, net_buffer_t *buffer) {
  *
  * This can only be done if the requested range is within a single buffer. It
  * can generally be assumed that this is the case for protocol headers: on
- * transmit, these are added as one buffer, while on receive, it is expected
- * that network device drivers pass in the whole received packet as a single
- * buffer.
+ * transmit, these are added as one buffer each, while on receive, it is
+ * expected that network device drivers pass in the whole received packet as a
+ * single buffer.
  *
  * If the requested range is not within a single buffer, or outside of the
  * range of the packet, then this will return NULL. On received packets this

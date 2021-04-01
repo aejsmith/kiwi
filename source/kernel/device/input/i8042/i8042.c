@@ -27,7 +27,8 @@
  * first port and mouse in the second port.
  */
 
-#include <device/input.h>
+#include <device/input/input.h>
+
 #include <device/io.h>
 #include <device/irq.h>
 

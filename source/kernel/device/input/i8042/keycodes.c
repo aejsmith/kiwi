@@ -19,7 +19,7 @@
  * @brief               i8042 keyboard codes.
  */
 
-#include <device/input.h>
+#include <device/input/input.h>
 
 /**
  * Table converting i8042 keyboard codes to input event key codes. Indexed by
