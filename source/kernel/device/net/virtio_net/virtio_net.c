@@ -17,6 +17,13 @@
 /**
  * @file
  * @brief               VirtIO network device driver.
+ *
+ * TODO:
+ *  - Checksum offloading.
+ *  - Zero-copy transmit. Can use scatter-gather with descriptor chains, but
+ *    all of the packet memory needs to be suitable allocations (we can deal
+ *    with 64-bit physical addresses for VirtIO, but we should consider generic
+ *    support for devices that have constraints on DMA, e.g. 32-bit addresses).
  */
 
 #include <device/net/net.h>
@@ -24,10 +31,12 @@
 #include <device/bus/virtio/virtio.h>
 
 #include <mm/malloc.h>
+#include <mm/phys.h>
 
 #include <net/ethernet.h>
 #include <net/packet.h>
 
+#include <assert.h>
 #include <kernel.h>
 #include <status.h>
 
@@ -36,18 +45,32 @@
 #define VIRTIO_NET_SUPPORTED_FEATURES   (VIRTIO_F(VIRTIO_NET_F_MAC))
 #define VIRTIO_NET_REQUIRED_FEATURES    (VIRTIO_F(VIRTIO_NET_F_MAC))
 
+/** Size of each RX/TX buffer to allocate.
+ * @note                Will need to increase this by 2 if MRG_RXBUF is used. */
+#define VIRTIO_BUFFER_SIZE \
+    (ETHERNET_MAX_FRAME_SIZE + sizeof(struct virtio_net_hdr))
+
 enum {
     VIRTIO_NET_QUEUE_RX = 0,
     VIRTIO_NET_QUEUE_TX = 1,
+
+    VIRTIO_NET_QUEUE_COUNT
 };
+
+typedef struct virtio_net_queue {
+    virtio_queue_t *queue;
+
+    size_t buf_size;
+    phys_ptr_t buf_phys;
+    void *buf_virt;
+} virtio_net_queue_t;
 
 typedef struct virtio_net_device {
     net_device_t net;
 
     virtio_device_t *virtio;
 
-    virtio_queue_t *rx_queue;
-    virtio_queue_t *tx_queue;
+    virtio_net_queue_t queues[VIRTIO_NET_QUEUE_COUNT];
 } virtio_net_device_t;
 
 DEFINE_CLASS_CAST(virtio_net_device, net_device, net);
@@ -107,17 +130,31 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
 
     device_kprintf(device->net.node, LOG_NOTICE, "MAC address is %pM\n", device->net.hw_addr);
 
-    /* Create virtqueues. */
-    // TODO: Should probably only have these created while the network device is
-    // up?
-    device->rx_queue = virtio_device_alloc_queue(virtio, VIRTIO_NET_QUEUE_RX);
-    device->tx_queue = virtio_device_alloc_queue(virtio, VIRTIO_NET_QUEUE_TX);
+    /* Create virtqueues and buffers. */
+    // TODO: Should only have these created while the network device is up?
+    for (unsigned i = 0; i < VIRTIO_NET_QUEUE_COUNT; i++) {
+        virtio_net_queue_t *queue = &device->queues[i];
 
-    if (!device->rx_queue || !device->tx_queue) {
-        device_kprintf(device->net.node, LOG_ERROR, "failed to create virtqueues\n");
-        net_device_destroy(&device->net);
-        return STATUS_DEVICE_ERROR;
+        queue->queue = virtio_device_alloc_queue(virtio, i);
+        if (!queue->queue) {
+            device_kprintf(device->net.node, LOG_ERROR, "failed to create virtqueues\n");
+            net_device_destroy(&device->net);
+            return STATUS_DEVICE_ERROR;
+        }
+
+        queue->buf_size = round_up(queue->queue->ring.num * VIRTIO_BUFFER_SIZE, PAGE_SIZE);
+
+        phys_alloc(queue->buf_size, 0, 0, 0, 0, MM_KERNEL, &queue->buf_phys);
+        queue->buf_virt = phys_map(queue->buf_phys, queue->buf_size, MM_KERNEL);
     }
+
+    device_kprintf(
+        device->net.node, LOG_DEBUG,
+        "RX queue has %u descriptors (%zuKiB), TX queue has %u descriptors (%zuKiB)\n",
+        device->queues[VIRTIO_NET_QUEUE_RX].queue->ring.num,
+        device->queues[VIRTIO_NET_QUEUE_RX].buf_size / 1024,
+        device->queues[VIRTIO_NET_QUEUE_TX].queue->ring.num,
+        device->queues[VIRTIO_NET_QUEUE_TX].buf_size / 1024);
 
     ret = net_device_publish(&device->net);
     if (ret != STATUS_SUCCESS)
