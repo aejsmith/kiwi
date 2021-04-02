@@ -176,9 +176,13 @@ static inline void virtio_device_destroy(virtio_device_t *device) {
     bus_device_destroy(&device->bus);
 }
 
-/** Notify the device of new buffers in a queue.
+/**
+ * Notifies the device of new buffers in a queue. No synchronization is
+ * necessary for calls to this.
+ *
  * @param device        Device to notify.
- * @param index         Queue index. */
+ * @param index         Queue index.
+ */
 static inline void virtio_device_notify(virtio_device_t *device, uint16_t index) {
     device->transport->notify(device, index);
 }

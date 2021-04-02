@@ -70,6 +70,9 @@ __export struct vring_desc *virtio_queue_alloc(virtio_queue_t *queue, uint16_t *
     uint16_t desc_index = queue->free_list;
 
     struct vring_desc *desc = &queue->ring.desc[desc_index];
+
+    desc->flags = 0;
+
     queue->free_list = desc->next;
     queue->free_count--;
 
