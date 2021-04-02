@@ -193,8 +193,37 @@ static void print_device_path(printf_state_t *state, device_t *device) {
     spinlock_unlock(&device_printf_lock);
 }
 
+static void print_ipv4_addr(printf_state_t *state, const uint8_t *addr) {
+    state->base  = 10;
+    state->flags = 0;
+
+    for (unsigned i = 0; i < 4; i++) {
+        state->width = -1;
+        state->precision = 1;
+        print_number(state, addr[i]);
+        if (i != 3)
+            print_char(state, '.');
+    }
+}
+
+static void print_ipv6_addr(printf_state_t *state, const uint8_t *addr) {
+    state->base  = 16;
+    state->flags = PRINTF_LOW_CASE;
+
+    for (unsigned i = 0; i < 8; i++) {
+        state->width = -1;
+        state->precision = 1;
+        print_number(state, addr[i * 2]);
+        state->width = -1;
+        state->precision = 1;
+        print_number(state, addr[(i * 2) + 1]);
+        if (i != 7)
+            print_char(state, ':');
+    }
+}
+
 static void print_mac_addr(printf_state_t *state, const uint8_t *addr) {
-    state->base = 16;
+    state->base  = 16;
     state->flags = PRINTF_ZERO_PAD | PRINTF_LOW_CASE;
 
     for (unsigned i = 0; i < 6; i++) {
@@ -215,11 +244,20 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
     /*
      * Extensions for certain useful things. Idea borrowed from the Linux
      * kernel. The following formats are implemented:
-     *  - %pB = Print a symbol for a backtrace handling tail calls correctly.
-     *  - %pD = Print a device path string given a device_t (not safe in KDB).
-     *  - %pM = Print a 6 byte MAC address, arg is pointer to 6 byte buffer.
-     *  - %pS = Print a symbol: [<addr>] <name>+<offset>
-     *  - %ps = Print a symbol: [<addr>] <name>
+     *
+     *  - %pB     = Print a backtrace symbol, handling tail calls correctly.
+     *              arg = address
+     *  - %pD     = Print a device_t path string (not safe in KDB).
+     *              arg = device_t pointer
+     *  - %pI[46] = Print an IP address, optional specifier for v4 or v6,
+     *              default is v4.
+     *              arg = pointer to appropriately sized buffer
+     *  - %pM     = Print a 6 byte (Ethernet) MAC address.
+     *              arg = pointer to 6 byte buffer
+     *  - %pS     = Print a symbol: [<addr>] <name>+<offset>
+     *              arg = address
+     *  - %ps     = Print a symbol: [<addr>] <name>
+     *              arg = address
      */
     switch ((*fmt)[1]) {
         case 'B':
@@ -230,6 +268,19 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
         case 'D':
             print_device_path(state, (device_t *)ptr);
             (*fmt)++;
+            break;
+        case 'I':
+            (*fmt)++;
+
+            if ((*fmt)[1] == '6') {
+                (*fmt)++;
+                print_ipv6_addr(state, (const uint8_t *)ptr);
+            } else {
+                if ((*fmt)[1] == '4')
+                    (*fmt)++;
+                print_ipv4_addr(state, (const uint8_t *)ptr);
+            }
+
             break;
         case 'M':
             print_mac_addr(state, (const uint8_t *)ptr);
