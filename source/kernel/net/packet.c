@@ -318,7 +318,8 @@ __export void net_packet_offset(net_packet_t *packet, uint32_t offset) {
             net_buffer_destroy(buffer);
         }
 
-        offset -= buf_offset;
+        offset       -= buf_offset;
+        packet->size -= buf_offset;
     }
 }
 
