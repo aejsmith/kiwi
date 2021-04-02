@@ -19,6 +19,7 @@
  * @brief               Network packet management.
  */
 
+#include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
@@ -35,9 +36,14 @@ static slab_cache_t *net_packet_cache;
 /**
  * Allocates a new network buffer with a kmalloc()'d data buffer.
  *
+ * The caller must ensure that the buffer data is fully written to prevent
+ * leakage of kernel data - use MM_ZERO if the buffer will not be fully written
+ * to.
+ *
  * The buffer is not owned by a packet, so should be destroyed with
  * net_buffer_destroy() if it is no longer needed before it is attached to a
  * packet.
+ *
  *
  * @param size          Size of the buffer to allocate.
  * @param mmflag        Memory allocation flags.
@@ -66,6 +72,9 @@ __export net_buffer_t *net_buffer_kmalloc(uint32_t size, unsigned mmflag, void *
  * This is intended for use where that are frequent allocations of a fixed
  * buffer size, namely protocol headers. Dedicated slab caches can be used for
  * faster allocation of these.
+ *
+ * The caller must ensure that the buffer data is fully written to prevent
+ * leakage of kernel data.
  *
  * The buffer is not owned by a packet, so should be destroyed with
  * net_buffer_destroy() if it is no longer needed before it is attached to a
@@ -385,6 +394,58 @@ __export void *net_packet_data(net_packet_t *packet, uint32_t offset, uint32_t s
 
         offset -= remaining;
         buffer  = buffer->next;
+    }
+}
+
+/**
+ * Copies data out of network packet to a contiguous buffer. The specified
+ * range must be within the packet.
+ *
+ * @param packet        Packet to copy from.
+ * @param dest          Destination buffer.
+ * @param offset        Offset within the packet to copy from.
+ * @param size          Size of the range to copy.
+ */
+__export void net_packet_copy_from(net_packet_t *packet, void *dest, uint32_t offset, uint32_t size) {
+    assert(size > 0);
+    assert(offset < packet->size);
+    assert(offset + size <= packet->size);
+
+    uint8_t *d = dest;
+
+    net_buffer_t *buffer = packet->head;
+
+    while (size > 0) {
+        assert(buffer);
+
+        uint32_t remaining = buffer->size - buffer->offset;
+
+        if (offset < remaining) {
+            uint32_t buf_size = min(size, remaining - offset);
+
+            if (buffer->type == NET_BUFFER_TYPE_REF) {
+                /* References may be non-contiguous in the underlying packet so
+                 * we must recurse to handle that. */
+                net_buffer_ref_t *derived = (net_buffer_ref_t *)buffer;
+                net_packet_copy_from(
+                    derived->packet, d,
+                    derived->packet_offset + buffer->offset + offset,
+                    buf_size);
+            } else {
+                /* Otherwise we have a contiguous range to copy. */
+                uint8_t *buf_data = net_buffer_data(buffer, offset, buf_size);
+                assert(buf_data);
+                memcpy(d, buf_data, buf_size);
+            }
+
+            size   -= buf_size;
+            d      += buf_size;
+            offset  = 0;
+        } else {
+            offset -= remaining;
+        }
+
+        buffer = buffer->next;
     }
 }
 

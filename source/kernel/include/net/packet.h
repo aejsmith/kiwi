@@ -218,6 +218,6 @@ extern void net_packet_prepend(net_packet_t *packet, net_buffer_t *buffer);
 
 extern void *net_packet_data(net_packet_t *packet, uint32_t offset, uint32_t size);
 
-// TODO: Read function
+extern void net_packet_copy_from(net_packet_t *packet, void *dest, uint32_t offset, uint32_t size);
 
 extern void net_packet_cache_init(void);
