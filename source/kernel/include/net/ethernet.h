@@ -23,5 +23,22 @@
 
 #include <net/net.h>
 
-#define ETHERNET_ADDR_LEN   6
-#define ETHERNET_MTU        1500
+/** Ethernet MAC address length. */
+#define ETHERNET_ADDR_LEN       6
+
+/** Frame sizes. */
+#define ETHERNET_MTU            1500
+#define ETHERNET_MIN_FRAME_SIZE 64
+#define ETHERNET_MAX_FRAME_SIZE 1514
+
+/** Ethernet frame header. */
+typedef struct ethernet_header {
+    uint8_t dest[ETHERNET_ADDR_LEN];
+    uint8_t source[ETHERNET_ADDR_LEN];
+    uint16_t type;
+} __packed ethernet_header_t;
+
+/** EtherType values. */
+#define ETHERNET_TYPE_IPV4      0x0800
+#define ETHERNET_TYPE_ARP       0x0806
+#define ETHERNET_TYPE_IPV6      0x86dd
