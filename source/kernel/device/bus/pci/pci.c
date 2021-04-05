@@ -314,6 +314,44 @@ __export status_t device_pci_bar_map_etc(
     return STATUS_SUCCESS;
 }
 
+static unsigned get_pci_irq(pci_device_t *device) {
+    // TODO: MSI
+    return device->interrupt_line;
+}
+
+/**
+ * Registers an IRQ handler for a PCI device. This behaves the same as
+ * irq_register(), but will determine the IRQ number for the device. The
+ * handler should be removed with irq_unregister() when no longer needed.
+ *
+ * @see                 irq_register().
+ *
+ * @param device        PCI device to register for.
+ */
+__export status_t pci_irq_register(
+    pci_device_t *device, irq_early_func_t early_func, irq_func_t func,
+    void *data, irq_handler_t **_handler)
+{
+    unsigned num = get_pci_irq(device);
+    return irq_register(num, early_func, func, data, _handler);
+}
+
+/**
+ * Registers an IRQ handler for a PCI device, as a device-managed resource
+ * (will be unregistered when the device is destroyed).
+ *
+ * @see                 pci_irq_register().
+ *
+ * @param owner         Device to register to.
+ */
+__export status_t device_pci_irq_register(
+    device_t *owner, pci_device_t *device, irq_early_func_t early_func,
+    irq_func_t func, void *data)
+{
+    unsigned num = get_pci_irq(device);
+    return device_irq_register(owner, num, early_func, func, data);
+}
+
 /** Set whether bus mastering is enabled on a PCI device.
  * @param device        Device to enable for.
  * @param enable        Whether to enable bus mastering. */

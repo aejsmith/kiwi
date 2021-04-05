@@ -23,6 +23,7 @@
 
 #include <device/bus.h>
 #include <device/io.h>
+#include <device/irq.h>
 
 #include <kernel/device/bus/pci.h>
 
@@ -217,5 +218,13 @@ extern status_t device_pci_bar_map(
 extern status_t device_pci_bar_map_etc(
     device_t *owner, pci_device_t *device, uint8_t index, phys_ptr_t offset,
     phys_size_t size, uint32_t flags, unsigned mmflag, io_region_t *_region);
+
+extern status_t pci_irq_register(
+    pci_device_t *device, irq_early_func_t early_func, irq_func_t func,
+    void *data, irq_handler_t **_handler);
+
+extern status_t device_pci_irq_register(
+    device_t *owner, pci_device_t *device, irq_early_func_t early_func,
+    irq_func_t func, void *data);
 
 extern void pci_enable_master(pci_device_t *device, bool enable);
