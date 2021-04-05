@@ -110,6 +110,23 @@ static virtio_transport_t virtio_pci_transport = {
     .get_config       = virtio_pci_get_config,
 };
 
+static irq_status_t virtio_pci_early_irq(unsigned num, void *_device) {
+    virtio_pci_device_t *device = _device;
+
+    // TODO: MSI
+
+    /* Read ISR. This also has the effect of acknowledging the interrupt.
+     * Bit 0 set indicates that this device fired an interrupt, so run the
+     * thread. */
+    uint8_t isr = io_read8(device->io, VIRTIO_PCI_ISR);
+    return (isr & (1 << 0)) ? IRQ_RUN_THREAD : IRQ_UNHANDLED;
+}
+
+static void virtio_pci_irq(unsigned num, void *_device) {
+    virtio_pci_device_t *device = _device;
+    virtio_device_irq(&device->virtio);
+}
+
 static status_t virtio_pci_init_device(pci_device_t *pci) {
     status_t ret;
 
@@ -155,6 +172,14 @@ static status_t virtio_pci_init_device(pci_device_t *pci) {
         return ret;
     }
 
+    /* Register IRQ handler. */
+    ret = device_pci_irq_register(device->virtio.bus.node, pci, virtio_pci_early_irq, virtio_pci_irq, device);
+    if (ret != STATUS_SUCCESS) {
+        device_kprintf(device->virtio.bus.node, LOG_ERROR, "failed to register IRQ: %" PRId32 "\n", ret);
+        virtio_device_destroy(&device->virtio);
+        return ret;
+    }
+
     /* Enable bus mastering. */
     pci_enable_master(pci, true);
 
@@ -169,7 +194,7 @@ static pci_match_t virtio_pci_matches[] = {
 };
 
 static pci_driver_t virtio_pci_driver = {
-    .matches = PCI_MATCH_TABLE(virtio_pci_matches),
+    .matches     = PCI_MATCH_TABLE(virtio_pci_matches),
     .init_device = virtio_pci_init_device,
 };
 

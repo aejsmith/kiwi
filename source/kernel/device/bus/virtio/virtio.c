@@ -207,6 +207,32 @@ __export virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint
     return queue;
 }
 
+/** Handles an IRQ on a VirtIO device (from transport).
+ * @param device        Device that IRQ is for. */
+__export void virtio_device_irq(virtio_device_t *device) {
+    virtio_driver_t *driver = cast_virtio_driver(device->bus.driver);
+
+    /* Check for progress on any queues. */
+    for (uint16_t i = 0; i < VIRTIO_MAX_QUEUES; i++) {
+        virtio_queue_t *queue = &device->queues[i];
+
+        if (queue->mem_size == 0)
+            continue;
+
+        /* We don't need any locking here - last_used should only be accessed
+         * by the IRQ handler. Driver handler callback should implement
+         * appropriate synchronization itself. */
+        while (queue->ring.used->idx != queue->last_used) {
+            struct vring_used_elem *elem = &queue->ring.used->ring[queue->last_used % queue->ring.num];
+            queue->last_used++;
+
+            driver->handle_used(device, i, elem);
+
+            memory_barrier();
+        }
+    }
+}
+
 /**
  * Bus methods.
  */

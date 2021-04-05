@@ -46,6 +46,17 @@ typedef struct virtio_driver {
      * @param device        Device to initialize.
      * @return              Status code describing the result of the operation. */
     status_t (*init_device)(struct virtio_device *device);
+
+    /**
+     * Handles a used buffer from the device. This is called when the IRQ
+     * handler detects a new buffer in the used ring. It is the responsibility
+     * of the handler to free this descriptor or reuse it.
+     *
+     * @param device        Device to handle on.
+     * @param queue         Queue index.
+     * @param elem          Used ring element.
+     */
+    void (*handle_used)(struct virtio_device *device, uint16_t index, struct vring_used_elem *elem);
 } virtio_driver_t;
 
 DEFINE_CLASS_CAST(virtio_driver, bus_driver, bus);
@@ -113,21 +124,23 @@ typedef struct virtio_queue {
     uint16_t free_list;                 /**< Free pointer (0xffff = null). */
     uint16_t free_count;                /**< Number of free descriptors. */
 
-    uint16_t last_used;                 /**< Last seen used index. */
+    /** Last seen used index (only accessed by IRQ handler). */
+    uint16_t last_used;
 
     /** Memory allocation details. */
     phys_ptr_t mem_phys;
     phys_size_t mem_size;
 } virtio_queue_t;
 
-/** Return the descriptor at the given index in a queue. */
+/** Returns the descriptor at the given index in a queue. */
 static inline struct vring_desc *virtio_queue_desc(virtio_queue_t *queue, uint16_t desc_index) {
     return &queue->ring.desc[desc_index];
 }
 
-/** Return the next descriptor in a chain in a queue. */
-static inline struct vring_desc *virtio_queue_next(virtio_queue_t *queue, struct vring_desc *desc) {
-    return virtio_queue_desc(queue, desc->next);
+/** Returns the next descriptor index in a chain in a queue.
+ * @return              Next descriptor index, or 0xffff for end of chain. */
+static inline uint16_t virtio_queue_next(virtio_queue_t *queue, struct vring_desc *desc) {
+    return (desc->flags & VRING_DESC_F_NEXT) ? desc->next : 0xffff;
 }
 
 extern struct vring_desc *virtio_queue_alloc(virtio_queue_t *queue, uint16_t *_desc_index);
@@ -148,6 +161,7 @@ typedef struct virtio_device {
     virtio_transport_t *transport;      /**< Transport implementation. */
 
     uint32_t host_features;             /**< Supported host features. */
+    void *private;                      /**< Private data pointer for driver. */
 
     /** Device virtqueues. */
     virtio_queue_t queues[VIRTIO_MAX_QUEUES];
@@ -173,6 +187,8 @@ extern void virtio_device_get_config(virtio_device_t *device, void *buf, uint32_
 
 extern void virtio_device_set_features(virtio_device_t *device, uint32_t features);
 extern virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint16_t index);
+
+extern void virtio_device_irq(virtio_device_t *device);
 
 extern status_t virtio_create_device(device_t *parent, virtio_device_t *device);
 
