@@ -16,17 +16,32 @@
 
 /**
  * @file
- * @brief               IPv4 definitions.
+ * @brief               ARP protocol definitions.
  */
 
 #pragma once
 
-#include <net/net.h>
+#include <net/ipv4.h>
 
-#define IPV4_ADDR_LEN   4
+/** ARP packet structure. */
+typedef struct arp_packet {
+    uint16_t hw_type;
+    uint16_t proto_type;
+    uint8_t hw_len;
+    uint8_t proto_len;
+    uint16_t opcode;
 
-/** Type used to store an IPv4 address. */
-typedef union ipv4_addr {
-    uint32_t val;               /**< 32-bit address (network byte order). */
-    uint8_t bytes[IPV4_ADDR_LEN];
-} ipv4_addr_t;
+    /**
+     * Address fields. These are technically variable length but we only use
+     * this for Ethernet/IPv4 right now.
+     */
+    uint8_t hw_sender[6];
+    ipv4_addr_t proto_sender;
+    uint8_t hw_target[6];
+    ipv4_addr_t proto_target;
+} __packed arp_packet_t;
+
+#define ARP_HW_TYPE_ETHERNET    1
+
+#define ARP_OPCODE_REQUEST      1
+#define ARP_OPCODE_REPLY        2
