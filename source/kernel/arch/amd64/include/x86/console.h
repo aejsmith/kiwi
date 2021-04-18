@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief               PC console code.
+ * @brief               AMD64 console code.
  */
 
 #pragma once

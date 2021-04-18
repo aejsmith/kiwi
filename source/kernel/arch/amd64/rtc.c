@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief               PC RTC functions.
+ * @brief               AMD64 RTC functions.
  */
 
 #include <arch/cpu.h>
@@ -34,7 +34,7 @@ static inline uint32_t bcd_to_dec(uint8_t num) {
 
 /** Get the number of nanoseconds since the Epoch from the RTC.
  * @return              Number of nanoseconds since Epoch. */
-nstime_t platform_time_from_hardware(void) {
+nstime_t arch_time_from_hardware(void) {
     spinlock_lock(&rtc_lock);
 
     /* Check if an update is in progress. */

@@ -154,7 +154,7 @@ extern status_t delay_etc(nstime_t nsecs, int flags);
 extern void delay(nstime_t nsecs);
 extern void spin(nstime_t nsecs);
 
-extern nstime_t platform_time_from_hardware(void);
+extern nstime_t arch_time_from_hardware(void);
 
 extern void time_init(void);
 extern void time_late_init(void);

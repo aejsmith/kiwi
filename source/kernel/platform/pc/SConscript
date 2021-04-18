@@ -21,5 +21,4 @@ kern_sources += FeatureSources(config, [
     'pic.c',
     'pit.c',
     'platform.c',
-    'rtc.c',
 ])

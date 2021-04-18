@@ -68,3 +68,10 @@ __init_text void arm64_time_init(void) {
     /* Boot time, this is the base for system_time(). */
     arm64_boot_time = arm64_read_sysreg(cntpct_el0);
 }
+
+/** Get the number of nanoseconds since the Epoch from the RTC.
+ * @return              Number of nanoseconds since Epoch. */
+nstime_t arch_time_from_hardware(void) {
+    /* TODO */
+    return 0;
+}

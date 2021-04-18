@@ -524,7 +524,7 @@ static kdb_status_t kdb_cmd_uptime(int argc, char **argv, kdb_filter_t *filter) 
 /** Initialize the timing system. */
 __init_text void time_init(void) {
     /* Initialize the boot time. */
-    boot_unix_time = platform_time_from_hardware() - system_time();
+    boot_unix_time = arch_time_from_hardware() - system_time();
 
     /* Register debugger commands. */
     kdb_register_command("timers", "Print a list of running timers.", kdb_cmd_timers);
