@@ -31,6 +31,8 @@ kern_sources += FeatureSources(config, [
     'lapic.c',
     'mmu.c',
     'page.c',
+    'pic.c',
+    'pit.c',
     'rtc.c',
     'setjmp.S',
     'smp.c',

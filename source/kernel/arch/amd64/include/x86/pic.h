@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief               Programmable Interrupt Controller code.
+ * @brief               AMD64 Programmable Interrupt Controller code.
  */
 
 #pragma once

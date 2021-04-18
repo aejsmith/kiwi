@@ -19,24 +19,9 @@
  * @brief               PC platform core code.
  */
 
-#include <arch/cpu.h>
-#include <arch/io.h>
-
-#include <x86/descriptor.h>
-#include <x86/lapic.h>
-
-#include <pc/pic.h>
-#include <pc/pit.h>
-
 #include <kernel.h>
-#include <kboot.h>
-#include <time.h>
 
 /** PC platform initialization. */
 __init_text void platform_init(void) {
-    pic_init();
 
-    /* If the LAPIC is not available, we must use the PIT as the timer. */
-    if (!lapic_enabled())
-        pit_init();
 }

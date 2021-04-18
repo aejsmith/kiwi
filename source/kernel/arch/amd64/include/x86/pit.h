@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief               PC Programmable Interval Timer code.
+ * @brief               AMD64 Programmable Interval Timer code.
  */
 
 #pragma once

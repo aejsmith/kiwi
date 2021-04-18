@@ -27,12 +27,11 @@
 #include <x86/descriptor.h>
 #include <x86/interrupt.h>
 #include <x86/lapic.h>
+#include <x86/pit.h>
 #include <x86/tsc.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
-
-#include <pc/pit.h>
 
 #include <cpu.h>
 #include <kdb.h>

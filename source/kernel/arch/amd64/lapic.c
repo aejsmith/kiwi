@@ -24,12 +24,11 @@
 #include <x86/cpu.h>
 #include <x86/interrupt.h>
 #include <x86/lapic.h>
+#include <x86/pit.h>
 
 #include <lib/string.h>
 
 #include <mm/phys.h>
-
-#include <pc/pit.h>
 
 #include <cpu.h>
 #include <kboot.h>

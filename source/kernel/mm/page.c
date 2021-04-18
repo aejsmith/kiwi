@@ -47,13 +47,13 @@
  *
  * Free pages are stored in a number of lists. Allocating a single page is just
  * a matter of popping a page from the first list that has free pages. The
- * lists are separated in a platform-specific manner. This is done to improve
+ * lists are separated in a arch-specific manner. This is done to improve
  * allocation speed with commonly used minimum/maximum address constraints. For
- * example, the PC platform separates the lists into below 16MB (ISA DMA),
- * below 4GB (devices that use 32-bit DMA addresses) and anything else, since
- * these are the most likely constraints that will be used. Allocations using
- * these constraints can be satisfied simply by popping a page from an
- * appropriate list.
+ * example, AMD64 separates the lists into below 16MB (ISA DMA), below 4GB
+ * (devices that use 32-bit DMA addresses) and anything else, since these are
+ * the most likely constraints that will be used. Allocations using these
+ * constraints can be satisfied simply by popping a page from an appropriate
+ * list.
  *
  * The allocation code is not optimised for quick allocations of contiguous
  * ranges of pages, or pages with alignment/boundary constraints, as it is
@@ -474,8 +474,8 @@ static page_t *phys_alloc_slowpath(
  * as 0. It is intended that this function is not used regularly, for example
  * within driver initialization routines, as it is not optimised for fast
  * allocations. It is, however, optimised for single-page allocations with only
- * certain platform-specific minimum/maximum address constraints, for example
- * below 16MB or below 4GB on the PC platform.
+ * certain arch-specific minimum/maximum address constraints, for example below
+ * 16MB or below 4GB on AMD64.
  *
  * @param size          Size of the range to allocate.
  * @param align         Required alignment of the range (power of 2).

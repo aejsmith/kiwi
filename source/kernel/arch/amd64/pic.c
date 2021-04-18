@@ -16,14 +16,14 @@
 
 /**
  * @file
- * @brief               Programmable Interrupt Controller code.
+ * @brief               AMD64 Programmable Interrupt Controller code.
  */
 
 #include <arch/io.h>
 
-#include <device/irq.h>
+#include <x86/pic.h>
 
-#include <pc/pic.h>
+#include <device/irq.h>
 
 #include <assert.h>
 #include <kernel.h>

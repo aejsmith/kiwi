@@ -16,12 +16,15 @@
 
 /**
  * @file
- * @brief               PC Programmable Interval Timer code.
+ * @brief               AMD64 Programmable Interval Timer code.
  */
 
 #include <arch/io.h>
+
+#include <x86/pit.h>
+
 #include <device/irq.h>
-#include <pc/pit.h>
+
 #include <time.h>
 
 static irq_status_t pit_irq(unsigned num, void *data) {

@@ -25,12 +25,21 @@
 #include <x86/acpi.h>
 #include <x86/console.h>
 #include <x86/descriptor.h>
+#include <x86/lapic.h>
+#include <x86/pic.h>
+#include <x86/pit.h>
 
 #include <kernel.h>
 #include <time.h>
 
 __init_text void arch_init(void) {
+    pic_init();
     acpi_init();
+
+    /* If the LAPIC is not available, we must use the PIT as the timer. */
+    if (!lapic_enabled())
+        pit_init();
+
     i8042_init();
 }
 

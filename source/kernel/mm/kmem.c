@@ -98,7 +98,7 @@ static kmem_range_t *kmem_range_get(unsigned mmflag) {
     if (unlikely(list_empty(&kmem_range_pool))) {
         /* No free range structures available. Allocate a new page that can be
          * accessed from the physical map area. It is expected that the
-         * architecture/platform segregates the free page lists such that pages
+         * architecture segregates the free page lists such that pages
          * accessible through the physical map area can be allocated using the
          * fast path, and are not allocated unless pages outside of it aren't
          * available. */
