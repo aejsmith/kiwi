@@ -19,6 +19,8 @@ Import('config', 'kern_env', 'kern_sources', 'mod_env')
 
 kern_sources += FeatureSources(config, [
     'ap_boot.bin.c',
+    'acpi.c',
+    'arch.c',
     'cpu.c',
     'descriptor.c',
     'elf.c',

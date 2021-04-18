@@ -105,14 +105,12 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
     if (kboot_boolean_option("early_kdb"))
         kdb_enter(KDB_REASON_USER, NULL);
 
-    /* Finish initializing the CPU subsystem and set up the platform. */
     cpu_init();
+    arch_init();
     platform_init();
     time_init();
     smp_init();
     slab_late_init();
-
-    /* Perform other initialization tasks. */
     object_init();
     token_init();
     ipc_init();

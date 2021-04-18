@@ -16,28 +16,34 @@
 
 /**
  * @file
- * @brief               DT SMP detection code.
+ * @brief               ARM64 SMP detection code.
  */
 #include <kernel.h>
 #include <smp.h>
 
+/** Send an IPI interrupt to a single CPU.
+ * @param dest          Destination CPU ID. */
+void arch_smp_ipi(cpu_id_t dest) {
+    fatal_todo();
+}
+
 /** Detect all secondary CPUs in the system. */
-void platform_smp_detect(void) {
+void arch_smp_detect(void) {
     /* TODO */
 }
 
 /** Prepare the SMP boot process. */
-__init_text void platform_smp_boot_prepare(void) {
+__init_text void arch_smp_boot_prepare(void) {
     fatal_todo();
 }
 
 /** Boot a secondary CPU.
  * @param cpu           CPU to boot. */
-__init_text void platform_smp_boot(cpu_t *cpu) {
+__init_text void arch_smp_boot(cpu_t *cpu) {
     fatal_todo();
 }
 
 /** Clean up after secondary CPUs have been booted. */
-__init_text void platform_smp_boot_cleanup(void) {
+__init_text void arch_smp_boot_cleanup(void) {
     fatal_todo();
 }

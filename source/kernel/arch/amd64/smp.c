@@ -22,8 +22,10 @@
 #include <arch/barrier.h>
 #include <arch/stack.h>
 
+#include <x86/acpi.h>
 #include <x86/lapic.h>
 #include <x86/mmu.h>
+#include <x86/smp.h>
 #include <x86/tsc.h>
 
 #include <lib/string.h>
@@ -51,8 +53,41 @@ void arch_smp_ipi(cpu_id_t dest) {
     lapic_ipi(LAPIC_IPI_DEST_SINGLE, (uint32_t)dest, LAPIC_IPI_FIXED, LAPIC_VECT_IPI);
 }
 
+/** Detect all secondary CPUs in the system. */
+void arch_smp_detect(void) {
+    /* If the LAPIC is disabled, we cannot use SMP. */
+    if (!lapic_enabled()) {
+        return;
+    } else if (!acpi_supported) {
+        return;
+    }
+
+    acpi_madt_t *madt = (acpi_madt_t *)acpi_table_find(ACPI_MADT_SIGNATURE);
+    if (!madt)
+        return;
+
+    size_t length = madt->header.length - sizeof(acpi_madt_t);
+
+    acpi_madt_lapic_t *lapic;
+    for (size_t i = 0; i < length; i += lapic->length) {
+        lapic = (acpi_madt_lapic_t *)(madt->apic_structures + i);
+        if (lapic->type != ACPI_MADT_LAPIC) {
+            continue;
+        } else if (!(lapic->flags & (1<<0))) {
+            /* Ignore disabled processors. */
+            continue;
+        } else if (lapic->lapic_id == curr_cpu->id) {
+            continue;
+        }
+
+        cpu_register(lapic->lapic_id, CPU_OFFLINE);
+    }
+    
+    return;
+}
+
 /** Prepare the SMP boot process. */
-__init_text void x86_smp_boot_prepare(void) {
+__init_text void arch_smp_boot_prepare(void) {
     /* Allocate a low memory page for the trampoline code. */
     phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_BOOT, &ap_bootstrap_page);
 
@@ -111,7 +146,7 @@ static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
 
 /** Boot a secondary CPU.
  * @param cpu           CPU to boot. */
-__init_text void x86_smp_boot(cpu_t *cpu) {
+__init_text void arch_smp_boot(cpu_t *cpu) {
     kprintf(LOG_DEBUG, "cpu: booting CPU %" PRIu32 "...\n", cpu->id);
     assert(lapic_enabled());
 
@@ -141,7 +176,7 @@ __init_text void x86_smp_boot(cpu_t *cpu) {
 }
 
 /** Clean up after secondary CPUs have been booted. */
-__init_text void x86_smp_boot_cleanup(void) {
+__init_text void arch_smp_boot_cleanup(void) {
     /* Destroy the temporary MMU context. */
     mmu_context_destroy(ap_mmu_context);
 

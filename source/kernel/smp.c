@@ -337,7 +337,7 @@ __init_text void smp_init(void) {
         return;
 
     /* First we want to detect secondary CPUs. */
-    platform_smp_detect();
+    arch_smp_detect();
 
     /* If we only have 1 CPU, there is no need to set up the call system. */
     if (cpu_count == 1)
@@ -362,16 +362,16 @@ __init_text void smp_init(void) {
 __init_text void smp_boot(void) {
     bool irq_state = local_irq_disable();
 
-    platform_smp_boot_prepare();
+    arch_smp_boot_prepare();
 
     for (cpu_id_t i = 0; i <= highest_cpu_id; i++) {
         if (cpus[i] && cpus[i]->state == CPU_OFFLINE) {
             smp_boot_status = SMP_BOOT_INIT;
-            platform_smp_boot(cpus[i]);
+            arch_smp_boot(cpus[i]);
         }
     }
 
-    platform_smp_boot_cleanup();
+    arch_smp_boot_cleanup();
 
     /* Indicate to the newly-booted CPUs that all CPUs are up and they can start
      * scheduling threads (see kmain_secondary()). */

@@ -25,7 +25,6 @@
 #include <x86/descriptor.h>
 #include <x86/lapic.h>
 
-#include <pc/acpi.h>
 #include <pc/console.h>
 #include <pc/pic.h>
 #include <pc/pit.h>
@@ -37,7 +36,6 @@
 /** PC platform initialization. */
 __init_text void platform_init(void) {
     pic_init();
-    acpi_init();
 
     /* If the LAPIC is not available, we must use the PIT as the timer. */
     if (!lapic_enabled())

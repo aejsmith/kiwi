@@ -16,10 +16,10 @@
 
 /**
  * @file
- * @brief               PC ACPI functions.
+ * @brief               AMD64 ACPI functions.
  */
 
-#include <pc/acpi.h>
+#include <x86/acpi.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>

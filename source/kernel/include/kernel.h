@@ -57,6 +57,8 @@ typedef void (*initcall_t)(void);
 
 extern initcall_t __initcall_start[], __initcall_end[];
 
+extern void arch_init(void);
+
 extern void platform_init(void);
 extern void platform_reboot(void);
 extern void platform_poweroff(void);

@@ -16,13 +16,11 @@
 
 /**
  * @file
- * @brief               x86 SMP definitions.
+ * @brief               ARM64 architecture main functions.
  */
 
-#pragma once
+#include <kernel.h>
 
-struct cpu;
-
-/** x86-specific SMP boot status values. */
-#define SMP_BOOT_TSC_SYNC1      4   /**< Stage 1 of TSC synchronization. */
-#define SMP_BOOT_TSC_SYNC2      5   /**< Stage 2 of TSC synchronization. */
+__init_text void arch_init(void) {
+    
+}

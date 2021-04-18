@@ -51,10 +51,10 @@ extern void smp_call_acknowledge(status_t status);
 #define SMP_BOOT_BOOTED         2   /**< AP has completed kmain_secondary(). */
 #define SMP_BOOT_COMPLETE       3   /**< All APs have been booted. */
 
-extern void platform_smp_detect(void);
-extern void platform_smp_boot_prepare(void);
-extern void platform_smp_boot(cpu_t *cpu);
-extern void platform_smp_boot_cleanup(void);
+extern void arch_smp_detect(void);
+extern void arch_smp_boot_prepare(void);
+extern void arch_smp_boot(cpu_t *cpu);
+extern void arch_smp_boot_cleanup(void);
 
 extern void smp_init(void);
 extern void smp_boot(void);
