@@ -19,8 +19,19 @@
  * @brief               ARM64 architecture main functions.
  */
 
+#include <arch/cpu.h>
+
 #include <kernel.h>
 
 __init_text void arch_init(void) {
     
+}
+
+void arch_reboot(void) {
+    fatal_todo();
+}
+
+void arch_poweroff(void) {
+    /* TODO. */
+    arch_cpu_halt();
 }

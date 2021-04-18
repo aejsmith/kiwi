@@ -58,10 +58,10 @@ typedef void (*initcall_t)(void);
 extern initcall_t __initcall_start[], __initcall_end[];
 
 extern void arch_init(void);
+extern void arch_reboot(void);
+extern void arch_poweroff(void);
 
 extern void platform_init(void);
-extern void platform_reboot(void);
-extern void platform_poweroff(void);
 
 extern void update_boot_progress(int percent);
 

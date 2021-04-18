@@ -1018,7 +1018,7 @@ static kdb_status_t kdb_cmd_reboot(int argc, char **argv, kdb_filter_t *filter) 
         return KDB_SUCCESS;
     }
 
-    platform_reboot();
+    arch_reboot();
     return KDB_FAILURE;
 }
 

@@ -55,11 +55,11 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
     switch (action) {
         case SHUTDOWN_REBOOT:
             kprintf(LOG_NOTICE, "system: rebooting...\n");
-            platform_reboot();
+            arch_reboot();
             break;
         case SHUTDOWN_POWEROFF:
             kprintf(LOG_NOTICE, "system: powering off...\n");
-            platform_poweroff();
+            arch_poweroff();
             break;
     }
 

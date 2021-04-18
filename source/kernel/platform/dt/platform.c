@@ -27,14 +27,3 @@
 __init_text void platform_init(void) {
 
 }
-
-/** Reboot the system. */
-void platform_reboot(void) {
-    fatal_todo();
-}
-
-/** Power off the system. */
-void platform_poweroff(void) {
-    /* TODO. */
-    arch_cpu_halt();
-}
