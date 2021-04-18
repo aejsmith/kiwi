@@ -51,13 +51,13 @@ __init_text void console_early_init(void) {
     kboot_tag_video_t *video   = kboot_tag_iterate(KBOOT_TAG_VIDEO, NULL);
     kboot_tag_serial_t *serial = kboot_tag_iterate(KBOOT_TAG_SERIAL, NULL);
 
-    platform_console_early_init(video, serial);
+    arch_console_early_init(video, serial);
 
-    /* Try to set up a serial port if the platform didn't. */
+    /* Try to set up a serial port if the architecture didn't. */
     if (!debug_console.out && serial)
         serial_console_early_init(serial);
 
-    /* Set up a framebuffer console if the platform didn't. */
+    /* Set up a framebuffer console if the architecture didn't. */
     if (!main_console.out && video && video->type == KBOOT_VIDEO_LFB)
         fb_console_early_init(video);
 }

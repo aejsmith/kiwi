@@ -23,6 +23,7 @@
 #include <arch/io.h>
 
 #include <x86/acpi.h>
+#include <x86/console.h>
 #include <x86/descriptor.h>
 
 #include <kernel.h>
@@ -30,6 +31,7 @@
 
 __init_text void arch_init(void) {
     acpi_init();
+    i8042_init();
 }
 
 void arch_reboot(void) {

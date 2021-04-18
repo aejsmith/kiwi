@@ -81,7 +81,7 @@ typedef struct console {
 extern console_t main_console;
 extern console_t debug_console;
 
-extern void platform_console_early_init(struct kboot_tag_video *video, struct kboot_tag_serial *serial);
+extern void arch_console_early_init(struct kboot_tag_video *video, struct kboot_tag_serial *serial);
 
 extern void console_early_init(void);
 extern void console_init(void);

@@ -18,7 +18,6 @@ Import('config', 'kern_sources')
 from util import FeatureSources
 
 kern_sources += FeatureSources(config, [
-    'console.c',
     'pic.c',
     'pit.c',
     'platform.c',

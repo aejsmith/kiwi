@@ -21,6 +21,7 @@ kern_sources += FeatureSources(config, [
     'ap_boot.bin.c',
     'acpi.c',
     'arch.c',
+    'console.c',
     'cpu.c',
     'descriptor.c',
     'elf.c',

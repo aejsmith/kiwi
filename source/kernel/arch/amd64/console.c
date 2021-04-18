@@ -16,16 +16,16 @@
 
 /**
  * @file
- * @brief               PC console code.
+ * @brief               AMD64 console code.
  */
 
 #include <arch/io.h>
 
+#include <x86/console.h>
+
 #include <device/console/ns16550.h>
 
 #include <lib/string.h>
-
-#include <pc/console.h>
 
 #include <console.h>
 #include <kboot.h>
@@ -166,7 +166,7 @@ __init_text void i8042_init(void) {
  */
 
 /** Set up the debug console. */
-__init_text void platform_console_early_init(kboot_tag_video_t *video, kboot_tag_serial_t *serial) {
+__init_text void arch_console_early_init(kboot_tag_video_t *video, kboot_tag_serial_t *serial) {
     if (!serial) {
         /* Initialize and configure a serial port if the boot loader didn't
          * give us one. */
