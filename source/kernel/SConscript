@@ -70,14 +70,14 @@ kern_env = manager.CreateBare(name = 'kernel', flags = {
     'CCFLAGS': [
         '-nostdlib', '-nostdinc', '-ffreestanding',
         '-fno-optimize-sibling-calls', '-fno-stack-protector',
-        '-include', 'build/%s-%s-%s/config.h' % (config['ARCH'], config['PLATFORM'], config['BUILD']),
+        '-include', 'build/%s-%s/config.h' % (config['ARCH'], config['BUILD']),
     ],
     'CXXFLAGS': [
         '-fno-exceptions', '-fno-rtti',
     ],
     'ASFLAGS': [
-        '-nostdinc', '-include',
-        'build/%s-%s-%s/config.h' % (config['ARCH'], config['PLATFORM'], config['BUILD']),
+        '-nostdinc',
+        '-include', 'build/%s-%s/config.h' % (config['ARCH'], config['BUILD']),
     ],
     'LINKFLAGS': [
         '-nostdlib',

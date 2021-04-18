@@ -240,7 +240,6 @@ class LLVMToolchain(Toolchain):
 class ToolchainManager:
     def __init__(self, config):
         self.arch           = config['ARCH']
-        self.platform       = config['PLATFORM']
         self.build          = config['BUILD']
         self.destdir        = config['TOOLCHAIN_DIR']
         self.target         = config['TOOLCHAIN_TARGET']
@@ -261,7 +260,7 @@ class ToolchainManager:
         sysrootdir = os.path.join(self.targetdir, 'sysroot')
         libdir     = os.path.join(sysrootdir, 'lib')
         includedir = os.path.join(sysrootdir, 'include')
-        builddir   = os.path.join(os.getcwd(), 'build', '%s-%s-%s' % (self.arch, self.platform, self.build))
+        builddir   = os.path.join(os.getcwd(), 'build', '%s-%s' % (self.arch, self.build))
 
         # Remove any existing sysroot.
         remove(sysrootdir)

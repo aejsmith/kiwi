@@ -146,7 +146,6 @@ endmenu
 comment "Target system "
 
 source "config/Kconfig.arch"
-source "config/Kconfig.platform"
 
 comment "System configuration"
 

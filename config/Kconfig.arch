@@ -46,7 +46,7 @@ config ARCH_AMD64
 	select SYS_SUPPORTS_LITTLE_ENDIAN
 	select SYS_SUPPORTS_USERSPACE
 	help
-	  Target the built system to 64-bit x86 processors.
+	  Target the built system to 64-bit x86 PCs.
 
 config ARCH_ARM64
 	bool "ARM64"
@@ -84,6 +84,11 @@ config ARCH_ASFLAGS
 config ARCH_CCFLAGS
 	string
 	default ""
+
+config KBOOT_TARGETS
+	string
+	default "bios,efi-amd64,efi-ia32" if ARCH_AMD64
+	default "dt-arm64" if ARCH_ARM64
 
 choice
 	prompt "Endianness"

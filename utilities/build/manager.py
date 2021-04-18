@@ -164,9 +164,9 @@ class BuildManager:
         # need to add the compiler's own include directory to the path, though.
         self.merge_flags(env, {
             'ASFLAGS': ['-nostdinc', '-isystem', incdir, '-include',
-                'build/%s-%s-%s/config.h' % (config['ARCH'], config['PLATFORM'], config['BUILD'])],
+                'build/%s-%s/config.h' % (config['ARCH'], config['BUILD'])],
             'CCFLAGS': ['-nostdinc', '-isystem', incdir, '-include',
-                'build/%s-%s-%s/config.h' % (config['ARCH'], config['PLATFORM'], config['BUILD'])],
+                'build/%s-%s/config.h' % (config['ARCH'], config['BUILD'])],
             'LIBPATH': [env['_LIBOUTDIR']],
             'LIBS': libraries,
         })

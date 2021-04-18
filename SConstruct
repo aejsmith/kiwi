@@ -187,10 +187,6 @@ if 'ARCH_ASFLAGS' in config:
     target_env['ASFLAGS'] += config['ARCH_ASFLAGS'].split()
 if 'ARCH_CCFLAGS' in config:
     target_env['CCFLAGS'] += config['ARCH_CCFLAGS'].split()
-if 'PLATFORM_ASFLAGS' in config:
-    target_env['CCFLAGS'] += config['PLATFORM_ASFLAGS'].split()
-if 'PLATFORM_CCFLAGS' in config:
-    target_env['CCFLAGS'] += config['PLATFORM_CCFLAGS'].split()
 
 target_env['CCFLAGS']  += config['EXTRA_CCFLAGS'].split()
 target_env['CFLAGS']   += config['EXTRA_CFLAGS'].split()
@@ -222,7 +218,7 @@ target_env['RANLIB']  = toolchain.tool_path('ranlib')
 target_env['OBJCOPY'] = toolchain.tool_path('objcopy')
 target_env['LD']      = toolchain.tool_path('ld')
 
-build_dir = os.path.join('build', '%s-%s-%s' % (config['ARCH'], config['PLATFORM'], config['BUILD']))
+build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['BUILD']))
 
 # Build the target system.
 SConscript('source/SConscript', variant_dir = build_dir)
