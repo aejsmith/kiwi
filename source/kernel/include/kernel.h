@@ -61,8 +61,6 @@ extern void arch_init(void);
 extern void arch_reboot(void);
 extern void arch_poweroff(void);
 
-extern void platform_init(void);
-
 extern void update_boot_progress(int percent);
 
 extern void system_shutdown(unsigned action);

@@ -19,7 +19,7 @@ comment "Bus managers"
 config DEVICE_BUS_PCI
 	bool "PCI bus manager"
 	default y
-    depends on PLATFORM_PC
+    depends on ARCH_X86
 	help
 	  Enable the PCI bus manager.
 

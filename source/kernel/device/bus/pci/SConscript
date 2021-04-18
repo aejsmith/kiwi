@@ -16,7 +16,10 @@
 
 Import('config', 'mod_env')
 
+if config['ARCH'] == 'amd64':
+    pci_platform = 'pc'
+
 mod_env.Module('pci', [
-    'platform/%s.c' % (config['PLATFORM']),
+    'platform/%s.c' % (pci_platform),
     'pci.c',
 ])

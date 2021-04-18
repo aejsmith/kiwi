@@ -35,10 +35,9 @@ base_sources = FeatureSources(config, [
 ])
 
 dirs = FeatureDirs(config, [
-    # Architecture/platform must be first as they may change build flags which
-    # must apply to all other subdirectories.
+    # Architecture must be first as they may change build flags which must
+    # apply to all other subdirectories.
     'arch/%s' % (config['ARCH']),
-    'platform/%s' % (config['PLATFORM']),
 
     'console',
     'device',
@@ -67,7 +66,6 @@ kern_env = manager.CreateBare(name = 'kernel', flags = {
     'CPPPATH': [
         Dir('include'),
         Dir('arch/%s/include' % (config['ARCH'])),
-        Dir('platform/%s/include' % (config['PLATFORM'])),
     ],
     'CCFLAGS': [
         '-nostdlib', '-nostdinc', '-ffreestanding',

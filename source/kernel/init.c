@@ -107,7 +107,6 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
 
     cpu_init();
     arch_init();
-    platform_init();
     time_init();
     smp_init();
     slab_late_init();

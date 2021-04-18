@@ -24,10 +24,6 @@ menu "Architecture"
 source "arch/Kconfig"
 endmenu
 
-menu "Platform"
-source "platform/Kconfig"
-endmenu
-
 ########################
 menu "Debugging options"
 	depends on DEBUG
