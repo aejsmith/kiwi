@@ -16,11 +16,10 @@
 
 /**
  * @file
- * @brief               DT IRQ definitions.
+ * @brief               AMD64 IRQ definitions.
  */
 
 #pragma once
 
-/** Number of IRQs. */
-// TODO
-#define IRQ_COUNT       64
+/** Number of IRQs (32 hardware exceptions). */
+#define IRQ_COUNT       (256 - 32)

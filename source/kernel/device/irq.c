@@ -19,14 +19,14 @@
  * @brief               Hardware interrupt handling code.
  */
 
+#include <arch/irq.h>
+
 #include <device/device.h>
 #include <device/irq.h>
 
 #include <lib/string.h>
 
 #include <mm/malloc.h>
-
-#include <platform/irq.h>
 
 #include <proc/thread.h>
 

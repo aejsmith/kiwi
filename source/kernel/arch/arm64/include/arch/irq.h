@@ -16,10 +16,11 @@
 
 /**
  * @file
- * @brief               PC IRQ definitions.
+ * @brief               ARM64 IRQ definitions.
  */
 
 #pragma once
 
-/** Number of IRQs (32 hardware exceptions). */
-#define IRQ_COUNT       (256 - 32)
+/** Number of IRQs. */
+// TODO
+#define IRQ_COUNT       64
