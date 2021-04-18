@@ -538,6 +538,8 @@ __init_text void time_late_init(void) {
 
 /** Initialize per-CPU time state. */
 __init_text void time_init_percpu(void) {
+    assert(timer_device);
+
     if (timer_device->type == TIMER_DEVICE_ONESHOT)
         curr_cpu->timer_enabled = true;
 
