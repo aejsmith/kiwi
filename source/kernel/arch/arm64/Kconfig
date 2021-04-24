@@ -16,3 +16,4 @@
 
 config KERNEL_ARCH_ARM64
 	def_bool y
+	select DEVICE_BUS_DT

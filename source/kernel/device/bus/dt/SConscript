@@ -14,30 +14,26 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-comment "Bus managers"
+Import('config', 'kern_env', 'kern_sources')
+from util import FeatureSources
 
-# Selected by architecture if required.
-config DEVICE_BUS_DT
-	bool
+# The Device Tree bus manager is built in to the kernel, since on DT platforms,
+# core kernel functionality (IRQs, timers, low-level platform setup) is
+# dependent on it.
 
-config DEVICE_BUS_PCI
-	bool "PCI bus manager"
-	default y
-	depends on ARCH_X86
-	help
-	  Enable the PCI bus manager.
+kern_env['CPPPATH'] += [Dir('fdt/include')]
 
-config DEVICE_BUS_VIRTIO
-	bool "VirtIO bus manager"
-	default y
-	help
-	  Enable support for VirtIO devices. This is just the core VirtIO bus
-	  manager - to be useful, a transport driver and device drivers must also
-	  be enabled.
+kern_sources += FeatureSources(config, [
+    'fdt/fdt_addresses.c',
+    'fdt/fdt.c',
+    'fdt/fdt_check.c',
+    'fdt/fdt_empty_tree.c',
+    'fdt/fdt_overlay.c',
+    'fdt/fdt_ro.c',
+    'fdt/fdt_rw.c',
+    'fdt/fdt_strerror.c',
+    'fdt/fdt_sw.c',
+    'fdt/fdt_wip.c',
 
-config DEVICE_BUS_VIRTIO_PCI
-	bool "VirtIO PCI transport driver"
-	default y
-	depends on DEVICE_BUS_PCI && DEVICE_BUS_VIRTIO
-	help
-	  Enable support for VirtIO over PCI.
+    'dt.c',
+])
