@@ -234,4 +234,5 @@ extern status_t device_open(
 
 extern int device_kprintf(device_t *device, int level, const char *fmt, ...) __printf(3, 4);
 
+extern void device_early_init(void);
 extern void device_init(void);

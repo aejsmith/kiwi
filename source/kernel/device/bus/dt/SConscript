@@ -14,14 +14,15 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'kern_env', 'kern_sources')
+Import('config', 'kern_env', 'kern_sources', 'mod_env')
 from util import FeatureSources
 
-# The Device Tree bus manager is built in to the kernel, since on DT platforms,
-# core kernel functionality (IRQs, timers, low-level platform setup) is
-# dependent on it.
+# See device/bus/{dt,fdt}.h, there are two parts to DT support: the low-level
+# libfdt-based interface used by core kernel functionality that needs to use
+# DT for device detection, and the high-level DT bus manager driver.
 
-kern_env['CPPPATH'] += [Dir('fdt/include')]
+for env in [kern_env, mod_env]:
+    env['CPPPATH'] += [Dir('fdt/include')]
 
 kern_sources += FeatureSources(config, [
     'fdt/fdt_addresses.c',
@@ -35,5 +36,9 @@ kern_sources += FeatureSources(config, [
     'fdt/fdt_sw.c',
     'fdt/fdt_wip.c',
 
+    'fdt.c',
+])
+
+mod_env.Module('dt', [
     'dt.c',
 ])

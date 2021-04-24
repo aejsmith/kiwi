@@ -19,6 +19,8 @@
  * @brief               Device manager.
  */
 
+#include <device/bus/fdt.h>
+
 #include <device/device.h>
 
 #include <io/request.h>
@@ -1021,6 +1023,13 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
     }
 
     return KDB_SUCCESS;
+}
+
+/** Early device initialization. */
+__init_text void device_early_init(void) {
+    #if CONFIG_DEVICE_BUS_DT
+        fdt_init();
+    #endif
 }
 
 /** Initialize the device manager. */

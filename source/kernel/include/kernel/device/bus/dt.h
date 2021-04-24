@@ -16,23 +16,16 @@
 
 /**
  * @file
- * @brief               Device Tree bus manager.
+ * @brief               Device Tree bus interface.
  */
 
-#include <device/bus/dt.h>
+#pragma once
 
-#include <module.h>
-#include <status.h>
+#include <kernel/device.h>
 
-static status_t dt_init(void) {
-    // TODO
-    return STATUS_SUCCESS;
-}
+__KERNEL_EXTERN_C_BEGIN
 
-static status_t dt_unload(void) {
-    return STATUS_NOT_IMPLEMENTED;
-}
+/** DT device class name. */
+#define DT_DEVICE_CLASS_NAME        "dt_device"
 
-MODULE_NAME(DT_MODULE_NAME);
-MODULE_DESC("Device Tree bus manager");
-MODULE_FUNCS(dt_init, dt_unload);
+__KERNEL_EXTERN_C_END

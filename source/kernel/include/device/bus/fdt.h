@@ -16,23 +16,19 @@
 
 /**
  * @file
- * @brief               Device Tree bus manager.
+ * @brief               FDT (low-level) device tree interface.
+ *
+ * This is a low-level libfdt-based interface to the platform device tree. This
+ * is built in to the kernel on DT-based platforms. It is necessary since there
+ * are various bits of core kernel functionality that rely on the DT to detect
+ * hardware (IRQ controllers, timers, SMP, etc.).
  */
 
-#include <device/bus/dt.h>
+#pragma once
 
-#include <module.h>
-#include <status.h>
+#include <libfdt.h>
 
-static status_t dt_init(void) {
-    // TODO
-    return STATUS_SUCCESS;
-}
+extern const void *fdt_get(void);
 
-static status_t dt_unload(void) {
-    return STATUS_NOT_IMPLEMENTED;
-}
+extern void fdt_init(void);
 
-MODULE_NAME(DT_MODULE_NAME);
-MODULE_DESC("Device Tree bus manager");
-MODULE_FUNCS(dt_init, dt_unload);

@@ -105,6 +105,7 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
     if (kboot_boolean_option("early_kdb"))
         kdb_enter(KDB_REASON_USER, NULL);
 
+    device_early_init();
     cpu_init();
     arch_init();
     time_init();

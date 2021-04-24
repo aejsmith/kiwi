@@ -17,6 +17,15 @@
 /**
  * @file
  * @brief               Device Tree bus manager.
+ *
+ * This is the higher level Device Tree bus manager driver. This is built as a
+ * module and is used by non-core drivers.
  */
 
 #pragma once
+
+#include <kernel/device/bus/dt.h>
+
+#define DT_MODULE_NAME "dt"
+
+// TODO
