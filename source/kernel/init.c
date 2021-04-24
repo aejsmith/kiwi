@@ -58,6 +58,8 @@
 KBOOT_IMAGE(KBOOT_IMAGE_LOG | KBOOT_IMAGE_SECTIONS);
 KBOOT_BOOLEAN_OPTION("early_kdb", "Enter KDB during initialization", false);
 
+extern initcall_t __initcall_start[], __initcall_end[];
+
 static void init_thread(void *arg1, void *arg2);
 
 /** Address of the KBoot tag list. */
@@ -170,8 +172,7 @@ static void init_thread(void *arg1, void *arg2) {
     fs_init();
 
     /* Call other initialization functions. */
-    for (initcall_t *initcall = __initcall_start; initcall != __initcall_end; initcall++)
-        (*initcall)();
+    initcall_run(INITCALL_TYPE_OTHER);
 
     update_boot_progress(10);
 
@@ -226,6 +227,14 @@ static void init_thread(void *arg1, void *arg2) {
     if (ret != STATUS_SUCCESS)
         fatal("Could not start service manager (%d)", ret);
 }
+
+/** Run initcalls of a given type. */
+__init_text void initcall_run(initcall_type_t type) {
+    for (initcall_t *initcall = __initcall_start; initcall != __initcall_end; initcall++) {
+        if (initcall->type == type)
+            initcall->func();
+    }
+} 
 
 /** Iterate over the KBoot tag list.
  * @param type          Type of tag to iterate.

@@ -42,20 +42,42 @@ extern int kiwi_ver_update;         /**< Release update number. */
 extern int kiwi_ver_revision;       /**< Release revision number. */
 extern const char *kiwi_ver_string; /**< String of version number. */
 
-/** Type of an initcall function. */
-typedef void (*initcall_t)(void);
-
 /**
- * Macro to declare an initialization function.
- *
- * Initcalls are called in the initialization thread, after other CPUs have
- * been booted. They are called in the order that they are in the initcall
- * section.
+ * Initialization function types. All functions with the same type get called
+ * in indeterminate order at a time specific to that type.
  */
-#define INITCALL(func)  \
-    static ptr_t __initcall_##func __section(".init.initcalls") __used = (ptr_t)func
+typedef enum initcall_type {
+    /** Early platform device detection. */
+    INITCALL_TYPE_EARLY_DEVICE,
 
-extern initcall_t __initcall_start[], __initcall_end[];
+    /** Register IRQ controllers. */
+    INITCALL_TYPE_IRQC,
+
+    /** Register timer devices. */
+    INITCALL_TYPE_TIME,
+
+    /** Late initialization functions called on the init thread. */
+    INITCALL_TYPE_OTHER,
+} initcall_type_t;
+
+/** Type of an initcall function. */
+typedef struct initcall {
+    initcall_type_t type;
+    void (*func)(void);
+} initcall_t;
+
+/** Macro to declare an initialization function with a specified type. */
+#define INITCALL_TYPE(_func, _type) \
+    static initcall_t __initcall_##func __section(".init.initcalls") __used = { \
+        .type = _type, \
+        .func = _func, \
+     }
+
+/** Macro to declare an initialization function as INITCALL_TYPE_OTHER. */
+#define INITCALL(_func) \
+    INITCALL_TYPE(_func, INITCALL_TYPE_OTHER)
+
+extern void initcall_run(initcall_type_t type);
 
 extern void arch_init(void);
 extern void arch_reboot(void);

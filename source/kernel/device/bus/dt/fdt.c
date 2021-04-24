@@ -37,7 +37,7 @@ const void *fdt_get(void) {
 }
 
 /** Initialize the FDT. */
-__init_text void fdt_init(void) {
+static __init_text void fdt_init(void) {
     kboot_tag_fdt_t *tag = kboot_tag_iterate(KBOOT_TAG_FDT, NULL);
     if (!tag)
         fatal("Boot loader did not supply FDT");
@@ -51,3 +51,5 @@ __init_text void fdt_init(void) {
     if (ret != 0)
         fatal("FDT header validation failed (%d)", ret);
 }
+
+INITCALL_TYPE(fdt_init, INITCALL_TYPE_EARLY_DEVICE);

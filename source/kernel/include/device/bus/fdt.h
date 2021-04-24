@@ -29,6 +29,3 @@
 #include <libfdt.h>
 
 extern const void *fdt_get(void);
-
-extern void fdt_init(void);
-
