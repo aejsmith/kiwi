@@ -96,11 +96,8 @@ class TARArchive:
             self.tar.addfile(tarinfo)
 
     def add_dir_tree(self, path):
-        cwd = os.getcwd()
-        os.chdir(path)
-        for f in glob.glob('*'):
-            self.tar.add(f)
-        os.chdir(cwd)
+        for f in glob.glob(os.path.join(path, '*')):
+            self.tar.add(f, arcname = os.path.relpath(f, path))
 
 # Create a TAR archive containing the filesystem tree.
 def fs_image_func(target, source, env):
