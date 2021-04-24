@@ -216,14 +216,14 @@ static inline void timer_device_disable(void) {
  *
  * @param device        Device to set.
  */
-void timer_device_set(timer_device_t *device) {
+void time_set_device(timer_device_t *device) {
     assert(!timer_device);
 
     timer_device = device;
     if (timer_device->type == TIMER_DEVICE_ONESHOT)
         curr_cpu->timer_enabled = true;
 
-    kprintf(LOG_NOTICE, "timer: activated timer device %s\n", device->name);
+    kprintf(LOG_NOTICE, "time: activated timer device %s\n", device->name);
 }
 
 /** Start a timer, with CPU timer lock held. */
@@ -533,6 +533,9 @@ __init_text void time_init(void) {
 
 /** Perform late timing system initialization. */
 __init_text void time_late_init(void) {
+    /* Look for a timer device. */
+    initcall_run(INITCALL_TYPE_TIME);
+
     time_init_percpu();
 }
 

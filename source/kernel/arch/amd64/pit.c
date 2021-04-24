@@ -21,10 +21,12 @@
 
 #include <arch/io.h>
 
+#include <x86/lapic.h>
 #include <x86/pit.h>
 
 #include <device/irq.h>
 
+#include <kernel.h>
 #include <time.h>
 
 static irq_status_t pit_irq(unsigned num, void *data) {
@@ -55,8 +57,13 @@ static timer_device_t pit_timer_device = {
 };
 
 /** Initialize the PIT timer. */
-__init_text void pit_init(void) {
-    timer_device_set(&pit_timer_device);
+static __init_text void pit_init(void) {
+    if (lapic_enabled())
+        return;
+
+    time_set_device(&pit_timer_device);
     pit_disable();
     irq_register(0, pit_irq, NULL, NULL, NULL);
 }
+
+INITCALL_TYPE(pit_init, INITCALL_TYPE_TIME);

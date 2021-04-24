@@ -142,7 +142,6 @@ extern nstime_t system_time(void);
 extern nstime_t unix_time(void);
 extern nstime_t boot_time(void);
 
-extern void timer_device_set(timer_device_t *device);
 extern bool timer_tick(void);
 extern void timer_init(
     timer_t *timer, const char *name, timer_func_t func, void *data,
@@ -156,6 +155,7 @@ extern void spin(nstime_t nsecs);
 
 extern nstime_t arch_time_from_hardware(void);
 
+extern void time_set_device(timer_device_t *device);
 extern void time_init(void);
 extern void time_late_init(void);
 extern void time_init_percpu(void);

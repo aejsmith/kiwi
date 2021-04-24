@@ -33,13 +33,7 @@
 #include <time.h>
 
 __init_text void arch_init(void) {
-    pic_init();
     acpi_init();
-
-    /* If the LAPIC is not available, we must use the PIT as the timer. */
-    if (!lapic_enabled())
-        pit_init();
-
     i8042_init();
 }
 

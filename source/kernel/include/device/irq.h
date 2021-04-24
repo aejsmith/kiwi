@@ -136,4 +136,5 @@ extern status_t device_irq_register(
 
 extern void irq_handler(unsigned num);
 
-extern void irq_init(irq_controller_t *controller);
+extern void irq_set_controller(irq_controller_t *controller);
+extern void irq_init(void);

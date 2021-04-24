@@ -39,5 +39,3 @@
 
 /** ICW4 (Initialization Control Word 4) bits. */
 #define PIC_ICW4_8086       (1<<0)  /**< Should operate in 80x86 mode. */
-
-extern void pic_init(void);

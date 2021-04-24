@@ -207,7 +207,7 @@ __init_text void lapic_init(void) {
         base, lapic_mapping);
 
     /* Install the LAPIC timer device. */
-    timer_device_set(&lapic_timer_device);
+    time_set_device(&lapic_timer_device);
 
     /* Install interrupt vectors. */
     interrupt_table[LAPIC_VECT_SPURIOUS] = lapic_spurious_interrupt;

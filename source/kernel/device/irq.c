@@ -394,11 +394,17 @@ out:
     curr_thread->in_usermem = in_usermem;
 }
 
-/** Initialize the IRQ handling system.
+/** Set the IRQ controller.
  * @param controller    IRQ controller to use. */
-__init_text void irq_init(irq_controller_t *controller) {
+void irq_set_controller(irq_controller_t *controller) {
+    assert(!irq_controller);
     assert(controller->mode);
 
+    irq_controller = controller;
+}
+
+/** Initialize the IRQ handling system. */
+__init_text void irq_init(void) {
     for (unsigned i = 0; i < IRQ_COUNT; i++) {
         irq_t *irq = &irq_table[i];
 
@@ -411,5 +417,8 @@ __init_text void irq_init(irq_controller_t *controller) {
         irq->disable_count = 1;
     }
 
-    irq_controller = controller;
+    /* Look for a controller. */
+    initcall_run(INITCALL_TYPE_IRQC);
+
+    assert(irq_controller);
 }

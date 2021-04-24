@@ -20,6 +20,7 @@
  */
 
 #include <device/device.h>
+#include <device/irq.h>
 
 #include <io/fs.h>
 #include <io/memory_file.h>
@@ -110,6 +111,7 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
     device_early_init();
     cpu_init();
     arch_init();
+    irq_init();
     time_init();
     smp_init();
     slab_late_init();
