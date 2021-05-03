@@ -46,6 +46,8 @@ sources = [File(f) for f in [
     'locale/localeconv.c',
     'locale/setlocale.c',
 
+    'net/socket.c',
+
     'posix/alarm.c',
     'posix/exec.c',
     'posix/fd.c',

@@ -35,6 +35,7 @@ type offset_t int64_t;
 type user_id_t int16_t;
 type group_id_t int16_t;
 type image_id_t int16_t;
+type socklen_t uint32_t;
 
 syscall kern_system_info(uint, ptr_t);
 syscall kern_system_shutdown(int);
@@ -162,3 +163,20 @@ syscall kern_image_unregister(image_id_t) hidden;
 syscall kern_user_file_create(int, uint32_t, uint32_t, ptr_t, ptr_t);
 
 syscall kern_pipe_create(uint32_t, uint32_t, ptr_t, ptr_t);
+
+syscall kern_socket_accept(handle_t, socklen_t, ptr_t, ptr_t, ptr_t);
+syscall kern_socket_bind(handle_t, ptr_t, socklen_t);
+syscall kern_socket_connect(handle_t, ptr_t, socklen_t);
+syscall kern_socket_getpeername(handle_t, socklen_t, ptr_t, ptr_t);
+syscall kern_socket_getsockname(handle_t, socklen_t, ptr_t, ptr_t);
+syscall kern_socket_listen(handle_t, int);
+syscall kern_socket_recv(handle_t, ptr_t, size_t, int, ptr_t);
+syscall kern_socket_recvfrom(handle_t, ptr_t, size_t, int, socklen_t, ptr_t, ptr_t, ptr_t);
+syscall kern_socket_send(handle_t, ptr_t, size_t, int, ptr_t);
+syscall kern_socket_sendto(handle_t, ptr_t, size_t, int, ptr_t, socklen_t, ptr_t);
+syscall kern_socket_getsockopt(handle_t, int, int, socklen_t, ptr_t, ptr_t);
+syscall kern_socket_setsockopt(handle_t, int, int, ptr_t, socklen_t);
+syscall kern_socket_shutdown(handle_t, int);
+syscall kern_socket_sockatmark(handle_t, ptr_t);
+syscall kern_socket_create(int, int, int, ptr_t);
+syscall kern_socket_create_pair(int, int, int, ptr_t);

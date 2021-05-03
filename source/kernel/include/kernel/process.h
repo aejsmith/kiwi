@@ -106,6 +106,6 @@ extern status_t kern_process_token(handle_t *_handle);
 extern status_t kern_process_set_token(handle_t handle);
 extern status_t kern_process_set_exception_handler(unsigned code, exception_handler_t handler);
 
-extern void kern_process_exit(int status) __attribute__((noreturn));
+extern void kern_process_exit(int status) __kernel_noreturn;
 
 __KERNEL_EXTERN_C_END

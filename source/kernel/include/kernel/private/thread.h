@@ -43,7 +43,7 @@ extern status_t _kern_thread_create(
     const char *name, thread_entry_t entry, void *arg,
     const thread_stack_t *stack, uint32_t flags, handle_t *_handle);
 extern status_t _kern_thread_id(handle_t handle, thread_id_t *_id);
-extern void _kern_thread_exit(int status) __attribute__((noreturn));
+extern void _kern_thread_exit(int status) __kernel_noreturn;
 
 #endif /* __LIBKERNEL */
 #endif /* __KERNEL_PRIVATE */

@@ -24,5 +24,6 @@ kern_sources += FeatureSources(config, [
     'memory_file.c',
     'ramfs.c',
     'request.c',
+    'socket.c',
     'user_file.c',
 ])
