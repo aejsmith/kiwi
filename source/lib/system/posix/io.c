@@ -47,7 +47,7 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
         return -1;
     }
 
-    size_t bytes;
+    size_t bytes = 0;
     status_t ret = kern_file_read(fd, buf, count, offset, &bytes);
     if (ret != STATUS_SUCCESS && bytes == 0) {
         if (ret == STATUS_ACCESS_DENIED) {
@@ -74,7 +74,7 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
  *                      will be set appropriately).
  */
 ssize_t read(int fd, void *buf, size_t count) {
-    size_t bytes;
+    size_t bytes = 0;
     status_t ret = kern_file_read(fd, buf, count, -1, &bytes);
     if (ret != STATUS_SUCCESS && bytes == 0) {
         if (ret == STATUS_ACCESS_DENIED) {
@@ -107,7 +107,7 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset) {
         return -1;
     }
 
-    size_t bytes;
+    size_t bytes = 0;
     status_t ret = kern_file_write(fd, buf, count, offset, &bytes);
     if (ret != STATUS_SUCCESS && bytes == 0) {
         if (ret == STATUS_ACCESS_DENIED) {
@@ -134,7 +134,7 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset) {
  *                      will be set appropriately).
  */
 ssize_t write(int fd, const void *buf, size_t count) {
-    size_t bytes;
+    size_t bytes = 0;
     status_t ret = kern_file_write(fd, buf, count, -1, &bytes);
     if (ret != STATUS_SUCCESS && bytes == 0) {
         if (ret == STATUS_ACCESS_DENIED) {
