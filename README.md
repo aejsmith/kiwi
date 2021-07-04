@@ -1,17 +1,43 @@
 Kiwi
 ====
 
-Kiwi is an open source operating system supporting 64-bit x86 PCs. It uses a
-custom kernel design/API, taking inspiration from both POSIX and Windows NT.
-Some POSIX/UNIX compatibility is implemented by userspace libraries on top of
-the native kernel API, which is currently capable of running some UNIX command
-line software such as Bash.
-
-Screenshots
------------
+Kiwi is an open source operating system. It uses a custom kernel design/API,
+taking inspiration from both POSIX/UNIX and Windows NT. Some POSIX
+compatibility is implemented by userspace libraries on top of the native
+kernel API, which is currently capable of running some UNIX command line
+software such as Bash.
 
 ![Terminal](documentation/screenshots/1.png)
-![Kernel Debugger](documentation/screenshots/2.png)
+
+More screenshots in the [Screenshot Archive](documentation/screenshots.md).
+
+Supported platforms:
+
+ * 64-bit x86 PCs
+ * ARM64 (work-in-progress)
+     * QEMU 'virt' machine
+     * Raspberry Pi 3/4
+
+Features:
+
+ * Custom object-oriented kernel API
+     * Processes/threads
+     * Virtual memory
+     * IPC
+     * Event polling/waiting
+     * Filesystem
+     * Device access
+ * Partial POSIX compatibility implemented over the native API
+ * Multi-core CPU support
+ * Shared library support
+
+Planned features (in rough priority order):
+
+ * Networking (in progress)
+ * Common hardware support (disk devices, USB input)
+ * Finish ARM64 port
+ * Port additional software
+ * GUI
 
 Building
 --------
