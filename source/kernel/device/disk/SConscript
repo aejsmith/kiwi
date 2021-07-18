@@ -14,8 +14,12 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-source "bus/Kconfig"
-source "console/Kconfig"
-source "disk/Kconfig"
-source "input/Kconfig"
-source "net/Kconfig"
+Import('config', 'mod_env')
+from util import FeatureDirs
+
+mod_env.Module('disk', [
+    'disk.c',
+])
+
+#SConscript(dirs = FeatureDirs(config, [
+#]))
