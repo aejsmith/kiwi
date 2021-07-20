@@ -20,6 +20,7 @@
  */
 
 #include <device/device.h>
+#include <device/io.h>
 
 #include <lib/ctype.h>
 #include <lib/string.h>
@@ -254,6 +255,7 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
      *              arg = pointer to appropriately sized buffer
      *  - %pM     = Print a 6 byte (Ethernet) MAC address.
      *              arg = pointer to 6 byte buffer
+     *  - %pR     = Print an I/O region handle as <MMIO/PIO>@addr.
      *  - %pS     = Print a symbol: [<addr>] <name>+<offset>
      *              arg = address
      *  - %ps     = Print a symbol: [<addr>] <name>
@@ -285,6 +287,18 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
         case 'M':
             print_mac_addr(state, (const uint8_t *)ptr);
             (*fmt)++;
+            break;
+        case 'R':
+            (*fmt)++;
+
+            if (io_is_pio((io_region_t)ptr)) {
+                print_string(state, "PIO @ ", 6);
+            } else {
+                print_string(state, "MMIO @ ", 7);
+            }
+
+            state->base = 16;
+            print_number(state, io_addr((io_region_t)ptr));
             break;
         default:
             state->base = 16;

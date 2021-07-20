@@ -64,6 +64,19 @@ extern io_region_t device_pio_map(struct device *device, pio_addr_t addr, size_t
 
 extern void io_unmap(io_region_t region, size_t size);
 
+#if ARCH_HAS_PIO
+extern bool io_is_pio(io_region_t region);
+extern ptr_t io_addr(io_region_t region);
+#else
+static inline bool io_is_pio(io_region_t region) {
+    return false;
+}
+
+static inline ptr_t io_addr(io_region_t region) {
+    return region;
+}
+#endif
+
 extern uint8_t io_read8(io_region_t region, size_t offset);
 extern void io_write8(io_region_t region, size_t offset, uint8_t val);
 extern uint16_t io_read16( io_region_t region, size_t offset);

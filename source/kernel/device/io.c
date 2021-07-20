@@ -154,6 +154,22 @@ io_region_t device_pio_map(struct device *device, pio_addr_t addr, size_t size) 
     return pio_map(addr, size);
 }
 
+/** Return whether an I/O region is PIO. */
+bool io_is_pio(io_region_t region) {
+    do_io(
+        return false,
+        return true
+    );
+}
+
+/** Return the address of an I/O region. */
+ptr_t io_addr(io_region_t region) {
+    do_io(
+        return region,
+        return region
+    );
+}
+
 #endif
 
 /** Unmap an I/O region.
