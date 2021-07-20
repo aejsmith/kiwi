@@ -16,22 +16,22 @@
 
 /**
  * @file
- * @brief               Disk device class interface.
- *
- * Supported standard operations:
- *  - kern_file_read():
- *    Reads data from the disk (if media is present)
- *  - kern_file_write():
- *    Writes data to the disk (if media is present and is writeable).
+ * @brief               ATA device library.
  */
 
-#pragma once
+#include <device/disk/ata.h>
 
-#include <kernel/device.h>
+#include <module.h>
+#include <status.h>
 
-__KERNEL_EXTERN_C_BEGIN
+static status_t ata_init(void) {
+    return STATUS_SUCCESS;
+}
 
-/** Disk device class name. */
-#define DISK_DEVICE_CLASS_NAME      "disk"
+static status_t ata_unload(void) {
+    return STATUS_SUCCESS;
+}
 
-__KERNEL_EXTERN_C_END
+MODULE_NAME(ATA_MODULE_NAME);
+MODULE_DESC("ATA device library");
+MODULE_FUNCS(ata_init, ata_unload);

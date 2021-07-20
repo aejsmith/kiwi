@@ -14,11 +14,17 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-comment "Input devices"
+comment "Disk devices"
 
-config DEVICE_INPUT_I8042
-	bool "i8042 keyboard/mouse port"
+# Selected by ATA device drivers if enabled.
+config DEVICE_DISK_ATA
+	bool
+
+config DEVICE_DISK_PCI_ATA
+	bool "PCI ATA controller driver"
 	default y
-	depends on ARCH_X86
+	select DEVICE_DISK_ATA
+	depends on DEVICE_BUS_PCI
 	help
-	  Enable the i8042 (PS/2) keyboard/mouse port driver.
+	  Enable the PCI ATA controller driver. This supports PATA (IDE)
+	  controllers, and SATA controllers in IDE emulation mode.

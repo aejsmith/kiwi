@@ -14,14 +14,8 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'mod_env')
-from util import FeatureDirs
+Import('mod_env')
 
-mod_env.Module('disk', [
-    'disk.c',
+mod_env.Module('ata', [
+    'ata.c',
 ])
-
-SConscript(dirs = FeatureDirs(config, [
-    ('DEVICE_DISK_ATA', 'ata'),
-    ('DEVICE_DISK_PCI_ATA', 'pci_ata'),
-]))
