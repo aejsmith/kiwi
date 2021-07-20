@@ -844,6 +844,10 @@ static status_t kfb_device_request(
 
             break;
         }
+        default: {
+            ret = STATUS_INVALID_REQUEST;
+            break;
+        }
     }
 
     mutex_unlock(&kfb_device_lock);
