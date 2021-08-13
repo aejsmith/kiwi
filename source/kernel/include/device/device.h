@@ -27,6 +27,7 @@
 
 #include <lib/radix_tree.h>
 #include <lib/refcount.h>
+#include <lib/utility.h>
 
 #include <sync/mutex.h>
 #include <sync/rwlock.h>

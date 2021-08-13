@@ -263,6 +263,7 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
     ret = net_device_create(&device->net, virtio->bus.node);
     if (ret != STATUS_SUCCESS) {
         kprintf(LOG_WARN, "virtio_net: failed to create device: %d\n", ret);
+        kfree(device);
         return ret;
     }
 

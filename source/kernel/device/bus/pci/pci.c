@@ -517,9 +517,18 @@ static pci_device_t *scan_device(pci_address_t *addr) {
         device->vendor_id, device->device_id, device->base_class,
         device->sub_class);
 
-    /* Get BAR information. */
     spinlock_lock(&pci_config_lock);
+
+    /* Get BAR information. */
     scan_bars(device);
+
+    /* Enable interrupts if the device has an interrupt. */
+    if (device->interrupt_pin != 0) {
+        uint16_t cmd = platform_pci_config_read16(&device->addr, PCI_CONFIG_COMMAND);
+        cmd &= ~PCI_COMMAND_INT_DISABLE;
+        platform_pci_config_write16(&device->addr, PCI_CONFIG_COMMAND, cmd);
+    }
+
     spinlock_unlock(&pci_config_lock);
 
     bus_match_device(&pci_bus, &device->bus);

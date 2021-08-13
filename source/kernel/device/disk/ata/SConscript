@@ -18,4 +18,6 @@ Import('mod_env')
 
 mod_env.Module('ata', [
     'ata.c',
+    'channel.c',
+    'sff.c',
 ])

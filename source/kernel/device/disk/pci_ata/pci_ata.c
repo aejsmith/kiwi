@@ -61,11 +61,13 @@
 #define PCI_ATA_BM_STATUS_SIMPLEX   (1<<7)  /**< Simplex only. */
 
 typedef struct pci_ata_controller {
-    pci_device_t *pci;
     device_t *node;
+    pci_device_t *pci;
 } pci_ata_controller_t;
 
 typedef struct pci_ata_channel {
+    ata_sff_channel_t sff;
+
     pci_ata_controller_t *controller;
     io_region_t cmd;
     io_region_t ctrl;
@@ -86,20 +88,38 @@ static irq_status_t pci_ata_early_irq(unsigned num, void *_channel) {
     io_write8(channel->bus_master, PCI_ATA_BM_REG_STATUS, status);
 
     /* Clear INTRQ. */
-// temp
-#define ATA_CMD_REG_STATUS           7
     io_read8(channel->cmd, ATA_CMD_REG_STATUS);
 
     return IRQ_RUN_THREAD;
 }
 
 static void pci_ata_irq(unsigned num, void *_channel) {
-    //pci_ata_channel_t *channel = _channel;
-    //
-    //if (!channel->ata)
-    //    return;
-    //
-    //ata_channel_interrupt(channel->ata);
+    pci_ata_channel_t *channel = _channel;
+
+    ata_channel_interrupt(&channel->sff.ata);
+}
+
+static void add_channel(pci_ata_channel_t *channel, const char *mode) {
+    /* Check channel presence by writing a value to the low LBA port on the
+     * channel, then reading it back. If the value is the same, it is present. */
+    io_write8(channel->cmd, ATA_CMD_REG_LBA_LOW, 0xab);
+    if (io_read8(channel->cmd, ATA_CMD_REG_LBA_LOW) != 0xab) {
+        ata_channel_destroy(&channel->sff.ata);
+        return;
+    }
+
+    pci_enable_master(channel->controller->pci, true);
+
+    channel->sff.ata.caps = ATA_CHANNEL_CAP_PIO | ATA_CHANNEL_CAP_DMA;
+    channel->sff.ata.num_devices = 2;
+
+    device_kprintf(
+        channel->sff.ata.node, LOG_NOTICE, "%s mode (cmd: %pR, ctrl: %pR, bus_master: %pR)\n",
+        mode, channel->cmd, channel->ctrl, channel->bus_master);
+
+    status_t ret = ata_channel_publish(&channel->sff.ata);
+    if (ret != STATUS_SUCCESS)
+        ata_channel_destroy(&channel->sff.ata);
 }
 
 static void add_native_channel(
@@ -108,41 +128,49 @@ static void add_native_channel(
 {
     status_t ret;
 
+    // TODO: Destruction: Channel needs to get freed - add way to attach this
+    // allocation to the device.
     pci_ata_channel_t *channel = kmalloc(sizeof(*channel), MM_KERNEL);
 
-// TODO: move ownership of mappings to the child device, also need to make sure
-// channel gets freed.
+    ret = ata_sff_channel_create(&channel->sff, name, controller->node);
+    if (ret != STATUS_SUCCESS) {
+        device_kprintf(controller->node, LOG_ERROR, "failed to create channel: %d\n", ret);
+        kfree(channel);
+        return;
+    }
+
+    device_t *node = channel->sff.ata.node;
 
     channel->controller = controller;
     channel->bus_master = bus_master;
 
-    ret = device_pci_bar_map(controller->node, controller->pci, cmd_bar, MM_KERNEL, &channel->cmd);
+    ret = device_pci_bar_map(node, controller->pci, cmd_bar, MM_KERNEL, &channel->cmd);
     if (ret != STATUS_SUCCESS) {
-        device_kprintf(controller->node, LOG_ERROR, "failed to map command BAR %" PRIu8 ": %" PRId32 "\n", cmd_bar, ret);
-        kfree(channel);
-        return;
+        device_kprintf(node, LOG_ERROR, "failed to map command BAR %" PRIu8 ": %" PRId32 "\n", cmd_bar, ret);
+        goto err_destroy;
     }
 
     /* Control port is at offset 2 of the BAR. */
     ret = device_pci_bar_map_etc(
-        controller->node, controller->pci, ctrl_bar, 2, CTRL_IO_SIZE, MMU_ACCESS_RW,
+        node, controller->pci, ctrl_bar, 2, CTRL_IO_SIZE, MMU_ACCESS_RW,
         MM_KERNEL, &channel->ctrl);
     if (ret != STATUS_SUCCESS) {
-        device_kprintf(controller->node, LOG_ERROR, "failed to map control BAR %" PRIu8 ": %" PRId32 "\n", ctrl_bar, ret);
-        kfree(channel);
-        return;
+        device_kprintf(node, LOG_ERROR, "failed to map control BAR %" PRIu8 ": %" PRId32 "\n", ctrl_bar, ret);
+        goto err_destroy;
     }
 
-    ret = device_pci_irq_register(controller->node, controller->pci, pci_ata_early_irq, pci_ata_irq, channel);
+    ret = device_pci_irq_register(node, controller->pci, pci_ata_early_irq, pci_ata_irq, channel);
     if (ret != STATUS_SUCCESS) {
-        device_kprintf(controller->node, LOG_ERROR, "failed to register IRQ: %" PRId32 "\n", ret);
-        kfree(channel);
-        return;
+        device_kprintf(node, LOG_ERROR, "failed to register IRQ: %" PRId32 "\n", ret);
+        goto err_destroy;
     }
 
-    device_kprintf(
-        controller->node, LOG_NOTICE, "  %s: native PCI (cmd: %pR, ctrl: %pR, bus_master: %pR)\n",
-        name, channel->cmd, channel->ctrl, channel->bus_master);
+    add_channel(channel, "native PCI");
+    return;
+
+err_destroy:
+    ata_channel_destroy(&channel->sff.ata);
+    return;
 }
 
 static void add_compat_channel(
@@ -151,38 +179,46 @@ static void add_compat_channel(
 {
     status_t ret;
 
+    // TODO: Destruction: Channel needs to get freed - add way to attach this
+    // allocation to the device.
     pci_ata_channel_t *channel = kmalloc(sizeof(*channel), MM_KERNEL);
 
-// TODO: disk_device_create, move ownership of mappings to that (and replace kfree with destroy - ownership of channel)
-// use create/publish like net.
+    ret = ata_sff_channel_create(&channel->sff, name, controller->node);
+    if (ret != STATUS_SUCCESS) {
+        device_kprintf(controller->node, LOG_ERROR, "failed to create channel: %d\n", ret);
+        kfree(channel);
+        return;
+    }
+
+    device_t *node = channel->sff.ata.node;
 
     channel->controller = controller;
     channel->bus_master = bus_master;
 
-    channel->cmd = device_pio_map(controller->node, cmd_base, CMD_IO_SIZE);
+    channel->cmd = device_pio_map(node, cmd_base, CMD_IO_SIZE);
     if (channel->cmd == IO_REGION_INVALID) {
-        device_kprintf(controller->node, LOG_ERROR, "failed to map command I/O @ 0x%" PRIu16 "\n", cmd_base);
-        kfree(channel);
-        return;
+        device_kprintf(node, LOG_ERROR, "failed to map command I/O @ 0x%" PRIu16 "\n", cmd_base);
+        goto err_destroy;
     }
 
-    channel->ctrl = device_pio_map(controller->node, ctrl_base, CTRL_IO_SIZE);
+    channel->ctrl = device_pio_map(node, ctrl_base, CTRL_IO_SIZE);
     if (channel->ctrl == IO_REGION_INVALID) {
-        device_kprintf(controller->node, LOG_ERROR, "failed to map control I/O @ 0x%" PRIu16 "\n", ctrl_base);
-        kfree(channel);
-        return;
+        device_kprintf(node, LOG_ERROR, "failed to map control I/O @ 0x%" PRIu16 "\n", ctrl_base);
+        goto err_destroy;
     }
 
-    ret = device_irq_register(controller->node, irq, pci_ata_early_irq, pci_ata_irq, channel);
+    ret = device_irq_register(node, irq, pci_ata_early_irq, pci_ata_irq, channel);
     if (ret != STATUS_SUCCESS) {
-        device_kprintf(controller->node, LOG_ERROR, "failed to register IRQ: %" PRId32 "\n", ret);
-        kfree(channel);
-        return;
+        device_kprintf(node, LOG_ERROR, "failed to register IRQ: %" PRId32 "\n", ret);
+        goto err_destroy;
     }
 
-    device_kprintf(
-        controller->node, LOG_NOTICE, "  %s: compat (cmd: %pR, ctrl: %pR, bus_master: %pR)\n",
-        name, channel->cmd, channel->ctrl, channel->bus_master);
+    add_channel(channel, "compatibility");
+    return;
+
+err_destroy:
+    ata_channel_destroy(&channel->sff.ata);
+    return;
 }
 
 static status_t pci_ata_init_device(pci_device_t *pci) {
@@ -193,7 +229,13 @@ static status_t pci_ata_init_device(pci_device_t *pci) {
 
     controller->pci = pci;
 
-    ret = device_create_dir(PCI_ATA_MODULE_NAME, pci->bus.node, &controller->node);
+    device_attr_t attrs[] = {
+        { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = "pci_ata_controller" } },
+    };
+
+    ret = device_create(
+        PCI_ATA_MODULE_NAME, pci->bus.node, NULL, controller, attrs,
+        array_size(attrs), &controller->node);
     if (ret != STATUS_SUCCESS) {
         kfree(controller);
         return ret;
