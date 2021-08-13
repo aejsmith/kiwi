@@ -74,6 +74,35 @@ typedef struct pci_ata_channel {
     io_region_t bus_master;
 } pci_ata_channel_t;
 
+DEFINE_CLASS_CAST(pci_ata_channel, ata_sff_channel, sff);
+
+static uint8_t pci_ata_channel_read_ctrl(ata_sff_channel_t *_channel, uint8_t reg) {
+    pci_ata_channel_t *channel = cast_pci_ata_channel(_channel);
+    return io_read8(channel->ctrl, reg);
+}
+
+static void pci_ata_channel_write_ctrl(ata_sff_channel_t *_channel, uint8_t reg, uint8_t val) {
+    pci_ata_channel_t *channel = cast_pci_ata_channel(_channel);
+    io_write8(channel->ctrl, reg, val);
+}
+
+static uint8_t pci_ata_channel_read_cmd(ata_sff_channel_t *_channel, uint8_t reg) {
+    pci_ata_channel_t *channel = cast_pci_ata_channel(_channel);
+    return io_read8(channel->cmd, reg);
+}
+
+static void pci_ata_channel_write_cmd(ata_sff_channel_t *_channel, uint8_t reg, uint8_t val) {
+    pci_ata_channel_t *channel = cast_pci_ata_channel(_channel);
+    io_write8(channel->cmd, reg, val);
+}
+
+static ata_sff_channel_ops_t pci_ata_channel_ops = {
+    .read_ctrl  = pci_ata_channel_read_ctrl,
+    .write_ctrl = pci_ata_channel_write_ctrl,
+    .read_cmd   = pci_ata_channel_read_cmd,
+    .write_cmd  = pci_ata_channel_write_cmd,
+};
+
 static irq_status_t pci_ata_early_irq(unsigned num, void *_channel) {
     pci_ata_channel_t *channel = _channel;
 
@@ -110,8 +139,9 @@ static void add_channel(pci_ata_channel_t *channel, const char *mode) {
 
     pci_enable_master(channel->controller->pci, true);
 
-    channel->sff.ata.caps = ATA_CHANNEL_CAP_PIO | ATA_CHANNEL_CAP_DMA;
+    channel->sff.ata.caps        = ATA_CHANNEL_CAP_PIO | ATA_CHANNEL_CAP_DMA;
     channel->sff.ata.num_devices = 2;
+    channel->sff.ops             = &pci_ata_channel_ops;
 
     device_kprintf(
         channel->sff.ata.node, LOG_NOTICE, "%s mode (cmd: %pR, ctrl: %pR, bus_master: %pR)\n",

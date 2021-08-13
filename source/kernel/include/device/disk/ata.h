@@ -34,6 +34,9 @@
 
 #define ATA_MODULE_NAME "ata"
 
+struct ata_channel;
+struct ata_sff_channel;
+
 /**
  * ATA register/command definitions.
  */
@@ -79,12 +82,44 @@
 
 /** Operations for an ATA channel. */
 typedef struct ata_channel_ops {
-    void *dummy;
+    /** Resets the channel.
+     * @param channel       Channel to reset.
+     * @return              Status code describing result of operation. */
+    status_t (*reset)(struct ata_channel *channel);
+
+    /** Get the content of the status register.
+     * @note                This should not clear INTRQ, so should read the
+     *                      alternate status register.
+     * @param channel       Channel to get status from.
+     * @return              Content of the status register. */
+    uint8_t (*status)(struct ata_channel *channel);
 } ata_channel_ops_t;
 
 /** Operations for a SFF-style ATA channel. */
 typedef struct ata_sff_channel_ops {
-    void *dummy;
+    /** Read from a control register.
+     * @param channel       Channel to read from.
+     * @param reg           Register to read from.
+     * @return              Value read. */
+    uint8_t (*read_ctrl)(struct ata_sff_channel *channel, uint8_t reg);
+
+    /** Write to a control register.
+     * @param channel       Channel to read from.
+     * @param reg           Register to write to.
+     * @param val           Value to write. */
+    void (*write_ctrl)(struct ata_sff_channel *channel, uint8_t reg, uint8_t val);
+
+    /** Read from a command register.
+     * @param channel       Channel to read from.
+     * @param reg           Register to read from.
+     * @return              Value read. */
+    uint8_t (*read_cmd)(struct ata_sff_channel *channel, uint8_t reg);
+
+    /** Write to a command register.
+     * @param channel       Channel to read from.
+     * @param reg           Register to write to.
+     * @param val           Value to write. */
+    void (*write_cmd)(struct ata_sff_channel *channel, uint8_t reg, uint8_t val);
 } ata_sff_channel_ops_t;
 
 /** Base ATA channel structure. */
@@ -106,7 +141,7 @@ enum {
 /** Base SFF-style ATA channel structure. */
 typedef struct ata_sff_channel {
     ata_channel_t ata;
-    ata_channel_ops_t *ops;
+    ata_sff_channel_ops_t *ops;
 } ata_sff_channel_t;
 
 DEFINE_CLASS_CAST(ata_sff_channel, ata_channel, ata);

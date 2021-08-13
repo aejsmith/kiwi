@@ -23,4 +23,15 @@
 
 #include <device/disk/ata.h>
 
-extern status_t ata_channel_create_etc(module_t *module, ata_channel_t *channel, const char *name, device_t *parent);
+enum {
+    ATA_CHANNEL_WAIT_SET    = 0,        /**< Wait for specified bits to be set (default). */
+    ATA_CHANNEL_WAIT_CLEAR  = (1<<0),   /**< Wait for specified bits to be clear. */
+    ATA_CHANNEL_WAIT_ANY    = (1<<1),   /**< Wait for any specified bit to be set. */
+    ATA_CHANNEL_WAIT_ERROR  = (1<<2),   /**< Check for and report errors. */
+};
+
+extern status_t ata_channel_wait(ata_channel_t *channel, uint32_t flags, uint8_t bits, nstime_t timeout);
+
+extern status_t ata_channel_create_etc(
+    module_t *module, ata_channel_t *channel, const char *name,
+    device_t *parent);

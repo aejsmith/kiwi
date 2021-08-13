@@ -21,13 +21,78 @@
 
 #include <lib/string.h>
 
+#include <assert.h>
 #include <status.h>
+#include <time.h>
 
 #include "ata.h"
 
 /**
- * Handles an interrupt on an ATA channel. The calling driver should ensure that
- * the interrupt came from the channel before calling this function.
+ * Waits for device status to change according to the specified behaviour
+ * flags.
+ *
+ * Note that when BSY is set in the status register, other bits must be ignored.
+ * Therefore, if waiting for BSY, it must be the only bit specified to wait for
+ * (unless ATA_CHANNEL_WAIT_ANY is set).
+ *
+ * There is also no need to wait for BSY to be cleared, as this is done
+ * automatically.
+ *
+ * @param channel       Channel to wait on.
+ * @param flags         Behaviour flags.
+ * @param bits          Bits to wait for (used according to flags).
+ * @param timeout       Timeout in microseconds.
+ *
+ * @return              Status code describing result of the operation.
+ */
+status_t ata_channel_wait(ata_channel_t *channel, uint32_t flags, uint8_t bits, nstime_t timeout) {
+    assert(timeout > 0);
+
+    uint8_t set   = (!(flags & ATA_CHANNEL_WAIT_CLEAR)) ? bits : 0;
+    uint8_t clear = (flags & ATA_CHANNEL_WAIT_CLEAR) ? bits : 0;
+    bool any      = flags & ATA_CHANNEL_WAIT_ANY;
+    bool error    = flags & ATA_CHANNEL_WAIT_ERROR;
+
+    /* If waiting for BSY, ensure no other bits are set. Otherwise, add BSY
+     * to the bits to wait to be clear. */
+    if (set & ATA_STATUS_BSY) {
+        assert(any || (set == ATA_STATUS_BSY && clear == 0));
+    } else {
+        clear |= ATA_STATUS_BSY;
+    }
+
+    nstime_t elapsed = 0;
+    while (timeout) {
+        uint8_t status = channel->ops->status(channel);
+
+        if (error) {
+            if (!(status & ATA_STATUS_BSY) && (status & ATA_STATUS_ERR || status & ATA_STATUS_DF))
+                return STATUS_DEVICE_ERROR;
+        }
+
+        if (!(status & clear) && ((any && (status & set)) || (status & set) == set))
+            return STATUS_SUCCESS;
+
+        nstime_t step;
+        if (elapsed < 1000) {
+            step = min(timeout, 10);
+            spin(step);
+        } else {
+            step = min(timeout, 1000);
+            delay(step);
+        }
+
+        timeout -= step;
+        elapsed += step;
+    }
+
+    return STATUS_TIMED_OUT;
+}
+
+/**
+ * Handles an interrupt indicating completion of DMA on an ATA channel. The
+ * calling driver should ensure that the interrupt came from the channel before
+ * calling this function.
  *
  * @param channel       Channel that the interrupt occurred on.
  */
@@ -75,6 +140,18 @@ __export status_t ata_channel_create(ata_channel_t *channel, const char *name, d
  * @return              Status code describing the result of the operation.
  */
 __export status_t ata_channel_publish(ata_channel_t *channel) {
-    // TODO
+    status_t ret;
+
+    /* Reset the channel to a good state. */
+    ret = channel->ops->reset(channel);
+    if (ret != STATUS_SUCCESS) {
+        device_kprintf(channel->node, LOG_ERROR, "failed to reset device: %d\n", ret);
+        return ret;
+    }
+
+    // TODO: Is reset status checking necessary per-device? SRST bit applies to
+    // both but status is per-device.
+
+    // TODO: Probe devices
     return STATUS_SUCCESS;
 }

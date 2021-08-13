@@ -26,11 +26,37 @@
 #include <lib/string.h>
 
 #include <status.h>
+#include <time.h>
 
 #include "ata.h"
 
-static ata_channel_ops_t ata_sff_channel_ops = {
+static status_t ata_sff_channel_reset(ata_channel_t *_channel) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
 
+    /* See 11.2 - Software reset protocol (in Volume 2). We wait for longer
+     * than necessary to be sure it's done. */
+    channel->ops->write_ctrl(channel, ATA_CTRL_REG_DEV_CTRL, ATA_DEV_CTRL_SRST | ATA_DEV_CTRL_NIEN);
+    delay(usecs_to_nsecs(20));
+    channel->ops->write_ctrl(channel, ATA_CTRL_REG_DEV_CTRL, ATA_DEV_CTRL_NIEN);
+    delay(msecs_to_nsecs(20));
+
+    /* Wait for BSY to clear. */
+    ata_channel_wait(&channel->ata, 0, 0, 1000);
+
+    /* Clear any pending interrupts. */
+    channel->ops->read_cmd(channel, ATA_CMD_REG_STATUS);
+    return STATUS_SUCCESS;
+}
+
+static uint8_t ata_sff_channel_status(ata_channel_t *_channel) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+
+    return channel->ops->read_ctrl(channel, ATA_CTRL_REG_ALT_STATUS);
+}
+
+static ata_channel_ops_t ata_sff_channel_ops = {
+    .reset  = ata_sff_channel_reset,
+    .status = ata_sff_channel_status,
 };
 
 /** Initializes a new SFF-style ATA channel.
