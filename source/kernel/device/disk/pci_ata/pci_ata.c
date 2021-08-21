@@ -22,7 +22,7 @@
  * - PCI IDE Controller Specification
  *   http://www.bswd.com/pciide.pdf
  * - Programming Interface for Bus Master IDE Controller
- *   http://bswd.com/idems100.pdf
+ *   http://www.bswd.com/idems100.pdf
  */
 
 #include <device/bus/pci.h>
@@ -31,6 +31,7 @@
 
 #include <mm/malloc.h>
 
+#include <assert.h>
 #include <module.h>
 #include <status.h>
 
@@ -96,11 +97,29 @@ static void pci_ata_channel_write_cmd(ata_sff_channel_t *_channel, uint8_t reg, 
     io_write8(channel->cmd, reg, val);
 }
 
+static void pci_ata_channel_read_pio(ata_sff_channel_t *_channel, void *buf, size_t count) {
+    pci_ata_channel_t *channel = cast_pci_ata_channel(_channel);
+
+    assert(!(count % 2));
+
+    io_read16s(channel->cmd, ATA_CMD_REG_DATA, (count / 2), (uint16_t *)buf);
+}
+
+static void pci_ata_channel_write_pio(ata_sff_channel_t *_channel, const void *buf, size_t count) {
+    pci_ata_channel_t *channel = cast_pci_ata_channel(_channel);
+
+    assert(!(count % 2));
+
+    io_write16s(channel->cmd, ATA_CMD_REG_DATA, (count / 2), (const uint16_t *)buf);
+}
+
 static ata_sff_channel_ops_t pci_ata_channel_ops = {
     .read_ctrl  = pci_ata_channel_read_ctrl,
     .write_ctrl = pci_ata_channel_write_ctrl,
     .read_cmd   = pci_ata_channel_read_cmd,
     .write_cmd  = pci_ata_channel_write_cmd,
+    .read_pio   = pci_ata_channel_read_pio,
+    .write_pio  = pci_ata_channel_write_pio,
 };
 
 static irq_status_t pci_ata_early_irq(unsigned num, void *_channel) {
@@ -139,9 +158,8 @@ static void add_channel(pci_ata_channel_t *channel, const char *mode) {
 
     pci_enable_master(channel->controller->pci, true);
 
-    channel->sff.ata.caps        = ATA_CHANNEL_CAP_PIO | ATA_CHANNEL_CAP_DMA;
-    channel->sff.ata.num_devices = 2;
-    channel->sff.ops             = &pci_ata_channel_ops;
+    channel->sff.ata.caps = ATA_CHANNEL_CAP_PIO | ATA_CHANNEL_CAP_DMA | ATA_CHANNEL_CAP_SLAVE;
+    channel->sff.ops      = &pci_ata_channel_ops;
 
     device_kprintf(
         channel->sff.ata.node, LOG_NOTICE, "%s mode (cmd: %pR, ctrl: %pR, bus_master: %pR)\n",

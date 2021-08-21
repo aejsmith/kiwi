@@ -26,3 +26,30 @@
 #include <kernel/device/disk.h>
 
 #define DISK_MODULE_NAME "disk"
+
+struct disk_device;
+
+/** Disk device operations. */
+typedef struct disk_device_ops {
+    /** Destroy the device.
+     * @param device        Device to destroy. */
+    void (*destroy)(struct disk_device *device);
+} disk_device_ops_t;
+
+/** Disk device structure. */
+typedef struct disk_device {
+    device_t *node;                     /**< Device tree node. */
+
+    disk_device_ops_t *ops;
+} disk_device_t;
+
+/** Destroys a disk device.
+ * @see                 device_destroy().
+ * @param device        Device to destroy. */
+static inline status_t disk_device_destroy(disk_device_t *device) {
+    return device_destroy(device->node);
+}
+
+extern status_t disk_device_create_etc(disk_device_t *device, const char *name, device_t *parent);
+extern status_t disk_device_create(disk_device_t *device, device_t *parent);
+extern status_t disk_device_publish(disk_device_t *device);

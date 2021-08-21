@@ -25,13 +25,43 @@
 
 #include <lib/string.h>
 
+#include <assert.h>
 #include <status.h>
 #include <time.h>
 
 #include "ata.h"
 
+/** Flush writes to the channel registers. */
+static void ata_sff_channel_flush(ata_sff_channel_t *channel) {
+    channel->ops->read_ctrl(channel, ATA_CTRL_REG_ALT_STATUS);
+}
+
+static uint8_t ata_sff_channel_status(ata_channel_t *_channel) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+    return channel->ops->read_ctrl(channel, ATA_CTRL_REG_ALT_STATUS);
+}
+
+static uint8_t ata_sff_channel_selected(ata_channel_t *_channel) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+    return (channel->ops->read_cmd(channel, ATA_CMD_REG_DEVICE) >> 4) & 1;
+}
+
+static void ata_sff_channel_select(ata_channel_t *_channel, uint8_t num) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+
+    assert(num < 2);
+
+    channel->ops->write_cmd(channel, ATA_CMD_REG_DEVICE, num << 4);
+
+    /* Flush by checking status and then wait after selecting. */
+    ata_sff_channel_flush(channel);
+    spin(400);
+}
+
 static status_t ata_sff_channel_reset(ata_channel_t *_channel) {
     ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+
+    ata_sff_channel_select(&channel->ata, 0);
 
     /* See 11.2 - Software reset protocol (in Volume 2). We wait for longer
      * than necessary to be sure it's done. */
@@ -40,23 +70,72 @@ static status_t ata_sff_channel_reset(ata_channel_t *_channel) {
     channel->ops->write_ctrl(channel, ATA_CTRL_REG_DEV_CTRL, ATA_DEV_CTRL_NIEN);
     delay(msecs_to_nsecs(20));
 
-    /* Wait for BSY to clear. */
+    /* Wait for BSY to clear and clear any pending interrupts. */
     ata_channel_wait(&channel->ata, 0, 0, 1000);
-
-    /* Clear any pending interrupts. */
     channel->ops->read_cmd(channel, ATA_CMD_REG_STATUS);
+
+    if (channel->ata.device_mask & (1<<1)) {
+        /* Do the same for slave. */
+        ata_channel_wait(&channel->ata, 0, 0, 1000);
+        channel->ops->read_cmd(channel, ATA_CMD_REG_STATUS);
+    }
+
     return STATUS_SUCCESS;
 }
 
-static uint8_t ata_sff_channel_status(ata_channel_t *_channel) {
+static bool ata_sff_channel_present(ata_channel_t *_channel, uint8_t num) {
     ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
 
-    return channel->ops->read_ctrl(channel, ATA_CTRL_REG_ALT_STATUS);
+    assert(num < 2);
+
+    ata_sff_channel_select(&channel->ata, num);
+
+    if (ata_sff_channel_selected(&channel->ata) != num)
+        return false;
+
+    /* Check presence by writing a pattern to some registers and see if we can
+     * get the same pattern back. Procedure borrowed from Linux. */
+    channel->ops->write_cmd(channel, ATA_CMD_REG_SECTOR_COUNT, 0x55);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_LOW, 0xaa);
+
+    channel->ops->write_cmd(channel, ATA_CMD_REG_SECTOR_COUNT, 0xaa);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_LOW, 0x55);
+
+    channel->ops->write_cmd(channel, ATA_CMD_REG_SECTOR_COUNT, 0x55);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_LOW, 0xaa);
+
+    uint8_t sector_count = channel->ops->read_cmd(channel, ATA_CMD_REG_SECTOR_COUNT);
+    uint8_t lba_low      = channel->ops->read_cmd(channel, ATA_CMD_REG_LBA_LOW);
+
+    return sector_count == 0x55 && lba_low == 0xaa;
+}
+
+static void ata_sff_channel_command(ata_channel_t *_channel, uint8_t cmd) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+
+    channel->ops->write_cmd(channel, ATA_CMD_REG_CMD, cmd);
+    ata_sff_channel_flush(channel);
+}
+
+static void ata_sff_channel_read_pio(ata_channel_t *_channel, void *buf, size_t count) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+    channel->ops->read_pio(channel, buf, count);
+}
+
+static void ata_sff_channel_write_pio(ata_channel_t *_channel, const void *buf, size_t count) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+    channel->ops->write_pio(channel, buf, count);
 }
 
 static ata_channel_ops_t ata_sff_channel_ops = {
-    .reset  = ata_sff_channel_reset,
-    .status = ata_sff_channel_status,
+    .reset     = ata_sff_channel_reset,
+    .status    = ata_sff_channel_status,
+    .selected  = ata_sff_channel_selected,
+    .select    = ata_sff_channel_select,
+    .present   = ata_sff_channel_present,
+    .command   = ata_sff_channel_command,
+    .read_pio  = ata_sff_channel_read_pio,
+    .write_pio = ata_sff_channel_write_pio,
 };
 
 /** Initializes a new SFF-style ATA channel.

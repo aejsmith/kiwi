@@ -403,7 +403,7 @@ static void scan_bars(pci_device_t *device) {
                 width = 32;
                 mask  = 0xfffffffcul;
             #else
-                device_kprintf(device->bus.node, LOG_WARN, "  BAR %zu is PIO but PIO is unsupported, ignoring...\n");
+                device_kprintf(device->bus.node, LOG_WARN, "BAR %zu is PIO but PIO is unsupported, ignoring...\n");
                 continue;
             #endif
         } else {
@@ -416,7 +416,7 @@ static void scan_bars(pci_device_t *device) {
                 width = 64;
                 mask  = 0xfffffffffffffff0ul;
             } else {
-                device_kprintf(device->bus.node, LOG_WARN, "  BAR %zu has unrecognized memory type, ignoring...\n");
+                device_kprintf(device->bus.node, LOG_WARN, "BAR %zu has unrecognized memory type, ignoring...\n");
                 continue;
             }
 
@@ -447,13 +447,13 @@ static void scan_bars(pci_device_t *device) {
             cmd_bits |= PCI_COMMAND_IO;
 
             device_kprintf(
-                device->bus.node, LOG_NOTICE, "  BAR %zu PIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS "\n",
+                device->bus.node, LOG_NOTICE, "BAR %zu PIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS "\n",
                 i, device->bars[i].base, device->bars[i].size);
         } else {
             cmd_bits |= PCI_COMMAND_MEMORY;
 
             device_kprintf(
-                device->bus.node, LOG_NOTICE, "  BAR %zu MMIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS " (%" PRIu8 "-bit%s)\n",
+                device->bus.node, LOG_NOTICE, "BAR %zu MMIO @ 0x%" PRIxPHYS " size 0x%" PRIxPHYS " (%" PRIu8 "-bit%s)\n",
                 i, device->bars[i].base, device->bars[i].size,
                 width, (device->bars[i].prefetchable) ? ", prefetchable" : "");
         }

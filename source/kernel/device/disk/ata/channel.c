@@ -28,6 +28,124 @@
 #include "ata.h"
 
 /**
+ * Prepares to perform a command on a channel. This locks the channel, waits
+ * for it to become ready (DRQ and BSY set to 0), selects the specified device
+ * and waits for it to become ready again.
+ *
+ * This implements the HI1:Check_Status and HI2:Device_Select parts of the Bus
+ * idle protocol. It should be called prior to performing any command. When the
+ * command is finished, ata_channel_finish_command() must be called to unlock
+ * the channel.
+ *
+ * @param channel       Channel to perform command on.
+ * @param num           Device number to select (0 or 1).
+ *
+ * @return              Status code describing the result of the operation.
+ */
+status_t ata_channel_begin_command(ata_channel_t *channel, uint8_t num) {
+    assert(channel->device_mask & (1<<num));
+
+    mutex_lock(&channel->command_lock);
+
+/* Clear any pending interrupts. */
+//while(semaphore_down_etc(&channel->irq_sem, 0, 0) == STATUS_SUCCESS);
+// TODO
+
+    bool attempted = false;
+    while (true) {
+        /* Wait for BSY and DRQ to be cleared (BSY is checked automatically). */
+        status_t ret = ata_channel_wait(channel, ATA_CHANNEL_WAIT_CLEAR, ATA_STATUS_DRQ, secs_to_nsecs(5));
+        if (ret != STATUS_SUCCESS) {
+            device_kprintf(
+                channel->node, LOG_WARN,
+                "timed out while waiting for channel to become idle (status: 0x%x)\n",
+                channel->ops->status(channel));
+
+            mutex_unlock(&channel->command_lock);
+            return STATUS_DEVICE_ERROR;
+        }
+
+        /* Check whether the required device is selected. */
+        if (channel->ops->selected(channel) == num)
+            return STATUS_SUCCESS;
+
+        /* Fail if we've already attempted to set the device. */
+        if (attempted) {
+            device_kprintf(channel->node, LOG_WARN, "channel did not respond to setting device %u\n", num);
+
+            mutex_unlock(&channel->command_lock);
+            return STATUS_DEVICE_ERROR;
+        }
+
+        attempted = true;
+
+        /* Try to set it and then wait again. */
+        channel->ops->select(channel, num);
+    }
+}
+
+/** Releases the channel after a command.
+ * @param channel       Channel to finish on. */
+void ata_channel_finish_command(ata_channel_t *channel) {
+    mutex_unlock(&channel->command_lock);
+}
+
+/**
+ * Issue a command to the selected device. This must be performed within a
+ * ata_channel_begin_command()/ata_channel_finish_command() pair.
+ *
+ * @param channel       Channel to perform command on.
+ * @param cmd           Command to perform.
+ */
+void ata_channel_command(ata_channel_t *channel, uint8_t cmd) {
+    assert(mutex_held(&channel->command_lock));
+
+    channel->ops->command(channel, cmd);
+
+    /* Command protocols all say to wait 400ns before checking status, this is
+     * the time the device must set BSY within. */
+    spin(400);
+}
+
+/** Waits for DRQ and perform a PIO data read.
+ * @param channel       Channel to read from.
+ * @param buf           Buffer to read into.
+ * @param count         Number of bytes to read.
+ * @return              STATUS_SUCCESS if succeeded.
+ *                      STATUS_DEVICE_ERROR if a device error occurred.
+ *                      STATUS_TIMED_OUT if timed out while waiting for DRQ. */
+status_t ata_channel_read_pio(ata_channel_t *channel, void *buf, size_t count) {
+    assert(channel->caps & ATA_CHANNEL_CAP_PIO);
+
+    /* Wait for DRQ to be set and BSY to be clear. */
+    status_t ret = ata_channel_wait(channel, ATA_CHANNEL_WAIT_ERROR, ATA_STATUS_DRQ, secs_to_nsecs(5));
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    channel->ops->read_pio(channel, buf, count);
+    return STATUS_SUCCESS;
+}
+
+/** Waits for DRQ and perform a PIO data write.
+ * @param channel       Channel to write to.
+ * @param buf           Buffer to write from.
+ * @param count         Number of bytes to write.
+ * @return              STATUS_SUCCESS if succeeded.
+ *                      STATUS_DEVICE_ERROR if a device error occurred.
+ *                      STATUS_TIMED_OUT if timed out while waiting for DRQ. */
+status_t ata_channel_write_pio(ata_channel_t *channel, const void *buf, size_t count) {
+    assert(channel->caps & ATA_CHANNEL_CAP_PIO);
+
+    /* Wait for DRQ to be set and BSY to be clear. */
+    status_t ret = ata_channel_wait(channel, ATA_CHANNEL_WAIT_ERROR, ATA_STATUS_DRQ, secs_to_nsecs(5));
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    channel->ops->write_pio(channel, buf, count);
+    return STATUS_SUCCESS;
+}
+
+/**
  * Waits for device status to change according to the specified behaviour
  * flags.
  *
@@ -100,10 +218,13 @@ __export void ata_channel_interrupt(ata_channel_t *channel) {
     // TODO: Ignore interrupts before the channel is published.
     // TODO: If this ends up safe for interrupt context, get rid of threaded
     // handler in pci_ata.
+    // TODO: Clear pending in begin_command?
 }
 
 status_t ata_channel_create_etc(module_t *module, ata_channel_t *channel, const char *name, device_t *parent) {
     memset(channel, 0, sizeof(*channel));
+
+    mutex_init(&channel->command_lock, "ata_command_lock", 0);
 
     device_attr_t attrs[] = {
         { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = "ata_channel" } },
@@ -142,6 +263,13 @@ __export status_t ata_channel_create(ata_channel_t *channel, const char *name, d
 __export status_t ata_channel_publish(ata_channel_t *channel) {
     status_t ret;
 
+    /* Check device presence. */
+    channel->device_mask = 0;
+    if (channel->ops->present(channel, 0))
+        channel->device_mask |= (1<<0);
+    if (channel->caps & ATA_CHANNEL_CAP_SLAVE && channel->ops->present(channel, 1))
+        channel->device_mask |= (1<<1);
+
     /* Reset the channel to a good state. */
     ret = channel->ops->reset(channel);
     if (ret != STATUS_SUCCESS) {
@@ -149,9 +277,11 @@ __export status_t ata_channel_publish(ata_channel_t *channel) {
         return ret;
     }
 
-    // TODO: Is reset status checking necessary per-device? SRST bit applies to
-    // both but status is per-device.
+    /* Probe devices. */
+    if (channel->device_mask & (1<<0))
+        ata_device_detect(channel, 0);
+    if (channel->device_mask & (1<<1))
+        ata_device_detect(channel, 1);
 
-    // TODO: Probe devices
     return STATUS_SUCCESS;
 }
