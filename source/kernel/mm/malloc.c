@@ -191,6 +191,37 @@ void *device_kmalloc(device_t *device, size_t size, unsigned mmflag) {
     return mem;
 }
 
+typedef struct device_kalloc_resource {
+    void *addr;
+} device_kalloc_resource_t;
+
+static void device_kalloc_resource_release(device_t *device, void *data) {
+    device_kalloc_resource_t *resource = data;
+
+    kfree(resource->addr);
+}
+
+/**
+ * Turns an existing memory allocation into a device-managed resource. The
+ * memory will be freed when the device is destroyed. Once this is called, the
+ * allocation must not be passed to krealloc() or kfree().
+ *
+ * The use case for this is where device data needs to be allocated before the
+ * device itself is created (e.g. the device private data structure). Prefer
+ * device_kmalloc() where possible, since it is more space efficient.
+ *
+ * @param device        Device to register to.
+ * @param addr          Address of allocation.
+ */
+void device_add_kalloc(device_t *device, void *addr) {
+    device_kalloc_resource_t *resource = device_resource_alloc(
+        sizeof(device_kalloc_resource_t), device_kalloc_resource_release, MM_KERNEL);
+
+    resource->addr = addr;
+
+    device_resource_register(device, resource);
+}
+
 /** Initialize the allocator caches. */
 __init_text void malloc_init(void) {
     for (size_t i = 0; i < array_size(kmalloc_caches); i++) {

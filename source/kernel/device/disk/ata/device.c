@@ -102,8 +102,6 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
         return;
     }
 
-    // TODO: Destruction: Device needs to get freed - add way to attach this
-    // allocation to the device.
     ata_device_t *device = kmalloc(sizeof(*device), MM_KERNEL | MM_ZERO);
 
     char name[4];
@@ -116,13 +114,17 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
         return;
     }
 
+    device_t *node = device->disk.node;
+
+    device_add_kalloc(node, device);
+
     copy_ident_string(device->model, (char *)(ident + 27), 40);
     copy_ident_string(device->serial, (char *)(ident + 10), 20);
     copy_ident_string(device->revision, (char *)(ident + 23), 8);
 
-    device_kprintf(device->disk.node, LOG_NOTICE, "model:    %s\n", device->model);
-    device_kprintf(device->disk.node, LOG_NOTICE, "serial:   %s\n", device->serial);
-    device_kprintf(device->disk.node, LOG_NOTICE, "revision: %s\n", device->revision);
+    device_kprintf(node, LOG_NOTICE, "model:    %s\n", device->model);
+    device_kprintf(node, LOG_NOTICE, "serial:   %s\n", device->serial);
+    device_kprintf(node, LOG_NOTICE, "revision: %s\n", device->revision);
 
     ret = disk_device_publish(&device->disk);
     if (ret != STATUS_SUCCESS)

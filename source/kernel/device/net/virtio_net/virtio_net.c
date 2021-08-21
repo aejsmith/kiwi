@@ -267,6 +267,8 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
         return ret;
     }
 
+    device_add_kalloc(device->net.node, device);
+
     device_kprintf(
         device->net.node, LOG_NOTICE, "initializing device (features: 0x%x)\n",
         virtio->host_features);

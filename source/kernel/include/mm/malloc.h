@@ -41,5 +41,6 @@ static inline void __kfreep(void *p) {
 #define __cleanup_kfree  __cleanup(__kfreep)
 
 extern void *device_kmalloc(struct device *device, size_t size, unsigned mmflag) __malloc;
+extern void device_add_kalloc(struct device *device, void *addr);
 
 extern void malloc_init(void);

@@ -176,8 +176,6 @@ static void add_native_channel(
 {
     status_t ret;
 
-    // TODO: Destruction: Channel needs to get freed - add way to attach this
-    // allocation to the device.
     pci_ata_channel_t *channel = kmalloc(sizeof(*channel), MM_KERNEL);
 
     ret = ata_sff_channel_create(&channel->sff, name, controller->node);
@@ -188,6 +186,8 @@ static void add_native_channel(
     }
 
     device_t *node = channel->sff.ata.node;
+
+    device_add_kalloc(node, channel);
 
     channel->controller = controller;
     channel->bus_master = bus_master;
@@ -227,8 +227,6 @@ static void add_compat_channel(
 {
     status_t ret;
 
-    // TODO: Destruction: Channel needs to get freed - add way to attach this
-    // allocation to the device.
     pci_ata_channel_t *channel = kmalloc(sizeof(*channel), MM_KERNEL);
 
     ret = ata_sff_channel_create(&channel->sff, name, controller->node);
@@ -239,6 +237,8 @@ static void add_compat_channel(
     }
 
     device_t *node = channel->sff.ata.node;
+
+    device_add_kalloc(node, channel);
 
     channel->controller = controller;
     channel->bus_master = bus_master;
@@ -272,7 +272,6 @@ err_destroy:
 static status_t pci_ata_init_device(pci_device_t *pci) {
     status_t ret;
 
-    // TODO: Destruction: Need to free this somewhere.
     pci_ata_controller_t *controller = kmalloc(sizeof(*controller), MM_KERNEL);
 
     controller->pci = pci;
@@ -288,6 +287,8 @@ static status_t pci_ata_init_device(pci_device_t *pci) {
         kfree(controller);
         return ret;
     }
+
+    device_add_kalloc(controller->node, controller);
 
     device_kprintf(controller->node, LOG_NOTICE, "found PCI ATA controller\n");
 
