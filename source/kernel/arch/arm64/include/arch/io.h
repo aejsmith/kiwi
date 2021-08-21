@@ -65,3 +65,15 @@ static inline uint32_t read32(const volatile uint32_t *addr) {
 static inline void write32(volatile uint32_t *addr, uint32_t val) {
     __asm__ __volatile__("str %w0, [%1]" :: "rZ"(val), "r"(addr));
 }
+
+/** Reads an array of 16 bit values from a memory mapped register. */
+static inline void read16s(const volatile uint16_t *addr, size_t count, uint16_t *buf) {
+    for (size_t i = 0; i < count; i++)
+        buf[i] = read16(addr);
+}
+
+/** Writes an array of 16 bit values to a memory mapped register. */
+static inline void write16s(volatile uint16_t *addr, size_t count, const uint16_t *buf) {
+    for (size_t i = 0; i < count; i++)
+        write16(addr, buf[i]);
+}

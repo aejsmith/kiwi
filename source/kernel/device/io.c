@@ -229,3 +229,19 @@ void io_write32(io_region_t region, size_t offset, uint32_t val) {
         out32((pio_addr_t)(region + offset), val)
     );
 }
+
+/** Reads an array of 16 bit values from a port in an I/O region. */
+void io_read16s(io_region_t region, size_t offset, size_t count, uint16_t *buf) {
+    do_io(
+        read16s((const volatile uint16_t *)(region + offset), count, buf),
+        in16s((pio_addr_t)(region + offset), count, buf)
+    );
+}
+
+/** Writes an array of 16 bit values to a port in an I/O region. */
+void io_write16s(io_region_t region, size_t offset, size_t count, const uint16_t *buf) {
+    do_io(
+        write16s((volatile uint16_t *)(region + offset), count, buf),
+        out16s((pio_addr_t)(region + offset), count, buf)
+    );
+}

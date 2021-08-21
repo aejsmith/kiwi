@@ -79,7 +79,10 @@ static inline ptr_t io_addr(io_region_t region) {
 
 extern uint8_t io_read8(io_region_t region, size_t offset);
 extern void io_write8(io_region_t region, size_t offset, uint8_t val);
-extern uint16_t io_read16( io_region_t region, size_t offset);
+extern uint16_t io_read16(io_region_t region, size_t offset);
 extern void io_write16(io_region_t region, size_t offset, uint16_t val);
 extern uint32_t io_read32(io_region_t region, size_t offset);
 extern void io_write32(io_region_t region, size_t offset, uint32_t val);
+
+extern void io_read16s(io_region_t region, size_t offset, size_t count, uint16_t *buf);
+extern void io_write16s(io_region_t region, size_t offset, size_t count, const uint16_t *buf);
