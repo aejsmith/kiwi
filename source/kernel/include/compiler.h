@@ -37,6 +37,7 @@
 #define __deprecated            __attribute__((deprecated))
 #define __always_inline         __attribute__((always_inline))
 #define __noinline              __attribute__((noinline))
+#define __cleanup(f)            __attribute__((cleanup(f)))
 #define __cacheline_aligned     __aligned(CPU_CACHE_SIZE)
 
 #ifdef __clang_analyzer__

@@ -32,6 +32,14 @@ extern void *kcalloc(size_t nmemb, size_t size, unsigned mmflag) __malloc;
 extern void *krealloc(void *addr, size_t size, unsigned mmflag) __malloc;
 extern void kfree(void *addr);
 
+/** Helper for __cleanup_free. */
+static inline void __kfreep(void *p) {
+    kfree(*(void **)p);
+}
+
+/** Attribute to free a pointer with kfree when it goes out of scope. */
+#define __cleanup_kfree  __cleanup(__kfreep)
+
 extern void *device_kmalloc(struct device *device, size_t size, unsigned mmflag) __malloc;
 
 extern void malloc_init(void);
