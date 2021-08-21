@@ -19,10 +19,10 @@
  * @brief               ATA device library.
  */
 
-#include <device/disk/ata.h>
-
 #include <module.h>
 #include <status.h>
+
+#include "ata.h"
 
 static status_t ata_init(void) {
     return STATUS_SUCCESS;
@@ -35,3 +35,4 @@ static status_t ata_unload(void) {
 MODULE_NAME(ATA_MODULE_NAME);
 MODULE_DESC("ATA device library");
 MODULE_FUNCS(ata_init, ata_unload);
+MODULE_DEPS(DISK_MODULE_NAME);

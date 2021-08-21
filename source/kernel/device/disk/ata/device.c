@@ -106,13 +106,25 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
     // allocation to the device.
     ata_device_t *device = kmalloc(sizeof(*device), MM_KERNEL | MM_ZERO);
 
+    char name[4];
+    snprintf(name, sizeof(name), "%" PRIu8, num);
+
+    ret = disk_device_create_etc(&device->disk, name, channel->node);
+    if (ret != STATUS_SUCCESS) {
+        device_kprintf(channel->node, LOG_ERROR, "failed to create device %" PRIu8 ": %d\n", num, ret);
+        kfree(device);
+        return;
+    }
+
     copy_ident_string(device->model, (char *)(ident + 27), 40);
     copy_ident_string(device->serial, (char *)(ident + 10), 20);
     copy_ident_string(device->revision, (char *)(ident + 23), 8);
 
-    // TODO: Use device node
-    device_kprintf(channel->node, LOG_NOTICE, "device %u\n", num);
-    device_kprintf(channel->node, LOG_NOTICE, "model:    %s\n", device->model);
-    device_kprintf(channel->node, LOG_NOTICE, "serial:   %s\n", device->serial);
-    device_kprintf(channel->node, LOG_NOTICE, "revision: %s\n", device->revision);
+    device_kprintf(device->disk.node, LOG_NOTICE, "model:    %s\n", device->model);
+    device_kprintf(device->disk.node, LOG_NOTICE, "serial:   %s\n", device->serial);
+    device_kprintf(device->disk.node, LOG_NOTICE, "revision: %s\n", device->revision);
+
+    ret = disk_device_publish(&device->disk);
+    if (ret != STATUS_SUCCESS)
+        disk_device_destroy(&device->disk);
 }
