@@ -41,6 +41,11 @@ typedef struct disk_device {
     device_t *node;                     /**< Device tree node. */
 
     disk_device_ops_t *ops;
+
+    /** Properties of the device to be filled in by the driver. */
+    uint32_t physical_block_size;       /**< Block size of the underlying disk. */
+    uint32_t logical_block_size;        /**< Block size used for I/O. */
+    uint64_t block_count;               /**< Number of blocks on the device. */
 } disk_device_t;
 
 /** Destroys a disk device.

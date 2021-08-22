@@ -44,52 +44,84 @@ struct ata_sff_channel;
  */
 
 /** ATA Command Registers. */
-#define ATA_CMD_REG_DATA                0       /**< Data register (R/W). */
-#define ATA_CMD_REG_ERROR               1       /**< Error register (R). */
-#define ATA_CMD_REG_FEATURES            1       /**< Features register (W). */
-#define ATA_CMD_REG_SECTOR_COUNT        2       /**< Sector Count (R/W, W on packet). */
-#define ATA_CMD_REG_INT_REASON          2       /**< Interrupt Reason (R, packet only). */
-#define ATA_CMD_REG_LBA_LOW             3       /**< LBA Low (R/W). */
-#define ATA_CMD_REG_LBA_MID             4       /**< LBA Mid (R/W). */
-#define ATA_CMD_REG_BYTE_COUNT_LOW      4       /**< Byte Count Low (R/W, packet only). */
-#define ATA_CMD_REG_LBA_HIGH            5       /**< LBA High (R/W). */
-#define ATA_CMD_REG_BYTE_COUNT_HIGH     5       /**< Byte Count High (R/W, packet only). */
-#define ATA_CMD_REG_DEVICE              6       /**< Device register (R/W). */
-#define ATA_CMD_REG_STATUS              7       /**< Status register (R). */
-#define ATA_CMD_REG_CMD                 7       /**< Command register (W). */
+enum {
+    ATA_CMD_REG_DATA                    = 0,    /**< Data register (R/W). */
+    ATA_CMD_REG_ERROR                   = 1,    /**< Error register (R). */
+    ATA_CMD_REG_FEATURES                = 1,    /**< Features register (W). */
+    ATA_CMD_REG_SECTOR_COUNT            = 2,    /**< Sector Count (R/W, W on packet). */
+    ATA_CMD_REG_INT_REASON              = 2,    /**< Interrupt Reason (R, packet only). */
+    ATA_CMD_REG_LBA_LOW                 = 3,    /**< LBA Low (R/W). */
+    ATA_CMD_REG_LBA_MID                 = 4,    /**< LBA Mid (R/W). */
+    ATA_CMD_REG_BYTE_COUNT_LOW          = 4,    /**< Byte Count Low (R/W, packet only). */
+    ATA_CMD_REG_LBA_HIGH                = 5,    /**< LBA High (R/W). */
+    ATA_CMD_REG_BYTE_COUNT_HIGH         = 5,    /**< Byte Count High (R/W, packet only). */
+    ATA_CMD_REG_DEVICE                  = 6,    /**< Device register (R/W). */
+    ATA_CMD_REG_STATUS                  = 7,    /**< Status register (R). */
+    ATA_CMD_REG_CMD                     = 7,    /**< Command register (W). */
+};
 
 /** ATA Control Registers. */
-#define ATA_CTRL_REG_ALT_STATUS         0       /**< Alternate status (R). */
-#define ATA_CTRL_REG_DEV_CTRL           0       /**< Device control (W). */
+enum {
+    ATA_CTRL_REG_ALT_STATUS             = 0,    /**< Alternate status (R). */
+    ATA_CTRL_REG_DEV_CTRL               = 0,    /**< Device control (W). */
+};
 
 /** ATA error register bits. */
-#define ATA_ERROR_ABRT                  (1<<2)
-#define ATA_ERROR_IDNF                  (1<<4)
+enum {
+    ATA_ERROR_ABRT                      = (1<<2),
+    ATA_ERROR_IDNF                      = (1<<4),
+};
 
 /** ATA status register bits. */
-#define ATA_STATUS_ERR                  (1<<0)
-#define ATA_STATUS_DRQ                  (1<<3)
-#define ATA_STATUS_DF                   (1<<5)
-#define ATA_STATUS_DRDY                 (1<<6)
-#define ATA_STATUS_BSY                  (1<<7)
+enum {
+    ATA_STATUS_ERR                      = (1<<0),
+    ATA_STATUS_DRQ                      = (1<<3),
+    ATA_STATUS_DF                       = (1<<5),
+    ATA_STATUS_DRDY                     = (1<<6),
+    ATA_STATUS_BSY                      = (1<<7),
+};
 
 /** ATA device control register bits. */
-#define ATA_DEV_CTRL_NIEN               (1<<1)
-#define ATA_DEV_CTRL_SRST               (1<<2)
-#define ATA_DEV_CTRL_HOB                (1<<7)
+enum {
+    ATA_DEV_CTRL_NIEN                   = (1<<1),
+    ATA_DEV_CTRL_SRST                   = (1<<2),
+    ATA_DEV_CTRL_HOB                    = (1<<7),
+};
 
 /** ATA Commands. */
-#define ATA_CMD_READ_DMA                0xc8    /**< READ DMA. */
-#define ATA_CMD_READ_DMA_EXT            0x25    /**< READ DMA EXT. */
-#define ATA_CMD_READ_SECTORS            0x20    /**< READ SECTORS. */
-#define ATA_CMD_READ_SECTORS_EXT        0x24    /**< READ SECTORS EXT. */
-#define ATA_CMD_WRITE_DMA               0xca    /**< WRITE DMA. */
-#define ATA_CMD_WRITE_DMA_EXT           0x35    /**< WRITE DMA EXT. */
-#define ATA_CMD_WRITE_SECTORS           0x30    /**< WRITE SECTORS. */
-#define ATA_CMD_WRITE_SECTORS_EXT       0x34    /**< WRITE SECTORS EXT. */
-#define ATA_CMD_PACKET                  0xa0    /**< PACKET. */
-#define ATA_CMD_IDENTIFY_PACKET_DEVICE  0xa1    /**< IDENTIFY PACKET DEVICE. */
-#define ATA_CMD_IDENTIFY_DEVICE         0xec    /**< IDENTIFY DEVICE. */
+enum {
+    ATA_CMD_READ_DMA                    = 0xc8,
+    ATA_CMD_READ_DMA_EXT                = 0x25,
+    ATA_CMD_READ_SECTORS                = 0x20,
+    ATA_CMD_READ_SECTORS_EXT            = 0x24,
+    ATA_CMD_WRITE_DMA                   = 0xca,
+    ATA_CMD_WRITE_DMA_EXT               = 0x35,
+    ATA_CMD_WRITE_SECTORS               = 0x30,
+    ATA_CMD_WRITE_SECTORS_EXT           = 0x34,
+    ATA_CMD_PACKET                      = 0xa0,
+    ATA_CMD_IDENTIFY_PACKET_DEVICE      = 0xa1,
+    ATA_CMD_IDENTIFY_DEVICE             = 0xec,
+};
+
+/** ATA identification data word indices. */
+enum {
+    ATA_ID_CONFIG                       = 0,
+    ATA_ID_SERIAL                       = 10,
+    ATA_ID_REVISION                     = 23,
+    ATA_ID_MODEL                        = 27,
+    ATA_ID_CAPABILITIES_1               = 49,
+    ATA_ID_SECTOR_COUNT                 = 60,
+    ATA_ID_MULTIWORD_DMA                = 63,
+    ATA_ID_MAJOR_VERSION                = 80,
+    ATA_ID_FEATURE_SET_1                = 82,
+    ATA_ID_FEATURE_SET_2                = 83,
+    ATA_ID_ULTRA_DMA                    = 88,
+    ATA_ID_LBA48_SECTOR_COUNT           = 100,
+    ATA_ID_SECTOR_SIZE                  = 106,
+    ATA_ID_LOGICAL_SECTOR_SIZE          = 117,
+
+    ATA_ID_COUNT                        = 256
+};
 
 /**
  * ATA driver interface.

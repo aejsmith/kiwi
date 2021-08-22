@@ -46,10 +46,14 @@ extern status_t ata_channel_create_etc(
 typedef struct ata_device {
     disk_device_t disk;
 
-    /** Information from IDENTIFY. */
+    ata_channel_t *channel;
+    uint8_t num;
+
+    /** Information from IDENTIFY DEVICE. */
     char model[40 + 1];
     char serial[20 + 1];
     char revision[8 + 1];
+    uint16_t version;                   /**< ATA major version number. */
     uint32_t caps;                      /**< Device capabilities (ATA_DEVICE_CAP_*). */
 } ata_device_t;
 
@@ -58,6 +62,7 @@ DEFINE_CLASS_CAST(ata_device, disk_device, disk);
 /** ATA device capabilities. */
 enum {
     ATA_DEVICE_CAP_LBA48    = (1<<0),   /**< Device supports 48-bit addressing. */
+    ATA_DEVICE_CAP_DMA      = (1<<1),   /**< Device supports DMA. */
 };
 
 extern void ata_device_detect(ata_channel_t *channel, uint8_t num);
