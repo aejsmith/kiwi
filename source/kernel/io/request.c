@@ -162,3 +162,50 @@ status_t io_request_copy(io_request_t *request, void *buf, size_t size) {
 
     return STATUS_SUCCESS;
 }
+
+/**
+ * Tries to obtain a pointer to transfer data to/from at the current transfer
+ * offset. This is possible when there is a contiguous block of accessible
+ * memory of the specified size.
+ *
+ * If this succeeds, the transferred count will be updated by the specified
+ * size, and the caller should transfer directly to the returned pointer.
+ *
+ * If it fails, the caller must fall back to, for example, transferring to an
+ * intermediate buffer and using io_request_copy().
+ *
+ * @param request       Request to map for.
+ * @param size          Size to map.
+ *
+ * @return              Pointer to memory if mappable, NULL if not.
+ */
+void *io_request_map(io_request_t *request, size_t size) {
+    assert(size > 0);
+
+    /* TODO: Could implement this if we could pin the userspace memory in place
+     * so it is guaranteed not to fault. */
+    if (request->target == IO_TARGET_USER)
+        return NULL;
+
+    if (request->transferred + size > request->total)
+        return NULL;
+
+    size_t offset = 0;
+    for (size_t i = 0; i < request->count; i++) {
+        if (offset + request->vecs[i].size <= request->transferred) {
+            offset += request->vecs[i].size;
+        } else {
+            size_t vec_start = request->transferred - offset;
+            size_t vec_size  = min(request->vecs[i].size - vec_start, size);
+
+            if (vec_size >= size) {
+                request->transferred += vec_size;
+                return request->vecs[i].buffer + vec_start;
+            } else {
+                return NULL;
+            }
+        }
+    }
+
+    return NULL;
+}

@@ -34,18 +34,36 @@ typedef struct disk_device_ops {
     /** Destroy the device.
      * @param device        Device to destroy. */
     void (*destroy)(struct disk_device *device);
+
+    /** Read blocks from the device.
+     * @param device        Device to read from.
+     * @param buf           Buffer to read into.
+     * @param lba           Block number to start from.
+     * @param count         Number of blocks to read.
+     * @return              Status code describing result of operation. */
+    status_t (*read_blocks)(struct disk_device *device, void *buf, uint64_t lba, size_t count);
+
+    /** Write blocks to the device.
+     * @param device        Device to write to.
+     * @param buf           Buffer to write from.
+     * @param lba           Block number to start from.
+     * @param count         Number of blocks to write.
+     * @return              Status code describing result of operation. */
+    status_t (*write_blocks)(struct disk_device *device, const void *buf, uint64_t lba, size_t count);
 } disk_device_ops_t;
 
 /** Disk device structure. */
 typedef struct disk_device {
     device_t *node;                     /**< Device tree node. */
 
+    /** Fields to be filled in by the driver. */
     disk_device_ops_t *ops;
-
-    /** Properties of the device to be filled in by the driver. */
     uint32_t physical_block_size;       /**< Block size of the underlying disk. */
-    uint32_t logical_block_size;        /**< Block size used for I/O. */
-    uint64_t block_count;               /**< Number of blocks on the device. */
+    uint32_t block_size;                /**< Block size used for I/O. */
+    uint64_t block_count;               /**< Number of logical blocks on the device. */
+
+    /** Internal fields. */
+    uint64_t size;                      /**< Total size of the device. */
 } disk_device_t;
 
 /** Destroys a disk device.

@@ -26,6 +26,10 @@
 
 #include <device/class.h>
 
+#include <io/request.h>
+
+#include <mm/malloc.h>
+
 #include <lib/string.h>
 
 #include <assert.h>
@@ -34,8 +38,6 @@
 
 static device_class_t disk_device_class;
 
-/** Clean up all data associated with a device.
- * @param device        Device to destroy. */
 static void disk_device_destroy_impl(device_t *node) {
     disk_device_t *device = node->private;
 
@@ -44,11 +46,145 @@ static void disk_device_destroy_impl(device_t *node) {
     fatal("TODO");
 }
 
+static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request_t *request) {
+    disk_device_t *device = node->private;
+    status_t ret;
+
+    /* Ensure that we do not go past the end of the device. */
+    if ((uint64_t)request->offset >= device->size || !request->total)
+        return STATUS_SUCCESS;
+
+    if (request->op == IO_OP_READ && !device->ops->read_blocks) {
+        return STATUS_NOT_SUPPORTED;
+    } else if (request->op == IO_OP_WRITE && !device->ops->write_blocks) {
+        return STATUS_NOT_SUPPORTED;
+    }
+
+    size_t total = ((uint64_t)(request->offset + request->total) > device->size)
+        ? (size_t)(device->size - request->offset)
+        : request->total;
+
+    /* Work out the start and end blocks. Subtract one from count to prevent end
+     * from going onto the next block when the offset plus the count is an exact
+     * multiple of the block size. */
+    uint64_t start = request->offset / device->block_size;
+    uint64_t end   = (request->offset + (total - 1)) / device->block_size;
+
+    /* Temporary buffer allocated for partial block transfers if needed. */
+    void *buf __cleanup_kfree = NULL;
+
+    /* If we're not starting on a block boundary, we need to do a partial
+     * transfer on the initial block to get us up to a block boundary. If the
+     * transfer only goes across one block, this will handle it. */
+    uint32_t block_offset = request->offset % device->block_size;
+    if (block_offset > 0) {
+        buf = kmalloc(device->block_size, MM_KERNEL);
+
+        /* For a write, we need to partially update the current block contents,
+         * so we need to read in the block regardless of the operation. */
+        ret = device->ops->read_blocks(device, buf, start, 1);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+
+        size_t count = (start != end)
+            ? (size_t)(device->block_size - block_offset)
+            : total;
+
+        ret = io_request_copy(request, buf + block_offset, count);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+
+        /* If we're writing, write back the partially updated block. */
+        if (request->op == IO_OP_WRITE) {
+            ret = device->ops->write_blocks(device, buf, start, 1);
+            if (ret != STATUS_SUCCESS) {
+                request->transferred -= count;
+                return ret;
+            }
+        }
+
+        total -= count;
+        start++;
+    }
+
+    /* Handle any full blocks. */
+    while (total >= device->block_size) {
+        /*
+         * Use the request memory directly if it is a contiguous accessible
+         * block, otherwise use an intermediate buffer.
+         *
+         * TODO: Do multiple block transfers here in one go - needs to be able
+         * to find the maximum number of blocks we can map in the request.
+         */
+        void *dest = io_request_map(request, device->block_size);
+        if (!dest) {
+            if (!buf)
+                buf = kmalloc(device->block_size, MM_KERNEL);
+
+            dest = buf;
+
+            if (request->op == IO_OP_WRITE) {
+                /* Get the data to write into the temporary buffer. */
+                ret = io_request_copy(request, dest, device->block_size);
+                if (ret != STATUS_SUCCESS)
+                    return ret;
+            }
+        }
+
+        ret = (request->op == IO_OP_WRITE)
+            ? device->ops->write_blocks(device, dest, start, 1)
+            : device->ops->read_blocks(device, dest, start, 1);
+
+        if (ret != STATUS_SUCCESS) {
+            /* Transferred count might have been updated above, revert it. */
+            if (dest != buf || request->op == IO_OP_WRITE)
+                request->transferred -= device->block_size;
+
+            return ret;
+        }
+
+        if (dest == buf && request->op == IO_OP_READ) {
+            /* Copy back from the temporary buffer. */
+            ret = io_request_copy(request, dest, device->block_size);
+            if (ret != STATUS_SUCCESS)
+                return ret;
+        }
+
+        total -= device->block_size;
+        start++;
+    }
+
+    /* Handle anything that's left. This is similar to the first case. */
+    if (total) {
+        if (!buf)
+            buf = kmalloc(device->block_size, MM_KERNEL);
+
+        /* As before, for a write, need to partial update. */
+        ret = device->ops->read_blocks(device, buf, start, 1);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+
+        ret = io_request_copy(request, buf, total);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+
+        if (request->op == IO_OP_WRITE) {
+            ret = device->ops->write_blocks(device, buf, start, 1);
+            if (ret != STATUS_SUCCESS) {
+                request->transferred -= total;
+                return ret;
+            }
+        }
+    }
+
+    return STATUS_SUCCESS;
+}
+
 static device_ops_t disk_device_ops = {
     .type    = FILE_TYPE_BLOCK,
 
     .destroy = disk_device_destroy_impl,
-    // TODO.
+    .io      = disk_device_io,
 };
 
 static status_t create_disk_device(
@@ -105,6 +241,8 @@ __export status_t disk_device_create(disk_device_t *device, device_t *parent) {
  * @return              Status code describing the result of the operation.
  */
 __export status_t disk_device_publish(disk_device_t *device) {
+    device->size = device->block_count * device->block_size;
+
     // TODO: Scan for partitions.
 
     // TODO: device_publish() when that exists.

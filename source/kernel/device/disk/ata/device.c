@@ -44,17 +44,30 @@ enum {
 };
 
 static const char *ata_mode_strings[] = {
-    "PIO",
-    "MWDMA0",
-    "MWDMA1",
-    "MWDMA2",
-    "UDMA/16",
-    "UDMA/25",
-    "UDMA/33",
-    "UDMA/44",
-    "UDMA/66",
-    "UDMA/100",
-    "UDMA/133",
+    [ATA_MODE_PIO]         = "PIO",
+    [ATA_MODE_MULTIWORD_0] = "MWDMA0",
+    [ATA_MODE_MULTIWORD_1] = "MWDMA1",
+    [ATA_MODE_MULTIWORD_2] = "MWDMA2",
+    [ATA_MODE_UDMA_0]      = "UDMA/16",
+    [ATA_MODE_UDMA_1]      = "UDMA/25",
+    [ATA_MODE_UDMA_2]      = "UDMA/33",
+    [ATA_MODE_UDMA_3]      = "UDMA/44",
+    [ATA_MODE_UDMA_4]      = "UDMA/66",
+    [ATA_MODE_UDMA_5]      = "UDMA/100",
+    [ATA_MODE_UDMA_6]      = "UDMA/133",
+};
+
+static status_t ata_device_read_blocks(disk_device_t *_device, void *buf, uint64_t lba, size_t count) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static status_t ata_device_write_blocks(disk_device_t *_device, const void *buf, uint64_t lba, size_t count) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static disk_device_ops_t ata_device_ops = {
+    .read_blocks  = ata_device_read_blocks,
+    .write_blocks = ata_device_write_blocks,
 };
 
 static void copy_id_string(char *dest, char *src, size_t size) {
@@ -105,7 +118,7 @@ static bool process_id(ata_device_t *device, uint16_t *id) {
     if (read_id16(id, ATA_ID_FEATURE_SET_2) & (1<<10))
         device->caps |= ATA_DEVICE_CAP_LBA48;
 
-    device->disk.logical_block_size  = 512;
+    device->disk.block_size          = 512;
     device->disk.physical_block_size = 512;
 
     /* This word is valid if bit 14 is set and bit 15 is clear. */
@@ -113,17 +126,17 @@ static bool process_id(ata_device_t *device, uint16_t *id) {
     if ((sector_size & (3<<14)) == (1<<14)) {
         /* This bit indicates that logical sector size is more than 512 bytes. */
         if (sector_size & (1<<12))
-            device->disk.logical_block_size = read_id32(id, ATA_ID_LOGICAL_SECTOR_SIZE) * 2;
+            device->disk.block_size = read_id32(id, ATA_ID_LOGICAL_SECTOR_SIZE) * 2;
 
         /* Bits 3:0 indicate physical sector size in power of two logical
          * sectors. */
         uint32_t log_per_phys_shift = sector_size & 0xf;
-        device->disk.physical_block_size = device->disk.logical_block_size * (1<<log_per_phys_shift);
+        device->disk.physical_block_size = device->disk.block_size * (1<<log_per_phys_shift);
     }
 
     device_kprintf(
         device->disk.node, LOG_NOTICE, "block size: %" PRIu32 " bytes logical, %" PRIu32 " bytes physical\n",
-        device->disk.logical_block_size, device->disk.physical_block_size);
+        device->disk.block_size, device->disk.physical_block_size);
 
     if (device->caps & ATA_DEVICE_CAP_LBA48) {
         device->disk.block_count = read_id64(id, ATA_ID_LBA48_SECTOR_COUNT);
@@ -133,7 +146,7 @@ static bool process_id(ata_device_t *device, uint16_t *id) {
 
     device_kprintf(
         device->disk.node, LOG_NOTICE, "capacity: %" PRIu64 " MiB (blocks: %" PRIu64 ")\n",
-        (device->disk.block_count * device->disk.logical_block_size) / 1024 / 1024,
+        (device->disk.block_count * device->disk.block_size) / 1024 / 1024,
         device->disk.block_count);
 
     int mode = ATA_MODE_PIO;
@@ -245,8 +258,9 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 
     ata_device_t *device = kmalloc(sizeof(*device), MM_KERNEL | MM_ZERO);
 
-    device->channel = channel;
-    device->num     = num;
+    device->disk.ops = &ata_device_ops;
+    device->channel  = channel;
+    device->num      = num;
 
     char name[4];
     snprintf(name, sizeof(name), "%" PRIu8, num);
