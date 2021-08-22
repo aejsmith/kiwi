@@ -353,7 +353,7 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
 
     mutex_lock(&cache->lock);
 
-    /* Ensure that we do not go pass the end of the cache. */
+    /* Ensure that we do not go past the end of the cache. */
     if (request->offset >= cache->size || !request->total) {
         mutex_unlock(&cache->lock);
         return STATUS_SUCCESS;
@@ -386,8 +386,11 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
             ? (size_t)(PAGE_SIZE - (request->offset % PAGE_SIZE))
             : total;
 
-        io_request_copy(request, mapping + (request->offset % PAGE_SIZE), count);
+        ret = io_request_copy(request, mapping + (request->offset % PAGE_SIZE), count);
         vm_cache_unmap_page(cache, mapping, start, false, shared);
+
+        if (ret != STATUS_SUCCESS)
+            return ret;
 
         total -= count;
         start += PAGE_SIZE;
@@ -403,8 +406,11 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
         if (ret != STATUS_SUCCESS)
             return ret;
 
-        io_request_copy(request, mapping, PAGE_SIZE);
+        ret = io_request_copy(request, mapping, PAGE_SIZE);
         vm_cache_unmap_page(cache, mapping, start, false, shared);
+
+        if (ret != STATUS_SUCCESS)
+            return ret;
 
         total -= PAGE_SIZE;
         start += PAGE_SIZE;
@@ -416,8 +422,11 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
         if (ret != STATUS_SUCCESS)
             return ret;
 
-        io_request_copy(request, mapping, total);
+        ret = io_request_copy(request, mapping, total);
         vm_cache_unmap_page(cache, mapping, start, false, shared);
+
+        if (ret != STATUS_SUCCESS)
+            return ret;
     }
 
     return STATUS_SUCCESS;
