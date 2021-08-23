@@ -37,8 +37,52 @@
 #define __deprecated            __attribute__((deprecated))
 #define __always_inline         __attribute__((always_inline))
 #define __noinline              __attribute__((noinline))
-#define __cleanup(f)            __attribute__((cleanup(f)))
 #define __cacheline_aligned     __aligned(CPU_CACHE_SIZE)
+
+/**
+ * Convenience macro for __attribute__((cleanup)). This will run the specified
+ * function when the variable it applies to goes out of scope, with a pointer
+ * to the variable as its argument.
+ *
+ * This can be used to simplify writing cleanup destruction code. This behaves
+ * in the same way you would expect C++ to execute destructors for local
+ * variables:
+ *
+ *   {
+ *       if (...)
+ *           return A;
+ * 
+ *       void *test __cleanup_kfree = kmalloc(32, MM_KERNEL);
+ *
+ *       if (...)
+ *           return B;
+ *   }
+ *
+ *   <do thing>
+ *
+ * The "return A" would not execute kfree(), but "return B" would. If no return
+ * is hit, kfree() would be called at the closing brace, before "<do thing>".
+ *
+ * Mixing cleanup variables and gotos should be done with care. Clang will
+ * prevent you from doing a goto over the declaration of a cleanup variable
+ * into a scope where the variable is still defined. For example, the following
+ * is illegal and will result in a compile error:
+ *
+ *       if (...)
+ *           goto fail;
+ *
+ *       void *test __cleanup_kfree = kmalloc(32, MM_KERNEL);
+ *
+ *       ...
+ *
+ *   fail:
+ *       ...
+ *       return ret;
+ *
+ * However, wrapping the top part (before the label) inside a new scope would
+ * be allowed, since that means test is not in scope inside the label.
+ */
+#define __cleanup(f)            __attribute__((cleanup(f)))
 
 #ifdef __clang_analyzer__
 #   define __init_text
