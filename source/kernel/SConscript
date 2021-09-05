@@ -106,8 +106,8 @@ def mod_emitter(target, source, env):
     return target, source
 mod_env['BUILDERS']['Module'] = Builder(
     action = [
-        Action('$LD -r -o $TARGET $SOURCES', '$LINKCOMSTR'),
-        Action('$STRIP --strip-debug $TARGET', None),
+        Action('$LD -r -o ${TARGET}-unstripped $SOURCES', '$LINKCOMSTR'),
+        Action('$STRIP --strip-debug -o $TARGET ${TARGET}-unstripped', None),
     ],
     suffix      = '.km',
     src_suffix  = '$OBJSUFFIX',
