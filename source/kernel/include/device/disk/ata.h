@@ -141,6 +141,11 @@ typedef struct ata_channel_ops {
      * @return              Content of the status register. */
     uint8_t (*status)(struct ata_channel *channel);
 
+    /** Get the content of the error register.
+     * @param channel       Channel to get error from.
+     * @return              Content of the error register. */
+    uint8_t (*error)(struct ata_channel *channel);
+
     /** Get the selected device on a channel.
      * @param channel       Channel to get selected device from.
      * @return              Currently selected device number. */
@@ -161,6 +166,20 @@ typedef struct ata_channel_ops {
      * @param channel       Channel to perform command on.
      * @param cmd           Command to perform. */
     void (*command)(struct ata_channel *channel, uint8_t cmd);
+
+    /** Set up registers for an LBA28 transfer.
+     * @param channel       Channel to set up on.
+     * @param device        Device number to operate on.
+     * @param lba           LBA to transfer from/to.
+     * @param count         Sector count. */
+    void (*lba28_setup)(struct ata_channel *channel, uint8_t device, uint64_t lba, size_t count);
+
+    /** Set up registers for an LBA48 transfer.
+     * @param channel       Channel to set up on.
+     * @param device        Device number to operate on.
+     * @param lba           LBA to transfer from/to.
+     * @param count         Sector count. */
+    void (*lba48_setup)(struct ata_channel *channel, uint8_t device, uint64_t lba, size_t count);
 
     /**
      * Operations required on channels supporting PIO.

@@ -41,6 +41,11 @@ static uint8_t ata_sff_channel_status(ata_channel_t *_channel) {
     return channel->ops->read_ctrl(channel, ATA_CTRL_REG_ALT_STATUS);
 }
 
+static uint8_t ata_sff_channel_error(ata_channel_t *_channel) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+    return channel->ops->read_cmd(channel, ATA_CMD_REG_ERROR);
+}
+
 static uint8_t ata_sff_channel_selected(ata_channel_t *_channel) {
     ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
     return (channel->ops->read_cmd(channel, ATA_CMD_REG_DEVICE) >> 4) & 1;
@@ -117,6 +122,52 @@ static void ata_sff_channel_command(ata_channel_t *_channel, uint8_t cmd) {
     ata_sff_channel_flush(channel);
 }
 
+static void ata_sff_channel_lba28_setup(ata_channel_t *_channel, uint8_t device, uint64_t lba, size_t count) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+
+    /* Send a NULL to the feature register. */
+    channel->ops->write_cmd(channel, ATA_CMD_REG_FEATURES, 0);
+
+    /* Write out the number of blocks to read. 0 means 256. */
+    channel->ops->write_cmd(channel, ATA_CMD_REG_SECTOR_COUNT, (count == 256) ? 0 : count);
+
+    /* Specify the address of the block. */
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_LOW,  lba & 0xff);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_MID,  (lba >> 8) & 0xff);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_HIGH, (lba >> 16) & 0xff);
+
+    /* Device number with LBA bit set, and last 4 bits of address. */
+    channel->ops->write_cmd(channel, ATA_CMD_REG_DEVICE, 0x40 | (device << 4) | ((lba >> 24) & 0xf));
+}
+
+static void ata_sff_channel_lba48_setup(ata_channel_t *_channel, uint8_t device, uint64_t lba, size_t count) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+
+    /* Send 2 NULLs to the feature register. */
+    channel->ops->write_cmd(channel, ATA_CMD_REG_FEATURES, 0);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_FEATURES, 0);
+
+    /* Write out the number of blocks to read. */
+    if (count == 65536) {
+        channel->ops->write_cmd(channel, ATA_CMD_REG_SECTOR_COUNT, 0);
+        channel->ops->write_cmd(channel, ATA_CMD_REG_SECTOR_COUNT, 0);
+    } else {
+        channel->ops->write_cmd(channel, ATA_CMD_REG_SECTOR_COUNT, (count >> 8) & 0xff);
+        channel->ops->write_cmd(channel, ATA_CMD_REG_SECTOR_COUNT, count & 0xff);
+    }
+
+    /* Specify the address of the block. */
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_LOW,  (lba >> 24) & 0xff);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_LOW,  lba & 0xff);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_MID,  (lba >> 32) & 0xff);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_MID,  (lba >> 8) & 0xff);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_HIGH, (lba >> 40) & 0xff);
+    channel->ops->write_cmd(channel, ATA_CMD_REG_LBA_HIGH, (lba >> 16) & 0xff);
+
+    /* Device number with LBA bit set. */
+    channel->ops->write_cmd(channel, ATA_CMD_REG_DEVICE, 0x40 | (device << 4));
+}
+
 static void ata_sff_channel_read_pio(ata_channel_t *_channel, void *buf, size_t count) {
     ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
     channel->ops->read_pio(channel, buf, count);
@@ -128,14 +179,17 @@ static void ata_sff_channel_write_pio(ata_channel_t *_channel, const void *buf, 
 }
 
 static ata_channel_ops_t ata_sff_channel_ops = {
-    .reset     = ata_sff_channel_reset,
-    .status    = ata_sff_channel_status,
-    .selected  = ata_sff_channel_selected,
-    .select    = ata_sff_channel_select,
-    .present   = ata_sff_channel_present,
-    .command   = ata_sff_channel_command,
-    .read_pio  = ata_sff_channel_read_pio,
-    .write_pio = ata_sff_channel_write_pio,
+    .reset       = ata_sff_channel_reset,
+    .status      = ata_sff_channel_status,
+    .error       = ata_sff_channel_error,
+    .selected    = ata_sff_channel_selected,
+    .select      = ata_sff_channel_select,
+    .present     = ata_sff_channel_present,
+    .command     = ata_sff_channel_command,
+    .lba28_setup = ata_sff_channel_lba28_setup,
+    .lba48_setup = ata_sff_channel_lba48_setup,
+    .read_pio    = ata_sff_channel_read_pio,
+    .write_pio   = ata_sff_channel_write_pio,
 };
 
 /** Initializes a new SFF-style ATA channel.
