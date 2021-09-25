@@ -1360,6 +1360,11 @@ status_t fs_mount(
         if (ret != STATUS_SUCCESS)
             goto err_unlock;
 
+        if (mountpoint->node->file.type != FILE_TYPE_DIR) {
+            ret = STATUS_NOT_DIR;
+            goto err_release_mp;
+        }
+
         /* Check that it is not being used as a mount point already. */
         if (mountpoint->mount->root == mountpoint) {
             ret = STATUS_IN_USE;
