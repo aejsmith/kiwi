@@ -54,7 +54,7 @@ static status_t create_net_device(
 
     return device_class_create_device(
         &net_device_class, module, name, parent, &net_device_ops, device,
-        NULL, 0, &device->node);
+        NULL, 0, 0, &device->node);
 }
 
 /**

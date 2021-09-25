@@ -59,11 +59,12 @@ status_t device_class_destroy(device_class_t *class) {
  * @see                 device_create().
  *
  * @param class         Class to create device under.
+ * @param flags         Behaviour flags (DEVICE_CLASS_CREATE_DEVICE_*).
  */
 status_t device_class_create_device(
     device_class_t *class, module_t *module, const char *name, device_t *parent,
     device_ops_t *ops, void *data, device_attr_t *attrs, size_t count,
-    device_t **_device)
+    uint32_t flags, device_t **_device)
 {
     status_t ret;
 
@@ -85,14 +86,16 @@ status_t device_class_create_device(
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    // TODO: ID reuse. Can use device resource management to release IDs.
-    uint32_t id = atomic_fetch_add(&class->next_id, 1);
+    if (!(flags & DEVICE_CLASS_CREATE_DEVICE_NO_ALIAS)) {
+        // TODO: ID reuse. Can use device resource management to release IDs.
+        uint32_t id = atomic_fetch_add(&class->next_id, 1);
 
-    /* This should always succeed as the ID/name should be unique. */
-    char alias[16];
-    sprintf(alias, "%" PRId32, id);
-    ret = device_alias_etc(module_caller(), alias, class->dir, device, NULL);
-    assert(ret == STATUS_SUCCESS);
+        /* This should always succeed as the ID/name should be unique. */
+        char alias[16];
+        sprintf(alias, "%" PRId32, id);
+        ret = device_alias_etc(module_caller(), alias, class->dir, device, NULL);
+        assert(ret == STATUS_SUCCESS);
+    }
 
     if (_device)
         *_device = device;

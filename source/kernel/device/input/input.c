@@ -259,7 +259,7 @@ __export status_t input_device_create(
 
     status_t ret = device_class_create_device(
         &input_device_class, module_caller(), name, parent, &input_device_ops,
-        device, attrs, array_size(attrs), &device->node);
+        device, attrs, array_size(attrs), 0, &device->node);
     if (ret != STATUS_SUCCESS) {
         kfree(device);
         return ret;

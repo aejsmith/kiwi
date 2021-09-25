@@ -194,7 +194,7 @@ static status_t create_disk_device(
 
     return device_class_create_device(
         &disk_device_class, module, name, parent, &disk_device_ops, device,
-        NULL, 0, &device->node);
+        NULL, 0, 0, &device->node);
 }
 
 /**
