@@ -19,6 +19,8 @@ from util import FeatureDirs
 
 mod_env.Module('disk', [
     'disk.c',
+    'mbr.c',
+    'partition.c',
 ])
 
 SConscript(dirs = FeatureDirs(config, [

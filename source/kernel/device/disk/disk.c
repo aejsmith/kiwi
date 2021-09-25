@@ -19,12 +19,8 @@
  * @brief               Disk device class.
  *
  * TODO:
- *  - UUID-based aliases for partition devices.
+ *  - UUID-based aliases for devices.
  */
-
-#include <device/disk/disk.h>
-
-#include <device/class.h>
 
 #include <io/request.h>
 
@@ -36,7 +32,9 @@
 #include <module.h>
 #include <status.h>
 
-static device_class_t disk_device_class;
+#include "disk.h"
+
+device_class_t disk_device_class;
 
 static void disk_device_destroy_impl(device_t *node) {
     disk_device_t *device = node->private;
@@ -180,7 +178,7 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
     return STATUS_SUCCESS;
 }
 
-static device_ops_t disk_device_ops = {
+device_ops_t disk_device_ops = {
     .type    = FILE_TYPE_BLOCK,
 
     .destroy = disk_device_destroy_impl,
@@ -190,6 +188,8 @@ static device_ops_t disk_device_ops = {
 static status_t create_disk_device(
     disk_device_t *device, const char *name, device_t *parent, module_t *module)
 {
+    /* Keep this function in sync with add_partition(). */
+
     memset(device, 0, sizeof(*device));
 
     return device_class_create_device(
@@ -243,7 +243,8 @@ __export status_t disk_device_create(disk_device_t *device, device_t *parent) {
 __export status_t disk_device_publish(disk_device_t *device) {
     device->size = device->block_count * device->block_size;
 
-    // TODO: Scan for partitions.
+    /* Scan for partitions. */
+    partition_probe(device);
 
     // TODO: device_publish() when that exists.
     return STATUS_SUCCESS;
