@@ -14,13 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-dirs = [
-    'bash',
-    'dungeon',
-    'posix',
-    'terminal',
-    'test',
-    'utilities',
-]
+Import('manager')
 
-SConscript(dirs = dirs)
+env = manager.Create(libraries = ['kernel'])
+
+env.KiwiApplication('mount', ['mount.c'])
+env.KiwiApplication('unmount', ['unmount.c'])
