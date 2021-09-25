@@ -328,6 +328,8 @@ int do_vprintf(printf_helper_t helper, void *data, const char *fmt, va_list args
         case 's':
             /* We won't need the length modifier here, can use the len variable. */
             str = va_arg(args, const char *);
+            if (!str)
+                str = "(null)";
             len = strnlen(str, state.precision);
             if (state.flags & PRINTF_LEFT_JUSTIFY) {
                 print_string(&state, str, len);
