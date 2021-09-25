@@ -126,6 +126,14 @@ extern object_handle_t *object_handle_create(object_type_t *type, void *private)
 extern void object_handle_retain(object_handle_t *handle);
 extern void object_handle_release(object_handle_t *handle);
 
+/** Helper for __cleanup_object_handle. */
+static inline void __object_handle_releasep(void *p) {
+    object_handle_release(*(object_handle_t **)p);
+}
+
+/** Attribute to release a handle when it goes out of scope. */
+#define __cleanup_object_handle __cleanup(__object_handle_releasep)
+
 extern status_t object_handle_lookup(handle_t id, int type, object_handle_t **_handle);
 extern status_t object_handle_attach(object_handle_t *handle, handle_t *_id, handle_t *_uid);
 extern status_t object_handle_detach(handle_t id);
