@@ -51,6 +51,7 @@ sources = [File(f) for f in [
     'fs.c',
     'init.c',
     'process.c',
+    'status.c',
     'status_list.c',
     'syscalls.S',
     'thread.c',

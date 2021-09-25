@@ -78,8 +78,7 @@
 
 __KERNEL_EXTERN_C_BEGIN
 
-extern const char *__kern_status_strings[];
-extern size_t __kern_status_size;
+extern const char *kern_status_string(status_t status);
 
 __KERNEL_EXTERN_C_END
 
