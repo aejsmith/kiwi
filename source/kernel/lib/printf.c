@@ -236,6 +236,37 @@ static void print_mac_addr(printf_state_t *state, const uint8_t *addr) {
     }
 }
 
+static void print_uuid(printf_state_t *state, const uint8_t *uuid, bool big_endian) {
+    /* https://en.wikipedia.org/wiki/Universally_unique_identifier#Encoding */
+
+    state->base      = 16;
+    state->flags     = PRINTF_ZERO_PAD | PRINTF_LOW_CASE;
+    state->width     = 8;
+    state->precision = 1;
+
+    uint32_t val32 = *(const uint32_t *)(&uuid[0]);
+    print_number(state, (big_endian) ? be32_to_cpu(val32) : le32_to_cpu(val32));
+    print_char(state, '-');
+
+    for (unsigned i = 0; i < 2; i++) {
+        state->width     = 4;
+        state->precision = 1;
+
+        uint16_t val16 = *(const uint16_t *)(&uuid[4 + (i * 2)]);
+        print_number(state, (big_endian) ? be16_to_cpu(val16) : le16_to_cpu(val16));
+        print_char(state, '-');
+    }
+
+    for (unsigned i = 0; i < 8; i++) {
+        state->width     = 2;
+        state->precision = 1;
+
+        print_number(state, uuid[8 + i]);
+        if (i == 1)
+            print_char(state, '-');
+    }
+}
+
 static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
     /* Print lower-case and as though # was specified. */
     state->flags |= PRINTF_LOW_CASE | PRINTF_PREFIX;
@@ -260,6 +291,9 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
      *              arg = address
      *  - %ps     = Print a symbol: [<addr>] <name>
      *              arg = address
+     *  - %pu     = Print a little-endian (i.e. EFI) UUID, arg is pointer to
+     *              16-byte UUID.
+     *  - %pU     = Print a big-endian UUID, arg is pointer to 16-byte UUID.
      */
     switch ((*fmt)[1]) {
         case 'B':
@@ -300,6 +334,11 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
             state->base = 16;
             print_number(state, io_addr((io_region_t)ptr));
             break;
+        case 'u':
+        case 'U':
+            print_uuid(state, ptr, (*fmt)[1] == 'U');
+            (*fmt)++;
+            return;
         default:
             state->base = 16;
             print_number(state, (ptr_t)ptr);
