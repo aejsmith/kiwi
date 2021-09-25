@@ -878,6 +878,27 @@ err_release:
 }
 
 /**
+ * Gets the underlying device from a handle. This is only safe to use while a
+ * reference is still held to the handle.
+ *
+ * @param handle        Handle to get device for.
+ *
+ * @return              Pointer to device, or NULL if the handle is not a device
+ *                      handle.
+ */
+device_t *device_from_handle(object_handle_t *_handle) {
+    if (_handle->type->id != OBJECT_TYPE_FILE)
+        return NULL;
+
+    file_handle_t *handle = _handle->private;
+
+    if (handle->file->ops != &device_file_ops)
+        return NULL;
+
+    return handle->device;
+}
+
+/**
  * Device-specific version of kprintf() which will prefix messages with the
  * device module name and path. It is assumed that the device will not be
  * destroyed for the duration of the function.

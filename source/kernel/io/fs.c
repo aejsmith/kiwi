@@ -1309,13 +1309,13 @@ static void free_mount_opts(fs_mount_option_t *opts, size_t count) {
     kfree(opts);
 }
 
-static fs_type_t *probe_fs_type(object_handle_t *handle) {
+static fs_type_t *probe_fs_type(device_t *device, object_handle_t *handle) {
     list_foreach(&fs_types, iter) {
         fs_type_t *type = list_entry(iter, fs_type_t, header);
 
         if (!type->probe) {
             continue;
-        } else if (type->probe(handle, NULL)) {
+        } else if (type->probe(device, handle, NULL)) {
             return type;
         }
     }
@@ -1420,19 +1420,22 @@ status_t fs_mount(
         if (!(flags & FS_MOUNT_READ_ONLY))
             access |= FILE_ACCESS_WRITE;
 
-        ret = device_open(device, access, 0, &mount->device);
+        ret = device_open(device, access, 0, &mount->handle);
         if (ret != STATUS_SUCCESS)
             goto err_free_mount;
 
+        mount->device = device_from_handle(mount->handle);
+        assert(mount->device);
+
         if (!type) {
-            mount->type = probe_fs_type(mount->device);
+            mount->type = probe_fs_type(mount->device, mount->handle);
             if (!mount->type) {
                 ret = STATUS_UNKNOWN_FS;
                 goto err_free_mount;
             }
         } else if (mount->type->probe) {
             /* Check if the device contains the type. */
-            if (!mount->type->probe(mount->device, NULL)) {
+            if (!mount->type->probe(mount->device, mount->handle, NULL)) {
                 ret = STATUS_UNKNOWN_FS;
                 goto err_free_mount;
             }
@@ -1499,8 +1502,8 @@ err_free_root:
     fs_dentry_free(mount->root);
 
 err_free_mount:
-    if (mount->device)
-        object_handle_release(mount->device);
+    if (mount->handle)
+        object_handle_release(mount->handle);
 
     kfree(mount);
 
@@ -1632,8 +1635,8 @@ status_t fs_unmount(const char *path, unsigned flags) {
     if (mount->ops->unmount)
         mount->ops->unmount(mount);
 
-    if (mount->device)
-        object_handle_release(mount->device);
+    if (mount->handle)
+        object_handle_release(mount->handle);
 
     refcount_dec(&mount->type->count);
 
@@ -1950,6 +1953,7 @@ static kdb_status_t kdb_cmd_mount(int argc, char **argv, kdb_filter_t *filter) {
         kdb_printf("ops:        %ps\n", mount->ops);
         kdb_printf("private:    %p\n", mount->private);
         kdb_printf("device:     %p\n", mount->device);
+        kdb_printf("handle:     %p\n", mount->handle);
         kdb_printf("root:       %p\n", mount->root);
         kdb_printf(
             "mountpoint: %p ('%s')\n",

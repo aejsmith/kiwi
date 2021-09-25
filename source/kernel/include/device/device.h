@@ -181,16 +181,6 @@ extern device_t *device_bus_platform_dir;
 extern device_t *device_class_dir;
 extern device_t *device_virtual_dir;
 
-/** Get the name of a device from a handle.
- * @param handle        Handle to get name from.
- * @return              Name of the device. */
-static inline const char *device_name(object_handle_t *_handle) {
-    file_handle_t *handle = _handle->private;
-    device_t *device = (device_t *)handle->file;
-
-    return device->name;
-}
-
 extern status_t device_create_etc(
     module_t *module, const char *name, device_t *parent, device_ops_t *ops,
     void *private, device_attr_t *attrs, size_t count, device_t **_device);
@@ -232,6 +222,8 @@ extern status_t device_get(
 extern status_t device_open(
     const char *path, uint32_t access, uint32_t flags,
     object_handle_t **_handle);
+
+extern device_t *device_from_handle(object_handle_t *handle);
 
 extern int device_kprintf(device_t *device, int level, const char *fmt, ...) __printf(3, 4);
 

@@ -33,10 +33,14 @@
 
 #include <object.h>
 
+struct device;
 struct fs_mount;
 struct fs_node;
 struct fs_dentry;
 struct vm_cache;
+
+/** Length of a standard UUID string. */
+#define UUID_STR_LEN 36
 
 /** Structure containing a filesystem mount option. */
 typedef struct fs_mount_option {
@@ -57,13 +61,14 @@ typedef struct fs_type {
      * provided, then it is assumed that the FS does not use a backing device,
      * and one will not be passed to the mount() method.
      *
-     * @param device        Handle to device to check.
+     * @param device        Device to check.
+     * @param handle        Handle to device.
      * @param uuid          If not NULL, the function should only return true
      *                      if the filesystem also has this UUID.
      *
      * @return              Whether the device contains this FS type.
      */
-    bool (*probe)(object_handle_t *device, const char *uuid);
+    bool (*probe)(struct device *device, object_handle_t *handle, const char *uuid);
 
     /**
      * Mount an instance of this FS type. It is guaranteed that the device will
@@ -128,7 +133,8 @@ typedef struct fs_mount {
     unsigned flags;                 /**< Flags for the mount. */
     fs_mount_ops_t *ops;            /**< Mount operations. */
     void *private;                  /**< Filesystem type private data. */
-    object_handle_t *device;        /**< Handle to device that the filesystem resides on. */
+    struct device *device;          /**< Device that the filesystem resides on. */
+    object_handle_t *handle;        /**< Handle to device that the filesystem resides on. */
 
     avl_tree_t nodes;               /**< Tree mapping node IDs to node structures. */
     struct fs_dentry *root;         /**< Root directory entry. */
