@@ -53,8 +53,6 @@ typedef struct fs_type {
     refcount_t count;               /**< Number of mounts using this type. */
 
     /**
-     * Check whether a device contains this FS type.
-     *
      * Checks whether a device contains this FS type. If this method is not
      * provided, then it is assumed that the FS does not use a backing device,
      * and one will not be passed to the mount() method.
@@ -68,8 +66,6 @@ typedef struct fs_type {
     bool (*probe)(object_handle_t *device, const char *uuid);
 
     /**
-     * Mount an instance of this FS type.
-     *
      * Mount an instance of this FS type. It is guaranteed that the device will
      * contain the correct FS type when this is called, as the probe() operation
      * is called prior to this. This function should fill in the root directory
@@ -88,11 +84,20 @@ typedef struct fs_type {
 extern status_t fs_type_register(fs_type_t *type);
 extern status_t fs_type_unregister(fs_type_t *type);
 
+/** Define module init/unload functions for a filesystem type.
+ * @param type              Type to register. */
+#define MODULE_FS_TYPE(type) \
+    static status_t type##_init(void) { \
+        return fs_type_register(&type); \
+    } \
+    static status_t type##_unload(void) { \
+        return fs_type_unregister(&type); \
+    } \
+    MODULE_FUNCS(type##_init, type##_unload)
+
 /** Mount operations structure. */
 typedef struct fs_mount_ops {
     /**
-     * Unmount a filesystem.
-     *
      * Unmounts an instance of this filesystem type. All nodes will be been
      * freed. This function should free up any data allocated in the mount()
      * method. The flush() operation is not called before this function as
@@ -141,8 +146,6 @@ extern fs_mount_t *root_mount;
 /** Node operations structure. */
 typedef struct fs_node_ops {
     /**
-     * Free a node.
-     *
      * This function is called when the node is being freed and should free any
      * data allocated for it by the filesystem type. If the node's link count
      * has reached 0, this function should remove it from the filesystem. Note
@@ -161,8 +164,6 @@ typedef struct fs_node_ops {
     status_t (*flush)(struct fs_node *node);
 
     /**
-     * Create a new node.
-     *
      * Creates a new node as a child of an existing directory. The supplied
      * entry structure contains the name of the entry to create, and the
      * supplied node structure contains the attributes for the new node (type,
@@ -182,8 +183,6 @@ typedef struct fs_node_ops {
         const char *target);
 
     /**
-     * Create a hard link.
-     *
      * Creates a hard link in a directory to an existing node. This function
      * should fill in any flags it wishes on the directory entry, as with
      * create(). Note that it may be possible that an unlink takes place at the
@@ -200,8 +199,6 @@ typedef struct fs_node_ops {
     status_t (*link)(struct fs_node *parent, struct fs_dentry *entry, struct fs_node *node);
 
     /**
-     * Remove an entry from a directory.
-     *
      * Removes an entry from a directory. If the link count of the node that the
      * entry refers to reaches 0, the filesystem should set the FS_NODE_REMOVE
      * flag on the node, but not remove it from the filesystem as it may still
@@ -334,12 +331,10 @@ typedef struct fs_dentry {
     mutex_t lock;                   /**< Lock to protect the entry. */
 
     /**
-     * Reference count.
-     *
-     * The directory entry reference count holds the actual number of users of
-     * the entry. It does not count references by child entries. An entry is
-     * placed on the unused list and made freeable once it has no references
-     * and no children.
+     * Reference count. The directory entry reference count holds the actual
+     * number of users of the entry. It does not count references by child
+     * entries. An entry is placed on the unused list and made freeable once it
+     * has no references and no children.
      */
     refcount_t count;
 
@@ -349,12 +344,10 @@ typedef struct fs_dentry {
     fs_mount_t *mount;              /**< Mount that the entry resides on. */
 
     /**
-     * Node that the entry refers to.
-     *
-     * When an entry is in use (its reference count is non-zero), its node
-     * pointer is valid. The node pointer is invalid when the reference count
-     * is 0, i.e. no open handles refer to entry and it is not in use by any
-     * in-progress lookup.
+     * Node that the entry refers to. When an entry is in use (its reference
+     * count is non-zero), its node pointer is valid. The node pointer is
+     * invalid when the reference count is 0, i.e. no open handles refer to
+     * entry and it is not in use by any in-progress lookup.
      */
     fs_node_t *node;
 

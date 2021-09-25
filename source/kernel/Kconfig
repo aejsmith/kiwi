@@ -48,7 +48,5 @@ config SLAB_TRACING
 endmenu
 #######
 
-menu "Device support"
 source "device/Kconfig"
-endmenu
-
+source "io/fs/Kconfig"

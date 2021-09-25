@@ -14,19 +14,12 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'kern_sources')
-from util import FeatureDirs, FeatureSources
+menu "Filesystem support"
 
-kern_sources += FeatureSources(config, [
-    'context.c',
-    'file.c',
-    'fs.c',
-    'memory_file.c',
-    'request.c',
-    'socket.c',
-    'user_file.c',
-])
+config FS_EXT2
+	bool "Ext2/3/4 filesystem support"
+	default y
+	help
+	  Enable support for Ext2/3/4 filesystems.
 
-SConscript(dirs = FeatureDirs(config, [
-    'fs',
-]))
+endmenu

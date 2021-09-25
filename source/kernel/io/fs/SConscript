@@ -18,15 +18,9 @@ Import('config', 'kern_sources')
 from util import FeatureDirs, FeatureSources
 
 kern_sources += FeatureSources(config, [
-    'context.c',
-    'file.c',
-    'fs.c',
-    'memory_file.c',
-    'request.c',
-    'socket.c',
-    'user_file.c',
+    'ramfs.c',
 ])
 
 SConscript(dirs = FeatureDirs(config, [
-    'fs',
+    ('FS_EXT2', 'ext2'),
 ]))

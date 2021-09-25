@@ -14,8 +14,12 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+menu "Device support"
+
 source "bus/Kconfig"
 source "console/Kconfig"
 source "disk/Kconfig"
 source "input/Kconfig"
 source "net/Kconfig"
+
+endmenu
