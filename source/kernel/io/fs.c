@@ -49,6 +49,8 @@
  *    rwlocks.
  */
 
+#include <device/device.h>
+
 #include <io/fs.h>
 #include <io/request.h>
 
@@ -1307,6 +1309,20 @@ static void free_mount_opts(fs_mount_option_t *opts, size_t count) {
     kfree(opts);
 }
 
+static fs_type_t *probe_fs_type(object_handle_t *handle) {
+    list_foreach(&fs_types, iter) {
+        fs_type_t *type = list_entry(iter, fs_type_t, header);
+
+        if (!type->probe) {
+            continue;
+        } else if (type->probe(handle, NULL)) {
+            return type;
+        }
+    }
+
+    return NULL;
+}
+
 /**
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
  * Mounting multiple filesystems on one directory at a time is not allowed.
@@ -1399,7 +1415,28 @@ status_t fs_mount(
             goto err_free_mount;
         }
 
-        fatal("TODO: Devices");
+        /* Only request write access if not mounting read-only. */
+        uint32_t access = FILE_ACCESS_READ;
+        if (!(flags & FS_MOUNT_READ_ONLY))
+            access |= FILE_ACCESS_WRITE;
+
+        ret = device_open(device, access, 0, &mount->device);
+        if (ret != STATUS_SUCCESS)
+            goto err_free_mount;
+
+        if (!type) {
+            mount->type = probe_fs_type(mount->device);
+            if (!mount->type) {
+                ret = STATUS_UNKNOWN_FS;
+                goto err_free_mount;
+            }
+        } else if (mount->type->probe) {
+            /* Check if the device contains the type. */
+            if (!mount->type->probe(mount->device, NULL)) {
+                ret = STATUS_UNKNOWN_FS;
+                goto err_free_mount;
+            }
+        }
     }
 
     /* Allocate a mount ID. */
@@ -1462,6 +1499,9 @@ err_free_root:
     fs_dentry_free(mount->root);
 
 err_free_mount:
+    if (mount->device)
+        object_handle_release(mount->device);
+
     kfree(mount);
 
 err_release_mp:

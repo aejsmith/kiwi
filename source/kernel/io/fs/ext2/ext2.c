@@ -25,10 +25,12 @@
 #include <status.h>
 
 static bool ext2_probe(object_handle_t *device, const char *uuid) {
+    kprintf(LOG_DEBUG, "ext2: probe\n");
     return false;
 }
 
 static status_t ext2_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t count) {
+    kprintf(LOG_DEBUG, "ext2: mount\n");
     return STATUS_NOT_IMPLEMENTED;
 }
 
