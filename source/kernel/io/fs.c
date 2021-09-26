@@ -1453,6 +1453,7 @@ status_t fs_mount(
     /* Create root directory entry. It will be filled in by the FS' mount
      * operation. */
     mount->root = fs_dentry_alloc("", mount, NULL);
+    mount->root->flags |= FS_DENTRY_KEEP;
 
     /* Call the filesystem's mount operation. */
     ret = mount->type->mount(mount, opt_array, opt_count);
@@ -1485,10 +1486,22 @@ status_t fs_mount(
         curr_proc->io.curr_dir = root_mount->root;
     }
 
-    dprintf(
-        "fs: mounted %s%s%s on %s (mount: %p, root: %p)\n",
-        mount->type->name, (device) ? ":" : "", (device) ? device : "", path,
-        mount, mount->root);
+    char *full_path;
+    if (mount->mountpoint) {
+        ret = fs_dentry_path(mount->mountpoint, &full_path);
+        if (ret != STATUS_SUCCESS)
+            full_path = kstrdup("<unknown>", MM_KERNEL);
+    } else {
+        full_path = kstrdup("/", MM_KERNEL);
+    }
+
+    if (device) {
+        kprintf(LOG_NOTICE, "fs: mounted %s on %pD at %s\n", mount->type->name, mount->device, full_path);
+    } else {
+        kprintf(LOG_NOTICE, "fs: mounted %s at %s\n", mount->type->name, full_path);
+    }
+
+    kfree(full_path);
 
     mutex_unlock(&fs_mount_lock);
     free_mount_opts(opt_array, opt_count);

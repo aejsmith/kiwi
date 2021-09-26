@@ -335,10 +335,9 @@ static status_t ramfs_mount(fs_mount_t *_mount, fs_mount_option_t *opts, size_t 
 
     atomic_store(&mount->next_id, 1);
 
-    _mount->ops         = &ramfs_mount_ops;
-    _mount->private     = mount;
-    _mount->root->id    = RAMFS_ROOT_NODE;
-    _mount->root->flags |= FS_DENTRY_KEEP;
+    _mount->ops      = &ramfs_mount_ops;
+    _mount->private  = mount;
+    _mount->root->id = RAMFS_ROOT_NODE;
 
     return STATUS_SUCCESS;
 }
