@@ -23,6 +23,8 @@
 
 #include <io/fs.h>
 
+#include <mm/vm_cache.h>
+
 /**
  * On-disk filesystem structures/definitions.
  */
@@ -242,7 +244,7 @@ typedef struct ext2_group_desc {
 } __packed ext2_group_desc_t;
 
 /** Ext2 inode structure. */
-typedef struct ext2_inode {
+typedef struct ext2_disk_inode {
     uint16_t i_mode;                        /**< File mode. */
     uint16_t i_uid;                         /**< Lower 16-bits of owner's UID. */
     uint32_t i_size;                        /**< File size. */
@@ -287,7 +289,7 @@ typedef struct ext2_inode {
             uint32_t m_i_reserved2[2];
         } masix2;
     } osd2;                                 /**< OS-dependent data 2. */
-} __packed ext2_inode_t;
+} __packed ext2_disk_inode_t;
 
 /** Ext2 directory entry. */
 typedef struct ext2_dir_entry {
@@ -338,7 +340,7 @@ typedef struct ext4_extent_header {
 
 /** Ext2 mount structure. */
 typedef struct ext2_mount {
-    fs_mount_t *fs;
+    fs_mount_t *fs;                         /**< Parent fs_mount_t. */
 
     /** Superblock and information retrieved from it. */
     ext2_superblock_t sb;
@@ -349,6 +351,7 @@ typedef struct ext2_mount {
     uint32_t block_size;
     uint32_t block_groups;
     uint32_t inode_size;
+    uint32_t inode_read_size;
 
     /** Group descriptor table. */
     uint32_t group_desc_size;
@@ -356,3 +359,15 @@ typedef struct ext2_mount {
     size_t group_table_size;
     void *group_table;
 } ext2_mount_t;
+
+/** Ext2 in-memory inode structure. */
+typedef struct ext2_inode {
+    ext2_mount_t *mount;                    /**< Parent mount. */
+    uint32_t num;                           /**< Inode number. */
+    offset_t disk_offset;                   /**< Offset on disk. */
+    ext2_disk_inode_t disk;                 /**< On-disk inode structure. */
+    offset_t size;                          /**< Size of inode data. */
+} ext2_inode_t;
+
+extern status_t ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **_inode);
+extern void ext2_inode_put(ext2_inode_t *inode);

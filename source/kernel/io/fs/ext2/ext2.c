@@ -21,8 +21,6 @@
 
 #include <device/device.h>
 
-#include <io/fs.h>
-
 #include <lib/string.h>
 
 #include <mm/malloc.h>
@@ -32,6 +30,69 @@
 #include <status.h>
 
 #include "ext2.h"
+
+static void ext2_node_free(fs_node_t *node) {
+    kprintf(LOG_ERROR, "ext2_node_free: TODO\n");
+}
+
+static status_t ext2_node_flush(fs_node_t *node) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static status_t ext2_node_create(fs_node_t *parent, fs_dentry_t *entry, fs_node_t *node, const char *target) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static status_t ext2_node_link(fs_node_t *parent, fs_dentry_t *entry, fs_node_t *node) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static status_t ext2_node_unlink(fs_node_t *parent, fs_dentry_t *entry, fs_node_t *node) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static void ext2_node_info(fs_node_t *node, file_info_t *info) {
+    kprintf(LOG_ERROR, "ext2_node_info: TODO\n");
+}
+
+static status_t ext2_node_resize(fs_node_t *node, offset_t size) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static status_t ext2_node_lookup(fs_node_t *node, fs_dentry_t *entry) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static status_t ext2_node_read_symlink(fs_node_t *node, char **_target) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static status_t ext2_node_io(file_handle_t *handle, struct io_request *request) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static vm_cache_t *ext2_node_get_cache(file_handle_t *handle) {
+    return NULL;
+}
+
+static status_t ext2_node_read_dir(file_handle_t *handle, dir_entry_t **_entry) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static fs_node_ops_t ext2_node_ops = {
+    .free         = ext2_node_free,
+    .flush        = ext2_node_flush,
+    .create       = ext2_node_create,
+    .link         = ext2_node_link,
+    .unlink       = ext2_node_unlink,
+    .info         = ext2_node_info,
+    .resize       = ext2_node_resize,
+    .lookup       = ext2_node_lookup,
+    .read_symlink = ext2_node_read_symlink,
+    .io           = ext2_node_io,
+    .get_cache    = ext2_node_get_cache,
+    .read_dir     = ext2_node_read_dir,
+};
 
 static void ext2_unmount(fs_mount_t *_mount) {
     ext2_mount_t *mount = _mount->private;
@@ -51,9 +112,65 @@ static status_t ext2_flush(fs_mount_t *_mount) {
 }
 
 static status_t ext2_read_node(fs_mount_t *_mount, fs_node_t *node) {
-    //kprintf(LOG_DEBUG, "ext2_read_node: TODO\n");
-    //return STATUS_NOT_IMPLEMENTED;
+    ext2_mount_t *mount = _mount->private;
+    status_t ret;
+
+    ext2_inode_t *inode;
+    ret = ext2_inode_get(mount, node->id, &inode);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    node->ops     = &ext2_node_ops;
+    node->private = inode;
+
+    /* Figure out the node type. */
+    uint16_t mode = le16_to_cpu(inode->disk.i_mode);
+    switch (mode & EXT2_S_IFMT) {
+        case EXT2_S_IFSOCK:
+            node->file.type = FILE_TYPE_SOCKET;
+            break;
+        case EXT2_S_IFLNK:
+            node->file.type = FILE_TYPE_SYMLINK;
+            break;
+        case EXT2_S_IFREG:
+            node->file.type = FILE_TYPE_REGULAR;
+            break;
+        case EXT2_S_IFBLK:
+            node->file.type = FILE_TYPE_BLOCK;
+            break;
+        case EXT2_S_IFDIR:
+            node->file.type = FILE_TYPE_DIR;
+            break;
+        case EXT2_S_IFCHR:
+            node->file.type = FILE_TYPE_CHAR;
+            break;
+        case EXT2_S_IFIFO:
+            node->file.type = FILE_TYPE_PIPE;
+            break;
+        default:
+            kprintf(
+                LOG_WARN, "ext2: %pD: inode %" PRIu32 " has invalid type in mode (0x%" PRIx16 ")\n",
+                mount->fs->device, inode->num, mode);
+
+            ret = STATUS_CORRUPT_FS;
+            goto err_put;
+    }
+
+    /* Sanity check. */
+    if (inode->num == EXT2_ROOT_INO && node->file.type != FILE_TYPE_DIR) {
+        kprintf(
+            LOG_WARN, "ext2: %pD: root inode %" PRIu32 " is not a directory (0x%" PRIx16 ")\n",
+            mount->fs->device, inode->num, mode);
+
+        ret = STATUS_CORRUPT_FS;
+        goto err_put;
+    }
+
     return STATUS_SUCCESS;
+
+err_put:
+    ext2_inode_put(inode);
+    return ret;
 }
 
 static fs_mount_ops_t ext2_mount_ops = {
@@ -76,7 +193,7 @@ static bool ext2_probe(device_t *device, object_handle_t *handle, const char *uu
      * support. */
     uint32_t revision = le32_to_cpu(sb->s_rev_level);
     if (revision != EXT2_DYNAMIC_REV) {
-        kprintf(LOG_NOTICE, "ext2: device %pD has unsupported revision %" PRIu32 "\n", device, revision);
+        kprintf(LOG_NOTICE, "ext2: %pD: unsupported revision %" PRIu32 "\n", device, revision);
         return false;
     }
 
@@ -84,7 +201,7 @@ static bool ext2_probe(device_t *device, object_handle_t *handle, const char *uu
     uint32_t feature_incompat = le32_to_cpu(sb->s_feature_incompat);
     if (feature_incompat & ~(uint32_t)EXT2_FEATURE_INCOMPAT_SUPP) {
         kprintf(
-            LOG_NOTICE, "ext2: device %pD has unsupported incompatible features 0x%x\n",
+            LOG_NOTICE, "ext2: %pD: unsupported incompatible features 0x%x\n",
             device, feature_incompat);
 
         return false;
@@ -107,13 +224,14 @@ static status_t ext2_mount(fs_mount_t *_mount, fs_mount_option_t *opts, size_t c
 
     ext2_mount_t *mount = kmalloc(sizeof(*mount), MM_KERNEL | MM_ZERO);
 
-    mount->fs          = _mount;
-    mount->fs->private = mount;
-    mount->fs->ops     = &ext2_mount_ops;
+    mount->fs           = _mount;
+    mount->fs->private  = mount;
+    mount->fs->ops      = &ext2_mount_ops;
+    mount->fs->root->id = EXT2_ROOT_INO;
 
     ret = file_read(mount->fs->handle, &mount->sb, sizeof(mount->sb), EXT2_SUPERBLOCK_OFFSET, &bytes);
     if (ret != STATUS_SUCCESS) {
-        kprintf(LOG_WARN, "ext2: failed to read superblock for device %pD: %d\n", mount->fs->device, ret);
+        kprintf(LOG_WARN, "ext2: %pD: failed to read superblock: %d\n", mount->fs->device, ret);
         goto err_free;
     } else if (bytes != sizeof(mount->sb)) {
         ret = STATUS_CORRUPT_FS;
@@ -129,13 +247,13 @@ static status_t ext2_mount(fs_mount_t *_mount, fs_mount_option_t *opts, size_t c
     if (!(mount->fs->flags & FS_MOUNT_READ_ONLY)) {
         if (feature_ro_compat & ~(uint32_t)EXT2_FEATURE_RO_COMPAT_SUPP) {
             kprintf(
-                LOG_WARN, "ext2: device %pD has unsupported write features 0x%x, mounting read-only\n",
+                LOG_WARN, "ext2: %pD: unsupported write features 0x%x, mounting read-only\n",
                 mount->fs->device, feature_ro_compat);
 
             mount->fs->flags |= FS_MOUNT_READ_ONLY;
         } else if (le16_to_cpu(mount->sb.s_state) != EXT2_VALID_FS) {
             kprintf(
-                LOG_WARN, "ext2: device %pD was not cleanly unmounted or is damaged, mounting read-only\n",
+                LOG_WARN, "ext2: %pD: damaged or not cleanly unmounted, mounting read-only\n",
                 mount->fs->device);
 
             mount->fs->flags |= FS_MOUNT_READ_ONLY;
@@ -152,10 +270,11 @@ static status_t ext2_mount(fs_mount_t *_mount, fs_mount_option_t *opts, size_t c
     mount->block_size       = 1024 << le32_to_cpu(mount->sb.s_log_block_size);
     mount->block_groups     = mount->inode_count / mount->inodes_per_group;
     mount->inode_size       = le16_to_cpu(mount->sb.s_inode_size);
+    mount->inode_read_size  = min(mount->inode_size, sizeof(ext2_disk_inode_t));
 
     if (mount->block_size > PAGE_SIZE) {
         kprintf(
-            LOG_WARN, "ext2: device %pD has unsupported block size %" PRIu32 " greater than system page size\n",
+            LOG_WARN, "ext2: %pD: unsupported block size %" PRIu32 " greater than system page size\n",
             mount->fs->device, mount->block_size);
 
         ret = STATUS_NOT_SUPPORTED;
@@ -177,7 +296,7 @@ static status_t ext2_mount(fs_mount_t *_mount, fs_mount_option_t *opts, size_t c
             !is_pow2(mount->group_desc_size))
         {
             kprintf(
-                LOG_WARN, "ext2: device %pD has unsupported group descriptor size %" PRIu32 "\n",
+                LOG_WARN, "ext2: %pD: unsupported group descriptor size %" PRIu32 "\n",
                 mount->fs->device, mount->group_desc_size);
 
             ret = STATUS_CORRUPT_FS;
@@ -199,10 +318,10 @@ static status_t ext2_mount(fs_mount_t *_mount, fs_mount_option_t *opts, size_t c
 
     ret = file_read(mount->fs->handle, mount->group_table, mount->group_table_size, mount->group_table_offset, &bytes);
     if (ret != STATUS_SUCCESS) {
-        kprintf(LOG_WARN, "ext2: failed to read group table for device %pD: %d\n", mount->fs->device, ret);
+        kprintf(LOG_WARN, "ext2: %pD: failed to read group table: %d\n", mount->fs->device, ret);
         goto err_free;
     } else if (bytes != mount->group_table_size) {
-        kprintf(LOG_WARN, "ext2: incomplete read of group table for device %pD\n", mount->fs->device);
+        kprintf(LOG_WARN, "ext2: %pD: incomplete read of group table\n", mount->fs->device);
         ret = STATUS_CORRUPT_FS;
         goto err_free;
     }
@@ -214,15 +333,13 @@ static status_t ext2_mount(fs_mount_t *_mount, fs_mount_option_t *opts, size_t c
 
         ret = file_write(mount->fs->handle, &mount->sb, sizeof(mount->sb), EXT2_SUPERBLOCK_OFFSET, &bytes);
         if (ret != STATUS_SUCCESS) {
-            kprintf(LOG_WARN, "ext2: failed to write superblock for device %pD: %d\n", mount->fs->device, ret);
+            kprintf(LOG_WARN, "ext2: %pD: failed to write superblock: %d\n", mount->fs->device, ret);
             goto err_free;
         } else if (bytes != sizeof(mount->sb)) {
             ret = STATUS_CORRUPT_FS;
             goto err_free;
         }
     }
-
-    mount->fs->root->id = EXT2_ROOT_INO;
 
     return STATUS_SUCCESS;
 
