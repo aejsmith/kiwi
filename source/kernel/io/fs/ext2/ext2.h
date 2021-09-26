@@ -16,12 +16,16 @@
 
 /**
  * @file
- * @brief               Ext2 filesystem types/definitions.
+ * @brief               Ext2 filesystem internal definitions.
  */
 
 #pragma once
 
-#include <types.h>
+#include <io/fs.h>
+
+/**
+ * On-disk filesystem structures/definitions.
+ */
 
 /** Ext2 filesystem magic number. */
 #define EXT2_MAGIC              0xef53
@@ -118,9 +122,11 @@
 
 #define EXT2_FEATURE_INCOMPAT_SUPP ( \
     EXT2_FEATURE_INCOMPAT_FILETYPE | \
-    EXT2_FEATURE_INCOMPAT_META_BG)
+    EXT2_FEATURE_INCOMPAT_META_BG | \
+    EXT4_FEATURE_INCOMPAT_64BIT)
 
 /** Structure sizes. */
+#define EXT2_SUPERBLOCK_OFFSET                  1024
 #define EXT2_SUPERBLOCK_SIZE                    1024
 #define EXT2_INODE_SIZE                         128
 #define EXT2_MIN_GROUP_DESC_SIZE                32
@@ -316,3 +322,37 @@ typedef struct ext4_extent_header {
     uint16_t eh_depth;
     uint32_t eh_generation;
 } __packed ext4_extent_header_t;
+
+/**
+ * Driver internal definitions.
+ */
+
+/** Define to enable debug output. */
+#define DEBUG_EXT2
+
+#ifdef DEBUG_EXT2
+#   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
+#else
+#   define dprintf(fmt...)
+#endif
+
+/** Ext2 mount structure. */
+typedef struct ext2_mount {
+    fs_mount_t *fs;
+
+    /** Superblock and information retrieved from it. */
+    ext2_superblock_t sb;
+    uint32_t inodes_per_group;
+    uint32_t inode_count;
+    uint32_t blocks_per_group;
+    uint32_t block_count;
+    uint32_t block_size;
+    uint32_t block_groups;
+    uint32_t inode_size;
+
+    /** Group descriptor table. */
+    uint32_t group_desc_size;
+    offset_t group_table_offset;
+    size_t group_table_size;
+    void *group_table;
+} ext2_mount_t;
