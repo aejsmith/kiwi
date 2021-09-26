@@ -110,7 +110,7 @@ static status_t ramfs_node_create(
 
     /* We exist entirely in the cache, so we should not free our unused nodes. */
     fs_node_set_flag(_node, FS_NODE_KEEP);
-    entry->flags |= FS_NODE_KEEP;
+    entry->flags |= FS_DENTRY_KEEP;
 
     return STATUS_SUCCESS;
 }
