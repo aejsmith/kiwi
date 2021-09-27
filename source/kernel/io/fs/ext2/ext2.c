@@ -103,6 +103,7 @@ static void ext2_unmount(fs_mount_t *_mount) {
     //}
     kprintf(LOG_DEBUG, "ext2_unmount: TODO\n");
 
+    kfree(mount->group_table);
     kfree(mount);
 }
 
