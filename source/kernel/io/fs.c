@@ -1403,7 +1403,7 @@ status_t fs_mount(
     if (type) {
         mount->type = fs_type_lookup(type);
         if (!mount->type) {
-            ret = STATUS_NOT_FOUND;
+            ret = STATUS_UNKNOWN_FS;
             goto err_free_mount;
         }
     }
