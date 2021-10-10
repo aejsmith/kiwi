@@ -22,6 +22,7 @@
 #include <mm/malloc.h>
 
 #include <status.h>
+#include <time.h>
 
 #include "ext2.h"
 
@@ -65,7 +66,7 @@ status_t ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **_inode
         goto err_free;
     }
 
-    inode->size = le32_to_cpu(inode->disk.i_size);
+    inode->size = le32_to_cpu(inode->disk.i_size_lo);
     if (le16_to_cpu(inode->disk.i_mode) & EXT2_S_IFREG)
         inode->size |= (offset_t)le32_to_cpu(inode->disk.i_size_high) << 32;
 
@@ -81,8 +82,7 @@ err_free:
     return ret;
 }
 
-/** Free an in-memory inode structure.
- * @param inode         Inode to free. */
+/** Free an in-memory inode structure. */
 void ext2_inode_put(ext2_inode_t *inode) {
     if (!(inode->mount->fs->flags & FS_MOUNT_READ_ONLY)) {
         if (le16_to_cpu(inode->disk.i_links_count) == 0) {
@@ -91,4 +91,34 @@ void ext2_inode_put(ext2_inode_t *inode) {
     }
 
     kfree(inode);
+}
+
+static nstime_t decode_timestamp(ext2_inode_t *inode, uint32_t *_low, uint32_t *_high) {
+    uint64_t seconds     = le32_to_cpu(*_low);
+    uint64_t nanoseconds = 0;
+
+    /* High part is valid if the on-disk inode size includes it. */
+    size_t end = (uint8_t *)&_high[1] - (uint8_t *)&inode->disk;
+    if (inode->mount->inode_size >= end) {
+        uint32_t high = le32_to_cpu(*_high);
+        seconds      |= (uint64_t)(high & 3) << 32;
+        nanoseconds   = high >> 2;
+    }
+
+    return secs_to_nsecs(seconds) + nanoseconds;
+}
+
+/** Get the access time of an inode. */
+nstime_t ext2_inode_atime(ext2_inode_t *inode) {
+    return decode_timestamp(inode, &inode->disk.i_atime, &inode->disk.i_atime_extra);
+}
+
+/** Get the access time of an inode. */
+nstime_t ext2_inode_ctime(ext2_inode_t *inode) {
+    return decode_timestamp(inode, &inode->disk.i_ctime, &inode->disk.i_ctime_extra);
+}
+
+/** Get the modification time of an inode. */
+nstime_t ext2_inode_mtime(ext2_inode_t *inode) {
+    return decode_timestamp(inode, &inode->disk.i_mtime, &inode->disk.i_mtime_extra);
 }

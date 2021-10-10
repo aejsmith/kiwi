@@ -52,7 +52,14 @@ static status_t ext2_node_unlink(fs_node_t *parent, fs_dentry_t *entry, fs_node_
 }
 
 static void ext2_node_info(fs_node_t *node, file_info_t *info) {
-    kprintf(LOG_ERROR, "ext2_node_info: TODO\n");
+    ext2_inode_t *inode = node->private;
+
+    info->block_size = PAGE_SIZE;
+    info->size       = inode->size;
+    info->links      = le16_to_cpu(inode->disk.i_links_count);
+    info->accessed   = ext2_inode_atime(inode);
+    info->created    = ext2_inode_ctime(inode);
+    info->modified   = ext2_inode_mtime(inode);
 }
 
 static status_t ext2_node_resize(fs_node_t *node, offset_t size) {
