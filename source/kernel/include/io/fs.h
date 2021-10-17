@@ -284,10 +284,12 @@ typedef struct fs_node_ops {
      *                      rewind_dir() is called on it, otherwise it is not
      *                      modified.
      * @param handle        File handle structure.
-     * @param _entry        Where to store pointer to directory entry
-     *                      structure (must be allocated using a
-     *                      kmalloc()-based function).
-     * @return              Status code describing result of the operation. */
+     * @param _entry        Where to store pointer to directory entry structure
+     *                      (must be allocated using a kmalloc()-based function).
+     * @return              STATUS_SUCCESS if successful.
+     *                      STATUS_NOT_FOUND if the end of the directory has been
+     *                      reached.
+     *                      Other status code on error. */
     status_t (*read_dir)(file_handle_t *handle, dir_entry_t **_entry);
 } fs_node_ops_t;
 
