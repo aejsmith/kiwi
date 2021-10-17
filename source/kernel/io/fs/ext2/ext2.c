@@ -35,7 +35,8 @@
 #include "ext2.h"
 
 static void ext2_node_free(fs_node_t *node) {
-    kprintf(LOG_ERROR, "ext2_node_free: TODO\n");
+    if (!(node->mount->flags & FS_MOUNT_READ_ONLY))
+        kprintf(LOG_ERROR, "ext2_node_free: TODO\n");
 }
 
 static status_t ext2_node_flush(fs_node_t *node) {
@@ -199,11 +200,11 @@ static fs_node_ops_t ext2_node_ops = {
 static void ext2_unmount(fs_mount_t *_mount) {
     ext2_mount_t *mount = _mount->private;
 
-    //if (!(mount->fs->flags & FS_MOUNT_READ_ONLY)) {
-    //    mount->sb.s_state = cpu_to_le16(EXT2_VALID_FS);
-    //    ext2_mount_flush(mount);
-    //}
-    kprintf(LOG_DEBUG, "ext2_unmount: TODO\n");
+    if (!(mount->fs->flags & FS_MOUNT_READ_ONLY)) {
+        kprintf(LOG_DEBUG, "ext2_unmount: TODO\n");
+        //mount->sb.s_state = cpu_to_le16(EXT2_VALID_FS);
+        //ext2_mount_flush(mount);
+    }
 
     kfree(mount->group_table);
     kfree(mount);
