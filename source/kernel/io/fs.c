@@ -459,9 +459,13 @@ static status_t fs_dentry_instantiate(fs_dentry_t *entry) {
 
     if (!(entry->flags & FS_DENTRY_KEEP)) {
         spinlock_lock(&unused_entries_lock);
-        assert(!list_empty(&entry->unused_link));
-        unused_entry_count--;
-        list_remove(&entry->unused_link);
+
+        /* May be newly created and not on the list. */
+        if (!list_empty(&entry->unused_link)) {
+            unused_entry_count--;
+            list_remove(&entry->unused_link);
+        }
+
         spinlock_unlock(&unused_entries_lock);
     }
 
