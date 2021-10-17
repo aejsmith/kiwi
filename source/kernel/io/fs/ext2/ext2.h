@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include <io/file_map.h>
 #include <io/fs.h>
 
 #include <mm/vm_cache.h>
@@ -271,8 +272,8 @@ typedef struct ext2_disk_inode {
             uint32_t m_i_reserved1;
         } masix1;
     } osd1;
-    uint32_t i_generation;
     uint32_t i_block[EXT2_N_BLOCKS];
+    uint32_t i_generation;
     uint32_t i_file_acl_lo;
     uint32_t i_size_high;
     uint32_t i_obso_faddr;
@@ -385,7 +386,25 @@ typedef struct ext2_inode {
     offset_t disk_offset;                   /**< Offset on disk. */
     ext2_disk_inode_t disk;                 /**< On-disk inode structure. */
     offset_t size;                          /**< Size of inode data. */
+
+    file_map_t *map;                        /**< File block map. */
+    vm_cache_t *cache;                      /**< Page cache. */
 } ext2_inode_t;
+
+extern status_t ext2_block_read(ext2_mount_t *mount, void *buf, uint32_t num);
+
+/** Callback function for ext2_dir_iterate().
+ * @param inode         Directory being iterated.
+ * @param entry         Directory entry header.
+ * @param name          Name of entry.
+ * @param offset        Offset of entry.
+ * @param arg           Argument passed to ext2_dir_iterate().
+ * @return              Whether to continue iterating. */
+typedef bool (*ext2_dir_iterate_cb_t)(
+    ext2_inode_t *inode, ext2_dir_entry_t *entry, const char *name,
+    offset_t offset, void *arg);
+
+extern status_t ext2_dir_iterate(ext2_inode_t *inode, offset_t offset, ext2_dir_iterate_cb_t cb, void *arg);
 
 extern status_t ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **_inode);
 extern void ext2_inode_put(ext2_inode_t *inode);
@@ -393,3 +412,17 @@ extern void ext2_inode_put(ext2_inode_t *inode);
 extern nstime_t ext2_inode_atime(ext2_inode_t *inode);
 extern nstime_t ext2_inode_ctime(ext2_inode_t *inode);
 extern nstime_t ext2_inode_mtime(ext2_inode_t *inode);
+
+static inline status_t ext2_inode_read(
+    ext2_inode_t *inode, void *buf, size_t size, offset_t offset,
+    size_t *_bytes)
+{
+    return vm_cache_read(inode->cache, buf, size, offset, _bytes);
+}
+
+static inline status_t ext2_inode_write(
+    ext2_inode_t *inode, const void *buf, size_t size, offset_t offset,
+    size_t *_bytes)
+{
+    return vm_cache_write(inode->cache, buf, size, offset, _bytes);
+}

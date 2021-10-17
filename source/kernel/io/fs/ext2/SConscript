@@ -17,6 +17,8 @@
 Import('mod_env')
 
 mod_env.Module('ext2', [
+    'block.c',
+    'dir.c',
     'ext2.c',
     'inode.c',
 ])

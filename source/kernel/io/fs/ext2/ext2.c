@@ -21,11 +21,14 @@
 
 #include <device/device.h>
 
+#include <io/request.h>
+
 #include <lib/string.h>
 
 #include <mm/malloc.h>
 #include <mm/page.h>
 
+#include <assert.h>
 #include <module.h>
 #include <status.h>
 
@@ -66,24 +69,116 @@ static status_t ext2_node_resize(fs_node_t *node, offset_t size) {
     return STATUS_NOT_IMPLEMENTED;
 }
 
+typedef struct lookup_iterate_data {
+    const char *name;
+    uint32_t id;
+} lookup_iterate_data_t;
+
+static bool lookup_iterate_cb(
+    ext2_inode_t *inode, ext2_dir_entry_t *entry, const char *name,
+    offset_t offset, void *arg)
+{
+    lookup_iterate_data_t *data = arg;
+
+    if (strcmp(name, data->name) == 0) {
+        data->id = le32_to_cpu(entry->inode);
+        return false;
+    } else {
+        return true;
+    }
+}
+
 static status_t ext2_node_lookup(fs_node_t *node, fs_dentry_t *entry) {
-    return STATUS_NOT_IMPLEMENTED;
+    ext2_inode_t *inode = node->private;
+
+    lookup_iterate_data_t data;
+    data.name = entry->name;
+    data.id   = 0;
+
+    status_t ret = ext2_dir_iterate(inode, 0, lookup_iterate_cb, &data);
+    if (ret == STATUS_SUCCESS) {
+        if (data.id != 0) {
+            entry->id = data.id;
+        } else {
+            ret = STATUS_NOT_FOUND;
+        }
+    }
+
+    return ret;
 }
 
 static status_t ext2_node_read_symlink(fs_node_t *node, char **_target) {
     return STATUS_NOT_IMPLEMENTED;
 }
 
-static status_t ext2_node_io(file_handle_t *handle, struct io_request *request) {
-    return STATUS_NOT_IMPLEMENTED;
+static status_t ext2_node_io(file_handle_t *handle, io_request_t *request) {
+    ext2_inode_t *inode = handle->node->private;
+
+    assert(handle->file->type == FILE_TYPE_REGULAR);
+
+    if (request->op == IO_OP_WRITE) {
+        // TODO: Need to potentially resize the inode, reserve blocks,
+        // resize the cache, and update mtime.
+        kprintf(LOG_DEBUG, "ext2: TODO: write\n");
+        return STATUS_NOT_IMPLEMENTED;
+    }
+
+    return vm_cache_io(inode->cache, request);
 }
 
 static vm_cache_t *ext2_node_get_cache(file_handle_t *handle) {
-    return NULL;
+    ext2_inode_t *inode = handle->node->private;
+
+    return inode->cache;
+}
+
+typedef struct read_dir_iterate_data {
+    dir_entry_t *entry;
+    offset_t next_offset;
+} read_dir_iterate_data_t;
+
+static bool read_dir_iterate_cb(
+    ext2_inode_t *inode, ext2_dir_entry_t *entry, const char *name,
+    offset_t offset, void *arg)
+{
+    read_dir_iterate_data_t *data = arg;
+
+    size_t length = sizeof(*data->entry) + entry->name_len + 1;
+
+    data->entry = kmalloc(length, MM_KERNEL);
+
+    data->entry->length = length;
+    data->entry->id     = le32_to_cpu(entry->inode);
+
+    memcpy(data->entry->name, name, entry->name_len + 1);
+
+    data->next_offset = offset + le16_to_cpu(entry->rec_len);
+    return false;
 }
 
 static status_t ext2_node_read_dir(file_handle_t *handle, dir_entry_t **_entry) {
-    return STATUS_NOT_IMPLEMENTED;
+    ext2_inode_t *inode = handle->node->private;
+
+    /*
+     * We use the byte offset into the directory entry array in the handle. This
+     * is done under the assumption that offsets are stable: when we remove a
+     * directory entry we just zero the entry in place. This will need changes
+     * if we coalesce free entries upon removal. See notes in dir.c.
+     */
+
+    read_dir_iterate_data_t data = {};
+
+    status_t ret = ext2_dir_iterate(inode, handle->offset, read_dir_iterate_cb, &data);
+    if (ret == STATUS_SUCCESS) {
+        if (data.entry) {
+            *_entry        = data.entry;
+            handle->offset = data.next_offset;
+        } else {
+            ret = STATUS_NOT_FOUND;
+        }
+    }
+
+    return ret;
 }
 
 static fs_node_ops_t ext2_node_ops = {
