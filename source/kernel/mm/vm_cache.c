@@ -432,6 +432,66 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
     return STATUS_SUCCESS;
 }
 
+/** Reads data from a cache into a kernel buffer.
+ * @param cache         Cache to read from.
+ * @param buf           Buffer to read into.
+ * @param size          Number of bytes to read.
+ * @param offset        Offset to read from.
+ * @param _bytes        Where to store number of bytes read.
+ * @return              Status code describing result of the operation. */
+status_t vm_cache_read(vm_cache_t *cache, void *buf, size_t size, offset_t offset, size_t *_bytes) {
+    status_t ret;
+
+    io_vec_t vec;
+    vec.buffer = buf;
+    vec.size   = size;
+
+    if (_bytes)
+        *_bytes = 0;
+
+    io_request_t request;
+    ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ, IO_TARGET_KERNEL);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    ret = vm_cache_io(cache, &request);
+    if (_bytes)
+        *_bytes = request.transferred;
+
+    io_request_destroy(&request);
+    return ret;
+}
+
+/** Wrtes data to a cache from a kernel buffer.
+ * @param cache         Cache to write to.
+ * @param buf           Buffer to write from.
+ * @param size          Number of bytes to write.
+ * @param offset        Offset to write to.
+ * @param _bytes        Where to store number of bytes written.
+ * @return              Status code describing result of the operation. */
+status_t vm_cache_write(vm_cache_t *cache, const void *buf, size_t size, offset_t offset, size_t *_bytes) {
+    status_t ret;
+
+    io_vec_t vec;
+    vec.buffer = (void *)buf;
+    vec.size   = size;
+
+    if (_bytes)
+        *_bytes = 0;
+
+    io_request_t request;
+    ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    ret = vm_cache_io(cache, &request);
+    if (_bytes)
+        *_bytes = request.transferred;
+
+    io_request_destroy(&request);
+    return ret;
+}
+
 /** Resizes a cache.
  * @param cache         Cache to resize.
  * @param size          New size of the cache. */

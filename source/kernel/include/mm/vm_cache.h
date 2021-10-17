@@ -73,6 +73,9 @@ typedef struct vm_cache {
 extern vm_region_ops_t vm_cache_region_ops;
 
 extern status_t vm_cache_io(vm_cache_t *cache, struct io_request *request);
+extern status_t vm_cache_read(vm_cache_t *cache, void *buf, size_t size, offset_t offset, size_t *_bytes);
+extern status_t vm_cache_write(vm_cache_t *cache, const void *buf, size_t size, offset_t offset, size_t *_bytes);
+
 extern void vm_cache_resize(vm_cache_t *cache, offset_t size);
 extern status_t vm_cache_flush(vm_cache_t *cache);
 
