@@ -20,6 +20,7 @@ from util import FeatureDirs, FeatureSources
 kern_sources += FeatureSources(config, [
     'context.c',
     'file.c',
+    'file_map.c',
     'fs.c',
     'memory_file.c',
     'request.c',
