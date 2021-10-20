@@ -532,21 +532,29 @@ status_t file_read_dir(object_handle_t *handle, dir_entry_t *buf, size_t size) {
      * the offset. */
     mutex_lock(&fhandle->lock);
 
+    /* Preserve original offset to restore in case of error. */
+    offset_t orig_offset = fhandle->offset;
+
     dir_entry_t *entry;
     ret = fhandle->file->ops->read_dir(fhandle, &entry);
 
-    mutex_unlock(&fhandle->lock);
-
-    if (ret != STATUS_SUCCESS) {
-        return ret;
-    } else if (entry->length > size) {
+    if (ret == STATUS_SUCCESS && entry->length > size) {
         kfree(entry);
-        return STATUS_TOO_SMALL;
+        ret = STATUS_TOO_SMALL;
     }
 
-    memcpy(buf, entry, entry->length);
-    kfree(entry);
-    return STATUS_SUCCESS;
+    /* Restore offset on error. */
+    if (ret != STATUS_SUCCESS)
+        fhandle->offset = orig_offset;
+
+    mutex_unlock(&fhandle->lock);
+
+    if (ret == STATUS_SUCCESS) {
+        memcpy(buf, entry, entry->length);
+        kfree(entry);
+    }
+
+    return ret;
 }
 
 /** Rewind to the beginning of a directory.
