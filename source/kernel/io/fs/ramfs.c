@@ -229,22 +229,28 @@ static status_t ramfs_node_read_dir(file_handle_t *handle, dir_entry_t **_entry)
 
     mutex_lock(&handle->entry->lock);
 
-    /* Our entire directory structure is stored in the directory cache. To read
+    /*
+     * Our entire directory structure is stored in the directory cache. To read
      * the entries in a ramfs directory, we iterate over the child entries for
-     * the entry used to open the directory handle (with special cases for the
-     * "." and ".." entries, as these do not exist in the directory cache). */
+     * the entry used to open the directory handle.
+     *
+     * There are special cases for the "." and ".." entries, as these do not
+     * exist in the directory cache). When a node is unlinked (null parent), do
+     * not add "." and ".." entries.
+     */
     const char *name;
     node_id_t id;
-    if (handle->offset == 0) {
+    bool has_parent = handle->entry->parent;
+    if (has_parent && handle->offset == 0) {
         name = ".";
         id = handle->entry->id;
-    } else if (handle->offset == 1) {
+    } else if (has_parent && handle->offset == 1) {
         name = "..";
-        id = (handle->entry->parent) ? handle->entry->parent->id : handle->entry->id;
+        id = handle->entry->parent->id;
     } else {
         name = NULL;
 
-        offset_t i = 2;
+        offset_t i = (has_parent) ? 2 : 0;
         radix_tree_foreach(&handle->entry->entries, iter) {
             fs_dentry_t *child = radix_tree_entry(iter, fs_dentry_t);
 

@@ -660,6 +660,13 @@ static status_t fs_lookup_internal(
 
             assert(entry != root_mount->root);
 
+            /* Check for an unlinked entry. We'll return not found if we try to
+             * go up out of this. */
+            if (!entry->parent) {
+                ret = STATUS_NOT_FOUND;
+                goto err_release;
+            }
+
             if (entry == entry->mount->root) {
                 /* We're at the root of the mount. The entry parent pointer is
                  * NULL in this case. Move over onto the mountpoint's parent. */
@@ -828,6 +835,12 @@ static status_t fs_create_prepare(const char *path, fs_dentry_t **_entry) {
         goto out_release_parent;
     }
 
+    /* Cannot create within an unlinked directory. */
+    if (parent != root_mount->root && !parent->parent) {
+        ret = STATUS_NOT_FOUND;
+        goto out_release_parent;
+    }
+
     /* Check if the name we're creating already exists. */
     fs_dentry_t *entry;
     ret = fs_dentry_lookup(parent, name, &entry);
@@ -890,12 +903,12 @@ static status_t fs_create(
 {
     status_t ret;
 
-    fs_dentry_t*entry;
+    fs_dentry_t *entry;
     ret = fs_create_prepare(path, &entry);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    fs_dentry_t* parent = entry->parent;
+    fs_dentry_t *parent = entry->parent;
     if (!parent->node->ops->create) {
         ret = STATUS_NOT_SUPPORTED;
         goto err_free_entry;
