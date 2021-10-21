@@ -75,6 +75,6 @@ static inline status_t net_device_destroy(net_device_t *device) {
 
 extern status_t net_device_create_etc(net_device_t *device, const char *name, device_t *parent);
 extern status_t net_device_create(net_device_t *device, device_t *parent);
-extern status_t net_device_publish(net_device_t *device);
+extern void net_device_publish(net_device_t *device);
 
 extern void net_device_class_init(void);

@@ -237,18 +237,14 @@ __export status_t disk_device_create(disk_device_t *device, device_t *parent) {
  * has finished initialization, and then publishes the device for use.
  *
  * @param device        Device to publish.
- *
- * @return              Status code describing the result of the operation.
  */
-__export status_t disk_device_publish(disk_device_t *device) {
+__export void disk_device_publish(disk_device_t *device) {
     device->size = device->block_count * device->block_size;
 
     device_publish(device->node);
 
     /* Scan for partitions. */
     partition_probe(device);
-
-    return STATUS_SUCCESS;
 }
 
 static status_t disk_init(void) {

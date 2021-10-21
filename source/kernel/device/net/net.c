@@ -97,14 +97,9 @@ __export status_t net_device_create(net_device_t *device, device_t *parent) {
  * has finished initialization, and then publishes the device for use.
  *
  * @param device        Device to publish.
- *
- * @return              Status code describing the result of the operation.
  */
-__export status_t net_device_publish(net_device_t *device) {
-    // TODO
-
+__export void net_device_publish(net_device_t *device) {
     device_publish(device->node);
-    return STATUS_SUCCESS;
 }
 
 /** Initialize the network device class. */

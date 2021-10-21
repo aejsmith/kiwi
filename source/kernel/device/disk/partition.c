@@ -86,11 +86,7 @@ static void add_partition(disk_device_t *parent, uint8_t id, uint64_t lba, uint6
     device->parent                   = parent;
     device->offset                   = lba;
 
-    ret = disk_device_publish(&device->disk);
-    if (ret != STATUS_SUCCESS) {
-        disk_device_destroy(&device->disk);
-        return;
-    }
+    disk_device_publish(&device->disk);
 
     device_kprintf(
         parent->node, LOG_NOTICE, "partition %" PRIu8 " @ %" PRIu64 ", %" PRIu64 " MiB (blocks: %" PRIu64 ")\n",

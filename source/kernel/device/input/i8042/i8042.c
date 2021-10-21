@@ -60,10 +60,17 @@
 #define I8042_IRQ_KEYBOARD          1
 #define I8042_IRQ_MOUSE             12
 
+typedef struct i8042_device {
+    input_device_t input;
+} i8042_device_t;
+
+DEFINE_CLASS_CAST(i8042_device, input_device, input);
+
 typedef struct i8042_controller {
-    device_t *device;
-    input_device_t *keyboard;
-    input_device_t *mouse;
+    device_t *node;
+
+    i8042_device_t keyboard;
+    i8042_device_t mouse;
 
     io_region_t io;
 
@@ -89,7 +96,7 @@ static void i8042_wait_data(i8042_controller_t *controller) {
         delay(msecs_to_nsecs(1));
     }
 
-    device_kprintf(controller->device, LOG_WARN, "timed out while waiting for data\n");
+    device_kprintf(controller->node, LOG_WARN, "timed out while waiting for data\n");
 }
 
 /** Reads from the i8042 status port. */
@@ -107,7 +114,7 @@ static void i8042_wait_write(i8042_controller_t *controller) {
         delay(msecs_to_nsecs(1));
     }
 
-    device_kprintf(controller->device, LOG_WARN, "timed out while waiting to write\n");
+    device_kprintf(controller->node, LOG_WARN, "timed out while waiting to write\n");
 }
 
 /** Reads from the i8042 data port. */
@@ -197,7 +204,7 @@ static void i8042_keyboard_irq(unsigned num, void *data) {
             event.type  = type;
             event.value = key;
 
-            input_device_event(controller->keyboard, &event);
+            input_device_event(&controller->keyboard.input, &event);
         }
     }
 }
@@ -205,19 +212,13 @@ static void i8042_keyboard_irq(unsigned num, void *data) {
 static status_t i8042_controller_init(i8042_controller_t *controller) {
     status_t ret;
 
-    controller->keyboard    = NULL;
-    controller->mouse       = NULL;
-    controller->extended    = 0;
-    controller->pause_index = 0;
-    controller->ralt_down   = false;
+    memset(controller, 0, sizeof(*controller));
 
-    ret = device_create_dir("i8042", device_bus_platform_dir, &controller->device);
+    ret = device_create_dir("i8042", device_bus_platform_dir, &controller->node);
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    device_publish(controller->device);
-
-    controller->io = device_pio_map(controller->device, I8042_PORT_BASE, I8042_PORT_COUNT);
+    controller->io = device_pio_map(controller->node, I8042_PORT_BASE, I8042_PORT_COUNT);
     if (controller->io == IO_REGION_INVALID)
         goto err;
 
@@ -236,28 +237,31 @@ static status_t i8042_controller_init(i8042_controller_t *controller) {
     i8042_write_command(controller, I8042_COMMAND_WRITE_CONFIG);
     i8042_write_data(controller, config);
 
-    ret = input_device_create(
-        "keyboard", controller->device, INPUT_DEVICE_KEYBOARD,
-        &controller->keyboard);
+    ret = input_device_create_etc(
+        &controller->keyboard.input, "keyboard", controller->node,
+        INPUT_DEVICE_KEYBOARD);
     if (ret != STATUS_SUCCESS)
         goto err;
 
     ret = device_irq_register(
-        controller->device, I8042_IRQ_KEYBOARD, i8042_keyboard_irq_early,
+        controller->node, I8042_IRQ_KEYBOARD, i8042_keyboard_irq_early,
         i8042_keyboard_irq, controller);
     if (ret != STATUS_SUCCESS)
         goto err;
 
+    device_publish(controller->node);
+    input_device_publish(&controller->keyboard.input);
+
     return STATUS_SUCCESS;
 
 err:
-    if (controller->keyboard)
-        input_device_destroy(controller->keyboard);
+    if (controller->keyboard.input.node)
+        input_device_destroy(&controller->keyboard.input);
 
-    if (controller->mouse)
-        input_device_destroy(controller->mouse);
+    if (controller->mouse.input.node)
+        input_device_destroy(&controller->mouse.input);
 
-    device_destroy(controller->device);
+    device_destroy(controller->node);
     return ret;
 }
 

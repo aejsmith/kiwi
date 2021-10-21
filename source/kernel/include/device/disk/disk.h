@@ -75,4 +75,4 @@ static inline status_t disk_device_destroy(disk_device_t *device) {
 
 extern status_t disk_device_create_etc(disk_device_t *device, const char *name, device_t *parent);
 extern status_t disk_device_create(disk_device_t *device, device_t *parent);
-extern status_t disk_device_publish(disk_device_t *device);
+extern void disk_device_publish(disk_device_t *device);

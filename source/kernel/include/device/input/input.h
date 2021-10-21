@@ -30,6 +30,7 @@
 /** Input device structure. */
 typedef struct input_device {
     device_t *node;                     /**< Device tree node. */
+
     input_device_type_t type;           /**< Type of the device. */
 
     mutex_t clients_lock;               /**< Lock for clients list. */
@@ -38,13 +39,15 @@ typedef struct input_device {
 
 extern void input_device_event(input_device_t *device, input_event_t *event);
 
-extern status_t input_device_create(
-    const char *name, device_t *parent, input_device_type_t type,
-    input_device_t **_device);
-
 /** Destroys an input device.
  * @see                 device_destroy().
  * @param device        Device to destroy. */
 static inline status_t input_device_destroy(input_device_t *device) {
     return device_destroy(device->node);
 }
+
+extern status_t input_device_create_etc(
+    input_device_t *device, const char *name, device_t *parent,
+    input_device_type_t type);
+extern status_t input_device_create(input_device_t *device, device_t *parent, input_device_type_t type);
+extern void input_device_publish(input_device_t *device);

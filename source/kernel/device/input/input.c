@@ -236,40 +236,74 @@ __export void input_device_event(input_device_t *device, input_event_t *event) {
     mutex_unlock(&device->clients_lock);
 }
 
-/** Creates a new input device.
- * @param name          Name of the device.
- * @param parent        Parent device.
- * @param type          Type of the device.
- * @param _device       Where to return created device.
- * @return              Status code describing result of the operation. */
-__export status_t input_device_create(
-    const char *name, device_t *parent, input_device_type_t type,
-    input_device_t **_device)
+static status_t create_input_device(
+    input_device_t *device, const char *name, device_t *parent,
+    input_device_type_t type, module_t *module)
 {
-    input_device_t *device = kmalloc(sizeof(*device), MM_KERNEL);
-
     mutex_init(&device->clients_lock, "input_device_clients_lock", 0);
     list_init(&device->clients);
 
     device->type = type;
 
+    // TODO: Make it possible to set these later and then remove the type
+    // parameter, just have the driver set the field like we do in other drivers.
     device_attr_t attrs[] = {
         { INPUT_DEVICE_ATTR_TYPE, DEVICE_ATTR_INT32, { .int32 = type } },
     };
 
-    status_t ret = device_class_create_device(
+    return device_class_create_device(
         &input_device_class, module_caller(), name, parent, &input_device_ops,
         device, attrs, array_size(attrs), 0, &device->node);
-    if (ret != STATUS_SUCCESS) {
-        kfree(device);
-        return ret;
-    }
+}
 
-    // TODO
+/**
+ * Initializes a new input device. This only creates a device tree node and
+ * initializes some state in the device, the device will not yet be used.
+ * Once the driver has completed initialization, it should call
+ * input_device_publish().
+ *
+ * @param device        Device to initialize.
+ * @param name          Name to give the device node.
+ * @param parent        Parent device node.
+ * @param type          Type of the device.
+ *
+ * @return              Status code describing the result of the operation.
+ */
+__export status_t input_device_create_etc(
+    input_device_t *device, const char *name, device_t *parent,
+    input_device_type_t type)
+{
+    module_t *module = module_caller();
+    return create_input_device(device, name, parent, type, module);
+}
+
+/**
+ * Initializes a new input device. This only creates a device tree node and
+ * initializes some state in the device, the device will not yet be used.
+ * Once the driver has completed initialization, it should call
+ * input_device_publish().
+ *
+ * The device will be named after the module creating the device.
+ *
+ * @param device        Device to initialize.
+ * @param parent        Parent device node (e.g. bus device).
+ * @param type          Type of the device.
+ *
+ * @return              Status code describing the result of the operation.
+ */
+__export status_t input_device_create(input_device_t *device, device_t *parent, input_device_type_t type) {
+    module_t *module = module_caller();
+    return create_input_device(device, module->name, parent, type, module);
+}
+
+/**
+ * Publishes an input device. This completes initialization after the driver
+ * has finished initialization, and then publishes the device for use.
+ *
+ * @param device        Device to publish.
+ */
+__export void input_device_publish(input_device_t *device) {
     device_publish(device->node);
-
-    *_device = device;
-    return STATUS_SUCCESS;
 }
 
 static status_t input_init(void) {

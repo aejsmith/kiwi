@@ -432,9 +432,5 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
         return;
     }
 
-    ret = disk_device_publish(&device->disk);
-    if (ret != STATUS_SUCCESS) {
-        disk_device_destroy(&device->disk);
-        return;
-    }
+    disk_device_publish(&device->disk);
 }

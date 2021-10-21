@@ -350,9 +350,7 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
     /* Notify the device that RX buffers are available. */
     virtio_device_notify(virtio, VIRTIO_NET_QUEUE_RX);
 
-    ret = net_device_publish(&device->net);
-    if (ret != STATUS_SUCCESS)
-        net_device_destroy(&device->net);
+    net_device_publish(&device->net);
 
 #if 0
     {
