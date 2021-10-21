@@ -277,6 +277,8 @@ __export status_t ata_channel_publish(ata_channel_t *channel) {
         return ret;
     }
 
+    device_publish(channel->node);
+
     /* Probe devices. */
     if (channel->device_mask & (1<<0))
         ata_device_detect(channel, 0);

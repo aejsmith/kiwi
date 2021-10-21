@@ -114,11 +114,14 @@ static __init_text void kconsole_device_init(void) {
         { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = "kconsole" } },
     };
 
+    device_t *device;
     status_t ret = device_create(
         "kconsole", device_virtual_dir, &kconsole_device_ops, NULL, attrs,
-        array_size(attrs), NULL);
+        array_size(attrs), &device);
     if (ret != STATUS_SUCCESS)
         fatal("Failed to register kernel console device (%d)", ret);
+
+    device_publish(device);
 }
 
 INITCALL(kconsole_device_init);

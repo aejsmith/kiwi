@@ -133,6 +133,7 @@ typedef struct device {
     refcount_t count;               /**< Number of users of the device. */
     module_t *module;               /**< Module that owns the device. */
     nstime_t time;                  /**< Creation time. */
+    uint32_t flags;                 /**< Device flags. */
 
     /** Device tree linkage. */
     struct device *parent;          /**< Parent tree entry. */
@@ -156,6 +157,11 @@ typedef struct device {
     mutex_t resource_lock;          /**< Lock for resource list. */
     list_t resources;               /**< List of managed resources. */
 } device_t;
+
+/** Device flags. */
+enum {
+    DEVICE_PUBLISHED = (1<<0),      /**< Device is published. */
+};
 
 /** Device resource release callback.
  * @param device        Device that the resource is registered to.
@@ -200,6 +206,8 @@ extern status_t device_alias_etc(
 /** @see device_alias_etc(). */
 #define device_alias(name, parent, dest, _device) \
     device_alias_etc(module_self(), name, parent, dest, _device)
+
+extern void device_publish(device_t *device);
 
 extern status_t device_destroy(device_t *device);
 

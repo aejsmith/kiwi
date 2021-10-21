@@ -289,6 +289,7 @@ static status_t pci_ata_init_device(pci_device_t *pci) {
     }
 
     device_add_kalloc(controller->node, controller);
+    device_publish(controller->node);
 
     device_kprintf(controller->node, LOG_NOTICE, "found PCI ATA controller\n");
 

@@ -37,7 +37,13 @@ status_t device_class_init(device_class_t *class, const char *name) {
     class->name    = name;
     class->next_id = 0;
 
-    return device_create_etc(module_caller(), name, device_class_dir, NULL, NULL, NULL, 0, &class->dir);
+    status_t ret = device_create_etc(module_caller(), name, device_class_dir, NULL, NULL, NULL, 0, &class->dir);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    device_publish(class->dir);
+
+    return STATUS_SUCCESS;
 }
 
 /** Destroys a device class.

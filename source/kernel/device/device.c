@@ -223,6 +223,11 @@ static void device_ctor(device_t *device) {
  * reference on it. The device can have no operations, in which case it will
  * simply act as a container for other devices.
  *
+ * Devices are unpublished when first created. This prevents devices from being
+ * used until they have been fully initialized. The device must be published
+ * with device_publish() after creation once it is safe for the device to be
+ * used.
+ *
  * @param module        Module that owns the device.
  * @param name          Name of device to create (will be copied).
  * @param parent        Parent device. Must not be an alias.
@@ -369,6 +374,10 @@ status_t device_alias_etc(
     device->parent     = parent;
     device->dest       = dest;
 
+    /* Aliases are published, but whether they are actually available depends
+     * on whether the destination is published. */
+    device->flags |= DEVICE_PUBLISHED;
+
     refcount_inc(&parent->count);
     radix_tree_insert(&parent->children, device->name, device);
 
@@ -385,6 +394,18 @@ status_t device_alias_etc(
         *_device = device;
 
     return STATUS_SUCCESS;
+}
+
+/**
+ * Publishes a device. This makes the device, and any published child devices,
+ * available for use.
+ *
+ * @param device        Device to publish.
+ */
+void device_publish(device_t *device) {
+    mutex_lock(&device->lock);
+    device->flags |= DEVICE_PUBLISHED;
+    mutex_unlock(&device->lock);
 }
 
 /**
@@ -411,6 +432,8 @@ status_t device_destroy(device_t *device) {
         mutex_unlock(&device->parent->lock);
         return STATUS_IN_USE;
     }
+
+    device->flags &= ~DEVICE_PUBLISHED;
 
     /* Call the device's destroy operation, if any. */
     if (device->ops && device->ops->destroy)
@@ -660,6 +683,18 @@ void device_iterate(device_t *start, device_iterate_t func, void *data) {
     device_iterate_internal(start, func, data);
 }
 
+/** Test if a device is effectively published (i.e. including all its parents). */
+static bool device_is_published(device_t *device) {
+    while (device) {
+        if (!(device->flags & DEVICE_PUBLISHED))
+            return false;
+
+        device = device->parent;
+    }
+
+    return true;
+}
+
 /** Looks up a device and increase its reference count.
  * @param path          Path to device.
  * @return              Pointer to device if found, NULL if not. */
@@ -669,8 +704,8 @@ static device_t *device_lookup(const char *path) {
     if (!path[0] || path[0] != '/')
         return NULL;
 
-    char *dup  = kstrdup(path, MM_KERNEL);
-    char *orig = dup;
+    char *dup = kstrdup(path, MM_KERNEL);
+    char *orig __cleanup_kfree __unused = dup;
 
     device_t *device = device_root_dir;
     mutex_lock(&device->lock);
@@ -683,23 +718,39 @@ static device_t *device_lookup(const char *path) {
         device_t *child = radix_tree_lookup(&device->children, tok);
         if (!child) {
             mutex_unlock(&device->lock);
-            kfree(orig);
             return NULL;
         }
 
-        /* Move down to the device and then iterate through until we reach an
-         * entry that isn't an alias. */
-        do {
+        /* Move down to the device. */
+        mutex_lock(&child->lock);
+        mutex_unlock(&device->lock);
+        device = child;
+
+        /* If this is an alias, go to the destination. This is guaranteed (by
+         * device_alias()) to not be another alias. */
+        if (device->dest) {
+            child = device->dest;
             mutex_lock(&child->lock);
             mutex_unlock(&device->lock);
             device = child;
-        } while ((child = device->dest));
+
+            /* We must retest if the destination is actually published from
+             * the root (all parents must be published for it to be available),
+             * since we have not gone through the full tree to get to the
+             * destination. */
+            if (!device_is_published(device)) {
+                mutex_unlock(&device->lock);
+                return NULL;
+            }
+        } else if (!(device->flags & DEVICE_PUBLISHED)) {
+            mutex_unlock(&device->lock);
+            return NULL;
+        }
     }
 
     refcount_inc(&device->count);
     mutex_unlock(&device->lock);
 
-    kfree(orig);
     return device;
 }
 
@@ -798,7 +849,10 @@ status_t device_get(device_t *device, uint32_t access, uint32_t flags, object_ha
 
     mutex_lock(&device->lock);
 
-    if (access && !file_access(&device->file, access)) {
+    if (!device_is_published(device)) {
+        ret = STATUS_NOT_FOUND;
+        goto err;
+    } else if (access && !file_access(&device->file, access)) {
         ret = STATUS_ACCESS_DENIED;
         goto err;
     }
@@ -934,8 +988,9 @@ static void dump_children(radix_tree_t *tree, int indent) {
             : "<none>";
 
         kdb_printf(
-            "%*s%-*s %-18p %-16s %-6d %s\n", indent, "",
+            "%*s%-*s %-18p %-16s %c    %-6d %s\n", indent, "",
             24 - indent, device->name, device, device->module->name,
+            (device->flags & DEVICE_PUBLISHED) ? 'Y' : 'N',
             refcount_get(&device->count), dest);
 
         if (!device->dest)
@@ -956,8 +1011,8 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
     }
 
     if (argc == 1) {
-        kdb_printf("Name                     Address            Module           Count  Destination\n");
-        kdb_printf("====                     =======            ======           =====  ===========\n");
+        kdb_printf("Name                     Address            Module           Pub  Count  Destination\n");
+        kdb_printf("====                     =======            ======           ===  =====  ===========\n");
 
         dump_children(&device_root_dir->children, 0);
         return KDB_SUCCESS;
@@ -983,6 +1038,7 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
     kdb_printf("Module:      %s\n", device->module->name);
     kdb_printf("Ops:         %p\n", device->ops);
     kdb_printf("Private:     %p\n", device->private);
+    kdb_printf("Flags:       0x%" PRIx32 "\n", device->flags);
 
     if (!device->attrs)
         return KDB_SUCCESS;
@@ -1077,6 +1133,12 @@ __init_text void device_init(void) {
     ret = device_create_dir("virtual", device_root_dir, &device_virtual_dir);
     if (ret != STATUS_SUCCESS)
         fatal("Could not create standard device directory (%d)", ret);
+
+    device_publish(device_root_dir);
+    device_publish(device_bus_dir);
+    device_publish(device_bus_platform_dir);
+    device_publish(device_class_dir);
+    device_publish(device_virtual_dir);
 
     /* Register the KDB command. */
     kdb_register_command("device", "Examine the device tree.", kdb_cmd_device);

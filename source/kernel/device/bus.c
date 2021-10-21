@@ -38,7 +38,13 @@ status_t bus_init(bus_t *bus, bus_type_t *type) {
 
     bus->type = type;
 
-    return device_create_etc(module_caller(), type->name, device_bus_dir, NULL, NULL, NULL, 0, &bus->dir);
+    status_t ret = device_create_etc(module_caller(), type->name, device_bus_dir, NULL, NULL, NULL, 0, &bus->dir);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    device_publish(bus->dir);
+
+    return ret;
 }
 
 /** Destroys a bus.

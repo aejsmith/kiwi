@@ -243,10 +243,11 @@ __export status_t disk_device_create(disk_device_t *device, device_t *parent) {
 __export status_t disk_device_publish(disk_device_t *device) {
     device->size = device->block_count * device->block_size;
 
+    device_publish(device->node);
+
     /* Scan for partitions. */
     partition_probe(device);
 
-    // TODO: device_publish() when that exists.
     return STATUS_SUCCESS;
 }
 

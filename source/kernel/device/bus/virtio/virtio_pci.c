@@ -184,6 +184,7 @@ static status_t virtio_pci_init_device(pci_device_t *pci) {
     pci_enable_master(pci, true);
 
     /* Search for a driver. */
+    device_publish(device->virtio.bus.node);
     virtio_match_device(&device->virtio);
 
     return STATUS_SUCCESS;

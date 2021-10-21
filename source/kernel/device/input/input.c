@@ -265,6 +265,9 @@ __export status_t input_device_create(
         return ret;
     }
 
+    // TODO
+    device_publish(device->node);
+
     *_device = device;
     return STATUS_SUCCESS;
 }

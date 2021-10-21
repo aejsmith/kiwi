@@ -103,7 +103,7 @@ __export status_t net_device_create(net_device_t *device, device_t *parent) {
 __export status_t net_device_publish(net_device_t *device) {
     // TODO
 
-    // TODO: device_publish() when that exists.
+    device_publish(device->node);
     return STATUS_SUCCESS;
 }
 

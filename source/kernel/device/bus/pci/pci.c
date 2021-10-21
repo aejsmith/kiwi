@@ -531,6 +531,7 @@ static pci_device_t *scan_device(pci_address_t *addr) {
 
     spinlock_unlock(&pci_config_lock);
 
+    device_publish(device->bus.node);
     bus_match_device(&pci_bus, &device->bus);
 
     /* Check for a PCI-to-PCI bridge. */

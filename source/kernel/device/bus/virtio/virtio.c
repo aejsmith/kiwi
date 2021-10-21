@@ -244,7 +244,7 @@ __export void virtio_device_irq(virtio_device_t *device) {
  * Create a new VirtIO device. Called by the transport driver to create the
  * VirtIO device node under the device node on the bus that the device was
  * found on. This does not search for and initialize a driver for the device,
- * this is done by virtio_add_device().
+ * this is done by virtio_match_device().
  *
  * @param parent        Parent device node.
  * @param device        VirtIO device structure created by the transport.

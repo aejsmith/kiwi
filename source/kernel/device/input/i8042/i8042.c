@@ -215,6 +215,8 @@ static status_t i8042_controller_init(i8042_controller_t *controller) {
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    device_publish(controller->device);
+
     controller->io = device_pio_map(controller->device, I8042_PORT_BASE, I8042_PORT_COUNT);
     if (controller->io == IO_REGION_INVALID)
         goto err;

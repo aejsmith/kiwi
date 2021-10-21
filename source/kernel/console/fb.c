@@ -871,11 +871,14 @@ static __init_text void kfb_device_init(void) {
             { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = KFB_DEVICE_CLASS_NAME } },
         };
 
+        device_t *device;
         status_t ret = device_create(
             "kfb", device_virtual_dir, &kfb_device_ops, NULL, attrs,
-            array_size(attrs), NULL);
+            array_size(attrs), &device);
         if (ret != STATUS_SUCCESS)
             fatal("Failed to register kernel FB device (%d)", ret);
+
+        device_publish(device);
     }
 }
 
