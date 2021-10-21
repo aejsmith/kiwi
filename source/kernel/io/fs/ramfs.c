@@ -240,17 +240,17 @@ static status_t ramfs_node_read_dir(file_handle_t *handle, dir_entry_t **_entry)
      */
     const char *name;
     node_id_t id;
-    bool has_parent = handle->entry->parent;
-    if (has_parent && handle->offset == 0) {
+    bool is_unlinked = handle->entry != handle->node->mount->root && !handle->entry->parent;
+    if (!is_unlinked && handle->offset == 0) {
         name = ".";
         id = handle->entry->id;
-    } else if (has_parent && handle->offset == 1) {
+    } else if (!is_unlinked && handle->offset == 1) {
         name = "..";
-        id = handle->entry->parent->id;
+        id = (handle->entry->parent) ? handle->entry->parent->id : handle->entry->id;
     } else {
         name = NULL;
 
-        offset_t i = (has_parent) ? 2 : 0;
+        offset_t i = (!is_unlinked) ? 2 : 0;
         radix_tree_foreach(&handle->entry->entries, iter) {
             fs_dentry_t *child = radix_tree_entry(iter, fs_dentry_t);
 

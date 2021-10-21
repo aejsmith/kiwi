@@ -660,18 +660,18 @@ static status_t fs_lookup_internal(
 
             assert(entry != root_mount->root);
 
-            /* Check for an unlinked entry. We'll return not found if we try to
-             * go up out of this. */
-            if (!entry->parent) {
-                ret = STATUS_NOT_FOUND;
-                goto err_release;
-            }
-
             if (entry == entry->mount->root) {
                 /* We're at the root of the mount. The entry parent pointer is
                  * NULL in this case. Move over onto the mountpoint's parent. */
                 entry = entry->mount->mountpoint->parent;
             } else {
+                /* Check for an unlinked entry. We'll return not found if we try to
+                 * go up out of this. */
+                if (!entry->parent) {
+                    ret = STATUS_NOT_FOUND;
+                    goto err_release;
+                }
+
                 entry = entry->parent;
             }
         } else {
@@ -1053,7 +1053,7 @@ static status_t fs_file_read_dir(file_handle_t *handle, dir_entry_t **_entry) {
         /* This is the '..' entry, and the directory is the root of its mount.
          * Change the node and mount IDs to be those of the mountpoint, if any. */
         if (mount->mountpoint) {
-            entry->id = mount->mountpoint->id;
+            entry->id = mount->mountpoint->parent->id;
             entry->mount = mount->mountpoint->mount->id;
         }
     } else {
