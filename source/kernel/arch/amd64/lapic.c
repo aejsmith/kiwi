@@ -80,7 +80,19 @@ static void lapic_ipi_interrupt(frame_t *frame) {
  * @param nsecs         Number of nanoseconds to tick in. */
 static void lapic_timer_prepare(nstime_t nsecs) {
     uint32_t count = (curr_cpu->arch.lapic_timer_cv * nsecs) >> 32;
-    lapic_write(LAPIC_REG_TIMER_INITIAL, (count == 0 && nsecs != 0) ? 1 : count);
+    lapic_write(LAPIC_REG_TIMER_INITIAL, max(count, 1));
+
+    /*
+     * On VirtualBox, if we just set the initial count, the timer interrupt may
+     * not fire until far later than it should do. In the tests that I did,
+     * after setting the initial count to 1, the interrupt would often not fire
+     * until several hundred microseconds later.
+     *
+     * For reasons unknown, doing this dummy read fixes it. I really don't know
+     * why and no other OS I've looked at seems to do this or have any
+     * documented issues with VirtualBox here... oh well...
+     */
+    lapic_read(LAPIC_REG_TIMER_CURRENT);
 }
 
 /** Local APIC timer device. */
