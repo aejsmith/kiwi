@@ -47,5 +47,5 @@ enum {
 
 extern status_t device_class_create_device(
     device_class_t *class, module_t *module, const char *name, device_t *parent,
-    device_ops_t *ops, void *data, device_attr_t *attrs, size_t count,
+    const device_ops_t *ops, void *data, device_attr_t *attrs, size_t count,
     uint32_t flags, device_t **_device);

@@ -218,7 +218,7 @@ static status_t ata_device_write_blocks(disk_device_t *_device, const void *buf,
     return ata_device_io(device, (void *)buf, lba, count, true);
 }
 
-static disk_device_ops_t ata_device_ops = {
+static const disk_device_ops_t ata_device_ops = {
     .read_blocks  = ata_device_read_blocks,
     .write_blocks = ata_device_write_blocks,
 };

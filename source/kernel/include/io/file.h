@@ -130,7 +130,7 @@ typedef struct file_ops {
 
 /** Header for a file object. */
 typedef struct file {
-    file_ops_t *ops;                    /**< File operations structure. */
+    const file_ops_t *ops;              /**< File operations structure. */
     file_type_t type;                   /**< Type of the file. */
 } file_t;
 

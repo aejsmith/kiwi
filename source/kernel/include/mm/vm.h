@@ -100,7 +100,7 @@ typedef struct vm_region {
     offset_t obj_offset;            /**< Offset into the object. */
     vm_amap_t *amap;                /**< Anonymous map. */
     offset_t amap_offset;           /**< Offset into the anonymous map. */
-    vm_region_ops_t *ops;           /**< Operations provided by the object. */
+    const vm_region_ops_t *ops;     /**< Operations provided by the object. */
     void *private;                  /**< Private data for the object type. */
 
     /** Kernel locking state. */

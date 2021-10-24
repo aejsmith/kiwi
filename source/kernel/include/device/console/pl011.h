@@ -24,5 +24,5 @@
 #include <device/console/serial.h>
 
 #if CONFIG_DEVICE_CONSOLE_PL011
-extern serial_port_ops_t pl011_serial_port_ops;
+extern const serial_port_ops_t pl011_serial_port_ops;
 #endif

@@ -419,7 +419,7 @@ void ipc_kmessage_set_handle(ipc_kmessage_t *msg, object_handle_t *handle) {
  * @return              Status code describing result of the operation.
  */
 status_t ipc_connection_create(
-    unsigned flags, ipc_endpoint_ops_t *ops, void *private,
+    unsigned flags, const ipc_endpoint_ops_t *ops, void *private,
     ipc_endpoint_t **_endpoint, handle_t *_id, handle_t *_uid)
 {
     if (!_uid)

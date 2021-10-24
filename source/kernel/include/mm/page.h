@@ -58,7 +58,7 @@ typedef struct page {
     uint8_t unused: 7;
 
     /** Information about how the page is being used. */
-    page_ops_t *ops;                /**< Operations for the page. */
+    const page_ops_t *ops;          /**< Operations for the page. */
     void *private;                  /**< Private data pointer for the owner. */
     offset_t offset;                /**< Offset into the owner of the page. */
     refcount_t count;               /**< Reference count for use by owner. */

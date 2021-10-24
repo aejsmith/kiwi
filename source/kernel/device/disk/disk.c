@@ -178,7 +178,7 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
     return STATUS_SUCCESS;
 }
 
-device_ops_t disk_device_ops = {
+const device_ops_t disk_device_ops = {
     .type    = FILE_TYPE_BLOCK,
 
     .destroy = disk_device_destroy_impl,

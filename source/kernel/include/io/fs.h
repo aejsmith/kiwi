@@ -131,7 +131,7 @@ typedef struct fs_mount {
     mutex_t lock;                   /**< Lock to protect structure. */
 
     unsigned flags;                 /**< Flags for the mount. */
-    fs_mount_ops_t *ops;            /**< Mount operations. */
+    const fs_mount_ops_t *ops;      /**< Mount operations. */
     void *private;                  /**< Filesystem type private data. */
     struct device *device;          /**< Device that the filesystem resides on. */
     object_handle_t *handle;        /**< Handle to device that the filesystem resides on. */
@@ -301,7 +301,7 @@ typedef struct fs_node {
     node_id_t id;                   /**< ID of the node. */
     atomic_uint32_t flags;          /**< Flags for the node. */
 
-    fs_node_ops_t *ops;             /**< Node operations. */
+    const fs_node_ops_t *ops;       /**< Node operations. */
     void *private;                  /**< Filesystem type private data. */
     fs_mount_t *mount;              /**< Mount that the node resides on. */
 

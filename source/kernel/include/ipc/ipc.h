@@ -85,7 +85,7 @@ typedef struct ipc_endpoint {
     struct ipc_connection *conn;        /**< Connection structure. */
     unsigned flags;                     /**< Behaviour flags for the endpoint. */
 
-    ipc_endpoint_ops_t *ops;            /**< Endpoint operations. */
+    const ipc_endpoint_ops_t *ops;      /**< Endpoint operations. */
     void *private;                      /**< Private data for endpoint owner. */
 
     list_t messages;                    /**< List of queued messages. */
@@ -160,7 +160,7 @@ static inline bool ipc_kmessage_has_attachment(ipc_kmessage_t *msg) {
 }
 
 extern status_t ipc_connection_create(
-    unsigned flags, ipc_endpoint_ops_t *ops, void *private,
+    unsigned flags, const ipc_endpoint_ops_t *ops, void *private,
     ipc_endpoint_t **_endpoint, handle_t *_id, handle_t *_uid);
 extern void ipc_connection_close(ipc_endpoint_t *endpoint);
 extern status_t ipc_connection_send(

@@ -69,7 +69,7 @@ static void memory_file_info(file_handle_t *handle, file_info_t *info) {
 }
 
 /** File operations for a memory-backed file. */
-static file_ops_t memory_file_ops = {
+static const file_ops_t memory_file_ops = {
     .close = memory_file_close,
     .io    = memory_file_io,
     .info  = memory_file_info,

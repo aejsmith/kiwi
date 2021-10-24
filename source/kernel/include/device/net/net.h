@@ -53,7 +53,7 @@ typedef struct net_device {
     device_t *node;                     /**< Device tree node. */
 
     net_device_type_t type;
-    net_device_ops_t *ops;
+    const net_device_ops_t *ops;
 
     /** Hardware address. */
     uint8_t hw_addr[NET_DEVICE_ADDR_MAX];

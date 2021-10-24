@@ -263,7 +263,7 @@ static void pipe_file_info(file_handle_t *handle, file_info_t *info) {
     info->block_size = PAGE_SIZE;
 }
 
-static file_ops_t pipe_file_ops = {
+static const file_ops_t pipe_file_ops = {
     .close    = pipe_file_close,
     .wait     = pipe_file_wait,
     .unwait   = pipe_file_unwait,

@@ -40,7 +40,7 @@ static void net_device_destroy_impl(device_t *node) {
     fatal("TODO");
 }
 
-static device_ops_t net_device_ops = {
+static const device_ops_t net_device_ops = {
     .type    = FILE_TYPE_CHAR,
 
     .destroy = net_device_destroy_impl,

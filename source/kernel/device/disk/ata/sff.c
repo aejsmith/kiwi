@@ -178,7 +178,7 @@ static void ata_sff_channel_write_pio(ata_channel_t *_channel, const void *buf, 
     channel->ops->write_pio(channel, buf, count);
 }
 
-static ata_channel_ops_t ata_sff_channel_ops = {
+static const ata_channel_ops_t ata_sff_channel_ops = {
     .reset       = ata_sff_channel_reset,
     .status      = ata_sff_channel_status,
     .error       = ata_sff_channel_error,

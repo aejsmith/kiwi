@@ -64,8 +64,6 @@ typedef struct i8042_device {
     input_device_t input;
 } i8042_device_t;
 
-DEFINE_CLASS_CAST(i8042_device, input_device, input);
-
 typedef struct i8042_controller {
     device_t *node;
 

@@ -106,7 +106,7 @@ static void pl011_serial_port_write(uint8_t val) {
     pl011_write(PL011_REG_DR, val);
 }
 
-serial_port_ops_t pl011_serial_port_ops = {
+const serial_port_ops_t pl011_serial_port_ops = {
     .early_init = pl011_serial_port_early_init,
     .init       = pl011_serial_port_init,
     .rx_empty   = pl011_serial_port_rx_empty,

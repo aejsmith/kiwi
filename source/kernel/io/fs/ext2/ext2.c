@@ -182,7 +182,7 @@ static status_t ext2_node_read_dir(file_handle_t *handle, dir_entry_t **_entry) 
     return ret;
 }
 
-static fs_node_ops_t ext2_node_ops = {
+static const fs_node_ops_t ext2_node_ops = {
     .free         = ext2_node_free,
     .flush        = ext2_node_flush,
     .create       = ext2_node_create,
@@ -277,7 +277,7 @@ err_put:
     return ret;
 }
 
-static fs_mount_ops_t ext2_mount_ops = {
+static const fs_mount_ops_t ext2_mount_ops = {
     .unmount   = ext2_unmount,
     .flush     = ext2_flush,
     .read_node = ext2_read_node,

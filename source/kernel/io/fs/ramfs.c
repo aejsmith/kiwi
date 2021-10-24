@@ -284,7 +284,7 @@ static status_t ramfs_node_read_dir(file_handle_t *handle, dir_entry_t **_entry)
 }
 
 /** Node operations structure. */
-static fs_node_ops_t ramfs_node_ops = {
+static const fs_node_ops_t ramfs_node_ops = {
     .free         = ramfs_node_free,
     .create       = ramfs_node_create,
     .link         = ramfs_node_link,
@@ -330,7 +330,7 @@ static status_t ramfs_read_node(fs_mount_t *mount, fs_node_t *_node) {
 }
 
 /** Mount operations structure. */
-static fs_mount_ops_t ramfs_mount_ops = {
+static const fs_mount_ops_t ramfs_mount_ops = {
     .unmount   = ramfs_unmount,
     .read_node = ramfs_read_node,
 };

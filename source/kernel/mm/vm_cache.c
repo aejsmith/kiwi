@@ -47,7 +47,7 @@
 #   define dprintf(fmt...)
 #endif
 
-static page_ops_t vm_cache_page_ops;
+static const page_ops_t vm_cache_page_ops;
 
 /** Slab cache for allocating VM cache structures. */
 static slab_cache_t *vm_cache_cache;
@@ -329,7 +329,7 @@ static void vm_cache_release_page(page_t *page) {
 }
 
 /** VM cache page operations. */
-static page_ops_t vm_cache_page_ops = {
+static const page_ops_t vm_cache_page_ops = {
     .flush_page   = vm_cache_flush_page,
     .release_page = vm_cache_release_page,
 };
@@ -340,7 +340,7 @@ static status_t vm_cache_get_page(vm_region_t *region, offset_t offset, page_t *
 }
 
 /** VM region operations for mapping a VM cache. */
-vm_region_ops_t vm_cache_region_ops = {
+const vm_region_ops_t vm_cache_region_ops = {
     .get_page = vm_cache_get_page,
 };
 
@@ -545,7 +545,7 @@ status_t vm_cache_flush(vm_cache_t *cache) {
  * @param ops           Pointer to operations structure (optional).
  * @param data          Implementation-specific data pointer.
  * @return              Pointer to cache structure. */
-vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data) {
+vm_cache_t *vm_cache_create(offset_t size, const vm_cache_ops_t *ops, void *data) {
     vm_cache_t *cache = slab_cache_alloc(vm_cache_cache, MM_KERNEL);
 
     cache->size    = size;

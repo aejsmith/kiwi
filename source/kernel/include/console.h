@@ -74,8 +74,8 @@ typedef struct console_in_ops {
  * while input is handled by the input driver.
  */
 typedef struct console {
-    console_out_ops_t *out;         /**< Output operations. */
-    console_in_ops_t *in;           /**< Input operations. */
+    const console_out_ops_t *out;   /**< Output operations. */
+    const console_in_ops_t *in;     /**< Input operations. */
 } console_t;
 
 extern console_t main_console;

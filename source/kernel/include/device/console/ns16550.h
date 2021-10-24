@@ -24,7 +24,7 @@
 #include <device/console/serial.h>
 
 #if CONFIG_DEVICE_CONSOLE_NS16550
-extern serial_port_ops_t ns16550_serial_port_ops;
+extern const serial_port_ops_t ns16550_serial_port_ops;
 #endif
 
 extern void ns16550_serial_configure(struct kboot_tag_serial *serial, uint32_t clock_rate);

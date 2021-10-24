@@ -74,7 +74,7 @@ typedef struct file_map {
     void *private;                  /**< Implementation-specific private data. */
 } file_map_t;
 
-extern struct vm_cache_ops file_map_vm_cache_ops;
+extern const struct vm_cache_ops file_map_vm_cache_ops;
 
 extern status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *_raw);
 extern void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count);

@@ -103,7 +103,7 @@ out:
 }
 
 /** Kernel console device operations structure. */
-static device_ops_t kconsole_device_ops = {
+static const device_ops_t kconsole_device_ops = {
     .type = FILE_TYPE_CHAR,
     .io   = kconsole_device_io,
 };

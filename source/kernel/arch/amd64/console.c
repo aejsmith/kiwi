@@ -151,7 +151,7 @@ static uint16_t i8042_console_poll(void) {
 }
 
 /** i8042 console input operations. */
-static console_in_ops_t i8042_console_in_ops = {
+static const console_in_ops_t i8042_console_in_ops = {
     .poll = i8042_console_poll,
 };
 

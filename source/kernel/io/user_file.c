@@ -212,7 +212,7 @@ static void user_file_endpoint_close(ipc_endpoint_t *endpoint) {
     mutex_unlock(&file->lock);
 }
 
-static ipc_endpoint_ops_t user_file_endpoint_ops = {
+static const ipc_endpoint_ops_t user_file_endpoint_ops = {
     .receive = user_file_endpoint_receive,
     .close   = user_file_endpoint_close,
 };
@@ -404,7 +404,7 @@ static status_t user_file_request(
     return ret;
 }
 
-static file_ops_t user_file_ops = {
+static const file_ops_t user_file_ops = {
     .open    = user_file_open,
     .close   = user_file_close,
     .io      = user_file_io,

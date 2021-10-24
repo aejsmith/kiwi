@@ -113,7 +113,7 @@ static void pci_ata_channel_write_pio(ata_sff_channel_t *_channel, const void *b
     io_write16s(channel->cmd, ATA_CMD_REG_DATA, (count / 2), (const uint16_t *)buf);
 }
 
-static ata_sff_channel_ops_t pci_ata_channel_ops = {
+static const ata_sff_channel_ops_t pci_ata_channel_ops = {
     .read_ctrl  = pci_ata_channel_read_ctrl,
     .write_ctrl = pci_ata_channel_write_ctrl,
     .read_cmd   = pci_ata_channel_read_cmd,

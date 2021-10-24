@@ -54,7 +54,7 @@ static status_t partition_device_write_blocks(disk_device_t *_device, const void
     return device->parent->ops->write_blocks(device->parent, buf, lba + device->offset, count);
 }
 
-disk_device_ops_t partition_device_ops = {
+const disk_device_ops_t partition_device_ops = {
     .read_blocks  = partition_device_read_blocks,
     .write_blocks = partition_device_write_blocks,
 };

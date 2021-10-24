@@ -65,12 +65,12 @@ typedef struct vm_cache {
     mutex_t lock;                   /**< Lock protecting cache. */
     avl_tree_t pages;               /**< Tree of pages. */
     offset_t size;                  /**< Size of the cache. */
-    vm_cache_ops_t *ops;            /**< Pointer to operations structure. */
+    const vm_cache_ops_t *ops;      /**< Pointer to operations structure. */
     void *data;                     /**< Cache data pointer. */
     bool deleted;                   /**< Whether the cache is destroyed. */
 } vm_cache_t;
 
-extern vm_region_ops_t vm_cache_region_ops;
+extern const vm_region_ops_t vm_cache_region_ops;
 
 extern status_t vm_cache_io(vm_cache_t *cache, struct io_request *request);
 extern status_t vm_cache_read(vm_cache_t *cache, void *buf, size_t size, offset_t offset, size_t *_bytes);
@@ -79,7 +79,7 @@ extern status_t vm_cache_write(vm_cache_t *cache, const void *buf, size_t size, 
 extern void vm_cache_resize(vm_cache_t *cache, offset_t size);
 extern status_t vm_cache_flush(vm_cache_t *cache);
 
-extern vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data);
+extern vm_cache_t *vm_cache_create(offset_t size, const vm_cache_ops_t *ops, void *data);
 extern status_t vm_cache_destroy(vm_cache_t *cache, bool discard);
 
 extern void vm_cache_init(void);

@@ -177,7 +177,7 @@ static status_t virtio_net_device_transmit(net_device_t *_device, net_packet_t *
     return STATUS_SUCCESS;
 }
 
-static net_device_ops_t virtio_net_device_ops = {
+static const net_device_ops_t virtio_net_device_ops = {
     .destroy  = virtio_net_device_destroy,
     .transmit = virtio_net_device_transmit,
 };

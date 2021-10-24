@@ -194,7 +194,7 @@ static status_t device_file_request(
 }
 
 /** Device file operations structure. */
-static file_ops_t device_file_ops = {
+static const file_ops_t device_file_ops = {
     .open    = device_file_open,
     .close   = device_file_close,
     .name    = device_file_name,
@@ -241,8 +241,9 @@ static void device_ctor(device_t *device) {
  * @return              Status code describing result of the operation.
  */
 status_t device_create_etc(
-    module_t *module, const char *name, device_t *parent, device_ops_t *ops,
-    void *private, device_attr_t *attrs, size_t count, device_t **_device)
+    module_t *module, const char *name, device_t *parent,
+    const device_ops_t *ops, void *private, device_attr_t *attrs, size_t count,
+    device_t **_device)
 {
     status_t ret;
 

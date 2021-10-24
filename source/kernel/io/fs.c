@@ -85,7 +85,7 @@
 #define FS_LOOKUP_FOLLOW    (1<<0)      /**< If final path component is a symlink, follow it. */
 #define FS_LOOKUP_LOCK      (1<<1)      /**< Return a locked entry. */
 
-static file_ops_t fs_file_ops;
+static const file_ops_t fs_file_ops;
 
 /** List of registered FS types (protected by fs_mount_lock). */
 static LIST_DEFINE(fs_types);
@@ -1098,7 +1098,7 @@ static status_t fs_file_sync(file_handle_t *handle) {
 }
 
 /** FS file object operations. */
-static file_ops_t fs_file_ops = {
+static const file_ops_t fs_file_ops = {
     .open     = fs_file_open,
     .close    = fs_file_close,
     .name     = fs_file_name,

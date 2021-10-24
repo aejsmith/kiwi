@@ -26,9 +26,9 @@
 #include <device/class.h>
 
 extern device_class_t disk_device_class;
-extern device_ops_t disk_device_ops;
+extern const device_ops_t disk_device_ops;
 
-extern disk_device_ops_t partition_device_ops;
+extern const disk_device_ops_t partition_device_ops;
 
 static inline bool disk_device_is_partition(disk_device_t *device) {
     return device->ops == &partition_device_ops;

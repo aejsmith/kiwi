@@ -36,5 +36,5 @@ typedef struct device_ops {
 struct device {
     handle_t handle;
     device_class_t dev_class;
-    device_ops_t *ops;
+    const device_ops_t *ops;
 };

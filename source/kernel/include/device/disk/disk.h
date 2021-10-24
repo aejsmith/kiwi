@@ -57,7 +57,7 @@ typedef struct disk_device {
     device_t *node;                     /**< Device tree node. */
 
     /** Fields to be filled in by the driver. */
-    disk_device_ops_t *ops;
+    const disk_device_ops_t *ops;
     uint32_t physical_block_size;       /**< Block size of the underlying disk. */
     uint32_t block_size;                /**< Block size used for I/O. */
     uint64_t block_count;               /**< Number of logical blocks on the device. */

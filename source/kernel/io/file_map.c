@@ -224,7 +224,7 @@ status_t file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset
  * VM cache operations using a file map to read/write blocks. The cache's data
  * pointer should be set to a pointer to the file map.
  */
-vm_cache_ops_t file_map_vm_cache_ops = {
+const vm_cache_ops_t file_map_vm_cache_ops = {
     .read_page  = file_map_read_page,
     .write_page = file_map_write_page,
 };

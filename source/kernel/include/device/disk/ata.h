@@ -242,7 +242,7 @@ typedef struct ata_channel {
     device_t *node;
 
     /** Fields to be filled out by channel driver. */
-    ata_channel_ops_t *ops;             /**< Channel operations. */
+    const ata_channel_ops_t *ops;       /**< Channel operations. */
     uint32_t caps;                      /**< Channel capabilities (ATA_CHANNEL_CAP_*). */
 
     /** Internal fields. */
@@ -260,7 +260,7 @@ enum {
 /** Base SFF-style ATA channel structure. */
 typedef struct ata_sff_channel {
     ata_channel_t ata;
-    ata_sff_channel_ops_t *ops;
+    const ata_sff_channel_ops_t *ops;
 } ata_sff_channel_t;
 
 DEFINE_CLASS_CAST(ata_sff_channel, ata_channel, ata);

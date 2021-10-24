@@ -145,7 +145,7 @@ typedef struct device {
     };
 
     /** Operations. */
-    device_ops_t *ops;              /**< Operations structure for the device. */
+    const device_ops_t *ops;        /**< Operations structure for the device. */
     void *private;                  /**< Implementation private data. */
 
     /** Attributes. */
@@ -188,8 +188,9 @@ extern device_t *device_class_dir;
 extern device_t *device_virtual_dir;
 
 extern status_t device_create_etc(
-    module_t *module, const char *name, device_t *parent, device_ops_t *ops,
-    void *private, device_attr_t *attrs, size_t count, device_t **_device);
+    module_t *module, const char *name, device_t *parent,
+    const device_ops_t *ops, void *private, device_attr_t *attrs, size_t count,
+    device_t **_device);
 extern status_t device_alias_etc(
     module_t *module, const char *name, device_t *parent, device_t *dest,
     device_t **_device);

@@ -190,7 +190,7 @@ static status_t input_device_io(device_t *_device, file_handle_t *handle, io_req
     return ret;
 }
 
-static device_ops_t input_device_ops = {
+static const device_ops_t input_device_ops = {
     .type    = FILE_TYPE_CHAR,
     .destroy = input_device_destroy_impl,
     .open    = input_device_open,

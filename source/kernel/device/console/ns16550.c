@@ -145,7 +145,7 @@ static void ns16550_serial_port_write(uint8_t val) {
     ns16550_write(NS16550_REG_THR, val);
 }
 
-serial_port_ops_t ns16550_serial_port_ops = {
+const serial_port_ops_t ns16550_serial_port_ops = {
     .early_init = ns16550_serial_port_early_init,
     .init       = ns16550_serial_port_init,
     .rx_empty   = ns16550_serial_port_rx_empty,

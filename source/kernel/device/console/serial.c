@@ -33,7 +33,7 @@
 #include <console.h>
 #include <kboot.h>
 
-static serial_port_ops_t *serial_ops;
+static const serial_port_ops_t *serial_ops;
 static ansi_parser_t serial_ansi_parser;
 static SPINLOCK_DEFINE(serial_lock);
 
@@ -78,17 +78,17 @@ static uint16_t serial_console_poll(void) {
     return 0;
 }
 
-static console_out_ops_t serial_console_out_ops = {
+static const console_out_ops_t serial_console_out_ops = {
     .init        = serial_console_init,
     .putc        = serial_console_putc,
     .putc_unsafe = serial_console_putc_unsafe,
 };
 
-static console_in_ops_t serial_console_in_ops = {
+static const console_in_ops_t serial_console_in_ops = {
     .poll = serial_console_poll,
 };
 
-static serial_port_ops_t *serial_console_types[] = {
+static const serial_port_ops_t *serial_console_types[] = {
     #if CONFIG_DEVICE_CONSOLE_NS16550
         &ns16550_serial_port_ops,
     #endif

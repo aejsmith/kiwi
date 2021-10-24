@@ -360,7 +360,7 @@ static void fb_console_init(void) {
 }
 
 /** Kernel console output operations structure. */
-static console_out_ops_t fb_console_out_ops = {
+static const console_out_ops_t fb_console_out_ops = {
     .init        = fb_console_init,
     .putc        = fb_console_putc,
     .putc_unsafe = fb_console_putc_unsafe,
@@ -855,7 +855,7 @@ static status_t kfb_device_request(
 }
 
 /** Kernel FB device operations structure. */
-static device_ops_t kfb_device_ops = {
+static const device_ops_t kfb_device_ops = {
     .type    = FILE_TYPE_CHAR,
     .close   = kfb_device_close,
     .wait    = kfb_device_wait,
