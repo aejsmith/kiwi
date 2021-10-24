@@ -104,12 +104,19 @@ static bool ns16550_serial_port_early_init(kboot_tag_serial_t *serial) {
             break;
         #if ARCH_HAS_PIO
         case KBOOT_IO_TYPE_PIO:
-            ns16550_registers      = pio_map(serial->addr, NS16550_REG_COUNT);
+            ns16550_registers       = pio_map(serial->addr, NS16550_REG_COUNT);
             ns16550_registers_shift = 0;
             break;
         #endif
         default:
             return false;
+    }
+
+    /* See if this looks like a 16550. Check for registers that are known 0. */
+    if (ns16550_read(NS16550_REG_IIR) & 0x30 || ns16550_read(NS16550_REG_MCR) & 0xe0) {
+        ns16550_registers      = IO_REGION_INVALID;
+        ns16550_registers_phys = 0;
+        return false;
     }
 
     return true;
@@ -148,7 +155,9 @@ serial_port_ops_t ns16550_serial_port_ops = {
 };
 
 void ns16550_serial_configure(kboot_tag_serial_t *serial, uint32_t clock_rate) {
-    assert(ns16550_registers != IO_REGION_INVALID);
+    if (ns16550_registers == IO_REGION_INVALID)
+        return;
+
     assert(clock_rate != 0);
 
     /* Disable all interrupts, disable the UART while configuring. */
