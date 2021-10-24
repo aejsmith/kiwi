@@ -192,11 +192,11 @@ status_t ata_channel_wait(ata_channel_t *channel, uint32_t flags, uint8_t bits, 
             return STATUS_SUCCESS;
 
         nstime_t step;
-        if (elapsed < 1000) {
-            step = min(timeout, 10);
+        if (elapsed < msecs_to_nsecs(1)) {
+            step = min(timeout, usecs_to_nsecs(10));
             spin(step);
         } else {
-            step = min(timeout, 1000);
+            step = min(timeout, msecs_to_nsecs(1));
             delay(step);
         }
 
