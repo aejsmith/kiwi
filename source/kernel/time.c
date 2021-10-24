@@ -185,9 +185,10 @@ nstime_t boot_time(void) {
 
 /** Prepares next timer tick. */
 static void timer_device_prepare(timer_t *timer) {
-    nstime_t length = timer->target - system_time();
+    nstime_t current = system_time();
+    nstime_t length  = (timer->target > current) ? timer->target - current : 1;
 
-    timer_device->prepare((length > 0) ? length : 1);
+    timer_device->prepare(length);
 }
 
 /** Ensure that the timer device is enabled. */
