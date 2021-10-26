@@ -289,7 +289,6 @@ static status_t pci_ata_init_device(pci_device_t *pci) {
     }
 
     device_add_kalloc(controller->node, controller);
-    device_publish(controller->node);
 
     device_kprintf(controller->node, LOG_NOTICE, "found PCI ATA controller\n");
 
@@ -299,9 +298,11 @@ static status_t pci_ata_init_device(pci_device_t *pci) {
         MMU_ACCESS_RW, MM_KERNEL, &bus_master);
     if (ret != STATUS_SUCCESS) {
         device_kprintf(controller->node, LOG_ERROR, "failed to map bus master BAR: %" PRId32 "\n", ret);
-        kfree(controller);
+        device_destroy(controller->node);
         return ret;
     }
+
+    device_publish(controller->node);
 
     /* Programming interface indicates which mode the channels are in:
      * Bit 0 = Primary native
