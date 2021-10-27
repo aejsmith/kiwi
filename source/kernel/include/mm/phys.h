@@ -46,4 +46,10 @@ extern status_t phys_alloc(
     phys_size_t size, phys_ptr_t align, phys_ptr_t boundary, phys_ptr_t minaddr,
     phys_ptr_t maxaddr, unsigned mmflag, phys_ptr_t *_base);
 extern void phys_free(phys_ptr_t base, phys_size_t size);
+
+extern status_t device_phys_alloc(
+    struct device *device, phys_size_t size, phys_ptr_t align,
+    phys_ptr_t boundary, phys_ptr_t minaddr, phys_ptr_t maxaddr, unsigned mmflag,
+    phys_ptr_t *_base);
+
 extern bool phys_copy(phys_ptr_t dest, phys_ptr_t source, unsigned mmflag);

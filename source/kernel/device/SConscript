@@ -21,6 +21,7 @@ kern_sources += FeatureSources(config, [
     'bus.c',
     'class.c',
     'device.c',
+    'dma.c',
     'io.c',
     'irq.c',
 ])

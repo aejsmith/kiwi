@@ -73,6 +73,8 @@
  *    space. This means that allocation will not overcommit memory.
  */
 
+#include <device/device.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -423,9 +425,6 @@ static page_t *phys_alloc_slowpath(
     if (boundary != 0)
         fatal("TODO: Implement boundary constraint");
 
-    if (!align)
-        align = PAGE_SIZE;
-
     /* Lovely and slow! Scan each page in each physical range to try to find a
      * set of pages that satisfy the allocation. Because we hold the free pages
      * lock, it is guaranteed that no pages will enter or leave the free state
@@ -491,10 +490,13 @@ status_t phys_alloc(
     phys_size_t size, phys_ptr_t align, phys_ptr_t boundary, phys_ptr_t minaddr,
     phys_ptr_t maxaddr, unsigned mmflag, phys_ptr_t *_base)
 {
+    if (align == 0)
+        align = PAGE_SIZE;
+
     assert(size);
     assert(!(size % PAGE_SIZE));
     assert(!(align % PAGE_SIZE));
-    assert(!align || is_pow2(align));
+    assert(is_pow2(align));
     assert(!(boundary % PAGE_SIZE));
     assert(!boundary || is_pow2(boundary));
     assert(!(minaddr % PAGE_SIZE));
@@ -510,7 +512,7 @@ status_t phys_alloc(
 
     /* Single-page allocations with no constraints or only minaddr/maxaddr
      * constraints can be performed quickly. */
-    page_t *pages = (count == 1 && !align && !boundary)
+    page_t *pages = (count == 1 && align <= PAGE_SIZE && boundary == 0)
         ? phys_alloc_fastpath(minaddr, maxaddr)
         : phys_alloc_slowpath(count, align, boundary, minaddr, maxaddr);
     if (unlikely(!pages)) {
@@ -602,6 +604,46 @@ void phys_free(phys_ptr_t base, phys_size_t size) {
     dprintf(
         "page: freed page range [0x%" PRIxPHYS ",0x%" PRIxPHYS ") (list: %u)\n",
         base, base + size, memory_ranges[pages->range].freelist);
+}
+
+typedef struct device_phys_alloc_resource {
+    phys_ptr_t base;
+    phys_size_t size;
+} device_phys_alloc_resource_t;
+
+static void device_phys_alloc_resource_release(device_t *device, void *data) {
+    device_phys_alloc_resource_t *resource = data;
+
+    phys_free(resource->base, resource->size);
+}
+
+/**
+ * Allocates a range of contiguous physical memory, as a device-managed resource
+ * (will be freed when the device is destroyed).
+ *
+ * @see                 phys_alloc().
+ *
+ * @param device        Device to register to.
+ */
+status_t device_phys_alloc(
+    device_t *device, phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
+    phys_ptr_t minaddr, phys_ptr_t maxaddr, unsigned mmflag, phys_ptr_t *_base)
+{
+    phys_ptr_t base;
+    status_t ret = phys_alloc(size, align, boundary, minaddr, maxaddr, mmflag, &base);
+    if (ret == STATUS_SUCCESS) {
+        device_phys_alloc_resource_t *resource = device_resource_alloc(
+            sizeof(device_phys_alloc_resource_t), device_phys_alloc_resource_release, MM_KERNEL);
+
+        resource->base = base;
+        resource->size = size;
+
+        device_resource_register(device, resource);
+
+        *_base = base;
+    }
+
+    return ret;
 }
 
 /** Gets physical memory usage statistics.
