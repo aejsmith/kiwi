@@ -38,6 +38,10 @@
 #include <device/device.h>
 #include <device/dma.h>
 
+#include <lib/string.h>
+#include <lib/utility.h>
+
+#include <assert.h>
 #include <status.h>
 
 static phys_ptr_t dma_to_phys(device_t *device, dma_ptr_t dma) {
@@ -48,6 +52,22 @@ static phys_ptr_t dma_to_phys(device_t *device, dma_ptr_t dma) {
 static dma_ptr_t dma_from_phys(device_t *device, phys_ptr_t phys) {
     // See TODO at top.
     return (dma_ptr_t)phys;
+}
+
+static void get_page_constraints(dma_constraints_t *dest, const dma_constraints_t *source) {
+    if (source) {
+        *dest = *source;
+
+        /* For page allocations we need minimum page alignment. */
+        if (dest->align == 0) {
+            dest->align = PAGE_SIZE;
+        } else {
+            assert(is_pow2(dest->align));
+            dest->align = round_up(dest->align, PAGE_SIZE);
+        }
+    } else {
+        memset(dest, 0, sizeof(*dest));
+    }
 }
 
 /**
@@ -78,9 +98,8 @@ status_t dma_alloc(
     unsigned mmflag, dma_ptr_t *_addr)
 {
     // TODO: Translate constraints to physical.
-    dma_constraints_t constr = {};
-    if (constraints)
-        constr = *constraints;
+    dma_constraints_t constr;
+    get_page_constraints(&constr, constraints);
 
     phys_ptr_t phys;
     status_t ret = phys_alloc(size, constr.align, 0, 0, constr.max_addr, mmflag, &phys);
@@ -113,9 +132,8 @@ status_t device_dma_alloc(
     unsigned mmflag, dma_ptr_t *_addr, void **_mapping)
 {
     // TODO: Translate constraints to physical.
-    dma_constraints_t constr = {};
-    if (constraints)
-        constr = *constraints;
+    dma_constraints_t constr;
+    get_page_constraints(&constr, constraints);
 
     phys_ptr_t phys;
     status_t ret = device_phys_alloc(device, size, constr.align, 0, 0, constr.max_addr, mmflag, &phys);
