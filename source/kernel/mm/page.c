@@ -130,8 +130,8 @@ typedef struct page_queue {
 /** Structure containing a free page list. */
 typedef struct page_freelist {
     list_t pages;                   /**< Pages in the list. */
-    phys_ptr_t minaddr;             /**< Lowest start address contained in the list. */
-    phys_ptr_t maxaddr;             /**< Highest end address contained in the list. */
+    phys_ptr_t min_addr;            /**< Lowest start address contained in the list. */
+    phys_ptr_t max_addr;            /**< Highest end address contained in the list. */
 } page_freelist_t;
 
 /** Page writer settings. */
@@ -368,7 +368,7 @@ page_t *page_copy(page_t *page, unsigned mmflag) {
 }
 
 /** Fast path for phys_alloc() (1 page, only minimum/maximum address). */
-static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
+static page_t *phys_alloc_fastpath(phys_ptr_t min_addr, phys_ptr_t max_addr) {
     /* Maximum of 2 possible partial fits. */
     unsigned partial_fits[2];
     unsigned partial_fit_count = 0;
@@ -377,17 +377,17 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
      * are guaranteed to fit these constraints. */
     for (unsigned i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
         page_freelist_t *list = &free_page_lists[i];
-        if (!list->minaddr && !list->maxaddr)
+        if (!list->min_addr && !list->max_addr)
             continue;
 
-        phys_ptr_t base = max(minaddr, list->minaddr);
-        phys_ptr_t end  = min(maxaddr - 1, list->maxaddr - 1);
+        phys_ptr_t base = max(min_addr, list->min_addr);
+        phys_ptr_t end  = min(max_addr - 1, list->max_addr - 1);
 
-        if (base == list->minaddr && end == (list->maxaddr - 1)) {
+        if (base == list->min_addr && end == (list->max_addr - 1)) {
             /* Exact fit. */
             dprintf(
                 "page: free list %u can satisfy [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
-                i, minaddr, maxaddr);
+                i, min_addr, max_addr);
             if (list_empty(&list->pages))
                 continue;
 
@@ -402,14 +402,14 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
     for (unsigned i = 0; i < partial_fit_count; i++) {
         dprintf(
             "page: free list %u can partially satisfy [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
-            partial_fits[i], minaddr, maxaddr);
+            partial_fits[i], min_addr, max_addr);
 
         /* Check if there are any pages that can fit. */
         page_freelist_t *list = &free_page_lists[partial_fits[i]];
         list_foreach(&list->pages, iter) {
             page_t *page = list_entry(iter, page_t, header);
 
-            if (page->addr >= minaddr && (!maxaddr || page->addr < maxaddr))
+            if (page->addr >= min_addr && (!max_addr || page->addr < max_addr))
                 return page;
         }
     }
@@ -419,8 +419,8 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 
 /** Slow path for phys_alloc(). */
 static page_t *phys_alloc_slowpath(
-    page_num_t count, phys_ptr_t align, phys_ptr_t boundary, phys_ptr_t minaddr,
-    phys_ptr_t maxaddr)
+    page_num_t count, phys_ptr_t align, phys_ptr_t boundary, phys_ptr_t min_addr,
+    phys_ptr_t max_addr)
 {
     if (boundary != 0)
         fatal("TODO: Implement boundary constraint");
@@ -434,8 +434,8 @@ static page_t *phys_alloc_slowpath(
         page_num_t total = 0;
 
         /* Check if this range contains pages in the requested range. */
-        phys_ptr_t match_start = max(minaddr, range->start);
-        phys_ptr_t match_end   = min(maxaddr - 1, range->end - 1);
+        phys_ptr_t match_start = max(min_addr, range->start);
+        phys_ptr_t match_end   = min(max_addr - 1, range->end - 1);
         if (match_end <= match_start)
             continue;
 
@@ -479,16 +479,18 @@ static page_t *phys_alloc_slowpath(
  * @param size          Size of the range to allocate.
  * @param align         Required alignment of the range (power of 2).
  * @param boundary      Boundary that the range cannot cross (power of 2).
- * @param minaddr       Minimum start address of the range.
- * @param maxaddr       Maximum end address of the range.
+ * @param min_addr      Minimum start address of the range.
+ * @param max_addr      Maximum end address of the range.
  * @param mmflag        Allocation behaviour flags.
  * @param _base         Where to store address of the allocation on success.
  *
- * @return              Status code describing the result of the operation.
+ * @return              Status code describing the result of the operation. This
+ *                      cannot fail if MM_WAIT is set.
  */
 status_t phys_alloc(
-    phys_size_t size, phys_ptr_t align, phys_ptr_t boundary, phys_ptr_t minaddr,
-    phys_ptr_t maxaddr, unsigned mmflag, phys_ptr_t *_base)
+    phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
+    phys_ptr_t min_addr, phys_ptr_t max_addr, unsigned mmflag,
+    phys_ptr_t *_base)
 {
     if (align == 0)
         align = PAGE_SIZE;
@@ -499,9 +501,9 @@ status_t phys_alloc(
     assert(is_pow2(align));
     assert(!(boundary % PAGE_SIZE));
     assert(!boundary || is_pow2(boundary));
-    assert(!(minaddr % PAGE_SIZE));
-    assert(!(maxaddr % PAGE_SIZE));
-    assert(!(minaddr && maxaddr) || maxaddr > minaddr);
+    assert(!(min_addr % PAGE_SIZE));
+    assert(!(max_addr % PAGE_SIZE));
+    assert(!(min_addr && max_addr) || max_addr > min_addr);
     assert((mmflag & (MM_WAIT | MM_ATOMIC)) != (MM_WAIT | MM_ATOMIC));
 
     /* Work out how many pages we need to allocate. */
@@ -510,11 +512,11 @@ status_t phys_alloc(
     preempt_disable();
     mutex_lock(&free_page_lock);
 
-    /* Single-page allocations with no constraints or only minaddr/maxaddr
+    /* Single-page allocations with no constraints or only min_addr/max_addr
      * constraints can be performed quickly. */
     page_t *pages = (count == 1 && align <= PAGE_SIZE && boundary == 0)
-        ? phys_alloc_fastpath(minaddr, maxaddr)
-        : phys_alloc_slowpath(count, align, boundary, minaddr, maxaddr);
+        ? phys_alloc_fastpath(min_addr, max_addr)
+        : phys_alloc_slowpath(count, align, boundary, min_addr, max_addr);
     if (unlikely(!pages)) {
         if (mmflag & MM_BOOT) {
             fatal("Unable to satisfy boot allocation of %zu page(s)", count);
@@ -627,10 +629,10 @@ static void device_phys_alloc_resource_release(device_t *device, void *data) {
  */
 status_t device_phys_alloc(
     device_t *device, phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
-    phys_ptr_t minaddr, phys_ptr_t maxaddr, unsigned mmflag, phys_ptr_t *_base)
+    phys_ptr_t min_addr, phys_ptr_t max_addr, unsigned mmflag, phys_ptr_t *_base)
 {
     phys_ptr_t base;
-    status_t ret = phys_alloc(size, align, boundary, minaddr, maxaddr, mmflag, &base);
+    status_t ret = phys_alloc(size, align, boundary, min_addr, max_addr, mmflag, &base);
     if (ret == STATUS_SUCCESS) {
         device_phys_alloc_resource_t *resource = device_resource_alloc(
             sizeof(device_phys_alloc_resource_t), device_phys_alloc_resource_release, MM_KERNEL);
@@ -733,14 +735,14 @@ __init_text void page_add_memory_range(phys_ptr_t start, phys_ptr_t end, unsigne
     total_page_count += (end - start) / PAGE_SIZE;
 
     /* Update the freelist to include this range. */
-    if (!list->minaddr && !list->maxaddr) {
-        list->minaddr = start;
-        list->maxaddr = end;
+    if (!list->min_addr && !list->max_addr) {
+        list->min_addr = start;
+        list->max_addr = end;
     } else {
-        if (start < list->minaddr)
-            list->minaddr = start;
-        if (end > list->maxaddr)
-            list->maxaddr = end;
+        if (start < list->min_addr)
+            list->min_addr = start;
+        if (end > list->max_addr)
+            list->max_addr = end;
     }
 
     /* If we're contiguous with the previously recorded range (if any) and have
@@ -802,8 +804,8 @@ __init_text void page_early_init(void) {
     }
     for (unsigned i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
         list_init(&free_page_lists[i].pages);
-        free_page_lists[i].minaddr = 0;
-        free_page_lists[i].maxaddr = 0;
+        free_page_lists[i].min_addr = 0;
+        free_page_lists[i].max_addr = 0;
     }
 
     /* First step is to call into arch-specific code to parse the memory map
@@ -832,11 +834,11 @@ __init_text void page_early_init(void) {
          * the lowest priority (highest index) list. */
         for (unsigned i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
             page_freelist_t *list = &free_page_lists[i];
-            if (!list->minaddr && !list->maxaddr)
+            if (!list->min_addr && !list->max_addr)
                 continue;
 
-            if (range->start <= (list->maxaddr - 1) &&
-                list->minaddr <= (range->start + range->size - 1))
+            if (range->start <= (list->max_addr - 1) &&
+                list->min_addr <= (range->start + range->size - 1))
             {
                 boot_ranges[boot_range_count].freelist = i;
             }
@@ -864,7 +866,7 @@ __init_text void page_init(void) {
     for (size_t i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
         kprintf(
             LOG_NOTICE, " %u: 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS "\n",
-            i, free_page_lists[i].minaddr, free_page_lists[i].maxaddr);
+            i, free_page_lists[i].min_addr, free_page_lists[i].max_addr);
     }
 
     /* Determine how much space we need for the page database. */
