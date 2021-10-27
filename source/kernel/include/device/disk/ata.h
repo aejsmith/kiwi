@@ -31,6 +31,7 @@
 #pragma once
 
 #include <device/device.h>
+#include <device/dma.h>
 
 #include <sync/mutex.h>
 
@@ -244,6 +245,7 @@ typedef struct ata_channel {
     /** Fields to be filled out by channel driver. */
     const ata_channel_ops_t *ops;       /**< Channel operations. */
     uint32_t caps;                      /**< Channel capabilities (ATA_CHANNEL_CAP_*). */
+    dma_constraints_t dma_constraints;  /**< DMA constraints (if ATA_CHANNEL_CAP_DMA set). */
 
     /** Internal fields. */
     mutex_t command_lock;               /**< Lock to gain exclusive use of the channel. */

@@ -161,6 +161,9 @@ static void add_channel(pci_ata_channel_t *channel, const char *mode) {
     channel->sff.ata.caps = ATA_CHANNEL_CAP_PIO | ATA_CHANNEL_CAP_DMA | ATA_CHANNEL_CAP_SLAVE;
     channel->sff.ops      = &pci_ata_channel_ops;
 
+    /* We are only capable of 32-bit DMA. */
+    channel->sff.ata.dma_constraints.max_addr = DMA_MAX_ADDR_32BIT - PAGE_SIZE;
+
     device_kprintf(
         channel->sff.ata.node, LOG_NOTICE, "%s mode (cmd: %pR, ctrl: %pR, bus_master: %pR)\n",
         mode, channel->cmd, channel->ctrl, channel->bus_master);

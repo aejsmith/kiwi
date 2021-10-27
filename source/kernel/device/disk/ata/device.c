@@ -74,9 +74,9 @@ static const uint8_t transfer_commands[2][2][2] = {
 
 static status_t ata_device_begin_transfer(
     ata_device_t *device, void *buf, uint64_t lba, size_t count, bool write,
-    size_t *_transfer_count, bool *_dma)
+    size_t *_transfer_count, bool *_is_dma)
 {
-    bool dma = false;//device->caps & ATA_DEVICE_CAP_DMA
+    bool is_dma = false;//device->caps & ATA_DEVICE_CAP_DMA
 
     if (lba < LBA28_MAX_BLOCK) {
         /* Check how many blocks we can transfer. */
@@ -85,7 +85,7 @@ static status_t ata_device_begin_transfer(
         if (count > 256)
             count = 256;
 
-        if (dma) {
+        if (is_dma) {
             /* Prepare the DMA transfer. */
             // TODO
             //ret = ata_channel_prepare_dma(device->channel, buf, count * device->block_size, write);
@@ -97,7 +97,7 @@ static status_t ata_device_begin_transfer(
 
         /* Start the transfer. */
         device->channel->ops->lba28_setup(device->channel, device->num, lba, count);
-        ata_channel_command(device->channel, transfer_commands[write][false][dma]);
+        ata_channel_command(device->channel, transfer_commands[write][false][is_dma]);
     } else if (lba < LBA48_MAX_BLOCK) {
         if (!(device->caps & ATA_DEVICE_CAP_LBA48)) {
             device_kprintf(
@@ -115,7 +115,7 @@ static status_t ata_device_begin_transfer(
         if (count > 256)
             count = 256;
 
-        if (dma) {
+        if (is_dma) {
             /* Prepare the DMA transfer. */
             // TODO
             //ret = ata_channel_prepare_dma(device->channel, buf, count * device->block_size, write);
@@ -127,19 +127,22 @@ static status_t ata_device_begin_transfer(
 
         /* Start the transfer. */
         device->channel->ops->lba48_setup(device->channel, device->num, lba, count);
-        ata_channel_command(device->channel, transfer_commands[write][true][dma]);
+        ata_channel_command(device->channel, transfer_commands[write][true][is_dma]);
     } else {
         device_kprintf(device->disk.node, LOG_WARN, "attempted out of range transfer (%" PRIu64 ")\n", lba);
         return STATUS_DEVICE_ERROR;
     }
 
     *_transfer_count = count;
-    *_dma            = dma;
+    *_is_dma         = is_dma;
 
     return STATUS_SUCCESS;
 }
 
-static status_t ata_device_io(ata_device_t *device, void *buf, uint64_t lba, size_t count, bool write) {
+static status_t ata_device_io(
+    ata_device_t *device, void *buf, dma_ptr_t dma, uint64_t lba, size_t count,
+    bool write)
+{
     status_t ret;
 
     ret = ata_channel_begin_command(device->channel, device->num);
@@ -148,12 +151,12 @@ static status_t ata_device_io(ata_device_t *device, void *buf, uint64_t lba, siz
 
     while (count > 0) {
         size_t transfer_count;
-        bool dma;
-        ret = ata_device_begin_transfer(device, buf, lba, count, write, &transfer_count, &dma);
+        bool is_dma;
+        ret = ata_device_begin_transfer(device, buf, lba, count, write, &transfer_count, &is_dma);
         if (ret != STATUS_SUCCESS)
             goto out;
 
-        if (dma) {
+        if (is_dma) {
             /* Start the DMA transfer and wait for it to finish. */
             // TODO
             //if (!ata_channel_perform_dma(device->channel)) {
@@ -206,16 +209,22 @@ out:
     return ret;
 }
 
-static status_t ata_device_read_blocks(disk_device_t *_device, void *buf, uint64_t lba, size_t count) {
+static status_t ata_device_read_blocks(
+    disk_device_t *_device, void *buf, dma_ptr_t dma, uint64_t lba,
+    size_t count)
+{
     ata_device_t *device = cast_ata_device(_device);
 
-    return ata_device_io(device, buf, lba, count, false);
+    return ata_device_io(device, buf, dma, lba, count, false);
 }
 
-static status_t ata_device_write_blocks(disk_device_t *_device, const void *buf, uint64_t lba, size_t count) {
+static status_t ata_device_write_blocks(
+    disk_device_t *_device, const void *buf, dma_ptr_t dma, uint64_t lba,
+    size_t count)
+{
     ata_device_t *device = cast_ata_device(_device);
 
-    return ata_device_io(device, (void *)buf, lba, count, true);
+    return ata_device_io(device, (void *)buf, dma, lba, count, true);
 }
 
 static const disk_device_ops_t ata_device_ops = {
@@ -423,14 +432,18 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 
     device_add_kalloc(device->disk.node, device);
 
-    device->disk.ops = &ata_device_ops;
-    device->channel  = channel;
-    device->num      = num;
+    device->disk.ops             = &ata_device_ops;
+    device->disk.dma_constraints = channel->dma_constraints;
+    device->channel              = channel;
+    device->num                  = num;
 
     if (!process_id(device, id)) {
         disk_device_destroy(&device->disk);
         return;
     }
+
+    if (device->caps & ATA_DEVICE_CAP_DMA)
+        device->disk.flags |= DISK_DEVICE_DMA;
 
     disk_device_publish(&device->disk);
 }

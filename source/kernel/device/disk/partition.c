@@ -36,22 +36,28 @@ typedef struct partition_device {
 
 DEFINE_CLASS_CAST(partition_device, disk_device, disk);
 
-static status_t partition_device_read_blocks(disk_device_t *_device, void *buf, uint64_t lba, size_t count) {
+static status_t partition_device_read_blocks(
+    disk_device_t *_device, void *buf, dma_ptr_t dma, uint64_t lba,
+    size_t count)
+{
     partition_device_t *device = cast_partition_device(_device);
 
     if (!device->parent->ops->read_blocks)
         return STATUS_NOT_SUPPORTED;
 
-    return device->parent->ops->read_blocks(device->parent, buf, lba + device->offset, count);
+    return device->parent->ops->read_blocks(device->parent, buf, dma, lba + device->offset, count);
 }
 
-static status_t partition_device_write_blocks(disk_device_t *_device, const void *buf, uint64_t lba, size_t count) {
+static status_t partition_device_write_blocks(
+    disk_device_t *_device, const void *buf, dma_ptr_t dma, uint64_t lba,
+    size_t count)
+{
     partition_device_t *device = cast_partition_device(_device);
 
     if (!device->parent->ops->write_blocks)
         return STATUS_NOT_SUPPORTED;
 
-    return device->parent->ops->write_blocks(device->parent, buf, lba + device->offset, count);
+    return device->parent->ops->write_blocks(device->parent, buf, dma, lba + device->offset, count);
 }
 
 const disk_device_ops_t partition_device_ops = {
@@ -83,6 +89,8 @@ static void add_partition(disk_device_t *parent, uint8_t id, uint64_t lba, uint6
     device->disk.physical_block_size = parent->physical_block_size;
     device->disk.block_size          = parent->block_size;
     device->disk.block_count         = blocks;
+    device->disk.flags               = parent->flags;
+    device->disk.dma_constraints     = parent->dma_constraints;
     device->parent                   = parent;
     device->offset                   = lba;
 
