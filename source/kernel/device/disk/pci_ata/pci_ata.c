@@ -248,7 +248,7 @@ static void add_channel(pci_ata_channel_t *channel, const char *mode) {
         channel->sff.ata.caps |= ATA_CHANNEL_CAP_DMA;
 
         /* We are only capable of 32-bit DMA. */
-        channel->sff.ata.dma_constraints.max_addr = DMA_MAX_ADDR_32BIT - PAGE_SIZE;
+        channel->sff.ata.dma_constraints.max_addr = DMA_MAX_ADDR_32BIT;
         channel->sff.ata.dma_max_region_size      = PRDT_MAX_REGION_SIZE;
         channel->sff.ata.dma_max_region_count     = PRDT_ENTRIES;
     }
