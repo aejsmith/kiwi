@@ -349,7 +349,7 @@ typedef struct ext4_extent_header {
  */
 
 /** Define to enable debug output. */
-#define DEBUG_EXT2
+//#define DEBUG_EXT2
 
 #ifdef DEBUG_EXT2
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
