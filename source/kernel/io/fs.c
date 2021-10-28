@@ -52,11 +52,14 @@
 #include <device/device.h>
 
 #include <io/fs.h>
+#include <io/memory_file.h>
 #include <io/request.h>
 
 #include <lib/string.h>
+#include <lib/tar.h>
 
 #include <mm/malloc.h>
+#include <mm/phys.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
@@ -80,6 +83,8 @@
 #else
 #   define dprintf(fmt...)
 #endif
+
+KBOOT_BOOLEAN_OPTION("force_fsimage", "Force filesystem image usage", false);
 
 /** Filesystem lookup behaviour flags. */
 #define FS_LOOKUP_FOLLOW    (1<<0)      /**< If final path component is a symlink, follow it. */
@@ -1326,13 +1331,13 @@ static void free_mount_opts(fs_mount_option_t *opts, size_t count) {
     kfree(opts);
 }
 
-static fs_type_t *probe_fs_type(device_t *device, object_handle_t *handle) {
+static fs_type_t *probe_fs_type(device_t *device, object_handle_t *handle, const char *uuid) {
     list_foreach(&fs_types, iter) {
         fs_type_t *type = list_entry(iter, fs_type_t, header);
 
         if (!type->probe) {
             continue;
-        } else if (type->probe(device, handle, NULL)) {
+        } else if (type->probe(device, handle, uuid)) {
             return type;
         }
     }
@@ -1445,7 +1450,7 @@ status_t fs_mount(
         assert(mount->device);
 
         if (!type) {
-            mount->type = probe_fs_type(mount->device, mount->handle);
+            mount->type = probe_fs_type(mount->device, mount->handle, NULL);
             if (!mount->type) {
                 ret = STATUS_UNKNOWN_FS;
                 goto err_free_mount;
@@ -2268,6 +2273,100 @@ __init_text void fs_init(void) {
         "node",
         "Display information about a filesystem node.",
         kdb_cmd_node);
+}
+
+static int mount_root_device_iterate_cb(device_t *device, void *_tag) {
+    kboot_tag_bootdev_t *tag = _tag;
+    status_t ret;
+
+    object_handle_t *handle __cleanup_object_handle = NULL;
+    ret = device_get(device, FILE_ACCESS_READ, 0, &handle);
+    if (ret == STATUS_SUCCESS) {
+        fs_type_t *type = probe_fs_type(device, handle, (const char *)tag->fs.uuid);
+        if (type) {
+            char *path __cleanup_kfree = device_path(device);
+            ret = fs_mount(path, "/", type->name, 0, NULL);
+            if (ret != STATUS_SUCCESS)
+                kprintf(LOG_ERROR, "fs: failed to mount root %s filesystem on %s: %d\n", type->name, path, ret);
+
+            return DEVICE_ITERATE_END;
+        }
+    }
+
+    return DEVICE_ITERATE_DESCEND;
+}
+
+static void mount_root_device(kboot_tag_bootdev_t *tag) {
+    status_t ret;
+
+    kprintf(LOG_NOTICE, "fs: searching for root filesystem with UUID %s\n", tag->fs.uuid);
+
+    /* Iterate through disk devices to find a device containing a filesystem
+     * matching the boot device. */
+    object_handle_t *handle __cleanup_object_handle = NULL;
+    ret = device_open("/class/disk", FILE_ACCESS_READ, 0, &handle);
+    if (ret != STATUS_SUCCESS) {
+        kprintf(LOG_ERROR, "fs: failed to open /class/disk: %d\n", ret);
+        return;
+    }
+
+    device_t *device = device_from_handle(handle);
+    device_iterate(device, mount_root_device_iterate_cb, tag);
+}
+
+static void mount_root_fsimage(void) {
+    status_t ret;
+
+    kboot_tag_foreach(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
+        const char *name        = kboot_tag_data(tag, 0);
+        void *mapping           = phys_map(tag->addr, tag->size, MM_BOOT);
+        object_handle_t *handle = memory_file_create(mapping, tag->size);
+
+        if (!root_mount) {
+            /* Mount a ramfs if this is the first image. */
+            ret = fs_mount(NULL, "/", "ramfs", 0, NULL);
+            if (ret != STATUS_SUCCESS)
+                fatal("Could not mount ramfs for root (%d)", ret);
+        }
+
+        ret = tar_extract(handle, "/");
+
+        object_handle_release(handle);
+        phys_unmap(mapping, tag->size, true);
+
+        if (ret == STATUS_UNKNOWN_IMAGE) {
+            continue;
+        } else if (ret != STATUS_SUCCESS) {
+            fatal("Failed to load FS image %s (%d)", name, ret);
+        }
+    }
+}
+
+/** Try to find the root filesystem. */
+__init_text void fs_mount_root(void) {
+    if (!kboot_boolean_option("force_fsimage")) {
+        /* Look for the KBoot boot device. */
+        kboot_tag_bootdev_t *tag = kboot_tag_iterate(KBOOT_TAG_BOOTDEV, NULL);
+        if (tag) {
+            switch (tag->type) {
+                case KBOOT_BOOTDEV_FS:
+                    mount_root_device(tag);
+                    break;
+                default:
+                    kprintf(LOG_ERROR, "fs: unsupported KBoot boot device type\n");
+                    break;
+            }
+        }
+    }
+
+    if (!root_mount) {
+        /* If we didn't find a device or want to use the FS image, load any
+         * images supplied. */
+        mount_root_fsimage();
+    }
+
+    if (!root_mount)
+        fatal("Could not find root filesystem");
 }
 
 /** Shut down the filesystem layer. */

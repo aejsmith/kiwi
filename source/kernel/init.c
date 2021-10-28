@@ -23,18 +23,15 @@
 #include <device/irq.h>
 
 #include <io/fs.h>
-#include <io/memory_file.h>
 
 #include <ipc/ipc.h>
 
 #include <lib/string.h>
-#include <lib/tar.h>
 
 #include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
-#include <mm/phys.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
 
@@ -181,46 +178,16 @@ static void init_thread(void *arg1, void *arg2) {
     /* Load modules loaded by KBoot. */
     module_init();
 
-    /* Load any FS images supplied. Wait until after loading kernel modules to
-     * do FS images, so that we only load FS images if the boot filesystem could
-     * not be mounted. */
-    if (!root_mount) {
-        /* Mount a ramfs at the root to extract the images to. */
-        ret = fs_mount(NULL, "/", "ramfs", 0, NULL);
-        if (ret != STATUS_SUCCESS)
-            fatal("Could not mount ramfs for root (%d)", ret);
+    update_boot_progress(20);
 
-        /* Search the KBoot module list for any filesystem images. */
-        size_t count = 0;
-        kboot_tag_foreach(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
-            const char *name        = kboot_tag_data(tag, 0);
-            void *mapping           = phys_map(tag->addr, tag->size, MM_BOOT);
-            object_handle_t *handle = memory_file_create(mapping, tag->size);
-
-            ret = tar_extract(handle, "/");
-
-            object_handle_release(handle);
-            phys_unmap(mapping, tag->size, true);
-
-            if (ret == STATUS_UNKNOWN_IMAGE) {
-                continue;
-            } else if (ret != STATUS_SUCCESS) {
-                fatal("Failed to load FS image %s (%d)", name, ret);
-            }
-
-            count++;
-        }
-
-        /* If there were no images, there's not much we can do. */
-        if (!count)
-            fatal("Could not find root filesystem");
-    }
+    /* Mount the root filesystem. */
+    fs_mount_root();
 
     /* Reclaim memory taken up by initialization code/data. */
     page_late_init();
     kmem_late_init();
 
-    update_boot_progress(20);
+    update_boot_progress(30);
 
     /* Run the service manager. */
     const char *args[] = { "/system/services/service_manager", NULL };

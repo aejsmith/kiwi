@@ -403,4 +403,5 @@ extern status_t fs_sync(void);
  */
 
 extern void fs_init(void);
+extern void fs_mount_root(void);
 extern void fs_shutdown(void);

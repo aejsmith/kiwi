@@ -674,6 +674,9 @@ static bool device_iterate_internal(device_t *device, device_iterate_t func, voi
  * Iterates through the device tree. The specified function will be called on a
  * device and all its children (and all their children, etc).
  *
+ * @todo                This function is really unsafe since it doesn't do any
+ *                      locking or reference counting...
+ *
  * @param start         Starting device.
  * @param func          Function to call on devices.
  * @param data          Data argument to pass to function.
