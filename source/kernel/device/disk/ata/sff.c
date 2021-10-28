@@ -178,6 +178,32 @@ static void ata_sff_channel_write_pio(ata_channel_t *_channel, const void *buf, 
     channel->ops->write_pio(channel, buf, count);
 }
 
+static status_t ata_sff_channel_prepare_dma(
+    ata_channel_t *_channel, const ata_dma_region_t *regions, size_t count,
+    bool is_write)
+{
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+    return channel->ops->prepare_dma(channel, regions, count, is_write);
+}
+
+static void ata_sff_channel_start_dma(ata_channel_t *_channel) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+
+    /* Enable interrupts. */
+    channel->ops->write_ctrl(channel, ATA_CTRL_REG_DEV_CTRL, 0);
+
+    channel->ops->start_dma(channel);
+}
+
+static status_t ata_sff_channel_finish_dma(ata_channel_t *_channel) {
+    ata_sff_channel_t *channel = cast_ata_sff_channel(_channel);
+
+    /* Disable interrupts. */
+    channel->ops->write_ctrl(channel, ATA_CTRL_REG_DEV_CTRL, ATA_DEV_CTRL_NIEN);
+
+    return channel->ops->finish_dma(channel);
+}
+
 static const ata_channel_ops_t ata_sff_channel_ops = {
     .reset       = ata_sff_channel_reset,
     .status      = ata_sff_channel_status,
@@ -190,6 +216,9 @@ static const ata_channel_ops_t ata_sff_channel_ops = {
     .lba48_setup = ata_sff_channel_lba48_setup,
     .read_pio    = ata_sff_channel_read_pio,
     .write_pio   = ata_sff_channel_write_pio,
+    .prepare_dma = ata_sff_channel_prepare_dma,
+    .start_dma   = ata_sff_channel_start_dma,
+    .finish_dma  = ata_sff_channel_finish_dma,
 };
 
 /** Initializes a new SFF-style ATA channel.

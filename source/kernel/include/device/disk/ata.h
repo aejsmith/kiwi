@@ -34,6 +34,7 @@
 #include <device/dma.h>
 
 #include <sync/mutex.h>
+#include <sync/semaphore.h>
 
 #define ATA_MODULE_NAME "ata"
 
@@ -128,6 +129,12 @@ enum {
  * ATA driver interface.
  */
 
+/** Structure containing DMA transfer parameters. */
+typedef struct ata_dma_region {
+    dma_ptr_t addr;                     /**< Physical destination address. */
+    phys_size_t size;                   /**< Number of bytes to transfer. */
+} ata_dma_region_t;
+
 /** Operations for an ATA channel. */
 typedef struct ata_channel_ops {
     /** Resets the channel.
@@ -197,6 +204,40 @@ typedef struct ata_channel_ops {
      * @param buf           Buffer to write from.
      * @param count         Number of bytes to write. */
     void (*write_pio)(struct ata_channel *channel, const void *buf, size_t count);
+
+    /**
+     * Operations required on channels supporting DMA.
+     */
+
+    /** Prepares a DMA transfer.
+     * @param channel       Channel to perform DMA on.
+     * @param regions       Array of transfer regions. This is guaranteed to
+     *                      conform to the constraints specified in the channel.
+     * @param count         Number of array entries.
+     * @param is_write      Whether the transfer is a write.
+     * @return              Status code describing result of operation. */
+    status_t (*prepare_dma)(
+        struct ata_channel *channel, const ata_dma_region_t *regions,
+        size_t count, bool is_write);
+
+    /**
+     * Starts a DMA transfer. This should cause an interrupt to be raised once
+     * the transfer is complete.
+     *
+     * @param channel       Channel to start on.
+     */
+    void (*start_dma)(struct ata_channel *channel);
+
+    /**
+     * Cleans up after a DMA transfer. This should ensure that no interrupts
+     * will be raised related to the transfer that has just completed or been
+     * cancelled.
+     *
+     * @param channel       Channel to clean up on.
+     * 
+     * @return              Status code describing result of the transfer.
+     */
+    status_t (*finish_dma)(struct ata_channel *channel);
 } ata_channel_ops_t;
 
 /** Operations for a SFF-style ATA channel. */
@@ -225,17 +266,35 @@ typedef struct ata_sff_channel_ops {
      * @param val           Value to write. */
     void (*write_cmd)(struct ata_sff_channel *channel, uint8_t reg, uint8_t val);
 
+    /**
+     * Operations required on channels supporting PIO.
+     */
+
     /** Perform a PIO data read.
-     * @param channel       Channel to read from.
-     * @param buf           Buffer to read into.
-     * @param count         Number of bytes to read. */
+     * @see                 ata_channel_ops_t::read_pio(). */
     void (*read_pio)(struct ata_sff_channel *channel, void *buf, size_t count);
 
     /** Perform a PIO data write.
-     * @param channel       Channel to write to.
-     * @param buf           Buffer to write from.
-     * @param count         Number of bytes to write. */
+     * @see                 ata_channel_ops_t::write_pio(). */
     void (*write_pio)(struct ata_sff_channel *channel, const void *buf, size_t count);
+
+    /**
+     * Operations required on channels supporting DMA.
+     */
+
+    /** Prepares a DMA transfer.
+     * @see                 ata_channel_ops_t::prepare_dma(). */
+    status_t (*prepare_dma)(
+        struct ata_sff_channel *channel, const ata_dma_region_t *regions,
+        size_t count, bool is_write);
+
+    /** Starts a DMA transfer.
+     * @see                 ata_channel_ops_t::start_dma(). */
+    void (*start_dma)(struct ata_sff_channel *channel);
+
+    /** Cleans up after a DMA transfer.
+     * @see                 ata_channel_ops_t::finish_dma(). */
+    status_t (*finish_dma)(struct ata_sff_channel *channel);
 } ata_sff_channel_ops_t;
 
 /** Base ATA channel structure. */
@@ -246,10 +305,13 @@ typedef struct ata_channel {
     const ata_channel_ops_t *ops;       /**< Channel operations. */
     uint32_t caps;                      /**< Channel capabilities (ATA_CHANNEL_CAP_*). */
     dma_constraints_t dma_constraints;  /**< DMA constraints (if ATA_CHANNEL_CAP_DMA set). */
+    uint32_t dma_max_region_size;       /**< Maximum byte size of a single DMA region. */
+    uint32_t dma_max_region_count;      /**< Maximum number of DMA regions in a single transfer. */
 
     /** Internal fields. */
     mutex_t command_lock;               /**< Lock to gain exclusive use of the channel. */
     uint8_t device_mask;                /**< Mask indicating devices present. */
+    semaphore_t irq_sem;                /**< Semaphore for interrupts. */
 } ata_channel_t;
 
 /** ATA channel capabilities. */
@@ -274,7 +336,7 @@ static inline status_t ata_channel_destroy(ata_channel_t *channel) {
     return device_destroy(channel->node);
 }
 
-extern void ata_channel_interrupt(ata_channel_t *channel);
+extern void ata_channel_irq(ata_channel_t *channel);
 
 extern status_t ata_channel_create(ata_channel_t *channel, const char *name, device_t *parent);
 extern status_t ata_channel_publish(ata_channel_t *channel);

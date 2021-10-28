@@ -40,6 +40,11 @@
 #define PRIMARY_CHANNEL_NAME        "primary"
 #define SECONDARY_CHANNEL_NAME      "secondary"
 
+/** Size that we allocate for the PRDT. */
+#define PRDT_SIZE                   PAGE_SIZE
+#define PRDT_ENTRIES                (PRDT_SIZE / sizeof(prdt_entry_t))
+#define PRDT_MAX_REGION_SIZE        65536
+
 #define CMD_IO_SIZE                 0x8
 #define CTRL_IO_SIZE                0x1
 #define BUS_MASTER_IO_SIZE          0x10
@@ -61,6 +66,14 @@
 #define PCI_ATA_BM_STATUS_CAPABLE1  (1<<6)  /**< Drive 1 DMA Capable. */
 #define PCI_ATA_BM_STATUS_SIMPLEX   (1<<7)  /**< Simplex only. */
 
+/** Structure containing a PRDT entry. */
+typedef struct prdt_entry {
+    uint32_t addr;                          /**< Physical address. */
+    uint16_t bytes;                         /**< Number of bytes to transfer (0 == 64K). */
+    uint16_t _reserved : 15;
+    uint16_t eot : 1;                       /**< End-Of-Transfer bit. */
+} __packed prdt_entry_t;
+
 typedef struct pci_ata_controller {
     device_t *node;
     pci_device_t *pci;
@@ -73,6 +86,9 @@ typedef struct pci_ata_channel {
     io_region_t cmd;
     io_region_t ctrl;
     io_region_t bus_master;
+
+    prdt_entry_t *prdt;
+    dma_ptr_t prdt_addr;
 } pci_ata_channel_t;
 
 DEFINE_CLASS_CAST(pci_ata_channel, ata_sff_channel, sff);
@@ -113,17 +129,87 @@ static void pci_ata_channel_write_pio(ata_sff_channel_t *_channel, const void *b
     io_write16s(channel->cmd, ATA_CMD_REG_DATA, (count / 2), (const uint16_t *)buf);
 }
 
+static status_t pci_ata_channel_prepare_dma(
+    ata_sff_channel_t *_channel, const ata_dma_region_t *regions, size_t count,
+    bool is_write)
+{
+    pci_ata_channel_t *channel = cast_pci_ata_channel(_channel);
+
+    assert(channel->bus_master != IO_REGION_INVALID);
+
+    for (size_t i = 0; i < count; i++) {
+        channel->prdt[i].addr      = regions[i].addr;
+        channel->prdt[i].bytes     = regions[i].size;
+        channel->prdt[i]._reserved = 0;
+        channel->prdt[i].eot       = (i + 1 == count) ? 1 : 0;
+    }
+
+    /* Write the new PRDT address. */
+    uint32_t addr = io_read32(channel->bus_master, PCI_ATA_BM_REG_PRDT_ADDRESS);
+    addr &= 0x3;
+    addr |= channel->prdt_addr;
+    io_write32(channel->bus_master, PCI_ATA_BM_REG_PRDT_ADDRESS, addr);
+
+    /* Clear error and interrupt bits (write 1 to clear). */
+    uint8_t status = io_read8(channel->bus_master, PCI_ATA_BM_REG_STATUS);
+    status |= (PCI_ATA_BM_STATUS_ERROR | PCI_ATA_BM_STATUS_INTERRUPT);
+    io_write8(channel->bus_master, PCI_ATA_BM_REG_STATUS, status);
+
+    /* Set transfer direction. */
+    uint8_t command = io_read8(channel->bus_master, PCI_ATA_BM_REG_CMD);
+    if (is_write) {
+        command &= ~PCI_ATA_BM_CMD_RWC;
+    } else {
+        command |= PCI_ATA_BM_CMD_RWC;
+    }
+    io_write8(channel->bus_master, PCI_ATA_BM_REG_CMD, command);
+
+    return STATUS_SUCCESS;
+}
+
+static void pci_ata_channel_start_dma(ata_sff_channel_t *_channel) {
+    pci_ata_channel_t *channel = cast_pci_ata_channel(_channel);
+
+    uint8_t command = io_read8(channel->bus_master, PCI_ATA_BM_REG_CMD);
+    command |= PCI_ATA_BM_CMD_START;
+    io_write8(channel->bus_master, PCI_ATA_BM_REG_CMD, command);
+}
+
+static status_t pci_ata_channel_finish_dma(ata_sff_channel_t *_channel) {
+    pci_ata_channel_t *channel = cast_pci_ata_channel(_channel);
+
+    uint8_t status = io_read8(channel->bus_master, PCI_ATA_BM_REG_STATUS);
+
+    /* Stop the transfer. */
+    uint8_t command = io_read8(channel->bus_master, PCI_ATA_BM_REG_CMD);
+    command &= ~PCI_ATA_BM_CMD_START;
+    io_write8(channel->bus_master, PCI_ATA_BM_REG_CMD, command);
+
+    /* Clear error and interrupt bits. */
+    io_write8(
+        channel->bus_master, PCI_ATA_BM_REG_STATUS,
+        status | PCI_ATA_BM_STATUS_ERROR | PCI_ATA_BM_STATUS_INTERRUPT);
+
+    return (status & PCI_ATA_BM_STATUS_ERROR) ? STATUS_DEVICE_ERROR : STATUS_SUCCESS;
+}
+
 static const ata_sff_channel_ops_t pci_ata_channel_ops = {
-    .read_ctrl  = pci_ata_channel_read_ctrl,
-    .write_ctrl = pci_ata_channel_write_ctrl,
-    .read_cmd   = pci_ata_channel_read_cmd,
-    .write_cmd  = pci_ata_channel_write_cmd,
-    .read_pio   = pci_ata_channel_read_pio,
-    .write_pio  = pci_ata_channel_write_pio,
+    .read_ctrl   = pci_ata_channel_read_ctrl,
+    .write_ctrl  = pci_ata_channel_write_ctrl,
+    .read_cmd    = pci_ata_channel_read_cmd,
+    .write_cmd   = pci_ata_channel_write_cmd,
+    .read_pio    = pci_ata_channel_read_pio,
+    .write_pio   = pci_ata_channel_write_pio,
+    .prepare_dma = pci_ata_channel_prepare_dma,
+    .start_dma   = pci_ata_channel_start_dma,
+    .finish_dma  = pci_ata_channel_finish_dma,
 };
 
 static irq_status_t pci_ata_early_irq(unsigned num, void *_channel) {
     pci_ata_channel_t *channel = _channel;
+
+    if (channel->bus_master == IO_REGION_INVALID)
+        return IRQ_UNHANDLED;
 
     /* Check whether this device has raised an interrupt. */
     uint8_t status = io_read8(channel->bus_master, PCI_ATA_BM_REG_STATUS);
@@ -138,16 +224,13 @@ static irq_status_t pci_ata_early_irq(unsigned num, void *_channel) {
     /* Clear INTRQ. */
     io_read8(channel->cmd, ATA_CMD_REG_STATUS);
 
-    return IRQ_RUN_THREAD;
-}
-
-static void pci_ata_irq(unsigned num, void *_channel) {
-    pci_ata_channel_t *channel = _channel;
-
-    ata_channel_interrupt(&channel->sff.ata);
+    ata_channel_irq(&channel->sff.ata);
+    return IRQ_HANDLED;
 }
 
 static void add_channel(pci_ata_channel_t *channel, const char *mode) {
+    device_t *node = channel->sff.ata.node;
+
     /* Check channel presence by writing a value to the low LBA port on the
      * channel, then reading it back. If the value is the same, it is present. */
     io_write8(channel->cmd, ATA_CMD_REG_LBA_LOW, 0xab);
@@ -156,17 +239,27 @@ static void add_channel(pci_ata_channel_t *channel, const char *mode) {
         return;
     }
 
-    pci_enable_master(channel->controller->pci, true);
-
-    channel->sff.ata.caps = ATA_CHANNEL_CAP_PIO | ATA_CHANNEL_CAP_DMA | ATA_CHANNEL_CAP_SLAVE;
+    channel->sff.ata.caps = ATA_CHANNEL_CAP_PIO | ATA_CHANNEL_CAP_SLAVE;
     channel->sff.ops      = &pci_ata_channel_ops;
 
-    /* We are only capable of 32-bit DMA. */
-    channel->sff.ata.dma_constraints.max_addr = DMA_MAX_ADDR_32BIT - PAGE_SIZE;
+    if (channel->bus_master != IO_REGION_INVALID) {
+        pci_enable_master(channel->controller->pci, true);
+
+        channel->sff.ata.caps |= ATA_CHANNEL_CAP_DMA;
+
+        /* We are only capable of 32-bit DMA. */
+        channel->sff.ata.dma_constraints.max_addr = DMA_MAX_ADDR_32BIT - PAGE_SIZE;
+        channel->sff.ata.dma_max_region_size      = PRDT_MAX_REGION_SIZE;
+        channel->sff.ata.dma_max_region_count     = PRDT_ENTRIES;
+    }
 
     device_kprintf(
-        channel->sff.ata.node, LOG_NOTICE, "%s mode (cmd: %pR, ctrl: %pR, bus_master: %pR)\n",
+        node, LOG_NOTICE, "%s mode (cmd: %pR, ctrl: %pR, bus_master: %pR)\n",
         mode, channel->cmd, channel->ctrl, channel->bus_master);
+
+    /* Allocate a PRDT. */
+    device_dma_alloc(node, PRDT_SIZE, &channel->sff.ata.dma_constraints, MM_KERNEL, &channel->prdt_addr);
+    channel->prdt = device_dma_map(node, channel->prdt_addr, PRDT_SIZE, MM_KERNEL);
 
     status_t ret = ata_channel_publish(&channel->sff.ata);
     if (ret != STATUS_SUCCESS)
@@ -210,7 +303,7 @@ static void add_native_channel(
         goto err_destroy;
     }
 
-    ret = device_pci_irq_register(node, controller->pci, pci_ata_early_irq, pci_ata_irq, channel);
+    ret = device_pci_irq_register(node, controller->pci, pci_ata_early_irq, NULL, channel);
     if (ret != STATUS_SUCCESS) {
         device_kprintf(node, LOG_ERROR, "failed to register IRQ: %" PRId32 "\n", ret);
         goto err_destroy;
@@ -258,7 +351,7 @@ static void add_compat_channel(
         goto err_destroy;
     }
 
-    ret = device_irq_register(node, irq, pci_ata_early_irq, pci_ata_irq, channel);
+    ret = device_irq_register(node, irq, pci_ata_early_irq, NULL, channel);
     if (ret != STATUS_SUCCESS) {
         device_kprintf(node, LOG_ERROR, "failed to register IRQ: %" PRId32 "\n", ret);
         goto err_destroy;
@@ -313,6 +406,15 @@ static status_t pci_ata_init_device(pci_device_t *pci) {
     bool primary_native   = pci->prog_iface & (1 << 0);
     bool secondary_native = pci->prog_iface & (1 << 2);
 
+    /* If the bus master is in simplex mode, disable DMA on the second channel.
+     * According to the Haiku code, Intel controllers use this for something
+     * other than simplex mode. */
+    io_region_t secondary_bus_master = bus_master + 0x8;
+    if (controller->pci->vendor_id != 0x8086) {
+        if (io_read8(bus_master, PCI_ATA_BM_REG_STATUS) & PCI_ATA_BM_STATUS_SIMPLEX)
+            secondary_bus_master = IO_REGION_INVALID;
+    }
+
     if (primary_native) {
         add_native_channel(controller, PRIMARY_CHANNEL_NAME, 0, 1, bus_master);
     } else {
@@ -321,10 +423,10 @@ static status_t pci_ata_init_device(pci_device_t *pci) {
     }
 
     if (secondary_native) {
-        add_native_channel(controller, SECONDARY_CHANNEL_NAME, 2, 3, bus_master + 0x8);
+        add_native_channel(controller, SECONDARY_CHANNEL_NAME, 2, 3, secondary_bus_master);
     } else {
         /* Compatibility mode channels always have the same details. */
-        add_compat_channel(controller, SECONDARY_CHANNEL_NAME, 0x170, 0x376, bus_master + 0x8, 15);
+        add_compat_channel(controller, SECONDARY_CHANNEL_NAME, 0x170, 0x376, secondary_bus_master, 15);
     }
 
     return STATUS_SUCCESS;

@@ -101,7 +101,7 @@ static void iterate_extended(disk_device_t *device, object_handle_t *handle, par
     for (uint32_t curr_ebr = lba, next_ebr = 0; curr_ebr != 0; curr_ebr = next_ebr) {
         status_t ret = read_mbr(device, handle, ebr, curr_ebr);
         if (ret != STATUS_SUCCESS) {
-            device_kprintf(device->node, LOG_WARN, "failed to read EBR at %" PRIu32 " from device: %d", curr_ebr, ret);
+            device_kprintf(device->node, LOG_WARN, "failed to read EBR at %" PRIu32 " from device: %d\n", curr_ebr, ret);
             break;
         }
 
@@ -140,7 +140,7 @@ static bool mbr_partition_iterate(disk_device_t *device, object_handle_t *handle
     status_t ret = read_mbr(device, handle, mbr, 0);
     if (ret != STATUS_SUCCESS) {
         if (ret != STATUS_NOT_FOUND)
-            device_kprintf(device->node, LOG_WARN, "failed to read MBR from device: %d", ret);
+            device_kprintf(device->node, LOG_WARN, "failed to read MBR from device: %d\n", ret);
 
         return false;
     }

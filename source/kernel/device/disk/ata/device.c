@@ -57,8 +57,10 @@ static const char *ata_mode_strings[] = {
     [ATA_MODE_UDMA_6]      = "UDMA/133",
 };
 
-#define LBA28_MAX_BLOCK (1ull<<28)
-#define LBA48_MAX_BLOCK (1ull<<48)
+#define LBA28_MAX_BLOCKS (1ull<<28)
+#define LBA48_MAX_BLOCKS (1ull<<48)
+#define LBA28_MAX_COUNT  256
+#define LBA48_MAX_COUNT  65536
 
 /** Array of commands. First index = write, second = LBA48, third = DMA. */
 static const uint8_t transfer_commands[2][2][2] = {
@@ -73,65 +75,65 @@ static const uint8_t transfer_commands[2][2][2] = {
 };
 
 static status_t ata_device_begin_transfer(
-    ata_device_t *device, void *buf, uint64_t lba, size_t count, bool write,
-    size_t *_transfer_count, bool *_is_dma)
+    ata_device_t *device, void *buf, dma_ptr_t dma, uint64_t lba, size_t count,
+    bool is_write, size_t *_transfer_count, bool *_is_dma)
 {
-    bool is_dma = false;//device->caps & ATA_DEVICE_CAP_DMA
+    ata_channel_t *channel = device->channel;
+    status_t ret;
 
-    if (lba < LBA28_MAX_BLOCK) {
-        /* Check how many blocks we can transfer. */
-        if ((lba + count) > LBA28_MAX_BLOCK)
-            count = LBA28_MAX_BLOCK - lba;
-        if (count > 256)
-            count = 256;
+    bool is_dma   = device->caps & ATA_DEVICE_CAP_DMA;
+    bool is_lba48 = device->caps & ATA_DEVICE_CAP_LBA48;
 
-        if (is_dma) {
-            /* Prepare the DMA transfer. */
-            // TODO
-            //ret = ata_channel_prepare_dma(device->channel, buf, count * device->block_size, write);
-            //if (ret != STATUS_SUCCESS) {
-            //    device_kprintf(device->disk.node, LOG_WARN, "failed to prepare DMA transfer (%d)\n", ret);
-            //    return ret;
-            //}
-        }
-
-        /* Start the transfer. */
-        device->channel->ops->lba28_setup(device->channel, device->num, lba, count);
-        ata_channel_command(device->channel, transfer_commands[write][false][is_dma]);
-    } else if (lba < LBA48_MAX_BLOCK) {
-        if (!(device->caps & ATA_DEVICE_CAP_LBA48)) {
-            device_kprintf(
-                device->disk.node, LOG_WARN, "attempted LBA48 read (%" PRIu64 ") on non-LBA48 device\n",
-                lba);
-            return STATUS_DEVICE_ERROR;
-        }
-
-        /* Check how many blocks we can transfer. FIXME: Because I'm lazy and
-         * haven't made ata_channel_prepare_dma() handle the case where we have
-         * more than the maximum number of blocks per transfer, limit this to
-         * 256. It can actually be 65536. */
-        if ((lba + count) > LBA48_MAX_BLOCK)
-            count = LBA48_MAX_BLOCK - lba;
-        if (count > 256)
-            count = 256;
-
-        if (is_dma) {
-            /* Prepare the DMA transfer. */
-            // TODO
-            //ret = ata_channel_prepare_dma(device->channel, buf, count * device->block_size, write);
-            //if (ret != STATUS_SUCCESS) {
-            //    device_kprintf(device->disk.node, LOG_WARN, "failed to prepare DMA transfer (%d)\n", ret);
-            //    return 0;
-            //}
-        }
-
-        /* Start the transfer. */
-        device->channel->ops->lba48_setup(device->channel, device->num, lba, count);
-        ata_channel_command(device->channel, transfer_commands[write][true][is_dma]);
-    } else {
-        device_kprintf(device->disk.node, LOG_WARN, "attempted out of range transfer (%" PRIu64 ")\n", lba);
+    /* Ensure this transfer is within range according to LBA48 support. */
+    uint64_t max_blocks = (is_lba48) ? LBA48_MAX_BLOCKS : LBA28_MAX_BLOCKS;
+    if (lba + count > max_blocks) {
+        device_kprintf(device->disk.node, LOG_WARN, "attempted out of range transfer (%" PRIu64 " + %zu)\n", lba, count);
         return STATUS_DEVICE_ERROR;
     }
+
+    /* Limit the number of blocks to transfer according to LBA48 support. */
+    size_t max_count = (is_lba48) ? LBA48_MAX_COUNT : LBA28_MAX_COUNT;
+    count = min(count, max_count);
+
+    if (is_dma) {
+        /* Prepare a DMA transfer. We need to fit into the device's DMA transfer
+         * limits. For now we're just passed in a single linear physical region
+         * from the disk layer so this is straightforward. */
+        size_t max_region_blocks = channel->dma_max_region_size / device->disk.block_size;
+        size_t region_count      = round_up(count, max_region_blocks) / max_region_blocks;
+        if (region_count > channel->dma_max_region_count) {
+            region_count = channel->dma_max_region_count;
+            count        = region_count * max_region_blocks;
+        }
+
+        ata_dma_region_t *regions __cleanup_kfree = kmalloc(sizeof(*regions) * region_count, MM_KERNEL);
+
+        dma_ptr_t region_dma = dma;
+        size_t total_size    = count * device->disk.block_size;
+
+        for (size_t i = 0; i < region_count; i++) {
+            regions[i].addr = region_dma;
+            regions[i].size = min(total_size, channel->dma_max_region_size);
+
+            region_dma += regions[i].size;
+            total_size -= regions[i].size;
+        }
+
+        ret = channel->ops->prepare_dma(channel, regions, region_count, is_write);
+        if (ret != STATUS_SUCCESS) {
+            device_kprintf(device->disk.node, LOG_WARN, "failed to prepare DMA transfer: %d\n", ret);
+            return ret;
+        }
+    }
+
+    if (is_lba48) {
+        channel->ops->lba48_setup(channel, device->num, lba, count);
+    } else {
+        channel->ops->lba28_setup(channel, device->num, lba, count);
+    }
+
+    /* Start the transfer. */
+    ata_channel_command(channel, transfer_commands[is_write][false][is_dma]);
 
     *_transfer_count = count;
     *_is_dma         = is_dma;
@@ -141,42 +143,34 @@ static status_t ata_device_begin_transfer(
 
 static status_t ata_device_io(
     ata_device_t *device, void *buf, dma_ptr_t dma, uint64_t lba, size_t count,
-    bool write)
+    bool is_write)
 {
+    ata_channel_t *channel = device->channel;
     status_t ret;
 
-    ret = ata_channel_begin_command(device->channel, device->num);
+    ret = ata_channel_begin_command(channel, device->num);
     if (ret != STATUS_SUCCESS)
         return ret;
 
     while (count > 0) {
         size_t transfer_count;
         bool is_dma;
-        ret = ata_device_begin_transfer(device, buf, lba, count, write, &transfer_count, &is_dma);
+        ret = ata_device_begin_transfer(device, buf, dma, lba, count, is_write, &transfer_count, &is_dma);
         if (ret != STATUS_SUCCESS)
             goto out;
 
         if (is_dma) {
             /* Start the DMA transfer and wait for it to finish. */
-            // TODO
-            //if (!ata_channel_perform_dma(device->channel)) {
-            //    ata_channel_finish_dma(device->channel);
-            //
-            //    device_kprintf(device->disk.node, LOG_WARN, "timed out waiting for DMA transfer\n");
-            //    ret = STATUS_DEVICE_ERROR;
-            //    goto out;
-            //}
-            //
-            //ret = ata_channel_finish_dma(device->channel);
-            //
-            //buf += transfer_count * device->disk.block_size;
+            ret = ata_channel_perform_dma(channel);
+            if (ret == STATUS_SUCCESS)
+                buf += transfer_count * device->disk.block_size;
         } else {
             /* Do a PIO transfer of each sector. */
             for (size_t i = 0; i < transfer_count; i++) {
-                if (write) {
-                    ret = ata_channel_write_pio(device->channel, buf, device->disk.block_size);
+                if (is_write) {
+                    ret = ata_channel_write_pio(channel, buf, device->disk.block_size);
                 } else {
-                    ret = ata_channel_read_pio(device->channel, buf, device->disk.block_size);
+                    ret = ata_channel_read_pio(channel, buf, device->disk.block_size);
                 }
 
                 if (ret != STATUS_SUCCESS)
@@ -187,13 +181,13 @@ static status_t ata_device_io(
         }
 
         if (ret != STATUS_SUCCESS) {
-            uint8_t status = device->channel->ops->status(device->channel);
-            uint8_t error  = device->channel->ops->error(device->channel);
+            uint8_t status = channel->ops->status(channel);
+            uint8_t error  = channel->ops->error(channel);
 
             device_kprintf(
                 device->disk.node, LOG_WARN,
                 "%s of %zu block(s) at %" PRIu64 " failed (ret: %d, status: 0x%x, error: 0x%x)\n",
-                (write) ? "write" : "read", transfer_count, lba, ret, status, error);
+                (is_write) ? "write" : "read", transfer_count, lba, ret, status, error);
 
             goto out;
         }
@@ -206,6 +200,12 @@ static status_t ata_device_io(
 
 out:
     ata_channel_finish_command(device->channel);
+
+    /* Treat timeout as device error for returning outside the driver, we just
+     * differentiate between them internally for info purposes. */
+    if (ret == STATUS_TIMED_OUT)
+        ret = STATUS_DEVICE_ERROR;
+
     return ret;
 }
 

@@ -47,9 +47,9 @@ status_t ata_channel_begin_command(ata_channel_t *channel, uint8_t num) {
 
     mutex_lock(&channel->command_lock);
 
-/* Clear any pending interrupts. */
-//while(semaphore_down_etc(&channel->irq_sem, 0, 0) == STATUS_SUCCESS);
-// TODO
+    /* Clear any pending interrupts. */
+    while (semaphore_down_etc(&channel->irq_sem, 0, 0) == STATUS_SUCCESS)
+        ;
 
     bool attempted = false;
     while (true) {
@@ -146,6 +146,27 @@ status_t ata_channel_write_pio(ata_channel_t *channel, const void *buf, size_t c
 }
 
 /**
+ * Starts a DMA transfer and waits for it to complete. The caller needs to have
+ * called channel->ops->prepare_dma() prior to this to set up the transfer. This
+ * will handle everything else, including timeout and finishing the transfer.
+ *
+ * @param channel       Channel to perform transfer on.
+ *
+ * @return              STATUS_SUCCESS if succeeded.
+ *                      STATUS_DEVICE_ERROR if a device error occurred.
+ *                      STATUS_TIMED_OUT if timed out while waiting for IRQ.
+ */
+status_t ata_channel_perform_dma(ata_channel_t *channel) {
+    assert(channel->caps & ATA_CHANNEL_CAP_DMA);
+
+    channel->ops->start_dma(channel);
+    status_t wait_ret   = semaphore_down_etc(&channel->irq_sem, secs_to_nsecs(5), 0);
+    status_t finish_ret = channel->ops->finish_dma(channel);
+
+    return (wait_ret == STATUS_SUCCESS) ? finish_ret : wait_ret;
+}
+
+/**
  * Waits for device status to change according to the specified behaviour
  * flags.
  *
@@ -210,21 +231,27 @@ status_t ata_channel_wait(ata_channel_t *channel, uint32_t flags, uint8_t bits, 
 /**
  * Handles an interrupt indicating completion of DMA on an ATA channel. The
  * calling driver should ensure that the interrupt came from the channel before
- * calling this function.
+ * calling this function. This is safe to call from interrupt context.
  *
  * @param channel       Channel that the interrupt occurred on.
  */
-__export void ata_channel_interrupt(ata_channel_t *channel) {
-    // TODO: Ignore interrupts before the channel is published.
-    // TODO: If this ends up safe for interrupt context, get rid of threaded
-    // handler in pci_ata.
-    // TODO: Clear pending in begin_command?
+__export void ata_channel_irq(ata_channel_t *channel) {
+    /* Ignore interrupts if there's no pending command, though we should not
+     * really get an interrupt left over from a previous command, as cancelling
+     * a DMA transfer (finish_dma) should ensure we don't get a stale interrupt
+     * after that. */
+    if (mutex_held(&channel->command_lock)) {
+        semaphore_up(&channel->irq_sem, 1);
+    } else {
+        device_kprintf(channel->node, LOG_WARN, "received unexpected interrupt");
+    }
 }
 
 status_t ata_channel_create_etc(module_t *module, ata_channel_t *channel, const char *name, device_t *parent) {
     memset(channel, 0, sizeof(*channel));
 
     mutex_init(&channel->command_lock, "ata_command_lock", 0);
+    semaphore_init(&channel->irq_sem, "ata_irq_sem", 0);
 
     device_attr_t attrs[] = {
         { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = "ata_channel" } },

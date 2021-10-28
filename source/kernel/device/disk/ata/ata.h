@@ -36,6 +36,7 @@ extern void ata_channel_finish_command(ata_channel_t *channel);
 extern void ata_channel_command(ata_channel_t *channel, uint8_t cmd);
 extern status_t ata_channel_read_pio(ata_channel_t *channel, void *buf, size_t count);
 extern status_t ata_channel_write_pio(ata_channel_t *channel, const void *buf, size_t count);
+extern status_t ata_channel_perform_dma(ata_channel_t *channel);
 extern status_t ata_channel_wait(ata_channel_t *channel, uint32_t flags, uint8_t bits, nstime_t timeout);
 
 extern status_t ata_channel_create_etc(
