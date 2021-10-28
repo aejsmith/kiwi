@@ -109,7 +109,33 @@ static status_t ext2_node_lookup(fs_node_t *node, fs_dentry_t *entry) {
 }
 
 static status_t ext2_node_read_symlink(fs_node_t *node, char **_target) {
-    return STATUS_NOT_IMPLEMENTED;
+    ext2_inode_t *inode = node->private;
+    status_t ret;
+
+    char *target = kmalloc(inode->size + 1, MM_KERNEL);
+
+    if (le32_to_cpu(inode->disk.i_blocks_lo) == 0) {
+        if (inode->size > (offset_t)sizeof(inode->disk.i_block)) {
+            kfree(target);
+            return STATUS_CORRUPT_FS;
+        }
+
+        memcpy(target, inode->disk.i_block, inode->size);
+    } else {
+        size_t bytes;
+        ret = ext2_inode_read(inode, target, inode->size, 0, &bytes);
+        if (ret != STATUS_SUCCESS) {
+            kfree(target);
+            return ret;
+        } else if ((offset_t)bytes != inode->size) {
+            kfree(target);
+            return STATUS_CORRUPT_FS;
+        }
+    }
+
+    target[inode->size] = 0;
+    *_target = target;
+    return STATUS_SUCCESS;
 }
 
 static status_t ext2_node_io(file_handle_t *handle, io_request_t *request) {
