@@ -19,6 +19,7 @@ from util import FeatureDirs
 
 mod_env.Module('disk', [
     'disk.c',
+    'gpt.c',
     'mbr.c',
     'partition.c',
 ])

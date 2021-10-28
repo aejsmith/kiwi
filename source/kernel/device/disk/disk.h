@@ -54,6 +54,7 @@ typedef struct partition_ops {
     bool (*iterate)(disk_device_t *device, object_handle_t *handle, partition_iterate_cb_t cb);
 } partition_ops_t;
 
+extern const partition_ops_t gpt_partition_ops;
 extern const partition_ops_t mbr_partition_ops;
 
 extern void partition_probe(disk_device_t *device);

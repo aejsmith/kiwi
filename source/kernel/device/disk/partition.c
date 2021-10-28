@@ -102,6 +102,7 @@ static void add_partition(disk_device_t *parent, uint8_t id, uint64_t lba, uint6
 }
 
 static const partition_ops_t *partition_types[] = {
+    &gpt_partition_ops,
     &mbr_partition_ops,
 };
 
