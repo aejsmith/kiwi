@@ -182,15 +182,18 @@ __export virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint
     if (num_descs == 0)
         return NULL;
 
-    size_t align        = device->transport->queue_align;
-    size_t mem_align    = round_up(align, PAGE_SIZE);
-    phys_ptr_t max_addr = (phys_ptr_t)1 << device->transport->queue_addr_width;
-    queue->mem_size     = round_up(vring_size(num_descs, align), mem_align);
+    size_t align = device->transport->queue_align;
+
+    dma_constraints_t constraints = {};
+    constraints.max_addr = (dma_ptr_t)1 << device->transport->queue_addr_width;
+    constraints.align    = round_up(align, PAGE_SIZE);;
+    
+    queue->mem_size = round_up(vring_size(num_descs, align), constraints.align);
 
     // TODO: Should we not use MM_WAIT here? Could be quite large.
-    phys_alloc(queue->mem_size, mem_align, 0, 0, max_addr, MM_KERNEL, &queue->mem_phys);
-    void *mem = phys_map_etc(
-        queue->mem_phys, queue->mem_size,
+    dma_alloc(device->bus.node, queue->mem_size, &constraints, MM_KERNEL, &queue->mem_dma);
+    void *mem = dma_map_etc(
+        device->bus.node, queue->mem_dma, queue->mem_size,
         MMU_ACCESS_RW | MMU_CACHE_NORMAL, MM_KERNEL);
 
     memset(mem, 0, queue->mem_size);

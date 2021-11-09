@@ -22,6 +22,7 @@
 #pragma once
 
 #include <device/bus.h>
+#include <device/dma.h>
 
 #include <device/bus/virtio/virtio_ids.h>
 #include <device/bus/virtio/virtio_ring.h>
@@ -128,7 +129,7 @@ typedef struct virtio_queue {
     uint16_t last_used;
 
     /** Memory allocation details. */
-    phys_ptr_t mem_phys;
+    dma_ptr_t mem_dma;
     phys_size_t mem_size;
 } virtio_queue_t;
 

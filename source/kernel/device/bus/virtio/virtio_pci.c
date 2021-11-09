@@ -80,7 +80,7 @@ static void virtio_pci_enable_queue(virtio_device_t *_device, uint16_t index) {
     virtio_queue_t *queue = &device->virtio.queues[index];
 
     io_write16(device->io, VIRTIO_PCI_QUEUE_SEL, index);
-    io_write32(device->io, VIRTIO_PCI_QUEUE_PFN, queue->mem_phys >> VIRTIO_PCI_QUEUE_ADDR_SHIFT);
+    io_write32(device->io, VIRTIO_PCI_QUEUE_PFN, queue->mem_dma >> VIRTIO_PCI_QUEUE_ADDR_SHIFT);
 }
 
 static void virtio_pci_notify(virtio_device_t *_device, uint16_t index) {

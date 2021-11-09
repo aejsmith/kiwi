@@ -77,7 +77,7 @@ typedef struct virtio_net_queue {
     virtio_queue_t *queue;
 
     size_t buf_size;
-    phys_ptr_t buf_phys;
+    dma_ptr_t buf_dma;
     uint8_t *buf_virt;
 } virtio_net_queue_t;
 
@@ -106,7 +106,7 @@ static void virtio_net_queue_rx(virtio_net_device_t *device, uint16_t desc_index
 
     struct vring_desc *desc = virtio_queue_desc(queue->queue, desc_index);
 
-    desc->addr  = queue->buf_phys + (desc_index * VIRTIO_BUFFER_SIZE);
+    desc->addr  = queue->buf_dma + (desc_index * VIRTIO_BUFFER_SIZE);
     desc->len   = VIRTIO_BUFFER_SIZE;
     desc->flags = VRING_DESC_F_WRITE;
 
@@ -166,7 +166,7 @@ static status_t virtio_net_device_transmit(net_device_t *_device, net_packet_t *
     /* Copy packet data. */
     net_packet_copy_from(packet, data + sizeof(*header), 0, packet->size);
 
-    desc->addr = queue->buf_phys + offset;
+    desc->addr = queue->buf_dma + offset;
     desc->len  = packet->size + sizeof(*header);
 
     /* Submit the packet. */
@@ -327,8 +327,8 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
             (i == VIRTIO_NET_QUEUE_RX) ? "RX" : "TX",
             desc_count, queue->buf_size / 1024);
 
-        phys_alloc(queue->buf_size, 0, 0, 0, 0, MM_KERNEL, &queue->buf_phys);
-        queue->buf_virt = phys_map(queue->buf_phys, queue->buf_size, MM_KERNEL);
+        dma_alloc(device->net.node, queue->buf_size, NULL, MM_KERNEL, &queue->buf_dma);
+        queue->buf_virt = dma_map(device->net.node, queue->buf_dma, queue->buf_size, MM_KERNEL);
 
         if (i == VIRTIO_NET_QUEUE_RX) {
             /* Create RX network buffers. */
