@@ -25,6 +25,7 @@ env = manager.Create(libraries = ['kernel'], flags = {
 sources = [
     'device.c',
     'input.c',
+    'net.c',
 ]
 
 env.KiwiLibrary('device',

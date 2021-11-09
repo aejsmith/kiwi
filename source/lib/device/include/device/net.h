@@ -21,23 +21,19 @@
 
 #pragma once
 
-#include <kernel/device.h>
+#include <kernel/device/net.h>
 
-__KERNEL_EXTERN_C_BEGIN
+#include <device/device.h>
 
-/** Network device class name. */
-#define NET_DEVICE_CLASS_NAME       "net"
+__SYS_EXTERN_C_BEGIN
 
-/** Maximum hardware address (MAC) length. */
-#define NET_DEVICE_ADDR_MAX         6
+/** Network device type alias. */
+typedef device_t net_device_t;
 
-/** Network device requests. */
-enum {
-    /** Brings up the network interface. */
-    NET_DEVICE_REQUEST_UP           = DEVICE_CLASS_REQUEST_START + 0,
+extern status_t net_device_open(const char *path, uint32_t access, uint32_t flags, net_device_t **_device);
+extern status_t net_device_from_handle(handle_t handle, net_device_t **_device);
 
-    /** Shuts down the network interface. */
-    NET_DEVICE_REQUEST_DOWN         = DEVICE_CLASS_REQUEST_START + 1,
-};
+extern status_t net_device_up(net_device_t *device);
+extern status_t net_device_down(net_device_t *device);
 
-__KERNEL_EXTERN_C_END
+__SYS_EXTERN_C_END

@@ -57,6 +57,9 @@ typedef enum device_class {
 
     /** Input device (input_device_*). */
     DEVICE_CLASS_INPUT = 1,
+
+    /** Network device (net_device_*). */
+    DEVICE_CLASS_NET = 2,
 } device_class_t;
 
 extern void device_close(device_t *device);

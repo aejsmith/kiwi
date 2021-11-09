@@ -30,8 +30,7 @@
 
 static device_class_t net_device_class;
 
-/** Clean up all data associated with a device.
- * @param device        Device to destroy. */
+/** Clean up all data associated with a network device. */
 static void net_device_destroy_impl(device_t *node) {
     net_device_t *device = node->private;
 
@@ -40,11 +39,42 @@ static void net_device_destroy_impl(device_t *node) {
     fatal("TODO");
 }
 
+static status_t net_device_up(net_device_t *device) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static status_t net_device_down(net_device_t *device) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Handler for network device-specific requests. */
+static status_t net_device_request(
+    device_t *node, file_handle_t *handle, unsigned request,
+    const void *in, size_t in_size, void **_out, size_t *_out_size)
+{
+    net_device_t *device = node->private;
+    status_t ret;
+
+    switch (request) {
+        case NET_DEVICE_REQUEST_UP:
+            ret = net_device_up(device);
+            break;
+        case NET_DEVICE_REQUEST_DOWN:
+            ret = net_device_down(device);
+            break;
+        default:
+            ret = STATUS_INVALID_REQUEST;
+            break;
+    }
+
+    return ret;
+}
+
 static const device_ops_t net_device_ops = {
     .type    = FILE_TYPE_CHAR,
 
     .destroy = net_device_destroy_impl,
-    // TODO.
+    .request = net_device_request,
 };
 
 static status_t create_net_device(

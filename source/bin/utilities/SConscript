@@ -20,3 +20,6 @@ env = manager.Create(libraries = ['kernel'])
 
 env.KiwiApplication('mount', ['mount.c'])
 env.KiwiApplication('unmount', ['unmount.c'])
+
+net_control_env = manager.Create(libraries = ['device', 'kernel'])
+net_control_env.KiwiApplication('net_control', ['net_control.c'])
