@@ -76,3 +76,31 @@ extern status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, unsigned flags);
 extern void mutex_lock(mutex_t *lock);
 extern void mutex_unlock(mutex_t *lock);
 extern void mutex_init(mutex_t *lock, const char *name, unsigned flags);
+
+static inline void __mutex_unlockp(void *p) {
+    mutex_t *mutex = *(mutex_t **)p;
+
+    if (mutex)
+        mutex_unlock(mutex);
+}
+
+/**
+ * RAII-style scoped lock. Locks the mutex, and defines a variable with a
+ * cleanup attribute which will unlock the mutex once it goes out of scope.
+ *
+ * @param name          Scoped lock variable name.
+ * @param mutex         Mutex to lock.
+ */
+#define MUTEX_SCOPED_LOCK(name, mutex) \
+    mutex_lock(mutex); \
+    mutex_t *name __unused __cleanup(__mutex_unlockp) = mutex;
+
+/**
+ * Explicit unlock for MUTEX_SCOPED_LOCK. If used, the lock will not be unlocked
+ * again once the lock variable goes out of scope.
+ *
+ * @param name          Scoped lock variable name.
+ */
+#define MUTEX_SCOPED_UNLOCK(name) \
+    mutex_unlock(name); \
+    name = NULL;
