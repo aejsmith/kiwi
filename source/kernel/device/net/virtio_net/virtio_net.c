@@ -128,13 +128,11 @@ static void virtio_net_buffer_free(net_buffer_external_t *net) {
     virtio_net_queue_rx(device, desc_index, true);
 }
 
-/** Destroys a VirtIO network device. */
-static void virtio_net_device_destroy(net_device_t *net) {
+static void virtio_net_device_destroy(net_device_t *_device) {
     // TODO. Must handle partial destruction (init failure)
     fatal("TODO");
 }
 
-/** Transmits a packet on a VirtIO network device. */
 static status_t virtio_net_device_transmit(net_device_t *_device, net_packet_t *packet) {
     virtio_net_device_t *device = cast_virtio_net_device(_device);
 
@@ -142,7 +140,8 @@ static status_t virtio_net_device_transmit(net_device_t *_device, net_packet_t *
     assert(packet->size <= ETHERNET_MAX_FRAME_SIZE);
 
     virtio_net_queue_t *queue = &device->queues[VIRTIO_NET_QUEUE_TX];
-    mutex_lock(&queue->lock);
+
+    MUTEX_SCOPED_LOCK(lock, &queue->lock);
 
     /* Allocate a descriptor. */
     uint16_t desc_index;
@@ -151,7 +150,6 @@ static status_t virtio_net_device_transmit(net_device_t *_device, net_packet_t *
         // TODO: Add this to a queue to process in the IRQ handler when a
         // descriptor becomes free.
         device_kprintf(device->net.node, LOG_WARN, "no TX descriptors free, dropping (TODO)\n");
-        mutex_unlock(&queue->lock);
         return STATUS_DEVICE_ERROR;
     }
 
@@ -173,12 +171,144 @@ static status_t virtio_net_device_transmit(net_device_t *_device, net_packet_t *
     virtio_queue_submit(queue->queue, desc_index);
     virtio_device_notify(device->virtio, VIRTIO_NET_QUEUE_TX);
 
-    mutex_unlock(&queue->lock);
+    return STATUS_SUCCESS;
+}
+
+static status_t virtio_net_device_down(net_device_t *_device) {
+    virtio_net_device_t *device = cast_virtio_net_device(_device);
+
+    /* Shut down the queues. */
+    for (unsigned i = 0; i < VIRTIO_NET_QUEUE_COUNT; i++) {
+        virtio_net_queue_t *queue = &device->queues[i];
+
+        mutex_lock(&queue->lock);
+
+        if (queue->queue) {
+            virtio_device_free_queue(device->virtio, i);
+            queue->queue = NULL;
+
+            dma_unmap(queue->buf_virt, queue->buf_size);
+            dma_free(device->net.node, queue->buf_dma, queue->buf_size);
+        }
+
+        mutex_unlock(&queue->lock);
+    }
+
+    kfree(device->rx_buffers);
+    device->rx_buffers = NULL;
+
+    // TODO: Seems to be necessary otherwise the device doesn't work if we bring
+    // it up again.
+    virtio_device_reset(device->virtio);
+
+    return STATUS_SUCCESS;
+}
+
+static status_t virtio_net_device_up(net_device_t *_device) {
+    virtio_net_device_t *device = cast_virtio_net_device(_device);
+
+    /* Create virtqueues and buffers. */
+    for (unsigned i = 0; i < VIRTIO_NET_QUEUE_COUNT; i++) {
+        virtio_net_queue_t *queue = &device->queues[i];
+
+        /* Once we create the queue we can start getting interrupts off it. */
+        mutex_lock(&queue->lock);
+
+        queue->queue = virtio_device_alloc_queue(device->virtio, i);
+        if (!queue->queue) {
+            device_kprintf(device->net.node, LOG_ERROR, "failed to create virtqueues\n");
+            mutex_unlock(&queue->lock);
+
+            /* This will clean up what we've set up. */
+            virtio_net_device_down(_device);
+            return STATUS_DEVICE_ERROR;
+        }
+
+        uint16_t desc_count = queue->queue->ring.num;
+
+        queue->buf_size = round_up(desc_count * VIRTIO_BUFFER_SIZE, PAGE_SIZE);
+
+        device_kprintf(
+            device->net.node, LOG_DEBUG,
+            "%s queue has %" PRIu16 " descriptors (%zuKiB)\n",
+            (i == VIRTIO_NET_QUEUE_RX) ? "RX" : "TX",
+            desc_count, queue->buf_size / 1024);
+
+        dma_alloc(device->net.node, queue->buf_size, NULL, MM_KERNEL, &queue->buf_dma);
+        queue->buf_virt = dma_map(device->net.node, queue->buf_dma, queue->buf_size, MM_KERNEL);
+
+        if (i == VIRTIO_NET_QUEUE_RX) {
+            /* Create RX network buffers. */
+            device->rx_buffers = kcalloc(desc_count, sizeof(*device->rx_buffers), MM_KERNEL);
+
+            /* Queue up all available RX buffers to the device. */
+            for (uint16_t j = 0; j < desc_count; j++) {
+                uint16_t desc_index;
+                struct vring_desc *desc = virtio_queue_alloc(queue->queue, &desc_index);
+                assert(desc);
+
+                virtio_net_queue_rx(device, desc_index, false);
+            }
+        }
+
+        mutex_unlock(&queue->lock);
+    }
+
+    /* Notify the device that RX buffers are available. */
+    virtio_device_notify(device->virtio, VIRTIO_NET_QUEUE_RX);
+
+#if 0
+    {
+        status_t ret;
+
+        size_t size = max(sizeof(arp_packet_t), (ETHERNET_MIN_FRAME_SIZE - sizeof(ethernet_header_t)));
+
+        arp_packet_t *data;
+        net_packet_t *packet = net_packet_kmalloc(size, MM_KERNEL | MM_ZERO, (void **)&data);
+
+        data->hw_type    = cpu_to_net16(ARP_HW_TYPE_ETHERNET);
+        data->proto_type = cpu_to_net16(ETHERNET_TYPE_IPV4);
+        data->hw_len     = ETHERNET_ADDR_LEN;
+        data->proto_len  = IPV4_ADDR_LEN;
+        data->opcode     = cpu_to_net16(ARP_OPCODE_REQUEST);
+
+        memcpy(data->hw_sender, device->net.hw_addr, sizeof(data->hw_sender));
+        data->proto_sender.val = 0;
+
+        memset(data->hw_target, 0, sizeof(data->hw_target));
+        data->proto_target.bytes[0] = 10;
+        data->proto_target.bytes[1] = 0;
+        data->proto_target.bytes[2] = 2;
+        data->proto_target.bytes[3] = 2;
+
+        ethernet_header_t *header;
+        net_buffer_t *eth = net_buffer_kmalloc(sizeof(ethernet_header_t), MM_KERNEL, (void **)&header);
+
+        memcpy(header->source, device->net.hw_addr, sizeof(header->source));
+        uint8_t broadcast[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+        memcpy(header->dest, broadcast, sizeof(header->dest));
+        header->type = cpu_to_net16(ETHERNET_TYPE_ARP);
+
+        net_packet_prepend(packet, eth);
+
+        ret = virtio_net_device_transmit(&device->net, packet);
+        if (ret == STATUS_SUCCESS) {
+            kprintf(LOG_DEBUG, "packet transmitted!\n");
+        } else {
+            kprintf(LOG_DEBUG, "failed to transmit packet: %d\n", ret);
+        }
+
+        net_packet_release(packet);
+    }
+#endif
+
     return STATUS_SUCCESS;
 }
 
 static const net_device_ops_t virtio_net_device_ops = {
     .destroy  = virtio_net_device_destroy,
+    .up       = virtio_net_device_up,
+    .down     = virtio_net_device_down,
     .transmit = virtio_net_device_transmit,
 };
 
@@ -187,7 +317,11 @@ static void virtio_net_handle_used(virtio_device_t *virtio, uint16_t index, stru
     virtio_net_device_t *device = virtio->private;
     virtio_net_queue_t *queue   = &device->queues[index];
 
-    mutex_lock(&queue->lock);
+    MUTEX_SCOPED_LOCK(lock, &queue->lock);
+
+    /* Device has been shut down. */
+    if (!queue->queue)
+        return;
 
     uint16_t next_index = elem->id;
     while (next_index != 0xffff) {
@@ -221,7 +355,7 @@ static void virtio_net_handle_used(virtio_device_t *virtio, uint16_t index, stru
 
             net_packet_t *packet = net_packet_create(&buffer->net.buffer);
 
-            kprintf(LOG_DEBUG, "packed received %u len %u\n", desc_index, size);
+            kprintf(LOG_DEBUG, "packet received %u len %u\n", desc_index, size);
 #if 0
             {
                 ethernet_header_t *header = net_packet_data(packet, 0, sizeof(ethernet_header_t));
@@ -240,7 +374,7 @@ static void virtio_net_handle_used(virtio_device_t *virtio, uint16_t index, stru
             }
 #endif
 
-            // TODO...
+            net_device_receive(&device->net, packet);
             net_packet_release(packet);
         } else {
             /* Transmit. Just free this descriptor. */
@@ -248,8 +382,6 @@ static void virtio_net_handle_used(virtio_device_t *virtio, uint16_t index, stru
             virtio_queue_free(queue->queue, desc_index);
         }
     }
-
-    mutex_unlock(&queue->lock);
 }
 
 /** Initializes a VirtIO network device. */
@@ -296,8 +428,6 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
 
     device_kprintf(device->net.node, LOG_NOTICE, "MAC address is %pM\n", device->net.hw_addr);
 
-    /* Create virtqueues and buffers. */
-    // TODO: Should only have these created while the network device is up?
     for (unsigned i = 0; i < VIRTIO_NET_QUEUE_COUNT; i++) {
         virtio_net_queue_t *queue = &device->queues[i];
 
@@ -305,97 +435,10 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
             &queue->lock,
             (i == VIRTIO_NET_QUEUE_RX) ? "virtio_net_rx_lock" : "virtio_net_tx_lock",
             MUTEX_RECURSIVE);
-
-        /* Once we create the queue we can start getting interrupts off it. */
-        mutex_lock(&queue->lock);
-
-        queue->queue = virtio_device_alloc_queue(virtio, i);
-        if (!queue->queue) {
-            device_kprintf(device->net.node, LOG_ERROR, "failed to create virtqueues\n");
-            mutex_unlock(&queue->lock);
-            net_device_destroy(&device->net);
-            return STATUS_DEVICE_ERROR;
-        }
-
-        uint16_t desc_count = queue->queue->ring.num;
-
-        queue->buf_size = round_up(desc_count * VIRTIO_BUFFER_SIZE, PAGE_SIZE);
-
-        device_kprintf(
-            device->net.node, LOG_DEBUG,
-            "%s queue has %" PRIu16 " descriptors (%zuKiB)\n",
-            (i == VIRTIO_NET_QUEUE_RX) ? "RX" : "TX",
-            desc_count, queue->buf_size / 1024);
-
-        dma_alloc(device->net.node, queue->buf_size, NULL, MM_KERNEL, &queue->buf_dma);
-        queue->buf_virt = dma_map(device->net.node, queue->buf_dma, queue->buf_size, MM_KERNEL);
-
-        if (i == VIRTIO_NET_QUEUE_RX) {
-            /* Create RX network buffers. */
-            device->rx_buffers = kcalloc(desc_count, sizeof(*device->rx_buffers), MM_KERNEL);
-
-            /* Queue up all available RX buffers to the device. */
-            for (uint16_t j = 0; j < desc_count; j++) {
-                uint16_t desc_index;
-                struct vring_desc *desc = virtio_queue_alloc(queue->queue, &desc_index);
-                assert(desc);
-
-                virtio_net_queue_rx(device, desc_index, false);
-            }
-        }
-
-        mutex_unlock(&queue->lock);
     }
-
-    /* Notify the device that RX buffers are available. */
-    virtio_device_notify(virtio, VIRTIO_NET_QUEUE_RX);
 
     net_device_publish(&device->net);
-
-#if 0
-    {
-        size_t size = max(sizeof(arp_packet_t), (ETHERNET_MIN_FRAME_SIZE - sizeof(ethernet_header_t)));
-
-        arp_packet_t *data;
-        net_packet_t *packet = net_packet_kmalloc(size, MM_KERNEL | MM_ZERO, (void **)&data);
-
-        data->hw_type    = cpu_to_net16(ARP_HW_TYPE_ETHERNET);
-        data->proto_type = cpu_to_net16(ETHERNET_TYPE_IPV4);
-        data->hw_len     = ETHERNET_ADDR_LEN;
-        data->proto_len  = IPV4_ADDR_LEN;
-        data->opcode     = cpu_to_net16(ARP_OPCODE_REQUEST);
-
-        memcpy(data->hw_sender, device->net.hw_addr, sizeof(data->hw_sender));
-        data->proto_sender.val = 0;
-
-        memset(data->hw_target, 0, sizeof(data->hw_target));
-        data->proto_target.bytes[0] = 10;
-        data->proto_target.bytes[1] = 0;
-        data->proto_target.bytes[2] = 2;
-        data->proto_target.bytes[3] = 2;
-
-        ethernet_header_t *header;
-        net_buffer_t *eth = net_buffer_kmalloc(sizeof(ethernet_header_t), MM_KERNEL, (void **)&header);
-
-        memcpy(header->source, device->net.hw_addr, sizeof(header->source));
-        uint8_t broadcast[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-        memcpy(header->dest, broadcast, sizeof(header->dest));
-        header->type = cpu_to_net16(ETHERNET_TYPE_ARP);
-
-        net_packet_prepend(packet, eth);
-
-        ret = virtio_net_device_transmit(&device->net, packet);
-        if (ret == STATUS_SUCCESS) {
-            kprintf(LOG_DEBUG, "packet transmitted!\n");
-        } else {
-            kprintf(LOG_DEBUG, "failed to transmit packet: %d\n", ret);
-        }
-
-        net_packet_release(packet);
-    }
-#endif
-
-    return ret;
+    return STATUS_SUCCESS;
 }
 
 static virtio_driver_t virtio_net_driver = {

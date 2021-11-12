@@ -103,6 +103,11 @@ typedef struct virtio_transport {
      * @param index         Queue index. */
     void (*enable_queue)(struct virtio_device *device, uint16_t index);
 
+    /** Disable a queue.
+     * @param device        Device to disable queue for.
+     * @param index         Queue index. */
+    void (*disable_queue)(struct virtio_device *device, uint16_t index);
+
     /** Notify of new buffers in a queue.
      * @param device        Device to notify.
      * @param index         Queue index. */
@@ -129,6 +134,7 @@ typedef struct virtio_queue {
     uint16_t last_used;
 
     /** Memory allocation details. */
+    void *mem_virt;
     dma_ptr_t mem_dma;
     phys_size_t mem_size;
 } virtio_queue_t;
@@ -162,6 +168,7 @@ typedef struct virtio_device {
     virtio_transport_t *transport;      /**< Transport implementation. */
 
     uint32_t host_features;             /**< Supported host features. */
+    uint32_t driver_features;           /**< Driver supported features. */
     void *private;                      /**< Private data pointer for driver. */
 
     /** Device virtqueues. */
@@ -192,6 +199,8 @@ extern void virtio_device_get_config(virtio_device_t *device, void *buf, uint32_
 
 extern void virtio_device_set_features(virtio_device_t *device, uint32_t features);
 extern virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint16_t index);
+extern void virtio_device_free_queue(virtio_device_t *device, uint16_t index);
+extern void virtio_device_reset(virtio_device_t *device);
 
 extern void virtio_device_irq(virtio_device_t *device);
 

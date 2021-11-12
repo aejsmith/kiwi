@@ -39,14 +39,6 @@ static void net_device_destroy_impl(device_t *node) {
     fatal("TODO");
 }
 
-static status_t net_device_up(net_device_t *device) {
-    return STATUS_NOT_IMPLEMENTED;
-}
-
-static status_t net_device_down(net_device_t *device) {
-    return STATUS_NOT_IMPLEMENTED;
-}
-
 /** Handler for network device-specific requests. */
 static status_t net_device_request(
     device_t *node, file_handle_t *handle, unsigned request,
@@ -57,10 +49,10 @@ static status_t net_device_request(
 
     switch (request) {
         case NET_DEVICE_REQUEST_UP:
-            ret = net_device_up(device);
+            ret = net_interface_up(&device->interface);
             break;
         case NET_DEVICE_REQUEST_DOWN:
-            ret = net_device_down(device);
+            ret = net_interface_down(&device->interface);
             break;
         default:
             ret = STATUS_INVALID_REQUEST;
@@ -81,6 +73,8 @@ static status_t create_net_device(
     net_device_t *device, const char *name, device_t *parent, module_t *module)
 {
     memset(device, 0, sizeof(*device));
+
+    net_interface_init(&device->interface);
 
     return device_class_create_device(
         &net_device_class, module, name, parent, &net_device_ops, device,

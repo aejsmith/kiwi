@@ -22,6 +22,7 @@ mod_env.Module('net', [
     # lives within the net module.
     '../device/net/net.c',
 
+    'interface.c',
     'net.c',
     'packet.c',
 ])

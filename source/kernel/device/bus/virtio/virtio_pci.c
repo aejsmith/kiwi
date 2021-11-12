@@ -83,6 +83,13 @@ static void virtio_pci_enable_queue(virtio_device_t *_device, uint16_t index) {
     io_write32(device->io, VIRTIO_PCI_QUEUE_PFN, queue->mem_dma >> VIRTIO_PCI_QUEUE_ADDR_SHIFT);
 }
 
+static void virtio_pci_disable_queue(virtio_device_t *_device, uint16_t index) {
+    virtio_pci_device_t *device = cast_virtio_pci_device(_device);
+
+    io_write16(device->io, VIRTIO_PCI_QUEUE_SEL, index);
+    io_write32(device->io, VIRTIO_PCI_QUEUE_PFN, 0);
+}
+
 static void virtio_pci_notify(virtio_device_t *_device, uint16_t index) {
     virtio_pci_device_t *device = cast_virtio_pci_device(_device);
 
@@ -106,6 +113,7 @@ static virtio_transport_t virtio_pci_transport = {
     .set_features     = virtio_pci_set_features,
     .get_queue_size   = virtio_pci_get_queue_size,
     .enable_queue     = virtio_pci_enable_queue,
+    .disable_queue    = virtio_pci_disable_queue,
     .notify           = virtio_pci_notify,
     .get_config       = virtio_pci_get_config,
 };

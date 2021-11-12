@@ -40,4 +40,10 @@ enum {
     NET_DEVICE_REQUEST_DOWN         = DEVICE_CLASS_REQUEST_START + 1,
 };
 
+/** Network interface flags. */
+enum {
+    /** Interface is up. */
+    NET_INTERFACE_UP = (1<<0),
+};
+
 __KERNEL_EXTERN_C_END

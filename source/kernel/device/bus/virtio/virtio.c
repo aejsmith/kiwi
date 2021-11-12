@@ -165,6 +165,8 @@ __export void virtio_device_set_features(virtio_device_t *device, uint32_t featu
     assert(!(device->transport->get_status(device) & VIRTIO_CONFIG_S_DRIVER_OK));
 
     device->transport->set_features(device, features);
+
+    device->driver_features = features;
 }
 
 /** Allocate and enable a queue (ring) for a VirtIO device.
@@ -192,12 +194,12 @@ __export virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint
 
     // TODO: Should we not use MM_WAIT here? Could be quite large.
     dma_alloc(device->bus.node, queue->mem_size, &constraints, MM_KERNEL, &queue->mem_dma);
-    void *mem = dma_map_etc(
+    queue->mem_virt = dma_map_etc(
         device->bus.node, queue->mem_dma, queue->mem_size,
         MMU_ACCESS_RW | MMU_CACHE_NORMAL, MM_KERNEL);
 
-    memset(mem, 0, queue->mem_size);
-    vring_init(&queue->ring, num_descs, mem, align);
+    memset(queue->mem_virt, 0, queue->mem_size);
+    vring_init(&queue->ring, num_descs, queue->mem_virt, align);
 
     queue->last_used = 0;
 
@@ -211,6 +213,42 @@ __export virtio_queue_t *virtio_device_alloc_queue(virtio_device_t *device, uint
     device->transport->enable_queue(device, index);
 
     return queue;
+}
+
+/** Disable and free a queue (ring) for a VirtIO device.
+ * @param device        Device to allocate for.
+ * @param index         Queue index. The driver must have previously allocated
+ *                      this queue. */
+__export void virtio_device_free_queue(virtio_device_t *device, uint16_t index) {
+    assert(index < VIRTIO_MAX_QUEUES);
+
+    virtio_queue_t *queue = &device->queues[index];
+    assert(queue->mem_size > 0);
+
+    device->transport->disable_queue(device, index);
+
+    dma_unmap(queue->mem_virt, queue->mem_size);
+    dma_free(device->bus.node, queue->mem_dma, queue->mem_size);
+
+    queue->mem_size = 0;
+    queue->mem_dma  = 0;
+    queue->mem_virt = NULL;
+}
+
+/**
+ * Resets a VirtIO device to initial state. No queues should currently be
+ * allocated.
+ *
+ * @param device        Device to reset.
+ */
+__export void virtio_device_reset(virtio_device_t *device) {
+    for (uint16_t i = 0; i < VIRTIO_MAX_QUEUES; i++)
+        assert(device->queues[i].mem_size == 0);
+
+    device->transport->set_status(device, 0);
+    device->transport->set_status(device, VIRTIO_CONFIG_S_ACKNOWLEDGE | VIRTIO_CONFIG_S_DRIVER);
+    device->transport->set_features(device, device->driver_features);
+    device->transport->set_status(device, VIRTIO_CONFIG_S_DRIVER_OK);
 }
 
 /** Handles an IRQ on a VirtIO device (from transport).
@@ -315,7 +353,8 @@ static status_t virtio_bus_init_device(bus_device_t *_device, bus_driver_t *_dri
     device->transport->set_status(device, 0);
     device->transport->set_status(device, VIRTIO_CONFIG_S_ACKNOWLEDGE | VIRTIO_CONFIG_S_DRIVER);
 
-    device->host_features = device->transport->get_features(device);
+    device->host_features   = device->transport->get_features(device);
+    device->driver_features = 0;
 
     /* Try to initialize the driver. */
     status_t ret = driver->init_device(device);
