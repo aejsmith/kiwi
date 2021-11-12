@@ -1024,7 +1024,7 @@ static void thread_object_unwait(object_handle_t *handle, object_event_t *event)
 }
 
 /** Thread object type. */
-static object_type_t thread_object_type = {
+static const object_type_t thread_object_type = {
     .id     = OBJECT_TYPE_THREAD,
     .flags  = OBJECT_TRANSFERRABLE,
     .close  = thread_object_close,

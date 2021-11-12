@@ -146,7 +146,7 @@ static void port_object_unwait(object_handle_t *handle, object_event_t *event) {
 }
 
 /** Port object type. */
-static object_type_t port_object_type = {
+static const object_type_t port_object_type = {
     .id     = OBJECT_TYPE_PORT,
     .flags  = OBJECT_TRANSFERRABLE,
     .close  = port_object_close,
@@ -255,7 +255,7 @@ static void connection_object_unwait(object_handle_t *handle, object_event_t *ev
 }
 
 /** Connection object type. */
-static object_type_t connection_object_type = {
+static const object_type_t connection_object_type = {
     .id     = OBJECT_TYPE_CONNECTION,
     .close  = connection_object_close,
     .wait   = connection_object_wait,

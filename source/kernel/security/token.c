@@ -46,7 +46,7 @@ static void token_object_close(object_handle_t *handle) {
 }
 
 /** Token object type. */
-static object_type_t token_object_type = {
+static const object_type_t token_object_type = {
     .id    = OBJECT_TYPE_TOKEN,
     .flags = OBJECT_TRANSFERRABLE,
     .close = token_object_close,

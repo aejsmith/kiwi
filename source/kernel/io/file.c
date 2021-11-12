@@ -102,7 +102,7 @@ static status_t file_object_map(object_handle_t *handle, vm_region_t *region) {
 }
 
 /** File object type definition. */
-static object_type_t file_object_type = {
+static const object_type_t file_object_type = {
     .id     = OBJECT_TYPE_FILE,
     .flags  = OBJECT_TRANSFERRABLE,
     .close  = file_object_close,

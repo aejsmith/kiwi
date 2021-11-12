@@ -108,7 +108,7 @@ typedef struct object_type {
 
 /** Structure containing a kernel object handle. */
 typedef struct object_handle {
-    object_type_t *type;                /**< Type of the object. */
+    const object_type_t *type;          /**< Type of the object. */
     void *private;                      /**< Per-handle data pointer. */
     refcount_t count;                   /**< References to the handle. */
 } object_handle_t;
@@ -122,7 +122,7 @@ typedef struct handle_table {
     unsigned long *bitmap;              /**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
 
-extern object_handle_t *object_handle_create(object_type_t *type, void *private);
+extern object_handle_t *object_handle_create(const object_type_t *type, void *private);
 extern void object_handle_retain(object_handle_t *handle);
 extern void object_handle_release(object_handle_t *handle);
 
@@ -137,7 +137,7 @@ static inline void __object_handle_releasep(void *p) {
 extern status_t object_handle_lookup(handle_t id, int type, object_handle_t **_handle);
 extern status_t object_handle_attach(object_handle_t *handle, handle_t *_id, handle_t *_uid);
 extern status_t object_handle_detach(handle_t id);
-extern status_t object_handle_open(object_type_t *type, void *private, handle_t *_id, handle_t *_uid);
+extern status_t object_handle_open(const object_type_t *type, void *private, handle_t *_id, handle_t *_uid);
 
 extern void object_process_init(struct process *process);
 extern void object_process_cleanup(struct process *process);

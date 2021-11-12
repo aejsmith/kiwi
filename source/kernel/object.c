@@ -139,7 +139,7 @@ static const char *object_type_names[] = {
  *
  * @return              Handle to the object.
  */
-object_handle_t *object_handle_create(object_type_t *type, void *private) {
+object_handle_t *object_handle_create(const object_type_t *type, void *private) {
     object_handle_t *handle = slab_cache_alloc(object_handle_cache, MM_WAIT);
 
     refcount_set(&handle->count, 1);
@@ -370,7 +370,7 @@ status_t object_handle_detach(handle_t id) {
  *
  * @return              Status code describing result of the operation.
  */
-status_t object_handle_open(object_type_t *type, void *private, handle_t *_id, handle_t *_uid) {
+status_t object_handle_open(const object_type_t *type, void *private, handle_t *_id, handle_t *_uid) {
     object_handle_t *handle = object_handle_create(type, private);
 
     rwlock_write_lock(&curr_proc->handles.lock);

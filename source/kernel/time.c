@@ -606,7 +606,7 @@ static void timer_object_unwait(object_handle_t *handle, object_event_t *event) 
 }
 
 /** Timer object type. */
-static object_type_t timer_object_type = {
+static const object_type_t timer_object_type = {
     .id     = OBJECT_TYPE_TIMER,
     .flags  = OBJECT_TRANSFERRABLE,
     .close  = timer_object_close,

@@ -785,7 +785,7 @@ static void process_object_unwait(object_handle_t *handle, object_event_t *event
 }
 
 /** Process object type operations. */
-static object_type_t process_object_type = {
+static const object_type_t process_object_type = {
     .id     = OBJECT_TYPE_PROCESS,
     .flags  = OBJECT_TRANSFERRABLE,
     .close  = process_object_close,
