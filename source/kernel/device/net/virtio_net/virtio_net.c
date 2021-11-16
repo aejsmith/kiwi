@@ -136,7 +136,8 @@ static void virtio_net_device_destroy(net_device_t *_device) {
 static status_t virtio_net_device_transmit(net_device_t *_device, net_packet_t *packet) {
     virtio_net_device_t *device = cast_virtio_net_device(_device);
 
-    assert(packet->size >= ETHERNET_MIN_FRAME_SIZE);
+    /* virtio-net can handle packets smaller than the minimum, no need to
+     * manually pad. */
     assert(packet->size <= ETHERNET_MAX_FRAME_SIZE);
 
     virtio_net_queue_t *queue = &device->queues[VIRTIO_NET_QUEUE_TX];
@@ -261,7 +262,7 @@ static status_t virtio_net_device_up(net_device_t *_device) {
     {
         status_t ret;
 
-        size_t size = max(sizeof(arp_packet_t), (ETHERNET_MIN_FRAME_SIZE - sizeof(ethernet_header_t)));
+        size_t size = sizeof(arp_packet_t);
 
         arp_packet_t *data;
         net_packet_t *packet = net_packet_kmalloc(size, MM_KERNEL | MM_ZERO, (void **)&data);

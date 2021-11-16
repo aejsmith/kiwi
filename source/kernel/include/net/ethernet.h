@@ -26,10 +26,13 @@
 /** Ethernet MAC address length. */
 #define ETHERNET_ADDR_LEN       6
 
-/** Frame sizes. */
-#define ETHERNET_MTU            1500
-#define ETHERNET_MIN_FRAME_SIZE 64
-#define ETHERNET_MAX_FRAME_SIZE 1514
+/** Ethernet frame size definitions. */
+#define ETHERNET_HEADER_SIZE        14      /**< Ethernet header size. */
+#define ETHERNET_MIN_PAYLOAD_SIZE   46      /**< Minimum payload size. */
+#define ETHERNET_MAX_PAYLOAD_SIZE   1500    /**< Minimum payload size. */
+#define ETHERNET_MTU                ETHERNET_MAX_PAYLOAD_SIZE
+#define ETHERNET_MIN_FRAME_SIZE     60      /**< Minimum frame (header + payload) size, minus FCS. */
+#define ETHERNET_MAX_FRAME_SIZE     1514    /**< Maximum frame size, minus FCS. */
 
 /** Ethernet frame header. */
 typedef struct ethernet_header {

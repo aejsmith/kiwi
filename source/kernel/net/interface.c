@@ -59,7 +59,7 @@ status_t net_interface_up(net_interface_t *interface) {
 
     interface->flags |= NET_INTERFACE_UP;
 
-    kprintf(LOG_NOTICE, "net: interface %pD is up\n", device->node);
+    kprintf(LOG_NOTICE, "net: %pD: interface is up\n", device->node);
     return STATUS_SUCCESS;
 }
 
@@ -83,7 +83,7 @@ status_t net_interface_down(net_interface_t *interface) {
 
     interface->flags &= ~NET_INTERFACE_UP;
 
-    kprintf(LOG_NOTICE, "net: interface %pD is down\n", device->node);
+    kprintf(LOG_NOTICE, "net: %pD: interface is down\n", device->node);
     return STATUS_SUCCESS;
 }
 
