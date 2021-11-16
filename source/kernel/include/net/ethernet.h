@@ -24,7 +24,7 @@
 #include <net/net.h>
 
 /** Ethernet MAC address length. */
-#define ETHERNET_ADDR_LEN       6
+#define ETHERNET_ADDR_SIZE          6
 
 /** Ethernet frame size definitions. */
 #define ETHERNET_HEADER_SIZE        14      /**< Ethernet header size. */
@@ -36,8 +36,8 @@
 
 /** Ethernet frame header. */
 typedef struct ethernet_header {
-    uint8_t dest[ETHERNET_ADDR_LEN];
-    uint8_t source[ETHERNET_ADDR_LEN];
+    uint8_t dest[ETHERNET_ADDR_SIZE];
+    uint8_t source[ETHERNET_ADDR_SIZE];
     uint16_t type;
 } __packed ethernet_header_t;
 

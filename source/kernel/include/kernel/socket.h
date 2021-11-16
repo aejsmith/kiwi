@@ -22,6 +22,7 @@
 #pragma once
 
 #include <kernel/file.h>
+#include <kernel/net/family.h>
 
 __KERNEL_EXTERN_C_BEGIN
 
@@ -30,7 +31,6 @@ __KERNEL_EXTERN_C_BEGIN
  */
 
 typedef uint32_t socklen_t;
-typedef uint16_t sa_family_t;
 
 typedef struct sockaddr {
     sa_family_t sa_family;
@@ -78,11 +78,6 @@ typedef struct sockaddr_storage {
 #define MSG_PEEK                (1<<5)
 #define MSG_TRUNC               (1<<6)
 #define MSG_WAITALL             (1<<7)
-
-#define AF_UNSPEC               0
-#define AF_INET                 1
-#define AF_INET6                2
-#define AF_UNIX                 3
 
 #define SHUT_RD                 0
 #define SHUT_RDWR               1

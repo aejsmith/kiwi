@@ -21,12 +21,6 @@
 
 #pragma once
 
+#include <kernel/net/ipv4.h>
+
 #include <net/net.h>
-
-#define IPV4_ADDR_LEN   4
-
-/** Type used to store an IPv4 address. */
-typedef union ipv4_addr {
-    uint32_t val;               /**< 32-bit address (network byte order). */
-    uint8_t bytes[IPV4_ADDR_LEN];
-} ipv4_addr_t;

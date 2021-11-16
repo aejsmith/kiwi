@@ -269,8 +269,8 @@ static status_t virtio_net_device_up(net_device_t *_device) {
 
         data->hw_type    = cpu_to_net16(ARP_HW_TYPE_ETHERNET);
         data->proto_type = cpu_to_net16(ETHERNET_TYPE_IPV4);
-        data->hw_len     = ETHERNET_ADDR_LEN;
-        data->proto_len  = IPV4_ADDR_LEN;
+        data->hw_len     = ETHERNET_ADDR_SIZE;
+        data->proto_len  = IPV4_ADDR_SIZE;
         data->opcode     = cpu_to_net16(ARP_OPCODE_REQUEST);
 
         memcpy(data->hw_sender, device->net.hw_addr, sizeof(data->hw_sender));
@@ -422,7 +422,7 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
     virtio_device_set_features(virtio, features);
 
     /* Retrieve the MAC address. */
-    device->net.hw_addr_len = ETHERNET_ADDR_LEN;
+    device->net.hw_addr_len = ETHERNET_ADDR_SIZE;
     virtio_device_get_config(
         virtio, device->net.hw_addr,
         offsetof(struct virtio_net_config, mac), sizeof(device->net.hw_addr));

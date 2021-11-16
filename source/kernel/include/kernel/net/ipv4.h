@@ -16,21 +16,33 @@
 
 /**
  * @file
- * @brief               Network stack core definitions.
+ * @brief               IPv4 definitions.
  */
 
 #pragma once
 
-#include <kernel/device/net.h>
-#include <kernel/socket.h>
+#include <kernel/net/family.h>
 
-/** Name of the network stack module. */
-#define NET_MODULE_NAME     "net"
+__KERNEL_EXTERN_C_BEGIN
 
-/** Endianness conversion functions. */
-#define net16_to_cpu(v)     be16_to_cpu(v)
-#define net32_to_cpu(v)     be32_to_cpu(v)
-#define net64_to_cpu(v)     be64_to_cpu(v)
-#define cpu_to_net16(v)     cpu_to_be16(v)
-#define cpu_to_net32(v)     cpu_to_be32(v)
-#define cpu_to_net64(v)     cpu_to_be64(v)
+#define IPV4_ADDR_SIZE  4
+
+typedef uint32_t in_addr_t;
+typedef uint16_t in_port_t;
+
+/** Type used to store an IPv4 address. */
+typedef struct in_addr {
+    union {
+        in_addr_t val;                  /**< 32-bit address in network byte order. */
+        uint8_t bytes[IPV4_ADDR_SIZE];
+        in_addr_t s_addr;               /**< 32-bit address in network byte order (POSIX-compatible name). */
+    };
+} ipv4_addr_t;
+
+typedef struct sockaddr_in {
+    sa_family_t sin_family;             /**< AF_INET. */
+    in_port_t sin_port;                 /**< Port number (network byte order). */
+    ipv4_addr_t sin_addr;               /**< Address. */
+} sockaddr_in_t;
+
+__KERNEL_EXTERN_C_END

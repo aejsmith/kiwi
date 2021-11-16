@@ -21,6 +21,30 @@
 
 #pragma once
 
-#include <kernel/net/ipv6.h>
+#include <kernel/net/ipv4.h>
 
-#include <net/net.h>
+__KERNEL_EXTERN_C_BEGIN
+
+#define IPV6_ADDR_SIZE  16
+
+/** Type used to store an IPv6 address. */
+typedef struct in6_addr {
+    union {
+        struct {
+            uint64_t high;
+            uint64_t low;
+        } val;
+        uint8_t bytes[IPV6_ADDR_SIZE];
+        uint8_t s6_addr[IPV6_ADDR_SIZE];
+    };
+} ipv6_addr_t;
+
+typedef struct sockaddr_in6 {
+    sa_family_t sin6_family;            /**< AF_INET6. */
+    in_port_t sin6_port;                /**< Port number (network byte order). */
+    ipv6_addr_t sin6_addr;              /**< IPv6 address. */
+    uint32_t sin6_flowinfo;             /**< IPv6 traffic class and flow information. */
+    uint32_t sin6_scope_id;             /**< Set of interfaces for a scope. */ 
+} sockaddr_in6_t;
+
+__KERNEL_EXTERN_C_END

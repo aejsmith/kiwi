@@ -16,21 +16,20 @@
 
 /**
  * @file
- * @brief               Network stack core definitions.
+ * @brief               Address family definitions.
  */
 
 #pragma once
 
-#include <kernel/device/net.h>
-#include <kernel/socket.h>
+#include <kernel/types.h>
 
-/** Name of the network stack module. */
-#define NET_MODULE_NAME     "net"
+__KERNEL_EXTERN_C_BEGIN
 
-/** Endianness conversion functions. */
-#define net16_to_cpu(v)     be16_to_cpu(v)
-#define net32_to_cpu(v)     be32_to_cpu(v)
-#define net64_to_cpu(v)     be64_to_cpu(v)
-#define cpu_to_net16(v)     cpu_to_be16(v)
-#define cpu_to_net32(v)     cpu_to_be32(v)
-#define cpu_to_net64(v)     cpu_to_be64(v)
+typedef uint16_t sa_family_t;
+
+#define AF_UNSPEC               0
+#define AF_INET                 1
+#define AF_INET6                2
+#define AF_UNIX                 3
+
+__KERNEL_EXTERN_C_END
