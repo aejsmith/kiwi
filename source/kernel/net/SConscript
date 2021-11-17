@@ -23,6 +23,7 @@ mod_env.Module('net', [
     '../device/net/net.c',
 
     'interface.c',
+    'ipv4.c',
     'net.c',
     'packet.c',
 ])

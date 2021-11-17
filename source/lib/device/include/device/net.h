@@ -35,5 +35,7 @@ extern status_t net_device_from_handle(handle_t handle, net_device_t **_device);
 
 extern status_t net_device_up(net_device_t *device);
 extern status_t net_device_down(net_device_t *device);
+extern status_t net_device_add_addr(net_device_t *device, const void *addr, size_t size);
+extern status_t net_device_remove_addr(net_device_t *device, const void *addr, size_t size);
 
 __SYS_EXTERN_C_END

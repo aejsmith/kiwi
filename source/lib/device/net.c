@@ -85,6 +85,7 @@ status_t net_device_from_handle(handle_t handle, net_device_t **_device) {
 }
 
 /** Brings up the network interface.
+ * @see                 NET_DEVICE_REQUEST_UP
  * @param device        Device to bring up.
  * @return              Status code describing the result of the operation. */
 status_t net_device_up(net_device_t *device) {
@@ -95,6 +96,7 @@ status_t net_device_up(net_device_t *device) {
 }
 
 /** Shuts down the network interface.
+ * @see                 NET_DEVICE_REQUEST_DOWN
  * @param device        Device to shut down.
  * @return              Status code describing the result of the operation. */
 status_t net_device_down(net_device_t *device) {
@@ -102,4 +104,36 @@ status_t net_device_down(net_device_t *device) {
         return STATUS_INCORRECT_TYPE;
 
     return kern_file_request(device->handle, NET_DEVICE_REQUEST_DOWN, NULL, 0, NULL, 0, NULL);
+}
+
+/** Adds an address to the network interface.
+ * @see                 NET_DEVICE_REQUEST_ADD_ADDR
+ * @param device        Device to add address to.
+ * @param addr          Pointer to a net_addr_*_t structure corresponding to the
+ *                      address family to add an address for. The content of
+ *                      this is determined from the 'family' member at the start
+ *                      of the structure.
+ * @param size          Size of the structure pointed to by addr.
+ * @return              Status code describing the result of the operation. */
+status_t net_device_add_addr(net_device_t *device, const void *addr, size_t size) {
+    if (device->dev_class != DEVICE_CLASS_NET)
+        return STATUS_INCORRECT_TYPE;
+
+    return kern_file_request(device->handle, NET_DEVICE_REQUEST_ADD_ADDR, addr, size, NULL, 0, NULL);
+}
+
+/** Removes an address from the network interface.
+ * @see                 NET_DEVICE_REQUEST_REMOVE_ADDR
+ * @param device        Device to remove address from.
+ * @param addr          Pointer to a net_addr_*_t structure corresponding to the
+ *                      address family to remove an address for. The content of
+ *                      this is determined from the 'family' member at the start
+ *                      of the structure.
+ * @param size          Size of the structure pointed to by addr.
+ * @return              Status code describing the result of the operation. */
+status_t net_device_remove_addr(net_device_t *device, const void *addr, size_t size) {
+    if (device->dev_class != DEVICE_CLASS_NET)
+        return STATUS_INCORRECT_TYPE;
+
+    return kern_file_request(device->handle, NET_DEVICE_REQUEST_REMOVE_ADDR, addr, size, NULL, 0, NULL);
 }

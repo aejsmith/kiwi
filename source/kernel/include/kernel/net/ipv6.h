@@ -39,6 +39,7 @@ typedef struct in6_addr {
     };
 } ipv6_addr_t;
 
+/** IPv6 socket address specification. */
 typedef struct sockaddr_in6 {
     sa_family_t sin6_family;            /**< AF_INET6. */
     in_port_t sin6_port;                /**< Port number (network byte order). */
@@ -46,5 +47,11 @@ typedef struct sockaddr_in6 {
     uint32_t sin6_flowinfo;             /**< IPv6 traffic class and flow information. */
     uint32_t sin6_scope_id;             /**< Set of interfaces for a scope. */ 
 } sockaddr_in6_t;
+
+/** IPv6 network interface address specification. */
+typedef struct net_addr_ipv6 {
+    sa_family_t family;                 /**< AF_INET6. */
+    // TODO
+} net_addr_ipv6_t;
 
 __KERNEL_EXTERN_C_END

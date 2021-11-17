@@ -21,10 +21,31 @@
 
 #include <device/net/net.h>
 
+#include <lib/string.h>
+
+#include <mm/malloc.h>
+
 #include <net/interface.h>
+#include <net/ipv4.h>
 #include <net/packet.h>
 
 #include <status.h>
+
+/** Supported network device operations, indexed by family. */
+static const net_addr_ops_t *supported_net_addr_ops[] = {
+    [AF_INET] = &ipv4_net_addr_ops,
+    //[AF_INET6] TODO
+};
+
+/** Get operations for handling a network interface address.
+ * @param addr          Address to get for.
+ * @return              Operations for the address, or NULL if family is not
+ *                      supported. */
+const net_addr_ops_t *net_addr_ops(const net_addr_t *addr) {
+    return (addr->family < array_size(supported_net_addr_ops))
+        ? supported_net_addr_ops[addr->family]
+        : NULL;
+}
 
 /** Called when a packet is received on an interface.
  * @param interface     Interface the packet was received on.
@@ -37,6 +58,80 @@ __export void net_interface_receive(net_interface_t *interface, net_packet_t *pa
         return;
 
     kprintf(LOG_DEBUG, "net: packet received\n");
+}
+
+/** Adds an address to a network interface.
+ * @param interface     Interface to add to.
+ * @param addr          Address to add.
+ * @return              Status code describing the result of the operation. */
+status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *addr) {
+    MUTEX_SCOPED_LOCK(lock, &interface->lock);
+
+    /* Can't add addresses to an interface that's down. */
+    if (!(interface->flags & NET_INTERFACE_UP))
+        return STATUS_NET_DOWN;
+
+    const net_addr_ops_t *ops = net_addr_ops(addr);
+    if (!ops) {
+        return STATUS_NOT_SUPPORTED;
+    } else if (!ops->valid(addr)) {
+        return STATUS_INVALID_ARG;
+    }
+
+    /* Check if this already exists. */
+    for (size_t i = 0; i < interface->addr_count; i++) {
+        if (ops->equal(&interface->addrs[i], addr))
+            return STATUS_ALREADY_EXISTS;
+    }
+
+    interface->addrs = krealloc(
+        interface->addrs,
+        sizeof(interface->addrs[0]) * (interface->addr_count + 1), MM_KERNEL);
+
+    memcpy(&interface->addrs[interface->addr_count], addr, sizeof(*addr));
+    interface->addr_count++;
+
+    return STATUS_SUCCESS;
+}
+
+/** Removes an address from a network interface.
+ * @param interface     Interface to remove from.
+ * @param addr          Address to remove.
+ * @return              Status code describing the result of the operation. */
+status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t *addr) {
+    MUTEX_SCOPED_LOCK(lock, &interface->lock);
+
+    /* Can't add addresses to an interface that's down. */
+    if (!(interface->flags & NET_INTERFACE_UP))
+        return STATUS_NET_DOWN;
+
+    const net_addr_ops_t *ops = net_addr_ops(addr);
+    if (!ops) {
+        return STATUS_NOT_SUPPORTED;
+    } else if (!ops->valid(addr)) {
+        return STATUS_INVALID_ARG;
+    }
+
+    for (size_t i = 0; i < interface->addr_count; i++) {
+        if (ops->equal(&interface->addrs[i], addr)) {
+            interface->addr_count--;
+
+            if (i != interface->addr_count) {
+                memmove(
+                    &interface->addrs[i],
+                    &interface->addrs[i + 1],
+                    sizeof(interface->addrs[0]) * (interface->addr_count - i));
+
+                interface->addrs = krealloc(
+                    interface->addrs,
+                    sizeof(interface->addrs[0]) * interface->addr_count, MM_KERNEL);
+            }
+
+            return STATUS_SUCCESS;
+        }
+    }
+
+    return STATUS_NOT_FOUND;
 }
 
 /** Bring up a network interface.
@@ -83,6 +178,10 @@ status_t net_interface_down(net_interface_t *interface) {
 
     interface->flags &= ~NET_INTERFACE_UP;
 
+    kfree(interface->addrs);
+    interface->addrs      = NULL;
+    interface->addr_count = 0;
+
     kprintf(LOG_NOTICE, "net: %pD: interface is down\n", device->node);
     return STATUS_SUCCESS;
 }
@@ -91,5 +190,7 @@ status_t net_interface_down(net_interface_t *interface) {
 void net_interface_init(net_interface_t *interface) {
     mutex_init(&interface->lock, "net_interface_lock", 0);
 
-    interface->flags = 0;
+    interface->flags      = 0;
+    interface->addrs      = NULL;
+    interface->addr_count = 0;
 }

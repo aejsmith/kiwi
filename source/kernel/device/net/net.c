@@ -17,6 +17,9 @@
 /**
  * @file
  * @brief               Network device class.
+ *
+ * TODO:
+ *  - Security controls for network device requests.
  */
 
 #include <device/net/net.h>
@@ -39,6 +42,33 @@ static void net_device_destroy_impl(device_t *node) {
     fatal("TODO");
 }
 
+/** Copy and validate a net_addr_t according to its family. */
+static status_t copy_net_addr(const void *in, size_t in_size, net_addr_t *addr) {
+    /*
+     * The net_addr_t structure is a kernel-internal union of all supported
+     * address families. The request supplies a structure specific to the
+     * address family. We first need to check the family to see what the size
+     * should be for that family.
+     */
+
+    memset(addr, 0, sizeof(*addr));
+
+    if (in_size < sizeof(sa_family_t))
+        return STATUS_INVALID_ARG;
+
+    addr->family = *(const sa_family_t *)in;
+
+    const net_addr_ops_t *ops = net_addr_ops(addr);
+    if (!ops) {
+        return STATUS_NOT_SUPPORTED;
+    } else if (in_size != ops->size) {
+        return STATUS_INVALID_ARG;
+    }
+
+    memcpy(addr, in, in_size);
+    return STATUS_SUCCESS;
+}
+
 /** Handler for network device-specific requests. */
 static status_t net_device_request(
     device_t *node, file_handle_t *handle, unsigned request,
@@ -48,15 +78,34 @@ static status_t net_device_request(
     status_t ret;
 
     switch (request) {
-        case NET_DEVICE_REQUEST_UP:
+        case NET_DEVICE_REQUEST_UP: {
             ret = net_interface_up(&device->interface);
             break;
-        case NET_DEVICE_REQUEST_DOWN:
+        }
+        case NET_DEVICE_REQUEST_DOWN: {
             ret = net_interface_down(&device->interface);
             break;
-        default:
+        }
+        case NET_DEVICE_REQUEST_ADD_ADDR: {
+            net_addr_t addr;
+            ret = copy_net_addr(in, in_size, &addr);
+            if (ret == STATUS_SUCCESS)
+                ret = net_interface_add_addr(&device->interface, &addr);
+
+            break;
+        }
+        case NET_DEVICE_REQUEST_REMOVE_ADDR: {
+            net_addr_t addr;
+            ret = copy_net_addr(in, in_size, &addr);
+            if (ret == STATUS_SUCCESS)
+                ret = net_interface_remove_addr(&device->interface, &addr);
+
+            break;
+        }
+        default: {
             ret = STATUS_INVALID_REQUEST;
             break;
+        }
     }
 
     return ret;

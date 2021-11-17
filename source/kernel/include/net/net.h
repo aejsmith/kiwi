@@ -21,8 +21,7 @@
 
 #pragma once
 
-#include <kernel/device/net.h>
-#include <kernel/socket.h>
+#include <types.h>
 
 /** Name of the network stack module. */
 #define NET_MODULE_NAME     "net"

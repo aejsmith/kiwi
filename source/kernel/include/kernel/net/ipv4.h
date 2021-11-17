@@ -39,10 +39,19 @@ typedef struct in_addr {
     };
 } ipv4_addr_t;
 
+/** IPv4 socket address specification. */
 typedef struct sockaddr_in {
     sa_family_t sin_family;             /**< AF_INET. */
     in_port_t sin_port;                 /**< Port number (network byte order). */
     ipv4_addr_t sin_addr;               /**< Address. */
 } sockaddr_in_t;
+
+/** IPv4 network interface address specification. */
+typedef struct net_addr_ipv4 {
+    sa_family_t family;                 /**< AF_INET. */
+    ipv4_addr_t addr;                   /**< Address of interface. */
+    ipv4_addr_t netmask;                /**< Mask for address. */
+    ipv4_addr_t broadcast;              /**< Broadcast address. */
+} net_addr_ipv4_t;
 
 __KERNEL_EXTERN_C_END

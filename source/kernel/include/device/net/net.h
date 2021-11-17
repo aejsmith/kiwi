@@ -23,6 +23,8 @@
 
 #include <device/device.h>
 
+#include <kernel/device/net.h>
+
 #include <net/interface.h>
 
 struct net_device;

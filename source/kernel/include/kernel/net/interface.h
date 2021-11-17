@@ -16,13 +16,20 @@
 
 /**
  * @file
- * @brief               Internet Protocol v4 implementation.
+ * @brief               Network interface definitions.
  */
 
 #pragma once
 
 #include <kernel/net/ipv4.h>
+#include <kernel/net/ipv6.h>
 
-#include <net/interface.h>
+__KERNEL_EXTERN_C_BEGIN
 
-extern const net_addr_ops_t ipv4_net_addr_ops;
+/** Network interface flags. */
+enum {
+    /** Interface is up. */
+    NET_INTERFACE_UP = (1<<0),
+};
+
+__KERNEL_EXTERN_C_END

@@ -38,12 +38,38 @@ enum {
 
     /** Shuts down the network interface. */
     NET_DEVICE_REQUEST_DOWN         = DEVICE_CLASS_REQUEST_START + 1,
-};
 
-/** Network interface flags. */
-enum {
-    /** Interface is up. */
-    NET_INTERFACE_UP = (1<<0),
+    /**
+     * Adds an address to the network interface.
+     *
+     * Input:               A net_addr_*_t structure corresponding to the
+     *                      address family to add an address for. The size and
+     *                      content of this is determined from the 'family'
+     *                      member at the start of the structure.
+     *
+     * Errors:              STATUS_ALREADY_EXISTS if the address already exists
+     *                      on the interface.
+     *                      STATUS_NOT_SUPPORTED if the address family is not
+     *                      supported.
+     *                      STATUS_NET_DOWN if the interface is down.
+     */
+    NET_DEVICE_REQUEST_ADD_ADDR     = DEVICE_CLASS_REQUEST_START + 2,
+
+    /**
+     * Removes an address from the network interface.
+     *
+     * Input:               A net_addr_*_t structure corresponding to the
+     *                      address family to remove an address for. The size
+     *                      and content of this is determined from the 'family'
+     *                      member at the start of the structure.
+     *
+     * Errors:              STATUS_NOT_FOUND if the address does not exist on
+     *                      the interface.
+     *                      STATUS_NOT_SUPPORTED if the address family is not
+     *                      supported.
+     *                      STATUS_NET_DOWN if the interface is down.
+     */
+    NET_DEVICE_REQUEST_REMOVE_ADDR  = DEVICE_CLASS_REQUEST_START + 3,
 };
 
 __KERNEL_EXTERN_C_END

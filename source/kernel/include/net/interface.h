@@ -21,11 +21,39 @@
 
 #pragma once
 
-#include <net/net.h>
+#include <kernel/net/interface.h>
+#include <kernel/net/ipv4.h>
+#include <kernel/net/ipv6.h>
 
 #include <sync/mutex.h>
 
 struct net_packet;
+
+/**
+ * Address assigned to a network interface. This is a kernel-internal union of
+ * all the supported address structures, which all start with a family member.
+ * The overall union is not exposed to userspace, which allows flexibility of
+ * adding new families with different (possibly larger) address structures,
+ * without breaking ABI compatibility.
+ */
+typedef union net_addr {
+    sa_family_t family;                 /**< Address family this is for. */
+    net_addr_ipv4_t ipv4;               /**< AF_INET. */
+    net_addr_ipv6_t ipv6;               /**< AF_INET6. */
+} net_addr_t;
+
+/** Operations for handling network interface addresses. */
+typedef struct net_addr_ops {
+    size_t size;                        /**< Size of the address structure. */
+
+    /** Check if an interface address is valid. */
+    bool (*valid)(const net_addr_t *addr);
+
+    /** Check if two network interface addresses are equal. */
+    bool (*equal)(const net_addr_t *a, const net_addr_t *b);
+} net_addr_ops_t;
+
+extern const net_addr_ops_t *net_addr_ops(const net_addr_t *addr);
 
 /**
  * Network interface state (addresses etc.). This is embedded within
@@ -44,9 +72,14 @@ typedef struct net_interface {
     mutex_t lock;
 
     uint32_t flags;                     /**< Flags for the interface (NET_INTERFACE_*). */
+    net_addr_t *addrs;                  /**< Array of addresses. */
+    size_t addr_count;                  /**< Number of addresses. */
 } net_interface_t;
 
 extern void net_interface_receive(net_interface_t *interface, struct net_packet *packet);
+
+extern status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *addr);
+extern status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t *addr);
 
 extern status_t net_interface_up(net_interface_t *interface);
 extern status_t net_interface_down(net_interface_t *interface);

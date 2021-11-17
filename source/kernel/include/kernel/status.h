@@ -71,6 +71,7 @@
 #define STATUS_CANCELLED            46  /**< Operation was cancelled. */
 #define STATUS_INCORRECT_TYPE       47  /**< Object is not of the correct type. */
 #define STATUS_PIPE_CLOSED          48  /**< Read end of pipe has been closed. */
+#define STATUS_NET_DOWN             49  /**< Network is down. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 
