@@ -16,17 +16,27 @@
 
 /**
  * @file
- * @brief               Internet address family.
+ * @brief               Definitions for internet operations.
  */
 
 #pragma once
 
-#include <kernel/net/ipv4.h>
-#include <kernel/net/ipv6.h>
+#include <core/endian.h>
 
-#define INET_ADDRSTRLEN     16
-#define INET6_ADDRSTRLEN    46
+#include <netinet/in.h>
 
-#define INADDR_ANY          ((in_addr_t)0x00000000)
-#define INADDR_BROADCAST    ((in_addr_t)0xffffffff)
-#define INADDR_NONE         ((in_addr_t)0xffffffff)
+__SYS_EXTERN_C_BEGIN
+
+#define htonl(val) core_cpu_to_be32(val)
+#define htons(val) core_cpu_to_be16(val)
+#define ntohl(val) core_be32_to_cpu(val)
+#define ntohs(val) core_be16_to_cpu(val)
+
+// TODO. Probably best off taking these (and extra, non-POSIX-standard)
+// functions from a BSD.
+/* extern in_addr_t inet_addr(const char *str); */
+/* char *inet_ntoa(struct in_addr); */
+/* const char *inet_ntop(int, const void *__restrict, char *__restrict, socklen_t); */
+/* int inet_pton(int, const char *__restrict, void *__restrict); */
+
+__SYS_EXTERN_C_END
