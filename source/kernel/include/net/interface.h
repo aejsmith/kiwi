@@ -25,6 +25,8 @@
 #include <kernel/net/ipv4.h>
 #include <kernel/net/ipv6.h>
 
+#include <lib/array.h>
+
 #include <sync/mutex.h>
 
 struct net_packet;
@@ -72,8 +74,7 @@ typedef struct net_interface {
     mutex_t lock;
 
     uint32_t flags;                     /**< Flags for the interface (NET_INTERFACE_*). */
-    net_addr_t *addrs;                  /**< Array of addresses. */
-    size_t addr_count;                  /**< Number of addresses. */
+    array_t addrs;                      /**< Array of addresses. */
 } net_interface_t;
 
 extern void net_interface_receive(net_interface_t *interface, struct net_packet *packet);

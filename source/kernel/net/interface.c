@@ -79,17 +79,14 @@ status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *ad
     }
 
     /* Check if this already exists. */
-    for (size_t i = 0; i < interface->addr_count; i++) {
-        if (ops->equal(&interface->addrs[i], addr))
+    for (size_t i = 0; i < interface->addrs.count; i++) {
+        const net_addr_t *entry = array_entry(&interface->addrs, net_addr_t, i);
+        if (ops->equal(entry, addr))
             return STATUS_ALREADY_EXISTS;
     }
 
-    interface->addrs = krealloc(
-        interface->addrs,
-        sizeof(interface->addrs[0]) * (interface->addr_count + 1), MM_KERNEL);
-
-    memcpy(&interface->addrs[interface->addr_count], addr, sizeof(*addr));
-    interface->addr_count++;
+    net_addr_t *entry = array_append(&interface->addrs, net_addr_t);
+    memcpy(entry, addr, sizeof(*addr));
 
     return STATUS_SUCCESS;
 }
@@ -112,21 +109,11 @@ status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t 
         return STATUS_INVALID_ARG;
     }
 
-    for (size_t i = 0; i < interface->addr_count; i++) {
-        if (ops->equal(&interface->addrs[i], addr)) {
-            interface->addr_count--;
+    for (size_t i = 0; i < interface->addrs.count; i++) {
+        const net_addr_t *entry = array_entry(&interface->addrs, net_addr_t, i);
 
-            if (i != interface->addr_count) {
-                memmove(
-                    &interface->addrs[i],
-                    &interface->addrs[i + 1],
-                    sizeof(interface->addrs[0]) * (interface->addr_count - i));
-
-                interface->addrs = krealloc(
-                    interface->addrs,
-                    sizeof(interface->addrs[0]) * interface->addr_count, MM_KERNEL);
-            }
-
+        if (ops->equal(entry, addr)) {
+            array_remove(&interface->addrs, net_addr_t, i);
             return STATUS_SUCCESS;
         }
     }
@@ -178,9 +165,7 @@ status_t net_interface_down(net_interface_t *interface) {
 
     interface->flags &= ~NET_INTERFACE_UP;
 
-    kfree(interface->addrs);
-    interface->addrs      = NULL;
-    interface->addr_count = 0;
+    array_clear(&interface->addrs);
 
     kprintf(LOG_NOTICE, "net: %pD: interface is down\n", device->node);
     return STATUS_SUCCESS;
@@ -189,8 +174,7 @@ status_t net_interface_down(net_interface_t *interface) {
 /** Initialize a network interface. */
 void net_interface_init(net_interface_t *interface) {
     mutex_init(&interface->lock, "net_interface_lock", 0);
+    array_init(&interface->addrs);
 
-    interface->flags      = 0;
-    interface->addrs      = NULL;
-    interface->addr_count = 0;
+    interface->flags = 0;
 }
