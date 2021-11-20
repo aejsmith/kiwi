@@ -56,18 +56,10 @@ status_t kern_socket_listen(handle_t handle, int backlog) {
     return STATUS_NOT_IMPLEMENTED;
 }
 
-status_t kern_socket_recv(handle_t handle, void *buf, size_t size, int flags, size_t *_bytes) {
-    return STATUS_NOT_IMPLEMENTED;
-}
-
 status_t kern_socket_recvfrom(
     handle_t handle, void *buf, size_t size, int flags, socklen_t max_addr_len,
     size_t *_bytes, sockaddr_t *_addr, socklen_t *_addr_len)
 {
-    return STATUS_NOT_IMPLEMENTED;
-}
-
-status_t kern_socket_send(handle_t handle, const void *buf, size_t size, int flags, size_t *_bytes) {
     return STATUS_NOT_IMPLEMENTED;
 }
 
@@ -91,7 +83,6 @@ status_t kern_socket_setsockopt(
 {
     return STATUS_NOT_IMPLEMENTED;
 }
-
 
 status_t kern_socket_shutdown(handle_t handle, int how) {
     return STATUS_NOT_IMPLEMENTED;

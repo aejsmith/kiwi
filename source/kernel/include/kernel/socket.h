@@ -99,11 +99,9 @@ extern status_t kern_socket_getsockname(
     handle_t handle, socklen_t max_len, sockaddr_t *_addr,
     socklen_t *_addr_len);
 extern status_t kern_socket_listen(handle_t handle, int backlog);
-extern status_t kern_socket_recv(handle_t handle, void *buf, size_t size, int flags, size_t *_bytes);
 extern status_t kern_socket_recvfrom(
     handle_t handle, void *buf, size_t size, int flags, socklen_t max_addr_len,
     size_t *_bytes, sockaddr_t *_addr, socklen_t *_addr_len);
-extern status_t kern_socket_send(handle_t handle, const void *buf, size_t size, int flags, size_t *_bytes);
 extern status_t kern_socket_sendto(
     handle_t handle, const void *buf, size_t size, int flags,
     const sockaddr_t *addr, socklen_t addr_len, size_t *_bytes);

@@ -113,7 +113,7 @@ int listen(int socket, int backlog) {
 /** Receive a message from a connected socket. */
 ssize_t recv(int socket, void *buf, size_t length, int flags) {
     size_t bytes = 0;
-    status_t ret = kern_socket_recv(socket, buf, length, flags, &bytes);
+    status_t ret = kern_socket_recvfrom(socket, buf, length, flags, 0, &bytes, NULL, NULL);
     if (ret != STATUS_SUCCESS && bytes == 0) {
         libsystem_status_to_errno(ret);
         return -1;
@@ -142,7 +142,7 @@ ssize_t recvfrom(
 /** Send a message on a socket. */
 ssize_t send(int socket, const void *buf, size_t length, int flags) {
     size_t bytes = 0;
-    status_t ret = kern_socket_send(socket, buf, length, flags, &bytes);
+    status_t ret = kern_socket_sendto(socket, buf, length, flags, NULL, 0, &bytes);
     if (ret != STATUS_SUCCESS && bytes == 0) {
         libsystem_status_to_errno(ret);
         return -1;
