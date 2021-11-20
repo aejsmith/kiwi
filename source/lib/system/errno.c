@@ -82,6 +82,7 @@ static int status_to_errno_table[] = {
     [STATUS_DIFFERENT_FS]    = EXDEV,
     [STATUS_IS_DIR]          = EISDIR,
     [STATUS_PIPE_CLOSED]     = EPIPE,
+    [STATUS_NET_DOWN]        = ENETDOWN,
 };
 
 /** Real location of errno. */
