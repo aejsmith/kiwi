@@ -205,23 +205,45 @@ int sockatmark(int socket) {
 
 /** Create an endpoint for communication. */
 int socket(int domain, int type, int protocol) {
+    int kern_type = type & __SOCK_TYPE;
+
+    uint32_t flags = 0;
+    if (type & SOCK_NONBLOCK)
+        flags |= FILE_NONBLOCK;
+
     handle_t handle;
-    status_t ret = kern_socket_create(domain, type, protocol, &handle);
+    status_t ret = kern_socket_create(domain, kern_type, protocol, flags, &handle);
     if (ret != STATUS_SUCCESS) {
         libsystem_status_to_errno(ret);
         return -1;
     }
+
+    /* Mark the handle as inheritable if not opening with SOCK_CLOEXEC. */
+    if (!(type & SOCK_CLOEXEC))
+        kern_handle_set_flags(handle, HANDLE_INHERITABLE);
 
     return (int)handle;
 }
 
 /** Create a pair of connected sockets. */
 int socketpair(int domain, int type, int protocol, int sockets[2]) {
+    int kern_type = type & __SOCK_TYPE;
+
+    uint32_t flags = 0;
+    if (type & SOCK_NONBLOCK)
+        flags |= FILE_NONBLOCK;
+
     handle_t handles[2];
-    status_t ret = kern_socket_create_pair(domain, type, protocol, handles);
+    status_t ret = kern_socket_create_pair(domain, kern_type, protocol, flags, handles);
     if (ret != STATUS_SUCCESS) {
         libsystem_status_to_errno(ret);
         return -1;
+    }
+
+    /* Mark the handles as inheritable if not opening with SOCK_CLOEXEC. */
+    if (!(type & SOCK_CLOEXEC)) {
+        kern_handle_set_flags(handles[0], HANDLE_INHERITABLE);
+        kern_handle_set_flags(handles[1], HANDLE_INHERITABLE);
     }
 
     sockets[0] = (int)handles[0];

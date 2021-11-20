@@ -73,7 +73,7 @@ status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *ad
 
     const net_addr_ops_t *ops = net_addr_ops(addr);
     if (!ops) {
-        return STATUS_NOT_SUPPORTED;
+        return STATUS_ADDR_NOT_SUPPORTED;
     } else if (!ops->valid(addr)) {
         return STATUS_INVALID_ARG;
     }
@@ -104,7 +104,7 @@ status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t 
 
     const net_addr_ops_t *ops = net_addr_ops(addr);
     if (!ops) {
-        return STATUS_NOT_SUPPORTED;
+        return STATUS_ADDR_NOT_SUPPORTED;
     } else if (!ops->valid(addr)) {
         return STATUS_INVALID_ARG;
     }

@@ -49,8 +49,8 @@ enum {
      *
      * Errors:              STATUS_ALREADY_EXISTS if the address already exists
      *                      on the interface.
-     *                      STATUS_NOT_SUPPORTED if the address family is not
-     *                      supported.
+     *                      STATUS_ADDR_NOT_SUPPORTED if the address family is
+     *                      not supported.
      *                      STATUS_NET_DOWN if the interface is down.
      */
     NET_DEVICE_REQUEST_ADD_ADDR     = DEVICE_CLASS_REQUEST_START + 2,
@@ -65,8 +65,8 @@ enum {
      *
      * Errors:              STATUS_NOT_FOUND if the address does not exist on
      *                      the interface.
-     *                      STATUS_NOT_SUPPORTED if the address family is not
-     *                      supported.
+     *                      STATUS_ADDR_NOT_SUPPORTED if the address family is
+     *                      not supported.
      *                      STATUS_NET_DOWN if the interface is down.
      */
     NET_DEVICE_REQUEST_REMOVE_ADDR  = DEVICE_CLASS_REQUEST_START + 3,

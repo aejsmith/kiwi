@@ -21,15 +21,40 @@
 
 #include <device/net/net.h>
 
+#include <io/socket.h>
+
 #include <net/net.h>
 #include <net/packet.h>
 
 #include <module.h>
 #include <status.h>
 
+static status_t net_socket_create(file_handle_t *handle, sa_family_t family, int type, int protocol) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static void net_socket_close(file_handle_t *handle) {
+
+}
+
+static const socket_ops_t net_socket_ops = {
+    .create = net_socket_create,
+    .close  = net_socket_close,
+};
+
+static socket_family_t net_socket_families[] = {
+    { .id = AF_INET, .ops = &net_socket_ops },
+};
+
 static status_t net_init(void) {
     net_packet_cache_init();
     net_device_class_init();
+
+    status_t ret = socket_families_register(net_socket_families, array_size(net_socket_families));
+    if (ret != STATUS_SUCCESS) {
+        // TODO: Cleanup...
+        return ret;
+    }
 
     return STATUS_SUCCESS;
 }

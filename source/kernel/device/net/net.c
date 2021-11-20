@@ -60,7 +60,7 @@ static status_t copy_net_addr(const void *in, size_t in_size, net_addr_t *addr) 
 
     const net_addr_ops_t *ops = net_addr_ops(addr);
     if (!ops) {
-        return STATUS_NOT_SUPPORTED;
+        return STATUS_ADDR_NOT_SUPPORTED;
     } else if (in_size != ops->size) {
         return STATUS_INVALID_ARG;
     }

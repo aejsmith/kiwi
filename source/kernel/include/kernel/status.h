@@ -72,6 +72,7 @@
 #define STATUS_INCORRECT_TYPE       47  /**< Object is not of the correct type. */
 #define STATUS_PIPE_CLOSED          48  /**< Read end of pipe has been closed. */
 #define STATUS_NET_DOWN             49  /**< Network is down. */
+#define STATUS_ADDR_NOT_SUPPORTED   50  /**< Address family is not supported. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 

@@ -36,6 +36,7 @@ type user_id_t int16_t;
 type group_id_t int16_t;
 type image_id_t int16_t;
 type socklen_t uint32_t;
+type sa_family_t uint16_t;
 
 syscall kern_system_info(uint, ptr_t);
 syscall kern_system_shutdown(int);
@@ -176,5 +177,5 @@ syscall kern_socket_getsockopt(handle_t, int, int, socklen_t, ptr_t, ptr_t);
 syscall kern_socket_setsockopt(handle_t, int, int, ptr_t, socklen_t);
 syscall kern_socket_shutdown(handle_t, int);
 syscall kern_socket_sockatmark(handle_t, ptr_t);
-syscall kern_socket_create(int, int, int, ptr_t);
-syscall kern_socket_create_pair(int, int, int, ptr_t);
+syscall kern_socket_create(sa_family_t, int, int, uint32_t, ptr_t);
+syscall kern_socket_create_pair(sa_family_t, int, int, uint32_t, ptr_t);

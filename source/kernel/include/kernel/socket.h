@@ -114,7 +114,11 @@ extern status_t kern_socket_setsockopt(
 extern status_t kern_socket_shutdown(handle_t handle, int how);
 extern status_t kern_socket_sockatmark(handle_t handle, bool *_mark);
 
-extern status_t kern_socket_create(int domain, int type, int protocol, handle_t *_handle);
-extern status_t kern_socket_create_pair(int domain, int type, int protocol, handle_t _handles[2]);
+extern status_t kern_socket_create(
+    sa_family_t family, int type, int protocol, uint32_t flags,
+    handle_t *_handle);
+extern status_t kern_socket_create_pair(
+    sa_family_t family, int type, int protocol, uint32_t flags,
+    handle_t _handles[2]);
 
 __KERNEL_EXTERN_C_END

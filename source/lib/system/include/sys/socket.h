@@ -27,6 +27,11 @@
 
 __SYS_EXTERN_C_BEGIN
 
+/** Linux-compatible flags for socket()/socketpair() type argument. */
+#define SOCK_CLOEXEC    (1<<16)
+#define SOCK_NONBLOCK   (1<<17)
+#define __SOCK_TYPE     0xffff
+
 extern int accept(int socket, struct sockaddr *__restrict addr, socklen_t *__restrict addr_len);
 extern int bind(int socket, const struct sockaddr *addr, socklen_t addr_len);
 extern int connect(int socket, const struct sockaddr *addr, socklen_t addr_len);
