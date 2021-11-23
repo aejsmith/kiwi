@@ -124,7 +124,6 @@ static void virtio_net_buffer_free(net_buffer_external_t *net) {
     uint16_t desc_index = buffer - device->rx_buffers;
 
     /* Re-queue the RX buffer for use again. */
-    kprintf(LOG_DEBUG, "requeue buffer %u\n", desc_index);
     virtio_net_queue_rx(device, desc_index, true);
 }
 
@@ -258,51 +257,6 @@ static status_t virtio_net_device_up(net_device_t *_device) {
     /* Notify the device that RX buffers are available. */
     virtio_device_notify(device->virtio, VIRTIO_NET_QUEUE_RX);
 
-#if 0
-    {
-        status_t ret;
-
-        size_t size = sizeof(arp_packet_t);
-
-        arp_packet_t *data;
-        net_packet_t *packet = net_packet_kmalloc(size, MM_KERNEL | MM_ZERO, (void **)&data);
-
-        data->hw_type    = cpu_to_net16(ARP_HW_TYPE_ETHERNET);
-        data->proto_type = cpu_to_net16(ETHERNET_TYPE_IPV4);
-        data->hw_len     = ETHERNET_ADDR_SIZE;
-        data->proto_len  = IPV4_ADDR_SIZE;
-        data->opcode     = cpu_to_net16(ARP_OPCODE_REQUEST);
-
-        memcpy(data->hw_sender, device->net.hw_addr, sizeof(data->hw_sender));
-        data->proto_sender.val = 0;
-
-        memset(data->hw_target, 0, sizeof(data->hw_target));
-        data->proto_target.bytes[0] = 10;
-        data->proto_target.bytes[1] = 0;
-        data->proto_target.bytes[2] = 2;
-        data->proto_target.bytes[3] = 2;
-
-        ethernet_header_t *header;
-        net_buffer_t *eth = net_buffer_kmalloc(sizeof(ethernet_header_t), MM_KERNEL, (void **)&header);
-
-        memcpy(header->source, device->net.hw_addr, sizeof(header->source));
-        uint8_t broadcast[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-        memcpy(header->dest, broadcast, sizeof(header->dest));
-        header->type = cpu_to_net16(ETHERNET_TYPE_ARP);
-
-        net_packet_prepend(packet, eth);
-
-        ret = virtio_net_device_transmit(&device->net, packet);
-        if (ret == STATUS_SUCCESS) {
-            kprintf(LOG_DEBUG, "packet transmitted!\n");
-        } else {
-            kprintf(LOG_DEBUG, "failed to transmit packet: %d\n", ret);
-        }
-
-        net_packet_release(packet);
-    }
-#endif
-
     return STATUS_SUCCESS;
 }
 
@@ -356,30 +310,10 @@ static void virtio_net_handle_used(virtio_device_t *virtio, uint16_t index, stru
 
             net_packet_t *packet = net_packet_create(&buffer->net.buffer);
 
-            kprintf(LOG_DEBUG, "packet received %u len %u\n", desc_index, size);
-#if 0
-            {
-                ethernet_header_t *header = net_packet_data(packet, 0, sizeof(ethernet_header_t));
-                assert(header);
-
-                kprintf(LOG_DEBUG, "Eth: dest = %pM source = %pM type = 0x%x\n",
-                    header->dest, header->source, net16_to_cpu(header->type));
-
-                net_packet_offset(packet, sizeof(*header));
-
-                arp_packet_t *arp = net_packet_data(packet, 0, sizeof(arp_packet_t));
-                assert(arp);
-
-                kprintf(LOG_DEBUG, "ARP: opcode = %u hw_sender = %pM proto_sender = %pI4 hw_target = %pM proto_target = %pI4\n",
-                    net16_to_cpu(arp->opcode), arp->hw_sender, arp->proto_sender.bytes, arp->hw_target, arp->proto_target.bytes);
-            }
-#endif
-
             net_device_receive(&device->net, packet);
             net_packet_release(packet);
         } else {
             /* Transmit. Just free this descriptor. */
-            kprintf(LOG_DEBUG, "free TX desc\n");
             virtio_queue_free(queue->queue, desc_index);
         }
     }
