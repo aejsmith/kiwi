@@ -340,15 +340,17 @@ status_t file_read(
     vec.size   = size;
 
     io_request_t request;
-    ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ, IO_TARGET_KERNEL);
-    if (ret != STATUS_SUCCESS)
-        return ret;
+    request.transferred = 0;
 
-    ret = file_io(handle, &request);
+    ret = io_request_init(&request, &vec, 1, offset, IO_OP_READ, IO_TARGET_KERNEL);
+    if (ret == STATUS_SUCCESS) {
+        ret = file_io(handle, &request);
+        io_request_destroy(&request);
+    }
+
     if (_bytes)
         *_bytes = request.transferred;
 
-    io_request_destroy(&request);
     return ret;
 }
 
@@ -394,15 +396,17 @@ status_t file_write(
     vec.size   = size;
 
     io_request_t request;
-    ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
-    if (ret != STATUS_SUCCESS)
-        return ret;
+    request.transferred = 0;
 
-    ret = file_io(handle, &request);
+    ret = io_request_init(&request, &vec, 1, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
+    if (ret == STATUS_SUCCESS) {
+        ret = file_io(handle, &request);
+        io_request_destroy(&request);
+    }
+
     if (_bytes)
         *_bytes = request.transferred;
 
-    io_request_destroy(&request);
     return ret;
 }
 
@@ -434,15 +438,17 @@ status_t file_read_vecs(
     assert(handle);
 
     io_request_t request;
-    ret = io_request_init(&request, vecs, count, offset, IO_OP_READ, IO_TARGET_KERNEL);
-    if (ret != STATUS_SUCCESS)
-        return ret;
+    request.transferred = 0;
 
-    ret = file_io(handle, &request);
+    ret = io_request_init(&request, vecs, count, offset, IO_OP_READ, IO_TARGET_KERNEL);
+    if (ret == STATUS_SUCCESS) {
+        ret = file_io(handle, &request);
+        io_request_destroy(&request);
+    }
+
     if (_bytes)
         *_bytes = request.transferred;
 
-    io_request_destroy(&request);
     return ret;
 }
 
@@ -475,15 +481,17 @@ status_t file_write_vecs(
     assert(handle);
 
     io_request_t request;
-    ret = io_request_init(&request, vecs, count, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
-    if (ret != STATUS_SUCCESS)
-        return ret;
+    request.transferred = 0;
 
-    ret = file_io(handle, &request);
+    ret = io_request_init(&request, vecs, count, offset, IO_OP_WRITE, IO_TARGET_KERNEL);
+    if (ret == STATUS_SUCCESS) {
+        ret = file_io(handle, &request);
+        io_request_destroy(&request);
+    }
+
     if (_bytes)
         *_bytes = request.transferred;
 
-    io_request_destroy(&request);
     return ret;
 }
 
