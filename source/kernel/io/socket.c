@@ -19,9 +19,13 @@
  * @brief               Socket API.
  */
 
+#include <io/request.h>
 #include <io/socket.h>
 
+#include <lib/utility.h>
+
 #include <mm/malloc.h>
+#include <mm/safe.h>
 
 #include <assert.h>
 #include <status.h>
@@ -101,6 +105,24 @@ status_t socket_families_unregister(socket_family_t *families, size_t count) {
     return STATUS_SUCCESS;
 }
 
+static status_t socket_do_send(
+    file_handle_t *handle, io_request_t *request, int flags,
+    const sockaddr_t *addr, socklen_t addr_len)
+{
+    socket_t *socket = handle->socket;
+
+    return socket->ops->send(socket, request, flags, addr, addr_len);
+}
+
+static status_t socket_do_receive(
+    file_handle_t *handle, io_request_t *request, int flags,
+    socklen_t max_addr_len, sockaddr_t *_addr, socklen_t *_addr_len)
+{
+    socket_t *socket = handle->socket;
+
+    return socket->ops->receive(socket, request, flags, max_addr_len, _addr, _addr_len);
+}
+
 static void socket_file_close(file_handle_t *handle) {
     socket_t *socket = handle->socket;
 
@@ -111,9 +133,31 @@ static void socket_file_close(file_handle_t *handle) {
     socket_family_release(family);
 }
 
+static status_t socket_file_io(file_handle_t *handle, io_request_t *request) {
+    if (request->op == IO_OP_WRITE) {
+        return socket_do_send(handle, request, 0, NULL, 0);
+    } else {
+        return socket_do_receive(handle, request, 0, 0, NULL, 0);
+    }
+}
+
 static const file_ops_t socket_file_ops = {
     .close = socket_file_close,
+    .io    = socket_file_io,
 };
+
+/** Validate that a handle is a socket and return its file_handle_t if so. */
+static file_handle_t *get_socket_handle(object_handle_t *handle) {
+    if (handle->type->id != OBJECT_TYPE_FILE)
+        return NULL;
+
+    file_handle_t *fhandle = handle->private;
+
+    if (fhandle->file->ops != &socket_file_ops)
+        return NULL;
+
+    return fhandle;
+}
 
 status_t socket_accept(
     object_handle_t *handle, socklen_t max_len, sockaddr_t *_addr,
@@ -148,19 +192,107 @@ status_t socket_listen(object_handle_t *handle, int backlog) {
     return STATUS_NOT_IMPLEMENTED;
 }
 
+/** Receives data from a socket.
+ * @param handle        Handle to socket to receive from.
+ * @param buf           Buffer to receive data into.
+ * @param size          Maximum size of data to receive.
+ * @param flags         Behaviour flags (MSG_*).
+ * @param max_addr_len  Maximum length of returned address (size of buffer).
+ * @param _bytes        Where to store number of bytes received.
+ * @param _addr         Where to return address of the source (can be NULL).
+ * @param _addr_len     Where to return actual size of the source address.
+ * @return              Status code describing result of the operation. */
 status_t socket_recvfrom(
     object_handle_t *handle, void *buf, size_t size, int flags,
     socklen_t max_addr_len, size_t *_bytes, sockaddr_t *_addr,
     socklen_t *_addr_len)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    status_t ret;
+
+    assert(handle);
+    assert(buf);
+    assert(max_addr_len == 0 || (_addr && _addr_len));
+
+    io_request_t request;
+    request.transferred = 0;
+
+    if (_addr_len)
+        *_addr_len = 0;
+
+    file_handle_t *fhandle = get_socket_handle(handle);
+    if (!fhandle) {
+        ret = STATUS_INVALID_HANDLE;
+        goto out;
+    }
+
+    io_vec_t vec;
+    vec.buffer = buf;
+    vec.size   = size;
+
+    ret = io_request_init(&request, &vec, 1, 0, IO_OP_READ, IO_TARGET_KERNEL);
+    if (ret != STATUS_SUCCESS)
+        goto out;
+
+    ret = socket_do_receive(
+        fhandle, &request, flags, max_addr_len,
+        (max_addr_len > 0) ? _addr : NULL, (max_addr_len > 0) ? _addr_len : NULL);
+
+    io_request_destroy(&request);
+
+out:
+    if (_bytes)
+        *_bytes = request.transferred;
+
+    return ret;
 }
 
+/** Sends data on a socket.
+ * @param handle        Handle to socket to send on.
+ * @param buf           Buffer containing data to send.
+ * @param size          Size of data to send.
+ * @param flags         Behaviour flags (MSG_*).
+ * @param addr          Address of the destination, for connectionless-mode
+ *                      sockets (can be NULL). Ignored for connection-mode
+ *                      sockets.
+ * @param addr_len      Size of the address structure.
+ * @param _bytes        Where to store number of bytes sent.
+ * @return              Status code describing result of the operation. */
 status_t socket_sendto(
     object_handle_t *handle, const void *buf, size_t size, int flags,
     const sockaddr_t *addr, socklen_t addr_len, size_t *_bytes)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    status_t ret;
+
+    assert(handle);
+    assert(buf);
+    assert(addr_len == 0 || addr);
+
+    io_request_t request;
+    request.transferred = 0;
+
+    file_handle_t *fhandle = get_socket_handle(handle);
+    if (!fhandle) {
+        ret = STATUS_INVALID_HANDLE;
+        goto out;
+    }
+
+    io_vec_t vec;
+    vec.buffer = (void *)buf;
+    vec.size   = size;
+
+    ret = io_request_init(&request, &vec, 1, 0, IO_OP_WRITE, IO_TARGET_KERNEL);
+    if (ret != STATUS_SUCCESS)
+        goto out;
+
+    ret = socket_do_send(fhandle, &request, flags, addr, addr_len);
+
+    io_request_destroy(&request);
+
+out:
+    if (_bytes)
+        *_bytes = request.transferred;
+
+    return ret;
 }
 
 status_t socket_getsockopt(
@@ -275,18 +407,151 @@ status_t kern_socket_listen(handle_t handle, int backlog) {
     return STATUS_NOT_IMPLEMENTED;
 }
 
+/** Receives data from a socket.
+ * @param handle        Handle to socket to receive from.
+ * @param buf           Buffer to receive data into.
+ * @param size          Maximum size of data to receive.
+ * @param flags         Behaviour flags (MSG_*).
+ * @param max_addr_len  Maximum length of returned address (size of buffer).
+ * @param _bytes        Where to store number of bytes received.
+ * @param _addr         Where to return address of the source (can be NULL).
+ * @param _addr_len     Where to return actual size of the source address.
+ * @return              Status code describing result of the operation. */
 status_t kern_socket_recvfrom(
     handle_t handle, void *buf, size_t size, int flags, socklen_t max_addr_len,
     size_t *_bytes, sockaddr_t *_addr, socklen_t *_addr_len)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    status_t ret, err;
+
+    io_request_t request;
+    request.transferred = 0;
+
+    socklen_t addr_len = 0;
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    void *kaddr __cleanup_kfree = NULL;
+
+    if (!buf ||
+        (max_addr_len > 0 && (!_addr || !_addr_len)) ||
+        max_addr_len > SOCKADDR_STORAGE_SIZE)
+    {
+        ret = STATUS_INVALID_ARG;
+        goto out;
+    }
+
+    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+    if (ret != STATUS_SUCCESS)
+        goto out;
+
+    file_handle_t *fhandle = get_socket_handle(khandle);
+    if (!fhandle) {
+        ret = STATUS_INVALID_HANDLE;
+        goto out;
+    }
+
+    io_vec_t vec;
+    vec.buffer = buf;
+    vec.size   = size;
+
+    ret = io_request_init(&request, &vec, 1, 0, IO_OP_READ, IO_TARGET_USER);
+    if (ret != STATUS_SUCCESS)
+        goto out;
+
+    if (max_addr_len > 0)
+        kaddr = kmalloc(max_addr_len, MM_KERNEL);
+
+    ret = socket_do_receive(fhandle, &request, flags, max_addr_len, kaddr, (kaddr) ? &addr_len : NULL);
+
+    io_request_destroy(&request);
+
+out:
+    if (_addr_len) {
+        err = write_user(_addr_len, addr_len);
+        if (err != STATUS_SUCCESS)
+            ret = err;
+    }
+
+    if (addr_len > 0) {
+        err = memcpy_to_user(_addr, kaddr, min(addr_len, max_addr_len));
+        if (err != STATUS_SUCCESS)
+            ret = err;
+    }
+
+    if (_bytes) {
+        err = write_user(_bytes, request.transferred);
+        if (err != STATUS_SUCCESS)
+            ret = err;
+    }
+
+    return ret;
 }
 
+/** Sends data on a socket.
+ * @param handle        Handle to socket to send on.
+ * @param buf           Buffer containing data to send.
+ * @param size          Size of data to send.
+ * @param flags         Behaviour flags (MSG_*).
+ * @param addr          Address of the destination, for connectionless-mode
+ *                      sockets (can be NULL). Ignored for connection-mode
+ *                      sockets.
+ * @param addr_len      Size of the address structure.
+ * @param _bytes        Where to store number of bytes sent.
+ * @return              Status code describing result of the operation. */
 status_t kern_socket_sendto(
     handle_t handle, const void *buf, size_t size, int flags,
     const sockaddr_t *addr, socklen_t addr_len, size_t *_bytes)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    status_t ret, err;
+
+    io_request_t request;
+    request.transferred = 0;
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    void *kaddr __cleanup_kfree = NULL;
+
+    if (!buf || (addr_len > 0 && !addr) || addr_len > SOCKADDR_STORAGE_SIZE) {
+        ret = STATUS_INVALID_ARG;
+        goto out;
+    }
+
+    if (addr_len > 0) {
+        kaddr = kmalloc(addr_len, MM_KERNEL);
+
+        ret = memcpy_from_user(kaddr, addr, addr_len);
+        if (ret != STATUS_SUCCESS)
+            goto out;
+    }
+
+    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+    if (ret != STATUS_SUCCESS)
+        goto out;
+
+    file_handle_t *fhandle = get_socket_handle(khandle);
+    if (!fhandle) {
+        ret = STATUS_INVALID_HANDLE;
+        goto out;
+    }
+
+    io_vec_t vec;
+    vec.buffer = (void *)buf;
+    vec.size   = size;
+
+    ret = io_request_init(&request, &vec, 1, 0, IO_OP_WRITE, IO_TARGET_USER);
+    if (ret != STATUS_SUCCESS)
+        goto out;
+
+    ret = socket_do_send(fhandle, &request, flags, kaddr, addr_len);
+
+    io_request_destroy(&request);
+
+out:
+    if (_bytes) {
+        err = write_user(_bytes, request.transferred);
+        if (err != STATUS_SUCCESS)
+            ret = err;
+    }
+
+    return ret;
 }
 
 status_t kern_socket_getsockopt(

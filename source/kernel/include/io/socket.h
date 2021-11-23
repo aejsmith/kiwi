@@ -28,6 +28,7 @@
 
 #include <kernel/socket.h>
 
+struct io_request;
 struct socket;
 
 /** Socket operations structure. */
@@ -35,6 +36,30 @@ typedef struct socket_ops {
     /** Closes and frees the socket.
      * @param socket        Socket to close. */
     void (*close)(struct socket *socket);
+
+    /** Sends data on the socket.
+     * @param socket        Socket to send on.
+     * @param request       I/O request containing data.
+     * @param flags         Behaviour flags (MSG_*).
+     * @param addr          Destination address.
+     * @param addr_len      Length of destination address (0 for unspecified).
+     * @return              Status code describing result of the operation. */
+    status_t (*send)(
+        struct socket *socket, struct io_request *request, int flags,
+        const sockaddr_t *addr, socklen_t addr_len);
+
+    /** Receives data from the socket.
+     * @param socket        Socket to receive from.
+     * @param request       I/O request to receive data.
+     * @param flags         Behaviour flags (MSG_*).
+     * @param max_addr_len  Maximum length of returned address (size of buffer,
+     *                      can be 0 if no address to be returned).
+     * @param _addr         Where to return address of the source.
+     * @param _addr_len     Where to return actual size of the source address.
+     * @return              Status code describing result of the operation. */
+    status_t (*receive)(
+        struct socket *socket, struct io_request *request, int flags,
+        socklen_t max_addr_len, sockaddr_t *_addr, socklen_t *_addr_len);
 } socket_ops_t;
 
 /** Base socket structure (embedded in protocol-specific implementation). */

@@ -21,6 +21,8 @@
 
 #include <mm/malloc.h>
 
+#include <io/request.h>
+
 #include <net/udp.h>
 
 #include <status.h>
@@ -31,8 +33,30 @@ static void udp_socket_close(socket_t *_socket) {
     kfree(socket);
 }
 
+static status_t udp_socket_send(
+    socket_t *_socket, io_request_t *request, int flags, const sockaddr_t *addr,
+    socklen_t addr_len)
+{
+    udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
+
+    (void)socket;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static status_t udp_socket_receive(
+    socket_t *_socket, io_request_t *request, int flags, socklen_t max_addr_len,
+    sockaddr_t *_addr, socklen_t *_addr_len)
+{
+    udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
+
+    (void)socket;
+    return STATUS_NOT_IMPLEMENTED;
+}
+
 static const socket_ops_t udp_socket_ops = {
-    .close = udp_socket_close,
+    .close   = udp_socket_close,
+    .send    = udp_socket_send,
+    .receive = udp_socket_receive,
 };
 
 /** Creates a UDP socket. */
