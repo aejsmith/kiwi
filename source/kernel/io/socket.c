@@ -49,14 +49,18 @@ static socket_family_t *socket_family_get(sa_family_t id) {
 
     socket_family_t *family = socket_family_lookup(id);
     if (family)
-        refcount_inc(&family->count);
+        family->count++;
 
     return family;
 }
 
 /** Release a socket family. */
-static void socket_family_release(socket_family_t *family) {
-    refcount_dec(&family->count);
+static void socket_family_release(sa_family_t id) {
+    MUTEX_SCOPED_LOCK(lock, &socket_families_lock);
+
+    socket_family_t *family = socket_family_lookup(id);
+    assert(family);
+    family->count--;
 }
 
 /** Registers a set of socket families.
@@ -72,12 +76,9 @@ status_t socket_families_register(socket_family_t *families, size_t count) {
     }
 
     for (size_t i = 0; i < count; i++) {
-        families[i].file.type = FILE_TYPE_SOCKET;
-        families[i].file.ops  = &socket_file_ops;
+        families[i].count = 0;
 
-        refcount_set(&families[i].count, 0);
         list_init(&families[i].link);
-
         list_append(&socket_families, &families[i].link);
     }
 
@@ -101,9 +102,12 @@ status_t socket_families_unregister(socket_family_t *families, size_t count) {
 }
 
 static void socket_file_close(file_handle_t *handle) {
-    socket_family_t *family = handle->socket;
+    socket_t *socket = handle->socket;
 
-    family->ops->close(handle);
+    /* Save this since close() frees it. */
+    sa_family_t family = socket->family;
+
+    socket->ops->close(socket);
     socket_family_release(family);
 }
 
@@ -190,26 +194,31 @@ status_t socket_sockatmark(object_handle_t *handle, bool *_mark) {
  * @param _handle       Where to store created handle.
  * @return              Status code describing result of the operation. */
 status_t socket_create(
-    sa_family_t family, int type, int protocol, uint32_t flags,
+    sa_family_t _family, int type, int protocol, uint32_t flags,
     object_handle_t **_handle)
 {
     status_t ret;
 
     assert(_handle);
 
-    socket_family_t *file = socket_family_get(family);
-    if (!file)
+    socket_family_t *family = socket_family_get(_family);
+    if (!family)
         return STATUS_ADDR_NOT_SUPPORTED;
 
-    file_handle_t *handle = file_handle_alloc(&file->file, FILE_ACCESS_READ | FILE_ACCESS_WRITE, flags);
-
-    ret = file->ops->create(handle, family, type, protocol);
+    socket_t *socket;
+    ret = family->create(family->id, type, protocol, &socket);
     if (ret != STATUS_SUCCESS) {
-        file_handle_free(handle);
-        socket_family_release(file);
+        socket_family_release(family->id);
         return ret;
     }
 
+    assert(socket->ops);
+
+    socket->file.type = FILE_TYPE_SOCKET;
+    socket->file.ops  = &socket_file_ops;
+    socket->family    = family->id;
+
+    file_handle_t *handle = file_handle_alloc(&socket->file, FILE_ACCESS_READ | FILE_ACCESS_WRITE, flags);
     *_handle = file_handle_create(handle);
     return STATUS_SUCCESS;
 }

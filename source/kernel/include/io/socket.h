@@ -28,35 +28,35 @@
 
 #include <kernel/socket.h>
 
-struct socket_family;
+struct socket;
 
 /** Socket operations structure. */
 typedef struct socket_ops {
-    /** Creates a socket.
-     * @param handle        File handle structure.
-     * @param family        Address family of the socket.
-     * @param type          Type of the socket.
-     * @param protocol      Protocol number.
-     * @return              Status code describing the result of the operation. */
-    status_t (*create)(file_handle_t *handle, sa_family_t family, int type, int protocol);
-
-    /** Closes the socket.
-     * @param handle        File handle structure. */
-    void (*close)(file_handle_t *handle);
+    /** Closes and frees the socket.
+     * @param socket        Socket to close. */
+    void (*close)(struct socket *socket);
 } socket_ops_t;
+
+/** Base socket structure (embedded in protocol-specific implementation). */
+typedef struct socket {
+    file_t file;                    /**< File header. */
+    sa_family_t family;             /**< Address family ID (AF_*). */
+    const socket_ops_t *ops;        /**< Operations implementing the socket. */
+} socket_t;
 
 /** Structure describing a supported socket family. */
 typedef struct socket_family {
-    /**
-     * File header (all sockets on a family share the same file since actual
-     * state is stored in per-handle data).
-     */
-    file_t file;
-
     list_t link;                    /**< Link to families list. */
-    refcount_t count;               /**< Sockets open using the family. */
+    uint32_t count;                 /**< Number of sockets open using the family. */
     sa_family_t id;                 /**< Family ID (AF_*). */
-    const socket_ops_t *ops;        /**< Operations implementing the family. */
+
+    /** Creates a socket.
+     * @param family        Address family of the socket.
+     * @param type          Type of the socket.
+     * @param protocol      Protocol number.
+     * @param _socket       Where to store pointer to created socket.
+     * @return              Status code describing the result of the operation. */
+    status_t (*create)(sa_family_t family, int type, int protocol, socket_t **_socket);
 } socket_family_t;
 
 extern status_t socket_families_register(socket_family_t *families, size_t count);

@@ -54,4 +54,10 @@ typedef struct net_addr_ipv4 {
     ipv4_addr_t broadcast;              /**< Broadcast address. */
 } net_addr_ipv4_t;
 
+enum {
+    IPPROTO_IP      = 0,
+    IPPROTO_TCP     = 1,
+    IPPROTO_UDP     = 2,
+};
+
 __KERNEL_EXTERN_C_END

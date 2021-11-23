@@ -16,40 +16,18 @@
 
 /**
  * @file
- * @brief               Network stack module main functions.
+ * @brief               UDP protocol implementation.
  */
 
-#include <device/net/net.h>
+#pragma once
 
-#include <io/socket.h>
+#include <net/socket.h>
 
-#include <net/ipv4.h>
-#include <net/packet.h>
+/** UDP socket structure. */
+typedef struct udp_socket {
+    net_socket_t net;
+} udp_socket_t;
 
-#include <module.h>
-#include <status.h>
+DEFINE_CLASS_CAST(udp_socket, net_socket, net);
 
-static socket_family_t net_socket_families[] = {
-    { .id = AF_INET, .create = ipv4_socket_create },
-};
-
-static status_t net_init(void) {
-    net_packet_cache_init();
-    net_device_class_init();
-
-    status_t ret = socket_families_register(net_socket_families, array_size(net_socket_families));
-    if (ret != STATUS_SUCCESS) {
-        // TODO: Cleanup...
-        return ret;
-    }
-
-    return STATUS_SUCCESS;
-}
-
-static status_t net_unload(void) {
-    return STATUS_NOT_IMPLEMENTED;
-}
-
-MODULE_NAME(NET_MODULE_NAME);
-MODULE_DESC("Network stack");
-MODULE_FUNCS(net_init, net_unload);
+extern status_t udp_socket_create(sa_family_t family, socket_t **_socket);

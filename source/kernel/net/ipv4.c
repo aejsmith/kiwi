@@ -20,8 +20,10 @@
  */
 
 #include <net/ipv4.h>
+#include <net/udp.h>
 
 #include <kernel.h>
+#include <status.h>
 
 static bool ipv4_net_addr_valid(const net_addr_t *addr) {
     const uint8_t *addr_bytes = addr->ipv4.addr.bytes;
@@ -50,3 +52,23 @@ const net_addr_ops_t ipv4_net_addr_ops = {
     .valid = ipv4_net_addr_valid,
     .equal = ipv4_net_addr_equal,
 };
+
+/** Creates an IPv4 socket. */
+status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t **_socket) {
+    switch (type) {
+        case SOCK_DGRAM: {
+            switch (protocol) {
+                case IPPROTO_IP:
+                case IPPROTO_UDP:
+                    return udp_socket_create(family, _socket);
+            }
+
+            break;
+        }
+        //case SOCK_STREAM: {
+        //  break;
+        //}
+    }
+
+    return STATUS_INVALID_ARG;
+}

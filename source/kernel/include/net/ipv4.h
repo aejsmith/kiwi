@@ -23,6 +23,10 @@
 
 #include <kernel/net/ipv4.h>
 
+#include <io/socket.h>
+
 #include <net/interface.h>
 
 extern const net_addr_ops_t ipv4_net_addr_ops;
+
+extern status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t **_socket);
