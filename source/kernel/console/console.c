@@ -86,7 +86,7 @@ static status_t kconsole_device_io(device_t *device, file_handle_t *handle, io_r
     if (!buf)
         return STATUS_NO_MEMORY;
 
-    ret = io_request_copy(request, buf, request->total);
+    ret = io_request_copy(request, buf, request->total, true);
     if (ret != STATUS_SUCCESS)
         goto out;
 

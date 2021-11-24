@@ -113,16 +113,16 @@ status_t pipe_io(pipe_t *pipe, io_request_t *request, bool nonblock) {
         if (pos + size > PIPE_SIZE) {
             size_t split = PIPE_SIZE - pos;
 
-            err = io_request_copy(request, &pipe->buf[pos], split);
+            err = io_request_copy(request, &pipe->buf[pos], split, true);
             if (err == STATUS_SUCCESS) {
-                err = io_request_copy(request, &pipe->buf[0], size - split);
+                err = io_request_copy(request, &pipe->buf[0], size - split, true);
                 if (err != STATUS_SUCCESS) {
                     /* Don't do a partial transfer in the copy fail case. */
                     request->transferred -= split;
                 }
             }
         } else {
-            err = io_request_copy(request, &pipe->buf[pos], size);
+            err = io_request_copy(request, &pipe->buf[pos], size, true);
         }
 
         /* Only update the pipe if we succeeded in copying. */

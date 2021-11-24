@@ -177,7 +177,7 @@ static status_t input_device_io(device_t *_device, file_handle_t *handle, io_req
                 break;
         }
 
-        ret = io_request_copy(request, &client->buffer[client->start], sizeof(input_event_t));
+        ret = io_request_copy(request, &client->buffer[client->start], sizeof(input_event_t), true);
         if (ret != STATUS_SUCCESS)
             break;
 

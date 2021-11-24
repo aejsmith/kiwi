@@ -60,12 +60,13 @@ static status_t udp_socket_send(
         return STATUS_NO_MEMORY;
 
     void *data = &header[1];
-    ret = io_request_copy(request, data, request->total);
+    ret = io_request_copy(request, data, request->total, false);
     if (ret != STATUS_SUCCESS) {
         net_packet_release(packet);
         return ret;
     }
 
+// update request->transferred when sent
     net_packet_release(packet);
     return STATUS_NOT_IMPLEMENTED;
 }

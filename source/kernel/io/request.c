@@ -96,29 +96,34 @@ void io_request_destroy(io_request_t *request) {
 /**
  * Copies data for an I/O request. If the request is a read, then data will be
  * copied from the supplied buffer to the request's buffer. If it is a write,
- * data will be copied from the request's buffer to the supplied buffer. The
- * data will be copied to/from after any previously copied data, and the total
- * transferred count will be updated.
+ * data will be copied from the request's buffer to the supplied buffer.
+ *
+ * The data will be copied to/from at the current transfer offset (given by the
+ * transferred count). If requested, the transferred count will be advanced by
+ * the copy amount upon success.
  *
  * @param request       Request to copy for.
  * @param buf           Buffer to transfer data to/from.
  * @param size          Size to transfer.
+ * @param advance       Whether to advance the transferred count.
  *
  * @return              Status code describing result of the operation.
  */
-status_t io_request_copy(io_request_t *request, void *buf, size_t size) {
+status_t io_request_copy(io_request_t *request, void *buf, size_t size, bool advance) {
     status_t ret;
 
-    size_t offset = 0;
-    for (size_t i = 0; i < request->count && size; i++) {
+    size_t remaining  = size;
+    size_t offset     = request->transferred;
+    size_t vec_offset = 0;
+    for (size_t i = 0; i < request->count && remaining; i++) {
         /* Find the vector to start at. */
-        if (offset + request->vecs[i].size <= request->transferred) {
-            offset += request->vecs[i].size;
+        if (vec_offset + request->vecs[i].size <= offset) {
+            vec_offset += request->vecs[i].size;
             continue;
         }
 
-        size_t vec_start = request->transferred - offset;
-        size_t vec_size  = min(request->vecs[i].size - vec_start, size);
+        size_t vec_start = offset - vec_offset;
+        size_t vec_size  = min(request->vecs[i].size - vec_start, remaining);
         void *vec_buf    = request->vecs[i].buffer + vec_start;
 
         if (request->op == IO_OP_WRITE) {
@@ -147,39 +152,42 @@ status_t io_request_copy(io_request_t *request, void *buf, size_t size) {
             }
         }
 
-        request->transferred += vec_size;
-
-        offset += request->vecs[i].size;
+        vec_offset += request->vecs[i].size;
         buf += vec_size;
-        size -= vec_size;
+        remaining -= vec_size;
     }
 
-    if (unlikely(size)) {
+    if (unlikely(remaining)) {
         fatal(
             "I/O request transfer too large (total: %zu, remaining: %zu)",
-            request->total, size);
+            request->total, remaining);
     }
+
+    if (advance)
+        request->transferred += size;
 
     return STATUS_SUCCESS;
 }
 
 /**
  * Tries to obtain a pointer to transfer data to/from at the current transfer
- * offset. This is possible when there is a contiguous block of accessible
- * memory of the specified size.
+ * offset (given by the transferred count). This is possible when there is a
+ * contiguous block of accessible memory of the specified size.
  *
- * If this succeeds, the transferred count will be updated by the specified
- * size, and the caller should transfer directly to the returned pointer.
+ * If successful, the caller should transfer directly to the returned pointer.
+ * If requested, the transferred count will be advanced by the specified size
+ * upon success.
  *
  * If it fails, the caller must fall back to, for example, transferring to an
  * intermediate buffer and using io_request_copy().
  *
  * @param request       Request to map for.
  * @param size          Size to map.
+ * @param advance       Whether to advance the transferred count.
  *
  * @return              Pointer to memory if mappable, NULL if not.
  */
-void *io_request_map(io_request_t *request, size_t size) {
+void *io_request_map(io_request_t *request, size_t size, bool advance) {
     assert(size > 0);
 
     /* TODO: Could implement this if we could pin the userspace memory in place
@@ -198,8 +206,10 @@ void *io_request_map(io_request_t *request, size_t size) {
             size_t vec_start = request->transferred - offset;
             size_t vec_size  = min(request->vecs[i].size - vec_start, size);
 
-            if (vec_size >= size) {
-                request->transferred += vec_size;
+            if (vec_size == size) {
+                if (advance)
+                    request->transferred += size;
+
                 return request->vecs[i].buffer + vec_start;
             } else {
                 return NULL;

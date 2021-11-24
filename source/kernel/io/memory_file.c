@@ -52,7 +52,7 @@ static status_t memory_file_io(file_handle_t *handle, io_request_t *request) {
         ? file->size - request->offset
         : request->total;
 
-    return io_request_copy(request, (void *)file->data + request->offset, size);
+    return io_request_copy(request, (void *)file->data + request->offset, size, true);
 }
 
 /** Get information about a memory file. */

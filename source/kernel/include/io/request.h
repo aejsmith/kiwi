@@ -54,5 +54,5 @@ extern status_t io_request_init(
     io_op_t op, io_target_t target);
 extern void io_request_destroy(io_request_t *request);
 
-extern status_t io_request_copy(io_request_t *request, void *buf, size_t size);
-extern void *io_request_map(io_request_t *request, size_t size);
+extern status_t io_request_copy(io_request_t *request, void *buf, size_t size, bool advance);
+extern void *io_request_map(io_request_t *request, size_t size, bool advance);

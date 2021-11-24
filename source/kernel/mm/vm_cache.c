@@ -386,7 +386,7 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
             ? (size_t)(PAGE_SIZE - (request->offset % PAGE_SIZE))
             : total;
 
-        ret = io_request_copy(request, mapping + (request->offset % PAGE_SIZE), count);
+        ret = io_request_copy(request, mapping + (request->offset % PAGE_SIZE), count, true);
         vm_cache_unmap_page(cache, mapping, start, false, shared);
 
         if (ret != STATUS_SUCCESS)
@@ -406,7 +406,7 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
         if (ret != STATUS_SUCCESS)
             return ret;
 
-        ret = io_request_copy(request, mapping, PAGE_SIZE);
+        ret = io_request_copy(request, mapping, PAGE_SIZE, true);
         vm_cache_unmap_page(cache, mapping, start, false, shared);
 
         if (ret != STATUS_SUCCESS)
@@ -422,7 +422,7 @@ status_t vm_cache_io(vm_cache_t *cache, io_request_t *request) {
         if (ret != STATUS_SUCCESS)
             return ret;
 
-        ret = io_request_copy(request, mapping, total);
+        ret = io_request_copy(request, mapping, total, true);
         vm_cache_unmap_page(cache, mapping, start, false, shared);
 
         if (ret != STATUS_SUCCESS)

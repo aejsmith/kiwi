@@ -270,7 +270,7 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
         } else {
             op = user_file_op_alloc(file, USER_FILE_OP_WRITE, size);
 
-            ret = io_request_copy(request, op->msg->data, size);
+            ret = io_request_copy(request, op->msg->data, size, false);
             if (ret != STATUS_SUCCESS)
                 break;
 
@@ -293,7 +293,7 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
             if (transfer_size > size) {
                 ret = user_file_invalid_reply(file, op);
             } else if (transfer_size > 0) {
-                ret = io_request_copy(request, op->msg->data, transfer_size);
+                ret = io_request_copy(request, op->msg->data, transfer_size, false);
             }
 
             if (ret == STATUS_SUCCESS)
@@ -307,12 +307,10 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
             } else {
                 ret = op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_STATUS];
             }
-
-            /* If less data was written than we asked, update the I/O request
-             * (transferred count was updated when we copied out of it before
-             * sending the op). */
-            request->transferred -= size - transfer_size;
         }
+
+        /* Advance count by what we actually transferred. */
+        request->transferred += transfer_size;
 
         /* Stop if any error was indicated or we have transferred less than we
          * should have (e.g. end of file). */

@@ -110,24 +110,23 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
         if (ret != STATUS_SUCCESS)
             goto out;
 
-        size_t count = (start != end)
+        size_t size = (start != end)
             ? (size_t)(device->block_size - block_offset)
             : total;
 
-        ret = io_request_copy(request, temp_buf + block_offset, count);
+        ret = io_request_copy(request, temp_buf + block_offset, size, false);
         if (ret != STATUS_SUCCESS)
             goto out;
 
         /* If we're writing, write back the partially updated block. */
         if (request->op == IO_OP_WRITE) {
             ret = device->ops->write_blocks(device, temp_buf, temp_dma, start, 1);
-            if (ret != STATUS_SUCCESS) {
-                request->transferred -= count;
+            if (ret != STATUS_SUCCESS)
                 goto out;
-            }
         }
 
-        total -= count;
+        request->transferred += size;
+        total -= size;
         start++;
     }
 
@@ -148,7 +147,7 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
          * we can into one request to the driver.
          */
         dma_ptr_t dest_dma = 0;
-        void *dest_buf = NULL;//io_request_map(request, device->block_size);
+        void *dest_buf = NULL;//io_request_map(request, device->block_size, false);
         if (!dest_buf) {
             if (!temp_buf)
                 temp_buf = alloc_block_buffer(device, &temp_dma);
@@ -158,7 +157,7 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
 
             if (request->op == IO_OP_WRITE) {
                 /* Get the data to write into the temporary buffer. */
-                ret = io_request_copy(request, dest_buf, device->block_size);
+                ret = io_request_copy(request, dest_buf, device->block_size, false);
                 if (ret != STATUS_SUCCESS)
                     goto out;
             }
@@ -167,22 +166,17 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
         ret = (request->op == IO_OP_WRITE)
             ? device->ops->write_blocks(device, dest_buf, dest_dma, start, 1)
             : device->ops->read_blocks(device, dest_buf, dest_dma, start, 1);
-
-        if (ret != STATUS_SUCCESS) {
-            /* Transferred count might have been updated above, revert it. */
-            if (dest_buf != temp_buf || request->op == IO_OP_WRITE)
-                request->transferred -= device->block_size;
-
+        if (ret != STATUS_SUCCESS)
             goto out;
-        }
 
         if (dest_buf == temp_buf && request->op == IO_OP_READ) {
             /* Copy back from the temporary buffer. */
-            ret = io_request_copy(request, dest_buf, device->block_size);
+            ret = io_request_copy(request, dest_buf, device->block_size, false);
             if (ret != STATUS_SUCCESS)
                 goto out;
         }
 
+        request->transferred += device->block_size;
         total -= device->block_size;
         start++;
     }
@@ -197,17 +191,17 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
         if (ret != STATUS_SUCCESS)
             goto out;
 
-        ret = io_request_copy(request, temp_buf, total);
+        ret = io_request_copy(request, temp_buf, total, false);
         if (ret != STATUS_SUCCESS)
             goto out;
 
         if (request->op == IO_OP_WRITE) {
             ret = device->ops->write_blocks(device, temp_buf, temp_dma, start, 1);
-            if (ret != STATUS_SUCCESS) {
-                request->transferred -= total;
+            if (ret != STATUS_SUCCESS)
                 goto out;
-            }
         }
+
+        request->transferred += total;
     }
 
     ret = STATUS_SUCCESS;
