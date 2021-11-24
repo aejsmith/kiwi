@@ -70,7 +70,7 @@ __SYS_EXTERN_C_BEGIN
 #define ENAMETOOLONG    38      /**< Filename too long. */
 #define ENETDOWN        39      /**< Network is down. */
 #define ENETRESET       40      /**< Connection aborted by network. */
-#define ENETUNREACH     41      /**< Network unreachable. */
+#define ENETUNREACH     41      /**< Network is unreachable. */
 #define ENFILE          42      /**< Too many files open in system. */
 #define ENOBUFS         43      /**< No buffer space available. */
 #define ENODATA         44      /**< No data available. */

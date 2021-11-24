@@ -20,6 +20,7 @@
  */
 
 #include <net/ipv4.h>
+#include <net/packet.h>
 #include <net/socket.h>
 #include <net/udp.h>
 
@@ -53,17 +54,33 @@ const net_addr_ops_t ipv4_net_addr_ops = {
     .equal = ipv4_net_addr_equal,
 };
 
-static uint16_t ipv4_net_family_addr_port(const net_socket_t *socket, const sockaddr_t *_addr) {
+static uint16_t ipv4_addr_port(const net_socket_t *socket, const sockaddr_t *_addr) {
     const sockaddr_in_t *addr = (const sockaddr_in_t *)_addr;
 
     return addr->sin_port;
+}
+
+static status_t ipv4_route(
+    net_socket_t *socket, const sockaddr_t *dest_addr,
+    net_interface_t **_interface, sockaddr_t *_source_addr)
+{
+    return STATUS_NET_UNREACHABLE;
+}
+
+static status_t ipv4_transmit(
+    net_socket_t *socket, net_packet_t *packet, net_interface_t *interface,
+    const sockaddr_t *source_addr, const sockaddr_t *dest_addr)
+{
+    return STATUS_NOT_IMPLEMENTED;
 }
 
 static const net_family_ops_t ipv4_net_family_ops = {
     .mtu       = IPV4_MTU,
     .addr_len  = sizeof(sockaddr_in_t),
 
-    .addr_port = ipv4_net_family_addr_port,
+    .addr_port = ipv4_addr_port,
+    .route     = ipv4_route,
+    .transmit  = ipv4_transmit,
 };
 
 /** Creates an IPv4 socket. */

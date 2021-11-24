@@ -27,6 +27,8 @@
 
 #include <status.h>
 
+struct net_interface;
+struct net_packet;
 struct net_socket;
 
 /** Network socket address family operations. */
@@ -46,6 +48,29 @@ typedef struct net_family_ops {
      * @param addr          Address to get from (must be valid).
      * @return              Port number (in network byte order). */
     uint16_t (*addr_port)(const struct net_socket *socket, const sockaddr_t *addr);
+
+    /** Determines a route (interface and source address) for a packet.
+     * @param socket        Socket to route for.
+     * @param dest_addr     Destination address (must be valid)
+     * @param _interface    Where to return interface to transmit on.
+     * @param _source_addr  Where to return source address (must be sized for
+     *                      the family).
+     * @return              Status code describing result of the operation. */
+    status_t (*route)(
+        struct net_socket *socket, const sockaddr_t *dest_addr,
+        struct net_interface **_interface, sockaddr_t *_source_addr);
+
+    /** Transmits a packet on the socket using the address family.
+     * @param socket        Socket to transmit on.
+     * @param packet        Packet to transmit.
+     * @param interface     Interface to transmit on.
+     * @param source_addr   Source address.
+     * @param dest_addr     Destination address.
+     * @return              Status code describing result of the operation. */
+    status_t (*transmit)(
+        struct net_socket *socket, struct net_packet *packet,
+        struct net_interface *interface, const sockaddr_t *source_addr,
+        const sockaddr_t *dest_addr);
 } net_family_ops_t;
 
 /** Network socket structure. */
@@ -69,4 +94,29 @@ static inline status_t net_socket_addr_valid(const net_socket_t *socket, const s
     }
 
     return STATUS_SUCCESS;
+}
+
+/** Gets the port from an address.
+ * @see                 net_family_ops_t::addr_port */
+static inline uint16_t net_socket_addr_port(const net_socket_t *socket, const sockaddr_t *addr) {
+    return socket->family_ops->addr_port(socket, addr);
+}
+
+/** Determines a route (interface and source address) for a packet.
+ * @see                 net_family_ops_t::route */
+static inline status_t net_socket_route(
+    net_socket_t *socket, const sockaddr_t *dest_addr,
+    struct net_interface **_interface, sockaddr_t *_source_addr)
+{
+    return socket->family_ops->route(socket, dest_addr, _interface, _source_addr);
+}
+
+/** Transmits a packet on the socket using the address family.
+ * @see                 net_family_ops_t::transmit */
+static inline status_t net_socket_transmit(
+    net_socket_t *socket, struct net_packet *packet,
+    struct net_interface *interface, const sockaddr_t *source_addr,
+    const sockaddr_t *dest_addr)
+{
+    return socket->family_ops->transmit(socket, packet, interface, source_addr, dest_addr);
 }

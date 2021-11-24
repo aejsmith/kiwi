@@ -26,6 +26,26 @@
 #include <net/interface.h>
 #include <net/socket.h>
 
+/** IPv4 header structure. */
+typedef struct ipv4_header {
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    uint8_t ihl     : 4;
+    uint8_t version : 4;
+#else
+    uint8_t version : 4;
+    uint8_t ihl     : 4;
+#endif
+    uint8_t tos;
+    uint16_t total_len;
+    uint16_t id;
+    uint16_t frag_offset_flags;
+    uint8_t ttl;
+    uint8_t protocol;
+    uint16_t checksum;
+    uint32_t source_addr;
+    uint32_t dest_addr;
+} __packed ipv4_header_t;
+
 /** Maximum IPv4 packet size and MTU (payload size). */
 #define IPV4_MAX_PACKET_SIZE    65535
 #define IPV4_MTU                65515

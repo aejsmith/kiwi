@@ -75,6 +75,7 @@
 #define STATUS_ADDR_NOT_SUPPORTED   50  /**< Address family is not supported. */
 #define STATUS_MSG_TOO_LONG         51  /**< Socket message is too long. */
 #define STATUS_DEST_ADDR_REQUIRED   52  /**< Destination address is required. */
+#define STATUS_NET_UNREACHABLE      53  /**< Network is unreachable. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 
