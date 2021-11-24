@@ -49,24 +49,34 @@ typedef struct net_family_ops {
      * @return              Port number (in network byte order). */
     uint16_t (*addr_port)(const struct net_socket *socket, const sockaddr_t *addr);
 
-    /** Determines a route (interface and source address) for a packet.
+    /**
+     * Determines a route (interface and source address) for a packet. The
+     * net_addr_lock should be held.
+     *
      * @param socket        Socket to route for.
      * @param dest_addr     Destination address (must be valid)
      * @param _interface    Where to return interface to transmit on.
      * @param _source_addr  Where to return source address (must be sized for
      *                      the family).
-     * @return              Status code describing result of the operation. */
+     *
+     * @return              Status code describing result of the operation.
+     */
     status_t (*route)(
         struct net_socket *socket, const sockaddr_t *dest_addr,
         struct net_interface **_interface, sockaddr_t *_source_addr);
 
-    /** Transmits a packet on the socket using the address family.
+    /**
+     * Transmits a packet on the socket using the address family. The
+     * net_addr_lock should be held.
+     *
      * @param socket        Socket to transmit on.
      * @param packet        Packet to transmit.
      * @param interface     Interface to transmit on.
      * @param source_addr   Source address.
      * @param dest_addr     Destination address.
-     * @return              Status code describing result of the operation. */
+     *
+     * @return              Status code describing result of the operation.
+     */
     status_t (*transmit)(
         struct net_socket *socket, struct net_packet *packet,
         struct net_interface *interface, const sockaddr_t *source_addr,

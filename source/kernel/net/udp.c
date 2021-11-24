@@ -69,15 +69,6 @@ static status_t udp_socket_send(
     if (packet_size > UDP_MAX_PACKET_SIZE || packet_size > socket->net.family_ops->mtu)
         return STATUS_MSG_TOO_LONG;
 
-    /* Calculate a route for the packet. */
-// TODO: For sockets bound to a specific address use that source.
-// TODO: We need a way to ensure this interface won't go down/away while we're sending the packet...
-    net_interface_t *interface;
-    sockaddr_ip_t source_addr;
-    ret = net_socket_route(&socket->net, &dest_addr->addr, &interface, &source_addr.addr);
-    if (ret != STATUS_SUCCESS)
-        return STATUS_NET_UNREACHABLE;
-
     udp_header_t *header;
     net_packet_t *packet = net_packet_kmalloc(packet_size, MM_USER, (void **)&header);
     if (!packet)
@@ -87,6 +78,16 @@ static status_t udp_socket_send(
     ret = io_request_copy(request, data, request->total, false);
     if (ret != STATUS_SUCCESS)
         goto out_release;
+
+    net_addr_read_lock();
+
+    /* Calculate a route for the packet. */
+// TODO: For sockets bound to a specific address use that source.
+    net_interface_t *interface;
+    sockaddr_ip_t source_addr;
+    ret = net_socket_route(&socket->net, &dest_addr->addr, &interface, &source_addr.addr);
+    if (ret != STATUS_SUCCESS)
+        goto out_unlock;
 
     /* Initialise header. */
     header->length      = cpu_to_be16(packet_size);
@@ -102,6 +103,9 @@ static status_t udp_socket_send(
     if (ret == STATUS_SUCCESS)
         request->transferred += request->total;
 
+out_unlock:
+    net_addr_unlock();
+
 out_release:
     net_packet_release(packet);
     return ret;
@@ -113,6 +117,7 @@ static status_t udp_socket_receive(
 {
     udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
 
+// locking needed...?
     (void)socket;
     return STATUS_NOT_IMPLEMENTED;
 }

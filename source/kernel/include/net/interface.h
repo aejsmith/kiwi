@@ -65,17 +65,14 @@ extern const net_addr_ops_t *net_addr_ops(const net_addr_t *addr);
  */
 typedef struct net_interface {
     list_t interfaces_link;             /**< Link to active interfaces list. */
-
-    /**
-     * Lock for operations on the interface. TODO: Might be too coarse-grained,
-     * investigate whether this can be broken up later. Good enough for initial
-     * implementation though.
-     */
-    mutex_t lock;
-
     uint32_t flags;                     /**< Flags for the interface (NET_INTERFACE_*). */
     array_t addrs;                      /**< Array of addresses. */
 } net_interface_t;
+
+extern list_t net_interface_list;
+
+extern void net_addr_read_lock(void);
+extern void net_addr_unlock(void);
 
 extern void net_interface_receive(net_interface_t *interface, struct net_packet *packet);
 

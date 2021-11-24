@@ -25,11 +25,22 @@
 
 #include <mm/malloc.h>
 
+#include <sync/rwlock.h>
+
 #include <net/interface.h>
 #include <net/ipv4.h>
 #include <net/packet.h>
 
 #include <status.h>
+
+/** Address configuration lock (see net_addr_read_lock()). */
+static RWLOCK_DEFINE(net_addr_lock);
+
+/**
+ * List of active network interfaces. Access to this is protected by
+ * net_addr_lock.
+ */
+LIST_DEFINE(net_interface_list);
 
 /** Supported network device operations, indexed by family. */
 static const net_addr_ops_t *supported_net_addr_ops[] = {
@@ -47,16 +58,49 @@ const net_addr_ops_t *net_addr_ops(const net_addr_t *addr) {
         : NULL;
 }
 
+/**
+ * Takes the global network address lock for reading. This is a global
+ * read/write lock used to synchronise changes to the available network
+ * interfaces and their address configuration.
+ *
+ * We need synchronisation to ensure that an interface or one of its addresses
+ * do not get removed between making a routing decision that picks a certain
+ * interface and actually queueing a packet to that interface.
+ *
+ * Changes to the interface list and address configuration are infrequent, so
+ * using a global rwlock is a simple and low overhead solution to this. It is
+ * only locked for writing on address/interface changes, all other users just
+ * lock for reading and can therefore operate concurrently.
+ *
+ * Use this lock where you need to ensure that a net_interface_t is kept alive,
+ * and that routing decisions that have been made for it remain valid. It
+ * should not be held for long periods.
+ */
+void net_addr_read_lock(void) {
+    rwlock_read_lock(&net_addr_lock);
+}
+
+/** Takes the global network address lock for writing (internal only). */
+static void net_addr_write_lock(void) {
+    rwlock_write_lock(&net_addr_lock);
+}
+
+/** Release the global network address lock. */
+void net_addr_unlock(void) {
+    rwlock_unlock(&net_addr_lock);
+}
+
 /** Called when a packet is received on an interface.
  * @param interface     Interface the packet was received on.
  * @param packet        Packet that was received. */
 __export void net_interface_receive(net_interface_t *interface, net_packet_t *packet) {
-    MUTEX_SCOPED_LOCK(lock, &interface->lock);
-
     /* Ignore the packet if the interface is down. */
     if (!(interface->flags & NET_INTERFACE_UP))
         return;
 
+    // TODO: What locking will be needed here? addr_lock should be taken for
+    // protecting interface state above... don't want a write lock for every
+    // packet received though so we might need something else
     kprintf(LOG_DEBUG, "net: packet received\n");
 }
 
@@ -65,30 +109,42 @@ __export void net_interface_receive(net_interface_t *interface, net_packet_t *pa
  * @param addr          Address to add.
  * @return              Status code describing the result of the operation. */
 status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *addr) {
-    MUTEX_SCOPED_LOCK(lock, &interface->lock);
+    status_t ret;
+
+    net_addr_write_lock();
 
     /* Can't add addresses to an interface that's down. */
-    if (!(interface->flags & NET_INTERFACE_UP))
-        return STATUS_NET_DOWN;
+    if (!(interface->flags & NET_INTERFACE_UP)) {
+        ret = STATUS_NET_DOWN;
+        goto out;
+    }
 
     const net_addr_ops_t *ops = net_addr_ops(addr);
     if (!ops) {
-        return STATUS_ADDR_NOT_SUPPORTED;
+        ret = STATUS_ADDR_NOT_SUPPORTED;
+        goto out;
     } else if (!ops->valid(addr)) {
-        return STATUS_INVALID_ARG;
+        ret = STATUS_INVALID_ARG;
+        goto out;
     }
 
     /* Check if this already exists. */
     for (size_t i = 0; i < interface->addrs.count; i++) {
         const net_addr_t *entry = array_entry(&interface->addrs, net_addr_t, i);
-        if (ops->equal(entry, addr))
-            return STATUS_ALREADY_EXISTS;
+        if (ops->equal(entry, addr)) {
+            ret = STATUS_ALREADY_EXISTS;
+            goto out;
+        }
     }
 
     net_addr_t *entry = array_append(&interface->addrs, net_addr_t);
     memcpy(entry, addr, sizeof(*addr));
 
-    return STATUS_SUCCESS;
+    ret = STATUS_SUCCESS;
+
+out:
+    net_addr_unlock();
+    return ret;
 }
 
 /** Removes an address from a network interface.
@@ -96,29 +152,40 @@ status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *ad
  * @param addr          Address to remove.
  * @return              Status code describing the result of the operation. */
 status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t *addr) {
-    MUTEX_SCOPED_LOCK(lock, &interface->lock);
+    status_t ret;
+
+    net_addr_write_lock();
 
     /* Can't add addresses to an interface that's down. */
-    if (!(interface->flags & NET_INTERFACE_UP))
-        return STATUS_NET_DOWN;
+    if (!(interface->flags & NET_INTERFACE_UP)) {
+        ret = STATUS_NET_DOWN;
+        goto out;
+    }
 
     const net_addr_ops_t *ops = net_addr_ops(addr);
     if (!ops) {
-        return STATUS_ADDR_NOT_SUPPORTED;
+        ret = STATUS_ADDR_NOT_SUPPORTED;
+        goto out;
     } else if (!ops->valid(addr)) {
-        return STATUS_INVALID_ARG;
+        ret = STATUS_INVALID_ARG;
+        goto out;
     }
+
+    ret = STATUS_NOT_FOUND;
 
     for (size_t i = 0; i < interface->addrs.count; i++) {
         const net_addr_t *entry = array_entry(&interface->addrs, net_addr_t, i);
 
         if (ops->equal(entry, addr)) {
             array_remove(&interface->addrs, net_addr_t, i);
-            return STATUS_SUCCESS;
+            ret = STATUS_SUCCESS;
+            break;
         }
     }
 
-    return STATUS_NOT_FOUND;
+out:
+    net_addr_unlock();
+    return ret;
 }
 
 /** Bring up a network interface.
@@ -126,23 +193,32 @@ status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t 
  * @return              Status code describing the result of the operation. */
 status_t net_interface_up(net_interface_t *interface) {
     net_device_t *device = net_device_from_interface(interface);
+    status_t ret;
 
-    MUTEX_SCOPED_LOCK(lock, &interface->lock);
+    net_addr_write_lock();
 
     /* Do nothing if it's already up. */
-    if (interface->flags & NET_INTERFACE_UP)
-        return STATUS_SUCCESS;
+    if (interface->flags & NET_INTERFACE_UP) {
+        ret = STATUS_SUCCESS;
+        goto out;
+    }
 
     if (device->ops->up) {
-        status_t ret = device->ops->up(device);
+        ret = device->ops->up(device);
         if (ret != STATUS_SUCCESS)
-            return ret;
+            goto out;
     }
 
     interface->flags |= NET_INTERFACE_UP;
 
+    list_append(&net_interface_list, &interface->interfaces_link);
+
     kprintf(LOG_NOTICE, "net: %pD: interface is up\n", device->node);
-    return STATUS_SUCCESS;
+    ret = STATUS_SUCCESS;
+
+out:
+    net_addr_unlock();
+    return ret;
 }
 
 /** Shut down a network interface.
@@ -150,30 +226,38 @@ status_t net_interface_up(net_interface_t *interface) {
  * @return              Status code describing the result of the operation. */
 status_t net_interface_down(net_interface_t *interface) {
     net_device_t *device = net_device_from_interface(interface);
+    status_t ret;
 
-    MUTEX_SCOPED_LOCK(lock, &interface->lock);
+    net_addr_write_lock();
 
     /* Do nothing if it's already down. */
-    if (!(interface->flags & NET_INTERFACE_UP))
-        return STATUS_SUCCESS;
-
-    if (device->ops->down) {
-        status_t ret = device->ops->down(device);
-        if (ret != STATUS_SUCCESS)
-            return ret;
+    if (!(interface->flags & NET_INTERFACE_UP)) {
+        ret = STATUS_SUCCESS;
+        goto out;
     }
 
+    if (device->ops->down) {
+        ret = device->ops->down(device);
+        if (ret != STATUS_SUCCESS)
+            goto out;
+    }
+
+    list_remove(&interface->interfaces_link);
     interface->flags &= ~NET_INTERFACE_UP;
 
     array_clear(&interface->addrs);
 
     kprintf(LOG_NOTICE, "net: %pD: interface is down\n", device->node);
-    return STATUS_SUCCESS;
+    ret = STATUS_SUCCESS;
+
+out:
+    net_addr_unlock();
+    return ret;
 }
 
 /** Initialize a network interface. */
 void net_interface_init(net_interface_t *interface) {
-    mutex_init(&interface->lock, "net_interface_lock", 0);
+    list_init(&interface->interfaces_link);
     array_init(&interface->addrs);
 
     interface->flags = 0;
