@@ -82,11 +82,13 @@ int main(int argc, char **argv) {
         ssize_t size = snprintf(msg, MESSAGE_MAX, "PING %zu", count);
         msg[size] = 0;
 
-        size = sendto(fd, msg, size, 0, (struct sockaddr *)&addr, sizeof(addr));
-        if (size < 0) {
+        ssize_t sent = sendto(fd, msg, size, 0, (struct sockaddr *)&addr, sizeof(addr));
+        if (sent < 0) {
             perror("sendto");
             return EXIT_FAILURE;
         }
+
+        printf("Client sent %ld of %ld bytes\n", sent, size);
 
         size = recvfrom(fd, msg, MESSAGE_MAX, 0, NULL, NULL);
         if (size < 0) {
@@ -96,7 +98,7 @@ int main(int argc, char **argv) {
 
         msg[size] = 0;
 
-        printf("Client received message '%s'\n", msg);
+        printf("Client received %ld byte message '%s'\n", size, msg);
 
         sleep(1);
     }

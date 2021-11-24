@@ -46,7 +46,7 @@ typedef union net_addr {
 
 /** Operations for handling network interface addresses. */
 typedef struct net_addr_ops {
-    size_t size;                        /**< Size of the address structure. */
+    size_t len;                         /**< Length of the address structure. */
 
     /** Check if an interface address is valid. */
     bool (*valid)(const net_addr_t *addr);

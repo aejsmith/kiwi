@@ -20,6 +20,7 @@
  */
 
 #include <net/ipv4.h>
+#include <net/socket.h>
 #include <net/udp.h>
 
 #include <kernel.h>
@@ -47,20 +48,35 @@ static bool ipv4_net_addr_equal(const net_addr_t *a, const net_addr_t *b) {
 }
 
 const net_addr_ops_t ipv4_net_addr_ops = {
-    .size  = sizeof(net_addr_ipv4_t),
-
+    .len   = sizeof(net_addr_ipv4_t),
     .valid = ipv4_net_addr_valid,
     .equal = ipv4_net_addr_equal,
 };
 
+static uint16_t ipv4_net_family_addr_port(const net_socket_t *socket, const sockaddr_t *_addr) {
+    const sockaddr_in_t *addr = (const sockaddr_in_t *)_addr;
+
+    return addr->sin_port;
+}
+
+static const net_family_ops_t ipv4_net_family_ops = {
+    .mtu       = IPV4_MTU,
+    .addr_len  = sizeof(sockaddr_in_t),
+
+    .addr_port = ipv4_net_family_addr_port,
+};
+
 /** Creates an IPv4 socket. */
 status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t **_socket) {
+    status_t ret = STATUS_INVALID_ARG;
+
     switch (type) {
         case SOCK_DGRAM: {
             switch (protocol) {
                 case IPPROTO_IP:
                 case IPPROTO_UDP:
-                    return udp_socket_create(family, _socket);
+                    ret = udp_socket_create(family, _socket);
+                    break;
             }
 
             break;
@@ -70,5 +86,12 @@ status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t
         //}
     }
 
-    return STATUS_INVALID_ARG;
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    net_socket_t *socket = cast_net_socket(*_socket);
+
+    socket->family_ops = &ipv4_net_family_ops;
+
+    return STATUS_SUCCESS;
 }

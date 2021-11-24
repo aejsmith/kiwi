@@ -23,9 +23,12 @@
 
 #include <kernel/net/ipv4.h>
 
-#include <io/socket.h>
-
 #include <net/interface.h>
+#include <net/socket.h>
+
+/** Maximum IPv4 packet size and MTU (payload size). */
+#define IPV4_MAX_PACKET_SIZE    65535
+#define IPV4_MTU                65515
 
 extern const net_addr_ops_t ipv4_net_addr_ops;
 

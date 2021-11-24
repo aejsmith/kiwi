@@ -35,7 +35,6 @@
 #include <mm/malloc.h>
 #include <mm/phys.h>
 
-#include <net/arp.h> // TODO: temp
 #include <net/ethernet.h>
 #include <net/packet.h>
 
@@ -147,8 +146,12 @@ static status_t virtio_net_device_transmit(net_device_t *_device, net_packet_t *
     uint16_t desc_index;
     struct vring_desc *desc = virtio_queue_alloc(queue->queue, &desc_index);
     if (!desc) {
-        // TODO: Add this to a queue to process in the IRQ handler when a
-        // descriptor becomes free.
+        // TODO: When there's no transmit space, the packet should be queued in
+        // the upper layers, and we should pull packets from that queue once TX
+        // descriptors become free in the IRQ handler. Potentially have a per-
+        // interface send queue, with optional attribution to a specific socket
+        // so that the amount of data queued to transmit on each socket cannot
+        // exceed a maximum.
         device_kprintf(device->net.node, LOG_WARN, "no TX descriptors free, dropping (TODO)\n");
         return STATUS_DEVICE_ERROR;
     }

@@ -23,6 +23,7 @@
 
 #include <io/request.h>
 
+#include <net/packet.h>
 #include <net/udp.h>
 
 #include <status.h>
@@ -38,8 +39,34 @@ static status_t udp_socket_send(
     socklen_t addr_len)
 {
     udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
+    status_t ret;
 
-    (void)socket;
+    // TODO: connect() should be able to set a default address if this is NULL.
+    if (addr_len == 0)
+        return STATUS_DEST_ADDR_REQUIRED;
+
+    ret = net_socket_addr_valid(&socket->net, addr, addr_len);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    /* Check packet size. */
+    size_t packet_size = sizeof(udp_header_t) + request->total;
+    if (packet_size > UDP_MAX_PACKET_SIZE || packet_size > socket->net.family_ops->mtu)
+        return STATUS_MSG_TOO_LONG;
+
+    udp_header_t *header;
+    net_packet_t *packet = net_packet_kmalloc(packet_size, MM_USER, (void **)&header);
+    if (!packet)
+        return STATUS_NO_MEMORY;
+
+    void *data = &header[1];
+    ret = io_request_copy(request, data, request->total);
+    if (ret != STATUS_SUCCESS) {
+        net_packet_release(packet);
+        return ret;
+    }
+
+    net_packet_release(packet);
     return STATUS_NOT_IMPLEMENTED;
 }
 

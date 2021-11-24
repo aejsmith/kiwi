@@ -61,16 +61,18 @@ int main(int argc, char **argv) {
 
         msg[size] = 0;
 
-        printf("Server received message '%s'\n", msg);
+        printf("Server received %ld byte message '%s'\n", size, msg);
 
         size = snprintf(msg, MESSAGE_MAX, "PONG %zu", count);
         msg[size] = 0;
 
-        size = sendto(fd, msg, size, 0, (struct sockaddr *)&client_addr, client_len);
-        if (size < 0) {
+        ssize_t sent = sendto(fd, msg, size, 0, (struct sockaddr *)&client_addr, client_len);
+        if (sent < 0) {
             perror("sendto");
             return EXIT_FAILURE;
         }
+
+        printf("Server sent %ld of %ld bytes\n", sent, size);
     }
 
     return EXIT_SUCCESS;
