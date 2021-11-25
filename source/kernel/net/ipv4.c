@@ -61,10 +61,47 @@ static uint16_t ipv4_addr_port(const net_socket_t *socket, const sockaddr_t *_ad
 }
 
 static status_t ipv4_route(
-    net_socket_t *socket, const sockaddr_t *dest_addr,
+    net_socket_t *socket, const sockaddr_t *_dest_addr,
     net_interface_t **_interface, sockaddr_t *_source_addr)
 {
-    return STATUS_NET_UNREACHABLE;
+    // TODO: Proper configurable routing table.
+
+    const sockaddr_in_t *dest_addr = (const sockaddr_in_t *)_dest_addr;
+    sockaddr_in_t *source_addr     = (sockaddr_in_t *)_source_addr;
+
+    source_addr->sin_family = AF_INET;
+    source_addr->sin_port   = 0;
+
+    /* Find a suitable route based on interface addresses. net_addr_lock should
+     * be held. */
+    status_t ret = STATUS_NET_UNREACHABLE;
+    list_foreach(&net_interface_list, iter) {
+        net_interface_t *interface = list_entry(iter, net_interface_t, interfaces_link);
+
+        for (size_t i = 0; i < interface->addrs.count; i++) {
+            const net_addr_t *interface_addr = array_entry(&interface->addrs, net_addr_t, i);
+
+            if (interface_addr->family == AF_INET) {
+                const in_addr_t dest_net      = dest_addr->sin_addr.val & interface_addr->ipv4.netmask.val;
+                const in_addr_t interface_net = interface_addr->ipv4.addr.val & interface_addr->ipv4.netmask.val;
+
+                if (dest_net == interface_net) {
+                    source_addr->sin_addr.val = interface_addr->ipv4.addr.val;
+                    ret = STATUS_SUCCESS;
+                    break;
+                }
+            }
+        }
+
+        if (ret == STATUS_SUCCESS)
+            break;
+    }
+
+    if (ret == STATUS_NET_UNREACHABLE) {
+        // TODO: Default route.
+    }
+
+    return ret;
 }
 
 static status_t ipv4_transmit(
