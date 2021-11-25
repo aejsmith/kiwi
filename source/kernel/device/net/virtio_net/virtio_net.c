@@ -359,7 +359,7 @@ static status_t virtio_net_init_device(virtio_device_t *virtio) {
     virtio_device_set_features(virtio, features);
 
     /* Retrieve the MAC address. */
-    device->net.hw_addr_len = ETHERNET_ADDR_SIZE;
+    device->net.hw_addr_len = ETHERNET_ADDR_LEN;
     virtio_device_get_config(
         virtio, device->net.hw_addr,
         offsetof(struct virtio_net_config, mac), sizeof(device->net.hw_addr));

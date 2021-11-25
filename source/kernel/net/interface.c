@@ -27,10 +27,12 @@
 
 #include <sync/rwlock.h>
 
+#include <net/ethernet.h>
 #include <net/interface.h>
 #include <net/ipv4.h>
 #include <net/packet.h>
 
+#include <assert.h>
 #include <status.h>
 
 /** Address configuration lock (see net_addr_read_lock()). */
@@ -46,6 +48,11 @@ LIST_DEFINE(net_interface_list);
 static const net_addr_ops_t *supported_net_addr_ops[] = {
     [AF_INET] = &ipv4_net_addr_ops,
     //[AF_INET6] TODO
+};
+
+/** Supported network link operations, indexed by device type. */
+static const net_link_ops_t *supported_net_link_ops[] = {
+    [NET_DEVICE_ETHERNET] = &ethernet_net_link_ops,
 };
 
 /** Get operations for handling a network interface address.
@@ -88,20 +95,6 @@ static void net_addr_write_lock(void) {
 /** Release the global network address lock. */
 void net_addr_unlock(void) {
     rwlock_unlock(&net_addr_lock);
-}
-
-/** Called when a packet is received on an interface.
- * @param interface     Interface the packet was received on.
- * @param packet        Packet that was received. */
-__export void net_interface_receive(net_interface_t *interface, net_packet_t *packet) {
-    /* Ignore the packet if the interface is down. */
-    if (!(interface->flags & NET_INTERFACE_UP))
-        return;
-
-    // TODO: What locking will be needed here? addr_lock should be taken for
-    // protecting interface state above... don't want a write lock for every
-    // packet received though so we might need something else
-    kprintf(LOG_DEBUG, "net: packet received\n");
 }
 
 /** Adds an address to a network interface.
@@ -195,6 +188,8 @@ status_t net_interface_up(net_interface_t *interface) {
     net_device_t *device = net_device_from_interface(interface);
     status_t ret;
 
+    assert(device->type < array_size(supported_net_link_ops) && supported_net_link_ops[device->type]);
+
     net_addr_write_lock();
 
     /* Do nothing if it's already up. */
@@ -253,6 +248,52 @@ status_t net_interface_down(net_interface_t *interface) {
 out:
     net_addr_unlock();
     return ret;
+}
+
+/** Called when a packet is received on an interface.
+ * @param interface     Interface the packet was received on.
+ * @param packet        Packet that was received. */
+__export void net_interface_receive(net_interface_t *interface, net_packet_t *packet) {
+    /* Ignore the packet if the interface is down. */
+    if (!(interface->flags & NET_INTERFACE_UP))
+        return;
+
+    // TODO: What locking will be needed here? addr_lock should be taken for
+    // protecting interface state above... don't want a write lock for every
+    // packet received though so we might need something else
+    kprintf(LOG_DEBUG, "net: packet received\n");
+}
+
+/**
+ * Transmits a packet on a network interface. This will add the link-layer
+ * protocol header and transmit it on the underlying device. The packet should
+ * be no larger than the device's MTU.
+ *
+ * @param interface     Interface to transmit on.
+ * @param packet        Packet to transmit. Must have a valid type set.
+ * @param dest_addr     Destination hardware address (length is the device's
+ *                      hardware address length).
+ *
+ * @return              Status code describing the result of the operation.
+ */
+status_t net_interface_transmit(net_interface_t *interface, net_packet_t *packet, const uint8_t *dest_addr) {
+    net_device_t *device = net_device_from_interface(interface);
+    status_t ret;
+
+    assert(packet->type != NET_PACKET_TYPE_UNKNOWN);
+
+    // TODO: Any per-interface locking needed? net_addr_lock is held at least...
+    // Will need something for transmit buffering.
+
+    if (packet->size > device->mtu)
+        return STATUS_MSG_TOO_LONG;
+
+    ret = supported_net_link_ops[device->type]->add_header(interface, packet, dest_addr);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    // TODO: Buffering when the device transmit queue is full.
+    return device->ops->transmit(device, packet);
 }
 
 /** Initialize a network interface. */

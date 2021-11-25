@@ -19,6 +19,9 @@
  * @brief               Internet Protocol v4 implementation.
  */
 
+#include <device/net/net.h>
+
+#include <net/arp.h>
 #include <net/ipv4.h>
 #include <net/packet.h>
 #include <net/socket.h>
@@ -87,6 +90,8 @@ static status_t ipv4_route(
 
                 if (dest_net == interface_net) {
                     source_addr->sin_addr.val = interface_addr->ipv4.addr.val;
+
+                    *_interface = interface;
                     ret = STATUS_SUCCESS;
                     break;
                 }
@@ -104,11 +109,62 @@ static status_t ipv4_route(
     return ret;
 }
 
+static uint16_t ipv4_checksum(const ipv4_header_t *header) {
+    const uint16_t *data = (const uint16_t *)header;
+    uint32_t sum = 0;
+    for (size_t i = 0; i < sizeof(*header) / sizeof(uint16_t); i++) {
+        sum += be16_to_cpu(data[i]);
+        if (sum > 0xffff)
+            sum = (sum >> 16) + (sum & 0xffff);
+    }
+
+    return cpu_to_net16((uint16_t)(~sum));
+}
+
 static status_t ipv4_transmit(
     net_socket_t *socket, net_packet_t *packet, net_interface_t *interface,
-    const sockaddr_t *source_addr, const sockaddr_t *dest_addr)
+    const sockaddr_t *_source_addr, const sockaddr_t *_dest_addr)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    const sockaddr_in_t *dest_addr   = (const sockaddr_in_t *)_dest_addr;
+    const sockaddr_in_t *source_addr = (const sockaddr_in_t *)_source_addr;
+    net_device_t *device             = net_device_from_interface(interface);
+    status_t ret;
+
+    // TODO: Fragmentation.
+    if (packet->size > IPV4_MTU || packet->size + sizeof(ipv4_header_t) > device->mtu)
+        return STATUS_MSG_TOO_LONG;
+
+    ipv4_header_t *header;
+    net_buffer_t *buffer = net_buffer_kmalloc(sizeof(*header), MM_KERNEL, (void **)&header);
+    net_packet_prepend(packet, buffer);
+
+    header->version           = 4;
+    header->ihl               = sizeof(ipv4_header_t) / 4;
+    header->dscp_ecn          = 0;
+    header->total_len         = cpu_to_net16(packet->size);
+    header->id                = 0;
+    header->frag_offset_flags = 0;
+    header->ttl               = 64;
+    header->protocol          = socket->protocol;
+    header->checksum          = 0;
+    header->source_addr       = source_addr->sin_addr.val;
+    header->dest_addr         = dest_addr->sin_addr.val;
+
+    /* Calculate checksum based on header with checksum initialised to 0. */
+    header->checksum = ipv4_checksum(header);
+
+    /* Find our destination hardware address. */
+    // TODO: Use gateway IP for default route.
+    // TODO: I don't like that net_addr_lock can be potentially held for a long
+    // time (read-only) while waiting for an ARP reply...
+    uint8_t dest_hw_addr[NET_DEVICE_ADDR_MAX];
+    ret = arp_lookup(interface, source_addr, dest_addr, dest_hw_addr);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    packet->type = NET_PACKET_TYPE_IPV4;
+
+    return net_interface_transmit(interface, packet, dest_hw_addr);
 }
 
 static const net_family_ops_t ipv4_net_family_ops = {
@@ -144,8 +200,6 @@ status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t
         return ret;
 
     net_socket_t *socket = cast_net_socket(*_socket);
-
     socket->family_ops = &ipv4_net_family_ops;
-
     return STATUS_SUCCESS;
 }

@@ -35,7 +35,7 @@ typedef struct ipv4_header {
     uint8_t version : 4;
     uint8_t ihl     : 4;
 #endif
-    uint8_t tos;
+    uint8_t dscp_ecn;
     uint16_t total_len;
     uint16_t id;
     uint16_t frag_offset_flags;

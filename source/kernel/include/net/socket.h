@@ -67,7 +67,8 @@ typedef struct net_family_ops {
 
     /**
      * Transmits a packet on the socket using the address family. The
-     * net_addr_lock should be held.
+     * net_addr_lock should be held. This function will add a reference to the
+     * packet if necessary so the caller should release its reference.
      *
      * @param socket        Socket to transmit on.
      * @param packet        Packet to transmit.
@@ -85,8 +86,9 @@ typedef struct net_family_ops {
 
 /** Network socket structure. */
 typedef struct net_socket {
-    socket_t socket;
-    const net_family_ops_t *family_ops;
+    socket_t socket;                    /**< Socket header. */
+    const net_family_ops_t *family_ops; /**< Family operations. */
+    int protocol;                       /**< Family-specific protocol number. */
 } net_socket_t;
 
 DEFINE_CLASS_CAST(net_socket, socket, socket);

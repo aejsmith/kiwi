@@ -16,36 +16,22 @@
 
 /**
  * @file
- * @brief               ARP protocol definitions.
+ * @brief               Address Resolution Protocol.
  */
 
-#pragma once
+#include <net/arp.h>
 
-#include <net/ipv4.h>
-
-/** ARP packet structure. */
-typedef struct arp_packet {
-    uint16_t hw_type;
-    uint16_t proto_type;
-    uint8_t hw_len;
-    uint8_t proto_len;
-    uint16_t opcode;
-
-    /**
-     * Address fields. These are technically variable length but we only use
-     * this for Ethernet/IPv4 right now.
-     */
-    uint8_t hw_sender[6];
-    ipv4_addr_t proto_sender;
-    uint8_t hw_target[6];
-    ipv4_addr_t proto_target;
-} __packed arp_packet_t;
-
-#define ARP_HW_TYPE_ETHERNET    1
-
-#define ARP_OPCODE_REQUEST      1
-#define ARP_OPCODE_REPLY        2
-
-extern status_t arp_lookup(
+status_t arp_lookup(
     net_interface_t *interface, const sockaddr_in_t *source_addr,
-    const sockaddr_in_t *dest_addr, uint8_t *_dest_hw_addr);
+    const sockaddr_in_t *dest_addr, uint8_t *_dest_hw_addr)
+{
+    // TODO: Implement properly once receive path is implemented. This is for
+    // QEMU user networking.
+    _dest_hw_addr[0] = 0x52;
+    _dest_hw_addr[1] = 0x55;
+    _dest_hw_addr[2] = 0x0a;
+    _dest_hw_addr[3] = 0x00;
+    _dest_hw_addr[4] = 0x02;
+    _dest_hw_addr[5] = 0x02;
+    return STATUS_SUCCESS;
+}

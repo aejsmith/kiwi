@@ -30,11 +30,6 @@
 struct net_device;
 struct net_packet;
 
-/** Type of a network device. */
-typedef enum net_device_type {
-    NET_DEVICE_ETHERNET,
-} net_device_type_t;
-
 /** Network device operations. */
 typedef struct net_device_ops {
     /** Destroys the device.

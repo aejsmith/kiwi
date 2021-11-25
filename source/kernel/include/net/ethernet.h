@@ -21,10 +21,10 @@
 
 #pragma once
 
-#include <net/net.h>
+#include <net/interface.h>
 
 /** Ethernet MAC address length. */
-#define ETHERNET_ADDR_SIZE          6
+#define ETHERNET_ADDR_LEN           6
 
 /** Ethernet frame size definitions. */
 #define ETHERNET_HEADER_SIZE        14      /**< Ethernet header size. */
@@ -36,12 +36,9 @@
 
 /** Ethernet frame header. */
 typedef struct ethernet_header {
-    uint8_t dest[ETHERNET_ADDR_SIZE];
-    uint8_t source[ETHERNET_ADDR_SIZE];
+    uint8_t dest_addr[ETHERNET_ADDR_LEN];
+    uint8_t source_addr[ETHERNET_ADDR_LEN];
     uint16_t type;
 } __packed ethernet_header_t;
 
-/** EtherType values. */
-#define ETHERNET_TYPE_IPV4      0x0800
-#define ETHERNET_TYPE_ARP       0x0806
-#define ETHERNET_TYPE_IPV6      0x86dd
+extern const net_link_ops_t ethernet_net_link_ops;

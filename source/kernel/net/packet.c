@@ -291,6 +291,7 @@ __export net_packet_t *net_packet_create(net_buffer_t *buffer) {
     packet->head     = buffer;
     packet->refcount = 1;
     packet->size     = buffer->size - buffer->offset;
+    packet->type     = NET_PACKET_TYPE_UNKNOWN;
 
     return packet;
 }

@@ -31,6 +31,11 @@ __KERNEL_EXTERN_C_BEGIN
 /** Maximum hardware address (MAC) length. */
 #define NET_DEVICE_ADDR_MAX         6
 
+/** Type of a network device. */
+typedef enum net_device_type {
+    NET_DEVICE_ETHERNET     = 0,    /**< Ethernet. */
+} net_device_type_t;
+
 /** Network device requests. */
 enum {
     /** Brings up the network interface. */

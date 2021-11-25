@@ -25,7 +25,7 @@
 
 __KERNEL_EXTERN_C_BEGIN
 
-#define IPV4_ADDR_SIZE  4
+#define IPV4_ADDR_LEN   4
 
 typedef uint32_t in_addr_t;
 typedef uint16_t in_port_t;
@@ -34,7 +34,7 @@ typedef uint16_t in_port_t;
 typedef struct in_addr {
     union {
         in_addr_t val;                  /**< 32-bit address in network byte order. */
-        uint8_t bytes[IPV4_ADDR_SIZE];
+        uint8_t bytes[IPV4_ADDR_LEN];
         in_addr_t s_addr;               /**< 32-bit address in network byte order (POSIX-compatible name). */
     };
 } ipv4_addr_t;
@@ -54,10 +54,15 @@ typedef struct net_addr_ipv4 {
     ipv4_addr_t broadcast;              /**< Broadcast address. */
 } net_addr_ipv4_t;
 
+/**
+ * Standard IP protocol numbers from
+ * https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
+ */
 enum {
     IPPROTO_IP      = 0,
-    IPPROTO_TCP     = 1,
-    IPPROTO_UDP     = 2,
+    IPPROTO_ICMP    = 1,
+    IPPROTO_TCP     = 6,
+    IPPROTO_UDP     = 17,
 };
 
 __KERNEL_EXTERN_C_END

@@ -29,6 +29,7 @@
 
 #include <sync/mutex.h>
 
+struct net_interface;
 struct net_packet;
 
 /**
@@ -57,6 +58,18 @@ typedef struct net_addr_ops {
 
 extern const net_addr_ops_t *net_addr_ops(const net_addr_t *addr);
 
+/** Network link operations. */
+typedef struct net_link_ops {
+    /** Adds link-layer headers to a packet
+     * @param interface     Interface being transmitted on.
+     * @param packet        Packet to transmit.
+     * @param dest_addr     Destination link-layer address.
+     * @return              Status code describing the result of the operation. */
+    status_t (*add_header)(
+        struct net_interface *interface, struct net_packet *packet,
+        const uint8_t *dest_addr);
+} net_link_ops_t;
+
 /**
  * Network interface state (addresses etc.). This is embedded within
  * net_device_t, but it is a separate structure/file so that we have some
@@ -75,6 +88,9 @@ extern void net_addr_read_lock(void);
 extern void net_addr_unlock(void);
 
 extern void net_interface_receive(net_interface_t *interface, struct net_packet *packet);
+extern status_t net_interface_transmit(
+    net_interface_t *interface, struct net_packet *packet,
+    const uint8_t *dest_addr);
 
 extern status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *addr);
 extern status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t *addr);

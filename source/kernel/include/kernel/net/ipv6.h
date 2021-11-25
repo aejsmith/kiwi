@@ -25,7 +25,7 @@
 
 __KERNEL_EXTERN_C_BEGIN
 
-#define IPV6_ADDR_SIZE  16
+#define IPV6_ADDR_LEN   16
 
 /** Type used to store an IPv6 address. */
 typedef struct in6_addr {
@@ -34,8 +34,8 @@ typedef struct in6_addr {
             uint64_t high;
             uint64_t low;
         } val;
-        uint8_t bytes[IPV6_ADDR_SIZE];
-        uint8_t s6_addr[IPV6_ADDR_SIZE];
+        uint8_t bytes[IPV6_ADDR_LEN];
+        uint8_t s6_addr[IPV6_ADDR_LEN];
     };
 } ipv6_addr_t;
 

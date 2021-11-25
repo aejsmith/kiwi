@@ -139,6 +139,18 @@ extern net_buffer_t *net_buffer_from_subset(struct net_packet *packet, uint32_t 
 
 extern void net_buffer_destroy(net_buffer_t *buffer);
 
+/**
+ * Network packet type identifiers. These are standard EtherType values so that
+ * Ethernet implementation (the most common) can use these without conversion.
+ */
+enum {
+    NET_PACKET_TYPE_UNKNOWN = 0,
+
+    NET_PACKET_TYPE_IPV4    = 0x0800,
+    NET_PACKET_TYPE_ARP     = 0x0806,
+    NET_PACKET_TYPE_IPV6    = 0x86dd,
+};
+
 /** Network packet packet structure. */
 typedef struct net_packet {
     net_buffer_t *head;                 /**< First buffer in the chain. */
@@ -154,6 +166,9 @@ typedef struct net_packet {
      * refer to them.
      */
     uint16_t refcount;
+
+    /** Type of the packet (NET_PACKET_TYPE_*). */
+    uint16_t type;
 
     /**
      * Total size of the packet data (equal to the sum of (size - offset) for

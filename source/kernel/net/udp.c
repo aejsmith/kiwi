@@ -90,13 +90,13 @@ static status_t udp_socket_send(
         goto out_unlock;
 
     /* Initialise header. */
-    header->length      = cpu_to_be16(packet_size);
+    header->length      = cpu_to_net16(packet_size);
     header->dest_port   = net_socket_addr_port(&socket->net, &dest_addr->addr);
 // TODO! ephemeral port assignment (or bound address)
-    header->source_port = cpu_to_be16(49152);
+    header->source_port = cpu_to_net16(49152);
     header->checksum    = 0;
 
-    /* Calculate checksum. This uses the checksum field set to 0 above. */
+    /* Calculate checksum based on header with checksum initialised to 0. */
     header->checksum = udp_checksum(header, packet_size, &source_addr, dest_addr);
 
     ret = net_socket_transmit(&socket->net, packet, interface, &source_addr.addr, &dest_addr->addr);
@@ -133,7 +133,10 @@ status_t udp_socket_create(sa_family_t family, socket_t **_socket) {
     assert(family == AF_INET || family == AF_INET6);
 
     udp_socket_t *socket = kmalloc(sizeof(udp_socket_t), MM_KERNEL);
+
     socket->net.socket.ops = &udp_socket_ops;
+    socket->net.protocol   = IPPROTO_UDP;
+
     *_socket = &socket->net.socket;
     return STATUS_SUCCESS;
 }

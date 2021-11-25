@@ -22,6 +22,8 @@ mod_env.Module('net', [
     # lives within the net module.
     '../device/net/net.c',
 
+    'arp.c',
+    'ethernet.c',
     'interface.c',
     'ipv4.c',
     'net.c',
