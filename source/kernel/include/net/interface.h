@@ -78,14 +78,30 @@ typedef struct net_link_ops {
  */
 typedef struct net_interface {
     list_t interfaces_link;             /**< Link to active interfaces list. */
+
+    /**
+     * Active interface ID. Each active interface has an ID which is unique
+     * for the whole system lifetime, i.e. IDs are never reused. This allows
+     * the IDs to be used to be persistently used to refer to an interface
+     * without having to hold net_interface_lock for the whole time to ensure
+     * the interface pointer remains valid. When an interface actually needs to
+     * be used, net_interface_lock is taken and then it can be looked up from
+     * the ID, and used only if it still exists.
+     */
+    uint32_t id;
+
     uint32_t flags;                     /**< Flags for the interface (NET_INTERFACE_*). */
     array_t addrs;                      /**< Array of addresses. */
 } net_interface_t;
 
+#define NET_INTERFACE_INVALID_ID    UINT32_MAX
+
 extern list_t net_interface_list;
 
-extern void net_addr_read_lock(void);
-extern void net_addr_unlock(void);
+extern void net_interface_read_lock(void);
+extern void net_interface_unlock(void);
+
+extern net_interface_t *net_interface_get(uint32_t id);
 
 extern void net_interface_receive(net_interface_t *interface, struct net_packet *packet);
 extern status_t net_interface_transmit(

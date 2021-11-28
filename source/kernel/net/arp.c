@@ -22,7 +22,7 @@
 #include <net/arp.h>
 
 status_t arp_lookup(
-    net_interface_t *interface, const sockaddr_in_t *source_addr,
+    uint32_t interface_id, const sockaddr_in_t *source_addr,
     const sockaddr_in_t *dest_addr, uint8_t *_dest_hw_addr)
 {
     // TODO: Implement properly once receive path is implemented. This is for

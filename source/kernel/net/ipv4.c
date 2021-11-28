@@ -64,10 +64,12 @@ static uint16_t ipv4_addr_port(const net_socket_t *socket, const sockaddr_t *_ad
 }
 
 static status_t ipv4_route(
-    net_socket_t *socket, const sockaddr_t *_dest_addr,
-    net_interface_t **_interface, sockaddr_t *_source_addr)
+    net_socket_t *socket, const sockaddr_t *_dest_addr, uint32_t *_interface_id,
+    sockaddr_t *_source_addr)
 {
-    // TODO: Proper configurable routing table.
+    // TODO: Proper configurable routing table. That routing table should be
+    // based on interface indices with its own separate lock, so we don't need
+    // to deal with the interface list here at all.
 
     const sockaddr_in_t *dest_addr = (const sockaddr_in_t *)_dest_addr;
     sockaddr_in_t *source_addr     = (sockaddr_in_t *)_source_addr;
@@ -75,8 +77,9 @@ static status_t ipv4_route(
     source_addr->sin_family = AF_INET;
     source_addr->sin_port   = 0;
 
-    /* Find a suitable route based on interface addresses. net_addr_lock should
-     * be held. */
+    net_interface_read_lock();
+
+    /* Find a suitable route based on interface addresses. */
     status_t ret = STATUS_NET_UNREACHABLE;
     list_foreach(&net_interface_list, iter) {
         net_interface_t *interface = list_entry(iter, net_interface_t, interfaces_link);
@@ -91,7 +94,7 @@ static status_t ipv4_route(
                 if (dest_net == interface_net) {
                     source_addr->sin_addr.val = interface_addr->ipv4.addr.val;
 
-                    *_interface = interface;
+                    *_interface_id = interface->id;
                     ret = STATUS_SUCCESS;
                     break;
                 }
@@ -106,6 +109,7 @@ static status_t ipv4_route(
         // TODO: Default route.
     }
 
+    net_interface_unlock();
     return ret;
 }
 
@@ -122,17 +126,39 @@ static uint16_t ipv4_checksum(const ipv4_header_t *header) {
 }
 
 static status_t ipv4_transmit(
-    net_socket_t *socket, net_packet_t *packet, net_interface_t *interface,
+    net_socket_t *socket, net_packet_t *packet, uint32_t interface_id,
     const sockaddr_t *_source_addr, const sockaddr_t *_dest_addr)
 {
-    const sockaddr_in_t *dest_addr   = (const sockaddr_in_t *)_dest_addr;
-    const sockaddr_in_t *source_addr = (const sockaddr_in_t *)_source_addr;
-    net_device_t *device             = net_device_from_interface(interface);
     status_t ret;
 
-    // TODO: Fragmentation.
-    if (packet->size > IPV4_MTU || packet->size + sizeof(ipv4_header_t) > device->mtu)
+    if (packet->size > IPV4_MTU)
         return STATUS_MSG_TOO_LONG;
+
+    const sockaddr_in_t *dest_addr   = (const sockaddr_in_t *)_dest_addr;
+    const sockaddr_in_t *source_addr = (const sockaddr_in_t *)_source_addr;
+
+    /* Find our destination hardware address. */
+    // TODO: Use gateway IP for default route.
+    uint8_t dest_hw_addr[NET_DEVICE_ADDR_MAX];
+    ret = arp_lookup(interface_id, source_addr, dest_addr, dest_hw_addr);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    net_interface_read_lock();
+
+    net_interface_t *interface = net_interface_get(interface_id);
+    if (!interface) {
+        ret = STATUS_NET_DOWN;
+        goto out_unlock;
+    }
+
+    net_device_t *device = net_device_from_interface(interface);
+
+    // TODO: Fragmentation.
+    if (packet->size + sizeof(ipv4_header_t) > device->mtu) {
+        ret = STATUS_MSG_TOO_LONG;
+        goto out_unlock;
+    }
 
     ipv4_header_t *header;
     net_buffer_t *buffer = net_buffer_kmalloc(sizeof(*header), MM_KERNEL, (void **)&header);
@@ -153,18 +179,13 @@ static status_t ipv4_transmit(
     /* Calculate checksum based on header with checksum initialised to 0. */
     header->checksum = ipv4_checksum(header);
 
-    /* Find our destination hardware address. */
-    // TODO: Use gateway IP for default route.
-    // TODO: I don't like that net_addr_lock can be potentially held for a long
-    // time (read-only) while waiting for an ARP reply...
-    uint8_t dest_hw_addr[NET_DEVICE_ADDR_MAX];
-    ret = arp_lookup(interface, source_addr, dest_addr, dest_hw_addr);
-    if (ret != STATUS_SUCCESS)
-        return ret;
-
     packet->type = NET_PACKET_TYPE_IPV4;
 
-    return net_interface_transmit(interface, packet, dest_hw_addr);
+    ret = net_interface_transmit(interface, packet, dest_hw_addr);
+
+out_unlock:
+    net_interface_unlock();
+    return ret;
 }
 
 static const net_family_ops_t ipv4_net_family_ops = {

@@ -77,17 +77,15 @@ static status_t udp_socket_send(
     void *data = &header[1];
     ret = io_request_copy(request, data, request->total, false);
     if (ret != STATUS_SUCCESS)
-        goto out_release;
-
-    net_addr_read_lock();
+        goto out;
 
     /* Calculate a route for the packet. */
 // TODO: For sockets bound to a specific address use that source.
-    net_interface_t *interface;
+    uint32_t interface_id;
     sockaddr_ip_t source_addr;
-    ret = net_socket_route(&socket->net, &dest_addr->addr, &interface, &source_addr.addr);
+    ret = net_socket_route(&socket->net, &dest_addr->addr, &interface_id, &source_addr.addr);
     if (ret != STATUS_SUCCESS)
-        goto out_unlock;
+        goto out;
 
     /* Initialise header. */
     header->length      = cpu_to_net16(packet_size);
@@ -99,14 +97,11 @@ static status_t udp_socket_send(
     /* Calculate checksum based on header with checksum initialised to 0. */
     header->checksum = udp_checksum(header, packet_size, &source_addr, dest_addr);
 
-    ret = net_socket_transmit(&socket->net, packet, interface, &source_addr.addr, &dest_addr->addr);
+    ret = net_socket_transmit(&socket->net, packet, interface_id, &source_addr.addr, &dest_addr->addr);
     if (ret == STATUS_SUCCESS)
         request->transferred += request->total;
 
-out_unlock:
-    net_addr_unlock();
-
-out_release:
+out:
     net_packet_release(packet);
     return ret;
 }
