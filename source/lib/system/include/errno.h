@@ -54,7 +54,7 @@ __SYS_EXTERN_C_BEGIN
 #define EEXIST          22      /**< File exists. */
 #define EFAULT          23      /**< Bad address. */
 #define EFBIG           24      /**< File too large. */
-#define EHOSTUNREACH    25      /**< Host is unreachable. */
+#define EHOSTUNREACH    25      /**< No route to host. */
 #define EIDRM           26      /**< Identifier removed. */
 #define EINPROGRESS     27      /**< Operation in progress. */
 #define EINTR           28      /**< Interrupted function. */

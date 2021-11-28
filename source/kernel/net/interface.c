@@ -247,7 +247,9 @@ status_t net_interface_up(net_interface_t *interface) {
             goto out;
     }
 
-    interface->id = next_interface_id++;
+    interface->id       = next_interface_id++;
+    interface->link_ops = supported_net_link_ops[device->type];
+
     interface->flags |= NET_INTERFACE_UP;
 
     list_append(&net_interface_list, &interface->interfaces_link);
@@ -338,7 +340,7 @@ status_t net_interface_transmit(net_interface_t *interface, net_packet_t *packet
     if (packet->size > device->mtu)
         return STATUS_MSG_TOO_LONG;
 
-    ret = supported_net_link_ops[device->type]->add_header(interface, packet, dest_addr);
+    ret = interface->link_ops->add_header(interface, packet, dest_addr);
     if (ret != STATUS_SUCCESS)
         return ret;
 
@@ -351,6 +353,7 @@ void net_interface_init(net_interface_t *interface) {
     list_init(&interface->interfaces_link);
     array_init(&interface->addrs);
 
-    interface->id    = NET_INTERFACE_INVALID_ID;
-    interface->flags = 0;
+    interface->id       = NET_INTERFACE_INVALID_ID;
+    interface->flags    = 0;
+    interface->link_ops = NULL;
 }

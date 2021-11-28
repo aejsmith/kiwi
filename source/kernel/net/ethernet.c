@@ -27,6 +27,8 @@
 #include <assert.h>
 #include <status.h>
 
+static const uint8_t ethernet_broadcast_addr[ETHERNET_ADDR_LEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
 static status_t ethernet_add_header(net_interface_t *interface, net_packet_t *packet, const uint8_t *dest_addr) {
     net_device_t *device = net_device_from_interface(interface);
 
@@ -44,5 +46,7 @@ static status_t ethernet_add_header(net_interface_t *interface, net_packet_t *pa
 }
 
 const net_link_ops_t ethernet_net_link_ops = {
+    .broadcast_addr = ethernet_broadcast_addr,
+
     .add_header = ethernet_add_header,
 };

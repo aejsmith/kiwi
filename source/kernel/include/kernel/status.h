@@ -76,6 +76,7 @@
 #define STATUS_MSG_TOO_LONG         51  /**< Socket message is too long. */
 #define STATUS_DEST_ADDR_REQUIRED   52  /**< Destination address is required. */
 #define STATUS_NET_UNREACHABLE      53  /**< Network is unreachable. */
+#define STATUS_HOST_UNREACHABLE     54  /**< No route to host. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 

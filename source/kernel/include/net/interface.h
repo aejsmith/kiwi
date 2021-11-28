@@ -60,6 +60,9 @@ extern const net_addr_ops_t *net_addr_ops(const net_addr_t *addr);
 
 /** Network link operations. */
 typedef struct net_link_ops {
+    /** Broadcast link-layer address for the link type. */
+    const uint8_t *broadcast_addr;
+
     /** Adds link-layer headers to a packet
      * @param interface     Interface being transmitted on.
      * @param packet        Packet to transmit.
@@ -91,6 +94,7 @@ typedef struct net_interface {
     uint32_t id;
 
     uint32_t flags;                     /**< Flags for the interface (NET_INTERFACE_*). */
+    const net_link_ops_t *link_ops;     /**< Link operations for the interface type. */
     array_t addrs;                      /**< Array of addresses. */
 } net_interface_t;
 

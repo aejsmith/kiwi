@@ -140,7 +140,7 @@ static status_t ipv4_transmit(
     /* Find our destination hardware address. */
     // TODO: Use gateway IP for default route.
     uint8_t dest_hw_addr[NET_DEVICE_ADDR_MAX];
-    ret = arp_lookup(interface_id, source_addr, dest_addr, dest_hw_addr);
+    ret = arp_lookup(interface_id, &source_addr->sin_addr, &dest_addr->sin_addr, dest_hw_addr);
     if (ret != STATUS_SUCCESS)
         return ret;
 

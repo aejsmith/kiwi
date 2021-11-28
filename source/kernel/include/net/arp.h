@@ -32,13 +32,13 @@ typedef struct arp_packet {
     uint16_t opcode;
 
     /**
-     * Address fields. These are technically variable length but we only use
-     * this for Ethernet/IPv4 right now.
+     * Variable length address fields.
+     *   uint8_t hw_sender[hw_len];
+     *   uint8_t proto_sender[proto_len];
+     *   uint8_t hw_target[hw_len];
+     *   uint8_t proto_target[proto_len];
      */
-    uint8_t hw_sender[6];
-    ipv4_addr_t proto_sender;
-    uint8_t hw_target[6];
-    ipv4_addr_t proto_target;
+    uint8_t addrs[];
 } __packed arp_packet_t;
 
 #define ARP_HW_TYPE_ETHERNET    1
@@ -47,5 +47,5 @@ typedef struct arp_packet {
 #define ARP_OPCODE_REPLY        2
 
 extern status_t arp_lookup(
-    uint32_t interface_id, const sockaddr_in_t *source_addr,
-    const sockaddr_in_t *dest_addr, uint8_t *_dest_hw_addr);
+    uint32_t interface_id, const ipv4_addr_t *source_addr,
+    const ipv4_addr_t *dest_addr, uint8_t *_dest_hw_addr);

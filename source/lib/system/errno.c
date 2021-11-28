@@ -86,6 +86,7 @@ static int status_to_errno_table[] = {
     [STATUS_ADDR_NOT_SUPPORTED]     = EAFNOSUPPORT,
     [STATUS_MSG_TOO_LONG]           = EMSGSIZE,
     [STATUS_NET_UNREACHABLE]        = ENETUNREACH,
+    [STATUS_HOST_UNREACHABLE]       = EHOSTUNREACH,
 };
 
 /** Real location of errno. */
