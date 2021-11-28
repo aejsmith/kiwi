@@ -27,6 +27,7 @@
 
 #include <sync/rwlock.h>
 
+#include <net/arp.h>
 #include <net/ethernet.h>
 #include <net/interface.h>
 #include <net/ipv4.h>
@@ -254,7 +255,7 @@ status_t net_interface_up(net_interface_t *interface) {
 
     list_append(&net_interface_list, &interface->interfaces_link);
 
-    kprintf(LOG_NOTICE, "net: %pD: interface is up\n", device->node);
+    kprintf(LOG_NOTICE, "net: %pD: interface is up (id: %" PRIu32 ")\n", device->node, interface->id);
     ret = STATUS_SUCCESS;
 
 out:
@@ -305,14 +306,25 @@ out:
  * @param interface     Interface the packet was received on.
  * @param packet        Packet that was received. */
 __export void net_interface_receive(net_interface_t *interface, net_packet_t *packet) {
-    /* Ignore the packet if the interface is down. */
-    if (!(interface->flags & NET_INTERFACE_UP))
-        return;
+    packet->type = NET_PACKET_TYPE_UNKNOWN;
 
-    // TODO: What locking will be needed here? interface_lock should be taken
-    // for reading to protect interface state above. do we need any per-interface
-    // locking on top of that?
-    kprintf(LOG_DEBUG, "net: packet received\n");
+    net_interface_read_lock();
+
+    /* Ignore the packet if the interface is down. */
+    if (interface->flags & NET_INTERFACE_UP) {
+        interface->link_ops->parse_header(interface, packet);
+
+        switch (packet->type) {
+            case NET_PACKET_TYPE_ARP:
+                arp_receive(interface, packet);
+                break;
+            case NET_PACKET_TYPE_IPV4:
+                ipv4_receive(interface, packet);
+                break;
+        }
+    }
+
+    net_interface_unlock();
 }
 
 /**

@@ -63,7 +63,7 @@ typedef struct net_link_ops {
     /** Broadcast link-layer address for the link type. */
     const uint8_t *broadcast_addr;
 
-    /** Adds link-layer headers to a packet
+    /** Adds link-layer headers to a packet.
      * @param interface     Interface being transmitted on.
      * @param packet        Packet to transmit.
      * @param dest_addr     Destination link-layer address.
@@ -71,6 +71,14 @@ typedef struct net_link_ops {
     status_t (*add_header)(
         struct net_interface *interface, struct net_packet *packet,
         const uint8_t *dest_addr);
+
+    /** Parse and remove link-layer headers from a packet.
+     * @param interface     Interface packet was received on.
+     * @param packet        Packet received. This function should set its type
+     *                      according to the link-layer header if the header
+     *                      was valid, or to NET_PACKET_TYPE_UNKNOWN if it was
+     *                      invalid. */
+    void (*parse_header)(struct net_interface *interface, struct net_packet *packet);
 } net_link_ops_t;
 
 /**

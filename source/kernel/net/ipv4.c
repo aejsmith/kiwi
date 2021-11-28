@@ -224,3 +224,12 @@ status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t
     socket->family_ops = &ipv4_net_family_ops;
     return STATUS_SUCCESS;
 }
+
+/** Handles a received IPv4 packet.
+ * @param interface     Source interface.
+ * @param packet        Packet that was received. */
+void ipv4_receive(net_interface_t *interface, net_packet_t *packet) {
+    kprintf(LOG_DEBUG, "ipv4: packet received\n");
+
+    // TODO: Validate source IP address against the interface.
+}

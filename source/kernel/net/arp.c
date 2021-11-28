@@ -34,6 +34,16 @@
 #include <status.h>
 #include <time.h>
 
+/** Define to enable debug output. */
+#define DEBUG_ARP
+
+#ifdef DEBUG_ARP
+#   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
+#else
+#   define dprintf(fmt...)
+#endif
+
+
 /** ARP cache entry structure. */
 typedef struct arp_entry {
     list_t link;
@@ -44,8 +54,8 @@ typedef struct arp_entry {
     uint32_t interface_id;          /**< Interface ID that this entry is for. */
 
     /** Destination IP address and resolved HW address. */
-    ipv4_addr_t dest_addr;
-    uint8_t dest_hw_addr[NET_DEVICE_ADDR_MAX];
+    ipv4_addr_t addr;
+    uint8_t hw_addr[NET_DEVICE_ADDR_MAX];
 
     condvar_t cvar;                 /**< Condition variable to wait for completion. */
 } arp_entry_t;
@@ -60,8 +70,6 @@ typedef struct arp_entry {
 // TODO: Better data structure.
 static LIST_DEFINE(arp_cache);
 static MUTEX_DEFINE(arp_cache_lock, 0);
-
-// TODO: Need to handle ARP requests as input.
 
 static uint16_t arp_hw_type(net_device_type_t type) {
     switch (type) {
@@ -107,7 +115,6 @@ static status_t send_arp_request(
     memset(addrs, 0, device->hw_addr_len);
     addrs += device->hw_addr_len;
     memcpy(addrs, dest_addr, IPV4_ADDR_LEN);
-    addrs += IPV4_ADDR_LEN;
 
     packet->type = NET_PACKET_TYPE_ARP;
 
@@ -142,7 +149,7 @@ status_t arp_lookup(
     list_foreach(&arp_cache, iter) {
         arp_entry_t *exist = list_entry(iter, arp_entry_t, link);
 
-        if (exist->interface_id == interface_id && exist->dest_addr.val == dest_addr->val) {
+        if (exist->interface_id == interface_id && exist->addr.val == dest_addr->val) {
             entry = exist;
             break;
         }
@@ -155,9 +162,9 @@ status_t arp_lookup(
         list_init(&entry->link);
         condvar_init(&entry->cvar, "arp_entry_cvar");
 
-        entry->retries       = ARP_MAX_RETRIES;
-        entry->interface_id  = interface_id;
-        entry->dest_addr.val = dest_addr->val;
+        entry->retries      = ARP_MAX_RETRIES;
+        entry->interface_id = interface_id;
+        entry->addr.val     = dest_addr->val;
 
         list_append(&arp_cache, &entry->link);
     }
@@ -172,6 +179,10 @@ status_t arp_lookup(
         if (curr_time >= entry->timeout) {
             if (entry->retries == 0)
                 break;
+
+            dprintf(
+                "arp: sending request for %pI4 from %pI4 on interface %u (retries: %u)\n",
+                dest_addr, source_addr, entry->interface_id, entry->retries);
 
             entry->retries--;
 
@@ -199,11 +210,83 @@ status_t arp_lookup(
 
     if (ret == STATUS_SUCCESS) {
         if (entry->complete) {
-            memcpy(_dest_hw_addr, entry->dest_hw_addr, NET_DEVICE_ADDR_MAX);
+            memcpy(_dest_hw_addr, entry->hw_addr, NET_DEVICE_ADDR_MAX);
         } else {
             ret = STATUS_HOST_UNREACHABLE;
         }
     }
 
     return ret;
+}
+
+static void handle_arp_reply(net_device_t *device, const ipv4_addr_t *addr, const uint8_t *hw_addr) {
+    MUTEX_SCOPED_LOCK(lock, &arp_cache_lock);
+
+    list_foreach(&arp_cache, iter) {
+        arp_entry_t *entry = list_entry(iter, arp_entry_t, link);
+
+        if (entry->interface_id == device->interface.id && entry->addr.val == addr->val) {
+            dprintf("arp: resolved address %pI4 to %pM\n", addr, hw_addr);
+
+            memcpy(entry->hw_addr, hw_addr, device->hw_addr_len);
+            entry->complete = true;
+            condvar_broadcast(&entry->cvar);
+            break;
+        }
+    }
+
+    // TODO: If we don't have it we could cache this anyway, if it looks valid
+    // for the interface's address configuration.
+}
+
+/** Handles a received ARP packet.
+ * @param interface     Source interface.
+ * @param packet        Packet that was received. */
+void arp_receive(net_interface_t *interface, net_packet_t *packet) {
+    net_device_t *device = net_device_from_interface(interface);
+
+    const arp_packet_t *header = net_packet_data(packet, 0, sizeof(*header));
+    if (!header) {
+        dprintf("arp: dropping packet: too short\n");
+        return;
+    } else if (header->hw_type != arp_hw_type(device->type)) {
+        dprintf("arp: dropping packet: invalid HW type\n");
+        return;
+    } else if (header->hw_len != device->hw_addr_len) {
+        dprintf("arp: dropping packet: invalid HW address length\n");
+        return;
+    } else if (header->proto_type != cpu_to_net16(NET_PACKET_TYPE_IPV4)) {
+        dprintf("arp: dropping packet: unknown protocol type\n");
+        return;
+    } else if (header->proto_len != IPV4_ADDR_LEN) {
+        dprintf("arp: dropping packet: invalid HW address length\n");
+        return;
+    }
+
+    const uint8_t *addrs = header->addrs;
+
+    const uint8_t *hw_sender = addrs;
+    addrs += device->hw_addr_len;
+    const ipv4_addr_t *proto_sender = (const ipv4_addr_t *)addrs;
+    addrs += IPV4_ADDR_LEN;
+    const uint8_t *hw_target = addrs;
+    addrs += device->hw_addr_len;
+    const ipv4_addr_t *proto_target = (const ipv4_addr_t *)addrs;
+
+    dprintf(
+        "arp: received packet 0x%" PRIx16 " (hw_sender: %pM, proto_sender, %pI4, hw_target: %pM, proto_target: %pI4)\n",
+        net16_to_cpu(header->opcode), hw_sender, proto_sender, hw_target, proto_target);
+
+    switch (net16_to_cpu(header->opcode)) {
+        case ARP_OPCODE_REPLY:
+            handle_arp_reply(device, proto_sender, hw_sender);
+            break;
+        case ARP_OPCODE_REQUEST:
+            // TODO: Can add the sender to our cache.
+            dprintf("arp: TODO: handle requests\n");
+            break;
+        default:
+            dprintf("arp: dropping packet: unknown opcode\n");
+            break;
+    }
 }

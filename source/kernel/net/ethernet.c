@@ -45,8 +45,22 @@ static status_t ethernet_add_header(net_interface_t *interface, net_packet_t *pa
     return STATUS_SUCCESS;
 }
 
+static void ethernet_parse_header(net_interface_t *interface, net_packet_t *packet) {
+    ethernet_header_t *header = net_packet_data(packet, 0, sizeof(*header));
+    if (header) {
+        packet->type = net16_to_cpu(header->type);
+
+        // TODO: Do upper layers need to know if this is a broadcast packet or not?
+
+        net_packet_offset(packet, sizeof(*header));
+    } else {
+        packet->type = NET_PACKET_TYPE_UNKNOWN;
+    }
+}
+
 const net_link_ops_t ethernet_net_link_ops = {
     .broadcast_addr = ethernet_broadcast_addr,
 
-    .add_header = ethernet_add_header,
+    .add_header   = ethernet_add_header,
+    .parse_header = ethernet_parse_header,
 };

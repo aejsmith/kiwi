@@ -26,6 +26,8 @@
 #include <net/interface.h>
 #include <net/socket.h>
 
+struct net_packet;
+
 /** IPv4 header structure. */
 typedef struct ipv4_header {
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
@@ -53,3 +55,5 @@ typedef struct ipv4_header {
 extern const net_addr_ops_t ipv4_net_addr_ops;
 
 extern status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t **_socket);
+
+extern void ipv4_receive(net_interface_t *interface, struct net_packet *packet);

@@ -23,6 +23,8 @@
 
 #include <net/ipv4.h>
 
+struct net_packet;
+
 /** ARP packet structure. */
 typedef struct arp_packet {
     uint16_t hw_type;
@@ -49,3 +51,5 @@ typedef struct arp_packet {
 extern status_t arp_lookup(
     uint32_t interface_id, const ipv4_addr_t *source_addr,
     const ipv4_addr_t *dest_addr, uint8_t *_dest_hw_addr);
+
+extern void arp_receive(net_interface_t *interface, struct net_packet *packet);
