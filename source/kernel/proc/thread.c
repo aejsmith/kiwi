@@ -501,17 +501,19 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsi
 
     assert(curr_cpu->in_interrupt == ((lock) ? 1 : 0));
 
+    /* If timeout is 0, we return an error immediately. */
+    if (timeout == 0) {
+        ret = STATUS_WOULD_BLOCK;
+        goto cancel;
+    }
+
     /* Convert an absolute target time to a relative time. */
     if (flags & SLEEP_ABSOLUTE && timeout > 0) {
         timeout = timeout - system_time();
-        if (timeout < 0)
-            timeout = 0;
-    }
-
-    /* If timeout is 0, we return an error immediately. */
-    if (!timeout) {
-        ret = STATUS_WOULD_BLOCK;
-        goto cancel;
+        if (timeout <= 0) {
+            ret = STATUS_TIMED_OUT;
+            goto cancel;
+        }
     }
 
     /* If interruptible and the interrupted flag is set, we also return an error
