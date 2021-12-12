@@ -229,6 +229,7 @@ static inline net_packet_t *net_packet_from_subset(net_packet_t *packet, uint32_
 }
 
 extern void net_packet_offset(net_packet_t *packet, uint32_t offset);
+extern void net_packet_subset(net_packet_t *packet, uint32_t offset, uint32_t size);
 extern void net_packet_prepend(net_packet_t *packet, net_buffer_t *buffer);
 
 extern void *net_packet_data(net_packet_t *packet, uint32_t offset, uint32_t size);

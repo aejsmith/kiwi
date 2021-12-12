@@ -38,7 +38,7 @@ typedef struct ipv4_header {
     uint8_t ihl     : 4;
 #endif
     uint8_t dscp_ecn;
-    uint16_t total_len;
+    uint16_t total_size;
     uint16_t id;
     uint16_t frag_offset_flags;
     uint8_t ttl;
@@ -48,9 +48,12 @@ typedef struct ipv4_header {
     uint32_t dest_addr;
 } __packed ipv4_header_t;
 
+#define IPV4_HEADER_FRAG_OFFSET_MASK    0x1fff
+#define IPV4_HEADER_FRAG_FLAGS_MF       0x2000
+
 /** Maximum IPv4 packet size and MTU (payload size). */
-#define IPV4_MAX_PACKET_SIZE    65535
-#define IPV4_MTU                65515
+#define IPV4_MAX_PACKET_SIZE            65535
+#define IPV4_MTU                        65515
 
 extern const net_addr_ops_t ipv4_net_addr_ops;
 

@@ -22,6 +22,7 @@
 #include <device/net/net.h>
 
 #include <net/arp.h>
+#include <net/ip.h>
 #include <net/ipv4.h>
 #include <net/packet.h>
 #include <net/socket.h>
@@ -29,6 +30,15 @@
 
 #include <kernel.h>
 #include <status.h>
+
+/** Define to enable debug output. */
+#define DEBUG_IPV4
+
+#ifdef DEBUG_IPV4
+#   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
+#else
+#   define dprintf(fmt...)
+#endif
 
 static bool ipv4_net_addr_valid(const net_addr_t *addr) {
     const uint8_t *addr_bytes = addr->ipv4.addr.bytes;
@@ -56,12 +66,6 @@ const net_addr_ops_t ipv4_net_addr_ops = {
     .valid = ipv4_net_addr_valid,
     .equal = ipv4_net_addr_equal,
 };
-
-static uint16_t ipv4_addr_port(const net_socket_t *socket, const sockaddr_t *_addr) {
-    const sockaddr_in_t *addr = (const sockaddr_in_t *)_addr;
-
-    return addr->sin_port;
-}
 
 static status_t ipv4_route(
     net_socket_t *socket, const sockaddr_t *_dest_addr, uint32_t *_interface_id,
@@ -165,9 +169,9 @@ static status_t ipv4_transmit(
     net_packet_prepend(packet, buffer);
 
     header->version           = 4;
-    header->ihl               = sizeof(ipv4_header_t) / 4;
+    header->ihl               = sizeof(*header) / 4;
     header->dscp_ecn          = 0;
-    header->total_len         = cpu_to_net16(packet->size);
+    header->total_size        = cpu_to_net16(packet->size);
     header->id                = 0;
     header->frag_offset_flags = 0;
     header->ttl               = 64;
@@ -189,12 +193,11 @@ out_unlock:
 }
 
 static const net_family_ops_t ipv4_net_family_ops = {
-    .mtu       = IPV4_MTU,
-    .addr_len  = sizeof(sockaddr_in_t),
+    .mtu      = IPV4_MTU,
+    .addr_len = sizeof(sockaddr_in_t),
 
-    .addr_port = ipv4_addr_port,
-    .route     = ipv4_route,
-    .transmit  = ipv4_transmit,
+    .route    = ipv4_route,
+    .transmit = ipv4_transmit,
 };
 
 /** Creates an IPv4 socket. */
@@ -229,7 +232,86 @@ status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t
  * @param interface     Source interface.
  * @param packet        Packet that was received. */
 void ipv4_receive(net_interface_t *interface, net_packet_t *packet) {
-    kprintf(LOG_DEBUG, "ipv4: packet received\n");
+    /* Get and validate the header. */
+    const ipv4_header_t *header = net_packet_data(packet, 0, sizeof(*header));
+    if (!header) {
+        dprintf("ipv4: dropping packet: too short for header\n");
+        return;
+    } else if (header->version != 4) {
+        dprintf("ipv4: dropping packet: incorrect version (%" PRIu8 ")\n", header->version);
+        return;
+    } else if (header->ihl < sizeof(*header) / 4) {
+        dprintf("ipv4: dropping packet: IHL too short (%" PRIu8 ")\n", header->ihl);
+        return;
+    }
 
-    // TODO: Validate source IP address against the interface.
+    // TODO: Fragmentation.
+    if (net16_to_cpu(header->frag_offset_flags) & (IPV4_HEADER_FRAG_OFFSET_MASK | IPV4_HEADER_FRAG_FLAGS_MF)) {
+        dprintf("ipv4: dropping packet: fragmentation unsupported\n");
+        return;
+    }
+
+    uint16_t total_size  = net16_to_cpu(header->total_size);
+    uint16_t header_size = header->ihl * 4;
+    if (total_size > packet->size) {
+        dprintf(
+            "ipv4: dropping packet: packet size mismatch (total_size: %" PRIu16 ", packet_size: %" PRIu16 ")\n",
+            total_size, packet->size);
+        return;
+    } else if (header_size > total_size) {
+        dprintf(
+            "ipv4: dropping packet: header size exceeds packet size (header_size: %" PRIu16 ", total_size: %" PRIu16 ")\n",
+            header_size, total_size);
+        return;
+    }
+
+    /* Checksum the header. */
+    if (ipv4_checksum(header) != 0) {
+        dprintf("ipv4: dropping packet: checksum failed\n");
+        return;
+    }
+
+    /* Check whether this packet is destined for us. */
+    bool found_addr = false;
+    for (size_t i = 0; i < interface->addrs.count && !found_addr; i++) {
+        const net_addr_t *interface_addr = array_entry(&interface->addrs, net_addr_t, i);
+
+        if (interface_addr->family == AF_INET) {
+            found_addr =
+                header->dest_addr == interface_addr->ipv4.addr.val ||
+                header->dest_addr == interface_addr->ipv4.broadcast.val;
+        }
+    }
+    if (!found_addr) {
+        dprintf("ipv4: dropping packet: not destined for us\n");
+        return;
+    }
+
+    dprintf(
+        "ipv4: received %" PRIu16 " byte packet with protocol %" PRIu8 "\n",
+        total_size, header->protocol);
+
+    /* Remove header and subset to the actual data size specified by the header
+     * for the protocol. */
+    uint16_t data_size = total_size - header_size;
+    if (data_size > 0) {
+        sockaddr_ip_t source_addr;
+        memset(&source_addr, 0, sizeof(source_addr));
+        source_addr.ipv4.sin_family   = AF_INET;
+        source_addr.ipv4.sin_addr.val = header->source_addr;
+
+        sockaddr_ip_t dest_addr;
+        memset(&dest_addr, 0, sizeof(dest_addr));
+        dest_addr.ipv4.sin_family     = AF_INET;
+        dest_addr.ipv4.sin_addr.val   = header->dest_addr;
+
+        net_packet_subset(packet, header_size, data_size);
+
+        // TODO: Would be good to release net_interface_lock past here.
+        switch (header->protocol) {
+            case IPPROTO_UDP:
+                udp_receive(packet, &source_addr, &dest_addr);
+                break;
+        }
+    }
 }

@@ -200,7 +200,9 @@ status_t socket_listen(object_handle_t *handle, int backlog) {
  * @param max_addr_len  Maximum length of returned address (size of buffer).
  * @param _bytes        Where to store number of bytes received.
  * @param _addr         Where to return address of the source (can be NULL).
- * @param _addr_len     Where to return actual size of the source address.
+ * @param _addr_len     Where to return actual size of the source address. Can
+ *                      be larger than max_addr_len, in which case the address
+ *                      will have been truncated.
  * @return              Status code describing result of the operation. */
 status_t socket_recvfrom(
     object_handle_t *handle, void *buf, size_t size, int flags,
@@ -415,7 +417,9 @@ status_t kern_socket_listen(handle_t handle, int backlog) {
  * @param max_addr_len  Maximum length of returned address (size of buffer).
  * @param _bytes        Where to store number of bytes received.
  * @param _addr         Where to return address of the source (can be NULL).
- * @param _addr_len     Where to return actual size of the source address.
+ * @param _addr_len     Where to return actual size of the source address. Can
+ *                      be larger than max_addr_len, in which case the address
+ *                      will have been truncated.
  * @return              Status code describing result of the operation. */
 status_t kern_socket_recvfrom(
     handle_t handle, void *buf, size_t size, int flags, socklen_t max_addr_len,
@@ -472,6 +476,8 @@ out:
     }
 
     if (addr_len > 0) {
+        /* Address can be truncated if family addresses are larger than
+         * max_addr_len. */
         err = memcpy_to_user(_addr, kaddr, min(addr_len, max_addr_len));
         if (err != STATUS_SUCCESS)
             ret = err;

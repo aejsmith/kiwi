@@ -43,7 +43,6 @@
 #   define dprintf(fmt...)
 #endif
 
-
 /** ARP cache entry structure. */
 typedef struct arp_entry {
     list_t link;

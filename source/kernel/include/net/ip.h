@@ -27,8 +27,10 @@
 
 /** Socket address union supporting both IPv4 and IPv6. */
 typedef union sockaddr_ip {
-    uint16_t family;
-    sockaddr_t addr;
+    struct {
+        uint16_t family;
+        uint16_t port;
+    };
     sockaddr_in_t ipv4;
     sockaddr_in6_t ipv6;
 } sockaddr_ip_t;

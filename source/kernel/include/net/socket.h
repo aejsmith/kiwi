@@ -43,12 +43,6 @@ typedef struct net_family_ops {
     /** Socket address length for this family. */
     socklen_t addr_len;
 
-    /** Gets the port from an address.
-     * @param socket        Socket to get for.
-     * @param addr          Address to get from (must be valid).
-     * @return              Port number (in network byte order). */
-    uint16_t (*addr_port)(const struct net_socket *socket, const sockaddr_t *addr);
-
     /** Determines a route (interface and source address) for a packet.
      * @param socket        Socket to route for.
      * @param dest_addr     Destination address (must be valid)
@@ -103,10 +97,15 @@ static inline status_t net_socket_addr_valid(const net_socket_t *socket, const s
     return STATUS_SUCCESS;
 }
 
-/** Gets the port from an address.
- * @see                 net_family_ops_t::addr_port */
-static inline uint16_t net_socket_addr_port(const net_socket_t *socket, const sockaddr_t *addr) {
-    return socket->family_ops->addr_port(socket, addr);
+/** Helper to return socket addresses. */
+static inline void net_socket_addr_copy(
+    const net_socket_t *socket, const sockaddr_t *addr, socklen_t max_addr_len,
+    sockaddr_t *_addr, socklen_t *_addr_len)
+{
+    if (_addr_len)
+        *_addr_len = socket->family_ops->addr_len;
+    if (_addr)
+        memcpy(_addr, addr, min(max_addr_len, socket->family_ops->addr_len));
 }
 
 /** Determines a route (interface and source address) for a packet.

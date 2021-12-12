@@ -334,6 +334,48 @@ __export void net_packet_offset(net_packet_t *packet, uint32_t offset) {
 }
 
 /**
+ * Resizes the packet to a subset of the data, i.e. offsets it and adjusts the
+ * size. The caller must verify that the subset is within the packet before
+ * calling this function.
+ *
+ * This cannot be reversed. Buffers outside of the subset will be freed.
+ *
+ * @param packet        Packet to subset. Must have a reference count of 1.
+ * @param offset        Start offset of the subset.
+ * @param size          Size of the subset.
+ */
+void net_packet_subset(net_packet_t *packet, uint32_t offset, uint32_t size) {
+    assert(packet->refcount == 1);
+    assert(offset >= 0);
+    assert(size > 0);
+    assert(offset < packet->size);
+    assert(offset + size <= packet->size);
+
+    /* Perform the offset. */
+    net_packet_offset(packet, offset);
+
+    /* Trim off any excess buffers at the end. */
+    net_buffer_t *next = packet->head;
+    uint32_t total = 0;
+    while (total < size) {
+        assert(next);
+        net_buffer_t *buffer = next;
+        next = buffer->next;
+        total += buffer->size - buffer->offset;
+        if (total >= size)
+            buffer->next = NULL;
+    }
+
+    while (next) {
+        net_buffer_t *buffer = next;
+        next = buffer->next;
+        net_buffer_destroy(buffer);
+    }
+
+    packet->size = size;
+}
+
+/**
  * Prepends a data buffer to a packet, e.g. to add a protocol header. The
  * buffer must not be in use by any other packet, ownership of it will be taken
  * by the packet.

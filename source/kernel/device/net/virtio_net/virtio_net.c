@@ -122,6 +122,11 @@ static void virtio_net_buffer_free(net_buffer_external_t *net) {
 
     uint16_t desc_index = buffer - device->rx_buffers;
 
+    // TODO: It currently won't happen but we might in future have these
+    // net_buffers persist beyond net_interface_receive if device buffers get
+    // stored (at the moment we always copy). If this happens, we'll need
+    // locking here.
+
     /* Re-queue the RX buffer for use again. */
     virtio_net_queue_rx(device, desc_index, true);
 }

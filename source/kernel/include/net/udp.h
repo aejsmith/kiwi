@@ -31,14 +31,9 @@ typedef struct udp_header {
     uint16_t checksum;
 } __packed udp_header_t;
 
-/** UDP socket structure. */
-typedef struct udp_socket {
-    net_socket_t net;
-} udp_socket_t;
-
-DEFINE_CLASS_CAST(udp_socket, net_socket, net);
-
 /** Maximum UDP packet size (without IP header). */
 #define UDP_MAX_PACKET_SIZE     65535
 
 extern status_t udp_socket_create(sa_family_t family, socket_t **_socket);
+
+extern void udp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr);
