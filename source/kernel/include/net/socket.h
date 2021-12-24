@@ -23,6 +23,7 @@
 
 #include <io/socket.h>
 
+#include <lib/string.h>
 #include <lib/utility.h>
 
 #include <status.h>

@@ -73,10 +73,11 @@
 #define STATUS_PIPE_CLOSED          48  /**< Read end of pipe has been closed. */
 #define STATUS_NET_DOWN             49  /**< Network is down. */
 #define STATUS_ADDR_NOT_SUPPORTED   50  /**< Address family is not supported. */
-#define STATUS_MSG_TOO_LONG         51  /**< Socket message is too long. */
-#define STATUS_DEST_ADDR_REQUIRED   52  /**< Destination address is required. */
-#define STATUS_NET_UNREACHABLE      53  /**< Network is unreachable. */
-#define STATUS_HOST_UNREACHABLE     54  /**< No route to host. */
+#define STATUS_PROTO_NOT_SUPPORTED  51  /**< Protocol is not supported. */
+#define STATUS_MSG_TOO_LONG         52  /**< Socket message is too long. */
+#define STATUS_DEST_ADDR_REQUIRED   53  /**< Destination address is required. */
+#define STATUS_NET_UNREACHABLE      54  /**< Network is unreachable. */
+#define STATUS_HOST_UNREACHABLE     55  /**< No route to host. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 

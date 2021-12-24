@@ -26,6 +26,7 @@
 #include <net/ipv4.h>
 #include <net/packet.h>
 #include <net/socket.h>
+#include <net/tcp.h>
 #include <net/udp.h>
 
 #include <kernel.h>
@@ -202,7 +203,7 @@ static const net_family_ops_t ipv4_net_family_ops = {
 
 /** Creates an IPv4 socket. */
 status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t **_socket) {
-    status_t ret = STATUS_INVALID_ARG;
+    status_t ret = STATUS_PROTO_NOT_SUPPORTED;
 
     switch (type) {
         case SOCK_DGRAM: {
@@ -215,9 +216,16 @@ status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t
 
             break;
         }
-        //case SOCK_STREAM: {
-        //  break;
-        //}
+        case SOCK_STREAM: {
+            switch (protocol) {
+                case IPPROTO_IP:
+                case IPPROTO_TCP:
+                    ret = tcp_socket_create(family, _socket);
+                    break;
+            }
+
+            break;
+        }
     }
 
     if (ret != STATUS_SUCCESS)
@@ -309,6 +317,9 @@ void ipv4_receive(net_interface_t *interface, net_packet_t *packet) {
 
         // TODO: Would be good to release net_interface_lock past here.
         switch (header->protocol) {
+            case IPPROTO_TCP:
+                tcp_receive(packet, &source_addr, &dest_addr);
+                break;
             case IPPROTO_UDP:
                 udp_receive(packet, &source_addr, &dest_addr);
                 break;
