@@ -37,6 +37,13 @@ typedef struct socket_ops {
      * @param socket        Socket to close. */
     void (*close)(struct socket *socket);
 
+    /** Initiate a connection on a socket.
+     * @param socket        Socket to connect.
+     * @param addr          Destination address.
+     * @param addr_len      Length of destination address.
+     * @return              Status code describing result of the operation. */
+    status_t (*connect)(struct socket *socket, const sockaddr_t *addr, socklen_t addr_len);
+
     /** Sends data on the socket.
      * @param socket        Socket to send on.
      * @param request       I/O request containing data.

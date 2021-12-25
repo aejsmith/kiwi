@@ -170,8 +170,22 @@ status_t socket_bind(object_handle_t *handle, const sockaddr_t *addr, socklen_t 
     return STATUS_NOT_IMPLEMENTED;
 }
 
+/** Initiate a connection on a socket.
+ * @param handle        Handle to socket to connect.
+ * @param addr          Destination address.
+ * @param addr_len      Length of destination address.
+ * @return              Status code describing result of the operation. */
 status_t socket_connect(object_handle_t *handle, const sockaddr_t *addr, socklen_t addr_len) {
-    return STATUS_NOT_IMPLEMENTED;
+    file_handle_t *fhandle = get_socket_handle(handle);
+    if (!fhandle)
+        return STATUS_INVALID_HANDLE;
+
+    socket_t *socket = fhandle->socket;
+
+    if (!socket->ops->connect)
+        return STATUS_NOT_SUPPORTED;
+
+    return socket->ops->connect(socket, addr, addr_len);
 }
 
 status_t socket_getpeername(
@@ -387,8 +401,29 @@ status_t kern_socket_bind(handle_t handle, const sockaddr_t *addr, socklen_t add
     return STATUS_NOT_IMPLEMENTED;
 }
 
+/** Initiate a connection on a socket.
+ * @param handle        Handle to socket to connect.
+ * @param addr          Destination address.
+ * @param addr_len      Length of destination address.
+ * @return              Status code describing result of the operation. */
 status_t kern_socket_connect(handle_t handle, const sockaddr_t *addr, socklen_t addr_len) {
-    return STATUS_NOT_IMPLEMENTED;
+    status_t ret;
+
+    if (!addr || addr_len == 0 || addr_len > SOCKADDR_STORAGE_SIZE)
+        return STATUS_INVALID_ARG;
+
+    void *kaddr __cleanup_kfree = kmalloc(addr_len, MM_KERNEL);
+
+    ret = memcpy_from_user(kaddr, addr, addr_len);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    return socket_connect(khandle, kaddr, addr_len);
 }
 
 status_t kern_socket_getpeername(

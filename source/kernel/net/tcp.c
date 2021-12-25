@@ -51,6 +51,10 @@ static void tcp_socket_close(socket_t *_socket) {
     kfree(socket);
 }
 
+static status_t tcp_socket_connect(socket_t *socket, const sockaddr_t *addr, socklen_t addr_len) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
 static status_t tcp_socket_send(
     socket_t *_socket, io_request_t *request, int flags, const sockaddr_t *addr,
     socklen_t addr_len)
@@ -73,6 +77,7 @@ static status_t tcp_socket_receive(
 
 static const socket_ops_t tcp_socket_ops = {
     .close   = tcp_socket_close,
+    .connect = tcp_socket_connect,
     .send    = tcp_socket_send,
     .receive = tcp_socket_receive,
 };
