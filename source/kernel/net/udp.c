@@ -27,6 +27,7 @@
 #include <net/interface.h>
 #include <net/ip.h>
 #include <net/packet.h>
+#include <net/port.h>
 #include <net/udp.h>
 
 #include <sync/condvar.h>
@@ -46,10 +47,6 @@
 // TODO: Make this configurable.
 #define UDP_RX_QUEUE_MAX_SIZE       PAGE_SIZE
 
-/** Range to use for ephemeral (dynamic) ports (IANA standard range). */
-#define UDP_EPHEMERAL_PORT_FIRST    49152
-#define UDP_EPHEMERAL_PORT_LAST     65535
-
 /** Received UDP packet structure. */
 typedef struct udp_rx_packet {
     list_t link;                    /**< Link to RX queue. */
@@ -62,9 +59,7 @@ typedef struct udp_rx_packet {
 typedef struct udp_socket {
     net_socket_t net;
 
-    list_t ports_link;              /**< Link to ports list. */
-    uint16_t port;                  /**< Bound port number. */
-
+    net_port_t port;                /**< Port allocation. */
     mutex_t rx_lock;                /**< Receive queue lock. */
     condvar_t rx_cvar;              /**< Condition to wait for RX packets on. */
     uint32_t rx_size;               /**< Total amount of data in the RX queue. */
@@ -73,85 +68,47 @@ typedef struct udp_socket {
 
 DEFINE_CLASS_CAST(udp_socket, net_socket, net);
 
-/** UDP port address space (IPv4 and IPv6 have a different address space) */
-typedef struct udp_port_space {
-    rwlock_t lock;
+static net_port_space_t udp_ipv4_space = NET_PORT_SPACE_INITIALIZER(udp_ipv4_space);
+static net_port_space_t udp_ipv6_space = NET_PORT_SPACE_INITIALIZER(udp_ipv6_space);
 
-    // TODO: Replace this with a hash table.
-    list_t sockets;                 /**< List of all sockets bound to a port. */
-
-    uint16_t next_ephemeral_port;   /**< Next ephemeral port number. */
-} udp_port_space_t;
-
-#define UDP_PORT_SPACE_INITIALIZER(_var) \
-    { \
-        .lock                = RWLOCK_INITIALIZER(_var.lock, "udp_ports_lock"), \
-        .sockets             = LIST_INITIALIZER(_var.sockets), \
-        .next_ephemeral_port = UDP_EPHEMERAL_PORT_FIRST, \
-    }
-
-static udp_port_space_t udp_ipv4_space = UDP_PORT_SPACE_INITIALIZER(udp_ipv4_space);
-static udp_port_space_t udp_ipv6_space = UDP_PORT_SPACE_INITIALIZER(udp_ipv6_space);
-
-static udp_port_space_t *get_socket_port_space(udp_socket_t *socket) {
+static net_port_space_t *get_socket_port_space(udp_socket_t *socket) {
     return (socket->net.socket.family == AF_INET6) ? &udp_ipv6_space : &udp_ipv4_space;
 }
 
-static udp_port_space_t *get_packet_port_space(net_packet_t *packet) {
+static net_port_space_t *get_packet_port_space(net_packet_t *packet) {
     return (packet->type == NET_PACKET_TYPE_IPV6) ? &udp_ipv6_space : &udp_ipv4_space;
 }
 
-/** Finds the socket bound to the given port number (if any). */
-static udp_socket_t *find_socket(udp_port_space_t *space, uint16_t port) {
-    // TODO: Really needs a hash table...
-    list_foreach(&space->sockets, iter) {
-        udp_socket_t *socket = list_entry(iter, udp_socket_t, ports_link);
-        if (socket->port == port)
-            return socket;
+/**
+ * Finds the socket bound to a given number, if any, and takes its receive
+ * lock.
+ */
+static udp_socket_t *find_rx_socket(net_packet_t *packet, uint16_t num) {
+    net_port_space_t *space = get_packet_port_space(packet);
+    net_port_space_read_lock(space);
+
+    udp_socket_t *socket = NULL;
+    net_port_t *port = net_port_lookup_unsafe(space, num);
+    if (port) {
+        socket = container_of(port, udp_socket_t, port);
+        mutex_lock(&socket->rx_lock);
     }
 
-    return NULL;
+    net_port_space_unlock(space);
+    return socket;
 }
 
 /** Allocates a new ephemeral port number. */
 static status_t alloc_ephemeral_port(udp_socket_t *socket) {
-    assert(list_empty(&socket->ports_link));
-    assert(socket->port == 0);
-
-    udp_port_space_t *space = get_socket_port_space(socket);
-    rwlock_write_lock(&space->lock);
-
-    /* Round-robin allocation of port numbers. */
-    uint16_t start = space->next_ephemeral_port;
-    do {
-        if (!find_socket(space, space->next_ephemeral_port)) {
-            socket->port = space->next_ephemeral_port;
-            list_append(&space->sockets, &socket->ports_link);
-        }
-
-        if (space->next_ephemeral_port == UDP_EPHEMERAL_PORT_LAST) {
-            space->next_ephemeral_port = UDP_EPHEMERAL_PORT_FIRST;
-        } else {
-            space->next_ephemeral_port++;
-        }
-    } while (socket->port == 0 && space->next_ephemeral_port != start);
-
-    rwlock_unlock(&space->lock);
-    return (socket->port != 0) ? STATUS_SUCCESS : STATUS_TRY_AGAIN;
+    net_port_space_t *space = get_socket_port_space(socket);
+    return net_port_alloc_ephemeral(space, &socket->port);
 }
 
 static void udp_socket_close(socket_t *_socket) {
     udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
 
-    /* Free the port. */
-    if (socket->port != 0) {
-        udp_port_space_t *space = get_socket_port_space(socket);
-        rwlock_write_lock(&space->lock);
-
-        list_remove(&socket->ports_link);
-
-        rwlock_unlock(&space->lock);
-    }
+    net_port_space_t *space = get_socket_port_space(socket);
+    net_port_free(space, &socket->port);
 
     mutex_lock(&socket->rx_lock);
 
@@ -219,7 +176,7 @@ static status_t udp_socket_send(
         goto out;
 
     /* Allocate an ephemeral port if we're not already bound. */
-    if (socket->port == 0) {
+    if (socket->port.num == 0) {
         ret = alloc_ephemeral_port(socket);
         if (ret != STATUS_SUCCESS)
             goto out;
@@ -228,7 +185,7 @@ static status_t udp_socket_send(
     /* Initialise header. */
     header->length      = cpu_to_net16(packet_size);
     header->dest_port   = dest_addr->port;
-    header->source_port = cpu_to_net16(socket->port);
+    header->source_port = cpu_to_net16(socket->port.num);
     header->checksum    = 0;
 
     /* Calculate checksum based on header with checksum initialised to 0. */
@@ -289,14 +246,13 @@ status_t udp_socket_create(sa_family_t family, socket_t **_socket) {
 
     udp_socket_t *socket = kmalloc(sizeof(udp_socket_t), MM_KERNEL);
 
-    list_init(&socket->ports_link);
+    net_port_init(&socket->port);
     mutex_init(&socket->rx_lock, "udp_rx_lock", 0);
     condvar_init(&socket->rx_cvar, "udp_rx_cvar");
     list_init(&socket->rx_queue);
 
     socket->net.socket.ops = &udp_socket_ops;
     socket->net.protocol   = IPPROTO_UDP;
-    socket->port           = 0;
     socket->rx_size        = 0;
 
     *_socket = &socket->net.socket;
@@ -325,22 +281,14 @@ void udp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const s
     }
 
     /* Look for the socket. */
-    udp_port_space_t *space = get_packet_port_space(packet);
-    rwlock_read_lock(&space->lock);
-
-    udp_socket_t *socket = find_socket(space, dest_port);
-    if (socket)
-        mutex_lock(&socket->rx_lock);
-
-    // TODO: What happens for sockets bound to a specific IP address? Do we
-    // need to check the destination IP address?
-
-    rwlock_unlock(&space->lock);
-
+    udp_socket_t *socket = find_rx_socket(packet, dest_port);
     if (!socket) {
         dprintf("udp: dropping packet: destination port not bound (%" PRIu16 ")\n", dest_port);
         return;
     }
+
+    // TODO: What happens for sockets bound to a specific IP address? Do we
+    // need to check the destination IP address?
 
     uint16_t data_size = total_size - sizeof(*header);
 

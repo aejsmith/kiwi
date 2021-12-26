@@ -34,3 +34,7 @@ typedef union sockaddr_ip {
     sockaddr_in_t ipv4;
     sockaddr_in6_t ipv6;
 } sockaddr_ip_t;
+
+/** Default range to use for ephemeral (dynamic) ports (IANA standard range). */
+#define IP_EPHEMERAL_PORT_FIRST    49152
+#define IP_EPHEMERAL_PORT_LAST     65535

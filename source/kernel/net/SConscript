@@ -28,6 +28,7 @@ mod_env.Module('net', [
     'ipv4.c',
     'net.c',
     'packet.c',
+    'port.c',
     'tcp.c',
     'udp.c',
 ])
