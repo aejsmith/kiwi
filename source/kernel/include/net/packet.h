@@ -191,7 +191,7 @@ extern net_packet_t *net_packet_create(net_buffer_t *buffer);
  *
  * @return              Pointer to created packet, NULL on failure.
  */
-static inline net_packet_t *net_packet_kmalloc(uint32_t size, unsigned mmflag, void *_data) {
+static inline net_packet_t *net_packet_kmalloc(uint32_t size, unsigned mmflag, void **_data) {
     net_buffer_t *buffer = net_buffer_kmalloc(size, mmflag, _data);
     if (!buffer)
         return NULL;
