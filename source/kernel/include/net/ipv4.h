@@ -48,6 +48,15 @@ typedef struct ipv4_header {
     uint32_t dest_addr;
 } __packed ipv4_header_t;
 
+/** Pseudo IPv4 header used by TCP and UDP checksums. */
+typedef struct ipv4_pseudo_header {
+    uint32_t source_addr;
+    uint32_t dest_addr;
+    uint8_t zero;
+    uint8_t protocol;
+    uint16_t length;
+} __packed ipv4_pseudo_header_t;
+
 #define IPV4_HEADER_FRAG_OFFSET_MASK    0x1fff
 #define IPV4_HEADER_FRAG_FLAGS_MF       0x2000
 

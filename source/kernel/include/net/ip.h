@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief               IPv4/6 shared definitions.
+ * @brief               IPv4/6 common definitions.
  */
 
 #pragma once
@@ -38,3 +38,9 @@ typedef union sockaddr_ip {
 /** Default range to use for ephemeral (dynamic) ports (IANA standard range). */
 #define IP_EPHEMERAL_PORT_FIRST    49152
 #define IP_EPHEMERAL_PORT_LAST     65535
+
+extern uint16_t ip_checksum(const void *data, size_t size);
+
+extern uint16_t ip_checksum_pseudo(
+    const void *data, size_t size, uint8_t protocol,
+    const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr);

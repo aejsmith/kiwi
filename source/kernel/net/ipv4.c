@@ -118,18 +118,6 @@ static status_t ipv4_route(
     return ret;
 }
 
-static uint16_t ipv4_checksum(const ipv4_header_t *header) {
-    const uint16_t *data = (const uint16_t *)header;
-    uint32_t sum = 0;
-    for (size_t i = 0; i < sizeof(*header) / sizeof(uint16_t); i++) {
-        sum += be16_to_cpu(data[i]);
-        if (sum > 0xffff)
-            sum = (sum >> 16) + (sum & 0xffff);
-    }
-
-    return cpu_to_net16((uint16_t)(~sum));
-}
-
 static status_t ipv4_transmit(
     net_socket_t *socket, net_packet_t *packet, uint32_t interface_id,
     const sockaddr_t *_source_addr, const sockaddr_t *_dest_addr)
@@ -182,7 +170,7 @@ static status_t ipv4_transmit(
     header->dest_addr         = dest_addr->sin_addr.val;
 
     /* Calculate checksum based on header with checksum initialised to 0. */
-    header->checksum = ipv4_checksum(header);
+    header->checksum = ip_checksum(header, sizeof(*header));
 
     packet->type = NET_PACKET_TYPE_IPV4;
 
@@ -274,7 +262,7 @@ void ipv4_receive(net_interface_t *interface, net_packet_t *packet) {
     }
 
     /* Checksum the header. */
-    if (ipv4_checksum(header) != 0) {
+    if (ip_checksum(header, sizeof(*header)) != 0) {
         dprintf("ipv4: dropping packet: checksum failed\n");
         return;
     }

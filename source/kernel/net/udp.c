@@ -26,6 +26,8 @@
 
 #include <net/interface.h>
 #include <net/ip.h>
+#include <net/ipv4.h>
+#include <net/ipv6.h>
 #include <net/packet.h>
 #include <net/port.h>
 #include <net/udp.h>
@@ -98,7 +100,6 @@ static udp_socket_t *find_rx_socket(net_packet_t *packet, uint16_t num) {
     return socket;
 }
 
-/** Allocates a new ephemeral port number. */
 static status_t alloc_ephemeral_port(udp_socket_t *socket) {
     net_port_space_t *space = get_socket_port_space(socket);
     return net_port_alloc_ephemeral(space, &socket->port);
@@ -122,15 +123,6 @@ static void udp_socket_close(socket_t *_socket) {
     mutex_unlock(&socket->rx_lock);
 
     kfree(socket);
-}
-
-static uint16_t udp_checksum(
-    void *data, size_t size, const sockaddr_ip_t *source_addr,
-    const sockaddr_ip_t *dest_addr)
-{
-    // TODO: optional in IPv4 so can do without for now...
-    // if 0 return 0xffff
-    return 0;
 }
 
 static status_t udp_socket_send(
@@ -189,7 +181,11 @@ static status_t udp_socket_send(
     header->checksum    = 0;
 
     /* Calculate checksum based on header with checksum initialised to 0. */
-    header->checksum = udp_checksum(header, packet_size, &source_addr, dest_addr);
+    header->checksum = ip_checksum_pseudo(header, packet_size, IPPROTO_UDP, &source_addr, dest_addr);
+
+    /* 0 in the header indicates that no checksum has been calculated. */
+    if (header->checksum == 0)
+        header->checksum = 0xffff;
 
     ret = net_socket_transmit(&socket->net, packet, interface_id, (sockaddr_t *)&source_addr, (const sockaddr_t *)dest_addr);
     if (ret == STATUS_SUCCESS)
@@ -275,9 +271,19 @@ void udp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const s
         return;
     }
 
-    // TODO: Validate checksum.
-    if (header->checksum != 0) {
+    // TODO: Handle broken up packets for checksumming. We have no need for
+    // this right now, probably needed when we implement IP fragmentation.
+    const void *data = net_packet_data(packet, 0, total_size);
+    if (!data) {
+        kprintf(LOG_ERROR, "udp: TODO: can't get whole packet data, dropping packet\n");
+        return;
+    }
 
+    if (header->checksum != 0) {
+        if (ip_checksum_pseudo(data, total_size, IPPROTO_UDP, source_addr, dest_addr) != 0) {
+            dprintf("udp: dropping packet: checksum failed\n");
+            return;
+        }
     }
 
     /* Look for the socket. */
