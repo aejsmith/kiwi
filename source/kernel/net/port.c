@@ -79,5 +79,7 @@ void net_port_free(net_port_space_t *space, net_port_t *port) {
         rwlock_write_lock(&space->lock);
         list_remove(&port->link);
         rwlock_unlock(&space->lock);
+
+        port->num = 0;
     }
 }
