@@ -23,6 +23,7 @@
 #include <net/ipv4.h>
 #include <net/ipv6.h>
 #include <net/net.h>
+#include <net/packet.h>
 
 #include <kernel.h>
 
@@ -83,4 +84,32 @@ uint16_t ip_checksum_pseudo(
     sum = add_checksum(data, size, sum);
 
     return cpu_to_net16((uint16_t)(~sum));
+}
+
+/**
+ * Calculates an IP checksum for a subset of packet data with a pseudo-header
+ * attached.
+ *
+ * @param packet        Packet containing data to checksum.
+ * @param offset        Offset of data.
+ * @param size          Size of data.
+ * @param protocol      IP protocol number.
+ * @param source_addr   Source address.
+ * @param dest_addr     Destination address.
+ *
+ * @return              Calculated checksum.
+ */
+uint16_t ip_checksum_packet_pseudo(
+    net_packet_t *packet, uint32_t offset, uint32_t size, uint8_t protocol,
+    const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr)
+{
+    // TODO: Handle broken up packets for checksumming. We have no need for
+    // this right now, probably needed when we implement IP fragmentation.
+    const void *data = net_packet_data(packet, offset, size);
+    if (!data) {
+        kprintf(LOG_ERROR, "ip: TODO: can't get whole packet data, can't checksum\n");
+        return 0;
+    }
+
+    return ip_checksum_pseudo(data, size, protocol, source_addr, dest_addr);
 }

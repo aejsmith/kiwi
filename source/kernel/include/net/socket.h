@@ -86,7 +86,8 @@ DEFINE_CLASS_CAST(net_socket, socket, socket);
 /** Checks if an address is valid for the given socket.
  * @param socket        Socket to check for.
  * @param addr          Address to check.
- * @param addr_len      Specified address length.
+ * @param addr_len      Specified address length. This must be equal to the
+ *                      family's address length to be valid.
  * @return              Status code describing result of the check. */
 static inline status_t net_socket_addr_valid(const net_socket_t *socket, const sockaddr_t *addr, socklen_t addr_len) {
     if (addr_len != socket->family_ops->addr_len) {

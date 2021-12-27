@@ -26,6 +26,34 @@
 
 struct net_packet;
 
+/** TCP packet header. */
+typedef struct tcp_header {
+    uint16_t source_port;
+    uint16_t dest_port;
+    uint32_t seq_num;
+    uint32_t ack_num;
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    uint8_t reserved : 4;
+    uint8_t data_offset : 4;
+#else
+    uint8_t data_offset : 4;
+    uint8_t reserved : 4;
+#endif
+    uint8_t flags;
+    uint16_t window_size;
+    uint16_t checksum;
+    uint16_t urg_ptr;
+} __packed tcp_header_t;
+
+#define TCP_FIN     (1<<0)
+#define TCP_SYN     (1<<1)
+#define TCP_RST     (1<<2)
+#define TCP_PSH     (1<<3)
+#define TCP_ACK     (1<<4)
+#define TCP_URG     (1<<5)
+#define TCP_ECE     (1<<6)
+#define TCP_CWR     (1<<7)
+
 extern status_t tcp_socket_create(sa_family_t family, socket_t **_socket);
 
 extern void tcp_receive(struct net_packet *packet, const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr);

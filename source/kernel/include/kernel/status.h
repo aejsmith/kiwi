@@ -78,6 +78,9 @@
 #define STATUS_DEST_ADDR_REQUIRED   53  /**< Destination address is required. */
 #define STATUS_NET_UNREACHABLE      54  /**< Network is unreachable. */
 #define STATUS_HOST_UNREACHABLE     55  /**< No route to host. */
+#define STATUS_IN_PROGRESS          56  /**< Operation is in progress. */
+#define STATUS_ALREADY_IN_PROGRESS  57  /**< Operation is already in progress. */
+#define STATUS_ALREADY_CONNECTED    58  /**< Socket is already connected. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 

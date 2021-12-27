@@ -263,24 +263,16 @@ void udp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const s
         return;
     }
 
-    uint16_t total_size  = net16_to_cpu(header->length);
-    uint16_t dest_port   = net16_to_cpu(header->dest_port);
+    uint16_t total_size = net16_to_cpu(header->length);
+    uint16_t dest_port  = net16_to_cpu(header->dest_port);
 
     if (total_size > packet->size) {
         dprintf("udp: dropping packet: header length is too long (header: %" PRIu16 ", packet: %" PRIu32 ")\n", total_size, packet->size);
         return;
     }
 
-    // TODO: Handle broken up packets for checksumming. We have no need for
-    // this right now, probably needed when we implement IP fragmentation.
-    const void *data = net_packet_data(packet, 0, total_size);
-    if (!data) {
-        kprintf(LOG_ERROR, "udp: TODO: can't get whole packet data, dropping packet\n");
-        return;
-    }
-
     if (header->checksum != 0) {
-        if (ip_checksum_pseudo(data, total_size, IPPROTO_UDP, source_addr, dest_addr) != 0) {
+        if (ip_checksum_packet_pseudo(packet, 0, total_size, IPPROTO_UDP, source_addr, dest_addr) != 0) {
             dprintf("udp: dropping packet: checksum failed\n");
             return;
         }
