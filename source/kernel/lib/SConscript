@@ -27,6 +27,7 @@ kern_sources += FeatureSources(config, [
     'printf.c',
     'qsort.c',
     'radix_tree.c',
+    'random.c',
     'string.c',
     'tar.c',
 ])

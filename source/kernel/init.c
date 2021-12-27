@@ -26,6 +26,7 @@
 
 #include <ipc/ipc.h>
 
+#include <lib/random.h>
 #include <lib/string.h>
 
 #include <mm/kmem.h>
@@ -110,6 +111,7 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
     arch_init();
     irq_init();
     time_init();
+    random_init();
     smp_init();
     slab_late_init();
     object_init();
