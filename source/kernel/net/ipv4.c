@@ -41,6 +41,9 @@
 #   define dprintf(fmt...)
 #endif
 
+/** Next IPv4 packet ID. */
+static atomic_uint16_t next_ipv4_id = 0;
+
 static bool ipv4_net_addr_valid(const net_addr_t *addr) {
     const uint8_t *addr_bytes = addr->ipv4.addr.bytes;
 
@@ -157,11 +160,13 @@ static status_t ipv4_transmit(
     net_buffer_t *buffer = net_buffer_kmalloc(sizeof(*header), MM_KERNEL, (void **)&header);
     net_packet_prepend(packet, buffer);
 
+    uint16_t id = atomic_fetch_add_explicit(&next_ipv4_id, 1, memory_order_relaxed);
+
     header->version           = 4;
     header->ihl               = sizeof(*header) / 4;
     header->dscp_ecn          = 0;
     header->total_size        = cpu_to_net16(packet->size);
-    header->id                = 0;
+    header->id                = cpu_to_net16(id);
     header->frag_offset_flags = 0;
     header->ttl               = 64;
     header->protocol          = socket->protocol;
