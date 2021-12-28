@@ -105,7 +105,8 @@ typedef void (*net_buffer_external_free_t)(struct net_buffer_external *buffer);
 /**
  * Externally allocated network packet buffer. This can be embedded inside
  * another structure used by the implementation of this to store any other
- * state needed to be able to free the buffer.
+ * state needed to be able to free the buffer. It is also used by
+ * net_buffer_from_external().
  */
 typedef struct net_buffer_external {
     net_buffer_t buffer;
@@ -136,8 +137,11 @@ extern net_buffer_t *net_buffer_slab_alloc(struct slab_cache *cache, uint32_t si
 
 extern net_buffer_t *net_buffer_from_kmalloc(void *data, uint32_t size);
 extern net_buffer_t *net_buffer_from_subset(struct net_packet *packet, uint32_t offset, uint32_t size);
+extern net_buffer_t *net_buffer_from_external(void *data, uint32_t size);
 
 extern void net_buffer_destroy(net_buffer_t *buffer);
+
+extern uint8_t *net_buffer_data(net_buffer_t *buffer, uint32_t offset, uint32_t size);
 
 /**
  * Network packet type identifiers. These are standard EtherType values so that
@@ -231,6 +235,7 @@ static inline net_packet_t *net_packet_from_subset(net_packet_t *packet, uint32_
 extern void net_packet_offset(net_packet_t *packet, uint32_t offset);
 extern void net_packet_subset(net_packet_t *packet, uint32_t offset, uint32_t size);
 extern void net_packet_prepend(net_packet_t *packet, net_buffer_t *buffer);
+extern void net_packet_append(net_packet_t *packet, net_buffer_t *buffer);
 
 extern void *net_packet_data(net_packet_t *packet, uint32_t offset, uint32_t size);
 

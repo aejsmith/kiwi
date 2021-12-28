@@ -30,6 +30,7 @@
 #include <assert.h>
 
 static slab_cache_t *net_buffer_kmalloc_cache;
+static slab_cache_t *net_buffer_external_cache;
 static slab_cache_t *net_buffer_ref_cache;
 static slab_cache_t *net_packet_cache;
 
@@ -172,6 +173,39 @@ __export net_buffer_t *net_buffer_from_subset(net_packet_t *packet, uint32_t off
     return &buffer->buffer;
 }
 
+static void free_external_buffer(net_buffer_external_t *buffer) {
+    slab_cache_free(net_buffer_external_cache, buffer);
+}
+
+/**
+ * Creates a new network buffer referring to an external memory buffer. It is
+ * the responsibility of the caller to ensure that this buffer is valid for the
+ * lifetime of the packet.
+ *
+ * The buffer is not owned by a packet, so should be destroyed with
+ * net_buffer_destroy() if it is no longer needed before it is attached to a
+ * packet.
+ *
+ * @param data          Data for the buffer.
+ * @param size          Size of the data.
+ *
+ * @return              Allocated network buffer.
+ */
+net_buffer_t *net_buffer_from_external(void *data, uint32_t size) {
+    /* Reuse the same mechanism that allows the buffers structures to be
+     * externally allocated, but allocate the buffer header from a slab cache. */
+    net_buffer_external_t *buffer = slab_cache_alloc(net_buffer_external_cache, MM_KERNEL);
+
+    net_buffer_init(&buffer->buffer);
+
+    buffer->buffer.type = NET_BUFFER_TYPE_EXTERNAL;
+    buffer->buffer.size = size;
+    buffer->data        = data;
+    buffer->free        = free_external_buffer;
+
+    return &buffer->buffer;
+}
+
 /**
  * Destroys a network buffer. This should only be used either before the buffer
  * has been attached to a packet, or internally by the packet implementation:
@@ -210,8 +244,8 @@ __export void net_buffer_destroy(net_buffer_t *buffer) {
     }
 }
 
-/** Retrieve data pointer from a buffer. */
-static uint8_t *net_buffer_data(net_buffer_t *buffer, uint32_t offset, uint32_t size) {
+/** Retrieves a data pointer from a buffer. */
+uint8_t *net_buffer_data(net_buffer_t *buffer, uint32_t offset, uint32_t size) {
     offset += buffer->offset;
 
     assert(offset + size <= buffer->size);
@@ -396,6 +430,34 @@ __export void net_packet_prepend(net_packet_t *packet, net_buffer_t *buffer) {
 }
 
 /**
+ * Appends a data buffer to a packet, e.g. to add a packet data payload. The
+ * buffer must not be in use by any other packet, ownership of it will be taken
+ * by the packet.
+ *
+ * @param packet        Packet to append to. Must have a reference count of 1.
+ * @param buffer        Buffer to append.
+ */
+__export void net_packet_append(net_packet_t *packet, net_buffer_t *buffer) {
+    assert(packet->refcount == 1);
+    assert(buffer);
+    assert(buffer->size > 0);
+    assert(buffer->offset < buffer->size);
+
+    packet->size += buffer->size - buffer->offset;
+
+    buffer->next = NULL;
+
+    if (packet->head == NULL) {
+        packet->head = buffer;
+    } else {
+        net_buffer_t *curr = packet->head;
+        while (curr->next)
+            curr = curr->next;
+        curr->next = buffer;
+    }
+}
+
+/**
  * Retrieves a contiguous block of data from a packet.
  *
  * This can only be done if the requested range is within a single buffer. It
@@ -496,6 +558,9 @@ __export void net_packet_copy_from(net_packet_t *packet, void *dest, uint32_t of
 void net_packet_cache_init(void) {
     net_buffer_kmalloc_cache = object_cache_create(
         "net_buffer_kmalloc_cache", net_buffer_kmalloc_t, NULL, NULL, NULL, 0,
+        MM_KERNEL);
+    net_buffer_external_cache = object_cache_create(
+        "net_buffer_external_cache", net_buffer_external_t, NULL, NULL, NULL, 0,
         MM_KERNEL);
     net_buffer_ref_cache = object_cache_create(
         "net_buffer_ref_cache", net_buffer_ref_t, NULL, NULL, NULL, 0,

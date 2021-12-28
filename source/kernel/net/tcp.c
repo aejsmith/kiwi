@@ -24,7 +24,9 @@
 #include <lib/random.h>
 
 #include <mm/malloc.h>
+#include <mm/page.h>
 
+#include <net/ipv4.h>
 #include <net/packet.h>
 #include <net/port.h>
 #include <net/tcp.h>
@@ -43,6 +45,18 @@
 #else
 #   define dprintf(fmt...)
 #endif
+
+/**
+ * TCP buffer structure. This implements a circular buffer for sending and
+ * receiving data.
+ */
+typedef struct tcp_buffer {
+    uint8_t *data;                      /**< Buffer data. */
+    uint32_t start;                     /**< Start position. */
+    uint32_t curr_size;                 /**< Number of bytes in buffer. */
+    uint32_t max_size;                  /**< Maximum number of bytes in the buffer (power of 2). */
+    condvar_t cvar;                     /**< Condition to wait for space (TX) or data (RX). */
+} tcp_buffer_t;
 
 /** TCP socket structure. */
 typedef struct tcp_socket {
@@ -64,12 +78,21 @@ typedef struct tcp_socket {
         TCP_STATE_SYN_SENT,
         TCP_STATE_LISTEN,
         TCP_STATE_ESTABLISHED,
+        TCP_STATE_REFUSED,
         // TODO
     } state;
 
-    /** Sequence state. */
+    /**
+     * Transmit buffer and sequence state. The start of the buffer corresponds
+     * to the tx_unack sequence number.
+     */
+    tcp_buffer_t tx_buffer;
     uint32_t initial_tx_seq;            /**< Initial transmit sequence. */
     uint32_t tx_seq;                    /**< Next transmit sequence number. */
+    uint32_t tx_unack;                  /**< First unacknowledged transmit sequence number. */
+
+    /** Receive buffer and sequence state. */
+    tcp_buffer_t rx_buffer;
     uint32_t initial_rx_seq;            /**< Initial receive sequence. */
     uint32_t rx_seq;                    /**< Next receive sequence number. */
 
@@ -78,7 +101,10 @@ typedef struct tcp_socket {
 
 DEFINE_CLASS_CAST(tcp_socket, net_socket, net);
 
-/** TCP transmit packet structure. */
+/**
+ * TCP transmit packet structure. This is just used to keep track of state
+ * while sending a packet out to the network, it is not a persistent structure.
+ */
 typedef struct tcp_tx_packet {
     /** Route information. */
     uint32_t interface_id;
@@ -89,9 +115,18 @@ typedef struct tcp_tx_packet {
     tcp_header_t *header;
 } tcp_tx_packet_t;
 
-// TODO: Make these configurable.
-#define TCP_SYN_RETRIES             5   /**< Number of retries for connection attempts. */
-#define TCP_SYN_INITIAL_TIMEOUT     1   /**< Initial connection timeout (seconds), multiplied by 2 each retry. */
+/** TCP parameters. TODO: Make these configurable. */
+enum {
+    /** Number of retries for connection attempts. */
+    TCP_SYN_RETRIES = 5,
+
+    /** Initial connection timeout (seconds), multiplied by 2 each retry. */
+    TCP_SYN_INITIAL_TIMEOUT = 1,
+
+    /** TCP buffer sizes. */
+    TCP_TX_BUFFER_SIZE = PAGE_SIZE,
+    TCP_RX_BUFFER_SIZE = PAGE_SIZE,
+};
 
 static net_port_space_t tcp_ipv4_space = NET_PORT_SPACE_INITIALIZER(tcp_ipv4_space);
 static net_port_space_t tcp_ipv6_space = NET_PORT_SPACE_INITIALIZER(tcp_ipv6_space);
@@ -104,6 +139,8 @@ static void tcp_socket_release(tcp_socket_t *socket) {
     if (refcount_dec(&socket->count) == 0) {
         assert(socket->port.num == 0);
 
+        kfree(socket->tx_buffer.data);
+        kfree(socket->rx_buffer.data);
         kfree(socket);
     }
 }
@@ -156,7 +193,7 @@ static void alloc_initial_tx_seq(tcp_socket_t *socket) {
  * needed. The packet is initially sized for the header, data can be appended
  * if needed.
  */
-static status_t prepare_transmit_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet) {
+static status_t prepare_tx_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet) {
     status_t ret;
 
     // TODO: We could cache routes in the socket. Need to have some way to
@@ -178,7 +215,7 @@ static status_t prepare_transmit_packet(tcp_socket_t *socket, tcp_tx_packet_t *p
     header->reserved    = 0;
     header->data_offset = sizeof(*header) / sizeof(uint32_t);
     header->flags       = TCP_ACK;
-    header->window_size = cpu_to_net16(0xffff); // TODO
+    header->window_size = cpu_to_net16(0xffff); // TODO: Window size
     header->checksum    = 0;
     header->urg_ptr     = 0;
 
@@ -186,7 +223,7 @@ static status_t prepare_transmit_packet(tcp_socket_t *socket, tcp_tx_packet_t *p
 }
 
 /** Checksums and transmits a previously prepared packet. */
-static status_t transmit_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet, bool release) {
+static status_t tx_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet, bool release) {
     /* Checksum the packet based on checksum set to 0. */
     assert(packet->header->checksum == 0);
     packet->header->checksum = ip_checksum_packet_pseudo(
@@ -203,17 +240,125 @@ static status_t transmit_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet, b
     return ret;
 }
 
-/** Transmits an ACK for the current rx_seq value. */
-static void transmit_ack(tcp_socket_t *socket) {
+/** Transmits an ACK packet for the current rx_seq value. */
+static void tx_ack_packet(tcp_socket_t *socket) {
     tcp_tx_packet_t packet;
-    status_t ret = prepare_transmit_packet(socket, &packet);
+    status_t ret = prepare_tx_packet(socket, &packet);
     if (ret == STATUS_SUCCESS)
-        ret = transmit_packet(socket, &packet, true);
+        ret = tx_packet(socket, &packet, true);
 
     if (ret != STATUS_SUCCESS) {
-        /* This should be OK if this is just a temporary failure, we'll
-         * re-acknowledge it later. */
-        dprintf("tcp: failed to transmit ACK: %d\n", ret);
+        // TODO: Routing or device error. Should close the socket?
+        kprintf(LOG_WARN, "tcp: failed to transmit ACK: %d\n", ret);
+    }
+}
+
+/**
+ * Flushes the transmit buffer. This will retransmit unacknowledged segments if
+ * we determine that it is time to do so, and transmit segments for any new data
+ * that has been added to the buffer.
+ */
+static void flush_tx_buffer(tcp_socket_t *socket) {
+    tcp_buffer_t *buffer = &socket->tx_buffer;
+    status_t ret;
+
+    // TODO: Retransmit segments due for retransmission. Make sure to set same
+    // flags, sequence, etc.
+
+    /* Calculate what we have in the buffer that has yet to be attempted at all.
+     * Everything before tx_seq we have already tried sending at least once. */
+    uint32_t unsent_size = (socket->tx_unack + buffer->curr_size) - socket->tx_seq;
+
+    /* Calculate maximum segment size. */
+    // TODO: This can be negotiated using MSS option.
+    uint32_t mtu = socket->net.family_ops->mtu;
+    // TODO: HACK: We don't implement fragmentation yet so sending larger than
+    // device MTU will fail, but we don't have a device yet as we haven't
+    // routed. Even once we implement fragmentation, it would be better to get
+    // the device MTU to avoid fragmentation. Since we will probably implement
+    // caching for routing, we could cache the MTU with the routing information.
+    mtu = min(mtu, 1500 - sizeof(ipv4_header_t));
+    uint32_t max_segment_size = mtu - sizeof(tcp_header_t);
+
+    /* Divide the unsent data into segments. */
+    while (unsent_size > 0) {
+        uint32_t segment_size = min(unsent_size, max_segment_size);
+
+        tcp_tx_packet_t packet;
+        ret = prepare_tx_packet(socket, &packet);
+        if (ret != STATUS_SUCCESS) {
+            // TODO: This is a failure to route. Should we close the socket in
+            // this situation?
+            kprintf(LOG_WARN, "tcp: failed to route packet: %d\n", ret);
+            break;
+        }
+
+        /* If this is the last segment we're going to send for now, set PSH. */
+        if (segment_size == unsent_size)
+            packet.header->flags |= TCP_PSH;
+
+        /* Add the segment data. */
+        // TODO: We're currently using external buffers here under the
+        // assumption that the packet will be consumed by net_socket_transmit
+        // and not live any longer. In future, we'll implement some packet
+        // queueing for the situation where the device buffer is full. This will
+        // need to be careful to ensure that underlying buffer data stays around
+        // as long as any packets referring to it do - we'll need to be
+        // particularly careful for how we handle removing buffer data upon ACK.
+        // Device drivers may also want to keep packets around for zero-copy
+        // transmit in future, which will also need consideration here.
+        uint32_t pos = (buffer->start + buffer->curr_size - unsent_size) & (buffer->max_size - 1);
+        if (pos + segment_size > buffer->max_size) {
+            uint32_t split = buffer->max_size - pos;
+            net_packet_append(packet.packet, net_buffer_from_external(&buffer->data[pos], split));
+            net_packet_append(packet.packet, net_buffer_from_external(&buffer->data[0], segment_size - split));
+        } else {
+            net_packet_append(packet.packet, net_buffer_from_external(&buffer->data[pos], segment_size));
+        }
+
+        ret = tx_packet(socket, &packet, true);
+        if (ret != STATUS_SUCCESS) {
+            kprintf(LOG_WARN, "tcp: failed to transmit packet: %d\n", ret);
+            break;
+        }
+
+        /* Advance sequence number. Done after transmitting, the header sequence
+         * in the packet we transmit is the number of the first byte of data in
+         * the packet. */
+        socket->tx_seq += segment_size;
+        unsent_size    -= segment_size;
+    }
+}
+
+/**
+ * Handles acknowledgement received from the remote end by clearing out data
+ * from the transmit buffer that is no longer needed.
+ */
+static void ack_tx_buffer(tcp_socket_t *socket, uint32_t ack_num) {
+    /* Check that this sequence number looks sane. */
+    uint32_t old_unack_size = socket->tx_seq - socket->tx_unack;
+    uint32_t new_unack_size = socket->tx_seq - ack_num;
+    if (new_unack_size > old_unack_size) {
+        dprintf("tcp: received unexpected ACK sequence, ignoring\n");
+        return;
+    }
+
+    uint32_t ack_size = old_unack_size - new_unack_size;
+
+    if (ack_size > 0) {
+        socket->tx_unack = ack_num;
+
+        tcp_buffer_t *buffer = &socket->tx_buffer;
+
+        assert(ack_size <= buffer->curr_size);
+
+        // TODO: Handle anything to do with retransmission necessary here
+        // (cancel timers, drop segment info).
+
+        buffer->start      = (buffer->start + ack_size) & (buffer->max_size - 1);
+        buffer->curr_size -= ack_size;
+
+        condvar_broadcast(&buffer->cvar);
     }
 }
 
@@ -225,8 +370,12 @@ static void tcp_socket_close(socket_t *_socket) {
 
     mutex_lock(&socket->lock);
 
-    free_port(socket);
+    /* If the handle is being closed, there shouldn't be any waiters on it as
+     * they'd hold a reference to the handle. */
+    assert(list_empty(&socket->state_cvar.threads));
 
+    free_port(socket);
+    socket->state = TCP_STATE_CLOSED;
     // TODO. What cleanup should be done here vs tcp_socket_release().
 
     mutex_unlock(&socket->lock);
@@ -266,24 +415,26 @@ static status_t tcp_socket_connect(socket_t *_socket, const sockaddr_t *addr, so
     unsigned retries = TCP_SYN_RETRIES;
     nstime_t timeout = secs_to_nsecs(TCP_SYN_INITIAL_TIMEOUT);
     ret = STATUS_SUCCESS;
-    while (retries > 0 && socket->state != TCP_STATE_ESTABLISHED) {
+    while (retries > 0 && socket->state == TCP_STATE_SYN_SENT) {
         /* Retries are sent with the same sequence number. */
-        socket->tx_seq = socket->initial_tx_seq;
+        socket->tx_seq   = socket->initial_tx_seq;
+        socket->tx_unack = socket->initial_tx_seq;
 
         tcp_tx_packet_t packet;
-        ret = prepare_transmit_packet(socket, &packet);
+        ret = prepare_tx_packet(socket, &packet);
         if (ret != STATUS_SUCCESS)
             break;
 
-        /* prepare_transmit_packet() assumes we're past the initial SYN,
-         * override these. */
+        /* prepare_tx_packet() assumes we're past the initial SYN, override
+         * these. */
         packet.header->flags   = TCP_SYN;
         packet.header->ack_num = 0;
 
         /* Increment in case we succeed. */
         socket->tx_seq++;
+        socket->tx_unack = socket->tx_seq;
 
-        ret = transmit_packet(socket, &packet, true);
+        ret = tx_packet(socket, &packet, true);
         if (ret != STATUS_SUCCESS)
             break;
 
@@ -298,8 +449,11 @@ static status_t tcp_socket_connect(socket_t *_socket, const sockaddr_t *addr, so
     if (socket->state == TCP_STATE_ESTABLISHED) {
         ret = STATUS_SUCCESS;
     } else {
-        if (ret == STATUS_SUCCESS)
-            ret = STATUS_TIMED_OUT;
+        if (ret == STATUS_SUCCESS) {
+            ret = (socket->state == TCP_STATE_REFUSED)
+                ? STATUS_CONNECTION_REFUSED
+                : STATUS_TIMED_OUT;
+        }
 
         free_port(socket);
         socket->state = TCP_STATE_CLOSED;
@@ -313,9 +467,75 @@ static status_t tcp_socket_send(
     socklen_t addr_len)
 {
     tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
+    status_t ret;
 
-    (void)socket;
-    return STATUS_NOT_IMPLEMENTED;
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+
+    if (socket->state != TCP_STATE_ESTABLISHED)
+        return STATUS_NOT_CONNECTED;
+
+    if (addr_len > 0)
+        return STATUS_ALREADY_CONNECTED;
+
+    ret = STATUS_SUCCESS;
+
+    /*
+     * Copy the data into our transmit buffer. We don't need to indicate
+     * whether anything was actually successfully sent upon return from this,
+     * so the transferred amount we return is just what's copied into the
+     * buffer.
+     */
+    tcp_buffer_t *buffer = &socket->tx_buffer;
+    while (request->transferred < request->total) {
+        size_t remaining = request->total - request->transferred;
+        uint32_t space   = buffer->max_size - buffer->curr_size;
+        uint32_t size    = min(remaining, space);
+
+        if (size == 0) {
+            /* We need to wait for some space to become available. Flush
+             * anything we've added and wait. */
+            flush_tx_buffer(socket);
+
+            ret = condvar_wait_etc(&buffer->cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
+            if (ret != STATUS_SUCCESS)
+                break;
+
+            /* Check that we're still connected after waiting for space. */
+            if (socket->state != TCP_STATE_ESTABLISHED) {
+                ret = STATUS_NOT_CONNECTED;
+                break;
+            }
+
+            continue;
+        }
+
+        uint32_t pos = (buffer->start + buffer->curr_size) & (buffer->max_size - 1);
+        if (pos + size > buffer->max_size) {
+            /* Straddles the end of the circular buffer, split into 2 copies. */
+            uint32_t split = buffer->max_size - pos;
+            ret = io_request_copy(request, &buffer->data[pos], split, true);
+            if (ret == STATUS_SUCCESS) {
+                ret = io_request_copy(request, &buffer->data[0], size - split, true);
+                if (ret != STATUS_SUCCESS) {
+                    /* Don't do a partial transfer in the copy fail case. */
+                    request->transferred -= split;
+                }
+            }
+        } else {
+            ret = io_request_copy(request, &buffer->data[pos], size, true);
+        }
+
+        if (ret == STATUS_SUCCESS) {
+            buffer->curr_size += size;
+        } else {
+            break;
+        }
+    }
+
+    /* Flush anything we've added to the buffer. */
+    flush_tx_buffer(socket);
+
+    return STATUS_SUCCESS;
 }
 
 static status_t tcp_socket_receive(
@@ -324,8 +544,10 @@ static status_t tcp_socket_receive(
 {
     tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
 
+    // TODO: Return socket->dest_addr in addr.
     (void)socket;
-    return STATUS_NOT_IMPLEMENTED;
+    char buf[] = "TODO";
+    return io_request_copy(request, buf, min(sizeof(buf), request->total), true);
 }
 
 static const socket_ops_t tcp_socket_ops = {
@@ -334,6 +556,22 @@ static const socket_ops_t tcp_socket_ops = {
     .send    = tcp_socket_send,
     .receive = tcp_socket_receive,
 };
+
+static bool tcp_buffer_init(tcp_buffer_t *buffer, uint32_t size, const char *name) {
+    assert(is_pow2(size));
+
+    buffer->data = kmalloc(size, MM_USER);
+    if (!buffer->data)
+        return false;
+
+    condvar_init(&buffer->cvar, name);
+
+    buffer->start     = 0;
+    buffer->curr_size = 0;
+    buffer->max_size  = size;
+
+    return true;
+}
 
 /** Creates a TCP socket. */
 status_t tcp_socket_create(sa_family_t family, socket_t **_socket) {
@@ -344,11 +582,22 @@ status_t tcp_socket_create(sa_family_t family, socket_t **_socket) {
     refcount_set(&socket->count, 1);
     mutex_init(&socket->lock, "tcp_socket_lock", 0);
     net_port_init(&socket->port);
-    condvar_init(&socket->state_cvar, "tcp_socket_state_cvar");
+    condvar_init(&socket->state_cvar, "tcp_socket_state");
 
     socket->net.socket.ops = &tcp_socket_ops;
     socket->net.protocol   = IPPROTO_TCP;
     socket->state          = TCP_STATE_CLOSED;
+
+    if (!tcp_buffer_init(&socket->tx_buffer, TCP_TX_BUFFER_SIZE, "tcp_tx_buffer")) {
+        kfree(socket);
+        return STATUS_NO_MEMORY;
+    }
+
+    if (!tcp_buffer_init(&socket->rx_buffer, TCP_RX_BUFFER_SIZE, "tcp_rx_buffer")) {
+        kfree(socket->tx_buffer.data);
+        kfree(socket);
+        return STATUS_NO_MEMORY;
+    }
 
     *_socket = &socket->net.socket;
     return STATUS_SUCCESS;
@@ -369,16 +618,32 @@ static void receive_syn_sent(tcp_socket_t *socket, const tcp_header_t *header, n
         socket->initial_rx_seq = seq_num;
         socket->rx_seq         = seq_num + 1;
 
-        transmit_ack(socket);
+        tx_ack_packet(socket);
 
         socket->state = TCP_STATE_ESTABLISHED;
+        condvar_broadcast(&socket->state_cvar);
+    } else if (header->flags & TCP_RST) {
+        socket->state = TCP_STATE_REFUSED;
         condvar_broadcast(&socket->state_cvar);
     } else {
         // TODO: Do we need to handle SYN without ACK in this state? This would
         // be unexpected for a client socket.
-        dprintf("tcp: unexpected non-SYN-ACK packet, dropping\n");
+        dprintf("tcp: unexpected packet in SYN_SENT state, dropping\n");
         return;
     }
+}
+
+/** Handles packets while in the ESTABLISHED state. */
+static void receive_established(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
+    /* Start by handling acknowledgement. Any packet received in this state
+     * should have ACK set. */
+    if (!(header->flags & TCP_ACK)) {
+        // TODO: Close connection on error?
+        dprintf("tcp: packet received in ESTABLISHED state does not have ACK set, dropping\n");
+        return;
+    }
+
+    ack_tx_buffer(socket, net32_to_cpu(header->ack_num));
 }
 
 /** Handles a received TCP packet. */
@@ -398,7 +663,7 @@ void tcp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const s
     uint16_t dest_port = net16_to_cpu(header->dest_port);
     tcp_socket_t *socket = find_socket(packet, dest_port);
     if (!socket) {
-        // TODO: If this is a SYN, send RST?
+        // TODO: Send RST? For SYN only?
         dprintf("tcp: dropping packet: destination port not bound (%" PRIu16 ")\n", dest_port);
         return;
     }
@@ -414,6 +679,9 @@ void tcp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const s
         switch (socket->state) {
             case TCP_STATE_SYN_SENT:
                 receive_syn_sent(socket, header, packet);
+                break;
+            case TCP_STATE_ESTABLISHED:
+                receive_established(socket, header, packet);
                 break;
             default:
                 break;

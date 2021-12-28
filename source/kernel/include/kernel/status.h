@@ -81,6 +81,8 @@
 #define STATUS_IN_PROGRESS          56  /**< Operation is in progress. */
 #define STATUS_ALREADY_IN_PROGRESS  57  /**< Operation is already in progress. */
 #define STATUS_ALREADY_CONNECTED    58  /**< Socket is already connected. */
+#define STATUS_CONNECTION_REFUSED   59  /**< Destination refused the connection. */
+#define STATUS_NOT_CONNECTED        60  /**< Socket is not connected. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 
