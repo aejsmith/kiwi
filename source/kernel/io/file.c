@@ -252,7 +252,7 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
     }
 
     /* Don't do anything more if we have nothing to transfer. */
-    if (!request->count) {
+    if (request->total == 0) {
         ret = STATUS_SUCCESS;
         goto out;
     }
