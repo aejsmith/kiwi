@@ -67,6 +67,9 @@ private:
     status_t handleFileWrite(const ipc_message_t &message, const void *data);
     status_t handleFileInfo(const ipc_message_t &message);
     status_t handleFileRequest(const ipc_message_t &message, const void *data);
+    status_t handleFileWait(const ipc_message_t &message);
+    status_t handleFileUnwait(const ipc_message_t &message);
+    void signalReadEvents();
 
     status_t sendOutput(const void *data, size_t size);
 
@@ -74,6 +77,7 @@ private:
     bool isControlChar(uint16_t ch, int control) const;
     void echoInput(uint16_t ch, bool raw);
 
+    bool isReadable() const;
     bool readBuffer(ReadOperation &op);
     bool eraseChar();
     size_t eraseLine();
@@ -87,6 +91,9 @@ private:
 
     /** Pending reads that are waiting for input. */
     std::vector<ReadOperation> m_pendingReads;
+
+    /** Readable event requests. */
+    std::vector<uint64_t> m_readEvents;
 
     /** Terminal state. */
     struct termios m_termios;           /**< Terminal I/O settings. */

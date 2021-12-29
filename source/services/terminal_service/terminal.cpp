@@ -298,12 +298,18 @@ bool Terminal::handleFileMessages() {
             case USER_FILE_OP_REQUEST:
                 ret = handleFileRequest(message, data.get());
                 break;
+            case USER_FILE_OP_WAIT:
+                ret = handleFileWait(message);
+                break;
+            case USER_FILE_OP_UNWAIT:
+                ret = handleFileUnwait(message);
+                break;
             default:
                 core_unreachable();
         }
 
         if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_WARN, "failed to send file message: %" PRId32, ret);
+            core_log(CORE_LOG_WARN, "failed to send file message %" PRIu32 ": %" PRId32, message.id, ret);
             return false;
         }
     }
@@ -496,6 +502,67 @@ status_t Terminal::handleFileRequest(const ipc_message_t &message, const void *d
     return kern_connection_send(m_userFileConnection, &reply, outData.get(), INVALID_HANDLE, -1);
 }
 
+status_t Terminal::handleFileWait(const ipc_message_t &message) {
+    ipc_message_t reply = initializeFileReply(message);
+    reply.args[USER_FILE_MESSAGE_ARG_EVENT_NUM]    = message.args[USER_FILE_MESSAGE_ARG_EVENT_NUM];
+    reply.args[USER_FILE_MESSAGE_ARG_EVENT_STATUS] = STATUS_SUCCESS;
+
+    bool sendReply = false;
+
+    switch (message.args[USER_FILE_MESSAGE_ARG_EVENT_NUM]) {
+        case FILE_EVENT_READABLE:
+            sendReply = isReadable();
+            if (!sendReply) {
+                m_readEvents.emplace_back(message.args[USER_FILE_MESSAGE_ARG_SERIAL]);
+                break;
+            }
+
+            break;
+        case FILE_EVENT_WRITABLE:
+            /* Always writable. */
+            sendReply = true;
+            break;
+        default:
+            reply.args[USER_FILE_MESSAGE_ARG_EVENT_STATUS] = STATUS_INVALID_EVENT;
+            sendReply = true;
+            break;
+    }
+
+    return (sendReply)
+        ? kern_connection_send(m_userFileConnection, &reply, nullptr, INVALID_HANDLE, -1)
+        : STATUS_SUCCESS;
+}
+
+status_t Terminal::handleFileUnwait(const ipc_message_t &message) {
+    if (message.args[USER_FILE_MESSAGE_ARG_EVENT_NUM] == FILE_EVENT_READABLE) {
+        for (auto it = m_readEvents.begin(); it != m_readEvents.end(); ++it) {
+            if (*it == message.args[USER_FILE_MESSAGE_ARG_EVENT_SERIAL]) {
+                m_readEvents.erase(it);
+                break;
+            }
+        }
+    }
+
+    return STATUS_SUCCESS;
+}
+
+void Terminal::signalReadEvents() {
+    if (isReadable()) {
+        while (!m_readEvents.empty()) {
+            uint64_t serial = m_readEvents.back();
+            m_readEvents.pop_back();
+
+            ipc_message_t reply = initializeFileReply(USER_FILE_OP_WAIT, serial);
+            reply.args[USER_FILE_MESSAGE_ARG_EVENT_NUM]    = FILE_EVENT_READABLE;
+            reply.args[USER_FILE_MESSAGE_ARG_EVENT_STATUS] = STATUS_SUCCESS;
+
+            status_t ret = kern_connection_send(m_userFileConnection, &reply, nullptr, INVALID_HANDLE, -1);
+            if (ret != STATUS_SUCCESS && ret != STATUS_CANCELLED)
+                core_log(CORE_LOG_WARN, "failed to send file message %" PRIu32 ": %" PRId32, reply.id, ret);
+        }
+    }
+}
+
 status_t Terminal::sendOutput(const void *data, size_t size) {
     status_t ret;
 
@@ -656,6 +723,9 @@ void Terminal::addInput(unsigned char value) {
             ++it;
         }
     }
+
+    /* Signal events that can be satisfied. */
+    signalReadEvents();
 }
 
 /** Check if a character is a certain control character according to termios. */
@@ -687,6 +757,11 @@ void Terminal::echoInput(uint16_t ch, bool raw) {
     }
 
     sendOutput(buf, size);
+}
+
+/** Determine if the terminal is readable. */
+bool Terminal::isReadable() const {
+    return (m_termios.c_lflag & ICANON) ? m_inputBufferLines > 0 : m_inputBufferSize > 0;
 }
 
 /** Try to read from the input buffer.
@@ -745,7 +820,7 @@ bool Terminal::readBuffer(ReadOperation &op) {
         m_inputBufferSize  = bufferSize;
         m_inputBufferLines = bufferLines;
     } else if (ret != STATUS_CANCELLED) {
-        core_log(CORE_LOG_WARN, "failed to send file message: %" PRId32, ret);
+        core_log(CORE_LOG_WARN, "failed to send file message %" PRIu32 ": %" PRId32, reply.id, ret);
     }
 
     return true;
