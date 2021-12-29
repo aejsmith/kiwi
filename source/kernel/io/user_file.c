@@ -47,13 +47,14 @@
 
 /** User file operation structure. */
 typedef struct user_file_op {
-    list_t header;
+    list_t link;
 
     unsigned id;                        /**< Operation ID. */
     uint64_t serial;                    /**< Serial number. */
     bool complete;                      /**< Whether completed. */
     ipc_kmessage_t *msg;                /**< Message to send, message received if complete. */
     condvar_t cvar;                     /**< Condition variable to wait for completion. */
+    object_event_t *event;              /**< For USER_FILE_OP_WAIT, the event that is being waited for. */
 } user_file_op_t;
 
 /** User file structure. */
@@ -82,7 +83,7 @@ static void user_file_terminate(user_file_t *file) {
 
     /* Cancel outstanding operations. */
     list_foreach(&file->ops, iter) {
-        user_file_op_t *op = list_entry(iter, user_file_op_t, header);
+        user_file_op_t *op = list_entry(iter, user_file_op_t, link);
         condvar_signal(&op->cvar);
     }
 }
@@ -97,7 +98,7 @@ static status_t user_file_invalid_reply(user_file_t *file, user_file_op_t *op) {
 static void user_file_op_ctor(void *obj, void *data) {
     user_file_op_t *op = obj;
 
-    list_init(&op->header);
+    list_init(&op->link);
     condvar_init(&op->cvar, "user_file_op");
 }
 
@@ -111,6 +112,7 @@ static user_file_op_t *user_file_op_alloc(user_file_t *file, unsigned id, size_t
     op->complete    = false;
     op->msg         = ipc_kmessage_alloc();
     op->msg->msg.id = id;
+    op->event       = NULL;
 
     op->msg->msg.args[USER_FILE_MESSAGE_ARG_SERIAL] = op->serial;
 
@@ -129,7 +131,15 @@ static void user_file_op_free(user_file_op_t *op) {
     slab_cache_free(user_file_op_cache, op);
 }
 
-static status_t user_file_op_send(user_file_t *file, user_file_op_t *op) {
+enum {
+    /** No reply expected. */
+    USER_FILE_OP_SEND_NO_REPLY = (1<<0),
+
+    /** Don't wait, this will be handled specially. */
+    USER_FILE_OP_SEND_DONT_WAIT = (1<<1),
+};
+
+static status_t user_file_op_send(user_file_t *file, user_file_op_t *op, uint32_t flags) {
     if (!file->endpoint)
         return STATUS_DEVICE_ERROR;
 
@@ -141,23 +151,26 @@ static status_t user_file_op_send(user_file_t *file, user_file_op_t *op) {
     op->msg = NULL;
 
     if (ret == STATUS_SUCCESS) {
-        list_append(&file->ops, &op->header);
+        if (!(flags & USER_FILE_OP_SEND_NO_REPLY))
+            list_append(&file->ops, &op->link);
 
-        /* Wait for completion. */
-        ret = condvar_wait_etc(&op->cvar, &file->lock, -1, SLEEP_INTERRUPTIBLE);
+        if (!(flags & (USER_FILE_OP_SEND_NO_REPLY | USER_FILE_OP_SEND_DONT_WAIT))) {
+            /* Wait for completion. */
+            ret = condvar_wait_etc(&op->cvar, &file->lock, -1, SLEEP_INTERRUPTIBLE);
 
-        list_remove(&op->header);
+            list_remove(&op->link);
 
-        /* If we're woken and not complete, the connection hung up. */
-        if (ret == STATUS_SUCCESS) {
-            if (!op->complete) {
-                assert(!file->endpoint);
-                ret = STATUS_DEVICE_ERROR;
-            } else {
-                assert(op->msg);
+            /* If we're woken and not complete, the connection hung up. */
+            if (ret == STATUS_SUCCESS) {
+                if (!op->complete) {
+                    assert(!file->endpoint);
+                    ret = STATUS_DEVICE_ERROR;
+                } else {
+                    assert(op->msg);
 
-                if (op->msg->msg.id != op->id)
-                    ret = user_file_invalid_reply(file, op);
+                    if (op->msg->msg.id != op->id)
+                        ret = user_file_invalid_reply(file, op);
+                }
             }
         }
     } else if (ret == STATUS_CONN_HUNGUP) {
@@ -181,18 +194,33 @@ static status_t user_file_endpoint_receive(
     status_t ret    = STATUS_CANCELLED;
 
     list_foreach(&file->ops, iter) {
-        user_file_op_t *op = list_entry(iter, user_file_op_t, header);
+        user_file_op_t *op = list_entry(iter, user_file_op_t, link);
 
         if (op->serial == serial) {
             assert(!op->msg);
 
-            ipc_kmessage_retain(msg);
+            list_remove(&op->link);
 
-            op->msg      = msg;
-            op->complete = true;
+            if (op->id == USER_FILE_OP_WAIT) {
+                assert(op->event);
 
-            condvar_signal(&op->cvar);
-            list_remove(&op->header);
+                if (msg->msg.id != op->id || msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_NUM] != op->event->event) {
+                    user_file_invalid_reply(file, op);
+                } else {
+                    // FIXME: Allow status to be returned as error from the wait.
+                    object_event_signal(op->event, msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_DATA]);
+                }
+
+                /* We're responsible for freeing wait ops once signalled. */
+                user_file_op_free(op);
+            } else {
+                ipc_kmessage_retain(msg);
+
+                op->msg      = msg;
+                op->complete = true;
+
+                condvar_signal(&op->cvar);
+            }
 
             ret = STATUS_SUCCESS;
             break;
@@ -217,7 +245,6 @@ static const ipc_endpoint_ops_t user_file_endpoint_ops = {
     .close   = user_file_endpoint_close,
 };
 
-/** Open a user file. */
 static status_t user_file_open(file_handle_t *handle) {
     user_file_t *file = handle->user_file;
 
@@ -225,7 +252,6 @@ static status_t user_file_open(file_handle_t *handle) {
     return STATUS_SUCCESS;
 }
 
-/** Close a user file. */
 static void user_file_close(file_handle_t *handle) {
     user_file_t *file = handle->user_file;
 
@@ -248,7 +274,55 @@ static void user_file_close(file_handle_t *handle) {
     }
 }
 
-/** Perform I/O on a user file. */
+static status_t user_file_wait(file_handle_t *handle, object_event_t *event) {
+    user_file_t *file = handle->user_file;
+    status_t ret;
+
+    MUTEX_SCOPED_LOCK(lock, &file->lock);
+
+    user_file_op_t *op = user_file_op_alloc(file, USER_FILE_OP_WAIT, 0);
+
+    op->event = event;
+
+    op->msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_NUM] = event->event;
+
+    ret = user_file_op_send(file, op, USER_FILE_OP_SEND_DONT_WAIT);
+
+    /* If successful, this will be freed by the reply handler or unwait. */
+    if (ret != STATUS_SUCCESS)
+        user_file_op_free(op);
+
+    return ret;
+}
+
+static void user_file_unwait(file_handle_t *handle, object_event_t *event) {
+    user_file_t *file = handle->user_file;
+
+    MUTEX_SCOPED_LOCK(lock, &file->lock);
+
+    /* Look for a wait with this event. If we can't find it, it must have been
+     * replied to already. */
+    list_foreach(&file->ops, iter) {
+        user_file_op_t *wait = list_entry(iter, user_file_op_t, link);
+
+        if (wait->event == event) {
+            list_remove(&wait->link);
+
+            /* We have a match so send an unwait. */
+            user_file_op_t *unwait = user_file_op_alloc(file, USER_FILE_OP_UNWAIT, 0);
+
+            unwait->msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_NUM]    = event->event;
+            unwait->msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_SERIAL] = wait->serial;
+
+            user_file_op_send(file, unwait, USER_FILE_OP_SEND_NO_REPLY);
+
+            user_file_op_free(unwait);
+            user_file_op_free(wait);
+            break;
+        }
+    }
+}
+
 static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
     user_file_t *file = handle->user_file;
     status_t ret      = STATUS_SUCCESS;
@@ -279,7 +353,7 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
 
         op->msg->msg.args[USER_FILE_MESSAGE_ARG_FLAGS] = file_handle_flags(handle);
 
-        ret = user_file_op_send(file, op);
+        ret = user_file_op_send(file, op, 0);
         if (ret != STATUS_SUCCESS)
             break;
 
@@ -328,7 +402,6 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
     return ret;
 }
 
-/** Get information about a file. */
 static void user_file_info(file_handle_t *handle, file_info_t *info) {
     user_file_t *file = handle->user_file;
     status_t ret;
@@ -337,7 +410,7 @@ static void user_file_info(file_handle_t *handle, file_info_t *info) {
 
     user_file_op_t *op = user_file_op_alloc(file, USER_FILE_OP_INFO, 0);
 
-    ret = user_file_op_send(file, op);
+    ret = user_file_op_send(file, op, 0);
     if (ret == STATUS_SUCCESS) {
         assert(op->msg);
 
@@ -357,7 +430,6 @@ static void user_file_info(file_handle_t *handle, file_info_t *info) {
     info->type  = file->file.type;
 }
 
-/** Handler for file-specific requests. */
 static status_t user_file_request(
     struct file_handle *handle, unsigned request, const void *in,
     size_t in_size, void **_out, size_t *_out_size)
@@ -379,7 +451,7 @@ static status_t user_file_request(
     op->msg->msg.args[USER_FILE_MESSAGE_ARG_FLAGS]       = file_handle_flags(handle);
     op->msg->msg.args[USER_FILE_MESSAGE_ARG_REQUEST_NUM] = request;
 
-    ret = user_file_op_send(file, op);
+    ret = user_file_op_send(file, op, 0);
     if (ret == STATUS_SUCCESS) {
         assert(op->msg);
 
@@ -405,6 +477,8 @@ static status_t user_file_request(
 static const file_ops_t user_file_ops = {
     .open    = user_file_open,
     .close   = user_file_close,
+    .wait    = user_file_wait,
+    .unwait  = user_file_unwait,
     .io      = user_file_io,
     .info    = user_file_info,
     .request = user_file_request,

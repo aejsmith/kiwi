@@ -134,6 +134,50 @@ enum {
      *     Output data.
      */
     USER_FILE_OP_REQUEST = 3,
+
+    /**
+     * Wait for a file event. This should reply immediately if the event is
+     * signalled or there is an error with the event, otherwise the reply
+     * should be sent once the event is signalled. Waits are cancelled with
+     * USER_FILE_OP_UNWAIT.
+     *
+     * Input:
+     *   Arguments:
+     *     USER_FILE_MESSAGE_ARG_SERIAL         = Operation serial.
+     *     USER_FILE_MESSAGE_ARG_EVENT_NUM      = Event number to wait for.
+     *
+     * Reply:
+     *   Arguments:
+     *     USER_FILE_MESSAGE_ARG_SERIAL         = Operation serial.
+     *     USER_FILE_MESSAGE_ARG_EVENT_NUM      = Event number that occurred.
+     *     USER_FILE_MESSAGE_ARG_EVENT_STATUS   = Status code.
+     *     USER_FILE_MESSAGE_ARG_EVENT_DATA     = Event data.
+     */
+    USER_FILE_OP_WAIT = 4,
+
+    /**
+     * Cancels a previous event wait request. This is sent to allow the client
+     * to clean up any state corresponding to the wait if it hasn't been replied
+     * to by the time it is cancelled. Once this is sent, a reply for the
+     * corresponding wait request no longer needs to be sent.
+     *
+     * An unwait will not be sent for a given wait request once a reply to it
+     * has been processed, so any state corresponding to a wait should be
+     * cleaned up if sending a reply rather than waiting for a corresponding
+     * unwait.
+     *
+     * Input:
+     *   Arguments:
+     *     USER_FILE_MESSAGE_ARG_SERIAL         = Operation serial.
+     *     USER_FILE_MESSAGE_ARG_EVENT_NUM      = Event number being waited for.
+     *     USER_FILE_MESSAGE_ARG_EVENT_SERIAL   = Serial number of original
+     *                                            USER_FILE_OP_WAIT request to
+     *                                            cancel.
+     *
+     * Reply:
+     *   None needed.
+     */
+    USER_FILE_OP_UNWAIT = 5,
 };
 
 /** User file message fields. */
@@ -154,6 +198,12 @@ enum {
     USER_FILE_MESSAGE_ARG_REQUEST_NUM       = 2,
 
     USER_FILE_MESSAGE_ARG_REQUEST_STATUS    = 1,
+
+    USER_FILE_MESSAGE_ARG_EVENT_NUM         = 1,
+    USER_FILE_MESSAGE_ARG_EVENT_STATUS      = 2,
+    USER_FILE_MESSAGE_ARG_EVENT_DATA        = 3,
+
+    USER_FILE_MESSAGE_ARG_EVENT_SERIAL      = 2,
 };
 
 extern status_t kern_user_file_create(
