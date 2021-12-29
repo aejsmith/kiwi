@@ -141,9 +141,27 @@ static status_t socket_file_io(file_handle_t *handle, io_request_t *request) {
     }
 }
 
+static status_t socket_file_wait(file_handle_t *handle, object_event_t *event) {
+    socket_t *socket = handle->socket;
+
+    if (!socket->ops->wait)
+        return STATUS_INVALID_EVENT;
+
+    return socket->ops->wait(socket, event);
+}
+
+static void socket_file_unwait(file_handle_t *handle, object_event_t *event) {
+    socket_t *socket = handle->socket;
+
+    if (socket->ops->unwait)
+        socket->ops->unwait(socket, event);
+}
+
 static const file_ops_t socket_file_ops = {
-    .close = socket_file_close,
-    .io    = socket_file_io,
+    .close  = socket_file_close,
+    .io     = socket_file_io,
+    .wait   = socket_file_wait,
+    .unwait = socket_file_unwait,
 };
 
 /** Validate that a handle is a socket and return its file_handle_t if so. */

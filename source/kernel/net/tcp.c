@@ -24,6 +24,7 @@
 
 #include <io/request.h>
 
+#include <lib/notifier.h>
 #include <lib/random.h>
 
 #include <mm/malloc.h>
@@ -59,6 +60,7 @@ typedef struct tcp_buffer {
     uint32_t curr_size;                 /**< Number of bytes in buffer. */
     uint32_t max_size;                  /**< Maximum number of bytes in the buffer (power of 2). */
     condvar_t cvar;                     /**< Condition to wait for space (TX) or data (RX). */
+    notifier_t notifier;                /**< Notifier to wait for space or data. */
 } tcp_buffer_t;
 
 /** TCP socket structure. */
@@ -141,6 +143,9 @@ static void tcp_socket_retain(tcp_socket_t *socket) {
 static void tcp_socket_release(tcp_socket_t *socket) {
     if (refcount_dec(&socket->count) == 0) {
         assert(socket->port.num == 0);
+
+        assert(notifier_empty(&socket->tx_buffer.notifier));
+        assert(notifier_empty(&socket->rx_buffer.notifier));
 
         kfree(socket->tx_buffer.data);
         kfree(socket->rx_buffer.data);
@@ -352,8 +357,6 @@ static void ack_tx_buffer(tcp_socket_t *socket, uint32_t ack_num) {
     uint32_t ack_size = ack_num - socket->tx_unack;
 
     if (ack_size > 0) {
-        socket->tx_unack = ack_num;
-
         tcp_buffer_t *buffer = &socket->tx_buffer;
 
         assert(ack_size <= buffer->curr_size);
@@ -361,10 +364,12 @@ static void ack_tx_buffer(tcp_socket_t *socket, uint32_t ack_num) {
         // TODO: Handle anything to do with retransmission necessary here
         // (cancel timers, drop segment info).
 
+        socket->tx_unack   = ack_num;
         buffer->start      = (buffer->start + ack_size) & (buffer->max_size - 1);
         buffer->curr_size -= ack_size;
 
         condvar_broadcast(&buffer->cvar);
+        notifier_run(&buffer->notifier, NULL, false);
     }
 }
 
@@ -387,6 +392,55 @@ static void tcp_socket_close(socket_t *_socket) {
     mutex_unlock(&socket->lock);
 
     tcp_socket_release(socket);
+}
+
+static status_t tcp_socket_wait(socket_t *_socket, object_event_t *event) {
+    tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
+
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+
+    status_t ret = STATUS_SUCCESS;
+    switch (event->event) {
+        case FILE_EVENT_READABLE:
+            if (socket->rx_buffer.curr_size > 0) {
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&socket->rx_buffer.notifier, object_event_notifier, event);
+            }
+
+            break;
+
+        case FILE_EVENT_WRITABLE:
+            if (socket->tx_buffer.curr_size < socket->tx_buffer.max_size) {
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&socket->tx_buffer.notifier, object_event_notifier, event);
+            }
+
+            break;
+
+        default:
+            ret = STATUS_INVALID_EVENT;
+            break;
+    }
+
+    return ret;
+}
+
+static void tcp_socket_unwait(socket_t *_socket, object_event_t *event) {
+    tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
+
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+
+    switch (event->event) {
+        case FILE_EVENT_READABLE:
+            notifier_unregister(&socket->rx_buffer.notifier, object_event_notifier, event);
+            break;
+
+        case FILE_EVENT_WRITABLE:
+            notifier_unregister(&socket->tx_buffer.notifier, object_event_notifier, event);
+            break;
+    }
 }
 
 static status_t tcp_socket_connect(socket_t *_socket, const sockaddr_t *addr, socklen_t addr_len) {
@@ -556,6 +610,8 @@ static status_t tcp_socket_receive(
     tcp_buffer_t *buffer = &socket->rx_buffer;
 
     /* Wait for any data to be available on the socket. */
+    // TODO: If this changes when we implement data reordering, make sure to
+    // update tcp_socket_wait.
     while (buffer->curr_size == 0) {
         if (socket->state != TCP_STATE_ESTABLISHED)
             return STATUS_NOT_CONNECTED;
@@ -595,6 +651,8 @@ static status_t tcp_socket_receive(
 
 static const socket_ops_t tcp_socket_ops = {
     .close   = tcp_socket_close,
+    .wait    = tcp_socket_wait,
+    .unwait  = tcp_socket_unwait,
     .connect = tcp_socket_connect,
     .send    = tcp_socket_send,
     .receive = tcp_socket_receive,
@@ -608,6 +666,7 @@ static bool tcp_buffer_init(tcp_buffer_t *buffer, uint32_t size, const char *nam
         return false;
 
     condvar_init(&buffer->cvar, name);
+    notifier_init(&buffer->notifier, buffer);
 
     buffer->start     = 0;
     buffer->curr_size = 0;
@@ -739,6 +798,7 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
             buffer->curr_size += data_size;
 
             condvar_broadcast(&buffer->cvar);
+            notifier_run(&buffer->notifier, NULL, false);
         }
 
         /* Acknowledge what we've accepted (if anything). */

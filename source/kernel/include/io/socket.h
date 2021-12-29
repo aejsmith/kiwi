@@ -37,6 +37,18 @@ typedef struct socket_ops {
      * @param socket        Socket to close. */
     void (*close)(struct socket *socket);
 
+    /** Signals that a socket event is being waited for.
+     * @see                 file_ops_t::wait
+     * @param socket        Socket to wait on.
+     * @param event         Event that is being waited for.
+     * @return              Status code describing result of the operation. */
+    status_t (*wait)(struct socket *socket, object_event_t *event);
+
+    /** Stops waiting for a socket event.
+     * @param socket        Socket to stop waiting on.
+     * @param event         Event that is being waited for. */
+    void (*unwait)(struct socket *socket, object_event_t *event);
+
     /** Initiate a connection on a socket.
      * @param socket        Socket to connect.
      * @param addr          Destination address.
