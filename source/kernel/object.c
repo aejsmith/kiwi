@@ -63,6 +63,7 @@ typedef struct object_waiter {
 typedef struct object_wait {
     object_event_t event;           /**< User-supplied event information. */
     object_handle_t *handle;        /**< Handle being waited on. */
+    status_t status;                /**< Wait status. */
 
     /** Type of the wait. */
     enum {
@@ -670,17 +671,25 @@ static void post_object_event_interrupt(thread_interrupt_t *interrupt) {
 }
 
 /**
- * Signals that an event being waited for has occurred. This is safe to call in
- * interrupt context.
+ * Signals that an event being waited for has occurred or resulted in an error.
+ * Error status should only be used where it is not possible to determine
+ * error conditions at the point where the wait is first set up, e.g. user_file.
+ *
+ * This is safe to call in interrupt context.
  *
  * @param event         Object event structure.
  * @param data          Event data to return to waiter.
+ * @param status        Error status to return to the waiter. If this is not
+ *                      STATUS_SUCCESS then the event is marked as ERROR rather
+ *                      than SIGNALLED.
  */
-void object_event_signal(object_event_t *event, unsigned long data) {
+void object_event_signal_etc(object_event_t *event, unsigned long data, status_t status) {
     object_wait_t *wait = container_of(event, object_wait_t, event);
     
-    event->flags |= OBJECT_EVENT_SIGNALLED;
+    wait->status = status;
+
     event->data   = data;
+    event->flags |= (status == STATUS_SUCCESS) ? OBJECT_EVENT_SIGNALLED : OBJECT_EVENT_ERROR;
 
     switch (wait->type) {
         case OBJECT_WAIT_NORMAL: {
@@ -733,6 +742,17 @@ void object_event_signal(object_event_t *event, unsigned long data) {
             break;
         }
     }
+}
+
+/**
+ * Signals that an event being waited for has occurred. This is safe to call in
+ * interrupt context.
+ *
+ * @param event         Object event structure.
+ * @param data          Event data to return to waiter.
+ */
+void object_event_signal(object_event_t *event, unsigned long data) {
+    object_event_signal_etc(event, data, STATUS_SUCCESS);
 }
 
 /** Notifier function to use for object waiting.
@@ -890,6 +910,7 @@ status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags, 
         wait->event.flags &= ~(OBJECT_EVENT_SIGNALLED | OBJECT_EVENT_ERROR);
 
         wait->handle = NULL;
+        wait->status = STATUS_SUCCESS;
         wait->type   = OBJECT_WAIT_NORMAL;
         wait->waiter = &waiter;
 
@@ -931,11 +952,17 @@ out:
         object_wait_t *wait = list_first(&waits, object_wait_t, waits_link);
 
         if (wait->handle) {
-            if (!(wait->event.flags & OBJECT_EVENT_ERROR))
+            /* ERROR and !STATUS_SUCCESS indicates that the error was set
+             * later. Otherwise, we didn't finish setting up the wait. */
+            if (!(wait->event.flags & OBJECT_EVENT_ERROR) || wait->status != STATUS_SUCCESS)
                 wait->handle->type->unwait(wait->handle, &wait->event);
 
             object_handle_release(wait->handle);
         }
+
+        /* Return the first error that was set later, if any. */
+        if (ret == STATUS_SUCCESS)
+            ret = wait->status;
 
         /* Write back the updated flags and event data. */
         status_t err = write_user(&events[i].flags, wait->event.flags);
@@ -960,7 +987,7 @@ out:
  * supports edge-triggered events: the OBJECT_EVENT_EDGE flag must be set. The
  * callback will be executed every time the event condition changes to become
  * true. If the OBJECT_EVENT_ONESHOT flag is set, the callback function will be
- * removed the first time the event occurs
+ * removed the first time the event occurs.
  *
  * Callbacks are per-thread, i.e. will be delivered to the thread that
  * registered it, and per-handle table entry, i.e. will be removed when the
@@ -1043,6 +1070,7 @@ status_t kern_object_callback(object_event_t *event, object_callback_t callback,
     memcpy(&wait->event, &kevent, sizeof(wait->event));
 
     wait->type            = OBJECT_WAIT_CALLBACK;
+    wait->status          = STATUS_SUCCESS;
     wait->thread          = curr_thread;
     wait->callback        = callback;
     wait->priority        = priority;

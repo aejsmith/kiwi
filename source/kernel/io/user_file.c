@@ -212,8 +212,10 @@ static status_t user_file_endpoint_receive(
                 if (msg->msg.id != op->id || msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_NUM] != op->event->event) {
                     user_file_invalid_reply(file, op);
                 } else {
-                    // FIXME: Allow status to be returned as error from the wait.
-                    object_event_signal(op->event, msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_DATA]);
+                    object_event_signal_etc(
+                        op->event,
+                        msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_DATA],
+                        msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_STATUS]);
                 }
 
                 /* We're responsible for freeing wait ops once signalled. */
