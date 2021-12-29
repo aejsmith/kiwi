@@ -17,6 +17,9 @@
 /**
  * @file
  * @brief               TCP protocol implementation.
+ *
+ * TODO:
+ *  - Support SACK.
  */
 
 #include <io/request.h>
@@ -335,15 +338,18 @@ static void flush_tx_buffer(tcp_socket_t *socket) {
  * from the transmit buffer that is no longer needed.
  */
 static void ack_tx_buffer(tcp_socket_t *socket, uint32_t ack_num) {
-    /* Check that this sequence number looks sane. */
-    uint32_t old_unack_size = socket->tx_seq - socket->tx_unack;
-    uint32_t new_unack_size = socket->tx_seq - ack_num;
-    if (new_unack_size > old_unack_size) {
+    /*
+     * Check that this ack is acceptable:
+     *   A new acknowledgment (called an "acceptable ack"), is one for which
+     *   the inequality below holds:
+     *     SND.UNA < SEG.ACK =< SND.NXT
+     */
+    if (!TCP_SEQ_LE(socket->tx_unack, ack_num) || !TCP_SEQ_LE(ack_num, socket->tx_seq)) {
         dprintf("tcp: received unexpected ACK sequence, ignoring\n");
         return;
     }
 
-    uint32_t ack_size = old_unack_size - new_unack_size;
+    uint32_t ack_size = ack_num - socket->tx_unack;
 
     if (ack_size > 0) {
         socket->tx_unack = ack_num;
@@ -489,7 +495,7 @@ static status_t tcp_socket_send(
     while (request->transferred < request->total) {
         size_t remaining = request->total - request->transferred;
         uint32_t space   = buffer->max_size - buffer->curr_size;
-        uint32_t size    = min(remaining, space);
+        uint32_t size    = min(remaining, (size_t)space);
 
         if (size == 0) {
             /* We need to wait for some space to become available. Flush
@@ -543,11 +549,48 @@ static status_t tcp_socket_receive(
     sockaddr_t *_addr, socklen_t *_addr_len)
 {
     tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
+    status_t ret;
 
-    // TODO: Return socket->dest_addr in addr.
-    (void)socket;
-    char buf[] = "TODO";
-    return io_request_copy(request, buf, min(sizeof(buf), request->total), true);
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+
+    tcp_buffer_t *buffer = &socket->rx_buffer;
+
+    /* Wait for any data to be available on the socket. */
+    while (buffer->curr_size == 0) {
+        if (socket->state != TCP_STATE_ESTABLISHED)
+            return STATUS_NOT_CONNECTED;
+
+        ret = condvar_wait_etc(&buffer->cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
+
+    assert(request->transferred == 0);
+    uint32_t size = min((size_t)buffer->curr_size, request->total);
+
+    if (buffer->start + size > buffer->max_size) {
+        /* Straddles the end of the circular buffer, split into 2 copies. */
+        uint32_t split = buffer->max_size - buffer->start;
+        ret = io_request_copy(request, &buffer->data[buffer->start], split, true);
+        if (ret == STATUS_SUCCESS) {
+            ret = io_request_copy(request, &buffer->data[0], size - split, true);
+            if (ret != STATUS_SUCCESS) {
+                /* Don't do a partial transfer in the copy fail case. */
+                request->transferred -= split;
+            }
+        }
+    } else {
+        ret = io_request_copy(request, &buffer->data[buffer->start], size, true);
+    }
+
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    buffer->start      = (buffer->start + size) & (buffer->max_size - 1);
+    buffer->curr_size -= size;
+
+    net_socket_addr_copy(&socket->net, (const sockaddr_t *)&socket->dest_addr, max_addr_len, _addr, _addr_len);
+    return STATUS_SUCCESS;
 }
 
 static const socket_ops_t tcp_socket_ops = {
@@ -644,6 +687,63 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
     }
 
     ack_tx_buffer(socket, net32_to_cpu(header->ack_num));
+
+    /* data_offset is validated by tcp_receive(). */
+    uint32_t data_offset = header->data_offset * sizeof(uint32_t);
+    uint32_t data_size   = packet->size - data_offset;
+    if (data_size > 0) {
+        uint32_t seq_num  = net32_to_cpu(header->seq_num);
+
+        /* We can accept data if the start sequence is equal to rx_seq (next
+         * that we're expecting), or it is less than rx_seq and seq_next is
+         * greater than rx_seq. */
+        // TODO: Accept data with a start sequence greater than what we are
+        // expecting - this can happen if packets arrive out of order. We'll
+        // need to keep track of segments that we've received so that we can
+        // know once we've got contiguous data. For now, we'll rely on
+        // retransmission if we get things out of order.
+        if (seq_num != socket->rx_seq) {
+            uint32_t seq_next = seq_num + data_size;
+            if (TCP_SEQ_LT(seq_num, socket->rx_seq) && TCP_SEQ_GT(seq_next, socket->rx_seq)) {
+                uint32_t diff = socket->rx_seq - seq_num;
+                data_offset += diff;
+                data_size   -= diff;
+            } else {
+                /* Unexpected, drop. */
+                dprintf("tcp: dropping unexpected segment with seq %" PRIu32 " (expecting %" PRIu32 ")\n", seq_num, socket->rx_seq);
+                data_size = 0;
+            }
+        }
+
+        tcp_buffer_t *buffer = &socket->rx_buffer;
+
+        /* Clamp by what we can fit in the buffer. */
+        uint32_t space = buffer->max_size - buffer->curr_size;
+        if (data_size > 0 && data_size > space) {
+            dprintf("tcp: RX buffer full, dropping data (received %" PRIu32 " bytes, accepting %" PRIu32 ")\n", data_size, space);
+            data_size = space;
+        }
+
+        if (data_size > 0) {
+            uint32_t pos = (buffer->start + buffer->curr_size) & (buffer->max_size - 1);
+            if (pos + data_size > buffer->max_size) {
+                /* Straddles the end of the circular buffer, split into 2 copies. */
+                uint32_t split = buffer->max_size - pos;
+                net_packet_copy_from(packet, &buffer->data[pos], data_offset, split);
+                net_packet_copy_from(packet, &buffer->data[0], data_offset + split, data_size - split);
+            } else {
+                net_packet_copy_from(packet, &buffer->data[pos], data_offset, data_size);
+            }
+
+            socket->rx_seq    += data_size;
+            buffer->curr_size += data_size;
+
+            condvar_broadcast(&buffer->cvar);
+        }
+
+        /* Acknowledge what we've accepted (if anything). */
+        tx_ack_packet(socket);
+    }
 }
 
 /** Handles a received TCP packet. */
@@ -656,6 +756,11 @@ void tcp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const s
 
     if (ip_checksum_packet_pseudo(packet, 0, packet->size, IPPROTO_TCP, source_addr, dest_addr) != 0) {
         dprintf("tcp: dropping packet: checksum failed\n");
+        return;
+    }
+
+    if (header->data_offset * sizeof(uint32_t) > packet->size) {
+        dprintf("tcp: dropping packet: data offset is invalid\n");
         return;
     }
 
