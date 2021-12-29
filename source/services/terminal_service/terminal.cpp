@@ -813,7 +813,7 @@ bool Terminal::readBuffer(ReadOperation &op) {
         }
     }
 
-    status_t ret = kern_connection_send(m_userFileConnection, &reply, data.get(), INVALID_HANDLE, -1);
+    status_t ret = kern_connection_send(m_userFileConnection, &reply, (reply.size > 0) ? data.get() : nullptr, INVALID_HANDLE, -1);
     if (ret == STATUS_SUCCESS) {
         /* Only remove from the buffer if we could complete it. */
         m_inputBufferStart = bufferStart;
