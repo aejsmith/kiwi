@@ -19,57 +19,53 @@
  * @brief               Input/output multiplexing.
  */
 
-#include <kernel/device.h>
+#include <core/time.h>
+
 #include <kernel/object.h>
+#include <kernel/file.h>
 #include <kernel/status.h>
 
 #include <errno.h>
 #include <poll.h>
 #include <stdlib.h>
 
-#include "posix/posix.h"
+#include "libsystem.h"
 
 /** Information used to update poll table from info returned by kernel. */
 typedef struct poll_convert {
-    int index;                      /**< Index of poll table entry. */
+    size_t index;                   /**< Index of poll table entry. */
     short event;                    /**< Value to OR into revents. */
 } poll_convert_t;
 
-/** Add an event to the kernel events array.
- * @param _events       Current events array.
- * @param _convert      Array of conversion information.
- * @param _count        Current size of array.
- * @param handle        Handle to add.
- * @param event         Event to wait for on handle.
- * @param pollidx       Index of entry in poll table.
- * @param pollev        Event to map back to.
- * @return              Whether successful. */
 static bool add_event(
     object_event_t **_events, poll_convert_t **_convert, size_t *_count,
-    handle_t handle, int event, int pollidx, short pollev)
+    handle_t handle, unsigned event, size_t poll_index, short poll_event)
 {
-    poll_convert_t *convert;
-    object_event_t *events;
-    size_t count = *_count;
+    size_t index = *_count;
+    size_t count = index + 1;
 
-    events = realloc(*_events, sizeof(*events) * (count + 1));
+    object_event_t *events = realloc(*_events, sizeof(*events) * count);
     if (!events)
         return false;
 
     *_events = events;
 
-    convert = realloc(*_convert, sizeof(*convert) * (count + 1));
+    poll_convert_t *convert = realloc(*_convert, sizeof(*convert) * count);
     if (!convert)
         return false;
 
     *_convert = convert;
 
-    events[count].handle = handle;
-    events[count].event = event;
-    events[count].signalled = false;
-    convert[count].index = pollidx;
-    convert[count].event = pollev;
-    *_count = count + 1;
+    events[index].handle = handle;
+    events[index].event  = event;
+    events[index].flags  = 0;
+    events[index].data   = 0;
+    events[index].udata  = NULL;
+
+    convert[index].index = poll_index;
+    convert[index].event = poll_event;
+
+    *_count = count;
     return true;
 }
 
@@ -82,99 +78,79 @@ static bool add_event(
  * @return              Total number of file descriptors with returned events
  *                      on success, -1 on failure. */
 int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
-    poll_convert_t *convert = NULL;
-    object_event_t *events = NULL;
-    nfds_t signalled = 0;
-    size_t count = 0, i;
     status_t ret;
 
-    for (i = 0; i < nfds; i++) {
+    for (nfds_t i = 0; i < nfds; i++)
         fds[i].revents = 0;
 
-        switch (kern_object_type(fds[i].fd)) {
-        case OBJECT_TYPE_FILE:
-            if (fds[i].events & ~(POLLIN | POLLOUT)) {
-                errno = ENOTSUP;
-                goto fail;
-            }
+    poll_convert_t *convert __sys_cleanup_free = NULL;
+    object_event_t *events __sys_cleanup_free = NULL;
+    size_t count = 0;
 
-            /* Quote: "Regular files shall always poll TRUE for reading and
-             * writing". */
-            if (fds[i].events & POLLIN) {
-                fds[i].revents |= POLLIN;
-                signalled++;
-            }
+    for (nfds_t i = 0; i < nfds; i++) {
+        unsigned type;
+        ret = kern_object_type(fds[i].fd, &type);
+        if (ret != STATUS_SUCCESS) {
+            fds[i].revents |= POLLNVAL;
+            continue;
+        }
 
-            if (fds[i].events & POLLOUT) {
-                fds[i].revents |= POLLOUT;
-                signalled++;
-            }
-
-            break;
-        case OBJECT_TYPE_DEVICE:
-            if (fds[i].events & ~(POLLIN | POLLOUT)) {
-                errno = ENOTSUP;
-                goto fail;
-            }
-
-            if (fds[i].events & POLLIN) {
-                if (!add_event(
-                        &events, &convert, &count, fds[i].fd,
-                        DEVICE_EVENT_READABLE, i, POLLIN))
-                {
-                    goto fail;
+        switch (type) {
+            case OBJECT_TYPE_FILE:
+                if (fds[i].events & ~(POLLIN | POLLOUT)) {
+                    errno = ENOTSUP;
+                    return -1;
                 }
-            }
 
-            if (fds[i].events & POLLOUT) {
-                if (!add_event(
-                        &events, &convert, &count, fds[i].fd,
-                        DEVICE_EVENT_WRITABLE, i, POLLOUT))
-                {
-                    goto fail;
+                if (fds[i].events & POLLIN) {
+                    if (!add_event(
+                            &events, &convert, &count, fds[i].fd,
+                            FILE_EVENT_READABLE, i, POLLIN))
+                    {
+                        return -1;
+                    }
                 }
-            }
 
-            break;
-        case -1:
-            fds[i].revents = POLLNVAL;
-            signalled++;
-            break;
-        default:
-            errno = ENOTSUP;
-            goto fail;
+                if (fds[i].events & POLLOUT) {
+                    if (!add_event(
+                            &events, &convert, &count, fds[i].fd,
+                            FILE_EVENT_WRITABLE, i, POLLOUT))
+                    {
+                        return -1;
+                    }
+                }
+
+                break;
+            default:
+                errno = ENOTSUP;
+                return -1;
         }
     }
 
-    /* Check if we need to do anything more. */
-    if (signalled) {
-        goto out;
-    } else if (!count) {
+    if (count == 0) {
         errno = EINVAL;
         return -1;
     }
 
-    ret = kern_object_wait(events, count, (timeout < 0) ? -1 : (timeout * 1000));
-    if (ret != STATUS_SUCCESS) {
+    ret = kern_object_wait(events, count, 0, (timeout < 0) ? -1 : core_msecs_to_nsecs(timeout));
+
+    /* INVALID_EVENT would signal ERROR on the corresponding handle. */
+    if (ret != STATUS_SUCCESS && ret != STATUS_INVALID_EVENT) {
         libsystem_status_to_errno(ret);
-        goto fail;
+        return -1;
     }
 
     /* Update the poll table from what the kernel returned. */
-    for (i = 0; i < count; i++) {
-        if (events[i].signalled) {
+    nfds_t signalled = 0;
+    for (nfds_t i = 0; i < count; i++) {
+        if (events[i].flags & OBJECT_EVENT_ERROR) {
+            fds[convert[i].index].revents |= POLLERR;
+            signalled++;
+        } else if (events[i].flags & OBJECT_EVENT_SIGNALLED) {
             fds[convert[i].index].revents |= convert[i].event;
             signalled++;
         }
     }
 
-out:
-    free(events);
-    free(convert);
     return signalled;
-
-fail:
-    free(events);
-    free(convert);
-    return -1;
 }

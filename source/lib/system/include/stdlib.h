@@ -106,6 +106,14 @@ extern int unsetenv(const char *name);
 //extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);
 //extern int wctomb(char *s, wchar_t wc);
 
+/** Helper for __sys_cleanup_free. */
+static inline void __sys_freep(void *p) {
+    free(*(void **)p);
+}
+
+/** Attribute to free a pointer with free() when it goes out of scope. */
+#define __sys_cleanup_free  __sys_cleanup(__sys_freep)
+
 // Needed for libcxx build.
 #ifdef __cplusplus
 
