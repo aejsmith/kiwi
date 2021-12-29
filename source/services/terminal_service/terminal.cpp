@@ -35,6 +35,14 @@
 
 #include <array>
 
+static constexpr uint64_t kSupportedUserFileOps =
+    USER_FILE_SUPPORTED_OP_READ |
+    USER_FILE_SUPPORTED_OP_WRITE |
+    USER_FILE_SUPPORTED_OP_INFO |
+    USER_FILE_SUPPORTED_OP_REQUEST |
+    USER_FILE_SUPPORTED_OP_WAIT |
+    USER_FILE_SUPPORTED_OP_UNWAIT;
+
 Terminal::Terminal(core_connection_t *connection) :
     m_connection         (connection),
     m_userFile           (INVALID_HANDLE),
@@ -87,7 +95,7 @@ void Terminal::run() {
 
     ret = kern_user_file_create(
         FILE_TYPE_CHAR, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0,
-        &m_userFileConnection, &m_userFile);
+        kSupportedUserFileOps, &m_userFileConnection, &m_userFile);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create user file: %" PRId32, ret);
         return;

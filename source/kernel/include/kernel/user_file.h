@@ -156,7 +156,7 @@ enum {
     USER_FILE_OP_WAIT = 4,
 
     /**
-     * Cancels a previous event wait request. This is sent to allow the client
+     * Cancels a previous event wait request. This is sent to allow the server
      * to clean up any state corresponding to the wait if it hasn't been replied
      * to by the time it is cancelled. Once this is sent, a reply for the
      * corresponding wait request no longer needs to be sent.
@@ -206,8 +206,18 @@ enum {
     USER_FILE_MESSAGE_ARG_EVENT_SERIAL      = 2,
 };
 
+/** Flags to indicate which operations are supported. */
+enum {
+    USER_FILE_SUPPORTED_OP_READ     = (1 << USER_FILE_OP_READ),
+    USER_FILE_SUPPORTED_OP_WRITE    = (1 << USER_FILE_OP_WRITE),
+    USER_FILE_SUPPORTED_OP_INFO     = (1 << USER_FILE_OP_INFO),
+    USER_FILE_SUPPORTED_OP_REQUEST  = (1 << USER_FILE_OP_REQUEST),
+    USER_FILE_SUPPORTED_OP_WAIT     = (1 << USER_FILE_OP_WAIT),
+    USER_FILE_SUPPORTED_OP_UNWAIT   = (1 << USER_FILE_OP_UNWAIT),
+};
+
 extern status_t kern_user_file_create(
-    file_type_t type, uint32_t access, uint32_t flags, handle_t *_conn,
-    handle_t *_file);
+    file_type_t type, uint32_t access, uint32_t flags, uint64_t supported_ops,
+    handle_t *_conn, handle_t *_file);
 
 __KERNEL_EXTERN_C_END

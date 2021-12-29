@@ -48,7 +48,7 @@ LIST_DEFINE(net_interface_list);
 /** Next active interface ID. */
 static uint32_t next_interface_id = 0;
 
-/** Supported network device operations, indexed by family. */
+/** Supported network address operations, indexed by family. */
 static const net_addr_ops_t *supported_net_addr_ops[] = {
     [AF_INET] = &ipv4_net_addr_ops,
     //[AF_INET6] TODO

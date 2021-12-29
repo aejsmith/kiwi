@@ -63,12 +63,17 @@ typedef struct user_file {
 
     mutex_t lock;                       /**< Lock for file. */
     refcount_t count;                   /**< Reference count of open handles. */
+    uint64_t supported_ops;             /**< Supported ops on the file. */
     ipc_endpoint_t *endpoint;           /**< Endpoint for kernel side of the connection. */
     list_t ops;                         /**< Outstanding operations. */
     uint64_t next_serial;               /**< Next operation serial number. */
 } user_file_t;
 
 static slab_cache_t *user_file_op_cache;
+
+static inline bool user_file_supports(user_file_t *file, uint64_t op) {
+    return (file->supported_ops & ((uint64_t)1 << op));
+}
 
 /**
  * Closes the file's connection, cancels all outstanding operations, and makes
@@ -278,15 +283,19 @@ static status_t user_file_wait(file_handle_t *handle, object_event_t *event) {
     user_file_t *file = handle->user_file;
     status_t ret;
 
-    MUTEX_SCOPED_LOCK(lock, &file->lock);
+    if (!user_file_supports(file, USER_FILE_OP_WAIT))
+        return STATUS_INVALID_EVENT;
+
+    mutex_lock(&file->lock);
 
     user_file_op_t *op = user_file_op_alloc(file, USER_FILE_OP_WAIT, 0);
 
     op->event = event;
-
     op->msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_NUM] = event->event;
 
     ret = user_file_op_send(file, op, USER_FILE_OP_SEND_DONT_WAIT);
+
+    mutex_unlock(&file->lock);
 
     /* If successful, this will be freed by the reply handler or unwait. */
     if (ret != STATUS_SUCCESS)
@@ -298,7 +307,7 @@ static status_t user_file_wait(file_handle_t *handle, object_event_t *event) {
 static void user_file_unwait(file_handle_t *handle, object_event_t *event) {
     user_file_t *file = handle->user_file;
 
-    MUTEX_SCOPED_LOCK(lock, &file->lock);
+    mutex_lock(&file->lock);
 
     /* Look for a wait with this event. If we can't find it, it must have been
      * replied to already. */
@@ -308,24 +317,32 @@ static void user_file_unwait(file_handle_t *handle, object_event_t *event) {
         if (wait->event == event) {
             list_remove(&wait->link);
 
-            /* We have a match so send an unwait. */
-            user_file_op_t *unwait = user_file_op_alloc(file, USER_FILE_OP_UNWAIT, 0);
+            if (user_file_supports(file, USER_FILE_OP_UNWAIT)) {
+                /* We have a match so send an unwait. */
+                user_file_op_t *unwait = user_file_op_alloc(file, USER_FILE_OP_UNWAIT, 0);
 
-            unwait->msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_NUM]    = event->event;
-            unwait->msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_SERIAL] = wait->serial;
+                unwait->msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_NUM]    = event->event;
+                unwait->msg->msg.args[USER_FILE_MESSAGE_ARG_EVENT_SERIAL] = wait->serial;
 
-            user_file_op_send(file, unwait, USER_FILE_OP_SEND_NO_REPLY);
+                user_file_op_send(file, unwait, USER_FILE_OP_SEND_NO_REPLY);
 
-            user_file_op_free(unwait);
+                user_file_op_free(unwait);
+            }
+
             user_file_op_free(wait);
             break;
         }
     }
+
+    mutex_unlock(&file->lock);
 }
 
 static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
     user_file_t *file = handle->user_file;
     status_t ret      = STATUS_SUCCESS;
+
+    if (!user_file_supports(file, (request->op == IO_OP_READ) ? USER_FILE_OP_READ : USER_FILE_OP_WRITE))
+        return STATUS_NOT_SUPPORTED;
 
     mutex_lock(&file->lock);
 
@@ -406,24 +423,26 @@ static void user_file_info(file_handle_t *handle, file_info_t *info) {
     user_file_t *file = handle->user_file;
     status_t ret;
 
-    mutex_lock(&file->lock);
+    if (user_file_supports(file, USER_FILE_OP_INFO)) {
+        mutex_lock(&file->lock);
 
-    user_file_op_t *op = user_file_op_alloc(file, USER_FILE_OP_INFO, 0);
+        user_file_op_t *op = user_file_op_alloc(file, USER_FILE_OP_INFO, 0);
 
-    ret = user_file_op_send(file, op, 0);
-    if (ret == STATUS_SUCCESS) {
-        assert(op->msg);
+        ret = user_file_op_send(file, op, 0);
+        if (ret == STATUS_SUCCESS) {
+            assert(op->msg);
 
-        if (op->msg->msg.size != sizeof(*info)) {
-            user_file_invalid_reply(file, op);
-        } else {
-            memcpy(info, op->msg->data, sizeof(*info));
+            if (op->msg->msg.size != sizeof(*info)) {
+                user_file_invalid_reply(file, op);
+            } else {
+                memcpy(info, op->msg->data, sizeof(*info));
+            }
         }
+
+        mutex_unlock(&file->lock);
+
+        user_file_op_free(op);
     }
-
-    mutex_unlock(&file->lock);
-
-    user_file_op_free(op);
 
     /* We always set these ourself and override what we were sent. */
     info->mount = 0;
@@ -436,6 +455,9 @@ static status_t user_file_request(
 {
     user_file_t *file = handle->user_file;
     status_t ret;
+
+    if (!user_file_supports(file, USER_FILE_OP_REQUEST))
+        return STATUS_NOT_SUPPORTED;
 
     /* Has to fit in a single message. */
     if (in_size > IPC_DATA_MAX)
@@ -499,6 +521,7 @@ static const file_ops_t user_file_ops = {
  * @param type          Type of the file.
  * @param access        Requested access rights for the file handle.
  * @param flags         Behaviour flags for the file handle.
+ * @param supported_ops Supported operations on the file.
  * @param _conn         Where to return connection handle (must not be NULL).
  * @param _file         Where to return file handle (must not be NULL).
  *
@@ -508,8 +531,8 @@ static const file_ops_t user_file_ops = {
  *                      handle table.
  */
 status_t kern_user_file_create(
-    file_type_t type, uint32_t access, uint32_t flags, handle_t *_conn,
-    handle_t *_file)
+    file_type_t type, uint32_t access, uint32_t flags, uint64_t supported_ops,
+    handle_t *_conn, handle_t *_file)
 {
     status_t ret;
 
@@ -522,10 +545,11 @@ status_t kern_user_file_create(
     refcount_set(&file->count, 1);
     list_init(&file->ops);
 
-    file->file.ops    = &user_file_ops;
-    file->file.type   = type;
-    file->endpoint    = NULL;
-    file->next_serial = 0;
+    file->file.ops      = &user_file_ops;
+    file->file.type     = type;
+    file->supported_ops = supported_ops;
+    file->endpoint      = NULL;
+    file->next_serial   = 0;
 
     // TODO: Initialize ACL. To what?
 
