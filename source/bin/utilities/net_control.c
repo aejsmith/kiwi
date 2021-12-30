@@ -23,6 +23,7 @@
 
 #include <device/net.h>
 
+#include <kernel/device/ipv4_control.h>
 #include <kernel/net/ipv4.h>
 #include <kernel/status.h>
 
@@ -31,17 +32,22 @@
 #include <string.h>
 
 static net_device_t *net_device;
+static handle_t ipv4_control_device;
 
 static void usage(void) {
     printf("Usage: net_control command [args...]\n");
     printf("\n");
     printf("command is one of the following:\n\n");
-    printf("  add_addr dev_path ipv4_addr netmask [broadcast_addr]\n");
+    printf("  add_ipv4_addr dev_path addr netmask [broadcast_addr]\n");
     printf("    Adds a new IPv4 address to the network device at dev_path.\n");
+    printf("  add_ipv4_route dev_path addr netmask gateway source\n");
+    printf("    Adds a new IPv4 routing table entry.\n");
     printf("  down dev_path\n");
     printf("    Shuts down the network device at dev_path.\n");
-    printf("  remove_addr dev_path ipv4_addr netmask\n");
+    printf("  remove_ipv4_addr dev_path addr netmask\n");
     printf("    Removes the specified IPv4 address from the network device at dev_path.\n");
+    printf("  remove_ipv4_route dev_path addr netmask gateway source\n");
+    printf("    Removes an IPv4 routing table entry.\n");
     printf("  up dev_path\n");
     printf("    Brings up the network device at dev_path.\n");
     printf("\n");
@@ -51,6 +57,16 @@ static bool open_net_device(const char *path) {
     status_t ret = net_device_open(path, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &net_device);
     if (ret != STATUS_SUCCESS) {
         fprintf(stderr, "net_control: failed to open device '%s': %s\n", path, kern_status_string(ret));
+        return false;
+    }
+
+    return true;
+}
+
+static bool open_ipv4_control_device(void) {
+    status_t ret = kern_device_open("/virtual/net/control/ipv4", FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &ipv4_control_device);
+    if (ret != STATUS_SUCCESS) {
+        fprintf(stderr, "net_control: failed to open IPv4 control device: %s\n", kern_status_string(ret));
         return false;
     }
 
@@ -112,7 +128,7 @@ static bool command_down(int argc, char **argv) {
     return true;
 }
 
-static bool command_add_addr(int argc, char **argv) {
+static bool command_add_ipv4_addr(int argc, char **argv) {
     if (argc != 3 && argc != 4) {
         usage();
         return false;
@@ -142,7 +158,7 @@ static bool command_add_addr(int argc, char **argv) {
     return true;
 }
 
-static bool command_remove_addr(int argc, char **argv) {
+static bool command_remove_ipv4_addr(int argc, char **argv) {
     if (argc != 3) {
         usage();
         return false;
@@ -167,14 +183,69 @@ static bool command_remove_addr(int argc, char **argv) {
     return true;
 }
 
+static bool command_ipv4_route(int argc, char **argv, unsigned request) {
+    status_t ret;
+
+    if (argc != 5) {
+        usage();
+        return false;
+    }
+
+    const char *path = argv[0];
+    if (!open_net_device(path))
+        return false;
+
+    if (!open_ipv4_control_device())
+        return false;
+
+    ipv4_route_t route = {};
+
+    if (!parse_ipv4_address(argv[1], &route.addr) ||
+        !parse_ipv4_address(argv[2], &route.netmask) ||
+        !parse_ipv4_address(argv[3], &route.gateway) ||
+        !parse_ipv4_address(argv[4], &route.source))
+    {
+        return false;
+    }
+
+    ret = net_device_interface_id(net_device, &route.interface_id);
+    if (ret != STATUS_SUCCESS) {
+        fprintf(
+            stderr, "net_control: failed to get interface ID for '%s': %s\n",
+            path, kern_status_string(ret));
+        return false;
+    }
+
+    ret = kern_file_request(ipv4_control_device, request, &route, sizeof(route), NULL, 0, NULL);
+    if (ret != STATUS_SUCCESS) {
+        fprintf(
+            stderr, "net_control: failed to %s route for '%s': %s\n",
+            (request == IPV4_CONTROL_DEVICE_REQUEST_ADD_ROUTE) ? "add" : "remove",
+            path, kern_status_string(ret));
+        return false;
+    }
+
+    return true;
+}
+
+static bool command_add_ipv4_route(int argc, char **argv) {
+    return command_ipv4_route(argc, argv, IPV4_CONTROL_DEVICE_REQUEST_ADD_ROUTE);
+}
+
+static bool command_remove_ipv4_route(int argc, char **argv) {
+    return command_ipv4_route(argc, argv, IPV4_CONTROL_DEVICE_REQUEST_REMOVE_ROUTE);
+}
+
 static struct {
     const char *name;
     bool (*func)(int argc, char **argv);
 } command_funcs[] = {
-    { "up",             command_up },
-    { "down",           command_down },
-    { "add_addr",       command_add_addr },
-    { "remove_addr",    command_remove_addr },
+    { "up",                 command_up },
+    { "down",               command_down },
+    { "add_ipv4_addr",      command_add_ipv4_addr },
+    { "remove_ipv4_addr",   command_remove_ipv4_addr },
+    { "add_ipv4_route",     command_add_ipv4_route },
+    { "remove_ipv4_route",  command_remove_ipv4_route },
 };
 
 int main(int argc, char **argv) {
