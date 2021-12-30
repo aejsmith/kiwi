@@ -69,3 +69,5 @@ extern const net_addr_ops_t ipv4_net_addr_ops;
 extern status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t **_socket);
 
 extern void ipv4_receive(net_interface_t *interface, struct net_packet *packet);
+
+extern void ipv4_init(void);

@@ -21,6 +21,8 @@
 
 #include <device/net/net.h>
 
+#include <kernel/device/ipv4_control.h>
+
 #include <net/arp.h>
 #include <net/ip.h>
 #include <net/ipv4.h>
@@ -40,6 +42,9 @@
 #else
 #   define dprintf(fmt...)
 #endif
+
+/** /virtual/net/control/ipv4 */
+static device_t *ipv4_control_device;
 
 /** Next IPv4 packet ID. */
 static atomic_uint16_t next_ipv4_id = 0;
@@ -318,4 +323,30 @@ void ipv4_receive(net_interface_t *interface, net_packet_t *packet) {
                 break;
         }
     }
+}
+
+static status_t ipv4_control_device_request(
+    device_t *device, file_handle_t *handle, unsigned request,
+    const void *in, size_t in_size, void **_out, size_t *_out_size)
+{
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static const device_ops_t ipv4_control_device_ops = {
+    .type    = FILE_TYPE_CHAR,
+    .request = ipv4_control_device_request,
+};
+
+void ipv4_init(void) {
+    device_attr_t attrs[] = {
+        { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = IPV4_CONTROL_DEVICE_CLASS_NAME } },
+    };
+
+    status_t ret = device_create(
+        "ipv4", net_control_device, &ipv4_control_device_ops, NULL, attrs,
+        array_size(attrs), &ipv4_control_device);
+    if (ret != STATUS_SUCCESS)
+        fatal("Failed to create /virtual/net/control/ipv4: %" PRId32, ret);
+
+    device_publish(ipv4_control_device);
 }

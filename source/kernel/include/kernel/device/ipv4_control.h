@@ -16,25 +16,17 @@
 
 /**
  * @file
- * @brief               Network stack core definitions.
+ * @brief               IPv4 control device interface.
  */
 
 #pragma once
 
-#include <types.h>
+#include <kernel/device.h>
+#include <kernel/net/ipv4.h>
 
-struct device;
+__KERNEL_EXTERN_C_BEGIN
 
-/** Name of the network stack module. */
-#define NET_MODULE_NAME     "net"
+/** Network device class name. */
+#define IPV4_CONTROL_DEVICE_CLASS_NAME  "ipv4_control"
 
-/** Endianness conversion functions. */
-#define net16_to_cpu(v)     be16_to_cpu(v)
-#define net32_to_cpu(v)     be32_to_cpu(v)
-#define net64_to_cpu(v)     be64_to_cpu(v)
-#define cpu_to_net16(v)     cpu_to_be16(v)
-#define cpu_to_net32(v)     cpu_to_be32(v)
-#define cpu_to_net64(v)     cpu_to_be64(v)
-
-extern struct device *net_virtual_device;
-extern struct device *net_control_device;
+__KERNEL_EXTERN_C_END
