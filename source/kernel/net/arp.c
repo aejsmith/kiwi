@@ -124,6 +124,26 @@ static status_t send_arp_request(
 }
 
 /**
+ * Removes ARP cache entries corresponding to an interface that is being
+ * removed.
+ */
+void arp_remove_interface(net_interface_t *interface) {
+    MUTEX_SCOPED_LOCK(lock, &arp_cache_lock);
+
+    list_foreach_safe(&arp_cache, iter) {
+        arp_entry_t *entry = list_entry(iter, arp_entry_t, link);
+
+        if (entry->interface_id == interface->id) {
+            /* arp_lookup() will search for the entry again after waking and
+             * see that it has been removed. */
+            condvar_broadcast(&entry->cvar);
+            list_remove(&entry->link);
+            kfree(entry);
+        }
+    }
+}
+
+/**
  * Looks up a destination hardware address for the given destination IP address,
  * either by retrieiving an existing entry from the ARP cache or by performing
  * an ARP request.
@@ -170,7 +190,7 @@ status_t arp_lookup(
 
     status_t ret = STATUS_SUCCESS;
 
-    while (!entry->complete) {
+    while (entry && !entry->complete) {
         nstime_t curr_time = system_time();
 
         /* If the current timeout has passed, we should retry sending a new
@@ -196,19 +216,27 @@ status_t arp_lookup(
         ret = condvar_wait_etc(
             &entry->cvar, &arp_cache_lock, entry->timeout,
             SLEEP_ABSOLUTE | SLEEP_INTERRUPTIBLE);
+
+        /* Check to see if the entry still exists. It may have been removed if
+         * the interface was removed or the entry was manually removed. */
+        entry = NULL;
+        list_foreach(&arp_cache, iter) {
+            arp_entry_t *exist = list_entry(iter, arp_entry_t, link);
+
+            if (exist->interface_id == interface_id && exist->addr.val == dest_addr->val) {
+                entry = exist;
+                break;
+            }
+        }
+
         if (ret == STATUS_TIMED_OUT)
             ret = STATUS_SUCCESS;
         if (ret != STATUS_SUCCESS)
             break;
-
-        // TODO: This will need to handle the entry needing to be removed
-        // after waiting when we implement cache entry removal (from interface
-        // shut down or manual cache manipulation). Will need to have a refcount
-        // on each entry or something.
     }
 
     if (ret == STATUS_SUCCESS) {
-        if (entry->complete) {
+        if (entry && entry->complete) {
             memcpy(_dest_hw_addr, entry->hw_addr, NET_DEVICE_ADDR_MAX);
         } else {
             ret = STATUS_HOST_UNREACHABLE;

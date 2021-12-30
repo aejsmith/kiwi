@@ -25,6 +25,8 @@
 
 #include <mm/malloc.h>
 
+#include <assert.h>
+
 /** Dynamic array structure. */
 typedef struct array {
     void *data;
@@ -59,6 +61,30 @@ static inline void array_clear(array_t *array) {
     kfree(array->data);
     array_init(array);
 }
+
+static inline void *array_insert_impl(array_t *array, size_t size, size_t index) {
+    assert(index <= array->count);
+
+    array->data = krealloc(array->data, size * (array->count + 1), MM_KERNEL);
+
+    size_t offset = size * index;
+    if (index < array->count) {
+        memmove(
+            (uint8_t *)array->data + offset + size,
+            (uint8_t *)array->data + offset,
+            size * (array->count - index));
+    }
+
+    array->count++;
+    return (uint8_t *)array->data + offset;
+}
+
+/** Insert a new array entry at a given position (must be <= count).
+ * @param array         Array to insert into.
+ * @param type          Type of the array entries.
+ * @return              Pointer to new entry. */
+#define array_insert(array, type, index) \
+    ((type *)array_insert_impl((array), sizeof(type), index))
 
 static inline void *array_append_impl(array_t *array, size_t size) {
     size_t offset = size * array->count;

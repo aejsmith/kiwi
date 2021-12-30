@@ -23,7 +23,7 @@
 #include <net/ipv4.h>
 
 /** Supported network address families. */
-static const net_family_t *supported_net_families[] = {
+static const net_family_t *supported_net_families[__AF_COUNT] = {
     [AF_INET] = &ipv4_net_family,
     //[AF_INET6] TODO
 };

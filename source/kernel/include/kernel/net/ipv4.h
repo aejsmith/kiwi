@@ -65,4 +65,8 @@ enum {
     IPPROTO_UDP     = 17,
 };
 
+#define INADDR_ANY          ((in_addr_t)0x00000000)
+#define INADDR_BROADCAST    ((in_addr_t)0xffffffff)
+#define INADDR_NONE         ((in_addr_t)0xffffffff)
+
 __KERNEL_EXTERN_C_END

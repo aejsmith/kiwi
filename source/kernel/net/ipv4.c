@@ -32,6 +32,8 @@
 #include <net/tcp.h>
 #include <net/udp.h>
 
+#include <sync/rwlock.h>
+
 #include <kernel.h>
 #include <status.h>
 
@@ -50,6 +52,130 @@ static device_t *ipv4_control_device;
 /** Next IPv4 packet ID. */
 static atomic_uint16_t next_ipv4_id = 0;
 
+/** IPv4 routing table. */
+static ARRAY_DEFINE(ipv4_route_table);
+static RWLOCK_DEFINE(ipv4_route_lock);
+
+static bool is_netmask_valid(in_addr_t netmask) {
+    netmask = net32_to_cpu(netmask);
+    uint32_t i;
+    for (i = 0; i < 32 && !(netmask & 1); i++)
+        netmask >>= 1;
+    for (; i < 32 && (netmask & 1); i++)
+        netmask >>= 1;
+    return i == 32;
+}
+
+static uint32_t netmask_width(in_addr_t netmask) {
+    if (netmask == 0)
+        return 0;
+    return 32 - __builtin_ctz(net32_to_cpu(netmask));
+}
+
+static bool is_route_equal(const ipv4_route_t *a, const ipv4_route_t *b) {
+    /* Flags are not considered for equality. */
+    return
+        a->addr.val     == b->addr.val &&
+        a->netmask.val  == b->netmask.val &&
+        a->gateway.val  == b->gateway.val &&
+        a->source.val   == b->source.val &&
+        a->interface_id == b->interface_id;
+}
+
+static status_t ipv4_add_route(const ipv4_route_t *route, bool is_auto) {
+    status_t ret;
+
+    /* Can't externally add an AUTO route. */
+    if (!is_auto && route->flags & IPV4_ROUTE_AUTO)
+        return STATUS_INVALID_ARG;
+
+    /* Check netmask validity. */
+    if (!is_netmask_valid(route->netmask.val))
+        return STATUS_INVALID_ARG;
+
+    /* Host bits in the address must be 0. */
+    if (route->addr.val & ~route->netmask.val)
+        return STATUS_INVALID_ARG;
+
+    /* Source address must be on the network. */
+    if ((route->source.val & route->netmask.val) != route->addr.val)
+        return STATUS_INVALID_ARG;
+
+    /* A default route must have a gateway and a zero netmask. */
+    if (route->addr.val == INADDR_ANY && (route->gateway.val == INADDR_ANY || route->netmask.val != 0))
+        return STATUS_INVALID_ARG;
+
+    /* This is already locked for write when adding an automatic route. */
+    if (!is_auto)
+        net_interface_read_lock();
+
+    /* Check that the interface exists. */
+    net_interface_t *interface = net_interface_get(route->interface_id);
+    if (!interface) {
+        ret = STATUS_NET_DOWN;
+        goto out_unlock_interface;
+    }
+
+    rwlock_write_lock(&ipv4_route_lock);
+
+    /* Keep the routing table sorted from most-specific to least-specific. */
+    size_t pos;
+    for (pos = 0; pos < ipv4_route_table.count; pos++) {
+        ipv4_route_t *entry = array_entry(&ipv4_route_table, ipv4_route_t, pos);
+        if (netmask_width(route->netmask.val) > netmask_width(entry->netmask.val))
+            break;
+
+        /* Check if the entries are equal. Note that since we keep the list
+         * sorted, any entries after we break out on the previous test cannot
+         * be equal. */
+        if (is_route_equal(route, entry)) {
+            ret = STATUS_ALREADY_EXISTS;
+            goto out_unlock_route;
+        }
+    }
+
+    /* Add the entry. */
+    ipv4_route_t *entry = array_insert(&ipv4_route_table, ipv4_route_t, pos);
+    memcpy(entry, route, sizeof(*entry));
+
+    dprintf(
+        "ipv4: added route %pI4 netmask %pI4 gateway %pI4 source %pI4 on %pD\n",
+        &entry->addr, &entry->netmask, &entry->gateway, &entry->source,
+        net_device_from_interface(interface)->node);
+
+    ret = STATUS_SUCCESS;
+
+out_unlock_route:
+    rwlock_unlock(&ipv4_route_lock);
+
+out_unlock_interface:
+    if (!is_auto)
+        net_interface_unlock();
+
+    return ret;
+}
+
+static status_t ipv4_remove_route(const ipv4_route_t *route, bool auto_only) {
+    rwlock_write_lock(&ipv4_route_lock);
+
+    status_t ret = STATUS_NOT_FOUND;
+
+    for (size_t i = 0; i < ipv4_route_table.count; i++) {
+        ipv4_route_t *entry = array_entry(&ipv4_route_table, ipv4_route_t, i);
+
+        if (is_route_equal(route, entry)) {
+            if (!auto_only || route->flags & IPV4_ROUTE_AUTO)
+                array_remove(&ipv4_route_table, ipv4_route_t, i);
+
+            ret = STATUS_SUCCESS;
+            break;
+        }
+    }
+
+    rwlock_unlock(&ipv4_route_lock);
+    return ret;
+}
+
 static bool ipv4_interface_addr_valid(const net_interface_addr_t *addr) {
     const uint8_t *addr_bytes = addr->ipv4.addr.bytes;
 
@@ -61,7 +187,11 @@ static bool ipv4_interface_addr_valid(const net_interface_addr_t *addr) {
     if (addr_bytes[0] == 255 && addr_bytes[1] == 255 && addr_bytes[2] == 255 && addr_bytes[3] == 255)
         return false;
 
-    // TODO: Anything more needed here? Netmask validation?
+    /* Validate netmask bits. */
+    if (!is_netmask_valid(addr->ipv4.netmask.val))
+        return false;
+
+    // TODO: Anything more needed here?
     return true;
 }
 
@@ -71,52 +201,93 @@ static bool ipv4_interface_addr_equal(const net_interface_addr_t *a, const net_i
     return a->ipv4.addr.val == b->ipv4.addr.val;
 }
 
-static status_t ipv4_route(net_socket_t *socket, const sockaddr_t *_dest_addr, net_route_t *route) {
-    // TODO: Proper configurable routing table. That routing table should be
-    // based on interface indices with its own separate lock, so we don't need
-    // to deal with the interface list here at all.
+static void ipv4_remove_interface(net_interface_t *interface) {
+    /* Remove ARP cache entries corresponding to this interface. */
+    arp_remove_interface(interface);
 
+    /* Remove any routing table entries for this interface. */
+    rwlock_write_lock(&ipv4_route_lock);
+
+    for (size_t i = 0; i < ipv4_route_table.count; ) {
+        ipv4_route_t *entry = array_entry(&ipv4_route_table, ipv4_route_t, i);
+
+        if (entry->interface_id == interface->id) {
+            array_remove(&ipv4_route_table, ipv4_route_t, i);
+        } else {
+            i++;
+        }
+    }
+
+    rwlock_unlock(&ipv4_route_lock);
+}
+
+static void route_from_interface_addr(
+    net_interface_t *interface, const net_interface_addr_t *addr,
+    ipv4_route_t *route)
+{
+    route->addr.val     = addr->ipv4.addr.val & addr->ipv4.netmask.val;
+    route->netmask.val  = addr->ipv4.netmask.val;
+    route->gateway.val  = INADDR_ANY;
+    route->source.val   = addr->ipv4.addr.val;
+    route->interface_id = interface->id;
+    route->flags        = IPV4_ROUTE_AUTO;
+}
+
+static void ipv4_add_interface_addr(net_interface_t *interface, const net_interface_addr_t *addr) {
+    /* Add a routing table entry for this address. */
+    ipv4_route_t route;
+    route_from_interface_addr(interface, addr, &route);
+
+    status_t ret = ipv4_add_route(&route, true);
+    if (ret != STATUS_SUCCESS) {
+        kprintf(
+            LOG_ERROR, "ipv4: failed to add route for interface address %pI4: %" PRId32,
+            &addr->ipv4.addr, ret);
+    }
+}
+
+static void ipv4_remove_interface_addr(net_interface_t *interface, const net_interface_addr_t *addr) {
+    /* Remove any automatically added entry for this address. It could have
+     * been manually removed so don't worry about failure. */
+    ipv4_route_t route;
+    route_from_interface_addr(interface, addr, &route);
+    ipv4_remove_route(&route, true);
+}
+
+static status_t ipv4_route(net_socket_t *socket, const sockaddr_t *_dest_addr, net_route_t *route) {
     const sockaddr_in_t *dest_addr = (const sockaddr_in_t *)_dest_addr;
 
     route->source_addr.family  = AF_INET;
     route->dest_addr.family    = AF_INET;
     route->gateway_addr.family = AF_INET;
 
-    net_interface_read_lock();
+    rwlock_read_lock(&ipv4_route_lock);
 
-    /* Find a suitable route based on interface addresses. */
+    /* This is sorted most-specific to least specific, so pick the first match. */
     status_t ret = STATUS_NET_UNREACHABLE;
-    list_foreach(&net_interface_list, iter) {
-        net_interface_t *interface = list_entry(iter, net_interface_t, interfaces_link);
+    for (size_t i = 0; i < ipv4_route_table.count; i++) {
+        const ipv4_route_t *entry = array_entry(&ipv4_route_table, ipv4_route_t, i);
 
-        for (size_t i = 0; i < interface->addrs.count; i++) {
-            const net_interface_addr_t *interface_addr = array_entry(&interface->addrs, net_interface_addr_t, i);
+        if ((dest_addr->sin_addr.val & entry->netmask.val) == entry->addr.val) {
+            route->interface_id          = entry->interface_id;
+            route->source_addr.ipv4.val  = entry->source.val;
+            route->dest_addr.ipv4.val    = dest_addr->sin_addr.val;
 
-            if (interface_addr->family == AF_INET) {
-                const in_addr_t dest_net      = dest_addr->sin_addr.val & interface_addr->ipv4.netmask.val;
-                const in_addr_t interface_net = interface_addr->ipv4.addr.val & interface_addr->ipv4.netmask.val;
+            /* If this route has a gateway use that, else use the destination. */
+            route->gateway_addr.ipv4.val = (entry->gateway.val != INADDR_ANY)
+                ? entry->gateway.val
+                : dest_addr->sin_addr.val;
 
-                if (dest_net == interface_net) {
-                    route->interface_id          = interface->id;
-                    route->source_addr.ipv4.val  = interface_addr->ipv4.addr.val;
-                    route->dest_addr.ipv4.val    = dest_addr->sin_addr.val;
-                    route->gateway_addr.ipv4.val = dest_addr->sin_addr.val;
+            dprintf(
+                "ipv4: routing %pI4 to %pI4 netmask %pI4 gateway %pI4 source %pI4\n",
+                &dest_addr->sin_addr, &entry->addr, &entry->netmask, &route->gateway_addr.ipv4, &entry->source);
 
-                    ret = STATUS_SUCCESS;
-                    break;
-                }
-            }
-        }
-
-        if (ret == STATUS_SUCCESS)
+            ret = STATUS_SUCCESS;
             break;
+        }
     }
 
-    if (ret == STATUS_NET_UNREACHABLE) {
-        // TODO: Default route.
-    }
-
-    net_interface_unlock();
+    rwlock_unlock(&ipv4_route_lock);
     return ret;
 }
 
@@ -183,14 +354,17 @@ out_unlock:
 }
 
 const net_family_t ipv4_net_family = {
-    .mtu                  = IPV4_MTU,
-    .interface_addr_len   = sizeof(net_interface_addr_ipv4_t),
-    .socket_addr_len      = sizeof(sockaddr_in_t),
+    .mtu                    = IPV4_MTU,
+    .interface_addr_len     = sizeof(net_interface_addr_ipv4_t),
+    .socket_addr_len        = sizeof(sockaddr_in_t),
 
-    .interface_addr_valid = ipv4_interface_addr_valid,
-    .interface_addr_equal = ipv4_interface_addr_equal,
-    .route                = ipv4_route,
-    .transmit             = ipv4_transmit,
+    .interface_addr_valid   = ipv4_interface_addr_valid,
+    .interface_addr_equal   = ipv4_interface_addr_equal,
+    .remove_interface       = ipv4_remove_interface,
+    .add_interface_addr     = ipv4_add_interface_addr,
+    .remove_interface_addr  = ipv4_remove_interface_addr,
+    .route                  = ipv4_route,
+    .transmit               = ipv4_transmit,
 };
 
 /** Creates an IPv4 socket. */
@@ -321,7 +495,36 @@ static status_t ipv4_control_device_request(
     device_t *device, file_handle_t *handle, unsigned request,
     const void *in, size_t in_size, void **_out, size_t *_out_size)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    status_t ret;
+
+    switch (request) {
+        case IPV4_CONTROL_DEVICE_REQUEST_ADD_ROUTE:
+            if (in_size != sizeof(ipv4_route_t)) {
+                ret = STATUS_INVALID_ARG;
+                break;
+            }
+
+            ret = ipv4_add_route((const ipv4_route_t *)in, false);
+            break;
+
+        case IPV4_CONTROL_DEVICE_REQUEST_REMOVE_ROUTE:
+            if (in_size != sizeof(ipv4_route_t)) {
+                ret = STATUS_INVALID_ARG;
+                break;
+            }
+
+            ret = ipv4_remove_route((const ipv4_route_t *)in, false);
+            break;
+
+        // TODO: If we add a route query, make sure to zero the returned
+        // structure properly.
+
+        default:
+            ret = STATUS_INVALID_REQUEST;
+            break;
+    }
+
+    return ret;
 }
 
 static const device_ops_t ipv4_control_device_ops = {

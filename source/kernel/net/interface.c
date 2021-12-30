@@ -153,6 +153,9 @@ status_t net_interface_add_addr(net_interface_t *interface, const net_interface_
     net_interface_addr_t *entry = array_append(&interface->addrs, net_interface_addr_t);
     memcpy(entry, addr, sizeof(*addr));
 
+    if (family->add_interface_addr)
+        family->add_interface_addr(interface, entry);
+
     ret = STATUS_SUCCESS;
 
 out:
@@ -190,6 +193,9 @@ status_t net_interface_remove_addr(net_interface_t *interface, const net_interfa
         const net_interface_addr_t *entry = array_entry(&interface->addrs, net_interface_addr_t, i);
 
         if (family->interface_addr_equal(entry, addr)) {
+            if (family->remove_interface_addr)
+                family->remove_interface_addr(interface, entry);
+
             array_remove(&interface->addrs, net_interface_addr_t, i);
             ret = STATUS_SUCCESS;
             break;
@@ -268,15 +274,28 @@ status_t net_interface_down(net_interface_t *interface) {
             goto out;
     }
 
-    // TODO: Cancel anything that might be waiting on things coming in from
-    // this interface, e.g. ARP requests? Or just let them time out...
-    // TODO: Remove interface from routing tables, ARP cache, etc.
+    /* For each configured address on this interface, tell the family it is
+     * being removed. */
+    for (size_t i = 0; i < interface->addrs.count; i++) {
+        const net_interface_addr_t *addr = array_entry(&interface->addrs, net_interface_addr_t, i);
+        const net_family_t *family = net_family_get(addr->family);
+        if (family->remove_interface_addr)
+            family->remove_interface_addr(interface, addr);
+    }
+
+    array_clear(&interface->addrs);
+
+    /* Let families clean up any state they might have corresponding to this
+     * interface. */
+    for (size_t i = 0; i < __AF_COUNT; i++) {
+        const net_family_t *family = net_family_get(i);
+        if (family && family->remove_interface)
+            family->remove_interface(interface);
+    }
 
     list_remove(&interface->interfaces_link);
     interface->flags &= ~NET_INTERFACE_UP;
     interface->id = NET_INTERFACE_INVALID_ID;
-
-    array_clear(&interface->addrs);
 
     kprintf(LOG_NOTICE, "net: %pD: interface is down\n", device->node);
     ret = STATUS_SUCCESS;

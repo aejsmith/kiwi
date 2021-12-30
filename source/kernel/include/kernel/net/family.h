@@ -31,5 +31,6 @@ typedef uint16_t sa_family_t;
 #define AF_INET                 1
 #define AF_INET6                2
 #define AF_UNIX                 3
+#define __AF_COUNT              4
 
 __KERNEL_EXTERN_C_END

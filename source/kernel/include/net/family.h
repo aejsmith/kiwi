@@ -25,6 +25,7 @@
 #include <kernel/net/ipv6.h>
 #include <kernel/socket.h>
 
+struct net_interface;
 struct net_packet;
 struct net_route;
 struct net_socket;
@@ -57,11 +58,37 @@ typedef struct net_family {
     /** Socket address length for this family. */
     socklen_t socket_addr_len;
 
-    /** Check if an interface address is valid. */
+    /**
+     * Interface address operations.
+     */
+
+    /** Checks if an interface address is valid. */
     bool (*interface_addr_valid)(const union net_interface_addr *addr);
 
-    /** Check if two network interface addresses are equal. */
+    /** Checks if two network interface addresses are equal. */
     bool (*interface_addr_equal)(const union net_interface_addr *a, const union net_interface_addr *b);
+
+    /**
+     * Interface operations.
+     */
+
+    /** Called when an interface is being removed.
+     * @param interface     Interface being removed. */
+    void (*remove_interface)(struct net_interface *interface);
+
+    /** Called when an address is added to an interface.
+     * @param interface     Interface being added to.
+     * @param addr          Address being added. */
+    void (*add_interface_addr)(struct net_interface *interface, const union net_interface_addr *addr);
+
+    /** Called when an address is removed from an interface.
+     * @param interface     Interface being removed from.
+     * @param addr          Address being removed. */
+    void (*remove_interface_addr)(struct net_interface *interface, const union net_interface_addr *addr);
+
+    /**
+     * Socket operations.
+     */
 
     /** Determines a route for a packet.
      * @param socket        Socket to route for.

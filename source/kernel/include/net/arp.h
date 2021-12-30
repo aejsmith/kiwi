@@ -23,6 +23,7 @@
 
 #include <net/ipv4.h>
 
+struct net_interface;
 struct net_packet;
 
 /** ARP packet structure. */
@@ -47,6 +48,8 @@ typedef struct arp_packet {
 
 #define ARP_OPCODE_REQUEST      1
 #define ARP_OPCODE_REPLY        2
+
+extern void arp_remove_interface(struct net_interface *interface);
 
 extern status_t arp_lookup(
     uint32_t interface_id, const net_addr_ipv4_t *source_addr,
