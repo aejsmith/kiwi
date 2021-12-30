@@ -16,27 +16,29 @@
 
 /**
  * @file
- * @brief               UDP protocol implementation.
+ * @brief               Network route structure.
  */
 
 #pragma once
 
-#include <net/ip.h>
-#include <net/socket.h>
+#include <net/family.h>
 
-struct net_packet;
+/** Structure describing the route for a packet. */
+typedef struct net_route {
+    /** Interface to send the packet on. */
+    uint32_t interface_id;
 
-/** UDP packet header. */
-typedef struct udp_header {
-    uint16_t source_port;
-    uint16_t dest_port;
-    uint16_t length;
-    uint16_t checksum;
-} __packed udp_header_t;
+    /** Source address for the packet (one of the interface's addresses). */
+    net_addr_t source_addr;
 
-/** Maximum UDP packet size (without IP header). */
-#define UDP_MAX_PACKET_SIZE     65535
+    /** Final destination address for the packet. */
+    net_addr_t dest_addr;
 
-extern status_t udp_socket_create(sa_family_t family, socket_t **_socket);
-
-extern void udp_receive(struct net_packet *packet, const net_addr_t *source_addr, const net_addr_t *dest_addr);
+    /**
+     * Gateway address to send the packet to. If the destination is directly
+     * reachable, then this will be the same as the destination address,
+     * otherwise it is the gateway to send the packet to which is responsible
+     * for forwarding the packet to its destination.
+     */
+    net_addr_t gateway_addr;
+} net_route_t;

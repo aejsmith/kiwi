@@ -50,15 +50,15 @@ static inline uint32_t add_checksum(const void *data, size_t size, uint32_t sum)
 }
 
 static uint32_t add_pseudo_checksum(
-    size_t size, uint8_t protocol, const sockaddr_ip_t *source_addr,
-    const sockaddr_ip_t *dest_addr, uint32_t sum)
+    size_t size, uint8_t protocol, const net_addr_t *source_addr,
+    const net_addr_t *dest_addr, uint32_t sum)
 {
     if (source_addr->family == AF_INET6) {
         kprintf(LOG_ERROR, "ip: TODO: IPv6 checksum\n");
     } else {
         ipv4_pseudo_header_t header;
-        header.source_addr = source_addr->ipv4.sin_addr.val;
-        header.dest_addr   = dest_addr->ipv4.sin_addr.val;
+        header.source_addr = source_addr->ipv4.val;
+        header.dest_addr   = dest_addr->ipv4.val;
         header.zero        = 0;
         header.protocol    = protocol;
         header.length      = cpu_to_net16(size);
@@ -156,7 +156,7 @@ uint16_t ip_checksum(const void *data, size_t size) {
  */
 uint16_t ip_checksum_pseudo(
     const void *data, size_t size, uint8_t protocol,
-    const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr)
+    const net_addr_t *source_addr, const net_addr_t *dest_addr)
 {
     uint32_t sum = 0;
 
@@ -181,7 +181,7 @@ uint16_t ip_checksum_pseudo(
  */
 uint16_t ip_checksum_packet_pseudo(
     net_packet_t *packet, uint32_t offset, uint32_t size, uint8_t protocol,
-    const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr)
+    const net_addr_t *source_addr, const net_addr_t *dest_addr)
 {
     uint32_t sum = 0;
 

@@ -25,6 +25,8 @@
 #include <kernel/net/ipv6.h>
 #include <kernel/socket.h>
 
+#include <net/family.h>
+
 struct net_packet;
 
 /** Socket address union supporting both IPv4 and IPv6. */
@@ -45,7 +47,7 @@ extern uint16_t ip_checksum(const void *data, size_t size);
 
 extern uint16_t ip_checksum_pseudo(
     const void *data, size_t size, uint8_t protocol,
-    const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr);
+    const net_addr_t *source_addr, const net_addr_t *dest_addr);
 extern uint16_t ip_checksum_packet_pseudo(
     struct net_packet *packet, uint32_t offset, uint32_t size, uint8_t protocol,
-    const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr);
+    const net_addr_t *source_addr, const net_addr_t *dest_addr);

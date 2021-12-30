@@ -21,12 +21,26 @@
 
 #pragma once
 
-#include <kernel/net/family.h>
+#include <kernel/net/ipv4.h>
+#include <kernel/net/ipv6.h>
 #include <kernel/socket.h>
 
 struct net_packet;
+struct net_route;
 struct net_socket;
 union net_interface_addr;
+
+/**
+ * Single network address structure. This is used where we need a generic space
+ * to store an address of any supported family.
+ */
+typedef struct net_addr {
+    sa_family_t family;
+    union {
+        net_addr_ipv4_t ipv4;
+        net_addr_ipv6_t ipv6;
+    };
+} net_addr_t;
 
 /** Network address family properties/operations. */
 typedef struct net_family {
@@ -49,16 +63,14 @@ typedef struct net_family {
     /** Check if two network interface addresses are equal. */
     bool (*interface_addr_equal)(const union net_interface_addr *a, const union net_interface_addr *b);
 
-    /** Determines a route (interface and source address) for a packet.
+    /** Determines a route for a packet.
      * @param socket        Socket to route for.
-     * @param dest_addr     Destination address (must be valid)
-     * @param _interface_id Where to  return ID of interface to transmit on.
-     * @param _source_addr  Where to return source address (must be sized for
-     *                      the family).
+     * @param dest_addr     Destination address (must be valid).
+     * @param route         Where to store route information.
      * @return              Status code describing result of the operation. */
     status_t (*route)(
         struct net_socket *socket, const sockaddr_t *dest_addr,
-        uint32_t *_interface_id, sockaddr_t *_source_addr);
+        struct net_route *route);
 
     /**
      * Transmits a packet on the socket using the address family. This function
@@ -67,16 +79,13 @@ typedef struct net_family {
      *
      * @param socket        Socket to transmit on.
      * @param packet        Packet to transmit.
-     * @param interface_id  ID of interface to transmit on.
-     * @param source_addr   Source address.
-     * @param dest_addr     Destination address.
+     * @param route         Route for the packet.
      *
      * @return              Status code describing result of the operation.
      */
     status_t (*transmit)(
         struct net_socket *socket, struct net_packet *packet,
-        uint32_t interface_id, const sockaddr_t *source_addr,
-        const sockaddr_t *dest_addr);
+        const struct net_route *route);
 } net_family_t;
 
 extern const net_family_t *net_family_get(sa_family_t id);

@@ -68,18 +68,15 @@ static inline void net_socket_addr_copy(
 
 /** Determines a route (interface and source address) for a packet.
  * @see                 net_family_t::route */
-static inline status_t net_socket_route(
-    net_socket_t *socket, const sockaddr_t *dest_addr, uint32_t *_interface_id,
-    sockaddr_t *_source_addr)
-{
-    return socket->family->route(socket, dest_addr, _interface_id, _source_addr);
+static inline status_t net_socket_route(net_socket_t *socket, const sockaddr_t *dest_addr, struct net_route *route) {
+    return socket->family->route(socket, dest_addr, route);
 }
 
 /** Transmits a packet on the socket using the address family.
  * @see                 net_family_t::transmit */
 static inline status_t net_socket_transmit(
-    net_socket_t *socket, struct net_packet *packet, uint32_t interface_id,
-    const sockaddr_t *source_addr, const sockaddr_t *dest_addr)
+    net_socket_t *socket, struct net_packet *packet,
+    const struct net_route *route)
 {
-    return socket->family->transmit(socket, packet, interface_id, source_addr, dest_addr);
+    return socket->family->transmit(socket, packet, route);
 }

@@ -33,6 +33,7 @@
 #include <net/ipv4.h>
 #include <net/packet.h>
 #include <net/port.h>
+#include <net/route.h>
 #include <net/tcp.h>
 
 #include <sync/condvar.h>
@@ -111,11 +112,7 @@ DEFINE_CLASS_CAST(tcp_socket, net_socket, net);
  * while sending a packet out to the network, it is not a persistent structure.
  */
 typedef struct tcp_tx_packet {
-    /** Route information. */
-    uint32_t interface_id;
-    sockaddr_ip_t source_addr;
-
-    /** Packet allocation. */
+    net_route_t route;
     net_packet_t *packet;
     tcp_header_t *header;
 } tcp_tx_packet_t;
@@ -206,9 +203,7 @@ static status_t prepare_tx_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet)
 
     // TODO: We could cache routes in the socket. Need to have some way to
     // identify when routing might have changed, e.g. a routing table version.
-    ret = net_socket_route(
-        &socket->net, (const sockaddr_t *)&socket->dest_addr,
-        &packet->interface_id, (sockaddr_t *)&packet->source_addr);
+    ret = net_socket_route(&socket->net, (const sockaddr_t *)&socket->dest_addr, &packet->route);
     if (ret != STATUS_SUCCESS)
         return ret;
 
@@ -235,12 +230,10 @@ static status_t tx_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet, bool re
     /* Checksum the packet based on checksum set to 0. */
     assert(packet->header->checksum == 0);
     packet->header->checksum = ip_checksum_packet_pseudo(
-        packet->packet, 0, packet->packet->size, IPPROTO_TCP, &packet->source_addr,
-        &socket->dest_addr);
+        packet->packet, 0, packet->packet->size, IPPROTO_TCP, &packet->route.source_addr,
+        &packet->route.dest_addr);
 
-    status_t ret = net_socket_transmit(
-        &socket->net, packet->packet, packet->interface_id,
-        (sockaddr_t *)&packet->source_addr, (const sockaddr_t *)&socket->dest_addr);
+    status_t ret = net_socket_transmit(&socket->net, packet->packet, &packet->route);
 
     if (release)
         net_packet_release(packet->packet);
@@ -807,7 +800,7 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
 }
 
 /** Handles a received TCP packet. */
-void tcp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr) {
+void tcp_receive(net_packet_t *packet, const net_addr_t *source_addr, const net_addr_t *dest_addr) {
     const tcp_header_t *header = net_packet_data(packet, 0, sizeof(*header));
     if (!header) {
         dprintf("tcp: dropping packet: too short for header\n");

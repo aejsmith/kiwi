@@ -61,4 +61,4 @@ typedef struct tcp_header {
 
 extern status_t tcp_socket_create(sa_family_t family, socket_t **_socket);
 
-extern void tcp_receive(struct net_packet *packet, const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr);
+extern void tcp_receive(struct net_packet *packet, const net_addr_t *source_addr, const net_addr_t *dest_addr);

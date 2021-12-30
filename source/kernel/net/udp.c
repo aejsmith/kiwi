@@ -30,6 +30,7 @@
 #include <net/ipv6.h>
 #include <net/packet.h>
 #include <net/port.h>
+#include <net/route.h>
 #include <net/udp.h>
 
 #include <sync/condvar.h>
@@ -161,9 +162,8 @@ static status_t udp_socket_send(
 
     /* Calculate a route for the packet. */
 // TODO: For sockets bound to a specific address use that source.
-    uint32_t interface_id;
-    sockaddr_ip_t source_addr;
-    ret = net_socket_route(&socket->net, (const sockaddr_t *)dest_addr, &interface_id, (sockaddr_t *)&source_addr);
+    net_route_t route;
+    ret = net_socket_route(&socket->net, (const sockaddr_t *)dest_addr, &route);
     if (ret != STATUS_SUCCESS)
         goto out;
 
@@ -181,13 +181,13 @@ static status_t udp_socket_send(
     header->checksum    = 0;
 
     /* Calculate checksum based on header with checksum initialised to 0. */
-    header->checksum = ip_checksum_pseudo(header, packet_size, IPPROTO_UDP, &source_addr, dest_addr);
+    header->checksum = ip_checksum_pseudo(header, packet_size, IPPROTO_UDP, &route.source_addr, &route.dest_addr);
 
     /* 0 in the header indicates that no checksum has been calculated. */
     if (header->checksum == 0)
         header->checksum = 0xffff;
 
-    ret = net_socket_transmit(&socket->net, packet, interface_id, (sockaddr_t *)&source_addr, (const sockaddr_t *)dest_addr);
+    ret = net_socket_transmit(&socket->net, packet, &route);
     if (ret == STATUS_SUCCESS)
         request->transferred += request->total;
 
@@ -256,7 +256,7 @@ status_t udp_socket_create(sa_family_t family, socket_t **_socket) {
 }
 
 /** Handles a received UDP packet. */
-void udp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const sockaddr_ip_t *dest_addr) {
+void udp_receive(net_packet_t *packet, const net_addr_t *source_addr, const net_addr_t *dest_addr) {
     const udp_header_t *header = net_packet_data(packet, 0, sizeof(*header));
     if (!header) {
         dprintf("udp: dropping packet: too short for header\n");
@@ -301,7 +301,16 @@ void udp_receive(net_packet_t *packet, const sockaddr_ip_t *source_addr, const s
         // directly without copying.
         udp_rx_packet_t *rx = kmalloc(sizeof(*rx) + data_size, MM_KERNEL);
 
-        memcpy(&rx->source_addr, source_addr, sizeof(rx->source_addr));
+        /* This is copied directly to userspace, make sure it's clear. */
+        memset(&rx->source_addr, 0, sizeof(rx->source_addr));
+
+        if (source_addr->family == AF_INET6) {
+            rx->source_addr.ipv6.sin6_addr.val.high = source_addr->ipv6.val.high;
+            rx->source_addr.ipv6.sin6_addr.val.low  = source_addr->ipv6.val.low;
+        } else {
+            rx->source_addr.ipv4.sin_addr.val = source_addr->ipv4.val;
+        }
+
         rx->source_addr.port = header->source_port;
         rx->size             = data_size;
 

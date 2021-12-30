@@ -27,6 +27,7 @@
 #include <net/ip.h>
 #include <net/ipv4.h>
 #include <net/packet.h>
+#include <net/route.h>
 #include <net/socket.h>
 #include <net/tcp.h>
 #include <net/udp.h>
@@ -70,19 +71,16 @@ static bool ipv4_interface_addr_equal(const net_interface_addr_t *a, const net_i
     return a->ipv4.addr.val == b->ipv4.addr.val;
 }
 
-static status_t ipv4_route(
-    net_socket_t *socket, const sockaddr_t *_dest_addr, uint32_t *_interface_id,
-    sockaddr_t *_source_addr)
-{
+static status_t ipv4_route(net_socket_t *socket, const sockaddr_t *_dest_addr, net_route_t *route) {
     // TODO: Proper configurable routing table. That routing table should be
     // based on interface indices with its own separate lock, so we don't need
     // to deal with the interface list here at all.
 
     const sockaddr_in_t *dest_addr = (const sockaddr_in_t *)_dest_addr;
-    sockaddr_in_t *source_addr     = (sockaddr_in_t *)_source_addr;
 
-    source_addr->sin_family = AF_INET;
-    source_addr->sin_port   = 0;
+    route->source_addr.family  = AF_INET;
+    route->dest_addr.family    = AF_INET;
+    route->gateway_addr.family = AF_INET;
 
     net_interface_read_lock();
 
@@ -99,9 +97,11 @@ static status_t ipv4_route(
                 const in_addr_t interface_net = interface_addr->ipv4.addr.val & interface_addr->ipv4.netmask.val;
 
                 if (dest_net == interface_net) {
-                    source_addr->sin_addr.val = interface_addr->ipv4.addr.val;
+                    route->interface_id          = interface->id;
+                    route->source_addr.ipv4.val  = interface_addr->ipv4.addr.val;
+                    route->dest_addr.ipv4.val    = dest_addr->sin_addr.val;
+                    route->gateway_addr.ipv4.val = dest_addr->sin_addr.val;
 
-                    *_interface_id = interface->id;
                     ret = STATUS_SUCCESS;
                     break;
                 }
@@ -120,28 +120,25 @@ static status_t ipv4_route(
     return ret;
 }
 
-static status_t ipv4_transmit(
-    net_socket_t *socket, net_packet_t *packet, uint32_t interface_id,
-    const sockaddr_t *_source_addr, const sockaddr_t *_dest_addr)
-{
+static status_t ipv4_transmit(net_socket_t *socket, net_packet_t *packet, const net_route_t *route) {
     status_t ret;
 
     if (packet->size > IPV4_MTU)
         return STATUS_MSG_TOO_LONG;
 
-    const sockaddr_in_t *dest_addr   = (const sockaddr_in_t *)_dest_addr;
-    const sockaddr_in_t *source_addr = (const sockaddr_in_t *)_source_addr;
+    const net_addr_ipv4_t *source_addr  = &route->source_addr.ipv4;
+    const net_addr_ipv4_t *dest_addr    = &route->dest_addr.ipv4;
+    const net_addr_ipv4_t *gateway_addr = &route->gateway_addr.ipv4;
 
     /* Find our destination hardware address. */
-    // TODO: Use gateway IP for default route.
     uint8_t dest_hw_addr[NET_DEVICE_ADDR_MAX];
-    ret = arp_lookup(interface_id, &source_addr->sin_addr, &dest_addr->sin_addr, dest_hw_addr);
+    ret = arp_lookup(route->interface_id, source_addr, gateway_addr, dest_hw_addr);
     if (ret != STATUS_SUCCESS)
         return ret;
 
     net_interface_read_lock();
 
-    net_interface_t *interface = net_interface_get(interface_id);
+    net_interface_t *interface = net_interface_get(route->interface_id);
     if (!interface) {
         ret = STATUS_NET_DOWN;
         goto out_unlock;
@@ -170,8 +167,8 @@ static status_t ipv4_transmit(
     header->ttl               = 64;
     header->protocol          = socket->protocol;
     header->checksum          = 0;
-    header->source_addr       = source_addr->sin_addr.val;
-    header->dest_addr         = dest_addr->sin_addr.val;
+    header->source_addr       = source_addr->val;
+    header->dest_addr         = dest_addr->val;
 
     /* Calculate checksum based on header with checksum initialised to 0. */
     header->checksum = ip_checksum(header, sizeof(*header));
@@ -298,15 +295,13 @@ void ipv4_receive(net_interface_t *interface, net_packet_t *packet) {
      * for the protocol. */
     uint16_t data_size = total_size - header_size;
     if (data_size > 0) {
-        sockaddr_ip_t source_addr;
-        memset(&source_addr, 0, sizeof(source_addr));
-        source_addr.ipv4.sin_family   = AF_INET;
-        source_addr.ipv4.sin_addr.val = header->source_addr;
+        net_addr_t source_addr;
+        source_addr.family   = AF_INET;
+        source_addr.ipv4.val = header->source_addr;
 
-        sockaddr_ip_t dest_addr;
-        memset(&dest_addr, 0, sizeof(dest_addr));
-        dest_addr.ipv4.sin_family     = AF_INET;
-        dest_addr.ipv4.sin_addr.val   = header->dest_addr;
+        net_addr_t dest_addr;
+        dest_addr.family     = AF_INET;
+        dest_addr.ipv4.val   = header->dest_addr;
 
         net_packet_subset(packet, header_size, data_size);
 
