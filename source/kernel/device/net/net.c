@@ -24,6 +24,8 @@
 
 #include <device/net/net.h>
 
+#include <net/family.h>
+
 #include <device/class.h>
 
 #include <lib/string.h>
@@ -56,12 +58,12 @@ static status_t copy_net_interface_addr(const void *in, size_t in_size, net_inte
     if (in_size < sizeof(sa_family_t))
         return STATUS_INVALID_ARG;
 
-    addr->family = *(const sa_family_t *)in;
+    sa_family_t id = *(const sa_family_t *)in;
 
-    const net_addr_ops_t *ops = net_addr_ops(addr);
-    if (!ops) {
+    const net_family_t *family = net_family_get(id);
+    if (!family) {
         return STATUS_ADDR_NOT_SUPPORTED;
-    } else if (in_size != ops->len) {
+    } else if (in_size != family->interface_addr_len) {
         return STATUS_INVALID_ARG;
     }
 

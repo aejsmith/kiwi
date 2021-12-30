@@ -24,6 +24,7 @@ mod_env.Module('net', [
 
     'arp.c',
     'ethernet.c',
+    'family.c',
     'interface.c',
     'ip.c',
     'ipv4.c',

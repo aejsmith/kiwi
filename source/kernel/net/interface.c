@@ -48,26 +48,10 @@ LIST_DEFINE(net_interface_list);
 /** Next active interface ID. */
 static uint32_t next_interface_id = 0;
 
-/** Supported network address operations, indexed by family. */
-static const net_addr_ops_t *supported_net_addr_ops[] = {
-    [AF_INET] = &ipv4_net_addr_ops,
-    //[AF_INET6] TODO
-};
-
 /** Supported network link operations, indexed by device type. */
 static const net_link_ops_t *supported_net_link_ops[] = {
     [NET_DEVICE_ETHERNET] = &ethernet_net_link_ops,
 };
-
-/** Get operations for handling a network interface address.
- * @param addr          Address to get for.
- * @return              Operations for the address, or NULL if family is not
- *                      supported. */
-const net_addr_ops_t *net_addr_ops(const net_interface_addr_t *addr) {
-    return (addr->family < array_size(supported_net_addr_ops))
-        ? supported_net_addr_ops[addr->family]
-        : NULL;
-}
 
 /**
  * Takes the global network interface lock for reading. This is a global
@@ -148,11 +132,11 @@ status_t net_interface_add_addr(net_interface_t *interface, const net_interface_
         goto out;
     }
 
-    const net_addr_ops_t *ops = net_addr_ops(addr);
-    if (!ops) {
+    const net_family_t *family = net_family_get(addr->family);
+    if (!family) {
         ret = STATUS_ADDR_NOT_SUPPORTED;
         goto out;
-    } else if (!ops->valid(addr)) {
+    } else if (!family->interface_addr_valid(addr)) {
         ret = STATUS_INVALID_ARG;
         goto out;
     }
@@ -160,7 +144,7 @@ status_t net_interface_add_addr(net_interface_t *interface, const net_interface_
     /* Check if this already exists. */
     for (size_t i = 0; i < interface->addrs.count; i++) {
         const net_interface_addr_t *entry = array_entry(&interface->addrs, net_interface_addr_t, i);
-        if (ops->equal(entry, addr)) {
+        if (family->interface_addr_equal(entry, addr)) {
             ret = STATUS_ALREADY_EXISTS;
             goto out;
         }
@@ -191,11 +175,11 @@ status_t net_interface_remove_addr(net_interface_t *interface, const net_interfa
         goto out;
     }
 
-    const net_addr_ops_t *ops = net_addr_ops(addr);
-    if (!ops) {
+    const net_family_t *family = net_family_get(addr->family);
+    if (!family) {
         ret = STATUS_ADDR_NOT_SUPPORTED;
         goto out;
-    } else if (!ops->valid(addr)) {
+    } else if (!family->interface_addr_valid(addr)) {
         ret = STATUS_INVALID_ARG;
         goto out;
     }
@@ -205,7 +189,7 @@ status_t net_interface_remove_addr(net_interface_t *interface, const net_interfa
     for (size_t i = 0; i < interface->addrs.count; i++) {
         const net_interface_addr_t *entry = array_entry(&interface->addrs, net_interface_addr_t, i);
 
-        if (ops->equal(entry, addr)) {
+        if (family->interface_addr_equal(entry, addr)) {
             array_remove(&interface->addrs, net_interface_addr_t, i);
             ret = STATUS_SUCCESS;
             break;

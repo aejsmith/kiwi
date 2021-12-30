@@ -64,7 +64,7 @@ typedef struct ipv4_pseudo_header {
 #define IPV4_MAX_PACKET_SIZE            65535
 #define IPV4_MTU                        65515
 
-extern const net_addr_ops_t ipv4_net_addr_ops;
+extern const net_family_t ipv4_net_family;
 
 extern status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t **_socket);
 

@@ -49,7 +49,7 @@ static device_t *ipv4_control_device;
 /** Next IPv4 packet ID. */
 static atomic_uint16_t next_ipv4_id = 0;
 
-static bool ipv4_net_addr_valid(const net_interface_addr_t *addr) {
+static bool ipv4_interface_addr_valid(const net_interface_addr_t *addr) {
     const uint8_t *addr_bytes = addr->ipv4.addr.bytes;
 
     /* 0.0.0.0/8 is invalid as a host address. */
@@ -64,17 +64,11 @@ static bool ipv4_net_addr_valid(const net_interface_addr_t *addr) {
     return true;
 }
 
-static bool ipv4_net_addr_equal(const net_interface_addr_t *a, const net_interface_addr_t *b) {
+static bool ipv4_interface_addr_equal(const net_interface_addr_t *a, const net_interface_addr_t *b) {
     /* For equality testing interface addresses we only look at the address
      * itself, not netmask/broadcast. */
     return a->ipv4.addr.val == b->ipv4.addr.val;
 }
-
-const net_addr_ops_t ipv4_net_addr_ops = {
-    .len   = sizeof(net_interface_addr_ipv4_t),
-    .valid = ipv4_net_addr_valid,
-    .equal = ipv4_net_addr_equal,
-};
 
 static status_t ipv4_route(
     net_socket_t *socket, const sockaddr_t *_dest_addr, uint32_t *_interface_id,
@@ -191,12 +185,15 @@ out_unlock:
     return ret;
 }
 
-static const net_family_ops_t ipv4_net_family_ops = {
-    .mtu      = IPV4_MTU,
-    .addr_len = sizeof(sockaddr_in_t),
+const net_family_t ipv4_net_family = {
+    .mtu                  = IPV4_MTU,
+    .interface_addr_len   = sizeof(net_interface_addr_ipv4_t),
+    .socket_addr_len      = sizeof(sockaddr_in_t),
 
-    .route    = ipv4_route,
-    .transmit = ipv4_transmit,
+    .interface_addr_valid = ipv4_interface_addr_valid,
+    .interface_addr_equal = ipv4_interface_addr_equal,
+    .route                = ipv4_route,
+    .transmit             = ipv4_transmit,
 };
 
 /** Creates an IPv4 socket. */
@@ -230,7 +227,7 @@ status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t
         return ret;
 
     net_socket_t *socket = cast_net_socket(*_socket);
-    socket->family_ops = &ipv4_net_family_ops;
+    socket->family = &ipv4_net_family;
     return STATUS_SUCCESS;
 }
 

@@ -279,7 +279,7 @@ static void flush_tx_buffer(tcp_socket_t *socket) {
 
     /* Calculate maximum segment size. */
     // TODO: This can be negotiated using MSS option.
-    uint32_t mtu = socket->net.family_ops->mtu;
+    uint32_t mtu = socket->net.family->mtu;
     // TODO: HACK: We don't implement fragmentation yet so sending larger than
     // device MTU will fail, but we don't have a device yet as we haven't
     // routed. Even once we implement fragmentation, it would be better to get

@@ -146,7 +146,7 @@ static status_t udp_socket_send(
 
     /* Check packet size. */
     size_t packet_size = sizeof(udp_header_t) + request->total;
-    if (packet_size > UDP_MAX_PACKET_SIZE || packet_size > socket->net.family_ops->mtu)
+    if (packet_size > UDP_MAX_PACKET_SIZE || packet_size > socket->net.family->mtu)
         return STATUS_MSG_TOO_LONG;
 
     udp_header_t *header;

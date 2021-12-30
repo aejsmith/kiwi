@@ -45,19 +45,6 @@ typedef union net_interface_addr {
     net_interface_addr_ipv6_t ipv6;     /**< AF_INET6. */
 } net_interface_addr_t;
 
-/** Operations for handling network interface addresses. */
-typedef struct net_addr_ops {
-    size_t len;                         /**< Length of the address structure. */
-
-    /** Check if an interface address is valid. */
-    bool (*valid)(const net_interface_addr_t *addr);
-
-    /** Check if two network interface addresses are equal. */
-    bool (*equal)(const net_interface_addr_t *a, const net_interface_addr_t *b);
-} net_addr_ops_t;
-
-extern const net_addr_ops_t *net_addr_ops(const net_interface_addr_t *addr);
-
 /** Network link operations. */
 typedef struct net_link_ops {
     /** Broadcast link-layer address for the link type. */
