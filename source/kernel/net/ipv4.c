@@ -49,7 +49,7 @@ static device_t *ipv4_control_device;
 /** Next IPv4 packet ID. */
 static atomic_uint16_t next_ipv4_id = 0;
 
-static bool ipv4_net_addr_valid(const net_addr_t *addr) {
+static bool ipv4_net_addr_valid(const net_interface_addr_t *addr) {
     const uint8_t *addr_bytes = addr->ipv4.addr.bytes;
 
     /* 0.0.0.0/8 is invalid as a host address. */
@@ -64,14 +64,14 @@ static bool ipv4_net_addr_valid(const net_addr_t *addr) {
     return true;
 }
 
-static bool ipv4_net_addr_equal(const net_addr_t *a, const net_addr_t *b) {
+static bool ipv4_net_addr_equal(const net_interface_addr_t *a, const net_interface_addr_t *b) {
     /* For equality testing interface addresses we only look at the address
      * itself, not netmask/broadcast. */
     return a->ipv4.addr.val == b->ipv4.addr.val;
 }
 
 const net_addr_ops_t ipv4_net_addr_ops = {
-    .len   = sizeof(net_addr_ipv4_t),
+    .len   = sizeof(net_interface_addr_ipv4_t),
     .valid = ipv4_net_addr_valid,
     .equal = ipv4_net_addr_equal,
 };
@@ -98,7 +98,7 @@ static status_t ipv4_route(
         net_interface_t *interface = list_entry(iter, net_interface_t, interfaces_link);
 
         for (size_t i = 0; i < interface->addrs.count; i++) {
-            const net_addr_t *interface_addr = array_entry(&interface->addrs, net_addr_t, i);
+            const net_interface_addr_t *interface_addr = array_entry(&interface->addrs, net_interface_addr_t, i);
 
             if (interface_addr->family == AF_INET) {
                 const in_addr_t dest_net      = dest_addr->sin_addr.val & interface_addr->ipv4.netmask.val;
@@ -280,7 +280,7 @@ void ipv4_receive(net_interface_t *interface, net_packet_t *packet) {
     /* Check whether this packet is destined for us. */
     bool found_addr = false;
     for (size_t i = 0; i < interface->addrs.count && !found_addr; i++) {
-        const net_addr_t *interface_addr = array_entry(&interface->addrs, net_addr_t, i);
+        const net_interface_addr_t *interface_addr = array_entry(&interface->addrs, net_interface_addr_t, i);
 
         if (interface_addr->family == AF_INET) {
             found_addr =

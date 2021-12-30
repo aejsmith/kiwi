@@ -42,13 +42,13 @@ static void net_device_destroy_impl(device_t *node) {
     fatal("TODO");
 }
 
-/** Copy and validate a net_addr_t according to its family. */
-static status_t copy_net_addr(const void *in, size_t in_size, net_addr_t *addr) {
+/** Copy and validate a net_interface_addr_t according to its family. */
+static status_t copy_net_interface_addr(const void *in, size_t in_size, net_interface_addr_t *addr) {
     /*
-     * The net_addr_t structure is a kernel-internal union of all supported
-     * address families. The request supplies a structure specific to the
-     * address family. We first need to check the family to see what the size
-     * should be for that family.
+     * The net_interface_addr_t structure is a kernel-internal union of all
+     * supported address families. The request supplies a structure specific to
+     * the address family. We first need to check the family to see what the
+     * size should be for that family.
      */
 
     memset(addr, 0, sizeof(*addr));
@@ -87,16 +87,16 @@ static status_t net_device_request(
             break;
         }
         case NET_DEVICE_REQUEST_ADD_ADDR: {
-            net_addr_t addr;
-            ret = copy_net_addr(in, in_size, &addr);
+            net_interface_addr_t addr;
+            ret = copy_net_interface_addr(in, in_size, &addr);
             if (ret == STATUS_SUCCESS)
                 ret = net_interface_add_addr(&device->interface, &addr);
 
             break;
         }
         case NET_DEVICE_REQUEST_REMOVE_ADDR: {
-            net_addr_t addr;
-            ret = copy_net_addr(in, in_size, &addr);
+            net_interface_addr_t addr;
+            ret = copy_net_interface_addr(in, in_size, &addr);
             if (ret == STATUS_SUCCESS)
                 ret = net_interface_remove_addr(&device->interface, &addr);
 

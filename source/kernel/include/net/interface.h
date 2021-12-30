@@ -39,24 +39,24 @@ struct net_packet;
  * adding new families with different (possibly larger) address structures,
  * without breaking ABI compatibility.
  */
-typedef union net_addr {
+typedef union net_interface_addr {
     sa_family_t family;                 /**< Address family this is for. */
-    net_addr_ipv4_t ipv4;               /**< AF_INET. */
-    net_addr_ipv6_t ipv6;               /**< AF_INET6. */
-} net_addr_t;
+    net_interface_addr_ipv4_t ipv4;     /**< AF_INET. */
+    net_interface_addr_ipv6_t ipv6;     /**< AF_INET6. */
+} net_interface_addr_t;
 
 /** Operations for handling network interface addresses. */
 typedef struct net_addr_ops {
     size_t len;                         /**< Length of the address structure. */
 
     /** Check if an interface address is valid. */
-    bool (*valid)(const net_addr_t *addr);
+    bool (*valid)(const net_interface_addr_t *addr);
 
     /** Check if two network interface addresses are equal. */
-    bool (*equal)(const net_addr_t *a, const net_addr_t *b);
+    bool (*equal)(const net_interface_addr_t *a, const net_interface_addr_t *b);
 } net_addr_ops_t;
 
-extern const net_addr_ops_t *net_addr_ops(const net_addr_t *addr);
+extern const net_addr_ops_t *net_addr_ops(const net_interface_addr_t *addr);
 
 /** Network link operations. */
 typedef struct net_link_ops {
@@ -120,8 +120,8 @@ extern status_t net_interface_transmit(
     net_interface_t *interface, struct net_packet *packet,
     const uint8_t *dest_addr);
 
-extern status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *addr);
-extern status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t *addr);
+extern status_t net_interface_add_addr(net_interface_t *interface, const net_interface_addr_t *addr);
+extern status_t net_interface_remove_addr(net_interface_t *interface, const net_interface_addr_t *addr);
 
 extern status_t net_interface_up(net_interface_t *interface);
 extern status_t net_interface_down(net_interface_t *interface);

@@ -47,12 +47,12 @@ typedef struct sockaddr_in {
 } sockaddr_in_t;
 
 /** IPv4 network interface address specification. */
-typedef struct net_addr_ipv4 {
+typedef struct net_interface_addr_ipv4 {
     sa_family_t family;                 /**< AF_INET. */
     ipv4_addr_t addr;                   /**< Address of interface. */
     ipv4_addr_t netmask;                /**< Mask for address. */
     ipv4_addr_t broadcast;              /**< Broadcast address. */
-} net_addr_ipv4_t;
+} net_interface_addr_ipv4_t;
 
 /**
  * Standard IP protocol numbers from

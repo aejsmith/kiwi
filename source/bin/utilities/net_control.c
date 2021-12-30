@@ -122,7 +122,7 @@ static bool command_add_addr(int argc, char **argv) {
     if (!open_net_device(path))
         return false;
 
-    net_addr_ipv4_t addr = {};
+    net_interface_addr_ipv4_t addr = {};
     addr.family = AF_INET;
 
     if (!parse_ipv4_address(argv[1], &addr.addr) || !parse_ipv4_address(argv[2], &addr.netmask))
@@ -152,7 +152,7 @@ static bool command_remove_addr(int argc, char **argv) {
     if (!open_net_device(path))
         return false;
 
-    net_addr_ipv4_t addr = {};
+    net_interface_addr_ipv4_t addr = {};
     addr.family = AF_INET;
 
     if (!parse_ipv4_address(argv[1], &addr.addr) || !parse_ipv4_address(argv[2], &addr.netmask))

@@ -63,7 +63,7 @@ static const net_link_ops_t *supported_net_link_ops[] = {
  * @param addr          Address to get for.
  * @return              Operations for the address, or NULL if family is not
  *                      supported. */
-const net_addr_ops_t *net_addr_ops(const net_addr_t *addr) {
+const net_addr_ops_t *net_addr_ops(const net_interface_addr_t *addr) {
     return (addr->family < array_size(supported_net_addr_ops))
         ? supported_net_addr_ops[addr->family]
         : NULL;
@@ -137,7 +137,7 @@ net_interface_t *net_interface_get(uint32_t id) {
  * @param interface     Interface to add to.
  * @param addr          Address to add.
  * @return              Status code describing the result of the operation. */
-status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *addr) {
+status_t net_interface_add_addr(net_interface_t *interface, const net_interface_addr_t *addr) {
     status_t ret;
 
     net_interface_write_lock();
@@ -159,14 +159,14 @@ status_t net_interface_add_addr(net_interface_t *interface, const net_addr_t *ad
 
     /* Check if this already exists. */
     for (size_t i = 0; i < interface->addrs.count; i++) {
-        const net_addr_t *entry = array_entry(&interface->addrs, net_addr_t, i);
+        const net_interface_addr_t *entry = array_entry(&interface->addrs, net_interface_addr_t, i);
         if (ops->equal(entry, addr)) {
             ret = STATUS_ALREADY_EXISTS;
             goto out;
         }
     }
 
-    net_addr_t *entry = array_append(&interface->addrs, net_addr_t);
+    net_interface_addr_t *entry = array_append(&interface->addrs, net_interface_addr_t);
     memcpy(entry, addr, sizeof(*addr));
 
     ret = STATUS_SUCCESS;
@@ -180,7 +180,7 @@ out:
  * @param interface     Interface to remove from.
  * @param addr          Address to remove.
  * @return              Status code describing the result of the operation. */
-status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t *addr) {
+status_t net_interface_remove_addr(net_interface_t *interface, const net_interface_addr_t *addr) {
     status_t ret;
 
     net_interface_write_lock();
@@ -203,10 +203,10 @@ status_t net_interface_remove_addr(net_interface_t *interface, const net_addr_t 
     ret = STATUS_NOT_FOUND;
 
     for (size_t i = 0; i < interface->addrs.count; i++) {
-        const net_addr_t *entry = array_entry(&interface->addrs, net_addr_t, i);
+        const net_interface_addr_t *entry = array_entry(&interface->addrs, net_interface_addr_t, i);
 
         if (ops->equal(entry, addr)) {
-            array_remove(&interface->addrs, net_addr_t, i);
+            array_remove(&interface->addrs, net_interface_addr_t, i);
             ret = STATUS_SUCCESS;
             break;
         }

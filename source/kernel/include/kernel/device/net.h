@@ -47,9 +47,9 @@ enum {
     /**
      * Adds an address to the network interface.
      *
-     * Input:               A net_addr_*_t structure corresponding to the
-     *                      address family to add an address for. The size and
-     *                      content of this is determined from the 'family'
+     * Input:               A net_interface_addr_*_t structure corresponding to
+     *                      the address family to add an address for. The size
+     *                      and content of this is determined from the 'family'
      *                      member at the start of the structure.
      *
      * Errors:              STATUS_ALREADY_EXISTS if the address already exists
@@ -63,10 +63,10 @@ enum {
     /**
      * Removes an address from the network interface.
      *
-     * Input:               A net_addr_*_t structure corresponding to the
-     *                      address family to remove an address for. The size
-     *                      and content of this is determined from the 'family'
-     *                      member at the start of the structure.
+     * Input:               A net_interface_addr_*_t structure corresponding to
+     *                      the address family to remove an address for. The
+     *                      size and content of this is determined from the
+     *                      'family' member at the start of the structure.
      *
      * Errors:              STATUS_NOT_FOUND if the address does not exist on
      *                      the interface.

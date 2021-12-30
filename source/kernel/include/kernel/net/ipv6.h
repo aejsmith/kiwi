@@ -49,9 +49,9 @@ typedef struct sockaddr_in6 {
 } sockaddr_in6_t;
 
 /** IPv6 network interface address specification. */
-typedef struct net_addr_ipv6 {
+typedef struct net_interface_addr_ipv6 {
     sa_family_t family;                 /**< AF_INET6. */
     // TODO
-} net_addr_ipv6_t;
+} net_interface_addr_ipv6_t;
 
 __KERNEL_EXTERN_C_END
