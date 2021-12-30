@@ -53,7 +53,7 @@ typedef struct arp_entry {
     uint32_t interface_id;          /**< Interface ID that this entry is for. */
 
     /** Destination IP address and resolved HW address. */
-    ipv4_addr_t addr;
+    net_addr_ipv4_t addr;
     uint8_t hw_addr[NET_DEVICE_ADDR_MAX];
 
     condvar_t cvar;                 /**< Condition variable to wait for completion. */
@@ -81,8 +81,8 @@ static uint16_t arp_hw_type(net_device_type_t type) {
 }
 
 static status_t send_arp_request(
-    uint32_t interface_id, const ipv4_addr_t *source_addr,
-    const ipv4_addr_t *dest_addr)
+    uint32_t interface_id, const net_addr_ipv4_t *source_addr,
+    const net_addr_ipv4_t *dest_addr)
 {
     net_interface_read_lock();
 
@@ -137,8 +137,8 @@ static status_t send_arp_request(
  * @return              Status code describing the result of the operation.
  */
 status_t arp_lookup(
-    uint32_t interface_id, const ipv4_addr_t *source_addr,
-    const ipv4_addr_t *dest_addr, uint8_t *_dest_hw_addr)
+    uint32_t interface_id, const net_addr_ipv4_t *source_addr,
+    const net_addr_ipv4_t *dest_addr, uint8_t *_dest_hw_addr)
 {
     MUTEX_SCOPED_LOCK(lock, &arp_cache_lock);
 
@@ -218,7 +218,7 @@ status_t arp_lookup(
     return ret;
 }
 
-static void handle_arp_reply(net_device_t *device, const ipv4_addr_t *addr, const uint8_t *hw_addr) {
+static void handle_arp_reply(net_device_t *device, const net_addr_ipv4_t *addr, const uint8_t *hw_addr) {
     MUTEX_SCOPED_LOCK(lock, &arp_cache_lock);
 
     list_foreach(&arp_cache, iter) {
@@ -266,11 +266,11 @@ void arp_receive(net_interface_t *interface, net_packet_t *packet) {
 
     const uint8_t *hw_sender = addrs;
     addrs += device->hw_addr_len;
-    const ipv4_addr_t *proto_sender = (const ipv4_addr_t *)addrs;
+    const net_addr_ipv4_t *proto_sender = (const net_addr_ipv4_t *)addrs;
     addrs += IPV4_ADDR_LEN;
     const uint8_t *hw_target = addrs;
     addrs += device->hw_addr_len;
-    const ipv4_addr_t *proto_target = (const ipv4_addr_t *)addrs;
+    const net_addr_ipv4_t *proto_target = (const net_addr_ipv4_t *)addrs;
 
     dprintf(
         "arp: received packet 0x%" PRIx16 " (hw_sender: %pM, proto_sender, %pI4, hw_target: %pM, proto_target: %pI4)\n",

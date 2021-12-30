@@ -49,7 +49,7 @@ typedef struct arp_packet {
 #define ARP_OPCODE_REPLY        2
 
 extern status_t arp_lookup(
-    uint32_t interface_id, const ipv4_addr_t *source_addr,
-    const ipv4_addr_t *dest_addr, uint8_t *_dest_hw_addr);
+    uint32_t interface_id, const net_addr_ipv4_t *source_addr,
+    const net_addr_ipv4_t *dest_addr, uint8_t *_dest_hw_addr);
 
 extern void arp_receive(net_interface_t *interface, struct net_packet *packet);

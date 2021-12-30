@@ -57,7 +57,7 @@ static bool open_net_device(const char *path) {
     return true;
 }
 
-static bool parse_ipv4_address(const char *str, ipv4_addr_t *addr) {
+static bool parse_ipv4_address(const char *str, net_addr_ipv4_t *addr) {
     uint32_t vals[4];
     int pos = 0;
     int ret = sscanf(str, "%u.%u.%u.%u%n", &vals[0], &vals[1], &vals[2], &vals[3], &pos);
