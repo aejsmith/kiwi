@@ -84,6 +84,18 @@ status_t net_device_from_handle(handle_t handle, net_device_t **_device) {
     return STATUS_SUCCESS;
 }
 
+/** Gets the network interface ID.
+ * @see                 NET_DEVICE_REQUEST_INTERFACE_ID
+ * @param device        Device to get ID for.
+ * @param _interface_id Where to store network interface ID.
+ * @return              Status code describing the result of the operation. */
+status_t net_device_interface_id(net_device_t *device, uint32_t *_interface_id) {
+    if (device->dev_class != DEVICE_CLASS_NET)
+        return STATUS_INCORRECT_TYPE;
+
+    return kern_file_request(device->handle, NET_DEVICE_REQUEST_INTERFACE_ID, NULL, 0, _interface_id, sizeof(*_interface_id), NULL);
+}
+
 /** Brings up the network interface.
  * @see                 NET_DEVICE_REQUEST_UP
  * @param device        Device to bring up.

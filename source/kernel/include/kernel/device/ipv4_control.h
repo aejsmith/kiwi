@@ -60,7 +60,7 @@ typedef struct ipv4_route {
     net_addr_ipv4_t netmask;        /**< Network mask for address. */
     net_addr_ipv4_t gateway;        /**< Gateway address to use, or INADDR_ANY for direct route. */
     net_addr_ipv4_t source;         /**< Source address to use for this route. */
-    uint32_t interface_id;          /**< Interface ID (NET_DEVICE_REQUEST_GET_INTERFACE_ID). */
+    uint32_t interface_id;          /**< Interface ID (NET_DEVICE_REQUEST_INTERFACE_ID). */
     uint32_t flags;                 /**< Route flags (IPV4_ROUTE_*).. */
 } ipv4_route_t;
 

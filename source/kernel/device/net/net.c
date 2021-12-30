@@ -35,13 +35,33 @@
 
 static device_class_t net_device_class;
 
-/** Clean up all data associated with a network device. */
 static void net_device_destroy_impl(device_t *node) {
     net_device_t *device = node->private;
 
     // TODO. Call device destroy function.
     (void)device;
     fatal("TODO");
+}
+
+static status_t request_interface_id(net_device_t *device, void **_out, size_t *_out_size) {
+    status_t ret;
+
+    net_interface_read_lock();
+
+    if (device->interface.flags & NET_INTERFACE_UP) {
+        uint32_t *id = kmalloc(sizeof(*id), MM_KERNEL);
+        *id = device->interface.id;
+
+        *_out      = id;
+        *_out_size = sizeof(*id);
+
+        ret = STATUS_SUCCESS;
+    } else {
+        ret = STATUS_NET_DOWN;
+    }
+
+    net_interface_unlock();
+    return ret;
 }
 
 /** Copy and validate a net_interface_addr_t according to its family. */
@@ -71,6 +91,24 @@ static status_t copy_net_interface_addr(const void *in, size_t in_size, net_inte
     return STATUS_SUCCESS;
 }
 
+static status_t request_add_addr(net_device_t *device, const void *in, size_t in_size) {
+    net_interface_addr_t addr;
+    status_t ret = copy_net_interface_addr(in, in_size, &addr);
+    if (ret == STATUS_SUCCESS)
+        ret = net_interface_add_addr(&device->interface, &addr);
+
+    return ret;
+}
+
+static status_t request_remove_addr(net_device_t *device, const void *in, size_t in_size) {
+    net_interface_addr_t addr;
+    status_t ret = copy_net_interface_addr(in, in_size, &addr);
+    if (ret == STATUS_SUCCESS)
+        ret = net_interface_remove_addr(&device->interface, &addr);
+
+    return ret;
+}
+
 /** Handler for network device-specific requests. */
 static status_t net_device_request(
     device_t *node, file_handle_t *handle, unsigned request,
@@ -80,30 +118,26 @@ static status_t net_device_request(
     status_t ret;
 
     switch (request) {
-        case NET_DEVICE_REQUEST_UP: {
+        case NET_DEVICE_REQUEST_UP:
             ret = net_interface_up(&device->interface);
             break;
-        }
-        case NET_DEVICE_REQUEST_DOWN: {
+
+        case NET_DEVICE_REQUEST_DOWN:
             ret = net_interface_down(&device->interface);
             break;
-        }
-        case NET_DEVICE_REQUEST_ADD_ADDR: {
-            net_interface_addr_t addr;
-            ret = copy_net_interface_addr(in, in_size, &addr);
-            if (ret == STATUS_SUCCESS)
-                ret = net_interface_add_addr(&device->interface, &addr);
 
+        case NET_DEVICE_REQUEST_INTERFACE_ID:
+            ret = request_interface_id(device, _out, _out_size);
             break;
-        }
-        case NET_DEVICE_REQUEST_REMOVE_ADDR: {
-            net_interface_addr_t addr;
-            ret = copy_net_interface_addr(in, in_size, &addr);
-            if (ret == STATUS_SUCCESS)
-                ret = net_interface_remove_addr(&device->interface, &addr);
 
+        case NET_DEVICE_REQUEST_ADD_ADDR:
+            ret = request_add_addr(device, in, in_size);
             break;
-        }
+
+        case NET_DEVICE_REQUEST_REMOVE_ADDR:
+            ret = request_remove_addr(device, in, in_size);
+            break;
+
         default: {
             ret = STATUS_INVALID_REQUEST;
             break;

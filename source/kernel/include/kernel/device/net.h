@@ -45,6 +45,16 @@ enum {
     NET_DEVICE_REQUEST_DOWN         = DEVICE_CLASS_REQUEST_START + 1,
 
     /**
+     * Gets the network interface ID. This is an ID that is set each time the
+     * interface is brought up and is unique for the lifetime of the system.
+     *
+     * Output:              Network interface ID (uint32_t).
+     *
+     * Errors:              STATUS_NET_DOWN if the interface is down.
+     */
+    NET_DEVICE_REQUEST_INTERFACE_ID = DEVICE_CLASS_REQUEST_START + 2,
+
+    /**
      * Adds an address to the network interface.
      *
      * Input:               A net_interface_addr_*_t structure corresponding to
@@ -58,7 +68,7 @@ enum {
      *                      not supported.
      *                      STATUS_NET_DOWN if the interface is down.
      */
-    NET_DEVICE_REQUEST_ADD_ADDR     = DEVICE_CLASS_REQUEST_START + 2,
+    NET_DEVICE_REQUEST_ADD_ADDR     = DEVICE_CLASS_REQUEST_START + 3,
 
     /**
      * Removes an address from the network interface.
@@ -74,7 +84,7 @@ enum {
      *                      not supported.
      *                      STATUS_NET_DOWN if the interface is down.
      */
-    NET_DEVICE_REQUEST_REMOVE_ADDR  = DEVICE_CLASS_REQUEST_START + 3,
+    NET_DEVICE_REQUEST_REMOVE_ADDR  = DEVICE_CLASS_REQUEST_START + 4,
 };
 
 __KERNEL_EXTERN_C_END
