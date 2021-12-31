@@ -201,9 +201,9 @@ static bool ipv4_interface_addr_equal(const net_interface_addr_t *a, const net_i
     return a->ipv4.addr.val == b->ipv4.addr.val;
 }
 
-static void ipv4_remove_interface(net_interface_t *interface) {
+static void ipv4_interface_remove(net_interface_t *interface) {
     /* Remove ARP cache entries corresponding to this interface. */
-    arp_remove_interface(interface);
+    arp_interface_remove(interface);
 
     /* Remove any routing table entries for this interface. */
     rwlock_write_lock(&ipv4_route_lock);
@@ -233,7 +233,7 @@ static void route_from_interface_addr(
     route->flags        = IPV4_ROUTE_AUTO;
 }
 
-static void ipv4_add_interface_addr(net_interface_t *interface, const net_interface_addr_t *addr) {
+static void ipv4_interface_add_addr(net_interface_t *interface, const net_interface_addr_t *addr) {
     /* Add a routing table entry for this address. */
     ipv4_route_t route;
     route_from_interface_addr(interface, addr, &route);
@@ -246,7 +246,7 @@ static void ipv4_add_interface_addr(net_interface_t *interface, const net_interf
     }
 }
 
-static void ipv4_remove_interface_addr(net_interface_t *interface, const net_interface_addr_t *addr) {
+static void ipv4_interface_remove_addr(net_interface_t *interface, const net_interface_addr_t *addr) {
     /* Remove any automatically added entry for this address. It could have
      * been manually removed so don't worry about failure. */
     ipv4_route_t route;
@@ -254,7 +254,7 @@ static void ipv4_remove_interface_addr(net_interface_t *interface, const net_int
     ipv4_remove_route(&route, true);
 }
 
-static status_t ipv4_route(net_socket_t *socket, const sockaddr_t *_dest_addr, net_route_t *route) {
+static status_t ipv4_socket_route(net_socket_t *socket, const sockaddr_t *_dest_addr, net_route_t *route) {
     const sockaddr_in_t *dest_addr = (const sockaddr_in_t *)_dest_addr;
 
     route->source_addr.family  = AF_INET;
@@ -291,7 +291,7 @@ static status_t ipv4_route(net_socket_t *socket, const sockaddr_t *_dest_addr, n
     return ret;
 }
 
-static status_t ipv4_transmit(net_socket_t *socket, net_packet_t *packet, const net_route_t *route) {
+static status_t ipv4_socket_transmit(net_socket_t *socket, net_packet_t *packet, const net_route_t *route) {
     status_t ret;
 
     if (packet->size > IPV4_MTU)
@@ -360,11 +360,13 @@ const net_family_t ipv4_net_family = {
 
     .interface_addr_valid   = ipv4_interface_addr_valid,
     .interface_addr_equal   = ipv4_interface_addr_equal,
-    .remove_interface       = ipv4_remove_interface,
-    .add_interface_addr     = ipv4_add_interface_addr,
-    .remove_interface_addr  = ipv4_remove_interface_addr,
-    .route                  = ipv4_route,
-    .transmit               = ipv4_transmit,
+
+    .interface_remove       = ipv4_interface_remove,
+    .interface_add_addr     = ipv4_interface_add_addr,
+    .interface_remove_addr  = ipv4_interface_remove_addr,
+
+    .socket_route           = ipv4_socket_route,
+    .socket_transmit        = ipv4_socket_transmit,
 };
 
 /** Creates an IPv4 socket. */

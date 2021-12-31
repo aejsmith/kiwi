@@ -153,8 +153,8 @@ status_t net_interface_add_addr(net_interface_t *interface, const net_interface_
     net_interface_addr_t *entry = array_append(&interface->addrs, net_interface_addr_t);
     memcpy(entry, addr, sizeof(*addr));
 
-    if (family->add_interface_addr)
-        family->add_interface_addr(interface, entry);
+    if (family->interface_add_addr)
+        family->interface_add_addr(interface, entry);
 
     ret = STATUS_SUCCESS;
 
@@ -193,8 +193,8 @@ status_t net_interface_remove_addr(net_interface_t *interface, const net_interfa
         const net_interface_addr_t *entry = array_entry(&interface->addrs, net_interface_addr_t, i);
 
         if (family->interface_addr_equal(entry, addr)) {
-            if (family->remove_interface_addr)
-                family->remove_interface_addr(interface, entry);
+            if (family->interface_remove_addr)
+                family->interface_remove_addr(interface, entry);
 
             array_remove(&interface->addrs, net_interface_addr_t, i);
             ret = STATUS_SUCCESS;
@@ -279,8 +279,8 @@ status_t net_interface_down(net_interface_t *interface) {
     for (size_t i = 0; i < interface->addrs.count; i++) {
         const net_interface_addr_t *addr = array_entry(&interface->addrs, net_interface_addr_t, i);
         const net_family_t *family = net_family_get(addr->family);
-        if (family->remove_interface_addr)
-            family->remove_interface_addr(interface, addr);
+        if (family->interface_remove_addr)
+            family->interface_remove_addr(interface, addr);
     }
 
     array_clear(&interface->addrs);
@@ -289,8 +289,8 @@ status_t net_interface_down(net_interface_t *interface) {
      * interface. */
     for (size_t i = 0; i < __AF_COUNT; i++) {
         const net_family_t *family = net_family_get(i);
-        if (family && family->remove_interface)
-            family->remove_interface(interface);
+        if (family && family->interface_remove)
+            family->interface_remove(interface);
     }
 
     list_remove(&interface->interfaces_link);

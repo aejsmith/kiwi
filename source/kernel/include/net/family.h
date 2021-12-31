@@ -74,17 +74,17 @@ typedef struct net_family {
 
     /** Called when an interface is being removed.
      * @param interface     Interface being removed. */
-    void (*remove_interface)(struct net_interface *interface);
+    void (*interface_remove)(struct net_interface *interface);
 
     /** Called when an address is added to an interface.
      * @param interface     Interface being added to.
      * @param addr          Address being added. */
-    void (*add_interface_addr)(struct net_interface *interface, const union net_interface_addr *addr);
+    void (*interface_add_addr)(struct net_interface *interface, const union net_interface_addr *addr);
 
     /** Called when an address is removed from an interface.
      * @param interface     Interface being removed from.
      * @param addr          Address being removed. */
-    void (*remove_interface_addr)(struct net_interface *interface, const union net_interface_addr *addr);
+    void (*interface_remove_addr)(struct net_interface *interface, const union net_interface_addr *addr);
 
     /**
      * Socket operations.
@@ -95,7 +95,7 @@ typedef struct net_family {
      * @param dest_addr     Destination address (must be valid).
      * @param route         Where to store route information.
      * @return              Status code describing result of the operation. */
-    status_t (*route)(
+    status_t (*socket_route)(
         struct net_socket *socket, const sockaddr_t *dest_addr,
         struct net_route *route);
 
@@ -110,7 +110,7 @@ typedef struct net_family {
      *
      * @return              Status code describing result of the operation.
      */
-    status_t (*transmit)(
+    status_t (*socket_transmit)(
         struct net_socket *socket, struct net_packet *packet,
         const struct net_route *route);
 } net_family_t;

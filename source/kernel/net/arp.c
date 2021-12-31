@@ -127,7 +127,7 @@ static status_t send_arp_request(
  * Removes ARP cache entries corresponding to an interface that is being
  * removed.
  */
-void arp_remove_interface(net_interface_t *interface) {
+void arp_interface_remove(net_interface_t *interface) {
     MUTEX_SCOPED_LOCK(lock, &arp_cache_lock);
 
     list_foreach_safe(&arp_cache, iter) {
