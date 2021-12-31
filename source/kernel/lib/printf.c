@@ -198,6 +198,9 @@ static void print_ipv4_addr(printf_state_t *state, const uint8_t *addr) {
     state->base  = 10;
     state->flags = 0;
 
+    long width = state->width;
+    long start = state->total;
+
     for (unsigned i = 0; i < 4; i++) {
         state->width = -1;
         state->precision = 1;
@@ -205,11 +208,18 @@ static void print_ipv4_addr(printf_state_t *state, const uint8_t *addr) {
         if (i != 3)
             print_char(state, '.');
     }
+
+    long remaining = width - (state->total - start);
+    while (--remaining >= 0)
+        print_char(state, ' ');
 }
 
 static void print_ipv6_addr(printf_state_t *state, const uint8_t *addr) {
     state->base  = 16;
     state->flags = PRINTF_LOW_CASE;
+
+    long width = state->width;
+    long start = state->total;
 
     for (unsigned i = 0; i < 8; i++) {
         state->width = -1;
@@ -221,11 +231,18 @@ static void print_ipv6_addr(printf_state_t *state, const uint8_t *addr) {
         if (i != 7)
             print_char(state, ':');
     }
+
+    long remaining = width - (state->total - start);
+    while (--remaining >= 0)
+        print_char(state, ' ');
 }
 
 static void print_mac_addr(printf_state_t *state, const uint8_t *addr) {
     state->base  = 16;
     state->flags = PRINTF_ZERO_PAD | PRINTF_LOW_CASE;
+
+    long width = state->width;
+    long start = state->total;
 
     for (unsigned i = 0; i < 6; i++) {
         state->width = 2;
@@ -234,6 +251,10 @@ static void print_mac_addr(printf_state_t *state, const uint8_t *addr) {
         if (i != 5)
             print_char(state, ':');
     }
+
+    long remaining = width - (state->total - start);
+    while (--remaining >= 0)
+        print_char(state, ' ');
 }
 
 static void print_uuid(printf_state_t *state, const uint8_t *uuid, bool big_endian) {

@@ -34,6 +34,7 @@
 
 #include <sync/rwlock.h>
 
+#include <kdb.h>
 #include <kernel.h>
 #include <status.h>
 
@@ -534,6 +535,29 @@ static const device_ops_t ipv4_control_device_ops = {
     .request = ipv4_control_device_request,
 };
 
+static kdb_status_t kdb_cmd_ipv4_route(int argc, char **argv, kdb_filter_t *filter) {
+    if (kdb_help(argc, argv)) {
+        kdb_printf("Usage: %s\n\n", argv[0]);
+
+        kdb_printf("Shows the IPv4 routing table.\n");
+        return KDB_SUCCESS;
+    }
+
+    kdb_printf("Address         Netmask         Gateway         Source          Flags  Interface\n");
+    kdb_printf("=======         =======         =======         ======          =====  =========\n");
+
+    for (size_t i = 0; i < ipv4_route_table.count; i++) {
+        const ipv4_route_t *entry = array_entry(&ipv4_route_table, ipv4_route_t, i);
+
+        kdb_printf(
+            "%-15pI4 %-15pI4 %-15pI4 %-15pI4 0x%-4" PRIx32 " %" PRIu32 "\n",
+            &entry->addr, &entry->netmask, &entry->gateway, &entry->source,
+            entry->flags, entry->interface_id);
+    }
+
+    return KDB_SUCCESS;
+}
+
 void ipv4_init(void) {
     device_attr_t attrs[] = {
         { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = IPV4_CONTROL_DEVICE_CLASS_NAME } },
@@ -546,4 +570,6 @@ void ipv4_init(void) {
         fatal("Failed to create /virtual/net/control/ipv4: %" PRId32, ret);
 
     device_publish(ipv4_control_device);
+
+    kdb_register_command("ipv4_route", "Show the IPv4 routing table.", kdb_cmd_ipv4_route);
 }
