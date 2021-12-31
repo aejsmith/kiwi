@@ -31,6 +31,7 @@
 #include <sync/condvar.h>
 #include <sync/mutex.h>
 
+#include <kdb.h>
 #include <status.h>
 #include <time.h>
 
@@ -257,6 +258,8 @@ static void handle_arp_reply(net_device_t *device, const net_addr_ipv4_t *addr, 
 
             memcpy(entry->hw_addr, hw_addr, device->hw_addr_len);
             entry->complete = true;
+            entry->retries  = 0;
+
             condvar_broadcast(&entry->cvar);
             break;
         }
@@ -316,4 +319,31 @@ void arp_receive(net_interface_t *interface, net_packet_t *packet) {
             dprintf("arp: dropping packet: unknown opcode\n");
             break;
     }
+}
+
+static kdb_status_t kdb_cmd_arp(int argc, char **argv, kdb_filter_t *filter) {
+    if (kdb_help(argc, argv)) {
+        kdb_printf("Usage: %s\n\n", argv[0]);
+
+        kdb_printf("Shows the ARP cache.\n");
+        return KDB_SUCCESS;
+    }
+
+    kdb_printf("IP address      MAC address       Interface Complete Retries\n");
+    kdb_printf("==========      ===========       ========= ======== =======\n");
+
+    list_foreach(&arp_cache, iter) {
+        arp_entry_t *entry = list_entry(iter, arp_entry_t, link);
+
+        kdb_printf(
+            "%-15pI4 %-17pM %-9" PRIu32 " %-8s %" PRIu8 "\n",
+            &entry->addr, entry->hw_addr, entry->interface_id,
+            (entry->complete) ? "Y" : "N", entry->retries);
+    }
+
+    return KDB_SUCCESS;
+}
+
+void arp_init(void) {
+    kdb_register_command("arp", "Show the ARP cache.", kdb_cmd_arp);
 }

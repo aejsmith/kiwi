@@ -56,3 +56,5 @@ extern status_t arp_lookup(
     const net_addr_ipv4_t *dest_addr, uint8_t *_dest_hw_addr);
 
 extern void arp_receive(net_interface_t *interface, struct net_packet *packet);
+
+extern void arp_init(void);
