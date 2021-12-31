@@ -34,6 +34,7 @@
 #include <net/packet.h>
 
 #include <assert.h>
+#include <kdb.h>
 #include <status.h>
 
 /** Network interface lock (see net_interface_read_lock()). */
@@ -371,4 +372,94 @@ void net_interface_init(net_interface_t *interface) {
     interface->id       = NET_INTERFACE_INVALID_ID;
     interface->flags    = 0;
     interface->link_ops = NULL;
+}
+
+static kdb_status_t kdb_cmd_net_interface(int argc, char **argv, kdb_filter_t *filter) {
+    if (kdb_help(argc, argv)) {
+        kdb_printf("Usage: %s [<interface ID>]\n\n", argv[0]);
+
+        kdb_printf("Shows a list of all network interfaces, or detailed information about a\n");
+        kdb_printf("specific interface.\n");
+        return KDB_SUCCESS;
+    } else if (argc != 1 && argc != 2) {
+        kdb_printf("Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
+        return KDB_FAILURE;
+    }
+
+    if (argc == 2) {
+        uint64_t id;
+        if (kdb_parse_expression(argv[1], &id, NULL) != KDB_SUCCESS)
+            return KDB_FAILURE;
+
+        net_interface_t *interface = net_interface_get(id);
+        if (!interface) {
+            kdb_printf("Invalid interface ID.\n");
+            return KDB_FAILURE;
+        }
+
+        net_device_t *device = net_device_from_interface(interface);
+
+        kdb_printf("Interface %" PRIu32 " \"%pD\"\n", interface->id, device->node);
+        kdb_printf("=================================================\n");
+
+        kdb_printf("Flags:         ");
+    
+        if (interface->flags & NET_INTERFACE_UP) kdb_printf("UP ");
+
+        kdb_printf("\n");
+
+        kdb_printf("Type:          ");
+
+        switch (device->type) {
+            case NET_DEVICE_ETHERNET:   kdb_printf("Ethernet\n"); break;
+            default:                    kdb_printf("Unknown\n"); break;
+        }
+
+        kdb_printf("HW address:    %pM (len: %" PRIu8 ")\n", device->hw_addr, device->hw_addr_len);
+        kdb_printf("MTU:           %" PRIu32 "\n", device->mtu);
+        kdb_printf("Addresses:\n");
+
+        for (size_t i = 0; i < interface->addrs.count; i++) {
+            const net_interface_addr_t *addr = array_entry(&interface->addrs, net_interface_addr_t, i);
+
+            switch (addr->family) {
+                case AF_INET:
+                    kdb_printf("  %zu - IPv4:\n", i);
+                    kdb_printf("    Address:   %pI4\n", &addr->ipv4.addr);
+                    kdb_printf("    Netmask:   %pI4\n", &addr->ipv4.netmask);
+                    kdb_printf("    Broadcast: %pI4\n", &addr->ipv4.broadcast);
+                    break;
+
+                default:
+                    kdb_printf("  %zu - Unknown\n", i);
+                    break;
+
+            }
+        }
+    } else {
+        kdb_printf("ID   Flags HW address        Device\n");
+        kdb_printf("==   ===== ==========        ======\n");
+
+        list_foreach(&net_interface_list, iter) {
+            net_interface_t *interface = list_entry(iter, net_interface_t, interfaces_link);
+            net_device_t *device = net_device_from_interface(interface);
+
+            char flags[5];
+            size_t flag_count = 0;
+
+            if (interface->flags & NET_INTERFACE_UP) flags[flag_count++] = 'U';
+
+            flags[flag_count] = 0;
+
+            kdb_printf(
+                "%-4" PRIu32 " %-5s %-17pM %pD\n",
+                interface->id, flags, device->hw_addr, device->node);
+        }
+    }
+
+    return KDB_SUCCESS;
+}
+
+void net_interface_kdb_init(void) {
+    kdb_register_command("net_interface", "Show network interface information.", kdb_cmd_net_interface);
 }

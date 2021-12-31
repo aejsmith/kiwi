@@ -28,6 +28,7 @@
 
 #include <sync/spinlock.h>
 
+#include <kdb.h>
 #include <module.h>
 #include <types.h>
 
@@ -185,13 +186,23 @@ static void print_symbol(printf_state_t *state, void *ptr, char ext) {
 static char device_printf_buf[DEVICE_PATH_MAX];
 static SPINLOCK_DEFINE(device_printf_lock);
 
-static void print_device_path(printf_state_t *state, device_t *device) {
-    spinlock_lock(&device_printf_lock);
+/**
+ * Separate buffer for KDB to avoid potentially stamping on a use of the
+ * normal buffer that was in progress when KDB was entered.
+ */
+static char kdb_device_printf_buf[DEVICE_PATH_MAX];
 
-    char *path = device_path_inplace(device, device_printf_buf);
+static void print_device_path(printf_state_t *state, device_t *device) {
+    bool in_kdb = atomic_load(&kdb_running) > 0;
+
+    if (!in_kdb)
+        spinlock_lock(&device_printf_lock);
+
+    char *path = device_path_inplace(device, (in_kdb) ? kdb_device_printf_buf : device_printf_buf);
     state->total += do_printf(state->helper, state->data, "%s", path);
 
-    spinlock_unlock(&device_printf_lock);
+    if (!in_kdb)
+        spinlock_unlock(&device_printf_lock);
 }
 
 static void print_ipv4_addr(printf_state_t *state, const uint8_t *addr) {

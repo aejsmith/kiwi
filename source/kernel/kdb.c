@@ -957,12 +957,12 @@ static kdb_status_t kdb_cmd_help(int argc, char **argv, kdb_filter_t *filter) {
         return perform_call(&call, NULL, NULL);
     }
 
-    kdb_printf("Command       Description\n");
-    kdb_printf("=======       ===========\n");
+    kdb_printf("Command         Description\n");
+    kdb_printf("=======         ===========\n");
 
     list_foreach(&kdb_commands, iter) {
         kdb_command_desc_t *cmd = list_entry(iter, kdb_command_desc_t, header);
-        kdb_printf("%-12s  %s\n", cmd->name, cmd->description);
+        kdb_printf("%-15s %s\n", cmd->name, cmd->description);
     }
 
     kdb_printf("\nFor help on a specific command, type \"help <command>\".\n");

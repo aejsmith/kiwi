@@ -46,6 +46,7 @@ static status_t net_init(void) {
 
     net_packet_cache_init();
     net_device_class_init();
+    net_interface_kdb_init();
 
     ret = device_create_dir("net", device_virtual_dir, &net_virtual_device);
     if (ret != STATUS_SUCCESS)

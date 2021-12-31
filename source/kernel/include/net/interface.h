@@ -114,3 +114,5 @@ extern status_t net_interface_up(net_interface_t *interface);
 extern status_t net_interface_down(net_interface_t *interface);
 
 extern void net_interface_init(net_interface_t *interface);
+
+extern void net_interface_kdb_init(void);
