@@ -172,14 +172,19 @@ static void i8042_keyboard_irq(unsigned num, void *data) {
             controller->extended = 0;
         }
 
+        bool send_ralt_f1_up = false;
+
         /* RAlt + F* - debugging hooks to go into KDB, etc. */
         if (key == INPUT_KEY_RIGHT_ALT)
             controller->ralt_down = type == INPUT_EVENT_KEY_DOWN;
-        if (controller->ralt_down) {
+        if (controller->ralt_down && type == INPUT_EVENT_KEY_DOWN) {
             switch (key) {
                 case INPUT_KEY_F1:
                     /* F1 - Enter KDB. */
                     kdb_enter(KDB_REASON_USER, NULL);
+
+                    /* See below. */
+                    send_ralt_f1_up = true;
                     break;
                 case INPUT_KEY_F2:
                     /* F2 - Call fatal(). */
@@ -203,6 +208,20 @@ static void i8042_keyboard_irq(unsigned num, void *data) {
             event.value = key;
 
             input_device_event(&controller->keyboard.input, &event);
+
+            /* Entering KDB will eat the release of RAlt and F1 once it starts
+             * taking input, so send them manually to stop userspace getting
+             * confused. */
+            if (send_ralt_f1_up) {
+                event.type  = INPUT_EVENT_KEY_UP;
+                event.value = INPUT_KEY_F1;
+
+                input_device_event(&controller->keyboard.input, &event);
+
+                event.value = INPUT_KEY_RIGHT_ALT;
+
+                input_device_event(&controller->keyboard.input, &event);
+            }
         }
     }
 }
