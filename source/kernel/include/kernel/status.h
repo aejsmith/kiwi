@@ -60,29 +60,30 @@
 #define STATUS_IN_USE               35  /**< Object is in use. */
 #define STATUS_DEVICE_ERROR         36  /**< An error occurred during a hardware operation. */
 #define STATUS_STILL_RUNNING        37  /**< Process/thread is still running. */
-#define STATUS_UNKNOWN_IMAGE        38  /**< Executable image has an unrecognised format. */
-#define STATUS_MALFORMED_IMAGE      39  /**< Executable image format is incorrect. */
-#define STATUS_MISSING_LIBRARY      40  /**< Required library not found. */
-#define STATUS_MISSING_SYMBOL       41  /**< Referenced symbol not found. */
-#define STATUS_TRY_AGAIN            42  /**< Attempt the operation again. */
-#define STATUS_DIFFERENT_FS         43  /**< Link source and destination on different FS. */
-#define STATUS_IS_DIR               44  /**< Not a directory. */
-#define STATUS_CONN_HUNGUP          45  /**< Connection was hung up. */
-#define STATUS_CANCELLED            46  /**< Operation was cancelled. */
-#define STATUS_INCORRECT_TYPE       47  /**< Object is not of the correct type. */
-#define STATUS_PIPE_CLOSED          48  /**< Read end of pipe has been closed. */
-#define STATUS_NET_DOWN             49  /**< Network is down. */
-#define STATUS_ADDR_NOT_SUPPORTED   50  /**< Address family is not supported. */
-#define STATUS_PROTO_NOT_SUPPORTED  51  /**< Protocol is not supported. */
-#define STATUS_MSG_TOO_LONG         52  /**< Socket message is too long. */
-#define STATUS_DEST_ADDR_REQUIRED   53  /**< Destination address is required. */
-#define STATUS_NET_UNREACHABLE      54  /**< Network is unreachable. */
-#define STATUS_HOST_UNREACHABLE     55  /**< No route to host. */
-#define STATUS_IN_PROGRESS          56  /**< Operation is in progress. */
-#define STATUS_ALREADY_IN_PROGRESS  57  /**< Operation is already in progress. */
-#define STATUS_ALREADY_CONNECTED    58  /**< Socket is already connected. */
-#define STATUS_CONNECTION_REFUSED   59  /**< Destination refused the connection. */
-#define STATUS_NOT_CONNECTED        60  /**< Socket is not connected. */
+#define STATUS_NOT_RUNNING          38  /**< Process/thread is not running. */
+#define STATUS_UNKNOWN_IMAGE        39  /**< Executable image has an unrecognised format. */
+#define STATUS_MALFORMED_IMAGE      40  /**< Executable image format is incorrect. */
+#define STATUS_MISSING_LIBRARY      41  /**< Required library not found. */
+#define STATUS_MISSING_SYMBOL       42  /**< Referenced symbol not found. */
+#define STATUS_TRY_AGAIN            43  /**< Attempt the operation again. */
+#define STATUS_DIFFERENT_FS         44  /**< Link source and destination on different FS. */
+#define STATUS_IS_DIR               45  /**< Path refers to a directory. */
+#define STATUS_CONN_HUNGUP          46  /**< Connection was hung up. */
+#define STATUS_CANCELLED            47  /**< Operation was cancelled. */
+#define STATUS_INCORRECT_TYPE       48  /**< Object is not of the correct type. */
+#define STATUS_PIPE_CLOSED          49  /**< Read end of pipe has been closed. */
+#define STATUS_NET_DOWN             50  /**< Network is down. */
+#define STATUS_ADDR_NOT_SUPPORTED   51  /**< Address family is not supported. */
+#define STATUS_PROTO_NOT_SUPPORTED  52  /**< Protocol is not supported. */
+#define STATUS_MSG_TOO_LONG         53  /**< Socket message is too long. */
+#define STATUS_DEST_ADDR_REQUIRED   54  /**< Destination address is required. */
+#define STATUS_NET_UNREACHABLE      55  /**< Network is unreachable. */
+#define STATUS_HOST_UNREACHABLE     56  /**< No route to host. */
+#define STATUS_IN_PROGRESS          57  /**< Operation is in progress. */
+#define STATUS_ALREADY_IN_PROGRESS  58  /**< Operation is already in progress. */
+#define STATUS_ALREADY_CONNECTED    59  /**< Socket is already connected. */
+#define STATUS_CONNECTION_REFUSED   60  /**< Destination refused the connection. */
+#define STATUS_NOT_CONNECTED        61  /**< Socket is not connected. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 

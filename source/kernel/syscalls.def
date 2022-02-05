@@ -113,6 +113,11 @@ syscall kern_process_set_exception_handler(uint, ptr_t);
 syscall kern_process_exit(int);
 syscall kern_process_control(uint, ptr_t, ptr_t) hidden;
 
+syscall kern_process_group_create(uint32_t, ptr_t);
+syscall kern_process_group_add(handle_t, handle_t);
+syscall kern_process_group_remove(handle_t, handle_t);
+syscall kern_process_group_query(handle_t, handle_t);
+
 syscall kern_thread_create(ptr_t, ptr_t, ptr_t, ptr_t, uint32_t, ptr_t) wrapped;
 syscall kern_thread_open(thread_id_t, ptr_t);
 syscall kern_thread_id(handle_t, ptr_t) wrapped;

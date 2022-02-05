@@ -90,6 +90,7 @@ typedef struct process {
     avl_tree_node_t tree_link;          /**< Link to process tree. */
     process_id_t id;                    /**< ID of the process. */
     char *name;                         /**< Name of the process. */
+    list_t groups;                      /**< Group memberships (process_group_link_t). */
     notifier_t death_notifier;          /**< Notifier for process death. */
     int status;                         /**< Exit status. */
     int reason;                         /**< Exit reason. */
@@ -97,11 +98,16 @@ typedef struct process {
 } process_t;
 
 /** Process flag definitions. */
-#define PROCESS_CRITICAL        (1<<0)  /**< Process is critical to system operation, cannot die. */
+enum {
+    PROCESS_CRITICAL        = (1<<0),   /**< Process is critical to system operation, cannot die. */
+};
 
 /** Internal priority classes. */
-#define PRIORITY_CLASS_SYSTEM   3       /**< Used for the kernel process. */
-#define PRIORITY_CLASS_MAX      3
+enum {
+    PRIORITY_CLASS_SYSTEM   = 3,        /**< Used for the kernel process. */
+
+    PRIORITY_CLASS_MAX      = 3
+};
 
 /** Macro that expands to a pointer to the current process. */
 #define curr_proc               (curr_thread->owner)

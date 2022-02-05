@@ -35,37 +35,46 @@ struct thread_context;
 #define INVALID_HANDLE          (-1)
 
 /** Object type ID definitions. */
-#define OBJECT_TYPE_PROCESS     1       /**< Process (transferrable). */
-#define OBJECT_TYPE_THREAD      2       /**< Thread (transferrable). */
-#define OBJECT_TYPE_TOKEN       3       /**< Security Token (transferrable). */
-#define OBJECT_TYPE_TIMER       4       /**< Timer (transferrable). */
-#define OBJECT_TYPE_WATCHER     5       /**< Watcher (non-transferrable). */
-#define OBJECT_TYPE_AREA        6       /**< Memory Area (transferrable). */
-#define OBJECT_TYPE_FILE        7       /**< File (transferrable). */
-#define OBJECT_TYPE_PORT        8       /**< Port (transferrable). */
-#define OBJECT_TYPE_CONNECTION  9       /**< Connection (non-transferrable). */
-#define OBJECT_TYPE_SEMAPHORE   10      /**< Semaphore (transferrable). */
+enum {
+    OBJECT_TYPE_PROCESS         = 1,        /**< Process (transferrable). */
+    OBJECT_TYPE_THREAD          = 2,        /**< Thread (transferrable). */
+    OBJECT_TYPE_TOKEN           = 3,        /**< Security Token (transferrable). */
+    OBJECT_TYPE_TIMER           = 4,        /**< Timer (transferrable). */
+    OBJECT_TYPE_WATCHER         = 5,        /**< Watcher (non-transferrable). */
+    OBJECT_TYPE_AREA            = 6,        /**< Memory Area (transferrable). */
+    OBJECT_TYPE_FILE            = 7,        /**< File (transferrable). */
+    OBJECT_TYPE_PORT            = 8,        /**< Port (transferrable). */
+    OBJECT_TYPE_CONNECTION      = 9,        /**< Connection (non-transferrable). */
+    OBJECT_TYPE_SEMAPHORE       = 10,       /**< Semaphore (transferrable). */
+    OBJECT_TYPE_PROCESS_GROUP   = 11,       /**< Process Group (non-transferrable). */
+};
 
-/** Flags for a handle table entry. */
-#define HANDLE_INHERITABLE      (1<<0)  /**< Handle will be inherited by child processes. */
+/** Flags for handle table entries. */
+enum {
+    HANDLE_INHERITABLE          = (1<<0),   /**< Handle will be inherited by child processes. */
+};
 
 /** Details of an object event to wait for. */
 typedef struct object_event {
-    handle_t handle;                    /**< Handle to wait on. */
-    unsigned event;                     /**< Event to wait for. */
-    uint32_t flags;                     /**< Flags for the event. */
-    unsigned long data;                 /**< Integer data associated with the event. */
-    void *udata;                        /**< User data, passed through unmodified. */
+    handle_t handle;                        /**< Handle to wait on. */
+    unsigned event;                         /**< Event to wait for. */
+    uint32_t flags;                         /**< Flags for the event. */
+    unsigned long data;                     /**< Integer data associated with the event. */
+    void *udata;                            /**< User data, passed through unmodified. */
 } object_event_t;
 
 /** Object event flags. */
-#define OBJECT_EVENT_ERROR      (1<<0)  /**< Set if an error occurred in this event. */
-#define OBJECT_EVENT_SIGNALLED  (1<<1)  /**< Set if this event is signalled. */
-#define OBJECT_EVENT_ONESHOT    (1<<2)  /**< Remove after firing the first time. */
-#define OBJECT_EVENT_EDGE       (1<<3)  /**< Event should be edge triggered rather than level. */
+enum {
+    OBJECT_EVENT_ERROR          = (1<<0),   /**< Set if an error occurred in this event. */
+    OBJECT_EVENT_SIGNALLED      = (1<<1),   /**< Set if this event is signalled. */
+    OBJECT_EVENT_ONESHOT        = (1<<2),   /**< Remove after firing the first time. */
+    OBJECT_EVENT_EDGE           = (1<<3),   /**< Event should be edge triggered rather than level. */
+};
 
 /** Behaviour flags for kern_object_wait(). */
-#define OBJECT_WAIT_ALL         (1<<0)  /**< Wait for all the specified events to occur. */
+enum {
+    OBJECT_WAIT_ALL             = (1<<0),   /**< Wait for all the specified events to occur. */
+};
 
 /**
  * Type of an object event callback function. The function will be called via

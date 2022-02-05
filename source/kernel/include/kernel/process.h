@@ -77,15 +77,21 @@ typedef struct process_attrib {
 #define PROCESS_SELF            INVALID_HANDLE
 
 /** Process object events. */
-#define PROCESS_EVENT_DEATH     1       /**< Wait for process death. */
+enum {
+    PROCESS_EVENT_DEATH         = 1,        /**< Wait for process death. */
+};
 
 /** Process priority classes. */
-#define PRIORITY_CLASS_LOW      0       /**< Low priority. */
-#define PRIORITY_CLASS_NORMAL   1       /**< Normal priority. */
-#define PRIORITY_CLASS_HIGH     2       /**< High priority. */
+enum {
+    PRIORITY_CLASS_LOW          = 0,        /**< Low priority. */
+    PRIORITY_CLASS_NORMAL       = 1,        /**< Normal priority. */
+    PRIORITY_CLASS_HIGH         = 2,        /**< High priority. */
+};
 
 /** Process creation flags. */
-#define PROCESS_CREATE_CRITICAL (1<<0)  /**< Process is a critical system process. */
+enum {
+    PROCESS_CREATE_CRITICAL     = (1<<0),   /**< Process is a critical system process. */
+};
 
 extern status_t kern_process_create(
     const char *path, const char *const args[], const char *const env[],

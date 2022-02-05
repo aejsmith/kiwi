@@ -34,6 +34,7 @@
 #include <ipc/ipc.h>
 
 #include <kernel/private/process.h>
+#include <kernel/process_group.h>
 
 #include <mm/aspace.h>
 #include <mm/malloc.h>
@@ -70,6 +71,30 @@
 /** Expected path to libkernel. */
 #define LIBKERNEL_PATH      "/system/lib/libkernel.so"
 
+/** Process group structure. */
+typedef struct process_group {
+    uint32_t flags;                 /**< Behaviour flags of the group. */
+
+    /** Lock for group. Locking order is process, then group. */
+    mutex_t lock;
+
+    list_t processes;               /**< List of processes (process_group_link_t) in the group. */
+    notifier_t death_notifier;      /**< Notifier for when the group dies. */
+} process_group_t;
+
+/**
+ * Process group link structure. There is a many to many relationship between
+ * groups and processes, so we need a separate structure to keep track of each
+ * link. Links hold a reference to the process (see process_group_object_close()).
+ */
+typedef struct process_group_link {
+    process_group_t *group;
+    list_t group_link;
+
+    process_t *process;
+    list_t process_link;
+} process_group_link_t;
+
 /** Structure containing process loading state. */
 typedef struct process_load {
     char *path;                     /**< Path to program. */
@@ -92,7 +117,7 @@ typedef struct process_load {
     status_t status;                /**< Status code to return from the call. */
 } process_load_t;
 
-/** Tree of all processes. */
+/** Tree of all processes. TODO: A hash table would be more appropriate. */
 static AVL_TREE_DEFINE(process_tree);
 static RWLOCK_DEFINE(process_tree_lock);
 
@@ -101,6 +126,8 @@ static id_allocator_t process_id_allocator;
 
 /** Cache for process structures. */
 static slab_cache_t *process_cache;
+static slab_cache_t *process_group_cache;
+static slab_cache_t *process_group_link_cache;
 
 /** Handle to the kernel library. */
 static object_handle_t *kernel_library;
@@ -116,7 +143,23 @@ static void process_ctor(void *obj, void *data) {
     list_init(&process->threads);
     avl_tree_init(&process->futexes);
     list_init(&process->images);
+    list_init(&process->groups);
     notifier_init(&process->death_notifier, process);
+}
+
+static void process_group_ctor(void *obj, void *data) {
+    process_group_t *group = (process_group_t *)obj;
+
+    mutex_init(&group->lock, "process_group_lock", 0);
+    list_init(&group->processes);
+    notifier_init(&group->death_notifier, group);
+}
+
+static void process_group_link_ctor(void *obj, void *data) {
+    process_group_link_t *link = (process_group_link_t *)obj;
+
+    list_init(&link->group_link);
+    list_init(&link->process_link);
 }
 
 /** Allocate and initialize a new process structure.
@@ -193,6 +236,68 @@ static void process_cleanup(process_t *process) {
     notifier_clear(&process->death_notifier);
 }
 
+static void add_process_group_link(process_group_t *group, process_t *process) {
+    process_group_link_t *link = slab_cache_alloc(process_group_link_cache, MM_KERNEL);
+
+    process_retain(process);
+
+    link->group   = group;
+    link->process = process;
+
+    list_append(&group->processes, &link->group_link);
+    list_append(&process->groups, &link->process_link);
+}
+
+static void remove_process_group_link(process_group_link_t *link) {
+    list_remove(&link->group_link);
+    list_remove(&link->process_link);
+
+    if (list_empty(&link->group->processes))
+        notifier_run(&link->group->death_notifier, NULL, true);
+
+    process_release(link->process);
+
+    slab_cache_free(process_group_link_cache, link);
+}
+
+static bool is_process_in_group(process_group_t *group, process_t *process) {
+    /* Iterate group memberships of the process rather than the other way round
+     * as processes will typically be in a small number of groups, so this
+     * should be faster. */
+    list_foreach(&process->groups, iter) {
+        process_group_link_t *link = list_entry(iter, process_group_link_t, process_link);
+
+        if (link->group == group)
+            return true;
+    }
+
+    return false;
+}
+
+/**
+ * Inherits process group membership. This must be done only once a process is
+ * moving to the running state, since cleanup of groups only happens when going
+ * through the process death path.
+ */
+static void inherit_group_membership(process_t *process, process_t *parent) {
+    if (parent) {
+        mutex_lock(&parent->lock);
+
+        list_foreach(&parent->groups, iter) {
+            process_group_link_t *link = list_entry(iter, process_group_link_t, process_link);
+
+            mutex_lock(&link->group->lock);
+
+            if (link->group->flags & PROCESS_GROUP_INHERIT_MEMBERSHIP)
+                add_process_group_link(link->group, process);
+
+            mutex_unlock(&link->group->lock);
+        }
+
+        mutex_unlock(&parent->lock);
+    }
+}
+
 /**
  * Increases the reference count of a process. This should be done when you
  * want to ensure that the process will not freed: it will only be freed once
@@ -218,6 +323,7 @@ void process_release(process_t *process) {
 
     assert(process->state != PROCESS_RUNNING);
     assert(refcount_get(&process->running) == 0);
+    assert(list_empty(&process->groups));
 
     /* If no threads in the process have been run we still have to clean it up
      * as it will not have gone through thread_exit(). */
@@ -271,6 +377,8 @@ void process_thread_exited(thread_t *thread) {
     assert(process->state == PROCESS_RUNNING);
 
     if (refcount_dec(&process->running) == 0) {
+        mutex_lock(&process->lock);
+
         /* All threads have terminated, move the process to the dead state and
          * clean up its resources. */
         process->state = PROCESS_DEAD;
@@ -281,6 +389,19 @@ void process_thread_exited(thread_t *thread) {
         /* Don't bother running callbacks during shutdown. */
         if (!shutdown_in_progress)
             notifier_run(&process->death_notifier, NULL, true);
+
+        /* Remove from process groups. */
+        list_foreach(&process->groups, iter) {
+            process_group_link_t *link = list_entry(iter, process_group_link_t, process_link);
+
+            mutex_lock(&link->group->lock);
+            remove_process_group_link(link);
+            mutex_unlock(&link->group->lock);
+        }
+
+        /* Not necessary to hold this across cleanup, anything that matters
+         * has its own lock. */
+        mutex_unlock(&process->lock);
 
         process_cleanup(process);
 
@@ -676,15 +797,21 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 
 /** Initialize the process table and slab cache. */
 __init_text void process_init(void) {
-    /* Create the process ID allocator. We reserve ID 0 as it is always
-     * given to the kernel process. */
+    /* Create the process ID allocator. We reserve ID 0 as it is always given to
+     * the kernel process. */
     id_allocator_init(&process_id_allocator, 65535, MM_BOOT);
     id_allocator_reserve(&process_id_allocator, 0);
 
-    /* Create the process slab cache. */
+    /* Create the process slab caches. */
     process_cache = object_cache_create(
         "process_cache",
         process_t, process_ctor, NULL, NULL, 0, MM_BOOT);
+    process_group_cache = object_cache_create(
+        "process_group_cache",
+        process_group_t, process_group_ctor, NULL, NULL, 0, MM_BOOT);
+    process_group_link_cache = object_cache_create(
+        "process_group_link_cache",
+        process_group_link_t, process_group_link_ctor, NULL, NULL, 0, MM_BOOT);
 
     /* Register the KDB command. */
     kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);
@@ -1032,6 +1159,10 @@ status_t kern_process_create(
         goto out_release_process;
     }
 
+    /* Inherit group membership. This must be the last step before running the
+     * thread. */
+    inherit_group_membership(process, curr_proc);
+
     process->load = &load;
     thread_run(thread);
     thread_release(thread);
@@ -1300,6 +1431,10 @@ status_t kern_process_clone(handle_t *_handle) {
     thread->ustack = curr_thread->ustack;
     thread->ustack_size = curr_thread->ustack_size;
 
+    /* Inherit group membership. This must be the last step before running the
+     * thread. */
+    inherit_group_membership(process, curr_proc);
+
     thread_run(thread);
     thread_release(thread);
     return STATUS_SUCCESS;
@@ -1471,7 +1606,9 @@ status_t kern_process_status(handle_t handle, int *_status, int *_reason) {
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    if ((_status || _reason) && !process_access(process)) {
+    mutex_lock(&process->lock);
+
+    if ((_status || _reason) && !process_access_unsafe(process)) {
         ret = STATUS_ACCESS_DENIED;
     } else if (process->state != PROCESS_DEAD) {
         ret = STATUS_STILL_RUNNING;
@@ -1482,6 +1619,8 @@ status_t kern_process_status(handle_t handle, int *_status, int *_reason) {
 
     if (ret == STATUS_SUCCESS && _reason)
         ret = write_user(_reason, process->reason);
+
+    mutex_unlock(&process->lock);
 
     process_release(process);
     return ret;
@@ -1642,4 +1781,268 @@ status_t kern_process_control(unsigned action, const void *in, void *out) {
         default:
             return STATUS_INVALID_ARG;
     }
+}
+
+/**
+ * Creates a new process group.
+ */
+
+/** Closes a handle to a process group. */
+static void process_group_object_close(object_handle_t *handle) {
+    process_group_t *group = handle->private;
+
+    mutex_lock(&group->lock);
+
+    while (!list_empty(&group->processes)) {
+        /*
+         * We have to do a complicated synchronisation dance here. The locking
+         * order we use for processes and groups is process first, then group.
+         * This order is easier for updating groups on process death. However,
+         * it makes our life more complicated here.
+         *
+         * The process is guaranteed to have at least one reference since
+         * process_group_link_t holds one. However, we need to unlock the group,
+         * lock the process, and then relock the group for correct order.
+         *
+         * Theoretically, the process could die in the gap before we have both
+         * locks again, in which case process_thread_exited() could come in and
+         * remove the link. In doing so it would drop the process reference held
+         * by the link. The final reference to the process could also be dropped
+         * while it is dying if there are no handles to it, causing it to be
+         * freed. We need to guard against both the link and process being
+         * freed here.
+         *
+         * So, first we take an extra reference here to make sure the process
+         * won't be freed until we're done with it.
+         */
+        process_group_link_t *link = list_first(&group->processes, process_group_link_t, group_link);
+        process_t *process = link->process;
+        process_retain(process);
+
+        /* Then, unlock/relock in the right order. */
+        mutex_unlock(&group->lock);
+        mutex_lock(&process->lock);
+        mutex_lock(&group->lock);
+
+        /*
+         * Now check if the first element in the list is still the process.
+         * If it is, then we should proceed to free it here. Otherwise, it must
+         * have been removed/freed by process_thread_exited(). Note just
+         * checking the link pointer is unsafe - there's a chance that if it
+         * were freed, new process creation could then have reallocated that
+         * same link structure and added it again (referring to a different
+         * process).
+         */
+        if (!list_empty(&group->processes)) {
+            link = list_first(&group->processes, process_group_link_t, group_link);
+            if (link->process == process)
+                remove_process_group_link(link);
+        }
+
+        /* Don't unlock group for next iteration. */
+        mutex_unlock(&process->lock);
+
+        /* Drop the reference we added above. */
+        process_release(process);
+    }
+
+    mutex_unlock(&group->lock);
+    slab_cache_free(process_group_cache, group);
+}
+
+/** Signal that a process group event is being waited for. */
+static status_t process_group_object_wait(object_handle_t *handle, object_event_t *event) {
+    process_group_t *group = handle->private;
+
+    MUTEX_SCOPED_LOCK(lock, &group->lock);
+
+    switch (event->event) {
+        case PROCESS_GROUP_EVENT_DEATH:
+            /* Add to the notifier for edge triggered if already dead, since a
+             * new process could be added to the group making it not dead. */
+            if (list_empty(&group->processes) && !(event->flags & OBJECT_EVENT_EDGE)) {
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&group->death_notifier, object_event_notifier, event);
+            }
+
+            return STATUS_SUCCESS;
+        default:
+            return STATUS_INVALID_EVENT;
+    }
+}
+
+/** Stop waiting for a process group event. */
+static void process_group_object_unwait(object_handle_t *handle, object_event_t *event) {
+    process_group_t *group = handle->private;
+
+    MUTEX_SCOPED_LOCK(lock, &group->lock);
+
+    switch (event->event) {
+        case PROCESS_GROUP_EVENT_DEATH:
+            notifier_unregister(&group->death_notifier, object_event_notifier, event);
+            break;
+    }
+}
+
+/** Process group object type operations. */
+static const object_type_t process_group_object_type = {
+    .id     = OBJECT_TYPE_PROCESS_GROUP,
+    .close  = process_group_object_close,
+    .wait   = process_group_object_wait,
+    .unwait = process_group_object_unwait,
+};
+
+/** Creates a new process group.
+ * @param flags         Behaviour flags for the group (PROCESS_GROUP_*).
+ * @param _handle       Where to store pointer to created handle.
+ * @return              Status code describing result of the operation. */
+status_t kern_process_group_create(uint32_t flags, handle_t *_handle) {
+    if (!_handle)
+        return STATUS_INVALID_ARG;
+
+    process_group_t *group = slab_cache_alloc(process_group_cache, MM_KERNEL);
+
+    group->flags = flags;
+
+    status_t ret = object_handle_open(&process_group_object_type, group, NULL, _handle);
+    if (ret != STATUS_SUCCESS)
+        slab_cache_free(process_group_cache, group);
+
+    return ret;
+}
+
+/**
+ * Adds a process to a group. The calling thread must have privileged access to
+ * the specified process. Dead processes cannot be added to a group: if the
+ * process is dead by the time this is called, an error is returned.
+ *
+ * @param handle        Handle to process group.
+ * @param process       Handle to process.
+ *
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_INVALID_HANDLE if group or process handle is
+ *                      invalid.
+ *                      STATUS_ACCESS_DENIED if calling thread does not have
+ *                      privileged access to the process.
+ *                      STATUS_NOT_RUNNING if the process is dead.
+ *                      STATUS_ALREADY_EXISTS if the process is already in the
+ *                      group.
+ */
+status_t kern_process_group_add(handle_t handle, handle_t process) {
+    status_t ret;
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS_GROUP, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    process_group_t *group = khandle->private;
+
+    process_t *kprocess;
+    ret = process_handle_lookup(process, &kprocess);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    {
+        MUTEX_SCOPED_LOCK(process_lock, &kprocess->lock);
+        MUTEX_SCOPED_LOCK(group_lock, &group->lock);
+
+        if (!process_access_unsafe(kprocess)) {
+            ret = STATUS_ACCESS_DENIED;
+            goto out;
+        } else if (is_process_in_group(group, kprocess)) {
+            ret = STATUS_ALREADY_EXISTS;
+            goto out;
+        } else if (kprocess->state != PROCESS_RUNNING) {
+            ret = STATUS_NOT_RUNNING;
+            goto out;
+        }
+
+        add_process_group_link(group, kprocess);
+    }
+
+    ret = STATUS_SUCCESS;
+
+out:
+    process_release(kprocess);
+    return ret;
+}
+
+/** Removes a process from a group.
+ * @param handle        Handle to process group.
+ * @param process       Handle to process.
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_INVALID_HANDLE if group or process handle is
+ *                      invalid.
+ *                      STATUS_NOT_FOUND if the process is not in the group. */
+status_t kern_process_group_remove(handle_t handle, handle_t process) {
+    status_t ret;
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS_GROUP, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    process_group_t *group = khandle->private;
+
+    process_t *kprocess;
+    ret = process_handle_lookup(process, &kprocess);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    {
+        MUTEX_SCOPED_LOCK(process_lock, &kprocess->lock);
+        MUTEX_SCOPED_LOCK(group_lock, &group->lock);
+
+        ret = STATUS_NOT_FOUND;
+
+        list_foreach(&kprocess->groups, iter) {
+            process_group_link_t *link = list_entry(iter, process_group_link_t, process_link);
+
+            if (link->group == group) {
+                remove_process_group_link(link);
+                ret = STATUS_SUCCESS;
+                break;
+            }
+        }
+    }
+
+    process_release(kprocess);
+    return ret;
+}
+
+/** Queries whether a process is a member of a process group.
+ * @param handle        Handle to process group.
+ * @param process       Handle to process.
+ * @return              STATUS_SUCCESS if the process is in the group.
+ *                      STATUS_INVALID_HANDLE if group or process handle is
+ *                      invalid.
+ *                      STATUS_NOT_FOUND if the process is not in the group. */
+status_t kern_process_group_query(handle_t handle, handle_t process) {
+    status_t ret;
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS_GROUP, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    process_group_t *group = khandle->private;
+
+    process_t *kprocess;
+    ret = process_handle_lookup(process, &kprocess);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    {
+        MUTEX_SCOPED_LOCK(process_lock, &kprocess->lock);
+        MUTEX_SCOPED_LOCK(group_lock, &group->lock);
+
+        ret = (is_process_in_group(group, kprocess))
+            ? STATUS_SUCCESS
+            : STATUS_NOT_FOUND;
+    }
+
+    process_release(kprocess);
+    return ret;
 }
