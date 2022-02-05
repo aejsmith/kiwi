@@ -14,11 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-dirs = [
-    'posix_service',
-    'service_manager',
-    'terminal_service',
-    'test',
-]
+Import('manager')
 
-SConscript(dirs = dirs)
+env = manager.Create(libraries = ['kernel'])
+
+env.KiwiService('posix_service', [
+    'posix_service.cpp',
+])

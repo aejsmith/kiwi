@@ -66,6 +66,7 @@ int ServiceManager::run() {
     addEvent(m_port, PORT_EVENT_CONNECTION, this);
 
     /* TODO: Service configuration. */
+    addService("org.kiwi.posix", "/system/services/posix_service", Service::kIpc | Service::kOnDemand);
     addService("org.kiwi.test", "/system/services/test", Service::kIpc | Service::kOnDemand);
     addService("org.kiwi.terminal", "/system/services/terminal_service", Service::kIpc | Service::kOnDemand);
 
