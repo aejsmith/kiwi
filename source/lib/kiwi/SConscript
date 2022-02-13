@@ -14,26 +14,18 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('manager')
+Import('manager', 'config')
 
-# Set the library output directory.
-manager.AddVariable('_LIBOUTDIR', Dir('.'))
+env = manager.Create(libraries = ['kernel'], flags = {
+    'CPPPATH': [
+        Dir('include'),
+    ],
+})
 
-dirs = [
-    # Core runtime libraries (must be first).
-    'crt',
-    'kernel',
-    'system',
-    'compiler-rt',
-    'libm',
-    'cxxrt',
-    'cxx',
-    'kiwi',
-
-    # Other libraries.
-    'device',
-    'zlib',
-    'freetype',
+sources = [
 ]
 
-SConscript(dirs = dirs)
+env.KiwiLibrary('kiwi',
+    sources = sources,
+    include_paths = [Dir('include')],
+)

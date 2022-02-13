@@ -24,7 +24,7 @@
  * sessions and signals through this service, built on top of lower-level
  * kernel functionality. This avoids polluting the kernel with legacy POSIX
  * details it shouldn't need to care about like terminals (which are also
- * implemented in via a userspace service).
+ * implemented via a userspace service).
  */
 
 #include "posix_service.h"

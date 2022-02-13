@@ -23,6 +23,8 @@
 
 #include <core/ipc.h>
 
+#include <kiwi/core/handle.h>
+
 #include <termios.h>
 
 #include <thread>
@@ -86,8 +88,8 @@ private:
 private:
     core_connection_t *const m_connection;
     std::thread m_thread;
-    handle_t m_userFile;
-    handle_t m_userFileConnection;
+    Kiwi::Core::Handle m_userFile;
+    Kiwi::Core::Handle m_userFileConnection;
 
     /** Pending reads that are waiting for input. */
     std::vector<ReadOperation> m_pendingReads;

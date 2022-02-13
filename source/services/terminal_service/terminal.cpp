@@ -45,8 +45,6 @@ static constexpr uint64_t kSupportedUserFileOps =
 
 Terminal::Terminal(core_connection_t *connection) :
     m_connection         (connection),
-    m_userFile           (INVALID_HANDLE),
-    m_userFileConnection (INVALID_HANDLE),
     m_escaped            (false),
     m_inhibited          (false),
     m_inputBufferStart   (0),
@@ -82,12 +80,6 @@ Terminal::Terminal(core_connection_t *connection) :
 
 Terminal::~Terminal() {
     core_connection_close(m_connection);
-
-    if (m_userFile != INVALID_HANDLE)
-        kern_handle_close(m_userFile);
-
-    if (m_userFileConnection != INVALID_HANDLE)
-        kern_handle_close(m_userFileConnection);
 }
 
 void Terminal::run() {
@@ -95,7 +87,8 @@ void Terminal::run() {
 
     ret = kern_user_file_create(
         FILE_TYPE_CHAR, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0,
-        kSupportedUserFileOps, &m_userFileConnection, &m_userFile);
+        kSupportedUserFileOps,
+        m_userFileConnection.attach(), m_userFile.attach());
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create user file: %" PRId32, ret);
         return;
@@ -821,7 +814,9 @@ bool Terminal::readBuffer(ReadOperation &op) {
         }
     }
 
-    status_t ret = kern_connection_send(m_userFileConnection, &reply, (reply.size > 0) ? data.get() : nullptr, INVALID_HANDLE, -1);
+    status_t ret = kern_connection_send(
+        m_userFileConnection, &reply, (reply.size > 0) ? data.get() : nullptr,
+        INVALID_HANDLE, -1);
     if (ret == STATUS_SUCCESS) {
         /* Only remove from the buffer if we could complete it. */
         m_inputBufferStart = bufferStart;

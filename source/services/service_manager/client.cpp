@@ -178,13 +178,13 @@ void Client::handleRegisterPort(core_message_t *request) {
     auto replyData = reinterpret_cast<service_manager_reply_register_port_t *>(core_message_data(reply));
 
     if (m_service) {
-        handle_t handle = core_message_detach_handle(request);
+        Kiwi::Core::Handle port(core_message_detach_handle(request));
 
-        if (handle != INVALID_HANDLE) {
-            if (m_service->setPort(handle)) {
+        if (port.isValid()) {
+            if (m_service->setPort(std::move(port))) {
                 replyData->result = STATUS_SUCCESS;
             } else {
-                kern_handle_close(handle);
+                replyData->result = STATUS_ALREADY_EXISTS;
             }
         } else {
             replyData->result = STATUS_INVALID_ARG;

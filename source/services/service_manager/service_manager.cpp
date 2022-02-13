@@ -38,14 +38,9 @@ extern const char *const *environ;
 
 ServiceManager g_serviceManager;
 
-ServiceManager::ServiceManager() :
-    m_port (INVALID_HANDLE)
-{}
+ServiceManager::ServiceManager() {}
 
-ServiceManager::~ServiceManager() {
-    if (m_port != INVALID_HANDLE)
-        kern_handle_close(m_port);
-}
+ServiceManager::~ServiceManager() {}
 
 int ServiceManager::run() {
     status_t ret;
@@ -57,7 +52,7 @@ int ServiceManager::run() {
 
     core_log(CORE_LOG_NOTICE, "service manager started");
 
-    ret = kern_port_create(&m_port);
+    ret = kern_port_create(m_port.attach());
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create port: %d", ret);
         return EXIT_FAILURE;
@@ -124,7 +119,7 @@ Service* ServiceManager::findService(const std::string &name) {
     }
 }
 
-status_t ServiceManager::spawnProcess(const char *path, handle_t *_handle) const {
+status_t ServiceManager::spawnProcess(const char *path, Kiwi::Core::Handle *_handle) const {
     process_attrib_t attrib;
     handle_t map[][2] = { { 0, 0 }, { 1, 1 }, { 2, 2 } };
     attrib.token     = INVALID_HANDLE;
@@ -133,7 +128,9 @@ status_t ServiceManager::spawnProcess(const char *path, handle_t *_handle) const
     attrib.map_count = core_array_size(map);
 
     const char *args[] = { path, nullptr };
-    status_t ret = kern_process_create(path, args, environ, 0, &attrib, _handle);
+    status_t ret = kern_process_create(
+        path, args, environ, 0, &attrib,
+        (_handle) ? _handle->attach() : nullptr);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create process '%s': %d", path, ret);
         return ret;
@@ -148,8 +145,8 @@ void ServiceManager::handleEvent(const object_event_t &event) {
     assert(event.handle == m_port);
     assert(event.event == PORT_EVENT_CONNECTION);
 
-    handle_t handle;
-    ret = kern_port_listen(m_port, 0, &handle);
+    Kiwi::Core::Handle handle;
+    ret = kern_port_listen(m_port, 0, handle.attach());
     if (ret != STATUS_SUCCESS) {
         /* This may be harmless - client's connection attempt could be cancelled
          * between us receiving the event and calling listen, for instance. */
@@ -158,29 +155,28 @@ void ServiceManager::handleEvent(const object_event_t &event) {
     }
 
     process_id_t pid;
-    handle_t process;
-    ret = kern_connection_open_remote(handle, &process);
-    if (ret == STATUS_SUCCESS) {
-        ret = kern_process_id(process, &pid);
-        if (ret != STATUS_SUCCESS)
-            core_log(CORE_LOG_WARN, "failed to get client process ID: %" PRId32, ret);
-
-        kern_handle_close(process);
-    } else {
-        core_log(CORE_LOG_WARN, "failed to open client process handle: %" PRId32, ret);
+    {
+        Kiwi::Core::Handle process;
+        ret = kern_connection_open_remote(handle, process.attach());
+        if (ret == STATUS_SUCCESS) {
+            ret = kern_process_id(process, &pid);
+            if (ret != STATUS_SUCCESS)
+                core_log(CORE_LOG_WARN, "failed to get client process ID: %" PRId32, ret);
+        } else {
+            core_log(CORE_LOG_WARN, "failed to open client process handle: %" PRId32, ret);
+        }
     }
 
-    if (ret != STATUS_SUCCESS) {
-        kern_handle_close(handle);
+    if (ret != STATUS_SUCCESS)
         return;
-    }
 
     core_connection_t *connection = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
     if (!connection) {
         core_log(CORE_LOG_WARN, "failed to create connection");
-        kern_handle_close(handle);
         return;
     }
+
+    handle.detach();
 
     Client* client = new Client(connection, pid);
 

@@ -23,6 +23,8 @@
 
 #include "event_handler.h"
 
+#include <kiwi/core/handle.h>
+
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -41,7 +43,7 @@ public:
 
     Service* findService(const std::string &name);
 
-    status_t spawnProcess(const char *path, handle_t *_handle = nullptr) const;
+    status_t spawnProcess(const char *path, Kiwi::Core::Handle *_handle = nullptr) const;
 
     void addEvent(handle_t handle, unsigned id, EventHandler *handler);
     void removeEvents(EventHandler *handler);
@@ -55,7 +57,7 @@ private:
     using ServiceMap = std::unordered_map<std::string, std::unique_ptr<Service>>;
 
 private:
-    handle_t m_port;
+    Kiwi::Core::Handle m_port;
 
     ServiceMap m_services;
     std::vector<object_event_t> m_events;

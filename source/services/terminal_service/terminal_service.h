@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <kernel/types.h>
+#include <kiwi/core/handle.h>
 
 class TerminalService {
 public:
@@ -31,7 +31,7 @@ public:
     int run();
 
 private:
-    handle_t m_port;
+    Kiwi::Core::Handle m_port;
 };
 
 extern TerminalService g_terminalService;

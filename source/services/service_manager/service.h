@@ -23,6 +23,8 @@
 
 #include "event_handler.h"
 
+#include <kiwi/core/handle.h>
+
 #include <list>
 #include <string>
 
@@ -50,7 +52,7 @@ public:
     handle_t port() const           { return m_port; }
 
     void setClient(Client *client) { m_client = client; }
-    bool setPort(handle_t port);
+    bool setPort(Kiwi::Core::Handle port);
 
     void addPendingConnect(Client *client, core_message_t *reply);
     void removePendingConnects(Client *client);
@@ -73,12 +75,12 @@ private:
     const std::string m_path;
     const uint32_t m_flags;
 
-    handle_t m_process;
+    Kiwi::Core::Handle m_process;
     process_id_t m_processId;
 
     Client *m_client;
 
-    handle_t m_port;
+    Kiwi::Core::Handle m_port;
 
     std::list<PendingConnect> m_pendingConnects;
 };

@@ -30,7 +30,6 @@
 #include <core/log.h>
 #include <core/service.h>
 
-#include <kernel/object.h>
 #include <kernel/status.h>
 
 #include <inttypes.h>
@@ -40,15 +39,12 @@ TerminalService g_terminalService;
 
 TerminalService::TerminalService() {}
 
-TerminalService::~TerminalService() {
-    if (m_port != INVALID_HANDLE)
-        kern_handle_close(m_port);
-}
+TerminalService::~TerminalService() {}
 
 int TerminalService::run() {
     status_t ret;
 
-    ret = kern_port_create(&m_port);
+    ret = kern_port_create(m_port.attach());
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create port: %" PRId32, ret);
         return EXIT_FAILURE;
@@ -61,8 +57,8 @@ int TerminalService::run() {
     }
 
     while (true) {
-        handle_t handle;
-        ret = kern_port_listen(m_port, -1, &handle);
+        Kiwi::Core::Handle handle;
+        ret = kern_port_listen(m_port, -1, handle.attach());
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_ERROR, "failed to listen on port: %" PRId32, ret);
             continue;
@@ -71,9 +67,10 @@ int TerminalService::run() {
         core_connection_t *connection = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
         if (!connection) {
             core_log(CORE_LOG_WARN, "failed to create connection");
-            kern_handle_close(handle);
             continue;
         }
+
+        handle.detach();
 
         /* Each connection (terminal) runs in its own thread. */
         Terminal *terminal = new Terminal(connection);

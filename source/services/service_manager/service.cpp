@@ -35,25 +35,17 @@ Service::Service(std::string name, std::string path, uint32_t flags) :
     m_name      (std::move(name)),
     m_path      (std::move(path)),
     m_flags     (flags),
-    m_process   (INVALID_HANDLE),
     m_processId (-1),
-    m_client    (nullptr),
-    m_port      (INVALID_HANDLE)
+    m_client    (nullptr)
 {}
 
-Service::~Service() {
-    if (m_process != INVALID_HANDLE)
-        kern_handle_close(m_process);
-
-    if (m_port != INVALID_HANDLE)
-        kern_handle_close(m_port);
-}
+Service::~Service() {}
 
 /** Set the port for the service, failing if already set.
  * @return              Whether successful. */
-bool Service::setPort(handle_t port) {
-    if (m_port == INVALID_HANDLE) {
-        m_port = port;
+bool Service::setPort(Kiwi::Core::Handle port) {
+    if (!m_port.isValid()) {
+        m_port = std::move(port);
 
         /* Reply to pending connections. */
         while (!m_pendingConnects.empty()) {
@@ -125,14 +117,10 @@ void Service::handleDeath() {
 
     g_serviceManager.removeEvents(this);
 
-    kern_handle_close(m_process);
-    m_process   = INVALID_HANDLE;
+    m_process.close();
     m_processId = -1;
 
-    if (m_port != INVALID_HANDLE) {
-        kern_handle_close(m_port);
-        m_port = INVALID_HANDLE;
-    }
+    m_port.close();
 
     if (m_client) {
         /* If the client is still set, then we haven't handled the connection
