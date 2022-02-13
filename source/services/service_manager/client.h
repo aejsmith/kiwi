@@ -21,16 +21,16 @@
 
 #pragma once
 
-#include "event_handler.h"
-
 #include <core/ipc.h>
+
+#include <kiwi/core/event_loop.h>
 
 #include <list>
 
 class Service;
 
 /** Represents a client connection. */
-class Client final : public EventHandler {
+class Client {
 public:
     Client(core_connection_t *connection, process_id_t processId);
     ~Client();
@@ -39,12 +39,12 @@ public:
 
     void setService(Service *service) { m_service = service; }
 
-    void handleEvent(const object_event_t &event) override;
-
     void finishConnect(Service *service, core_message_t *reply);
 
 private:
-    void handleMessage();
+    void handleHangupEvent();
+    void handleMessageEvent();
+
     void handleConnect(core_message_t *request);
     void handleRegisterPort(core_message_t *request);
 
@@ -53,4 +53,7 @@ private:
     process_id_t m_processId;
     Service *m_service;
     std::list<Service *> m_pendingConnects;
+
+    Kiwi::Core::EventRef m_hangupEvent;
+    Kiwi::Core::EventRef m_messageEvent;
 };

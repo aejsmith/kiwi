@@ -31,7 +31,6 @@
 #include <services/terminal_service.h>
 
 #include <assert.h>
-#include <inttypes.h>
 
 #include <array>
 

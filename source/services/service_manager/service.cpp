@@ -29,7 +29,6 @@
 #include <kernel/status.h>
 
 #include <assert.h>
-#include <inttypes.h>
 
 Service::Service(std::string name, std::string path, uint32_t flags) :
     m_name      (std::move(name)),
@@ -83,13 +82,13 @@ void Service::removePendingConnects(Client *client) {
 bool Service::start() {
     status_t ret;
 
-    if (m_process != INVALID_HANDLE) {
+    if (m_process.isValid()) {
         ret = kern_process_status(m_process, nullptr, nullptr);
         if (ret != STATUS_STILL_RUNNING)
             handleDeath();
     }
 
-    if (m_process == INVALID_HANDLE) {
+    if (!m_process.isValid()) {
         ret = g_serviceManager.spawnProcess(m_path.c_str(), &m_process);
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_WARN, "failed to start service '%s': %d", m_name.c_str(), ret);
@@ -99,23 +98,18 @@ bool Service::start() {
         ret = kern_process_id(m_process, &m_processId);
         assert(ret == STATUS_SUCCESS);
 
-        g_serviceManager.addEvent(m_process, PROCESS_EVENT_DEATH, this);
+        m_deathEvent = g_serviceManager.eventLoop().addEvent(
+            m_process, PROCESS_EVENT_DEATH, 0,
+            [this] (const object_event_t &event) { handleDeath(); });
     }
 
     return true;
 }
 
-void Service::handleEvent(const object_event_t &event) {
-    assert(event.handle == m_process);
-    assert(event.event == PROCESS_EVENT_DEATH);
-
-    handleDeath();
-}
-
 void Service::handleDeath() {
     core_log(CORE_LOG_WARN, "service '%s' terminated unexpectedly", m_name.c_str());
 
-    g_serviceManager.removeEvents(this);
+    m_deathEvent.remove();
 
     m_process.close();
     m_processId = -1;

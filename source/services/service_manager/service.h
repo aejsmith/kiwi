@@ -21,8 +21,7 @@
 
 #pragma once
 
-#include "event_handler.h"
-
+#include <kiwi/core/event_loop.h>
 #include <kiwi/core/handle.h>
 
 #include <list>
@@ -31,7 +30,7 @@
 class Client;
 
 /** Represents a service. */
-class Service final : public EventHandler {
+class Service {
 public:
     enum Flags : uint32_t {
         /** Service is an IPC service and so can be connected to by clients. */
@@ -59,8 +58,6 @@ public:
 
     bool start();
 
-    void handleEvent(const object_event_t &event) override;
-
 private:
     struct PendingConnect {
         Client *client;
@@ -83,4 +80,6 @@ private:
     Kiwi::Core::Handle m_port;
 
     std::list<PendingConnect> m_pendingConnects;
+
+    Kiwi::Core::EventRef m_deathEvent;
 };

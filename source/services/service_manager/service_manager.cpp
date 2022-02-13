@@ -31,7 +31,6 @@
 #include <kernel/status.h>
 
 #include <assert.h>
-#include <inttypes.h>
 #include <stdlib.h>
 
 extern const char *const *environ;
@@ -58,7 +57,9 @@ int ServiceManager::run() {
         return EXIT_FAILURE;
     }
 
-    addEvent(m_port, PORT_EVENT_CONNECTION, this);
+    m_connectionEvent = m_eventLoop.addEvent(
+        m_port, PORT_EVENT_CONNECTION, 0,
+        [this] (const object_event_t &event) { handleConnectionEvent(); });
 
     /* TODO: Service configuration. */
     addService("org.kiwi.posix", "/system/services/posix_service", Service::kIpc | Service::kOnDemand);
@@ -68,36 +69,7 @@ int ServiceManager::run() {
     spawnProcess("/system/bin/terminal");
 
     while (true) {
-        ret = kern_object_wait(m_events.data(), m_events.size(), 0, -1);
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_WARN, "failed to wait for events: %d", ret);
-            continue;
-        }
-
-        size_t numEvents = m_events.size();
-
-        for (size_t i = 0; i < numEvents; ) {
-            object_event_t &event = m_events[i];
-
-            uint32_t flags = event.flags;
-            event.flags &= ~(OBJECT_EVENT_SIGNALLED | OBJECT_EVENT_ERROR);
-
-            if (flags & OBJECT_EVENT_ERROR) {
-                core_log(CORE_LOG_WARN, "error flagged on event %u for handle %u", event.event, event.handle);
-            } else if (flags & OBJECT_EVENT_SIGNALLED) {
-                auto handler = reinterpret_cast<EventHandler *>(event.udata);
-                handler->handleEvent(event);
-            }
-
-            /* Calling the handler may change the event array, so we have to
-             * handle this - start from the beginning. */
-            if (numEvents != m_events.size()) {
-                numEvents = m_events.size();
-                i = 0;
-            } else {
-                i++;
-            }
-        }
+        m_eventLoop.wait();
     }
 }
 
@@ -139,11 +111,8 @@ status_t ServiceManager::spawnProcess(const char *path, Kiwi::Core::Handle *_han
     return ret;
 }
 
-void ServiceManager::handleEvent(const object_event_t &event) {
+void ServiceManager::handleConnectionEvent() {
     status_t ret;
-
-    assert(event.handle == m_port);
-    assert(event.event == PORT_EVENT_CONNECTION);
 
     Kiwi::Core::Handle handle;
     ret = kern_port_listen(m_port, 0, handle.attach());
@@ -189,26 +158,6 @@ void ServiceManager::handleEvent(const object_event_t &event) {
         if (service->processId() == pid) {
             service->setClient(client);
             client->setService(service);
-        }
-    }
-}
-
-void ServiceManager::addEvent(handle_t handle, unsigned id, EventHandler *handler) {
-    object_event_t &event = m_events.emplace_back();
-
-    event.handle = handle;
-    event.event  = id;
-    event.flags  = 0;
-    event.data   = 0;
-    event.udata  = handler;
-}
-
-void ServiceManager::removeEvents(EventHandler *handler) {
-    for (auto it = m_events.begin(); it != m_events.end(); ) {
-        if (reinterpret_cast<EventHandler *>(it->udata) == handler) {
-            it = m_events.erase(it);
-        } else {
-            ++it;
         }
     }
 }

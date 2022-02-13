@@ -23,6 +23,7 @@ env = manager.Create(libraries = ['kernel'], flags = {
 })
 
 sources = [
+    'event_loop.cpp',
 ]
 
 env.KiwiLibrary('kiwi',

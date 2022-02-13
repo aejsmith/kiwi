@@ -32,7 +32,6 @@
 
 #include <kernel/status.h>
 
-#include <inttypes.h>
 #include <stdlib.h>
 
 TerminalService g_terminalService;

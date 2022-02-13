@@ -23,13 +23,10 @@
 
 #include <kernel/object.h>
 
-namespace Kiwi
-{
-    namespace Core
-    {
+namespace Kiwi {
+    namespace Core {
         /** RAII kernel handle wrapper. */
-        class Handle
-        {
+        class Handle {
         public:
             Handle();
             explicit Handle(handle_t handle);
@@ -79,6 +76,8 @@ namespace Kiwi
 
         /** Take ownership of another handle (other will be made invalid). */
         inline Handle& Handle::operator=(Handle &&other) {
+            close();
+
             m_handle = other.m_handle;
             other.m_handle = INVALID_HANDLE;
             return *this;

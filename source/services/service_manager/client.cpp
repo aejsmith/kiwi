@@ -39,7 +39,6 @@
 #include <services/service_manager.h>
 
 #include <assert.h>
-#include <inttypes.h>
 
 Client::Client(core_connection_t *connection, process_id_t processId) :
     m_connection (connection),
@@ -47,8 +46,13 @@ Client::Client(core_connection_t *connection, process_id_t processId) :
     m_service    (nullptr)
 {
     handle_t handle = core_connection_handle(m_connection);
-    g_serviceManager.addEvent(handle, CONNECTION_EVENT_HANGUP, this);
-    g_serviceManager.addEvent(handle, CONNECTION_EVENT_MESSAGE, this);
+
+    m_hangupEvent = g_serviceManager.eventLoop().addEvent(
+        handle, CONNECTION_EVENT_HANGUP, 0,
+        [this] (const object_event_t &event) { handleHangupEvent(); });
+    m_messageEvent = g_serviceManager.eventLoop().addEvent(
+        handle, CONNECTION_EVENT_MESSAGE, 0,
+        [this] (const object_event_t &event) { handleMessageEvent(); });
 }
 
 Client::~Client() {
@@ -58,29 +62,14 @@ Client::~Client() {
     for (Service *service : m_pendingConnects)
         service->removePendingConnects(this);
 
-    g_serviceManager.removeEvents(this);
     core_connection_close(m_connection);
 }
 
-void Client::handleEvent(const object_event_t &event) {
-    assert(event.handle == core_connection_handle(m_connection));
-
-    switch (event.event) {
-        case CONNECTION_EVENT_HANGUP:
-            delete this;
-            break;
-
-        case CONNECTION_EVENT_MESSAGE:
-            handleMessage();
-            break;
-
-        default:
-            core_unreachable();
-            break;
-    }
+void Client::handleHangupEvent() {
+    delete this;
 }
 
-void Client::handleMessage() {
+void Client::handleMessageEvent() {
     core_message_t *message;
     status_t ret = core_connection_receive(m_connection, 0, &message);
     if (ret != STATUS_SUCCESS)

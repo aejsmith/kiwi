@@ -21,8 +21,7 @@
 
 #pragma once
 
-#include "event_handler.h"
-
+#include <kiwi/core/event_loop.h>
 #include <kiwi/core/handle.h>
 
 #include <memory>
@@ -34,24 +33,23 @@ class Client;
 class Service;
 
 /** Main class of the service manager. */
-class ServiceManager final : public EventHandler {
+class ServiceManager {
 public:
     ServiceManager();
     ~ServiceManager();
 
+    Kiwi::Core::EventLoop &eventLoop() { return m_eventLoop; }
+
     int run();
 
-    Service* findService(const std::string &name);
+    Service *findService(const std::string &name);
 
     status_t spawnProcess(const char *path, Kiwi::Core::Handle *_handle = nullptr) const;
 
-    void addEvent(handle_t handle, unsigned id, EventHandler *handler);
-    void removeEvents(EventHandler *handler);
-
-    void handleEvent(const object_event_t &event) override;
-
 private:
     void addService(std::string name, std::string path, uint32_t flags);
+
+    void handleConnectionEvent();
 
 private:
     using ServiceMap = std::unordered_map<std::string, std::unique_ptr<Service>>;
@@ -60,7 +58,9 @@ private:
     Kiwi::Core::Handle m_port;
 
     ServiceMap m_services;
-    std::vector<object_event_t> m_events;
+
+    Kiwi::Core::EventLoop m_eventLoop;
+    Kiwi::Core::EventRef m_connectionEvent;
 };
 
 extern ServiceManager g_serviceManager;

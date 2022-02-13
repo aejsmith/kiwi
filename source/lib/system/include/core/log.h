@@ -23,6 +23,7 @@
 
 #include <system/defs.h>
 
+#include <inttypes.h>
 #include <stdarg.h>
 
 __SYS_EXTERN_C_BEGIN

@@ -67,7 +67,7 @@ typedef struct object_event {
 enum {
     OBJECT_EVENT_ERROR          = (1<<0),   /**< Set if an error occurred in this event. */
     OBJECT_EVENT_SIGNALLED      = (1<<1),   /**< Set if this event is signalled. */
-    OBJECT_EVENT_ONESHOT        = (1<<2),   /**< Remove after firing the first time. */
+    OBJECT_EVENT_ONESHOT        = (1<<2),   /**< Remove callback after firing the first time. */
     OBJECT_EVENT_EDGE           = (1<<3),   /**< Event should be edge triggered rather than level. */
 };
 
