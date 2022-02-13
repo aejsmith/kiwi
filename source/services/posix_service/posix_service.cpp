@@ -28,29 +28,28 @@
  */
 
 #include "posix_service.h"
+#include "process.h"
 
 #include <core/log.h>
 #include <core/service.h>
 
 #include <kernel/object.h>
+#include <kernel/process.h>
 #include <kernel/status.h>
 
-#include <inttypes.h>
+#include <assert.h>
 #include <stdlib.h>
 
 PosixService g_posixService;
 
 PosixService::PosixService() {}
 
-PosixService::~PosixService() {
-    if (m_port != INVALID_HANDLE)
-        kern_handle_close(m_port);
-}
+PosixService::~PosixService() {}
 
 int PosixService::run() {
     status_t ret;
 
-    ret = kern_port_create(&m_port);
+    ret = kern_port_create(m_port.attach());
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create port: %" PRId32, ret);
         return EXIT_FAILURE;
@@ -62,26 +61,69 @@ int PosixService::run() {
         return EXIT_FAILURE;
     }
 
+    m_connectionEvent = m_eventLoop.addEvent(
+        m_port, PORT_EVENT_CONNECTION, 0,
+        [this] (const object_event_t &event) { handleConnectionEvent(); });
+
     while (true) {
-        handle_t handle;
-        ret = kern_port_listen(m_port, -1, &handle);
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_ERROR, "failed to listen on port: %" PRId32, ret);
-            continue;
-        }
-
-        core_connection_t *connection = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
-        if (!connection) {
-            core_log(CORE_LOG_WARN, "failed to create connection");
-            kern_handle_close(handle);
-            continue;
-        }
-
-        core_log(CORE_LOG_NOTICE, "connection received\n");
-        core_connection_close(connection);
+        m_eventLoop.wait();
     }
 
     return EXIT_SUCCESS;
+}
+
+void PosixService::removeProcess(Process *process) {
+    auto ret = m_processes.find(process->pid());
+
+    assert(ret != m_processes.end());
+    assert(ret->second.get() == process);
+
+    m_processes.erase(ret);
+}
+
+void PosixService::handleConnectionEvent() {
+    status_t ret;
+
+    Kiwi::Core::Handle handle;
+    ret = kern_port_listen(m_port, 0, handle.attach());
+    if (ret != STATUS_SUCCESS) {
+        /* This may be harmless - client's connection attempt could be cancelled
+         * between us receiving the event and calling listen, for instance. */
+        core_log(CORE_LOG_WARN, "failed to listen on port after connection event: %" PRId32, ret);
+        return;
+    }
+
+    process_id_t pid;
+    Kiwi::Core::Handle processHandle;
+    ret = kern_connection_open_remote(handle, processHandle.attach());
+    if (ret == STATUS_SUCCESS) {
+        ret = kern_process_id(processHandle, &pid);
+        if (ret != STATUS_SUCCESS)
+            core_log(CORE_LOG_WARN, "failed to get client process ID: %" PRId32, ret);
+    } else {
+        core_log(CORE_LOG_WARN, "failed to open client process handle: %" PRId32, ret);
+    }
+
+    if (ret != STATUS_SUCCESS)
+        return;
+
+    /* Look for an existing process. */
+    auto it = m_processes.find(pid);
+    if (it != m_processes.end()) {
+        core_log(CORE_LOG_NOTICE, "ignoring connection from already connected process %" PRId32);
+        return;
+    }
+
+    core_connection_t *connection = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
+    if (!connection) {
+        core_log(CORE_LOG_WARN, "failed to create connection");
+        return;
+    }
+
+    handle.detach();
+
+    auto process = std::make_unique<Process>(connection, std::move(processHandle), pid);
+    m_processes.emplace(pid, std::move(process));
 }
 
 int main(int argc, char **argv) {

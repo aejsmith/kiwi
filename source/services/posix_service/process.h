@@ -16,34 +16,34 @@
 
 /**
  * @file
- * @brief               POSIX service IPC protocol.
+ * @brief               POSIX process class.
  */
 
 #pragma once
 
-#include <stdint.h>
+#include <core/ipc.h>
 
-#define POSIX_SERVICE_NAME "org.kiwi.posix"
+#include <kiwi/core/event_loop.h>
+#include <kiwi/core/handle.h>
 
-/** POSIX service message IDs. */
-enum {
-    /**
-     * Sends a signal to a process.
-     *
-     * Request:
-     *  - Data = posix_request_kill_t
-     *
-     * Reply:
-     *  - Data = posix_reply_kill_t
-     */
-    POSIX_REQUEST_KILL = 0,
+class Process {
+public:
+    Process(core_connection_t *connection, Kiwi::Core::Handle handle, process_id_t pid);
+    ~Process();
+
+    process_id_t pid() const { return m_pid; }
+
+private:
+    void handleHangupEvent();
+    void handleMessageEvent();
+
+    void handleKill(core_message_t *request);
+
+private:
+    core_connection_t *m_connection;
+    Kiwi::Core::Handle m_handle;
+    process_id_t m_pid;
+
+    Kiwi::Core::EventRef m_hangupEvent;
+    Kiwi::Core::EventRef m_messageEvent;
 };
-
-typedef struct posix_request_kill {
-    int32_t pid;
-    int32_t num;
-} posix_request_kill_t;
-
-typedef struct posix_reply_kill {
-    int32_t err;
-} posix_reply_kill_t;

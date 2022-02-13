@@ -57,6 +57,7 @@ sources = [File(f) for f in [
     'posix/mman.c',
     'posix/pipe.c',
     'posix/poll.c',
+    'posix/posix.c',
     'posix/process.c',
     'posix/pwd.c',
     'posix/signal.c',

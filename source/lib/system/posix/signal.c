@@ -20,6 +20,9 @@
  */
 
 #include <kernel/exception.h>
+#include <kernel/status.h>
+
+#include <services/posix_service.h>
 
 #include <errno.h>
 #include <setjmp.h>
@@ -27,7 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "libsystem.h"
+#include "posix/posix.h"
 
 /** Convert a kernel exception code to a signal number. */
 int exception_to_signal(unsigned code) {
@@ -54,19 +57,61 @@ int exception_to_signal(unsigned code) {
     }
 }
 
+static int do_kill(core_connection_t *conn, pid_t pid, int num) {
+    core_message_t *request = core_message_create_request(POSIX_REQUEST_KILL, sizeof(posix_request_kill_t));
+    if (!request) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    posix_request_kill_t *request_data = core_message_data(request);
+    request_data->pid = pid;
+    request_data->num = num;
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
+
+    posix_reply_kill_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return -1;
+    }
+
+    return 0;
+}
+
 /** Sends a signal to a process.
  * @param pid           ID of process.
  * @param num           Signal number.
  * @return              0 on success, -1 on failure. */
 int kill(pid_t pid, int num) {
-    libsystem_stub("raise", true);
-    return -1;
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    int ret = do_kill(conn, pid, num);
+    posix_service_put();
+    return ret;
 }
 
 /** Sends a signal to the current process.
  * @param num           Signal number.
  * @return              0 on success, -1 on failure. */
 int raise(int num) {
+    // TODO: Don't want to reach out to the POSIX service if we haven't connected
+    // to it, just handle internally.
     __asm__ volatile("ud2a");
     libsystem_stub("raise", true);
     return -1;

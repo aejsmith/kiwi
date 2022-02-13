@@ -21,17 +21,35 @@
 
 #pragma once
 
-#include <kernel/types.h>
+#include <kiwi/core/event_loop.h>
+#include <kiwi/core/handle.h>
+
+#include <memory>
+#include <unordered_map>
+
+class Process;
 
 class PosixService {
 public:
     PosixService();
     ~PosixService();
 
+    Kiwi::Core::EventLoop &eventLoop() { return m_eventLoop; }
+
     int run();
 
+    void removeProcess(Process *process);
+
 private:
-    handle_t m_port;
+    void handleConnectionEvent();
+
+private:
+    Kiwi::Core::Handle m_port;
+    Kiwi::Core::EventLoop m_eventLoop;
+
+    std::unordered_map<process_id_t, std::unique_ptr<Process>> m_processes;
+
+    Kiwi::Core::EventRef m_connectionEvent;
 };
 
 extern PosixService g_posixService;
