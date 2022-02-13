@@ -920,6 +920,23 @@ static const object_type_t process_object_type = {
     .unwait = process_object_unwait,
 };
 
+/**
+ * Creates a handle to a process and publishes it in the current process' handle
+ * table. A new reference will be added to the process.
+ *
+ * @param process       Process to publish.
+ * @param _id           If not NULL, a kernel location to store handle ID in.
+ * @param _uid          If not NULL, a user location to store handle ID in.
+ */
+status_t process_publish(process_t *process, handle_t *_id, handle_t *_uid) {
+    process_retain(process);
+
+    object_handle_t *handle = object_handle_create(&process_object_type, process);
+    status_t ret = object_handle_attach(handle, _id, _uid);
+    object_handle_release(handle);
+    return ret;
+}
+
 static status_t process_handle_lookup(handle_t handle, process_t **_process) {
     if (handle == PROCESS_SELF) {
         refcount_inc(&curr_proc->count);
@@ -1139,12 +1156,7 @@ status_t kern_process_create(
     /* Create a handle if necessary. */
     handle_t uhandle;
     if (_handle) {
-        refcount_inc(&process->count);
-
-        object_handle_t *khandle = object_handle_create(&process_object_type, process);
-        ret = object_handle_attach(khandle, &uhandle, _handle);
-        object_handle_release(khandle);
-
+        ret = process_publish(process, &uhandle, _handle);
         if (ret != STATUS_SUCCESS)
             goto out_release_process;
     }

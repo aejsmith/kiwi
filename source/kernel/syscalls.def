@@ -137,9 +137,10 @@ syscall kern_thread_control(uint, ptr_t, ptr_t) hidden;
 syscall kern_thread_restore() hidden;
 
 syscall kern_port_create(ptr_t);
-syscall kern_port_listen(handle_t, ptr_t, nstime_t, ptr_t);
+syscall kern_port_listen(handle_t, nstime_t, ptr_t);
 
 syscall kern_connection_open(handle_t, nstime_t, ptr_t);
+syscall kern_connection_open_remote(handle_t, ptr_t);
 syscall kern_connection_send(handle_t, ptr_t, ptr_t, handle_t, nstime_t);
 syscall kern_connection_receive(handle_t, ptr_t, ptr_t, nstime_t);
 syscall kern_connection_receive_data(handle_t, ptr_t);

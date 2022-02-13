@@ -23,6 +23,7 @@
 #include <core/service.h>
 
 #include <kernel/object.h>
+#include <kernel/process.h>
 #include <kernel/status.h>
 
 #include <inttypes.h>
@@ -49,15 +50,30 @@ int main(int argc, char **argv) {
 
     core_log(CORE_LOG_NOTICE, "server started and registered");
 
-    ipc_client_t client;
     handle_t handle;
-    ret = kern_port_listen(port, &client, -1, &handle);
+    ret = kern_port_listen(port, -1, &handle);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "server failed to listen for connection: %" PRId32, ret);
         return EXIT_FAILURE;
     }
 
-    core_log(CORE_LOG_NOTICE, "server got connection from PID %" PRId32, client.pid);
+    handle_t process;
+    ret = kern_connection_open_remote(handle, &process);
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_ERROR, "server failed to open remote: %" PRId32, ret);
+        return EXIT_FAILURE;
+    }
+
+    process_id_t pid;
+    ret = kern_process_id(process, &pid);
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_ERROR, "server failed to get remote PID: %" PRId32, ret);
+        return EXIT_FAILURE;
+    }
+
+    kern_handle_close(process);
+
+    core_log(CORE_LOG_NOTICE, "server got connection from PID %" PRId32, pid);
 
     core_connection_t *conn = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
     if (!conn)

@@ -124,6 +124,8 @@ extern void process_detach_thread(thread_t *thread);
 extern bool process_access_unsafe(process_t *process);
 extern bool process_access(process_t *process);
 
+extern status_t process_publish(process_t *process, handle_t *_id, handle_t *_uid);
+
 extern void process_exit(void) __noreturn;
 
 extern process_t *process_lookup_unsafe(process_id_t id);

@@ -64,7 +64,7 @@ int PosixService::run() {
 
     while (true) {
         handle_t handle;
-        ret = kern_port_listen(m_port, nullptr, -1, &handle);
+        ret = kern_port_listen(m_port, -1, &handle);
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_ERROR, "failed to listen on port: %" PRId32, ret);
             continue;

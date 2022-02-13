@@ -54,10 +54,10 @@ static bool spawn_client(handle_t port) {
     attrib.map       = map;
     attrib.map_count = 3;
 
-    const char *args[] = { "/system/bin/test-ipc", "--client", NULL };
+    const char *args[] = { "/system/bin/test_ipc", "--client", NULL };
     status_t ret = kern_process_create(args[0], args, (const char *const *)environ, 0, &attrib, NULL);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "Failed to create process: %d\n", ret);
+        fprintf(stderr, "Failed to create process: %" PRId32 "\n", ret);
         return false;
     }
 
@@ -70,25 +70,40 @@ static int test_server(void) {
     handle_t port;
     ret = kern_port_create(&port);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "Failed to create port: %d\n", ret);
+        fprintf(stderr, "Failed to create port: %" PRId32 "\n", ret);
         return EXIT_FAILURE;
     }
 
-    printf("Created port (handle: %d)\n", port);
+    printf("Created port (handle: %" PRId32 ")\n", port);
 
     if (!spawn_client(port))
         return EXIT_FAILURE;
 
-    ipc_client_t client;
     handle_t handle;
-    ret = kern_port_listen(port, &client, -1, &handle);
+    ret = kern_port_listen(port, -1, &handle);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "Server failed to listen for connection: %d\n", ret);
+        fprintf(stderr, "Server failed to listen for connection: %" PRId32 "\n", ret);
         return EXIT_FAILURE;
     }
 
-    printf("Server got connection (handle: %d)\n", handle);
-    printf("Client PID: %d\n", client.pid);
+    handle_t process;
+    ret = kern_connection_open_remote(handle, &process);
+    if (ret != STATUS_SUCCESS) {
+        fprintf(stderr, "Server failed to open remote: %" PRId32 "\n", ret);
+        return EXIT_FAILURE;
+    }
+
+    process_id_t pid;
+    ret = kern_process_id(process, &pid);
+    if (ret != STATUS_SUCCESS) {
+        fprintf(stderr, "Server failed to get remote PID: %" PRId32 "\n", ret);
+        return EXIT_FAILURE;
+    }
+
+    kern_handle_close(process);
+
+    printf("Server got connection (handle: %" PRId32 ")\n", handle);
+    printf("Client PID: %" PRId32 "\n", pid);
 
     core_connection_t *conn = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
     if (!conn)
@@ -97,7 +112,7 @@ static int test_server(void) {
     core_message_t *signal = core_message_create_signal(TEST_SIGNAL_START, 0);
     ret = core_connection_signal(conn, signal);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "Server failed to send signal: %d\n", ret);
+        fprintf(stderr, "Server failed to send signal: %" PRId32 "\n", ret);
         return EXIT_FAILURE;
     }
 
@@ -111,7 +126,7 @@ static int test_server(void) {
             if (ret == STATUS_CONN_HUNGUP) {
                 break;
             } else {
-                fprintf(stderr, "Server failed to receive message: %d\n", ret);
+                fprintf(stderr, "Server failed to receive message: %" PRId32 "\n", ret);
                 return EXIT_FAILURE;
             }
         }
@@ -139,7 +154,7 @@ static int test_server(void) {
 
         ret = core_connection_reply(conn, reply);
         if (ret != STATUS_SUCCESS) {
-            fprintf(stderr, "Server failed to send reply: %d\n", ret);
+            fprintf(stderr, "Server failed to send reply: %" PRId32 "\n", ret);
             return EXIT_FAILURE;
         }
 
@@ -158,7 +173,7 @@ static int test_client(void) {
     core_connection_t *conn;
     ret = core_connection_open(PROCESS_ROOT_PORT, -1, CORE_CONNECTION_RECEIVE_SIGNALS, &conn);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "Client failed to open connection: %d\n", ret);
+        fprintf(stderr, "Client failed to open connection: %" PRId32 "\n", ret);
         return EXIT_FAILURE;
     }
 
@@ -166,7 +181,7 @@ static int test_client(void) {
     core_message_t *signal;
     ret = core_connection_receive(conn, -1, &signal);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "Client failed to receive message: %d\n", ret);
+        fprintf(stderr, "Client failed to receive message: %" PRId32 "\n", ret);
         return EXIT_FAILURE;
     }
 
@@ -180,7 +195,7 @@ static int test_client(void) {
 
     core_message_destroy(signal);
 
-    printf("Client received start signal (handle: %d)\n", conn);
+    printf("Client received start signal (handle: %" PRId32 ")\n", conn);
 
     unsigned int count = 0;
     while (count < TEST_PING_COUNT) {
@@ -193,7 +208,7 @@ static int test_client(void) {
         core_message_t *reply;
         ret = core_connection_request(conn, request, &reply);
         if (ret != STATUS_SUCCESS) {
-            fprintf(stderr, "Client failed to send request: %d\n", ret);
+            fprintf(stderr, "Client failed to send request: %" PRId32 "\n", ret);
             return EXIT_FAILURE;
         }
 

@@ -46,12 +46,7 @@ typedef struct ipc_message {
 
 /** IPC message flags. */
 #define IPC_MESSAGE_HANDLE          (1<<0)  /**< Message has an attached handle. */
-
-/** Structure describing an IPC client. */
-typedef struct ipc_client {
-    process_id_t pid;                       /**< Connecting process ID. */
-    security_context_t security;            /**< Security context at time of connection. */
-} ipc_client_t;
+#define IPC_MESSAGE_SECURITY        (1<<1)  /**< Message has an attached security context. */
 
 /** IPC port event IDs. */
 #define PORT_EVENT_CONNECTION       0       /**< A connection is being made to the port. */
@@ -64,10 +59,11 @@ typedef struct ipc_client {
 #define PROCESS_ROOT_PORT           (-2)
 
 extern status_t kern_port_create(handle_t *_handle);
-extern status_t kern_port_listen(
-    handle_t handle, ipc_client_t *client, nstime_t timeout, handle_t *_handle);
+extern status_t kern_port_listen(handle_t handle, nstime_t timeout, handle_t *_handle);
 
 extern status_t kern_connection_open(handle_t port, nstime_t timeout, handle_t *_handle);
+
+extern status_t kern_connection_open_remote(handle_t handle, handle_t *_process);
 
 extern status_t kern_connection_send(
     handle_t handle, const ipc_message_t *msg, const void *data,

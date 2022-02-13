@@ -96,6 +96,13 @@ typedef struct ipc_endpoint {
 
     notifier_t hangup_notifier;         /**< Notifier for remote end being closed. */
     notifier_t message_notifier;        /**< Notifier for message arrival. */
+
+    /**
+     * Process owning this endpoint. Note that this does not bother holding a
+     * reference to the process since it will only be non-NULL while the
+     * endpoint is still open (and therefore the process is still alive).
+     */
+    process_t *process;
 } ipc_endpoint_t;
 
 /** IPC endpoint behaviour flags. */
@@ -124,7 +131,6 @@ typedef struct ipc_connection {
     /** Data used during connection setup. */
     list_t header;                      /**< Link to connection list. */
     condvar_t open_cvar;                /**< Condition for connecting thread to wait on. */
-    ipc_client_t *client;               /**< Pointer to client information structure. */
 } ipc_connection_t;
 
 /** Definitions for endpoint IDs. */

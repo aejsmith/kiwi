@@ -438,10 +438,12 @@ status_t ipc_connection_create(
     server->flags   = flags;
     server->ops     = ops;
     server->private = private;
+    server->process = NULL;
 
     client->flags   = 0;
     client->ops     = NULL;
     client->private = NULL;
+    client->process = curr_proc;
 
     status_t ret = object_handle_open(&connection_object_type, client, _id, _uid);
     if (ret != STATUS_SUCCESS) {
@@ -494,6 +496,10 @@ void ipc_connection_close(ipc_endpoint_t *endpoint) {
         ipc_kmessage_release(endpoint->pending);
         endpoint->pending = NULL;
     }
+
+    /* Process could be dying and therefore could be freed, make sure the remote
+     * can't open it. */
+    endpoint->process = NULL;
 
     assert(notifier_empty(&endpoint->hangup_notifier));
     assert(notifier_empty(&endpoint->message_notifier));
@@ -571,7 +577,8 @@ status_t ipc_connection_send(
 
     /* Save the message timestamp and security context. */
     msg->msg.timestamp = system_time();
-    memcpy(&msg->security, security_current_context(), sizeof(msg->security));
+    if (msg->msg.flags & IPC_MESSAGE_SECURITY)
+        memcpy(&msg->security, security_current_context(), sizeof(msg->security));
 
     if (remote->ops && remote->ops->receive) {
         mutex_unlock(&conn->lock);
@@ -747,14 +754,12 @@ status_t kern_port_create(handle_t *_handle) {
 /**
  * Listens for a connection on the given port. Only the process that created
  * a port may listen on it. When a connection is received, a handle to the
- * server side of the connection is returned, as well as details of the client
- * process (its PID and security context).
+ * server side of the connection is returned.
  *
  * Once created, connection objects have no relation to the port they were
  * opened on. If the port is destroyed, any active connections remain open.
  *
  * @param handle        Handle to port to listen on.
- * @param client        Where to store client information (can be NULL).
  * @param timeout       Timeout in nanoseconds. A negative value will block
  *                      until a connection attempt is received. A value of 0
  *                      will return an error immediately if no connection
@@ -771,7 +776,7 @@ status_t kern_port_create(handle_t *_handle) {
  *                      STATUS_INTERRUPTED if the calling thread is interrupted
  *                      while waiting for a connection.
  */
-status_t kern_port_listen(handle_t handle, ipc_client_t *client, nstime_t timeout, handle_t *_handle) {
+status_t kern_port_listen(handle_t handle, nstime_t timeout, handle_t *_handle) {
     status_t ret;
 
     if (!_handle)
@@ -809,12 +814,6 @@ status_t kern_port_listen(handle_t handle, ipc_client_t *client, nstime_t timeou
 
     ipc_endpoint_t *endpoint = &conn->endpoints[SERVER_ENDPOINT];
 
-    if (client) {
-        ret = memcpy_to_user(client, conn->client, sizeof(*client));
-        if (ret != STATUS_SUCCESS)
-            goto out_unlock_conn;
-    }
-
     refcount_inc(&conn->count);
     ret = object_handle_open(&connection_object_type, endpoint, NULL, _handle);
     if (ret != STATUS_SUCCESS) {
@@ -823,6 +822,8 @@ status_t kern_port_listen(handle_t handle, ipc_client_t *client, nstime_t timeou
         refcount_dec(&conn->count);
         goto out_unlock_conn;
     }
+
+    endpoint->process = curr_proc;
 
     /* Activate the connection and wake the connecting thread. */
     conn->state = IPC_CONNECTION_ACTIVE;
@@ -921,20 +922,17 @@ status_t kern_connection_open(handle_t port, nstime_t timeout, handle_t *_handle
         conn->endpoints[i].flags   = 0;
         conn->endpoints[i].ops     = NULL;
         conn->endpoints[i].private = NULL;
+        conn->endpoints[i].process = NULL;
     }
 
     ipc_endpoint_t *endpoint = &conn->endpoints[CLIENT_ENDPOINT];
+
+    endpoint->process = curr_proc;
 
     /* We initially set the reference count to 1 for the client. If connection
      * succeeds, the kern_port_listen() call will add a reference for the
      * server. */
     refcount_set(&conn->count, 1);
-
-    /* Save client information. */
-    ipc_client_t client;
-    client.pid = curr_proc->id;
-    memcpy(&client.security, security_current_context(), sizeof(client.security));
-    conn->client = &client;
 
     /* Queue the connection on the port. */
     list_append(&kport->waiting, &conn->header);
@@ -945,8 +943,6 @@ status_t kern_connection_open(handle_t port, nstime_t timeout, handle_t *_handle
     ret = condvar_wait_etc(&conn->open_cvar, &kport->lock, timeout, SLEEP_INTERRUPTIBLE);
 
     mutex_lock(&conn->lock);
-
-    conn->client = NULL;
 
     if (ret != STATUS_SUCCESS) {
         /* Even if the wait failed, the connection could have been accepted
@@ -983,6 +979,35 @@ status_t kern_connection_open(handle_t port, nstime_t timeout, handle_t *_handle
 out_unlock_port:
     mutex_unlock(&kport->lock);
     ipc_port_release(kport);
+    return ret;
+}
+
+/** Opens a handle to the process at the remote end of a connection.
+ * @param handle        Handle to connection.
+ * @param _process      Where to store handle to remote process.
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_NOT_FOUND if the remote process cannot be opened. */
+status_t kern_connection_open_remote(handle_t handle, handle_t *_process) {
+    status_t ret;
+
+    object_handle_t *khandle;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_CONNECTION, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    ipc_endpoint_t *endpoint = khandle->private;
+
+    {
+        MUTEX_SCOPED_LOCK(lock, &endpoint->conn->lock);
+
+        if (endpoint->remote->process) {
+            ret = process_publish(endpoint->remote->process, NULL, _process);
+        } else {
+            ret = STATUS_NOT_FOUND;
+        }
+    }
+
+    object_handle_release(khandle);
     return ret;
 }
 
@@ -1038,9 +1063,6 @@ static status_t copy_message_from_user(
             ret = STATUS_NOT_SUPPORTED;
             goto err;
         }
-    } else if (handle >= 0) {
-        ret = STATUS_INVALID_ARG;
-        goto err;
     }
 
     *_kmsg = kmsg;
@@ -1055,9 +1077,17 @@ err:
  * Queues a message at the remote end of a connection. Messages are sent
  * asynchronously. Message queues have a finite length to prevent flooding when
  * a process is not able to handle the volume of incoming messages: if the
- * remote message queue is full, this function can block. If a received data
- * buffer or handle are currently pending from a previous call to
- * kern_connection_receive(), they will be discarded.
+ * remote message queue is full, this function can block.
+ *
+ * Handles to transferrable objects can be attached to the message by setting
+ * IPC_MESSAGE_HANDLE in the message flags, and passing an object handle in the
+ * attached parameter.
+ *
+ * The calling thread's current security context can be attached to the message
+ * by setting IPC_MESSAGE_SECURITY in the message flags.
+ *
+ * If attachments to a previous message are currently pending from a previous
+ * call to kern_connection_receive(), they will be discarded.
  *
  * @param handle        Handle to connection.
  * @param msg           Message to send.
@@ -1121,15 +1151,20 @@ out_release_conn:
  * returned message, it can be retrieved by calling
  * kern_connection_receive_handle().
  *
- * Any attached data will be available until the next call to
+ * If it has the sending thread's security context (at the time the message was
+ * sent) attached, indicated by the IPC_MESSAGE_SECURITY flag in the returned
+ * message, it will be returned in the buffer given in the security parameter.
+ * If it does not, the supplied buffer (if any) will be zeroed. The caller
+ * should check for the flag before attempting to use the context.
+ *
+ * Any attachments will be available until the next call to
  * kern_connection_send() or kern_connection_receive() on the connection, at
- * which point data that has not been retrieved will be dropped.
+ * which point attachments that have not been retrieved will be dropped.
  *
  * @param handle        Handle to connection.
  * @param msg           Where to store received message.
- * @param security      Where to store the security context of the thread that
- *                      sent the message at the time the message was sent (can
- *                      be NULL).
+ * @param security      Where to store the security context of the sending
+ *                      thread, if attached (can be NULL).
  * @param timeout       Timeout in nanoseconds. A negative value will block
  *                      until a message is received. A value of 0 will return
  *                      an error immediately if there are no messages queued.
@@ -1176,7 +1211,12 @@ status_t kern_connection_receive(
     }
 
     if (security) {
-        ret = memcpy_to_user(security, &kmsg->security, sizeof(*security));
+        if (kmsg->msg.flags & IPC_MESSAGE_SECURITY) {
+            ret = memcpy_to_user(security, &kmsg->security, sizeof(*security));
+        } else {
+            ret = memset_user(security, 0, sizeof(*security));
+        }
+
         if (ret != STATUS_SUCCESS) {
             /* Same as above. */
             ipc_kmessage_release(kmsg);

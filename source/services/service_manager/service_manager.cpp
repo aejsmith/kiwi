@@ -149,12 +149,29 @@ void ServiceManager::handleEvent(const object_event_t &event) {
     assert(event.event == PORT_EVENT_CONNECTION);
 
     handle_t handle;
-    ipc_client_t ipcClient;
-    ret = kern_port_listen(m_port, &ipcClient, 0, &handle);
+    ret = kern_port_listen(m_port, 0, &handle);
     if (ret != STATUS_SUCCESS) {
         /* This may be harmless - client's connection attempt could be cancelled
          * between us receiving the event and calling listen, for instance. */
-        core_log(CORE_LOG_WARN, "failed to listen on port after connection event: %d", ret);
+        core_log(CORE_LOG_WARN, "failed to listen on port after connection event: %" PRId32, ret);
+        return;
+    }
+
+    process_id_t pid;
+    handle_t process;
+    ret = kern_connection_open_remote(handle, &process);
+    if (ret == STATUS_SUCCESS) {
+        ret = kern_process_id(process, &pid);
+        if (ret != STATUS_SUCCESS)
+            core_log(CORE_LOG_WARN, "failed to get client process ID: %" PRId32, ret);
+
+        kern_handle_close(process);
+    } else {
+        core_log(CORE_LOG_WARN, "failed to open client process handle: %" PRId32, ret);
+    }
+
+    if (ret != STATUS_SUCCESS) {
+        kern_handle_close(handle);
         return;
     }
 
@@ -165,13 +182,15 @@ void ServiceManager::handleEvent(const object_event_t &event) {
         return;
     }
 
-    Client* client = new Client(connection, ipcClient.pid);
+    Client* client = new Client(connection, pid);
 
-    /* See if this client matches one of our services. */
+    /* See if this client matches one of our services. Note that Service holds
+     * a handle to its process, so we can guarantee here that we're talking to
+     * the right process if the IDs match. */
     for (const auto &it : m_services) {
         Service *service = it.second.get();
 
-        if (service->processId() == ipcClient.pid) {
+        if (service->processId() == pid) {
             service->setClient(client);
             client->setService(service);
         }
