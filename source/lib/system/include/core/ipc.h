@@ -121,7 +121,7 @@ extern status_t core_connection_open(handle_t port, nstime_t timeout, uint32_t f
 extern void core_connection_close(core_connection_t *conn);
 extern void core_connection_destroy(core_connection_t *conn);
 
-extern handle_t core_connection_handle(core_connection_t *conn);
+extern handle_t core_connection_handle(const core_connection_t *conn);
 
 extern status_t core_connection_signal(core_connection_t *conn, core_message_t *signal);
 extern status_t core_connection_request(core_connection_t *conn, core_message_t *request, core_message_t **_reply);

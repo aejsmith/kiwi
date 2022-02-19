@@ -31,14 +31,14 @@
 
 #include <assert.h>
 
-Process::Process(core_connection_t *connection, Kiwi::Core::Handle handle, process_id_t pid) :
-    m_connection    (connection),
+Process::Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, process_id_t pid) :
+    m_connection    (std::move(connection)),
     m_handle        (std::move(handle)),
     m_pid           (pid)
 {
     core_log(CORE_LOG_DEBUG, "connection received from %" PRId32, m_pid);
 
-    handle_t connHandle = core_connection_handle(m_connection);
+    handle_t connHandle = m_connection.handle();
 
     m_hangupEvent = g_posixService.eventLoop().addEvent(
         connHandle, CONNECTION_EVENT_HANGUP, 0,
@@ -48,23 +48,21 @@ Process::Process(core_connection_t *connection, Kiwi::Core::Handle handle, proce
         [this] (const object_event_t &event) { handleMessageEvent(); });
 }
 
-Process::~Process() {
-    core_connection_close(m_connection);
-}
+Process::~Process() {}
 
 void Process::handleHangupEvent() {
     g_posixService.removeProcess(this);
 }
 
 void Process::handleMessageEvent() {
-    core_message_t *message;
-    status_t ret = core_connection_receive(m_connection, 0, &message);
+    Kiwi::Core::Message message;
+    status_t ret = m_connection.receive(0, message);
     if (ret != STATUS_SUCCESS)
         return;
 
-    assert(core_message_type(message) == CORE_MESSAGE_REQUEST);
+    assert(message.type() == Kiwi::Core::Message::kRequest);
 
-    uint32_t id = core_message_id(message);
+    uint32_t id = message.id();
     switch (id) {
         case POSIX_REQUEST_KILL:
             handleKill(message);
@@ -76,10 +74,8 @@ void Process::handleMessageEvent() {
                 id, m_pid);
             break;
     }
-
-    core_message_destroy(message);
 }
 
-void Process::handleKill(core_message_t *request) {
+void Process::handleKill(const Kiwi::Core::Message &request) {
     core_log(CORE_LOG_NOTICE, "kill request");
 }

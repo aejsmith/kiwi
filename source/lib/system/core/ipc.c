@@ -225,7 +225,7 @@ void core_connection_destroy(core_connection_t *conn) {
  *
  * @return              Underlying connection handle.
  */
-handle_t core_connection_handle(core_connection_t *conn) {
+handle_t core_connection_handle(const core_connection_t *conn) {
     libsystem_assert(conn);
 
     return conn->handle;

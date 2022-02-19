@@ -114,15 +114,13 @@ void PosixService::handleConnectionEvent() {
         return;
     }
 
-    core_connection_t *connection = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
-    if (!connection) {
+    Kiwi::Core::Connection connection;
+    if (!connection.create(std::move(handle), CORE_CONNECTION_RECEIVE_REQUESTS)) {
         core_log(CORE_LOG_WARN, "failed to create connection");
         return;
     }
 
-    handle.detach();
-
-    auto process = std::make_unique<Process>(connection, std::move(processHandle), pid);
+    auto process = std::make_unique<Process>(std::move(connection), std::move(processHandle), pid);
     m_processes.emplace(pid, std::move(process));
 }
 

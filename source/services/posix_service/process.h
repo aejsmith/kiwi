@@ -21,14 +21,13 @@
 
 #pragma once
 
-#include <core/ipc.h>
-
+#include <kiwi/core/connection.h>
 #include <kiwi/core/event_loop.h>
 #include <kiwi/core/handle.h>
 
 class Process {
 public:
-    Process(core_connection_t *connection, Kiwi::Core::Handle handle, process_id_t pid);
+    Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, process_id_t pid);
     ~Process();
 
     process_id_t pid() const { return m_pid; }
@@ -37,10 +36,10 @@ private:
     void handleHangupEvent();
     void handleMessageEvent();
 
-    void handleKill(core_message_t *request);
+    void handleKill(const Kiwi::Core::Message &request);
 
 private:
-    core_connection_t *m_connection;
+    Kiwi::Core::Connection m_connection;
     Kiwi::Core::Handle m_handle;
     process_id_t m_pid;
 
