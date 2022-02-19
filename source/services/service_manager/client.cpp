@@ -96,7 +96,7 @@ void Client::handleMessageEvent() {
 }
 
 void Client::handleConnect(core_message_t *request) {
-    core_message_t *reply = core_message_create_reply(request, sizeof(service_manager_reply_connect_t));
+    core_message_t *reply = core_message_create_reply(request, sizeof(service_manager_reply_connect_t), 0);
     if (!reply) {
         core_log(CORE_LOG_WARN, "failed to allocate reply message");
         return;
@@ -158,7 +158,7 @@ void Client::finishConnect(Service *service, core_message_t *reply) {
 }
 
 void Client::handleRegisterPort(core_message_t *request) {
-    core_message_t *reply = core_message_create_reply(request, sizeof(service_manager_reply_register_port_t));
+    core_message_t *reply = core_message_create_reply(request, sizeof(service_manager_reply_register_port_t), 0);
     if (!reply) {
         core_log(CORE_LOG_WARN, "failed to allocate reply message");
         return;

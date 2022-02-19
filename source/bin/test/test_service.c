@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
 
     unsigned int count = 0;
     while (count < TEST_PING_COUNT) {
-        core_message_t *request = core_message_create_request(TEST_REQUEST_PING, sizeof(test_request_ping_t));
+        core_message_t *request = core_message_create_request(TEST_REQUEST_PING, sizeof(test_request_ping_t), 0);
 
         test_request_ping_t *ping = (test_request_ping_t *)core_message_data(request);
         ping->index = count;

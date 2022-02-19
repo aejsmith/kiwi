@@ -93,7 +93,9 @@ enum {
 
     /**
      * Receive security credentials in messages on this connection. This can be
-     * omitted when not needed to reduce some CPU/allocation overhead.
+     * omitted when not needed to reduce some CPU/allocation overhead. Note
+     * that messages will only actually have a security context attached if the
+     * sender attached it.
      */
     CORE_CONNECTION_RECEIVE_SECURITY = (1<<2),
 };
@@ -108,6 +110,12 @@ typedef enum core_message_type {
     CORE_MESSAGE_REPLY   = 2,               /**< Reply to a previous request from the other side. */
 } core_message_type_t;
 
+/** Message flags. */
+enum {
+    /** Message should attach a security context when sent. */
+    CORE_MESSAGE_SEND_SECURITY  = (1<<1),
+};
+
 extern core_connection_t *core_connection_create(handle_t handle, uint32_t flags);
 extern status_t core_connection_open(handle_t port, nstime_t timeout, uint32_t flags, core_connection_t **_conn);
 extern void core_connection_close(core_connection_t *conn);
@@ -120,9 +128,9 @@ extern status_t core_connection_request(core_connection_t *conn, core_message_t 
 extern status_t core_connection_reply(core_connection_t *conn, core_message_t *reply);
 extern status_t core_connection_receive(core_connection_t *conn, nstime_t timeout, core_message_t **_message);
 
-extern core_message_t *core_message_create_signal(uint32_t id, size_t size);
-extern core_message_t *core_message_create_request(uint32_t id, size_t size);
-extern core_message_t *core_message_create_reply(const core_message_t *request, size_t size);
+extern core_message_t *core_message_create_signal(uint32_t id, size_t size, uint32_t flags);
+extern core_message_t *core_message_create_request(uint32_t id, size_t size, uint32_t flags);
+extern core_message_t *core_message_create_reply(const core_message_t *request, size_t size, uint32_t flags);
 extern void core_message_destroy(core_message_t *message);
 
 extern core_message_type_t core_message_type(const core_message_t *message);

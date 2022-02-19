@@ -58,7 +58,9 @@ int exception_to_signal(unsigned code) {
 }
 
 static int do_kill(core_connection_t *conn, pid_t pid, int num) {
-    core_message_t *request = core_message_create_request(POSIX_REQUEST_KILL, sizeof(posix_request_kill_t));
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_KILL, sizeof(posix_request_kill_t),
+        CORE_MESSAGE_SEND_SECURITY);
     if (!request) {
         errno = ENOMEM;
         return -1;

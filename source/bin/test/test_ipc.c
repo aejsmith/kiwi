@@ -109,7 +109,7 @@ static int test_server(void) {
     if (!conn)
         return EXIT_FAILURE;
 
-    core_message_t *signal = core_message_create_signal(TEST_SIGNAL_START, 0);
+    core_message_t *signal = core_message_create_signal(TEST_SIGNAL_START, 0, 0);
     ret = core_connection_signal(conn, signal);
     if (ret != STATUS_SUCCESS) {
         fprintf(stderr, "Server failed to send signal: %" PRId32 "\n", ret);
@@ -146,7 +146,7 @@ static int test_server(void) {
 
         printf("Server received: %u '%s' (timestamp: %" PRIu64 ")\n", ping->index, ping->string, timestamp);
 
-        core_message_t *reply = core_message_create_reply(request, sizeof(test_request_ping_t));
+        core_message_t *reply = core_message_create_reply(request, sizeof(test_request_ping_t), 0);
 
         test_request_ping_t *pong = (test_request_ping_t *)core_message_data(reply);
         pong->index = ping->index;
@@ -199,7 +199,7 @@ static int test_client(void) {
 
     unsigned int count = 0;
     while (count < TEST_PING_COUNT) {
-        core_message_t *request = core_message_create_request(TEST_REQUEST_PING, sizeof(test_request_ping_t));
+        core_message_t *request = core_message_create_request(TEST_REQUEST_PING, sizeof(test_request_ping_t), 0);
 
         test_request_ping_t *ping = (test_request_ping_t *)core_message_data(request);
         ping->index = count;

@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     if (!conn)
         return EXIT_FAILURE;
 
-    core_message_t *signal = core_message_create_signal(TEST_SIGNAL_START, 0);
+    core_message_t *signal = core_message_create_signal(TEST_SIGNAL_START, 0, 0);
     ret = core_connection_signal(conn, signal);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "server failed to send signal: %" PRId32, ret);
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
 
         core_log(CORE_LOG_NOTICE, "server received: %u '%s' (timestamp: %" PRIu64 ")", ping->index, ping->string, timestamp);
 
-        core_message_t *reply = core_message_create_reply(request, sizeof(test_request_ping_t));
+        core_message_t *reply = core_message_create_reply(request, sizeof(test_request_ping_t), 0);
 
         test_request_ping_t *pong = (test_request_ping_t *)core_message_data(reply);
         pong->index = ping->index;

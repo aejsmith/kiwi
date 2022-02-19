@@ -219,7 +219,7 @@ bool Terminal::handleClientMessages() {
 core_message_t *Terminal::handleClientOpenHandle(core_message_t *request) {
     auto requestData = reinterpret_cast<const terminal_request_open_handle_t *>(core_message_data(request));
 
-    core_message_t *reply = core_message_create_reply(request, sizeof(terminal_reply_open_handle_t));
+    core_message_t *reply = core_message_create_reply(request, sizeof(terminal_reply_open_handle_t), 0);
     if (!reply) {
         core_log(CORE_LOG_ERROR, "failed to create message");
         return nullptr;
@@ -246,7 +246,7 @@ core_message_t *Terminal::handleClientInput(core_message_t *request) {
     for (size_t i = 0; i < requestSize; i++)
         addInput(requestData[i]);
 
-    core_message_t *reply = core_message_create_reply(request, sizeof(terminal_reply_input_t));
+    core_message_t *reply = core_message_create_reply(request, sizeof(terminal_reply_input_t), 0);
     if (!reply) {
         core_log(CORE_LOG_ERROR, "failed to create message");
         return nullptr;
@@ -566,7 +566,7 @@ void Terminal::signalReadEvents() {
 status_t Terminal::sendOutput(const void *data, size_t size) {
     status_t ret;
 
-    core_message_t *signal = core_message_create_signal(TERMINAL_SIGNAL_OUTPUT, size);
+    core_message_t *signal = core_message_create_signal(TERMINAL_SIGNAL_OUTPUT, size, 0);
     if (signal) {
         memcpy(core_message_data(signal), data, size);
 

@@ -31,7 +31,8 @@ enum {
      * Sends a signal to a process.
      *
      * Request:
-     *  - Data = posix_request_kill_t
+     *  - Data  = posix_request_kill_t
+     *  - Flags = CORE_MESSAGE_SEND_SECURITY
      *
      * Reply:
      *  - Data = posix_reply_kill_t

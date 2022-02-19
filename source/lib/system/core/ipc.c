@@ -69,13 +69,16 @@ enum {
 /** Total amount of data that can be sent inline in the kernel message. */
 #define CORE_MESSAGE_INLINE_DATA_MAX    ((IPC_MESSAGE_ARGS_COUNT - CORE_MESSAGE_ARG_FIRST_DATA) * sizeof(uint64_t))
 
-/** Message flags. */
+/** Internal message flags. */
 enum {
+    /** Select only user-facing flags. */
+    CORE_MESSAGE_USER_FLAGS_MASK    = (1<<16) - 1,
+
     /** Message has a security context attached to it. */
-    CORE_MESSAGE_SECURITY    = (1<<0),
+    CORE_MESSAGE_HAS_SECURITY       = (1<<16),
 
     /** Message owns the attached handle. */
-    CORE_MESSAGE_OWNS_HANDLE = (1<<1),
+    CORE_MESSAGE_OWNS_HANDLE        = (1<<17),
 };
 
 /** Default timeout for sending signals/replies. TODO: Make this configurable. */
@@ -85,7 +88,7 @@ static size_t calc_message_alloc_size(size_t size, uint32_t flags) {
     /* Whole message is allocated in one chunk. */
     size_t alloc_size = sizeof(core_message_t);
 
-    if (flags & CORE_MESSAGE_SECURITY)
+    if (flags & CORE_MESSAGE_HAS_SECURITY)
         alloc_size += sizeof(security_context_t);
 
     /* Data is inlined into the base message if small enough. */
@@ -113,6 +116,9 @@ static core_message_t *create_message(core_message_type_t type, uint32_t id, siz
     message->message.args[CORE_MESSAGE_ARG_TOTAL_SIZE] = size;
     message->flags                                     = flags;
     message->handle                                    = INVALID_HANDLE;
+
+    if (flags & CORE_MESSAGE_SEND_SECURITY)
+        message->message.flags |= IPC_MESSAGE_SECURITY;
 
     return message;
 }
@@ -279,7 +285,11 @@ static status_t receive_message(core_connection_t *conn, nstime_t timeout, core_
         return STATUS_SUCCESS;
     }
 
-    uint32_t flags    = (conn->flags & CORE_CONNECTION_RECEIVE_SECURITY) ? CORE_MESSAGE_SECURITY : 0;
+    uint32_t flags = 0;
+
+    if (conn->flags & CORE_CONNECTION_RECEIVE_SECURITY && kmessage.flags & IPC_MESSAGE_SECURITY)
+        flags |= CORE_MESSAGE_HAS_SECURITY;
+
     size_t total_size = kmessage.args[CORE_MESSAGE_ARG_TOTAL_SIZE];
 
     /* Prevent a malicious client from causing us to overallocate. */
@@ -298,7 +308,7 @@ static status_t receive_message(core_connection_t *conn, nstime_t timeout, core_
     memcpy(&message->message, &kmessage, sizeof(kmessage));
     message->flags = flags;
 
-    if (conn->flags & CORE_CONNECTION_RECEIVE_SECURITY)
+    if (flags & CORE_MESSAGE_HAS_SECURITY)
         memcpy((void *)core_message_security(message), &security, sizeof(security));
 
     /* Check for consistency between user-supplied total size and kernel-
@@ -462,13 +472,14 @@ status_t core_connection_receive(core_connection_t *conn, nstime_t timeout, core
  *
  * @param id            Message ID.
  * @param size          Size of message data.
+ * @param flags         Message flags.
  *
  * @return              Allocated message, destroy with core_message_destroy()
  *                      once no longer needed.
  *                      NULL on failure.
  */
-core_message_t *core_message_create_signal(uint32_t id, size_t size) {
-    return create_message(CORE_MESSAGE_SIGNAL, id, size, 0);
+core_message_t *core_message_create_signal(uint32_t id, size_t size, uint32_t flags) {
+    return create_message(CORE_MESSAGE_SIGNAL, id, size, flags & CORE_MESSAGE_USER_FLAGS_MASK);
 }
 
 /**
@@ -476,13 +487,14 @@ core_message_t *core_message_create_signal(uint32_t id, size_t size) {
  *
  * @param id            Message ID.
  * @param size          Size of message data.
+ * @param flags         Message flags.
  *
  * @return              Allocated message, destroy with core_message_destroy()
  *                      once no longer needed.
  *                      NULL on failure.
  */
-core_message_t *core_message_create_request(uint32_t id, size_t size) {
-    return create_message(CORE_MESSAGE_REQUEST, id, size, 0);
+core_message_t *core_message_create_request(uint32_t id, size_t size, uint32_t flags) {
+    return create_message(CORE_MESSAGE_REQUEST, id, size, flags & CORE_MESSAGE_USER_FLAGS_MASK);
 }
 
 /**
@@ -490,17 +502,18 @@ core_message_t *core_message_create_request(uint32_t id, size_t size) {
  *
  * @param request       Request that this is a reply to.
  * @param size          Size of message data.
+ * @param flags         Message flags.
  *
  * @return              Allocated message, destroy with core_message_destroy()
  *                      once no longer needed.
  *                      NULL on failure.
  */
-core_message_t *core_message_create_reply(const core_message_t *request, size_t size) {
+core_message_t *core_message_create_reply(const core_message_t *request, size_t size, uint32_t flags) {
     libsystem_assert(request);
 
     uint32_t id = core_message_id(request);
 
-    core_message_t *message = create_message(CORE_MESSAGE_REPLY, id, size, 0);
+    core_message_t *message = create_message(CORE_MESSAGE_REPLY, id, size, flags & CORE_MESSAGE_USER_FLAGS_MASK);
     if (!message)
         return NULL;
 
@@ -563,19 +576,20 @@ nstime_t core_message_timestamp(const core_message_t *message) {
 }
 
 /**
- * Get the security context of a message's sender. This is only valid for
+ * Get the security context of a message's sender. This is only available for
  * messages returned by core_connection_receive() on a connection which has
- * CORE_CONNECTION_RECEIVE_SECURITY enabled.
+ * CORE_CONNECTION_RECEIVE_SECURITY enabled, and for which the sender attached
+ * a security context.
  *
  * @param message       Message object.
  *
  * @return              Security context of the message.
- *                      NULL if the message has no security context information.
+ *                      NULL if the message has no security context attached.
  */
 const security_context_t *core_message_security(const core_message_t *message) {
     libsystem_assert(message);
 
-    return (message->flags & CORE_MESSAGE_SECURITY)
+    return (message->flags & CORE_MESSAGE_HAS_SECURITY)
         ? (const security_context_t *)((const char *)message + sizeof(core_message_t))
         : NULL;
 }
@@ -595,7 +609,7 @@ void *core_message_data(core_message_t *message) {
     } else {
         size_t offset = sizeof(core_message_t);
 
-        if (message->flags & CORE_MESSAGE_SECURITY)
+        if (message->flags & CORE_MESSAGE_HAS_SECURITY)
             offset += sizeof(security_context_t);
 
         data = (char *)message + offset;

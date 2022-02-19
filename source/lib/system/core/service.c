@@ -94,7 +94,7 @@ status_t core_service_connect(
     while (ret == STATUS_CONN_HUNGUP) {
         core_message_t *request = core_message_create_request(
             SERVICE_MANAGER_REQUEST_CONNECT,
-            sizeof(service_manager_request_connect_t) + name_len);
+            sizeof(service_manager_request_connect_t) + name_len, 0);
         if (!request) {
             ret = STATUS_NO_MEMORY;
             break;
@@ -163,7 +163,7 @@ status_t core_service_register_port(handle_t port) {
     if (ret != STATUS_SUCCESS)
         return ret;
 
-    core_message_t *request = core_message_create_request(SERVICE_MANAGER_REQUEST_REGISTER_PORT, 0);
+    core_message_t *request = core_message_create_request(SERVICE_MANAGER_REQUEST_REGISTER_PORT, 0, 0);
     if (!request)
         return STATUS_NO_MEMORY;
 

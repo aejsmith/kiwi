@@ -77,7 +77,7 @@ bool Terminal::init() {
     const uint32_t handleAccess[2] = { FILE_ACCESS_READ, FILE_ACCESS_WRITE };
     for (int i = 0; i < 2; i++) {
         core_message_t *request =
-            core_message_create_request(TERMINAL_REQUEST_OPEN_HANDLE, sizeof(terminal_request_open_handle_t));
+            core_message_create_request(TERMINAL_REQUEST_OPEN_HANDLE, sizeof(terminal_request_open_handle_t), 0);
 
         auto requestData = reinterpret_cast<terminal_request_open_handle_t *>(core_message_data(request));
         requestData->access = handleAccess[i];
@@ -230,7 +230,7 @@ void Terminal::flushInput() {
     if (m_inputBatchSize == 0)
         return;
 
-    core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, m_inputBatchSize);
+    core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, m_inputBatchSize, 0);
 
     memcpy(core_message_data(request), m_inputBatch, m_inputBatchSize);
 
