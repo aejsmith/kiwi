@@ -59,18 +59,16 @@ bool Service::setPort(Kiwi::Core::Handle port) {
     }
 }
 
-void Service::addPendingConnect(Client *client, core_message_t *reply) {
+void Service::addPendingConnect(Client *client, Kiwi::Core::Message reply) {
     PendingConnect &connect = m_pendingConnects.emplace_back();
 
     connect.client = client;
-    connect.reply  = reply;
+    connect.reply  = std::move(reply);
 }
 
 void Service::removePendingConnects(Client *client) {
     for (auto it = m_pendingConnects.begin(); it != m_pendingConnects.end(); ) {
         if (it->client == client) {
-            /* We have to destroy this reply since the client won't do it. */
-            core_message_destroy(it->reply);
             it = m_pendingConnects.erase(it);
         } else {
             ++it;

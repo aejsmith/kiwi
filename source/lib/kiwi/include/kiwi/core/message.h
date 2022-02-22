@@ -75,8 +75,8 @@ namespace Kiwi {
             size_t size() const;
             nstime_t timestamp() const;
             const security_context_t *security() const;
-            void *data();
-            const void *data() const;
+            template <typename T = void> T *data();
+            template <typename T = void> const T *data() const;
 
             void attachHandle(handle_t handle, bool own = false);
             handle_t detachHandle();
@@ -216,13 +216,15 @@ namespace Kiwi {
         }
 
         /** @see                core_message_data(). */
-        inline void *Message::data() {
-            return core_message_data(m_message);
+        template <typename T>
+        inline T *Message::data() {
+            return reinterpret_cast<T *>(core_message_data(m_message));
         }
 
         /** @see                core_message_data(). */
-        inline const void *Message::data() const {
-            return const_cast<const void *>(core_message_data(m_message));
+        template <typename T>
+        inline const T *Message::data() const {
+            return reinterpret_cast<T *>(core_message_data(m_message));
         }
 
         /** @see                core_message_attach_handle(). */

@@ -40,12 +40,12 @@
 
 #include <assert.h>
 
-Client::Client(core_connection_t *connection, process_id_t processId) :
-    m_connection (connection),
+Client::Client(Kiwi::Core::Connection connection, process_id_t processId) :
+    m_connection (std::move(connection)),
     m_processId  (processId),
     m_service    (nullptr)
 {
-    handle_t handle = core_connection_handle(m_connection);
+    handle_t handle = m_connection.handle();
 
     m_hangupEvent = g_serviceManager.eventLoop().addEvent(
         handle, CONNECTION_EVENT_HANGUP, 0,
@@ -61,8 +61,6 @@ Client::~Client() {
 
     for (Service *service : m_pendingConnects)
         service->removePendingConnects(this);
-
-    core_connection_close(m_connection);
 }
 
 void Client::handleHangupEvent() {
@@ -70,14 +68,14 @@ void Client::handleHangupEvent() {
 }
 
 void Client::handleMessageEvent() {
-    core_message_t *message;
-    status_t ret = core_connection_receive(m_connection, 0, &message);
+    Kiwi::Core::Message message;
+    status_t ret = m_connection.receive(0, message);
     if (ret != STATUS_SUCCESS)
         return;
 
-    assert(core_message_type(message) == CORE_MESSAGE_REQUEST);
+    assert(message.type() == Kiwi::Core::Message::kRequest);
 
-    uint32_t id = core_message_id(message);
+    uint32_t id = message.id();
     switch (id) {
         case SERVICE_MANAGER_REQUEST_CONNECT:
             handleConnect(message);
@@ -91,20 +89,18 @@ void Client::handleMessageEvent() {
                 id, m_processId);
             break;
     }
-
-    core_message_destroy(message);
 }
 
-void Client::handleConnect(core_message_t *request) {
-    core_message_t *reply = core_message_create_reply(request, sizeof(service_manager_reply_connect_t), 0);
-    if (!reply) {
+void Client::handleConnect(Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(service_manager_reply_connect_t))) {
         core_log(CORE_LOG_WARN, "failed to allocate reply message");
         return;
     }
 
-    auto replyData = reinterpret_cast<service_manager_reply_connect_t *>(core_message_data(reply));
+    auto replyData = reply.data<service_manager_reply_connect_t>();
 
-    size_t requestSize = core_message_size(request);
+    size_t requestSize = request.size();
 
     Service *service = nullptr;
     bool canReply    = true;
@@ -112,7 +108,7 @@ void Client::handleConnect(core_message_t *request) {
     if (requestSize <= sizeof(service_manager_request_connect_t)) {
         replyData->result = STATUS_INVALID_ARG;
     } else {
-        auto requestData = reinterpret_cast<service_manager_request_connect_t *>(core_message_data(request));
+        auto requestData = request.data<service_manager_request_connect_t>();
 
         size_t nameSize = requestSize - sizeof(service_manager_request_connect_t);
         requestData->name[nameSize - 1] = 0;
@@ -129,7 +125,7 @@ void Client::handleConnect(core_message_t *request) {
              * replying. */
             canReply = service->port() != INVALID_HANDLE;
             if (!canReply) {
-                service->addPendingConnect(this, reply);
+                service->addPendingConnect(this, std::move(reply));
                 m_pendingConnects.emplace_back(service);
             }
         } else {
@@ -142,32 +138,30 @@ void Client::handleConnect(core_message_t *request) {
         finishConnect(service, reply);
 }
 
-void Client::finishConnect(Service *service, core_message_t *reply) {
+void Client::finishConnect(Service *service, Kiwi::Core::Message &reply) {
     if (service) {
         assert(service->port() != INVALID_HANDLE);
-        core_message_attach_handle(reply, service->port(), false);
+        reply.attachHandle(service->port(), false);
 
         m_pendingConnects.remove(service);
     }
 
-    status_t ret = core_connection_reply(m_connection, reply);
+    status_t ret = m_connection.reply(reply);
     if (ret != STATUS_SUCCESS)
         core_log(CORE_LOG_WARN, "failed to send reply message: %" PRId32, ret);
-
-    core_message_destroy(reply);
 }
 
-void Client::handleRegisterPort(core_message_t *request) {
-    core_message_t *reply = core_message_create_reply(request, sizeof(service_manager_reply_register_port_t), 0);
-    if (!reply) {
+void Client::handleRegisterPort(Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(service_manager_reply_register_port_t))) {
         core_log(CORE_LOG_WARN, "failed to allocate reply message");
         return;
     }
 
-    auto replyData = reinterpret_cast<service_manager_reply_register_port_t *>(core_message_data(reply));
+    auto replyData = reply.data<service_manager_reply_register_port_t>();
 
     if (m_service) {
-        Kiwi::Core::Handle port(core_message_detach_handle(request));
+        Kiwi::Core::Handle port(request.detachHandle());
 
         if (port.isValid()) {
             if (m_service->setPort(std::move(port))) {
@@ -182,9 +176,7 @@ void Client::handleRegisterPort(core_message_t *request) {
         replyData->result = STATUS_INVALID_REQUEST;
     }
 
-    status_t ret = core_connection_reply(m_connection, reply);
+    status_t ret = m_connection.reply(reply);
     if (ret != STATUS_SUCCESS)
         core_log(CORE_LOG_WARN, "failed to send reply message: %" PRId32, ret);
-
-    core_message_destroy(reply);
 }

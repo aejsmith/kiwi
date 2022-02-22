@@ -23,6 +23,7 @@
 
 #include <kiwi/core/event_loop.h>
 #include <kiwi/core/handle.h>
+#include <kiwi/core/message.h>
 
 #include <list>
 #include <string>
@@ -53,7 +54,7 @@ public:
     void setClient(Client *client) { m_client = client; }
     bool setPort(Kiwi::Core::Handle port);
 
-    void addPendingConnect(Client *client, core_message_t *reply);
+    void addPendingConnect(Client *client, Kiwi::Core::Message reply);
     void removePendingConnects(Client *client);
 
     bool start();
@@ -61,7 +62,7 @@ public:
 private:
     struct PendingConnect {
         Client *client;
-        core_message_t *reply;
+        Kiwi::Core::Message reply;
     };
 
 private:

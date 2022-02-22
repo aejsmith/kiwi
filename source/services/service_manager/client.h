@@ -21,8 +21,7 @@
 
 #pragma once
 
-#include <core/ipc.h>
-
+#include <kiwi/core/connection.h>
 #include <kiwi/core/event_loop.h>
 
 #include <list>
@@ -32,24 +31,24 @@ class Service;
 /** Represents a client connection. */
 class Client {
 public:
-    Client(core_connection_t *connection, process_id_t processId);
+    Client(Kiwi::Core::Connection connection, process_id_t processId);
     ~Client();
 
     Service *service() const { return m_service; }
 
     void setService(Service *service) { m_service = service; }
 
-    void finishConnect(Service *service, core_message_t *reply);
+    void finishConnect(Service *service, Kiwi::Core::Message &reply);
 
 private:
     void handleHangupEvent();
     void handleMessageEvent();
 
-    void handleConnect(core_message_t *request);
-    void handleRegisterPort(core_message_t *request);
+    void handleConnect(Kiwi::Core::Message &request);
+    void handleRegisterPort(Kiwi::Core::Message &request);
 
 private:
-    core_connection_t *m_connection;
+    Kiwi::Core::Connection m_connection;
     process_id_t m_processId;
     Service *m_service;
     std::list<Service *> m_pendingConnects;

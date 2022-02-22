@@ -139,15 +139,15 @@ void ServiceManager::handleConnectionEvent() {
     if (ret != STATUS_SUCCESS)
         return;
 
-    core_connection_t *connection = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
-    if (!connection) {
+    Kiwi::Core::Connection connection;
+    if (!connection.create(std::move(handle), Kiwi::Core::Connection::kReceiveRequests)) {
         core_log(CORE_LOG_WARN, "failed to create connection");
         return;
     }
 
     handle.detach();
 
-    Client* client = new Client(connection, pid);
+    Client* client = new Client(std::move(connection), pid);
 
     /* See if this client matches one of our services. Note that Service holds
      * a handle to its process, so we can guarantee here that we're talking to

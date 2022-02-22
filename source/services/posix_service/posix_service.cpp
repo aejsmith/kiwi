@@ -115,7 +115,10 @@ void PosixService::handleConnectionEvent() {
     }
 
     Kiwi::Core::Connection connection;
-    if (!connection.create(std::move(handle), CORE_CONNECTION_RECEIVE_REQUESTS)) {
+    if (!connection.create(
+            std::move(handle),
+            Kiwi::Core::Connection::kReceiveRequests | Kiwi::Core::Connection::kReceiveSecurity))
+    {
         core_log(CORE_LOG_WARN, "failed to create connection");
         return;
     }
