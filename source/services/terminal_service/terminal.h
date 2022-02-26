@@ -21,8 +21,7 @@
 
 #pragma once
 
-#include <core/ipc.h>
-
+#include <kiwi/core/connection.h>
 #include <kiwi/core/handle.h>
 
 #include <termios.h>
@@ -32,7 +31,7 @@
 
 class Terminal {
 public:
-    Terminal(core_connection_t *connection);
+    Terminal(Kiwi::Core::Connection connection);
     ~Terminal();
 
     void run();
@@ -61,8 +60,8 @@ private:
     bool handleEvent(object_event_t &event);
 
     bool handleClientMessages();
-    core_message_t *handleClientOpenHandle(core_message_t *request);
-    core_message_t *handleClientInput(core_message_t *request);
+    Kiwi::Core::Message handleClientOpenHandle(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleClientInput(Kiwi::Core::Message &request);
 
     bool handleFileMessages();
     status_t handleFileRead(const ipc_message_t &message);
@@ -86,7 +85,7 @@ private:
     void clearBuffer();
 
 private:
-    core_connection_t *const m_connection;
+    Kiwi::Core::Connection m_connection;
     std::thread m_thread;
     Kiwi::Core::Handle m_userFile;
     Kiwi::Core::Handle m_userFileConnection;

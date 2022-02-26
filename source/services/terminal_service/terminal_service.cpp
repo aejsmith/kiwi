@@ -63,16 +63,14 @@ int TerminalService::run() {
             continue;
         }
 
-        core_connection_t *connection = core_connection_create(handle, CORE_CONNECTION_RECEIVE_REQUESTS);
-        if (!connection) {
+        Kiwi::Core::Connection connection;
+        if (!connection.create(std::move(handle), Kiwi::Core::Connection::kReceiveRequests)) {
             core_log(CORE_LOG_WARN, "failed to create connection");
             continue;
         }
 
-        handle.detach();
-
         /* Each connection (terminal) runs in its own thread. */
-        Terminal *terminal = new Terminal(connection);
+        Terminal *terminal = new Terminal(std::move(connection));
         terminal->run();
     }
 

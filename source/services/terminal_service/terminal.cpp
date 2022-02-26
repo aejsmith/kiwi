@@ -42,8 +42,8 @@ static constexpr uint64_t kSupportedUserFileOps =
     USER_FILE_SUPPORTED_OP_WAIT |
     USER_FILE_SUPPORTED_OP_UNWAIT;
 
-Terminal::Terminal(core_connection_t *connection) :
-    m_connection         (connection),
+Terminal::Terminal(Kiwi::Core::Connection connection) :
+    m_connection         (std::move(connection)),
     m_escaped            (false),
     m_inhibited          (false),
     m_inputBufferStart   (0),
@@ -77,9 +77,7 @@ Terminal::Terminal(core_connection_t *connection) :
     m_winsize.ws_row       = 25;
 }
 
-Terminal::~Terminal() {
-    core_connection_close(m_connection);
-}
+Terminal::~Terminal() {}
 
 void Terminal::run() {
     status_t ret;
@@ -102,7 +100,7 @@ void Terminal::thread() {
     core_log(CORE_LOG_DEBUG, "terminal started");
 
     std::array<object_event_t, 4> events;
-    events[0].handle = core_connection_handle(m_connection);
+    events[0].handle = m_connection.handle();
     events[0].event  = CONNECTION_EVENT_HANGUP;
     events[1].handle = events[0].handle;
     events[1].event  = CONNECTION_EVENT_MESSAGE;
@@ -137,7 +135,7 @@ void Terminal::thread() {
 }
 
 bool Terminal::handleEvent(object_event_t &event) {
-    if (event.handle == core_connection_handle(m_connection)) {
+    if (event.handle == m_connection.handle()) {
         switch (event.event) {
             case CONNECTION_EVENT_HANGUP:
                 core_log(CORE_LOG_DEBUG, "client hung up, closing terminal");
@@ -175,8 +173,8 @@ bool Terminal::handleClientMessages() {
     while (true) {
         status_t ret;
 
-        core_message_t *message;
-        ret = core_connection_receive(m_connection, 0, &message);
+        Kiwi::Core::Message message;
+        ret = m_connection.receive(0, message);
         if (ret == STATUS_WOULD_BLOCK) {
             return false;
         } else if (ret == STATUS_CONN_HUNGUP) {
@@ -186,11 +184,11 @@ bool Terminal::handleClientMessages() {
             return false;
         }
 
-        assert(core_message_type(message) == CORE_MESSAGE_REQUEST);
+        assert(message.type() == Kiwi::Core::Message::kRequest);
 
-        core_message_t *reply = nullptr;
+        Kiwi::Core::Message reply;
 
-        uint32_t id = core_message_id(message);
+        uint32_t id = message.id();
         switch (id) {
             case TERMINAL_REQUEST_OPEN_HANDLE:
                 reply = handleClientOpenHandle(message);
@@ -203,29 +201,25 @@ bool Terminal::handleClientMessages() {
                 break;
         }
 
-        if (reply) {
-            ret = core_connection_reply(m_connection, reply);
-
-            core_message_destroy(reply);
+        if (reply.isValid()) {
+            ret = m_connection.reply(reply);
 
             if (ret != STATUS_SUCCESS && ret != STATUS_CANCELLED)
                 core_log(CORE_LOG_WARN, "failed to send reply: %" PRId32, ret);
         }
-
-        core_message_destroy(message);
     }
 }
 
-core_message_t *Terminal::handleClientOpenHandle(core_message_t *request) {
-    auto requestData = reinterpret_cast<const terminal_request_open_handle_t *>(core_message_data(request));
+Kiwi::Core::Message Terminal::handleClientOpenHandle(Kiwi::Core::Message &request) {
+    auto requestData = request.data<terminal_request_open_handle_t>();
 
-    core_message_t *reply = core_message_create_reply(request, sizeof(terminal_reply_open_handle_t), 0);
-    if (!reply) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(terminal_reply_open_handle_t))) {
         core_log(CORE_LOG_ERROR, "failed to create message");
-        return nullptr;
+        return Kiwi::Core::Message();
     }
 
-    auto replyData = reinterpret_cast<terminal_reply_open_handle_t *>(core_message_data(reply));
+    auto replyData = reply.data<terminal_reply_open_handle_t>();
     replyData->result = STATUS_SUCCESS;
 
     handle_t handle;
@@ -233,26 +227,26 @@ core_message_t *Terminal::handleClientOpenHandle(core_message_t *request) {
     if (ret != STATUS_SUCCESS) {
         replyData->result = STATUS_TRY_AGAIN;
     } else {
-        core_message_attach_handle(reply, handle, true);
+        reply.attachHandle(handle, true);
     }
 
     return reply;
 }
 
-core_message_t *Terminal::handleClientInput(core_message_t *request) {
-    auto requestData   = reinterpret_cast<unsigned char *>(core_message_data(request));
-    size_t requestSize = core_message_size(request);
+Kiwi::Core::Message Terminal::handleClientInput(Kiwi::Core::Message &request) {
+    auto requestData   = request.data<unsigned char>();
+    size_t requestSize = request.size();
 
     for (size_t i = 0; i < requestSize; i++)
         addInput(requestData[i]);
 
-    core_message_t *reply = core_message_create_reply(request, sizeof(terminal_reply_input_t), 0);
-    if (!reply) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(terminal_reply_input_t))) {
         core_log(CORE_LOG_ERROR, "failed to create message");
-        return nullptr;
+        return Kiwi::Core::Message();
     }
 
-    auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_data(reply));
+    auto replyData = reply.data<terminal_reply_input_t>();
     replyData->result = STATUS_SUCCESS;
 
     return reply;
@@ -566,17 +560,15 @@ void Terminal::signalReadEvents() {
 status_t Terminal::sendOutput(const void *data, size_t size) {
     status_t ret;
 
-    core_message_t *signal = core_message_create_signal(TERMINAL_SIGNAL_OUTPUT, size, 0);
-    if (signal) {
-        memcpy(core_message_data(signal), data, size);
+    Kiwi::Core::Message signal;
+    if (signal.createSignal(TERMINAL_SIGNAL_OUTPUT, size)) {
+        memcpy(signal.data<void>(), data, size);
 
-        ret = core_connection_signal(m_connection, signal);
+        ret = m_connection.signal(signal);
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_WARN, "failed to send signal: %" PRId32, ret);
             ret = STATUS_DEVICE_ERROR;
         }
-
-        core_message_destroy(signal);
     } else {
         core_log(CORE_LOG_ERROR, "failed to create message");
         ret = STATUS_NO_MEMORY;
