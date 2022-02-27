@@ -36,7 +36,7 @@ private:
     void handleHangupEvent();
     void handleMessageEvent();
 
-    void handleKill(const Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleKill(const Kiwi::Core::Message &request);
 
 private:
     Kiwi::Core::Connection m_connection;

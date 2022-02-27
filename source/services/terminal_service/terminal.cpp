@@ -204,7 +204,7 @@ bool Terminal::handleClientMessages() {
         if (reply.isValid()) {
             ret = m_connection.reply(reply);
 
-            if (ret != STATUS_SUCCESS && ret != STATUS_CANCELLED)
+            if (ret != STATUS_SUCCESS)
                 core_log(CORE_LOG_WARN, "failed to send reply: %" PRId32, ret);
         }
     }

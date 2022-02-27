@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <core/log.h>
+
 #include <kiwi/core/event_loop.h>
 #include <kiwi/core/handle.h>
 
@@ -28,6 +30,15 @@
 #include <unordered_map>
 
 class Process;
+
+/** Define to enable debug output from the POSIX service. */
+#define DEBUG_POSIX_SERVICE
+
+#ifdef DEBUG_POSIX_SERVICE
+#   define debug_log(fmt...)    core_log(CORE_LOG_DEBUG, fmt)
+#else
+#   define debug_log(fmt...)
+#endif
 
 class PosixService {
 public:

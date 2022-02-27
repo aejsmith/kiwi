@@ -54,7 +54,10 @@ int main(int argc, char **argv) {
     }
 
     kern_thread_sleep(core_msecs_to_nsecs(500), NULL);
-    kill(pid, SIGTERM);
+
+    int ret = kill(pid, SIGTERM);
+    if (ret != 0)
+        perror("kill");
 
     waitpid(-1, NULL, 0);
     return EXIT_SUCCESS;

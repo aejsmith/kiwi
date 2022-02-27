@@ -27,16 +27,19 @@
 #include <kernel/process.h>
 #include <kernel/status.h>
 
+#include <kiwi/core/token_setter.h>
+
 #include <services/posix_service.h>
 
 #include <assert.h>
+#include <errno.h>
 
 Process::Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, process_id_t pid) :
     m_connection    (std::move(connection)),
     m_handle        (std::move(handle)),
     m_pid           (pid)
 {
-    core_log(CORE_LOG_DEBUG, "connection received from %" PRId32, m_pid);
+    debug_log("connection received from PID %" PRId32, m_pid);
 
     handle_t connHandle = m_connection.handle();
 
@@ -51,6 +54,7 @@ Process::Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, p
 Process::~Process() {}
 
 void Process::handleHangupEvent() {
+    /* This destroys the Process, don't access this after. */
     g_posixService.removeProcess(this);
 }
 
@@ -62,10 +66,12 @@ void Process::handleMessageEvent() {
 
     assert(message.type() == Kiwi::Core::Message::kRequest);
 
+    Kiwi::Core::Message reply;
+
     uint32_t id = message.id();
     switch (id) {
         case POSIX_REQUEST_KILL:
-            handleKill(message);
+            reply = handleKill(message);
             break;
 
         default:
@@ -74,8 +80,49 @@ void Process::handleMessageEvent() {
                 id, m_pid);
             break;
     }
+
+    if (reply.isValid()) {
+        ret = m_connection.reply(reply);
+        if (ret != STATUS_SUCCESS)
+            core_log(CORE_LOG_WARN, "failed to send reply: %" PRId32, ret);
+    }
 }
 
-void Process::handleKill(const Kiwi::Core::Message &request) {
-    core_log(CORE_LOG_NOTICE, "kill request");
+Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
+    status_t ret;
+
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(posix_reply_kill_t))) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return Kiwi::Core::Message();
+    }
+
+    auto replyData = reply.data<posix_reply_kill_t>();
+    replyData->err = 0;
+
+    const security_context_t *security = request.security();
+
+    if (request.size() != sizeof(posix_request_kill_t) || !security) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    auto requestData = request.data<posix_request_kill_t>();
+
+    debug_log("kill(%" PRId32 ", %" PRId32 ") from PID %" PRId32, requestData->pid, requestData->num, m_pid);
+
+    {
+        Kiwi::Core::TokenSetter token;
+        ret = token.set(security);
+        if (ret != STATUS_SUCCESS) {
+            core_log(CORE_LOG_WARN, "failed to set security context: %" PRId32);
+            replyData->err = EPERM;
+            return reply;
+        }
+
+
+    }
+
+    replyData->err = ENOSYS;
+    return reply;
 }
