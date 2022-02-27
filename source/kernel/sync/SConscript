@@ -18,6 +18,7 @@ Import('config', 'kern_sources')
 from util import FeatureSources
 
 kern_sources += FeatureSources(config, [
+    'condition.c',
     'condvar.c',
     'futex.c',
     'mutex.c',

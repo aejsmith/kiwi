@@ -47,6 +47,7 @@ enum {
     OBJECT_TYPE_CONNECTION      = 9,        /**< Connection (non-transferrable). */
     OBJECT_TYPE_SEMAPHORE       = 10,       /**< Semaphore (transferrable). */
     OBJECT_TYPE_PROCESS_GROUP   = 11,       /**< Process Group (non-transferrable). */
+    OBJECT_TYPE_CONDITION       = 12,       /**< Condition (transferrable). */
 };
 
 /** Flags for handle table entries. */

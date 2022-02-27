@@ -185,3 +185,6 @@ syscall kern_socket_shutdown(handle_t, int);
 syscall kern_socket_sockatmark(handle_t, ptr_t);
 syscall kern_socket_create(sa_family_t, int, int, uint32_t, ptr_t);
 syscall kern_socket_create_pair(sa_family_t, int, int, uint32_t, ptr_t);
+
+syscall kern_condition_set(handle_t, bool);
+syscall kern_condition_create(ptr_t);
