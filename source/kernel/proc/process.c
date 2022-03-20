@@ -1502,6 +1502,31 @@ status_t kern_process_id(handle_t handle, process_id_t *_id) {
 }
 
 /**
+ * Check whether the calling thread has privileged access to the given process,
+ * i.e. the user IDs match, or the caller has the PRIV_PROCESS_ADMIN privilege.
+ *
+ * @param handle        Handle to process.
+ *
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_ACCESS_DENIED if the caller does not have
+ *                      privileged access to the process.
+ *                      STATUS_INVALID_HANDLE if the handle is invalid.
+ */
+status_t kern_process_access(handle_t handle) {
+    status_t ret;
+
+    process_t *process;
+    ret = process_handle_lookup(handle, &process);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    ret = (process_access(process)) ? STATUS_SUCCESS : STATUS_ACCESS_DENIED;
+
+    process_release(process);
+    return ret;
+}
+
+/**
  * Gets the given process' security context. This is only useful to query a
  * process' current identity, as it returns only the context content, rather
  * than a token object containing it. No special privilege is required to get

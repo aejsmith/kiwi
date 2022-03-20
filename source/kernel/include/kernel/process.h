@@ -103,6 +103,7 @@ extern status_t kern_process_clone(handle_t *_handle);
 
 extern status_t kern_process_open(process_id_t id, handle_t *_handle);
 extern status_t kern_process_id(handle_t handle, process_id_t *_id);
+extern status_t kern_process_access(handle_t handle);
 extern status_t kern_process_security(handle_t handle, security_context_t *ctx);
 extern status_t kern_process_port(handle_t handle, int32_t id, handle_t *_handle);
 extern status_t kern_process_status(handle_t handle, int *_status, int *_reason);
