@@ -1407,6 +1407,8 @@ status_t kern_process_clone(handle_t *_handle) {
     elf_process_clone(process, curr_proc);
     memcpy(&process->exceptions, &curr_proc->exceptions, sizeof(process->exceptions));
 
+    process->thread_restore = curr_proc->thread_restore;
+
     mutex_unlock(&curr_proc->lock);
 
     /* Create a new handle. This takes over the initial reference added by

@@ -679,6 +679,10 @@ void thread_at_kernel_exit(void) {
              * execute that instead. No point doing so for the moment because
              * trying to do that will just fail again. When implementing this
              * make sure to preserve the original IPL properly. */
+            kprintf(
+                LOG_WARN, "thread: failed to set up interrupt for thread %" PRId32 " (%" PRId32 "), killing process %" PRId32 "\n",
+                curr_thread->id, ret, curr_proc->id);
+
             curr_proc->reason = EXIT_REASON_KILLED;
             process_exit();
         }

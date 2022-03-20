@@ -255,6 +255,11 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
     if (ret != STATUS_SUCCESS)
         return ret;
 
+    if (!curr_proc->thread_restore) {
+        kprintf(LOG_WARN, "thread: no thread restore function set for process %" PRId32 "\n", curr_proc->id);
+        return STATUS_INVALID_ADDR;
+    }
+
     /* Write return address. */
     ret = write_user((ptr_t *)ret_addr, curr_proc->thread_restore);
     if (ret != STATUS_SUCCESS)
