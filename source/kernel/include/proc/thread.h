@@ -69,7 +69,7 @@ typedef struct thread {
 
     /** Main thread information. */
     void *kstack;                       /**< Kernel stack pointer. */
-    unsigned flags;                     /**< Flags for the thread. */
+    uint32_t flags;                     /**< Flags for the thread. */
     int priority;                       /**< Priority of the thread. */
     size_t wired;                       /**< How many calls to thread_wire() have been made. */
     size_t preempt_count;               /**< Whether preemption is disabled. */
@@ -105,7 +105,7 @@ typedef struct thread {
     refcount_t count;
 
     /** User mode interrupt information. */
-    unsigned ipl;                       /**< User mode interrupt priority level. */
+    uint32_t ipl;                       /**< User mode interrupt priority level. */
     list_t interrupts;                  /**< Pending user mode interrupts. */
     list_t callbacks;                   /**< Event callbacks registered by this thread. */
 
@@ -165,7 +165,7 @@ typedef void (*thread_post_interrupt_cb_t)(struct thread_interrupt *interrupt);
 /** User mode thread interrupt structure. */
 typedef struct thread_interrupt {
     list_t header;                      /**< Link to interrupt list. */
-    unsigned priority;                  /**< Interrupt priority. */
+    uint32_t priority;                  /**< Interrupt priority. */
     thread_post_interrupt_cb_t post_cb; /**< Post-setup callback. */
     void *cb_data;                      /**< Argument for callback. */
 
@@ -204,8 +204,8 @@ extern void arch_thread_switch(thread_t *thread, thread_t *prev);
 extern void arch_thread_set_tls_addr(ptr_t addr);
 extern void arch_thread_user_setup(struct frame *frame, ptr_t entry, ptr_t sp, ptr_t arg);
 extern void arch_thread_user_enter(struct frame *frame) __noreturn;
-extern status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl);
-extern status_t arch_thread_interrupt_restore(unsigned *_ipl);
+extern status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, uint32_t ipl);
+extern status_t arch_thread_interrupt_restore(uint32_t *_ipl);
 
 extern void thread_trampoline(void);
 
@@ -230,7 +230,7 @@ extern thread_t *thread_lookup_unsafe(thread_id_t id);
 extern thread_t *thread_lookup(thread_id_t id);
 
 extern status_t thread_create(
-    const char *name, struct process *owner, unsigned flags, thread_func_t func,
+    const char *name, struct process *owner, uint32_t flags, thread_func_t func,
     void *arg1, void *arg2, thread_t **_thread);
 extern void thread_run(thread_t *thread);
 

@@ -198,7 +198,7 @@ void arch_thread_user_setup(frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
  * @param interrupt     Interrupt to execute.
  * @param ipl           Previous IPL.
  * @return              Status code describing result of the operation. */
-status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl) {
+status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, uint32_t ipl) {
     status_t ret;
 
     frame_t *frame = curr_thread->arch.user_frame;
@@ -281,7 +281,7 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, unsigned ipl
 /** Restore previous state after returning from a user mode interrupt.
  * @param _ipl          Where to store previous IPL.
  * @return              Status code describing result of the operation. */
-status_t arch_thread_interrupt_restore(unsigned *_ipl) {
+status_t arch_thread_interrupt_restore(uint32_t *_ipl) {
     frame_t *frame = curr_thread->arch.user_frame;
     assert(frame->cs & 3);
 

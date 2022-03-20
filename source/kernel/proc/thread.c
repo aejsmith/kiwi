@@ -660,7 +660,7 @@ void thread_at_kernel_exit(void) {
         assert(interrupt->priority >= curr_thread->ipl);
 
         /* Raise the IPL to block further interrupts. */
-        unsigned ipl = curr_thread->ipl;
+        uint32_t ipl = curr_thread->ipl;
         curr_thread->ipl = interrupt->priority + 1;
 
         spinlock_unlock(&curr_thread->lock);
@@ -1361,7 +1361,7 @@ status_t kern_thread_kill(handle_t handle) {
  *                      STATUS_INVALID_ARG if _ipl is NULL.
  *                      STATUS_INVALID_ADDR if _ipl is an invalid address.
  */
-status_t kern_thread_ipl(unsigned *_ipl) {
+status_t kern_thread_ipl(uint32_t *_ipl) {
     if (!_ipl)
         return STATUS_INVALID_ARG;
 
@@ -1374,31 +1374,58 @@ status_t kern_thread_ipl(unsigned *_ipl) {
  * than the current IPL, any pending interrupts which have become unblocked
  * will be executed.
  *
+ * @param mode          How to set the IPL (THREAD_SET_IPL_*).
  * @param ipl           New IPL (must be less than or equal to THREAD_IPL_MAX).
+ * @param _prev_ipl     Where to store previous IPL (can be NULL).
  *
  * @return              STATUS_SUCCESS on success.
- *                      STATUS_INVALID_ARG if the new IPL is invalid.
+ *                      STATUS_INVALID_ARG if the new IPL or the mode is invalid.
  */
-status_t kern_thread_set_ipl(unsigned ipl) {
+status_t kern_thread_set_ipl(uint32_t mode, uint32_t ipl, uint32_t *_prev_ipl) {
     if (ipl > THREAD_IPL_MAX)
         return STATUS_INVALID_ARG;
 
+    status_t ret = STATUS_SUCCESS;
+
     spinlock_lock(&curr_thread->lock);
 
-    curr_thread->ipl = ipl;
+    uint32_t prev_ipl = curr_thread->ipl;
 
-    /* Check whether there are any pending interrupts that have now become
-     * unblocked. If so they, set the flag so that they will be executed when we
-     * return to user mode. */
-    curr_thread->flags &= ~THREAD_INTERRUPTED;
-    if (!list_empty(&curr_thread->interrupts)) {
-        thread_interrupt_t *interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
-        if (interrupt->priority >= ipl)
-            curr_thread->flags |= THREAD_INTERRUPTED;
+    bool should_set = false;
+    switch (mode) {
+        case THREAD_SET_IPL_ALWAYS:
+            should_set = true;
+            break;
+
+        case THREAD_SET_IPL_RAISE:
+            should_set = ipl > prev_ipl;
+            break;
+
+        default:
+            ret = STATUS_INVALID_ARG;
+            break;
+    }
+
+    if (should_set) {
+        curr_thread->ipl = ipl;
+
+        /* Check whether there are any pending interrupts that have now become
+         * unblocked. If so, set the flag so that they will be executed when we
+         * return to user mode. */
+        curr_thread->flags &= ~THREAD_INTERRUPTED;
+        if (!list_empty(&curr_thread->interrupts)) {
+            thread_interrupt_t *interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
+            if (interrupt->priority >= ipl)
+                curr_thread->flags |= THREAD_INTERRUPTED;
+        }
     }
 
     spinlock_unlock(&curr_thread->lock);
-    return STATUS_SUCCESS;
+
+    if (ret == STATUS_SUCCESS && _prev_ipl)
+        ret = write_user(_prev_ipl, prev_ipl);
+
+    return ret;
 }
 
 /**
@@ -1626,7 +1653,7 @@ status_t kern_thread_control(unsigned action, const void *in, void *out) {
 void kern_thread_restore(void) {
     status_t ret;
 
-    unsigned ipl;
+    uint32_t ipl;
     ret = arch_thread_interrupt_restore(&ipl);
     if (ret != STATUS_SUCCESS) {
         /* TODO: Same as in thread_at_kernel_exit(). */
@@ -1634,7 +1661,7 @@ void kern_thread_restore(void) {
         process_exit();
     }
 
-    ret = kern_thread_set_ipl(ipl);
+    ret = kern_thread_set_ipl(THREAD_SET_IPL_ALWAYS, ipl, NULL);
     if (ret != STATUS_SUCCESS) {
         curr_proc->reason = EXIT_REASON_KILLED;
         process_exit();

@@ -91,7 +91,7 @@ typedef void (*object_callback_t)(object_event_t *event, struct thread_context *
 
 extern status_t kern_object_type(handle_t handle, unsigned *_type);
 extern status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags, nstime_t timeout);
-extern status_t kern_object_callback(object_event_t *event, object_callback_t callback, unsigned priority);
+extern status_t kern_object_callback(object_event_t *event, object_callback_t callback, uint32_t priority);
 
 extern status_t kern_handle_flags(handle_t handle, uint32_t *_flags);
 extern status_t kern_handle_set_flags(handle_t handle, uint32_t flags);

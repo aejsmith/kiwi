@@ -89,7 +89,7 @@ typedef struct object_wait {
             /** Callback function. */
             object_callback_t callback;
 
-            unsigned priority;      /**< Callback priority. */
+            uint32_t priority;      /**< Callback priority. */
 
             /** Pre-allocated interrupt structure. */
             thread_interrupt_t *interrupt;
@@ -1023,7 +1023,7 @@ out:
  *                      STATUS_INVALID_EVENT if an invalid event ID is used.
  *                      STATUS_NOT_SUPPORTED if OBJECT_EVENT_EDGE is not set.
  */
-status_t kern_object_callback(object_event_t *event, object_callback_t callback, unsigned priority) {
+status_t kern_object_callback(object_event_t *event, object_callback_t callback, uint32_t priority) {
     status_t ret;
 
     if (!event || priority >= THREAD_IPL_EXCEPTION) {

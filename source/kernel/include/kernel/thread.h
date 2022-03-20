@@ -60,24 +60,39 @@ typedef int (*thread_entry_t)(void *arg);
 
 /** Saved thread context. */
 typedef struct thread_context {
-    cpu_context_t cpu;              /**< CPU context (register state, etc). */
-    unsigned ipl;                   /**< Interrupt priority level. */
+    cpu_context_t cpu;                  /**< CPU context (register state, etc). */
+    uint32_t ipl;                       /**< Interrupt priority level. */
 } thread_context_t;
 
 /** Handle value used to refer to the current thread. */
 #define THREAD_SELF             INVALID_HANDLE
 
 /** Thread object events. */
-#define THREAD_EVENT_DEATH      1   /**< Wait for thread death. */
+enum {
+    THREAD_EVENT_DEATH          = 1,    /**< Wait for thread death. */
+};
 
 /** Thread priority values. */
-#define THREAD_PRIORITY_LOW     0   /**< Low priority. */
-#define THREAD_PRIORITY_NORMAL  1   /**< Normal priority. */
-#define THREAD_PRIORITY_HIGH    2   /**< High priority. */
+enum {
+    THREAD_PRIORITY_LOW         = 0,    /**< Low priority. */
+    THREAD_PRIORITY_NORMAL      = 1,    /**< Normal priority. */
+    THREAD_PRIORITY_HIGH        = 2,    /**< High priority. */
+};
 
 /** Thread interrupt priority level (IPL) definitions. */
-#define THREAD_IPL_EXCEPTION    14  /**< Exception level. */
-#define THREAD_IPL_MAX          15  /**< Maximum IPL (all interrupts blocked). */
+enum {
+    THREAD_IPL_EXCEPTION        = 14,   /**< Exception level. */
+    THREAD_IPL_MAX              = 15,   /**< Maximum IPL (all interrupts blocked). */
+};
+
+/** Modes for kern_thread_set_ipl(). */
+enum {
+    /** Set the IPL to the given value regardless of its current value. */
+    THREAD_SET_IPL_ALWAYS       = 0,
+
+    /** Only set the IPL if it is higher than the current IPL. */
+    THREAD_SET_IPL_RAISE        = 1,
+};
 
 extern status_t kern_thread_create(
     const char *name, thread_entry_t entry, void *arg,
@@ -88,8 +103,8 @@ extern status_t kern_thread_security(handle_t handle, security_context_t *ctx);
 extern status_t kern_thread_status(handle_t handle, int *_status, int *_reason);
 extern status_t kern_thread_kill(handle_t handle);
 
-extern status_t kern_thread_ipl(unsigned *_ipl);
-extern status_t kern_thread_set_ipl(unsigned ipl);
+extern status_t kern_thread_ipl(uint32_t *_ipl);
+extern status_t kern_thread_set_ipl(uint32_t mode, uint32_t ipl, uint32_t *_prev_ipl);
 extern status_t kern_thread_token(handle_t *_handle);
 extern status_t kern_thread_set_token(handle_t handle);
 extern status_t kern_thread_set_exception_handler(unsigned code, exception_handler_t handler);
