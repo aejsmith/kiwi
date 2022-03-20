@@ -20,6 +20,7 @@
  */
 
 #include <core/time.h>
+#include <core/utility.h>
 
 #include <kernel/thread.h>
 
@@ -28,37 +29,71 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static void child_process(void) {
+static void child_process_default(void) {
+    printf("Test default handler\n");
+
     while (true) {
-        printf("Child running\n");
+        printf("- Child running\n");
         kern_thread_sleep(core_secs_to_nsecs(1), NULL);
     }
 }
 
-int main(int argc, char **argv) {
-    // Notes:
-    //  - Need to change IPL to take posix_service_lock in case the signal is
-    //    received while lock held by handler thread (will this be good enough?
-    //    what is the behaviour of receiving callback while IPL blocks it).
-    //  - Need security context send support in core_connection.
-    //  - Need to handle exec behaviour somehow - ignored signals (except
-    //    SIGCHLD) should be inherited.
+static volatile bool signal_received = false;
 
-    int pid = fork();
-    if (pid == 0) {
-        child_process();
-        return EXIT_SUCCESS;
-    } else if (pid == -1) {
-        perror("fork");
-        return EXIT_FAILURE;
+static void signal_handler(int num, siginfo_t *info, void *context) {
+    printf("- Signal handler (num: %d, pid: %d)\n", num, info->si_pid);
+    signal_received = true;
+}
+
+static void child_process_custom(void) {
+    printf("Test custom handler\n");
+
+    sigaction_t action = {};
+    action.sa_flags = SA_SIGINFO;
+    action.sa_sigaction = signal_handler;
+
+    int ret = sigaction(SIGTERM, &action, NULL);
+    if (ret != 0) {
+        perror("sigaction");
+        return;
     }
 
-    kern_thread_sleep(core_msecs_to_nsecs(500), NULL);
+    while (!signal_received) {
+        printf("- Child running\n");
+        kern_thread_sleep(core_secs_to_nsecs(1), NULL);
+    }
+}
 
-    int ret = kill(pid, SIGTERM);
-    if (ret != 0)
-        perror("kill");
+static void (*test_functions[])() = {
+    child_process_default,
+    child_process_custom,
+};
 
-    waitpid(-1, NULL, 0);
+int main(int argc, char **argv) {
+    for (size_t i = 0; i < core_array_size(test_functions); i++) {
+        int pid = fork();
+        if (pid == 0) {
+            test_functions[i]();
+            return EXIT_SUCCESS;
+        } else if (pid == -1) {
+            perror("fork");
+            return EXIT_FAILURE;
+        }
+
+        kern_thread_sleep(core_msecs_to_nsecs(500), NULL);
+
+        int ret = kill(pid, SIGTERM);
+        if (ret != 0) {
+            perror("kill");
+            return EXIT_FAILURE;
+        }
+
+        int status;
+        waitpid(-1, &status, 0);
+        printf("Exited with status 0x%x\n", status);
+    }
+
+    //kill(getpid(), SIGTERM);
+    //printf("Why am I here?\n");
     return EXIT_SUCCESS;
 }

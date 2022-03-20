@@ -25,6 +25,14 @@
 
 __SYS_EXTERN_C_BEGIN
 
+/**
+ * When a process is killed due to a POSIX signal, the signal information is
+ * communicated in the status code passed to kern_process_kill(). A magic value
+ * is set in the upper 16 bits to identify a status code that originated from
+ * a POSIX signal.
+ */
+#define __POSIX_KILLED_STATUS   0x5dba
+
 /** Process exit status codes. */
 #define __WEXITED       (1<<0)      /**< Process exited normally. */
 #define __WSIGNALED     (1<<1)      /**< Process exited because of a signal. */

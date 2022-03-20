@@ -72,6 +72,11 @@ int PosixService::run() {
     return EXIT_SUCCESS;
 }
 
+Process *PosixService::findProcess(int32_t pid) {
+    auto ret = m_processes.find(pid);
+    return (ret != m_processes.end()) ? ret->second.get() : nullptr;
+}
+
 void PosixService::removeProcess(Process *process) {
     auto ret = m_processes.find(process->pid());
 

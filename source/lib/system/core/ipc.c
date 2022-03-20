@@ -468,7 +468,7 @@ status_t core_connection_receive(core_connection_t *conn, nstime_t timeout, core
 }
 
 /**
- * Create a signal message.
+ * Create a signal message. Arguments and data will be zeroed.
  *
  * @param id            Message ID.
  * @param size          Size of message data.
@@ -483,7 +483,7 @@ core_message_t *core_message_create_signal(uint32_t id, size_t size, uint32_t fl
 }
 
 /**
- * Create a request message.
+ * Create a request message. Arguments and data will be zeroed.
  *
  * @param id            Message ID.
  * @param size          Size of message data.
@@ -498,7 +498,7 @@ core_message_t *core_message_create_request(uint32_t id, size_t size, uint32_t f
 }
 
 /**
- * Create a reply message.
+ * Create a reply message. Arguments and data will be zeroed.
  *
  * @param request       Request that this is a reply to.
  * @param size          Size of message data.

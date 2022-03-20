@@ -140,9 +140,17 @@ static inline int convert_exit_status(int status, int reason) {
         case EXIT_REASON_NORMAL:
             return (status << 8) | __WEXITED;
         case EXIT_REASON_KILLED:
+            if (((uint32_t)status >> 16) == __POSIX_KILLED_STATUS) {
+                int32_t signal = status & 0xffff;
+                if (signal >= 1 && signal < NSIG)
+                    return (signal << 8) | __WSIGNALED;
+            }
+
+            /* Must have come from a non-POSIX use of kern_process_kill(), so
+             * just say it was SIGKILL. */
             return (SIGKILL << 8) | __WSIGNALED;
         case EXIT_REASON_EXCEPTION:
-            return (exception_to_signal(status) << 8) | __WSIGNALED;
+            return (posix_signal_from_exception(status) << 8) | __WSIGNALED;
         default:
             libsystem_log(CORE_LOG_WARN, "unhandled exit reason %d", reason);
             return __WEXITED;

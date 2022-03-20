@@ -29,6 +29,12 @@
 __SYS_EXTERN_C_BEGIN
 
 /**
+ * Kernel IPL that POSIX signals are raised with. While a signal handler is
+ * executing, the handling thread's IPL is raised to 1 above this.
+ */
+#define POSIX_SIGNAL_IPL    8
+
+/**
  * Signal number definitions. Values of default action:
  *  - A: Abnormal termination with core dump.
  *  - T: Abnormal termination.
@@ -195,10 +201,8 @@ extern void psiginfo(const siginfo_t *info, const char *s);
 /* int pthread_kill(pthread_t, int); */
 /* int pthread_sigmask(int, const sigset_t *, sigset_t *); */
 extern int raise(int num);
-extern int sigaction(
-    int num, const struct sigaction *__restrict act,
-    struct sigaction *__restrict oldact);
-extern int sigaltstack(const stack_t *__restrict ss, stack_t *__restrict oldss);
+extern int sigaction(int num, const sigaction_t *__restrict act, sigaction_t *__restrict old_act);
+extern int sigaltstack(const stack_t *__restrict ss, stack_t *__restrict old_ss);
 extern int sigaddset(sigset_t *set, int num);
 extern int sigdelset(sigset_t *set, int num);
 extern int sigemptyset(sigset_t *set);

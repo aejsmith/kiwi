@@ -32,7 +32,7 @@
 class Process;
 
 /** Define to enable debug output from the POSIX service. */
-#define DEBUG_POSIX_SERVICE
+//#define DEBUG_POSIX_SERVICE
 
 #ifdef DEBUG_POSIX_SERVICE
 #   define debug_log(fmt...)    core_log(CORE_LOG_DEBUG, fmt)
@@ -50,6 +50,7 @@ public:
     int run();
 
     void removeProcess(Process *process);
+    Process *findProcess(int32_t pid);
 
 private:
     void handleConnectionEvent();

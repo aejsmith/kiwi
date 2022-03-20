@@ -26,7 +26,10 @@
 #include <core/mutex.h>
 
 #include <kernel/object.h>
+#include <kernel/status.h>
+#include <kernel/thread.h>
 
+#include <signal.h>
 #include <unistd.h>
 
 #include "libsystem.h"
@@ -48,4 +51,18 @@ extern void register_fork_handler(void (*func)(void)) __sys_hidden;
 extern core_connection_t *posix_service_get(void) __sys_hidden;
 extern void posix_service_put(void) __sys_hidden;
 
-extern int exception_to_signal(unsigned code) __sys_hidden;
+extern void posix_signal_fork(void) __sys_hidden;
+
+extern void posix_signal_guard_begin(void) __sys_hidden;
+extern void posix_signal_guard_end(void) __sys_hidden;
+
+static inline void posix_signal_guard_endp(void *p) {
+    posix_signal_guard_end();
+}
+
+/** RAII-style scoped signal guard. */
+#define POSIX_SCOPED_SIGNAL_GUARD(name) \
+    posix_signal_guard_begin(); \
+    uint32_t name __sys_unused __sys_cleanup(posix_signal_guard_endp) = 0;
+
+extern int posix_signal_from_exception(unsigned code) __sys_hidden;

@@ -17,8 +17,16 @@
 /**
  * @file
  * @brief               POSIX signal functions.
+ *
+ * TODO:
+ *  - Support for pthread signals. Currently, the first thread that installs a
+ *    signal handler will be the one that receives all signals, but this breaks
+ *    once we can set masks per-thread. I think the way to do this is to set up
+ *    a separate signal handler thread that initially receives signals, and then
+ *    internally distributes them to threads based on the per-thread masks.
  */
 
+#include <kernel/condition.h>
 #include <kernel/exception.h>
 #include <kernel/status.h>
 
@@ -32,8 +40,263 @@
 
 #include "posix/posix.h"
 
+/** Lock for signal state. This should be locked before the service lock. */
+static CORE_MUTEX_DEFINE(posix_signal_lock);
+
+/** Begin a signal guard and take the signal lock. */
+#define SCOPED_SIGNAL_LOCK() \
+    POSIX_SCOPED_SIGNAL_GUARD(scoped_guard); \
+    CORE_MUTEX_SCOPED_LOCK(scoped_lock, &posix_signal_lock);
+
+/** Condition object for signal notifications. */
+static handle_t posix_signal_condition = INVALID_HANDLE;
+
+/** Signal handler state. */
+typedef struct posix_signal {
+    sigaction_t action;
+    uint32_t disposition;
+} posix_signal_t;
+
+static posix_signal_t posix_signals[NSIG] = {};
+
+/** Current signal guard state for the current thread. */
+static __thread struct {
+    uint32_t prev_ipl;
+    uint32_t count;
+} posix_signal_guard = {};
+
+static bool get_pending_signal_request(core_connection_t *conn, siginfo_t *_info) {
+    core_message_t *request = core_message_create_request(POSIX_REQUEST_GET_PENDING_SIGNAL, 0, 0);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+        libsystem_status_to_errno(ret);
+        return false;
+    }
+
+    posix_reply_get_pending_signal_t *reply_data = core_message_data(reply);
+    memcpy(_info, &reply_data->info, sizeof(*_info));
+
+    core_message_destroy(reply);
+    return true;
+}
+
+/** Object event callback for a signal being raised. */
+static void signal_condition_callback(object_event_t *event, thread_context_t *ctx) {
+    while (true) {
+        core_connection_t *conn = posix_service_get();
+        if (!conn)
+            return;
+
+        siginfo_t pending;
+        bool success = get_pending_signal_request(conn, &pending);
+
+        posix_service_put();
+
+        /* signo == 0 indicates that there are no more pending signals. */
+        if (!success || pending.si_signo == 0)
+            break;
+
+        /* Take a copy of the current signal action. We must not keep the lock
+         * held around calling the handler, because it's legal for the handler
+         * to do something like longjmp() away and never return here. */
+        core_mutex_lock(&posix_signal_lock, -1);
+
+        sigaction_t action;
+        memcpy(&action, &posix_signals[pending.si_signo], sizeof(action));
+
+        core_mutex_unlock(&posix_signal_lock);
+
+        // TODO: Signal mask, flags...
+
+        // TODO: We should restore the original IPL around calling the signal
+        // handler in case we don't return here, and to let other signals in
+        // that aren't masked.
+
+        /* Just in case something changed between the signal being queued and
+         * us getting here. */
+        if (action.sa_handler != SIG_DFL && action.sa_handler != SIG_IGN) {
+            if (action.sa_flags & SA_SIGINFO) {
+                ucontext_t ucontext = {};
+                // TODO: uc_sigmask, uc_stack
+                memcpy(&ucontext.uc_mcontext, &ctx->cpu, sizeof(ucontext.uc_mcontext));
+
+                action.sa_sigaction(pending.si_signo, &pending, &ucontext);
+            } else {
+                action.sa_handler(pending.si_signo);
+            }
+        }
+    }
+}
+
+static bool get_signal_condition_request(core_connection_t *conn, handle_t *_handle) {
+    core_message_t *request = core_message_create_request(POSIX_REQUEST_GET_SIGNAL_CONDITION, 0, 0);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+        libsystem_status_to_errno(ret);
+        return false;
+    }
+
+    posix_reply_get_signal_condition_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+
+    if (reply_err == 0) {
+        *_handle = core_message_detach_handle(reply);
+        libsystem_assert(*_handle != INVALID_HANDLE);
+    }
+
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
+static bool set_signal_action_request(core_connection_t *conn, int32_t num, uint32_t disposition, uint32_t flags) {
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_SET_SIGNAL_ACTION, sizeof(posix_request_set_signal_action_t), 0);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    posix_request_set_signal_action_t *request_data = core_message_data(request);
+    request_data->num         = num;
+    request_data->disposition = disposition;
+    request_data->flags       = flags;
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+        libsystem_status_to_errno(ret);
+        return false;
+    }
+
+    posix_reply_set_signal_action_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
+static bool set_signal_action(core_connection_t *conn, int32_t num, uint32_t disposition, uint32_t flags) {
+    /* If this has a handler, set up the signal condition if we have not yet
+     * done so. */
+    if (disposition == POSIX_SIGNAL_DISPOSITION_HANDLER &&
+        posix_signal_condition == INVALID_HANDLE)
+    {
+        if (!get_signal_condition_request(conn, &posix_signal_condition))
+            return false;
+
+        object_event_t event = {};
+        event.handle = posix_signal_condition;
+        event.event  = CONDITION_EVENT_SET;
+        event.flags  = OBJECT_EVENT_EDGE;
+
+        status_t ret = kern_object_callback(&event, signal_condition_callback, POSIX_SIGNAL_IPL);
+        if (ret != STATUS_SUCCESS) {
+            libsystem_log(CORE_LOG_ERROR, "failed to register signal callback: %" PRId32, ret);
+
+            kern_handle_close(posix_signal_condition);
+            posix_signal_condition = INVALID_HANDLE;
+
+            libsystem_status_to_errno(ret);
+            return false;
+        }
+
+        // TODO: Set exception handlers for exception signals.
+    }
+
+    return set_signal_action_request(conn, num, disposition, flags);
+}
+
+/** Reset signal state after a fork. */
+void posix_signal_fork(void) {
+    SCOPED_SIGNAL_LOCK();
+
+    /* Signal condition is not marked as inheritable. */
+    posix_signal_condition = INVALID_HANDLE;
+
+    /* If we have any non-default state, set this at the service. */
+    core_connection_t *conn = NULL;
+
+    for (int32_t i = 1; i < NSIG; i++) {
+        posix_signal_t *signal = &posix_signals[i];
+
+        if (signal->disposition != POSIX_SIGNAL_DISPOSITION_DEFAULT) {
+            if (!conn)
+                conn = posix_service_get();
+
+            bool success = conn && set_signal_action(conn, i, signal->disposition, signal->action.sa_flags);
+
+            if (!success) {
+                libsystem_log(CORE_LOG_ERROR, "failed to set signal %" PRId32 " action after fork, resetting handler", i);
+                memset(signal, 0, sizeof(*signal));
+            }
+        }
+    }
+
+    // TODO: Mask inheritance
+
+    if (conn)
+        posix_service_put();
+}
+
+/**
+ * Enter a region which should be guarded against signals. This raises the
+ * current thread's IPL to (POSIX_SIGNAL_IPL + 1). This is necessary around
+ * regions which take locks that signal handlers will need to take, to prevent
+ * deadlock if a signal occurs while those locks are held.
+ *
+ * This is reference counted to handle nested calls.
+ */
+void posix_signal_guard_begin(void) {
+    if (posix_signal_guard.count++ == 0) {
+        status_t ret __sys_unused =
+            kern_thread_set_ipl(THREAD_SET_IPL_RAISE, POSIX_SIGNAL_IPL + 1, &posix_signal_guard.prev_ipl);
+        libsystem_assert(ret == STATUS_SUCCESS);
+    }
+}
+
+/** Exit a region guarded against signals. */
+void posix_signal_guard_end(void) {
+    libsystem_assert(posix_signal_guard.count > 0);
+    if (--posix_signal_guard.count == 0) {
+        status_t ret __sys_unused = kern_thread_set_ipl(THREAD_SET_IPL_ALWAYS, posix_signal_guard.prev_ipl, NULL);
+        libsystem_assert(ret == STATUS_SUCCESS);
+    }
+}
+
 /** Convert a kernel exception code to a signal number. */
-int exception_to_signal(unsigned code) {
+int posix_signal_from_exception(unsigned code) {
     switch (code) {
         case EXCEPTION_ADDR_UNMAPPED:       return SIGSEGV;
         case EXCEPTION_ACCESS_VIOLATION:    return SIGSEGV;
@@ -57,13 +320,13 @@ int exception_to_signal(unsigned code) {
     }
 }
 
-static int do_kill(core_connection_t *conn, pid_t pid, int num) {
+static bool kill_request(core_connection_t *conn, pid_t pid, int num) {
     core_message_t *request = core_message_create_request(
         POSIX_REQUEST_KILL, sizeof(posix_request_kill_t),
         CORE_MESSAGE_SEND_SECURITY);
     if (!request) {
         errno = ENOMEM;
-        return -1;
+        return false;
     }
 
     posix_request_kill_t *request_data = core_message_data(request);
@@ -77,7 +340,7 @@ static int do_kill(core_connection_t *conn, pid_t pid, int num) {
     if (ret != STATUS_SUCCESS) {
         libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
         libsystem_status_to_errno(ret);
-        return -1;
+        return false;
     }
 
     posix_reply_kill_t *reply_data = core_message_data(reply);
@@ -86,10 +349,10 @@ static int do_kill(core_connection_t *conn, pid_t pid, int num) {
 
     if (reply_err != 0) {
         errno = reply_err;
-        return -1;
+        return false;
     }
 
-    return 0;
+    return true;
 }
 
 /** Sends a signal to a process.
@@ -97,23 +360,28 @@ static int do_kill(core_connection_t *conn, pid_t pid, int num) {
  * @param num           Signal number.
  * @return              0 on success, -1 on failure. */
 int kill(pid_t pid, int num) {
+    if (num < 1 || num >= NSIG) {
+        errno = EINVAL;
+        return -1;
+    }
+
     core_connection_t *conn = posix_service_get();
     if (!conn) {
         errno = EAGAIN;
         return -1;
     }
 
-    int ret = do_kill(conn, pid, num);
+    bool success = kill_request(conn, pid, num);
     posix_service_put();
-    return ret;
+    return (success) ? 0 : -1;
 }
 
 /** Sends a signal to the current process.
  * @param num           Signal number.
  * @return              0 on success, -1 on failure. */
 int raise(int num) {
-    // TODO: Don't want to reach out to the POSIX service if we haven't connected
-    // to it, just handle internally.
+    // TODO: Don't reach out to the POSIX service, handle internally.
+    // Need to change IPL though.
     __asm__ volatile("ud2a");
     libsystem_stub("raise", true);
     return -1;
@@ -122,12 +390,52 @@ int raise(int num) {
 /** Examines or changes the action of a signal.
  * @param num           Signal number to modify.
  * @param act           Pointer to new action for signal (can be NULL).
- * @param oldact        Pointer to location to store previous action in (can
+ * @param old_act       Pointer to location to store previous action in (can
  *                      be NULL).
  * @return              0 on success, -1 on failure. */
-int sigaction(int num, const struct sigaction *restrict act, struct sigaction *restrict oldact) {
-    //libsystem_stub("sigaction", false);
-    return -1;
+int sigaction(int num, const sigaction_t *restrict act, sigaction_t *restrict old_act) {
+    if (num < 1 || num >= NSIG) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    SCOPED_SIGNAL_LOCK();
+
+    posix_signal_t *signal = &posix_signals[num];
+
+    if (old_act)
+        memcpy(old_act, &signal->action, sizeof(*old_act));
+
+    if (act) {
+        uint32_t disposition;
+        if (act->sa_handler == SIG_DFL) {
+            disposition = POSIX_SIGNAL_DISPOSITION_DEFAULT;
+        } else if (act->sa_handler == SIG_IGN) {
+            disposition = POSIX_SIGNAL_DISPOSITION_IGNORE;
+        } else {
+            disposition = POSIX_SIGNAL_DISPOSITION_HANDLER;
+        }
+
+        /* See if anything needs to be updated at the service. */
+        if (disposition != signal->disposition || act->sa_flags != signal->action.sa_flags) {
+            core_connection_t *conn = posix_service_get();
+            if (!conn) {
+                errno = EAGAIN;
+                return -1;
+            }
+
+            bool success = set_signal_action(conn, num, disposition, act->sa_flags);
+            posix_service_put();
+
+            if (!success)
+                return -1;
+        }
+
+        memcpy(&signal->action, act, sizeof(*act));
+        signal->disposition = disposition;
+    }
+
+    return 0;
 }
 
 /** Sets the handler of a signal.
@@ -135,8 +443,16 @@ int sigaction(int num, const struct sigaction *restrict act, struct sigaction *r
  * @param handler       Handler function.
  * @return              Previous handler, or SIG_ERR on failure. */
 sighandler_t signal(int num, sighandler_t handler) {
-    libsystem_stub("signal", false);
-    return SIG_ERR;
+    sigaction_t act;
+    act.sa_handler = handler;
+    act.sa_mask = SA_RESTART;
+
+    sigaction_t old_act;
+    int ret = sigaction(num, &act, &old_act);
+    if (ret != 0)
+        return SIG_ERR;
+
+    return old_act.sa_handler;
 }
 
 /** Sets the signal mask.
@@ -161,7 +477,7 @@ int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict oset) 
  *
  * @return              0 on success, -1 on failure.
  */
-int sigaltstack(const stack_t *restrict ss, stack_t *restrict oldss) {
+int sigaltstack(const stack_t *restrict ss, stack_t *restrict old_ss) {
     libsystem_stub("sigaltstack", false);
     return -1;
 }
@@ -182,6 +498,8 @@ int sigsuspend(const sigset_t *mask) {
  *                      returning from siglongjmp().
  */
 int sigsetjmp(sigjmp_buf env, int savemask) {
+    libsystem_stub("sigsetjmp", false);
+
     //if (savemask)
     //  sigprocmask(SIG_BLOCK, NULL, &env->mask);
 
@@ -198,6 +516,8 @@ int sigsetjmp(sigjmp_buf env, int savemask) {
  * @param val           Value that the original sigsetjmp() call should return.
  */
 void siglongjmp(sigjmp_buf env, int val) {
+    libsystem_stub("siglongjmp", false);
+
     //if (env->restore_mask)
     //  sigprocmask(SIG_SETMASK, &env->mask, NULL);
 
@@ -244,7 +564,7 @@ int sigemptyset(sigset_t *set) {
  * @param set           Set to fill.
  * @return              Always 0. */
 int sigfillset(sigset_t *set) {
-    *set = -1;
+    *set = (1 << NSIG) - 1;
     return 0;
 }
 
@@ -291,7 +611,7 @@ const char *const sys_siglist[NSIG] = {
 /** Gets the string representation of a signal number.
  * @return              Pointer to string. */
 char *strsignal(int sig) {
-    if (sig < 0 || sig >= NSIG)
+    if (sig < 1 || sig >= NSIG)
         return (char *)"Unknown signal";
 
     return (char *)sys_siglist[sig];
