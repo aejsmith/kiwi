@@ -1671,13 +1671,14 @@ status_t kern_process_status(handle_t handle, int *_status, int *_reason) {
  * process.
  *
  * @param handle        Handle to process.
+ * @param status        Exit status code (reason will be EXIT_REASON_KILLED).
  *
  * @return              STATUS_SUCCESS on success.
  *                      STATUS_INVALID_HANDLE if handle is invalid.
  *                      STATUS_ACCESS_DENIED if the caller does not have
  *                      privileged access to the process.
  */
-status_t kern_process_kill(handle_t handle) {
+status_t kern_process_kill(handle_t handle, int status) {
     status_t ret;
 
     process_t *process;
@@ -1690,14 +1691,15 @@ status_t kern_process_kill(handle_t handle) {
     } else {
         mutex_lock(&process->lock);
 
-        process->reason = EXIT_REASON_KILLED;
-
         /* Kill all of the process' threads. If this is the current process, we
          * will exit when returning back to user mode. */
         list_foreach_safe(&process->threads, iter) {
             thread_t *thread = list_entry(iter, thread_t, owner_link);
             thread_kill(thread);
         }
+
+        process->reason = EXIT_REASON_KILLED;
+        process->status = status;
 
         mutex_unlock(&process->lock);
     }
@@ -1789,7 +1791,9 @@ status_t kern_process_set_exception_handler(unsigned code, exception_handler_t h
  * @param status            Exit status code.
  */
 void kern_process_exit(int status) {
+    curr_proc->reason = EXIT_REASON_NORMAL;
     curr_proc->status = status;
+
     process_exit();
 }
 
