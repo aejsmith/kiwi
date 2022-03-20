@@ -245,12 +245,10 @@ FUNCTION_START(syscall_entry)
     movq    FRAME_OFF_R9(%rsp), %r9
     call    *syscall_table(,%rbx,1)
 .Lreturn:
-    movq    %gs:ARCH_THREAD_OFF_FLAGS, %rdi
-
     /* Save the return value of the system call, unless we're returning out of
      * kern_thread_restore(), in which case we shouldn't clobber the restored
      * RAX value. */
-    testq   $ARCH_THREAD_FRAME_RESTORED, %rdi
+    testq   $ARCH_THREAD_FRAME_RESTORED, %gs:ARCH_THREAD_OFF_FLAGS
     jnz     1f
     movq    %rax, FRAME_OFF_AX(%rsp)
 1:
@@ -262,7 +260,7 @@ FUNCTION_START(syscall_entry)
      * returned from one, the interrupt frame setup code will have set the
      * ARCH_THREAD_FRAME_MODIFIED flag. When this flag is set, we return via
      * IRET as it doesn't clobber certain registers. */
-    testq   $ARCH_THREAD_FRAME_MODIFIED, %rdi
+    testq   $ARCH_THREAD_FRAME_MODIFIED, %gs:ARCH_THREAD_OFF_FLAGS
     jnz     .Liret
 
     /* Restore saved registers, RFLAGS/RIP for SYSRET, and the userspace stack
