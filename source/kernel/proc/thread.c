@@ -596,8 +596,7 @@ void thread_exception(exception_info_t *info) {
             "thread: killing process %" PRId32 " (%s) due to thread %" PRId32 " (%s) exception %u\n",
             curr_proc->id, curr_proc->name, curr_thread->id, curr_thread->name, info->code);
 
-        curr_proc->status = info->code;
-        curr_proc->reason = EXIT_REASON_EXCEPTION;
+        process_set_exit_status(curr_proc, EXIT_REASON_EXCEPTION, info->code);
         process_exit();
     }
 
@@ -683,7 +682,7 @@ void thread_at_kernel_exit(void) {
                 LOG_WARN, "thread: failed to set up interrupt for thread %" PRId32 " (%" PRId32 "), killing process %" PRId32 "\n",
                 curr_thread->id, ret, curr_proc->id);
 
-            curr_proc->reason = EXIT_REASON_KILLED;
+            process_set_exit_status(curr_proc, EXIT_REASON_KILLED, 0);
             process_exit();
         }
     }
@@ -1657,13 +1656,13 @@ void kern_thread_restore(void) {
     ret = arch_thread_interrupt_restore(&ipl);
     if (ret != STATUS_SUCCESS) {
         /* TODO: Same as in thread_at_kernel_exit(). */
-        curr_proc->reason = EXIT_REASON_KILLED;
+        process_set_exit_status(curr_proc, EXIT_REASON_KILLED, 0);
         process_exit();
     }
 
     ret = kern_thread_set_ipl(THREAD_SET_IPL_ALWAYS, ipl, NULL);
     if (ret != STATUS_SUCCESS) {
-        curr_proc->reason = EXIT_REASON_KILLED;
+        process_set_exit_status(curr_proc, EXIT_REASON_KILLED, 0);
         process_exit();
     }
 

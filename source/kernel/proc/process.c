@@ -202,7 +202,7 @@ static status_t process_alloc(
     process->id             = id;
     process->name           = kstrdup(name, MM_KERNEL);
     process->status         = 0;
-    process->reason         = EXIT_REASON_NORMAL;
+    process->reason         = -1;
     process->load           = NULL;
 
     /* Add to the process tree. */
@@ -383,6 +383,11 @@ void process_thread_exited(thread_t *thread) {
          * clean up its resources. */
         process->state = PROCESS_DEAD;
 
+        if (process->reason == -1) {
+            process->reason = EXIT_REASON_NORMAL;
+            process->status = 0;
+        }
+
         if (process->flags & PROCESS_CRITICAL && !shutdown_in_progress)
             fatal("Critical process %" PRId32 " (%s) terminated", process->id, process->name);
 
@@ -462,6 +467,18 @@ bool process_access(process_t *process) {
     }
 
     return ret;
+}
+
+/** Set the exit reason and status for a process if it is not already set.
+ * @param reason        Exit reason.
+ * @param status        Exit status. */
+void process_set_exit_status(process_t *process, int reason, int status) {
+    MUTEX_SCOPED_LOCK(lock, &process->lock);
+
+    if (process->reason == -1) {
+        process->reason = reason;
+        process->status = status;
+    }
 }
 
 /** Terminate the calling process and all of its threads. */
@@ -1689,6 +1706,8 @@ status_t kern_process_kill(handle_t handle, int status) {
     if (!process_access(process)) {
         ret = STATUS_ACCESS_DENIED;
     } else {
+        process_set_exit_status(process, EXIT_REASON_KILLED, status);
+
         mutex_lock(&process->lock);
 
         /* Kill all of the process' threads. If this is the current process, we
@@ -1697,9 +1716,6 @@ status_t kern_process_kill(handle_t handle, int status) {
             thread_t *thread = list_entry(iter, thread_t, owner_link);
             thread_kill(thread);
         }
-
-        process->reason = EXIT_REASON_KILLED;
-        process->status = status;
 
         mutex_unlock(&process->lock);
     }
@@ -1791,8 +1807,7 @@ status_t kern_process_set_exception_handler(unsigned code, exception_handler_t h
  * @param status            Exit status code.
  */
 void kern_process_exit(int status) {
-    curr_proc->reason = EXIT_REASON_NORMAL;
-    curr_proc->status = status;
+    process_set_exit_status(curr_proc, EXIT_REASON_NORMAL, status);
 
     process_exit();
 }
