@@ -1333,6 +1333,9 @@ status_t kern_process_exec(
     /* Free all currently loaded images. */
     elf_process_cleanup(curr_proc);
 
+    /* Clear exception handlers. */
+    memset(curr_proc->exceptions, 0, sizeof(curr_proc->exceptions));
+
     mutex_unlock(&curr_proc->lock);
 
     /* Run the thread and wait for it to complete. */
