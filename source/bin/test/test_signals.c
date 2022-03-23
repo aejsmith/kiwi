@@ -34,11 +34,37 @@ static void child_process_default(void) {
 
     while (true) {
         printf("- Child running\n");
-        kern_thread_sleep(core_secs_to_nsecs(1), NULL);
+        kern_thread_sleep(core_secs_to_nsecs(2), NULL);
     }
 }
 
-static volatile bool signal_received = false;
+static void child_process_default_mask(void) {
+    printf("Test default handler with mask\n");
+
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGTERM);
+
+    int ret = sigprocmask(SIG_BLOCK, &set, NULL);
+    if (ret != 0) {
+        perror("sigprocmask");
+        return;
+    }
+
+    while (true) {
+        printf("- Child running\n");
+        kern_thread_sleep(core_secs_to_nsecs(2), NULL);
+
+        printf("- Unblocking\n");
+        int ret = sigprocmask(SIG_UNBLOCK, &set, NULL);
+        if (ret != 0) {
+            perror("sigprocmask");
+            return;
+        }
+    }
+}
+
+static volatile bool signal_received;
 
 static void signal_handler(int num, siginfo_t *info, void *context) {
     printf("- Signal handler (num: %d, pid: %d)\n", num, info->si_pid);
@@ -47,6 +73,8 @@ static void signal_handler(int num, siginfo_t *info, void *context) {
 
 static void child_process_custom(void) {
     printf("Test custom handler\n");
+
+    signal_received = false;
 
     sigaction_t action = {};
     action.sa_flags = SA_SIGINFO;
@@ -60,13 +88,53 @@ static void child_process_custom(void) {
 
     while (!signal_received) {
         printf("- Child running\n");
-        kern_thread_sleep(core_secs_to_nsecs(1), NULL);
+        kern_thread_sleep(core_secs_to_nsecs(2), NULL);
+    }
+}
+
+static void child_process_custom_mask(void) {
+    printf("Test custom handler\n");
+
+    signal_received = false;
+
+    sigaction_t action = {};
+    action.sa_flags = SA_SIGINFO;
+    action.sa_sigaction = signal_handler;
+
+    int ret = sigaction(SIGTERM, &action, NULL);
+    if (ret != 0) {
+        perror("sigaction");
+        return;
+    }
+
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGTERM);
+
+    ret = sigprocmask(SIG_BLOCK, &set, NULL);
+    if (ret != 0) {
+        perror("sigprocmask");
+        return;
+    }
+
+    while (!signal_received) {
+        printf("- Child running\n");
+        kern_thread_sleep(core_secs_to_nsecs(2), NULL);
+
+        printf("- Unblocking\n");
+        ret = sigprocmask(SIG_UNBLOCK, &set, NULL);
+        if (ret != 0) {
+            perror("sigprocmask");
+            return;
+        }
     }
 }
 
 static void (*test_functions[])() = {
     child_process_default,
+    child_process_default_mask,
     child_process_custom,
+    child_process_custom_mask,
 };
 
 int main(int argc, char **argv) {

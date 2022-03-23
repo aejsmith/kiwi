@@ -60,6 +60,17 @@ enum {
     POSIX_REQUEST_SET_SIGNAL_ACTION = 2,
 
     /**
+     * Sets the current signal mask.
+     *
+     * Request:
+     *  - Data = posix_request_set_signal_mask_t
+     *
+     * Reply:
+     *  - Data = posix_reply_set_signal_mask_t
+     */
+    POSIX_REQUEST_SET_SIGNAL_MASK = 3,
+
+    /**
      * Sends a signal to a process.
      *
      * Request:
@@ -69,7 +80,7 @@ enum {
      * Reply:
      *  - Data = posix_reply_kill_t
      */
-    POSIX_REQUEST_KILL = 3,
+    POSIX_REQUEST_KILL = 4,
 };
 
 typedef struct posix_reply_get_signal_condition {
@@ -100,6 +111,14 @@ typedef struct posix_request_set_signal_action {
 typedef struct posix_reply_set_signal_action {
     int32_t err;                    /**< Error number (0 on success). */
 } posix_reply_set_signal_action_t;
+
+typedef struct posix_request_set_signal_mask {
+    uint32_t mask;                  /**< New signal mask. */
+} posix_request_set_signal_mask_t;
+
+typedef struct posix_reply_set_signal_mask {
+    int32_t err;                    /**< Error number (0 on success). */
+} posix_reply_set_signal_mask_t;
 
 typedef struct posix_request_kill {
     int32_t pid;                    /**< PID to signal. */

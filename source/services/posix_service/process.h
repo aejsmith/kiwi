@@ -52,11 +52,12 @@ private:
     Kiwi::Core::Message handleGetSignalCondition(const Kiwi::Core::Message &request);
     Kiwi::Core::Message handleGetPendingSignal(const Kiwi::Core::Message &request);
     Kiwi::Core::Message handleSetSignalAction(const Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleSetSignalMask(const Kiwi::Core::Message &request);
     Kiwi::Core::Message handleKill(const Kiwi::Core::Message &request);
 
     uint32_t signalsDeliverable() const;
-    void updateSignalCondition();
-    int32_t sendSignal(int32_t num, const Process *sender, const security_context_t *senderSecurity);
+    void updateSignals();
+    void sendSignal(int32_t num, const Process *sender, const security_context_t *senderSecurity);
 
 private:
     Kiwi::Core::Connection m_connection;

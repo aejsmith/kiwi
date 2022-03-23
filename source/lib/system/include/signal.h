@@ -214,7 +214,7 @@ extern int sigismember(const sigset_t *set, int num);
 extern sighandler_t signal(int num, sighandler_t handler);
 /* int sigpause(int); */
 /* int sigpending(sigset_t *); */
-extern int sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict oset);
+extern int sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict old_set);
 extern int sigsuspend(const sigset_t *mask);
 /* int sigwait(const sigset_t *, int *); */
 

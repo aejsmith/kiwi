@@ -91,6 +91,7 @@ void Process::handleMessageEvent() {
         case POSIX_REQUEST_GET_SIGNAL_CONDITION:    reply = handleGetSignalCondition(message); break;
         case POSIX_REQUEST_GET_PENDING_SIGNAL:      reply = handleGetPendingSignal(message); break;
         case POSIX_REQUEST_SET_SIGNAL_ACTION:       reply = handleSetSignalAction(message); break;
+        case POSIX_REQUEST_SET_SIGNAL_MASK:         reply = handleSetSignalMask(message); break;
         case POSIX_REQUEST_KILL:                    reply = handleKill(message); break;
 
         default:
@@ -141,18 +142,26 @@ Kiwi::Core::Message Process::handleGetPendingSignal(const Kiwi::Core::Message &r
 
     auto replyData = reply.data<posix_reply_get_pending_signal_t>();
 
-    if (m_signalsPending) {
-        int32_t num = __builtin_ffs(m_signalsPending) - 1;
-        m_signalsPending &= ~(1 << num);
+    uint32_t deliverable = signalsDeliverable();
+    if (deliverable) {
+        int32_t num = __builtin_ffs(deliverable) - 1;
+        SignalState &signal = m_signals[num];
+
+        /* If it's still deliverable here, it should be using a handler.
+         * Ignored signals should not ever be set in pending, and default
+         * signals should be handled as soon as they made deliverable. */
+        assert(signal.disposition == kSignalDisposition_Handler);
 
         memcpy(&replyData->info, &m_signals[num].info, sizeof(replyData->info));
+
+        m_signalsPending &= ~(1 << num);
     } else {
         replyData->info.si_signo = 0;
     }
 
-    updateSignalCondition();
+    /* This will update the signal condition state . */
+    updateSignals();
 
-    reply.attachHandle(m_signalCondition);
     return reply;
 }
 
@@ -202,27 +211,55 @@ Kiwi::Core::Message Process::handleSetSignalAction(const Kiwi::Core::Message &re
     signal.disposition = requestData->disposition;
     signal.flags       = requestData->flags;
 
+    /* If it was pending but now ignored, remove it. */
+    if (signal.disposition == kSignalDisposition_Ignore) {
+        m_signalsPending &= ~(1 << requestData->num);
+        updateSignals();
+    }
+
     replyData->err = 0;
     return reply;
 }
 
-/** Get the set of deliverable signals (pending and unmasked). */
-uint32_t Process::signalsDeliverable() const {
-    return m_signalsPending & ~m_signalMask;
-}
-
-void Process::updateSignalCondition() {
-    if (m_signalCondition.isValid()) {
-        bool state = signalsDeliverable() != 0;
-
-        status_t ret = kern_condition_set(m_signalCondition, state);
-        if (ret != STATUS_SUCCESS)
-            core_log(CORE_LOG_ERROR, "failed to set signal condition for PID %" PRId32 ": %" PRId32, m_pid, ret);
+Kiwi::Core::Message Process::handleSetSignalMask(const Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(posix_reply_set_signal_mask_t))) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return Kiwi::Core::Message();
     }
+
+    auto replyData = reply.data<posix_reply_set_signal_mask_t>();
+    replyData->err = 0;
+
+    if (request.size() != sizeof(posix_request_set_signal_mask_t)) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    auto requestData = request.data<posix_request_set_signal_mask_t>();
+
+    /* Attempts to mask SIGKILL or SIGSTOP are silently ignored. */
+    uint32_t mask = requestData->mask;
+    mask &=  (1 << NSIG) - 1;
+    mask &= ~(1 << SIGKILL);
+    mask &= ~(1 << SIGSTOP);
+
+    if (mask != m_signalMask) {
+        m_signalMask = mask;
+        updateSignals();
+    }
+
+    replyData->err = 0;
+    return reply;
 }
 
-/** Perform the default action for a signal. */
-static int32_t defaultSignal(handle_t process, int32_t num) {
+/**
+ * Perform the default action for a signal. Note that this requires privileged
+ * access to the process, and the service should be running with sufficient
+ * privilege (PRIV_PROCESS_ADMIN) for this, so it is not necessary to call with
+ * the sending thread's security context.
+ */
+static void defaultSignal(handle_t process, int32_t num) {
     status_t ret;
 
     uint32_t disposition;
@@ -276,6 +313,9 @@ static int32_t defaultSignal(handle_t process, int32_t num) {
         case kSignalDisposition_CoreDump:
             // TODO: Core dump.
             ret = kern_process_kill(process, (__POSIX_KILLED_STATUS << 16) | num);
+            if (ret != STATUS_SUCCESS)
+                core_log(CORE_LOG_ERROR, "failed to kill process: %" PRId32, ret);
+
             break;
 
         case kSignalDisposition_Stop:
@@ -288,32 +328,62 @@ static int32_t defaultSignal(handle_t process, int32_t num) {
             /* Ignore. */
             break;
     }
-
-    return 0;
 }
 
-int32_t Process::sendSignal(int32_t num, const Process *sender, const security_context_t *senderSecurity) {
+/** Get the set of deliverable signals (pending and unmasked). */
+uint32_t Process::signalsDeliverable() const {
+    return m_signalsPending & ~m_signalMask;
+}
+
+/**
+ * Called when signal state is changed such that we should re-test if we can
+ * deliver any signals.
+ */
+void Process::updateSignals() {
+    bool needHandler = false;
+
+    uint32_t deliverable = signalsDeliverable();
+    while (deliverable) {
+        int32_t num = __builtin_ffs(deliverable) - 1;
+        deliverable &= ~(1 << num);
+
+        SignalState &signal = m_signals[num];
+
+        /* These should not be in the pending set. */
+        assert(signal.disposition != kSignalDisposition_Ignore);
+
+        if (signal.disposition == kSignalDisposition_Default) {
+            defaultSignal(m_handle, num);
+            m_signalsPending &= ~(1 << num);
+        } else if (signal.disposition == kSignalDisposition_Handler) {
+            /* Removed from pending set by GET_PENDING_SIGNAL. */
+            needHandler = true;
+        }
+    }
+
+    if (m_signalCondition.isValid()) {
+        status_t ret = kern_condition_set(m_signalCondition, needHandler);
+        if (ret != STATUS_SUCCESS)
+            core_log(CORE_LOG_ERROR, "failed to set signal condition for PID %" PRId32 ": %" PRId32, m_pid, ret);
+    }
+}
+
+void Process::sendSignal(int32_t num, const Process *sender, const security_context_t *senderSecurity) {
     SignalState &signal = m_signals[num];
 
-    if (signal.disposition == kSignalDisposition_Default) {
-        return defaultSignal(m_handle, num);
-    } else if (signal.disposition == kSignalDisposition_Handler) {
-        /* If it's not already pending, save info for it. */
-        if (!(m_signalsPending & (1 << num))) {
-            memset(&signal.info, 0, sizeof(signal.info));
+    /* Only need to do something if it's not ignored, and not already pending. */
+    if (signal.disposition != kSignalDisposition_Ignore &&
+        !(m_signalsPending & (1 << num)))
+    {
+        memset(&signal.info, 0, sizeof(signal.info));
 
-            signal.info.si_signo = num;
-            signal.info.si_pid   = sender->m_pid;
-            signal.info.si_uid   = senderSecurity->uid;
+        signal.info.si_signo = num;
+        signal.info.si_pid   = sender->m_pid;
+        signal.info.si_uid   = senderSecurity->uid;
 
-            m_signalsPending |= (1 << num);
-        }
+        m_signalsPending |= (1 << num);
 
-        updateSignalCondition();
-        return 0;
-    } else {
-        /* Ignored. */
-        return 0;
+        updateSignals();
     }
 }
 
@@ -351,8 +421,38 @@ Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
         return reply;
     }
 
-    /* Set our overridden token to the caller's security context so that access
-     * checks on the target process are performed against that. */
+    Process *process = g_posixService.findProcess(requestData->pid);
+
+    /* If the process is not known, it has not connected to the service and
+     * therefore should be treated as having default signal state. We need to
+     * open a handle to it. */
+    Kiwi::Core::Handle openedHandle;
+    handle_t handle;
+    if (process) {
+        handle = process->m_handle;
+    } else {
+        ret = kern_process_open(requestData->pid, openedHandle.attach());
+        if (ret != STATUS_SUCCESS) {
+            if (ret == STATUS_NOT_FOUND) {
+                replyData->err = ESRCH;
+            } else {
+                core_log(
+                    CORE_LOG_WARN, "failed to open process %" PRId32 ": %" PRId32,
+                    requestData->pid, ret);
+
+                replyData->err = EAGAIN;
+            }
+
+            return reply;
+        }
+
+        handle = openedHandle;
+    }
+
+    /* Check if we have sufficient privilege to signal the process. The kernel's
+     * privileged access definition matches the requirement of POSIX so use
+     * that. */
+    // TODO: What about saved-setuid?
     {
         Kiwi::Core::TokenSetter token;
         ret = token.set(security);
@@ -362,49 +462,17 @@ Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
             return reply;
         }
 
-        Process *process = g_posixService.findProcess(requestData->pid);
-
-        /* If the process is not known, it has not connected to the service and
-         * therefore should be treated as having default signal state. We need
-         * to open a handle to it. */
-        Kiwi::Core::Handle openedHandle;
-        handle_t handle;
-        if (process) {
-            handle = process->m_handle;
-        } else {
-            ret = kern_process_open(requestData->pid, openedHandle.attach());
-            if (ret != STATUS_SUCCESS) {
-                if (ret == STATUS_NOT_FOUND) {
-                    replyData->err = ESRCH;
-                } else {
-                    core_log(
-                        CORE_LOG_WARN, "failed to open process %" PRId32 ": %" PRId32,
-                        requestData->pid, ret);
-
-                    replyData->err = EAGAIN;
-                }
-
-                return reply;
-            }
-
-            handle = openedHandle;
-        }
-
-        /* Check if we have sufficient privilege to signal the process. The
-         * kernel's privileged access definition matches the requirement of
-         * POSIX so use that. */
-        // TODO: What about saved-setuid?
         ret = kern_process_access(handle);
         if (ret != STATUS_SUCCESS) {
             replyData->err = EPERM;
             return reply;
         }
+    }
 
-        if (process) {
-            replyData->err = process->sendSignal(requestData->num, this, security);
-        } else {
-            replyData->err = defaultSignal(handle, requestData->num);
-        }
+    if (process) {
+        process->sendSignal(requestData->num, this, security);
+    } else {
+        defaultSignal(handle, requestData->num);
     }
 
     return reply;
