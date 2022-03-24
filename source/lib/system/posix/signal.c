@@ -509,6 +509,8 @@ void posix_signal_fork(void) {
             if (!conn)
                 conn = posix_service_get();
 
+            /* Note that kernel exception handlers are inherited so this won't
+             * need to touch them, leave posix_exceptions_installed as is. */
             bool success = conn && set_signal_action(conn, i, signal->disposition, signal->action.sa_flags);
 
             if (!success) {
@@ -518,7 +520,17 @@ void posix_signal_fork(void) {
         }
     }
 
-    // TODO: Mask inheritance
+    if (posix_signal_mask != 0) {
+        if (!conn)
+            conn = posix_service_get();
+
+        bool success = conn && set_signal_mask_request(conn, posix_signal_mask);
+
+        if (!success) {
+            libsystem_log(CORE_LOG_ERROR, "failed to set signal mask after fork");
+            posix_signal_mask = 0;
+        }
+    }
 
     if (conn)
         posix_service_put();
