@@ -94,7 +94,8 @@ void PosixService::handleConnectionEvent() {
     if (ret != STATUS_SUCCESS) {
         /* This may be harmless - client's connection attempt could be cancelled
          * between us receiving the event and calling listen, for instance. */
-        core_log(CORE_LOG_WARN, "failed to listen on port after connection event: %" PRId32, ret);
+        if (ret != STATUS_WOULD_BLOCK)
+            core_log(CORE_LOG_WARN, "failed to listen on port after connection event: %" PRId32, ret);
         return;
     }
 

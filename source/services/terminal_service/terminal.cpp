@@ -302,7 +302,7 @@ bool Terminal::handleFileMessages() {
                 core_unreachable();
         }
 
-        if (ret != STATUS_SUCCESS) {
+        if (ret != STATUS_SUCCESS && ret != STATUS_CANCELLED) {
             core_log(CORE_LOG_WARN, "failed to send file message %" PRIu32 ": %" PRId32, message.id, ret);
             return false;
         }
