@@ -123,8 +123,13 @@ void libkernel_init(process_args_t *args) {
 /** Abort the process. */
 void libkernel_abort(void) {
     exception_info_t info;
-
     info.code = EXCEPTION_ABORT;
-    kern_thread_raise(&info);
-    kern_thread_exit(0);
+    kern_thread_exception(&info);
+
+    /* If this returns, then nuke any handlers and try again. */
+    kern_process_set_exception_handler(EXCEPTION_ABORT, NULL);
+    kern_thread_set_exception_handler(EXCEPTION_ABORT, NULL);
+    kern_thread_exception(&info);
+
+    kern_process_exit(-1);
 }

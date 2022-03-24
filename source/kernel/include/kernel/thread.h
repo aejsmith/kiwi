@@ -110,7 +110,7 @@ extern status_t kern_thread_set_token(handle_t handle);
 extern status_t kern_thread_set_exception_handler(unsigned code, exception_handler_t handler);
 extern status_t kern_thread_set_exception_stack(const thread_stack_t *stack);
 
-extern status_t kern_thread_raise(exception_info_t *info);
+extern status_t kern_thread_exception(exception_info_t *info);
 extern status_t kern_thread_sleep(nstime_t nsecs, nstime_t *_rem);
 extern void kern_thread_exit(int status) __kernel_noreturn;
 

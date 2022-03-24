@@ -1572,7 +1572,7 @@ status_t kern_thread_set_exception_stack(const thread_stack_t *stack) {
  *                      invalid.
  *                      STATUS_INVALID_ADDR if info points to an invalid address.
  */
-status_t kern_thread_raise(exception_info_t *info) {
+status_t kern_thread_exception(exception_info_t *info) {
     if (!info)
         return STATUS_INVALID_ARG;
 
