@@ -105,6 +105,27 @@ int *__errno_location(void) {
 }
 
 /**
+ * Return an errno value from a kernel status code.
+ *
+ * This function may not do the correct thing, POSIX is annoyingly inconsistent
+ * about error codes. Callers should be careful.
+ *
+ * @param status        Status code.
+ *
+ * @return              Corresponding errno value.
+ */
+int libsystem_status_to_errno_val(status_t status) {
+    if (status < 0 || (size_t)status >= core_array_size(status_to_errno_table))
+        libsystem_fatal("unknown status code passed to status_to_errno()");
+
+    int val = status_to_errno_table[status];
+    if (val == -1)
+        libsystem_fatal("trying to map disallowed status to errno");
+
+    return val;
+}
+
+/**
  * Set errno from a kernel status code.
  *
  * This function may not do the correct thing, POSIX is annoyingly inconsistent
@@ -113,10 +134,5 @@ int *__errno_location(void) {
  * @param status        Status to set.
  */
 void libsystem_status_to_errno(status_t status) {
-    if (status < 0 || (size_t)status >= core_array_size(status_to_errno_table))
-        libsystem_fatal("unknown status code passed to status_to_errno()");
-
-    __errno = status_to_errno_table[status];
-    if (__errno == -1)
-        libsystem_fatal("trying to map disallowed status to errno");
+    __errno = libsystem_status_to_errno_val(status);
 }

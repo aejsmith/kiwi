@@ -26,8 +26,11 @@
  *    internally distributes them to threads based on the per-thread masks.
  */
 
+#include <core/utility.h>
+
 #include <kernel/condition.h>
 #include <kernel/exception.h>
+#include <kernel/process.h>
 #include <kernel/status.h>
 
 #include <services/posix_service.h>
@@ -39,6 +42,46 @@
 #include <string.h>
 
 #include "posix/posix.h"
+
+/** Mapping of kernel exceptions to POSIX signals. */
+static int posix_exception_signals[] = {
+    [EXCEPTION_ADDR_UNMAPPED]       = SIGSEGV,
+    [EXCEPTION_ACCESS_VIOLATION]    = SIGSEGV,
+    [EXCEPTION_STACK_OVERFLOW]      = SIGSEGV,
+    [EXCEPTION_PAGE_ERROR]          = SIGBUS,
+    [EXCEPTION_INVALID_ALIGNMENT]   = SIGBUS,
+    [EXCEPTION_INVALID_INSTRUCTION] = SIGILL,
+    [EXCEPTION_INT_DIV_ZERO]        = SIGFPE,
+    [EXCEPTION_INT_OVERFLOW]        = SIGFPE,
+    [EXCEPTION_FLOAT_DIV_ZERO]      = SIGFPE,
+    [EXCEPTION_FLOAT_OVERFLOW]      = SIGFPE,
+    [EXCEPTION_FLOAT_UNDERFLOW]     = SIGFPE,
+    [EXCEPTION_FLOAT_PRECISION]     = SIGFPE,
+    [EXCEPTION_FLOAT_DENORMAL]      = SIGFPE,
+    [EXCEPTION_FLOAT_INVALID]       = SIGFPE,
+    [EXCEPTION_BREAKPOINT]          = SIGTRAP,
+    [EXCEPTION_ABORT]               = SIGABRT,
+};
+
+/** Mapping of kernel exceptions to POSIX signal codes. */
+static int posix_exception_codes[] = {
+    [EXCEPTION_ADDR_UNMAPPED]       = SEGV_MAPERR,
+    [EXCEPTION_ACCESS_VIOLATION]    = SEGV_ACCERR,
+    [EXCEPTION_STACK_OVERFLOW]      = SEGV_MAPERR,
+    [EXCEPTION_PAGE_ERROR]          = BUS_OBJERR,
+    [EXCEPTION_INVALID_ALIGNMENT]   = BUS_ADRALN,
+    [EXCEPTION_INVALID_INSTRUCTION] = ILL_ILLOPC,
+    [EXCEPTION_INT_DIV_ZERO]        = FPE_INTDIV,
+    [EXCEPTION_INT_OVERFLOW]        = FPE_INTOVF,
+    [EXCEPTION_FLOAT_DIV_ZERO]      = FPE_FLTDIV,
+    [EXCEPTION_FLOAT_OVERFLOW]      = FPE_FLTOVF,
+    [EXCEPTION_FLOAT_UNDERFLOW]     = FPE_FLTUND,
+    [EXCEPTION_FLOAT_PRECISION]     = FPE_FLTRES,
+    [EXCEPTION_FLOAT_DENORMAL]      = FPE_FLTUND,
+    [EXCEPTION_FLOAT_INVALID]       = FPE_FLTINV,
+    [EXCEPTION_BREAKPOINT]          = TRAP_BRKPT,
+    [EXCEPTION_ABORT]               = 0,
+};
 
 /** Lock for signal state. This should be locked before the service lock. */
 static CORE_MUTEX_DEFINE(posix_signal_lock);
@@ -58,6 +101,9 @@ typedef struct posix_signal {
 } posix_signal_t;
 
 static posix_signal_t posix_signals[NSIG] = {};
+
+/** Bitmap of exceptions that have the POSIX handler installed. */
+static uint32_t posix_exceptions_installed = 0;
 
 /** Current (process-wide) signal mask. */
 static sigset_t posix_signal_mask = 0;
@@ -238,6 +284,8 @@ static bool kill_request(core_connection_t *conn, pid_t pid, int num) {
  * Internal implementation details.
  */
 
+static bool set_signal_action(core_connection_t *conn, int32_t num, uint32_t disposition, uint32_t flags);
+
 static sigset_t make_valid_sigmask(sigset_t mask) {
     /* Restrict to valid signals. SIGKILL and SIGSTOP cannot be masked and
      * should be silently ignored. */
@@ -247,7 +295,84 @@ static sigset_t make_valid_sigmask(sigset_t mask) {
     return mask;
 }
 
-/** Object event callback for a signal being raised. */
+/**
+ * Handle a signal. When called, posix_signal_lock should be held, and the
+ * POSIX service should have been obtained. Both will be released when this
+ * function returns.
+ */
+static void handle_signal(core_connection_t *conn, siginfo_t *info, thread_context_t *ctx) {
+    /* Take a copy of the current signal action. We must not keep the lock held
+     * around calling the handler, because it's legal for the handler to do
+     * something like longjmp() away and never return here. */
+    sigaction_t action;
+    memcpy(&action, &posix_signals[info->si_signo], sizeof(action));
+
+    /* If we have SA_RESETHAND, restore default action. */
+    if (action.sa_flags & SA_RESETHAND) {
+        if (set_signal_action(conn, info->si_signo, POSIX_SIGNAL_DISPOSITION_DEFAULT, 0)) {
+            memset(&posix_signals[info->si_signo], 0, sizeof(*posix_signals));
+        } else {
+            libsystem_log(CORE_LOG_ERROR, "failed to reset handler while handling signal %d", info->si_signo);
+        }
+    }
+
+    /* See if we need to change the mask. */
+    sigset_t prev_mask = posix_signal_mask;
+    sigset_t mask      = posix_signal_mask;
+
+    if (!(action.sa_flags & SA_NODEFER))
+        mask |= (1 << info->si_signo);
+
+    mask |= make_valid_sigmask(action.sa_mask);
+
+    if (mask != prev_mask) {
+        if (set_signal_mask_request(conn, mask)) {
+            posix_signal_mask = mask;
+        } else {
+            libsystem_log(CORE_LOG_ERROR, "failed to update signal mask while handling signal %d", info->si_signo);
+        }
+    }
+
+    posix_service_put();
+    core_mutex_unlock(&posix_signal_lock);
+
+    /*
+     * Restore the previous IPL, for two reasons:
+     *  - To allow in further signals that have not been masked while this
+     *    handler is executing.
+     *  - In case we do not return here: again, it is legal to longjmp() out of
+     *    a handler, and if that happens the IPL would not be restored. POSIX
+     *    specifies that the previous signal mask should be manually restored
+     *    from the ucontext if that happens, but we can't expect POSIX
+     *    applications to restore the IPL.
+     */
+    uint32_t prev_ipl;
+    status_t ret __sys_unused = kern_thread_set_ipl(THREAD_SET_IPL_ALWAYS, ctx->ipl, &prev_ipl);
+    libsystem_assert(ret == STATUS_SUCCESS);
+    libsystem_assert(prev_ipl > POSIX_SIGNAL_IPL);
+
+    /* Just in case something changed between the signal being queued and us
+     * getting here. */
+    if (action.sa_handler != SIG_DFL && action.sa_handler != SIG_IGN) {
+        if (action.sa_flags & SA_SIGINFO) {
+            ucontext_t ucontext = {};
+            // TODO: uc_stack/SA_ONSTACK would require us to run the
+            // callback on the other stack...
+            memcpy(&ucontext.uc_mcontext, &ctx->cpu, sizeof(ucontext.uc_mcontext));
+            ucontext.uc_sigmask = prev_mask;
+
+            action.sa_sigaction(info->si_signo, info, &ucontext);
+        } else {
+            action.sa_handler(info->si_signo);
+        }
+    }
+
+    /* Restore previous IPL (in case caller loops again). */
+    ret = kern_thread_set_ipl(THREAD_SET_IPL_ALWAYS, prev_ipl, NULL);
+    libsystem_assert(ret == STATUS_SUCCESS);
+}
+
+/** Kernel object event callback for a signal being raised. */
 static void signal_condition_callback(object_event_t *event, thread_context_t *ctx) {
     while (true) {
         /* IPL is already at POSIX_SIGNAL_IPL + 1. */
@@ -269,81 +394,49 @@ static void signal_condition_callback(object_event_t *event, thread_context_t *c
             break;
         }
 
-        /* Take a copy of the current signal action. We must not keep the lock
-         * held around calling the handler, because it's legal for the handler
-         * to do something like longjmp() away and never return here. */
-        sigaction_t action;
-        memcpy(&action, &posix_signals[pending.si_signo], sizeof(action));
-
-        /* If we have SA_RESETHAND, restore default action. */
-        if (action.sa_flags & SA_RESETHAND) {
-            if (set_signal_action_request(conn, pending.si_signo, POSIX_SIGNAL_DISPOSITION_DEFAULT, 0)) {
-                memset(&posix_signals[pending.si_signo], 0, sizeof(*posix_signals));
-            } else {
-                libsystem_log(
-                    CORE_LOG_ERROR, "failed to reset handler while handling signal %d",
-                    pending.si_signo);
-            }
-        }
-
-        /* See if we need to change the mask. */
-        sigset_t prev_mask = posix_signal_mask;
-        sigset_t mask      = posix_signal_mask;
-
-        if (!(action.sa_flags & SA_NODEFER))
-            mask |= (1 << pending.si_signo);
-
-        mask |= make_valid_sigmask(action.sa_mask);
-
-        if (mask != prev_mask) {
-            if (set_signal_mask_request(conn, mask)) {
-                posix_signal_mask = mask;
-            } else {
-                libsystem_log(
-                    CORE_LOG_ERROR, "failed to update signal mask while handling signal %d",
-                    pending.si_signo);
-            }
-        }
-
-        posix_service_put();
-        core_mutex_unlock(&posix_signal_lock);
-
-        /*
-         * Restore the previous IPL, for two reasons:
-         *  - To allow in further signals that have not been masked while this
-         *    handler is executing.
-         *  - In case we do not return here: again, it is legal to longjmp()
-         *    out of a handler, and if that happens the IPL would not be
-         *    restored. POSIX specifies that the previous signal mask should
-         *    be manually restored from the ucontext if that happens, but we
-         *    can't expect POSIX applications to restore the IPL.
-         */
-        status_t ret __sys_unused = kern_thread_set_ipl(THREAD_SET_IPL_ALWAYS, ctx->ipl, NULL);
-        libsystem_assert(ret == STATUS_SUCCESS);
-
-        /* Just in case something changed between the signal being queued and
-         * us getting here. */
-        if (action.sa_handler != SIG_DFL && action.sa_handler != SIG_IGN) {
-            if (action.sa_flags & SA_SIGINFO) {
-                ucontext_t ucontext = {};
-                // TODO: uc_stack/SA_ONSTACK would require us to run the
-                // callback on the other stack...
-                memcpy(&ucontext.uc_mcontext, &ctx->cpu, sizeof(ucontext.uc_mcontext));
-                ucontext.uc_sigmask = prev_mask;
-
-                action.sa_sigaction(pending.si_signo, &pending, &ucontext);
-            } else {
-                action.sa_handler(pending.si_signo);
-            }
-        }
-
-        /* Set IPL up again for next iteration. */
-        ret = kern_thread_set_ipl(THREAD_SET_IPL_ALWAYS, POSIX_SIGNAL_IPL + 1, NULL);
-        libsystem_assert(ret == STATUS_SUCCESS);
+        /* Releases lock/service on return. */
+        handle_signal(conn, &pending, ctx);
     }
 }
 
+/** Kernel exception handler. */
+static void posix_exception_handler(exception_info_t *info, thread_context_t *ctx) {
+    libsystem_assert(info->code < core_array_size(posix_exception_signals));
+    libsystem_assert(posix_exception_signals[info->code] != 0);
+    libsystem_assert(info->code < core_array_size(posix_exception_codes));
+
+    /* Construct a siginfo_t for the exception. */
+    siginfo_t signal;
+    signal.si_signo = posix_exception_signals[info->code];
+    signal.si_code  = posix_exception_codes[info->code];
+    signal.si_addr  = info->addr;
+
+    if (info->code == EXCEPTION_PAGE_ERROR) {
+        signal.si_errno = libsystem_status_to_errno_val(info->status);
+    } else {
+        signal.si_errno = 0;
+    }
+
+    /* Use 0 to indicate kernel. */
+    signal.si_pid = 0;
+    signal.si_uid = 0;
+
+    /* IPL is already at THREAD_IPL_EXCEPTION + 1. */
+    core_mutex_lock(&posix_signal_lock, -1);
+
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        core_mutex_unlock(&posix_signal_lock);
+        return;
+    }
+
+    /* Releases lock/service on return. */
+    handle_signal(conn, &signal, ctx);
+}
+
 static bool set_signal_action(core_connection_t *conn, int32_t num, uint32_t disposition, uint32_t flags) {
+    status_t ret;
+
     /* If this has a handler, set up the signal condition if we have not yet
      * done so. */
     if (disposition == POSIX_SIGNAL_DISPOSITION_HANDLER &&
@@ -357,7 +450,7 @@ static bool set_signal_action(core_connection_t *conn, int32_t num, uint32_t dis
         event.event  = CONDITION_EVENT_SET;
         event.flags  = OBJECT_EVENT_EDGE;
 
-        status_t ret = kern_object_callback(&event, signal_condition_callback, POSIX_SIGNAL_IPL);
+        ret = kern_object_callback(&event, signal_condition_callback, POSIX_SIGNAL_IPL);
         if (ret != STATUS_SUCCESS) {
             libsystem_log(CORE_LOG_ERROR, "failed to register signal callback: %" PRId32, ret);
 
@@ -367,11 +460,36 @@ static bool set_signal_action(core_connection_t *conn, int32_t num, uint32_t dis
             libsystem_status_to_errno(ret);
             return false;
         }
-
-        // TODO: Set exception handlers for exception signals.
     }
 
-    return set_signal_action_request(conn, num, disposition, flags);
+    if (!set_signal_action_request(conn, num, disposition, flags))
+        return false;
+
+    /* If this signal maps to any exceptions, install/remove handlers as
+     * necessary. TODO: Possibly should warn if another handler is already
+     * installed as it means the app is mixing POSIX and native exception
+     * handling. */
+    for (size_t i = 0; i < core_array_size(posix_exception_signals); i++) {
+        if (posix_exception_signals[i] == num) {
+            if (disposition == POSIX_SIGNAL_DISPOSITION_HANDLER) {
+                if (!(posix_exceptions_installed & (1 << i))) {
+                    ret = kern_process_set_exception_handler(i, posix_exception_handler);
+                    libsystem_assert(ret == STATUS_SUCCESS);
+
+                    posix_exceptions_installed |= (1 << i);
+                }
+            } else {
+                if (posix_exceptions_installed & (1 << i)) {
+                    ret = kern_process_set_exception_handler(i, NULL);
+                    libsystem_assert(ret == STATUS_SUCCESS);
+
+                    posix_exceptions_installed &= ~(1 << i);
+                }
+            }
+        }
+    }
+
+    return true;
 }
 
 /** Reset signal state after a fork. */
@@ -433,27 +551,12 @@ void posix_signal_guard_end(void) {
 
 /** Convert a kernel exception code to a signal number. */
 int posix_signal_from_exception(unsigned code) {
-    switch (code) {
-        case EXCEPTION_ADDR_UNMAPPED:       return SIGSEGV;
-        case EXCEPTION_ACCESS_VIOLATION:    return SIGSEGV;
-        case EXCEPTION_STACK_OVERFLOW:      return SIGSEGV;
-        case EXCEPTION_PAGE_ERROR:          return SIGBUS;
-        case EXCEPTION_INVALID_ALIGNMENT:   return SIGBUS;
-        case EXCEPTION_INVALID_INSTRUCTION: return SIGILL;
-        case EXCEPTION_INT_DIV_ZERO:        return SIGFPE;
-        case EXCEPTION_INT_OVERFLOW:        return SIGFPE;
-        case EXCEPTION_FLOAT_DIV_ZERO:      return SIGFPE;
-        case EXCEPTION_FLOAT_OVERFLOW:      return SIGFPE;
-        case EXCEPTION_FLOAT_UNDERFLOW:     return SIGFPE;
-        case EXCEPTION_FLOAT_PRECISION:     return SIGFPE;
-        case EXCEPTION_FLOAT_DENORMAL:      return SIGFPE;
-        case EXCEPTION_FLOAT_INVALID:       return SIGFPE;
-        case EXCEPTION_BREAKPOINT:          return SIGTRAP;
-        case EXCEPTION_ABORT:               return SIGABRT;
-        default:
-            libsystem_log(CORE_LOG_WARN, "unhandled exception code %u", code);
-            return SIGKILL;
+    if (code >= core_array_size(posix_exception_signals) || posix_exception_signals[code] == 0) {
+        libsystem_log(CORE_LOG_WARN, "unhandled exception code %u", code);
+        return SIGKILL;
     }
+
+    return posix_exception_signals[code];
 }
 
 /**

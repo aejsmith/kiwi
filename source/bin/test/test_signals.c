@@ -29,6 +29,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+static void mask(int how, int num) {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, num);
+
+    int ret = sigprocmask(how, &set, NULL);
+    if (ret != 0)
+        perror("sigprocmask");
+}
+
 static void child_process_default(void) {
     printf("Test default handler\n");
 
@@ -41,33 +51,21 @@ static void child_process_default(void) {
 static void child_process_default_mask(void) {
     printf("Test default handler with mask\n");
 
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGTERM);
-
-    int ret = sigprocmask(SIG_BLOCK, &set, NULL);
-    if (ret != 0) {
-        perror("sigprocmask");
-        return;
-    }
+    mask(SIG_BLOCK, SIGTERM);
 
     while (true) {
         printf("- Child running\n");
         kern_thread_sleep(core_secs_to_nsecs(2), NULL);
 
         printf("- Unblocking\n");
-        int ret = sigprocmask(SIG_UNBLOCK, &set, NULL);
-        if (ret != 0) {
-            perror("sigprocmask");
-            return;
-        }
+        mask(SIG_UNBLOCK, SIGTERM);
     }
 }
 
 static volatile bool signal_received;
 
 static void signal_handler(int num, siginfo_t *info, void *context) {
-    printf("- Signal handler (num: %d, pid: %d)\n", num, info->si_pid);
+    printf("- Signal handler (num: %d, code: %d, pid: %d)\n", num, info->si_code, info->si_pid);
     signal_received = true;
 }
 
@@ -93,7 +91,7 @@ static void child_process_custom(void) {
 }
 
 static void child_process_custom_mask(void) {
-    printf("Test custom handler\n");
+    printf("Test custom handler with mask\n");
 
     signal_received = false;
 
@@ -107,27 +105,36 @@ static void child_process_custom_mask(void) {
         return;
     }
 
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGTERM);
-
-    ret = sigprocmask(SIG_BLOCK, &set, NULL);
-    if (ret != 0) {
-        perror("sigprocmask");
-        return;
-    }
+    mask(SIG_BLOCK, SIGTERM);
 
     while (!signal_received) {
         printf("- Child running\n");
         kern_thread_sleep(core_secs_to_nsecs(2), NULL);
 
         printf("- Unblocking\n");
-        ret = sigprocmask(SIG_UNBLOCK, &set, NULL);
-        if (ret != 0) {
-            perror("sigprocmask");
-            return;
-        }
+        mask(SIG_UNBLOCK, SIGTERM);
     }
+}
+
+static void child_process_exception(void) {
+    printf("Test exception handler\n");
+
+    mask(SIG_BLOCK, SIGTERM);
+
+    /* Reset handler after first execution so we get an exception again and exit. */
+    sigaction_t action = {};
+    action.sa_flags = SA_SIGINFO | SA_RESETHAND;
+    action.sa_sigaction = signal_handler;
+
+    int ret = sigaction(SIGILL, &action, NULL);
+    if (ret != 0) {
+        perror("sigaction");
+        return;
+    }
+
+    __asm__ volatile("ud2a");
+
+    printf("Shouldn't get here!");
 }
 
 static void (*test_functions[])() = {
@@ -135,6 +142,7 @@ static void (*test_functions[])() = {
     child_process_default_mask,
     child_process_custom,
     child_process_custom_mask,
+    child_process_exception,
 };
 
 int main(int argc, char **argv) {

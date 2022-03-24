@@ -127,7 +127,7 @@ typedef struct siginfo {
 #define FPE_INTOVF      21          /**< Integer overflow. */
 #define FPE_FLTDIV      22          /**< Floating-point divide by zero. */
 #define FPE_FLTOVF      23          /**< Floating-point overflow. */
-#define FPE_FLTUNDF     24          /**< loating-point underflow. */
+#define FPE_FLTUND      24          /**< Floating-point underflow. */
 #define FPE_FLTRES      25          /**< Floating-point inexact result. */
 #define FPE_FLTINV      26          /**< Invalid floating-point operation. */
 #define FPE_FLTSUB      27          /**< Subscript out of range. */

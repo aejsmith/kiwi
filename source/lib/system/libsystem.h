@@ -49,6 +49,7 @@ extern void libsystem_stub(const char *name, bool fatal) __sys_hidden;
 
 extern void libsystem_assert_fail(const char *cond, const char *file, unsigned int line, const char *func) __sys_noreturn __sys_hidden;
 
+extern int libsystem_status_to_errno_val(status_t status) __sys_hidden;
 extern void libsystem_status_to_errno(status_t status) __sys_hidden;
 
 extern int main(int argc, char **argv, char **envp);
