@@ -670,7 +670,7 @@ int sigaction(int num, const sigaction_t *restrict act, sigaction_t *restrict ol
  * @param handler       Handler function.
  * @return              Previous handler, or SIG_ERR on failure. */
 sighandler_t signal(int num, sighandler_t handler) {
-    sigaction_t act;
+    sigaction_t act = {};
     act.sa_handler = handler;
 
     sigaction_t old_act;
