@@ -69,7 +69,7 @@ static status_t open_service_manager(void) {
  *                      STATUS_NOT_FOUND if service is not found.
  *                      Any possible status code from core_connection_open().
  */
-status_t core_service_connect(
+status_t core_service_open(
     const char *name, uint32_t service_flags, uint32_t conn_flags,
     core_connection_t **_conn)
 {

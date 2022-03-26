@@ -43,31 +43,15 @@ extern const char *const *environ;
 
 Terminal::Terminal(TerminalWindow &window) :
     m_window         (window),
-    m_connection     (nullptr),
-    m_childProcess   (INVALID_HANDLE),
-    m_terminal       {INVALID_HANDLE, INVALID_HANDLE},
     m_inputBatchSize (0)
 {}
 
-Terminal::~Terminal() {
-    g_terminalApp.removeEvents(this);
-
-    if (m_connection)
-        core_connection_close(m_connection);
-
-    if (m_childProcess != INVALID_HANDLE)
-        kern_handle_close(m_childProcess);
-
-    for (handle_t handle : m_terminal) {
-        if (handle != INVALID_HANDLE)
-            kern_handle_close(handle);
-    }
-}
+Terminal::~Terminal() {}
 
 bool Terminal::init() {
     status_t ret;
 
-    ret = core_service_connect(TERMINAL_SERVICE_NAME, 0, CORE_CONNECTION_RECEIVE_SIGNALS, &m_connection);
+    ret = m_connection.openService(TERMINAL_SERVICE_NAME, 0, Kiwi::Core::Connection::kReceiveSignals);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to open connection to terminal service: %" PRId32, ret);
         return false;
@@ -76,33 +60,30 @@ bool Terminal::init() {
     /* Request handles to the terminal. */
     const uint32_t handleAccess[2] = { FILE_ACCESS_READ, FILE_ACCESS_WRITE };
     for (int i = 0; i < 2; i++) {
-        core_message_t *request =
-            core_message_create_request(TERMINAL_REQUEST_OPEN_HANDLE, sizeof(terminal_request_open_handle_t), 0);
+        Kiwi::Core::Message request;
+        if (!request.createRequest(TERMINAL_REQUEST_OPEN_HANDLE, sizeof(terminal_request_open_handle_t))) {
+            core_log(CORE_LOG_ERROR, "failed to create request message");
+            return false;
+        }
 
-        auto requestData = reinterpret_cast<terminal_request_open_handle_t *>(core_message_data(request));
+        auto requestData = request.data<terminal_request_open_handle_t>();
         requestData->access = handleAccess[i];
 
-        core_message_t *reply;
-        ret = core_connection_request(m_connection, request, &reply);
-
-        core_message_destroy(request);
-
+        Kiwi::Core::Message reply;
+        ret = m_connection.request(request, reply);
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_ERROR, "failed to make terminal handle request: %" PRId32, ret);
             return false;
         }
 
-        auto replyData = reinterpret_cast<terminal_reply_open_handle_t *>(core_message_data(reply));
-        ret            = replyData->result;
-        m_terminal[i]  = core_message_detach_handle(reply);
+        auto replyData = reply.data<terminal_reply_open_handle_t>();
 
-        core_message_destroy(reply);
-
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_ERROR, "failed to open terminal handle: %" PRId32, ret);
+        if (replyData->result != STATUS_SUCCESS) {
+            core_log(CORE_LOG_ERROR, "failed to open terminal handle: %" PRId32, replyData->result);
             return false;
         }
 
+        m_terminal[i].attach(reply.detachHandle());
         assert(m_terminal[i] != INVALID_HANDLE);
 
         kern_handle_set_flags(m_terminal[i], HANDLE_INHERITABLE);
@@ -113,7 +94,7 @@ bool Terminal::init() {
     ws.ws_col = m_window.cols();
     ws.ws_row = m_window.rows();
 
-    ret = kern_file_request(m_terminal[1], TIOCSWINSZ, &ws, sizeof(ws), NULL, 0, NULL);
+    ret = kern_file_request(m_terminal[1], TIOCSWINSZ, &ws, sizeof(ws), nullptr, 0, nullptr);
     if (ret != STATUS_SUCCESS)
         core_log(CORE_LOG_WARN, "failed to set window size: %" PRId32, ret);
 
@@ -121,50 +102,32 @@ bool Terminal::init() {
     if (spawnProcess("/system/bin/bash", m_childProcess) != STATUS_SUCCESS)
         return false;
 
-    g_terminalApp.addEvent(core_connection_handle(m_connection), CONNECTION_EVENT_HANGUP, this);
-    g_terminalApp.addEvent(core_connection_handle(m_connection), CONNECTION_EVENT_MESSAGE, this);
-    g_terminalApp.addEvent(m_childProcess, PROCESS_EVENT_DEATH, this);
+    handle_t connHandle = m_connection.handle();
+
+    m_hangupEvent = g_terminalApp.eventLoop().addEvent(
+        connHandle, CONNECTION_EVENT_HANGUP, 0,
+        [this] (const object_event_t &event) { handleHangupEvent(); });
+    m_messageEvent = g_terminalApp.eventLoop().addEvent(
+        connHandle, CONNECTION_EVENT_MESSAGE, 0,
+        [this] (const object_event_t &event) { handleMessages(); });
+    m_deathEvent = g_terminalApp.eventLoop().addEvent(
+        m_childProcess, PROCESS_EVENT_DEATH, 0,
+        [this] (const object_event_t &event) { handleDeathEvent(); });
 
     return true;
 }
 
-void Terminal::handleEvent(const object_event_t &event) {
-    bool close = false;
+void Terminal::handleHangupEvent() {
+    core_log(CORE_LOG_ERROR, "lost connection to terminal service, exiting");
 
-    if (event.handle == core_connection_handle(m_connection)) {
-        switch (event.event) {
-            case CONNECTION_EVENT_HANGUP:
-                core_log(CORE_LOG_ERROR, "lost connection to terminal service, exiting");
-                close = true;
-                break;
-
-            case CONNECTION_EVENT_MESSAGE:
-                handleMessages();
-                break;
-
-            default:
-                core_unreachable();
-
-        }
-    } else if (event.handle == m_childProcess) {
-        assert(event.event == PROCESS_EVENT_DEATH);
-
-        core_log(CORE_LOG_NOTICE, "child process exited, exiting");
-        close = true;
-    } else {
-        core_unreachable();
-    }
-
-    if (close) {
-        /* This will delete us - do this last. */
-        m_window.close();
-    }
+    /* This will delete us. */
+    m_window.close();
 }
 
 void Terminal::handleMessages() {
     while (true) {
-        core_message_t *message;
-        status_t ret = core_connection_receive(m_connection, 0, &message);
+        Kiwi::Core::Message message;
+        status_t ret = m_connection.receive(0, message);
         if (ret == STATUS_WOULD_BLOCK) {
             break;
         } else if (ret != STATUS_SUCCESS) {
@@ -172,23 +135,27 @@ void Terminal::handleMessages() {
             break;
         }
 
-        uint32_t id = core_message_id(message);
-        switch (id) {
+        switch (message.id()) {
             case TERMINAL_SIGNAL_OUTPUT:
                 handleOutput(message);
                 break;
             default:
-                core_log(CORE_LOG_ERROR, "unhandled signal %" PRIu32, id);
+                core_log(CORE_LOG_ERROR, "unhandled signal %" PRIu32, message.id());
                 break;
         }
-
-        core_message_destroy(message);
     }
 }
 
-void Terminal::handleOutput(core_message_t *message) {
-    const uint8_t *data = reinterpret_cast<uint8_t *>(core_message_data(message));
-    size_t size         = core_message_size(message);
+void Terminal::handleDeathEvent() {
+    core_log(CORE_LOG_NOTICE, "child process exited, exiting");
+
+    /* This will delete us. */
+    m_window.close();
+}
+
+void Terminal::handleOutput(const Kiwi::Core::Message &message) {
+    const uint8_t *data = message.data<uint8_t>();
+    size_t size         = message.size();
 
     for (size_t i = 0; i < size; i++)
         output(data[i]);
@@ -230,24 +197,23 @@ void Terminal::flushInput() {
     if (m_inputBatchSize == 0)
         return;
 
-    core_message_t *request = core_message_create_request(TERMINAL_REQUEST_INPUT, m_inputBatchSize, 0);
+    Kiwi::Core::Message request;
+    if (!request.createRequest(TERMINAL_REQUEST_INPUT, m_inputBatchSize)) {
+        core_log(CORE_LOG_ERROR, "failed to create terminal input request");
+        return;
+    }
 
-    memcpy(core_message_data(request), m_inputBatch, m_inputBatchSize);
+    memcpy(request.data(), m_inputBatch, m_inputBatchSize);
 
-    core_message_t *reply;
-    status_t ret = core_connection_request(m_connection, request, &reply);
-
-    core_message_destroy(request);
-
+    Kiwi::Core::Message reply;
+    status_t ret = m_connection.request(request, reply);
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to make terminal input request: %" PRId32, ret);
         return;
     }
 
-    auto replyData = reinterpret_cast<terminal_reply_input_t *>(core_message_data(reply));
+    auto replyData = reply.data<terminal_reply_input_t>();
     ret = replyData->result;
-
-    core_message_destroy(reply);
 
     if (ret != STATUS_SUCCESS)
         core_log(CORE_LOG_ERROR, "failed to send terminal input: %" PRId32, ret);
@@ -256,7 +222,7 @@ void Terminal::flushInput() {
 }
 
 /** Spawn a process attached to the terminal. */
-status_t Terminal::spawnProcess(const char *path, handle_t &handle) {
+status_t Terminal::spawnProcess(const char *path, Kiwi::Core::Handle &handle) {
     process_attrib_t attrib;
     handle_t map[][2] = { { m_terminal[0], 0 }, { m_terminal[1], 1 }, { m_terminal[1], 2 } };
     attrib.token     = INVALID_HANDLE;
@@ -265,7 +231,7 @@ status_t Terminal::spawnProcess(const char *path, handle_t &handle) {
     attrib.map_count = core_array_size(map);
 
     const char *args[] = { path, nullptr };
-    status_t ret = kern_process_create(path, args, environ, 0, &attrib, &handle);
+    status_t ret = kern_process_create(path, args, environ, 0, &attrib, handle.attach());
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create process '%s': %d", path, ret);
         return ret;

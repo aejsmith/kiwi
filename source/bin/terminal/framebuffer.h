@@ -21,12 +21,13 @@
 
 #pragma once
 
-#include "event_handler.h"
+#include <kiwi/core/event_loop.h>
+#include <kiwi/core/handle.h>
 
 #include <kernel/device/kfb.h>
 
 /** Class for drawing to a framebuffer. */
-class Framebuffer : public EventHandler {
+class Framebuffer {
 public:
     Framebuffer();
     ~Framebuffer();
@@ -36,8 +37,6 @@ public:
 
     bool init();
 
-    void handleEvent(const object_event_t &event) override;
-
     void putPixel(uint16_t x, uint16_t y, uint32_t rgb);
     void fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb);
     void copyRect(
@@ -45,9 +44,15 @@ public:
         uint16_t width, uint16_t height);
 
 private:
-    handle_t m_handle;
+    void handleRedrawEvent();
+
+private:
+    Kiwi::Core::Handle m_handle;
+
     kfb_mode_t m_mode;
     uint8_t *m_mapping;
     uint8_t *m_backbuffer;
     size_t m_size;
+
+    Kiwi::Core::EventRef m_redrawEvent;
 };

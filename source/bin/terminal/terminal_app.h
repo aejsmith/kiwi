@@ -21,14 +21,15 @@
 
 #pragma once
 
-#include "event_handler.h"
+#include <device/input.h>
+
+#include <kiwi/core/event_loop.h>
+
+#include <vector>
+
 #include "font.h"
 #include "framebuffer.h"
 #include "keyboard.h"
-
-#include <device/input.h>
-
-#include <vector>
 
 class TerminalWindow;
 
@@ -37,15 +38,13 @@ public:
     TerminalApp();
     ~TerminalApp();
 
+    Kiwi::Core::EventLoop &eventLoop()      { return m_eventLoop; }
     TerminalWindow &activeWindow() const    { return *m_windows[m_activeWindow]; }
     Framebuffer &framebuffer()              { return m_framebuffer; }
     Keyboard &keyboard()                    { return m_keyboard; }
     Font &font()                            { return m_font; }
 
     int run();
-
-    void addEvent(handle_t handle, unsigned id, EventHandler *handler);
-    void removeEvents(EventHandler *handler);
 
     void removeWindow(TerminalWindow *window);
 
@@ -54,17 +53,16 @@ public:
 
 private:
     using WindowArray = std::vector<TerminalWindow *>;
-    using EventArray  = std::vector<object_event_t>;
 
 private:
+    Kiwi::Core::EventLoop m_eventLoop;
+
     WindowArray m_windows;
     size_t m_activeWindow;
 
     Framebuffer m_framebuffer;
     Keyboard m_keyboard;
     Font m_font;
-
-    EventArray m_events;
 };
 
 extern TerminalApp g_terminalApp;

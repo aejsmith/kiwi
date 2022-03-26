@@ -67,7 +67,7 @@ core_connection_t *posix_service_get(void) {
     core_mutex_lock(&posix_service_lock, -1);
 
     if (!posix_service_conn) {
-        status_t ret = core_service_connect(POSIX_SERVICE_NAME, 0, 0, &posix_service_conn);
+        status_t ret = core_service_open(POSIX_SERVICE_NAME, 0, 0, &posix_service_conn);
         if (ret != STATUS_SUCCESS) {
             libsystem_log(CORE_LOG_WARN, "failed to connect to POSIX service: %" PRId32);
 

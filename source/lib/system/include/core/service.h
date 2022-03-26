@@ -25,7 +25,7 @@
 
 __SYS_EXTERN_C_BEGIN
 
-extern status_t core_service_connect(
+extern status_t core_service_open(
     const char *name, uint32_t service_flags, uint32_t conn_flags,
     core_connection_t **_conn);
 

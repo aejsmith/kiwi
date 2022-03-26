@@ -21,20 +21,19 @@
 
 #pragma once
 
-#include "event_handler.h"
-
-#include <core/ipc.h>
+#include <kiwi/core/connection.h>
+#include <kiwi/core/event_loop.h>
+#include <kiwi/core/handle.h>
 
 class TerminalBuffer;
 
-class Terminal : public EventHandler {
+class Terminal {
 public:
     Terminal(TerminalWindow &window);
     virtual ~Terminal();
 
     bool init();
 
-    void handleEvent(const object_event_t &event) final override;
     void handleMessages();
 
     void sendInput(char ch);
@@ -49,19 +48,26 @@ public:
     virtual void output(uint8_t ch) = 0;
 
 private:
-    void handleOutput(core_message_t *message);
+    void handleHangupEvent();
+    void handleDeathEvent();
 
-    status_t spawnProcess(const char *path, handle_t &handle);
+    void handleOutput(const Kiwi::Core::Message &message);
+
+    status_t spawnProcess(const char *path, Kiwi::Core::Handle &handle);
 
 protected:
     TerminalWindow& m_window;
 
 private:
-    core_connection_t *m_connection;        /**< Connection to terminal service. */
-    handle_t m_childProcess;                /**< Main child process. */
-    handle_t m_terminal[2];                 /**< Terminal handles (read/write). */
+    Kiwi::Core::Connection m_connection;    /**< Connection to terminal service. */
+    Kiwi::Core::Handle m_childProcess;      /**< Main child process. */
+    Kiwi::Core::Handle m_terminal[2];       /**< Terminal handles (read/write). */
 
     static constexpr uint32_t kInputBatchMax = 128;
     uint8_t m_inputBatch[kInputBatchMax];
     size_t m_inputBatchSize;
+
+    Kiwi::Core::EventRef m_hangupEvent;
+    Kiwi::Core::EventRef m_messageEvent;
+    Kiwi::Core::EventRef m_deathEvent;
 };

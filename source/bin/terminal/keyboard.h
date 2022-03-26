@@ -21,12 +21,12 @@
 
 #pragma once
 
-#include "event_handler.h"
-
 #include <device/input.h>
 
+#include <kiwi/core/event_loop.h>
+
 /** Class handling keyboard input. */
-class Keyboard : public EventHandler {
+class Keyboard {
 public:
     enum Modifiers : uint32_t {
         kModifier_LeftCtrl      = (1<<0),
@@ -55,11 +55,14 @@ public:
 
     bool init(const char *path);
 
-    void handleEvent(const object_event_t &event) override;
-
     size_t map(const input_event_t &event, uint8_t buf[4]);
+
+private:
+    void handleReadableEvent();
 
 private:
     input_device_t *m_device;
     uint32_t m_modifiers;
+
+    Kiwi::Core::EventRef m_readableEvent;
 };

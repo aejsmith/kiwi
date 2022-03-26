@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
     status_t ret;
 
     core_connection_t *conn;
-    ret = core_service_connect("org.kiwi.test", 0, CORE_CONNECTION_RECEIVE_SIGNALS, &conn);
+    ret = core_service_open("org.kiwi.test", 0, CORE_CONNECTION_RECEIVE_SIGNALS, &conn);
     if (ret != STATUS_SUCCESS) {
         fprintf(stderr, "Client failed to open connection: %d\n", ret);
         return EXIT_FAILURE;

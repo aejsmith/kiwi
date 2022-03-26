@@ -43,8 +43,6 @@ Keyboard::Keyboard() :
 {}
 
 Keyboard::~Keyboard() {
-    g_terminalApp.removeEvents(this);
-
     if (m_device)
         device_close(m_device);
 }
@@ -59,21 +57,18 @@ bool Keyboard::init(const char *path) {
         return false;
     }
 
-    g_terminalApp.addEvent(device_handle(m_device), FILE_EVENT_READABLE, this);
+    m_readableEvent = g_terminalApp.eventLoop().addEvent(
+        device_handle(m_device), FILE_EVENT_READABLE, 0,
+        [this] (const object_event_t &event) { handleReadableEvent(); });
 
     return true;
 }
 
-void Keyboard::handleEvent(const object_event_t &event) {
-    status_t ret;
-
-    assert(event.handle == device_handle(m_device));
-    assert(event.event == FILE_EVENT_READABLE);
-
+void Keyboard::handleReadableEvent() {
     bool done = false;
     while (!done) {
         input_event_t event;
-        ret = input_device_read_event(m_device, &event);
+        status_t ret = input_device_read_event(m_device, &event);
         if (ret == STATUS_SUCCESS) {
             auto handleModifier = [&] (int32_t key, uint32_t modifier) {
                 if (event.value == key) {

@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <core/service.h>
+
 #include <kernel/status.h>
 
 #include <kiwi/core/handle.h>
@@ -67,6 +69,7 @@ namespace Kiwi {
             bool create(Kiwi::Core::Handle handle, uint32_t flags);
             bool create(handle_t handle, uint32_t flags);
             status_t open(handle_t port, nstime_t timeout, uint32_t flags);
+            status_t openService(const char *name, uint32_t service_flags, uint32_t conn_flags);
             void close();
             void destroy();
 
@@ -175,6 +178,18 @@ namespace Kiwi {
             close();
 
             return core_connection_open(port, timeout, flags, &m_conn);
+        }
+
+        /**
+         * Creates a new connection by connecting to a service. If an existing
+         * connection is open then it will be closed.
+         *
+         * @see                 core_service_open().
+         */
+        inline status_t Connection::openService(const char *name, uint32_t service_flags, uint32_t conn_flags) {
+            close();
+
+            return core_service_open(name, service_flags, conn_flags, &m_conn);
         }
 
         /**

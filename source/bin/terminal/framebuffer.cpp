@@ -19,9 +19,6 @@
  * @brief               Framebuffer device class.
  */
 
-#include "framebuffer.h"
-#include "terminal_app.h"
-
 #include <core/log.h>
 #include <core/utility.h>
 
@@ -31,31 +28,28 @@
 
 #include <inttypes.h>
 
+#include "framebuffer.h"
+#include "terminal_app.h"
+
 static constexpr char kKfbDevicePath[] = "/virtual/kfb";
 
 Framebuffer::Framebuffer() :
-    m_handle     (INVALID_HANDLE),
     m_mapping    (nullptr),
     m_backbuffer (nullptr)
 {}
 
 Framebuffer::~Framebuffer() {
-    g_terminalApp.removeEvents(this);
-
     if (m_backbuffer)
         kern_vm_unmap(m_backbuffer, m_size);
 
     if (m_mapping)
         kern_vm_unmap(m_mapping, m_size);
-
-    if (m_handle != INVALID_HANDLE)
-        kern_handle_close(m_handle);
 }
 
 bool Framebuffer::init() {
     status_t ret;
 
-    ret = kern_device_open(kKfbDevicePath, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &m_handle);
+    ret = kern_device_open(kKfbDevicePath, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, m_handle.attach());
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to open device: %" PRId32, ret);
         return false;
@@ -98,15 +92,14 @@ bool Framebuffer::init() {
     memset(m_mapping, 0, m_size);
     memset(m_backbuffer, 0, m_size);
 
-    g_terminalApp.addEvent(m_handle, KFB_DEVICE_EVENT_REDRAW, this);
+    m_redrawEvent = g_terminalApp.eventLoop().addEvent(
+        m_handle, KFB_DEVICE_EVENT_REDRAW, 0,
+        [this] (const object_event_t &event) { handleRedrawEvent(); });
 
     return true;
 }
 
-void Framebuffer::handleEvent(const object_event_t &event) {
-    assert(event.handle == m_handle);
-    assert(event.event == KFB_DEVICE_EVENT_REDRAW);
-
+void Framebuffer::handleRedrawEvent() {
     memset(m_mapping, 0, m_size);
     memset(m_backbuffer, 0, m_size);
 
