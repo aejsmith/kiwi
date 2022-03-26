@@ -384,8 +384,9 @@ status_t core_connection_request(core_connection_t *conn, core_message_t *reques
         /* It isn't necessary to check the receive queue here - no other threads
          * should be using the connection simultaneously so all messages
          * received while waiting for the reply should be handled in this loop. */
+        // TODO: STATUS_INTERRUPTED check needed until we have syscall restarting.
         ret = receive_message(conn, -1, &message);
-        if (ret != STATUS_SUCCESS)
+        if (ret != STATUS_SUCCESS && ret != STATUS_INTERRUPTED)
             return ret;
 
         /* NULL if we get a malformed message or one we don't care about. */

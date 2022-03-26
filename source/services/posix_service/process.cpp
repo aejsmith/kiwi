@@ -453,7 +453,7 @@ Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
      * privileged access definition matches the requirement of POSIX so use
      * that. */
     // TODO: What about saved-setuid?
-    {
+    if (requestData->pid != m_pid) {
         Kiwi::Core::TokenSetter token;
         ret = token.set(security);
         if (ret != STATUS_SUCCESS) {

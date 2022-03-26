@@ -600,12 +600,18 @@ int kill(pid_t pid, int num) {
  * @param num           Signal number.
  * @return              0 on success, -1 on failure. */
 int raise(int num) {
-    // TODO: Don't reach out to the POSIX service, handle internally.
-    // Need to change IPL though.
-    // Go to the service if currently masked.
-    __asm__ volatile("ud2a");
-    libsystem_stub("raise", true);
-    return -1;
+    /*
+     * It is required that this if this should result in a signal handler being
+     * called, it will be called before raise() returns. This should be the
+     * case - the POSIX service will set the signal condition true before it
+     * sends the reply message and therefore we should receive the interrupt
+     * while waiting for the reply.
+     */
+
+    // TODO: When we implement pthread signals this should signal the calling
+    // thread, and make sure to respect the above requirement.
+
+    return kill(getpid(), num);
 }
 
 /** Examines or changes the action of a signal.

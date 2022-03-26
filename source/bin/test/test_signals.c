@@ -116,6 +116,28 @@ static void child_process_custom_mask(void) {
     }
 }
 
+static void child_process_raise(void) {
+    printf("Test raise()\n");
+
+    sigaction_t action = {};
+    action.sa_flags = SA_SIGINFO;
+    action.sa_sigaction = signal_handler;
+
+    int ret = sigaction(SIGTERM, &action, NULL);
+    if (ret != 0) {
+        perror("sigaction");
+        return;
+    }
+
+    ret = raise(SIGTERM);
+    if (ret != 0) {
+        perror("raise");
+        return;
+    }
+
+    printf("- Raise complete\n");
+}
+
 static void child_process_exception(void) {
     printf("Test exception handler\n");
 
@@ -142,6 +164,7 @@ static void (*test_functions[])() = {
     child_process_default_mask,
     child_process_custom,
     child_process_custom_mask,
+    child_process_raise,
     child_process_exception,
 };
 
