@@ -34,13 +34,13 @@ typedef unsigned long jmp_buf[JMP_BUF_SIZE];
 /** Buffer for sigsetjmp()/siglongjmp(). */
 typedef struct _sigjmp_buf {
     jmp_buf buf;
-    int restore_mask;
     sigset_t mask;
+    bool restore_mask;
 } sigjmp_buf[1];
 
 extern void longjmp(jmp_buf env, int val) __sys_noreturn;
 extern int setjmp(jmp_buf env);
 extern void siglongjmp(sigjmp_buf env, int val) __sys_noreturn;
-extern int sigsetjmp(sigjmp_buf env, int savemask);
+extern int sigsetjmp(sigjmp_buf env, int save_mask);
 
 __SYS_EXTERN_C_END

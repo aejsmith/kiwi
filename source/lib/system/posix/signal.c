@@ -689,9 +689,8 @@ sighandler_t signal(int num, sighandler_t handler) {
 int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict old_set) {
     SCOPED_SIGNAL_LOCK();
 
-    if (old_set) {
+    if (old_set)
         *old_set = posix_signal_mask;
-    }
 
     if (set) {
         sigset_t val  = make_valid_sigmask(*set);
@@ -759,18 +758,16 @@ int sigsuspend(const sigset_t *mask) {
  * siglongjmp(). If specified, the current signal mask will also be saved.
  *
  * @param env           Buffer to save to.
- * @param savemask      If not 0, the current signal mask will be saved.
+ * @param save_mask     If not 0, the current signal mask will be saved.
  *
  * @return              0 if returning from direct invocation, non-zero if
  *                      returning from siglongjmp().
  */
-int sigsetjmp(sigjmp_buf env, int savemask) {
-    libsystem_stub("sigsetjmp", false);
+int sigsetjmp(sigjmp_buf env, int save_mask) {
+    if (save_mask)
+        sigprocmask(SIG_BLOCK, NULL, &env->mask);
 
-    //if (savemask)
-    //  sigprocmask(SIG_BLOCK, NULL, &env->mask);
-
-    //env->restore_mask = savemask;
+    env->restore_mask = save_mask;
     return setjmp(env->buf);
 }
 
@@ -783,10 +780,8 @@ int sigsetjmp(sigjmp_buf env, int savemask) {
  * @param val           Value that the original sigsetjmp() call should return.
  */
 void siglongjmp(sigjmp_buf env, int val) {
-    libsystem_stub("siglongjmp", false);
-
-    //if (env->restore_mask)
-    //  sigprocmask(SIG_SETMASK, &env->mask, NULL);
+    if (env->restore_mask)
+        sigprocmask(SIG_SETMASK, &env->mask, NULL);
 
     longjmp(env->buf, val);
 }
