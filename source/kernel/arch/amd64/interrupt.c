@@ -296,7 +296,7 @@ void interrupt_handler(frame_t *frame) {
         /* Save the user-mode interrupt frame pointer, used by the signal frame
          * setup/restore code. */
         curr_thread->arch.user_frame = frame;
-        thread_at_kernel_entry();
+        thread_at_kernel_entry(true);
     }
 
     /* Call the handler. */

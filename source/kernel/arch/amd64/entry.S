@@ -220,6 +220,7 @@ FUNCTION_START(syscall_entry)
     movq    %rsp, %gs:ARCH_THREAD_OFF_USER_FRAME
 
     /* Perform kernel entry work and enable interrupts. */
+    xorl    %edi, %edi
     call    thread_at_kernel_entry
     sti
 

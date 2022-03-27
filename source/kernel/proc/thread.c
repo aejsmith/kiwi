@@ -619,14 +619,16 @@ void thread_exception(exception_info_t *info) {
 }
 
 /** Perform tasks necessary when a thread is entering the kernel. */
-void thread_at_kernel_entry(void) {
+void thread_at_kernel_entry(bool interrupt) {
     /* Update accounting information. */
     nstime_t now = system_time();
     curr_thread->user_time += now - curr_thread->last_time;
     curr_thread->last_time  = now;
 
-    /* Terminate the thread if killed. */
-    if (unlikely(curr_thread->flags & THREAD_KILLED)) {
+    /* Terminate the thread if killed on system call entry to avoid doing the
+     * syscall work. Do not do this on an interrupt: we must handle the
+     * interrupt first, and we'll exit in thread_at_kernel_exit(). */
+    if (!interrupt && unlikely(curr_thread->flags & THREAD_KILLED)) {
         curr_thread->reason = EXIT_REASON_KILLED;
         thread_exit();
     }

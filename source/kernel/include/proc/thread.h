@@ -221,7 +221,7 @@ extern void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt);
 
 extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsigned flags);
 extern void thread_yield(void);
-extern void thread_at_kernel_entry(void);
+extern void thread_at_kernel_entry(bool interrupt);
 extern void thread_at_kernel_exit(void);
 extern void thread_exception(exception_info_t *info);
 extern void thread_exit(void) __noreturn;
