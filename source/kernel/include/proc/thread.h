@@ -85,7 +85,6 @@ typedef struct thread {
     list_t wait_link;                   /**< Link to a waiting list. */
     timer_t sleep_timer;                /**< Sleep timeout timer. */
     status_t sleep_status;              /**< Sleep status (timed out/interrupted). */
-    spinlock_t *wait_lock;              /**< Lock for the waiting list. */
     const char *waiting_on;             /**< What is being waited on (for informational purposes). */
 
     /** Accounting information. */
@@ -145,11 +144,13 @@ typedef struct thread {
 } thread_t;
 
 /** Internal flags for a thread. */
-#define THREAD_INTERRUPTIBLE    (1<<0)  /**< Thread is in an interruptible sleep. */
-#define THREAD_INTERRUPTED      (1<<1)  /**< Thread has been interrupted. */
-#define THREAD_KILLED           (1<<2)  /**< Thread has been killed. */
-#define THREAD_PREEMPTED        (1<<3)  /**< Thread was preempted while preemption disabled. */
-#define THREAD_RWLOCK_WRITER    (1<<3)  /**< Thread is blocked on an rwlock for writing. */
+enum {
+    THREAD_INTERRUPTIBLE    = (1<<0),   /**< Thread is in an interruptible sleep. */
+    THREAD_INTERRUPTED      = (1<<1),   /**< Thread has been interrupted. */
+    THREAD_KILLED           = (1<<2),   /**< Thread has been killed. */
+    THREAD_PREEMPTED        = (1<<3),   /**< Thread was preempted while preemption disabled. */
+    THREAD_RWLOCK_WRITER    = (1<<3),   /**< Thread is blocked on an rwlock for writing. */
+};
 
 /**
  * Function called after a thread interrupt has been set up. This can be used
@@ -191,8 +192,16 @@ typedef struct thread_interrupt {
 } thread_interrupt_t;
 
 /** Sleeping behaviour flags. */
-#define SLEEP_INTERRUPTIBLE     (1<<0)  /**< Sleep should be interruptible. */
-#define SLEEP_ABSOLUTE          (1<<1)  /**< Specified timeout is absolute, not relative to current time. */
+enum {
+    SLEEP_INTERRUPTIBLE     = (1<<0),   /**< Sleep should be interruptible. */
+    SLEEP_ABSOLUTE          = (1<<1),   /**< Specified timeout is absolute, not relative to current time. */
+
+    /**
+     * Don't relock the specified lock upon return(). Do not use this unless
+     * calling thread_sleep() directly.
+     */
+    __SLEEP_NO_RELOCK       = (1<<2),
+};
 
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread             (arch_curr_thread())
@@ -215,11 +224,11 @@ extern void thread_release(thread_t *thread);
 extern void thread_rename(thread_t *thread, const char *name);
 extern void thread_wire(thread_t *thread);
 extern void thread_unwire(thread_t *thread);
-extern void thread_wake(thread_t *thread);
+extern bool thread_wake(thread_t *thread);
 extern void thread_kill(thread_t *thread);
 extern void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt);
 
-extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsigned flags);
+extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, uint32_t flags);
 extern void thread_yield(void);
 extern void thread_at_kernel_entry(bool interrupt);
 extern void thread_at_kernel_exit(void);

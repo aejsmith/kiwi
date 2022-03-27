@@ -55,7 +55,7 @@ typedef struct user_semaphore {
  * @return              Status code describing result of the operation. Failure
  *                      is only possible if the timeout is not -1, or if the
  *                      SLEEP_INTERRUPTIBLE flag is set. */
-status_t semaphore_down_etc(semaphore_t *sem, nstime_t timeout, unsigned flags) {
+status_t semaphore_down_etc(semaphore_t *sem, nstime_t timeout, uint32_t flags) {
     assert(!in_interrupt());
 
     spinlock_lock(&sem->lock);
@@ -67,7 +67,13 @@ status_t semaphore_down_etc(semaphore_t *sem, nstime_t timeout, unsigned flags) 
     }
 
     list_append(&sem->threads, &curr_thread->wait_link);
-    return thread_sleep(&sem->lock, timeout, sem->name, flags);
+    status_t ret = thread_sleep(&sem->lock, timeout, sem->name, flags);
+
+    /* Still on the list on interrupt or timeout. */
+    list_remove(&curr_thread->wait_link);
+
+    spinlock_unlock(&sem->lock);
+    return ret;
 }
 
 /** Decreases the count of a semaphore.
@@ -82,14 +88,15 @@ void semaphore_down(semaphore_t *sem) {
 void semaphore_up(semaphore_t *sem, size_t count) {
     spinlock_lock(&sem->lock);
 
-    for (size_t i = 0; i < count; i++) {
-        if (list_empty(&sem->threads)) {
-            sem->count++;
-        } else {
-            thread_t *thread = list_first(&sem->threads, thread_t, wait_link);
-            thread_wake(thread);
-        }
+    size_t woken = 0;
+    while (woken < count && !list_empty(&sem->threads)) {
+        thread_t *thread = list_first(&sem->threads, thread_t, wait_link);
+        list_remove(&thread->wait_link);
+        if (thread_wake(thread))
+            woken++;
     }
+
+    sem->count += count - woken;
 
     spinlock_unlock(&sem->lock);
 }
@@ -240,32 +247,20 @@ status_t kern_semaphore_up(handle_t handle, size_t count) {
 
     spinlock_lock(&sem->sem.lock);
 
-    /* Count the number of threads we would wake. */
-    size_t num_threads = 0;
-    list_foreach(&sem->sem.threads, iter) {
-        if (++num_threads == count)
-            break;
-    }
-
-    /* Check for overflow. */
-    if (sem->sem.count + (count - num_threads) < sem->sem.count) {
+    /* Check for possible overflow. */
+    if (sem->sem.count + count < sem->sem.count) {
         spinlock_lock(&sem->sem.lock);
         object_handle_release(khandle);
         return STATUS_OVERFLOW;
     }
 
-    /* Wake them up. */
-    for (size_t i = 0; i < num_threads; i++) {
-        thread_t *thread = list_first(&sem->sem.threads, thread_t, wait_link);
-        thread_wake(thread);
-    }
-
-    /* Add any remainder onto the count. */
-    sem->sem.count += count - num_threads;
+    size_t prev_count = sem->sem.count;
+    semaphore_up(&sem->sem, count);
+    size_t new_count = sem->sem.count;
 
     spinlock_unlock(&sem->sem.lock);
 
-    if (count - num_threads)
+    if (new_count > prev_count)
         notifier_run(&sem->notifier, NULL, false);
 
     object_handle_release(khandle);

@@ -30,7 +30,7 @@ struct thread;
 /** Structure containing a mutex. */
 typedef struct mutex {
     atomic_uint value;              /**< Lock count. */
-    unsigned flags;                 /**< Behaviour flags for the mutex. */
+    uint32_t flags;                 /**< Behaviour flags for the mutex. */
     spinlock_t lock;                /**< Lock to protect the thread list. */
     list_t threads;                 /**< List of waiting threads. */
     struct thread *holder;          /**< Thread holding the lock. */
@@ -72,10 +72,10 @@ static inline int mutex_recursion(mutex_t *lock) {
     return atomic_load_explicit(&lock->value, memory_order_relaxed);
 }
 
-extern status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, unsigned flags);
+extern status_t mutex_lock_etc(mutex_t *lock, nstime_t timeout, uint32_t flags);
 extern void mutex_lock(mutex_t *lock);
 extern void mutex_unlock(mutex_t *lock);
-extern void mutex_init(mutex_t *lock, const char *name, unsigned flags);
+extern void mutex_init(mutex_t *lock, const char *name, uint32_t flags);
 
 static inline void __mutex_unlockp(void *p) {
     mutex_t *mutex = *(mutex_t **)p;

@@ -597,7 +597,7 @@ status_t ipc_connection_send(
             ret = condvar_wait_etc(&remote->space_cvar, &conn->lock, absolute, sleep);
 
             /* Connection could have been closed while we were waiting (see
-            * ipc_connection_close()). */
+             * ipc_connection_close()). */
             if (conn->state == IPC_CONNECTION_CLOSED) {
                 ret = STATUS_CONN_HUNGUP;
                 goto out;

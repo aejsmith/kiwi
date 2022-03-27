@@ -695,8 +695,8 @@ void object_event_signal_etc(object_event_t *event, unsigned long data, status_t
         case OBJECT_WAIT_NORMAL: {
             spinlock_lock(&wait->waiter->lock);
 
-            /* Don't decrement the count if its already 0, only wake if thread
-             * is actually sleeping. */
+            /* Don't decrement the count if its already 0, only wake if we
+             * haven't already woken it. */
             if (wait->waiter->count && --wait->waiter->count == 0 && wait->waiter->thread) {
                 thread_wake(wait->waiter->thread);
                 wait->waiter->thread = NULL;
@@ -943,7 +943,7 @@ status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags, 
         spinlock_unlock(&waiter.lock);
     } else {
         waiter.thread = curr_thread;
-        ret = thread_sleep(&waiter.lock, timeout, "object_wait", SLEEP_INTERRUPTIBLE);
+        ret = thread_sleep(&waiter.lock, timeout, "object_wait", SLEEP_INTERRUPTIBLE | __SLEEP_NO_RELOCK);
     }
 
 out:

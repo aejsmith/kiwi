@@ -23,8 +23,6 @@
  *    http://www.kernel.org/doc/ols/2002/ols2002-pages-479-495.pdf
  *  - Futexes are Tricky
  *    http://dept-info.labri.fr/~denis/Enseignement/2008-IR/Articles/01-futex.pdf
- *  - The magical Futex
- *    http://www.owenshepherd.net/2010/08/11/the-magical-futex/
  *
  * TODO:
  *  - We should restrict what type of memory futexes can be placed in. For
@@ -55,7 +53,7 @@ typedef struct futex {
     phys_ptr_t phys;                /**< Physical address of futex. */
     refcount_t count;               /**< Number of processes referring to the futex. */
     spinlock_t lock;                /**< Lock for the futex. */
-    list_t threads;                 /**< List of threads waiting on the futex. */
+    list_t waiters;                 /**< List of threads waiting on the futex. */
     avl_tree_node_t tree_link;      /**< Link to global futex tree. */
 } futex_t;
 
@@ -64,6 +62,18 @@ typedef struct futex_link {
     futex_t *futex;                 /**< Futex. */
     avl_tree_node_t node;           /**< AVL tree node. */
 } futex_link_t;
+
+/** Thread wait state for a futex. */
+typedef struct futex_waiter {
+    list_t link;
+    thread_t *thread;
+
+    /**
+     * Futex that is being waited on. This can change while sleeping via
+     * kern_futex_requeue().
+     */
+    futex_t *futex;
+} futex_waiter_t;
 
 /** Futex allocator. */
 static slab_cache_t *futex_cache;
@@ -76,7 +86,7 @@ static void futex_ctor(void *obj, void *data) {
     futex_t *futex = obj;
 
     spinlock_init(&futex->lock, "futex_lock");
-    list_init(&futex->threads);
+    list_init(&futex->waiters);
 }
 
 /** Cleans up a process' futexes.
@@ -197,8 +207,21 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
     /* Now check the value to see if it has changed (see parameter description
      * above). The page is locked meaning it is safe to access it directly. */
     if (*addr == val) {
-        list_append(&futex->threads, &curr_thread->wait_link);
-        ret = thread_sleep(&futex->lock, timeout, "futex", SLEEP_INTERRUPTIBLE);
+        futex_waiter_t waiter;
+        waiter.thread = curr_thread;
+        waiter.futex  = futex;
+
+        list_init(&waiter.link);
+        list_append(&futex->waiters, &waiter.link);
+
+        /* The futex can change while waiting due to kern_futex_requeue(). Don't
+         * relock the same lock upon return and instead do it manually with the
+         * current futex. */
+        ret = thread_sleep(&futex->lock, timeout, "futex", SLEEP_INTERRUPTIBLE | __SLEEP_NO_RELOCK);
+
+        spinlock_lock(&waiter.futex->lock);
+        list_remove(&waiter.link);
+        spinlock_unlock(&waiter.futex->lock);
     } else {
         spinlock_unlock(&futex->lock);
         ret = STATUS_TRY_AGAIN;
@@ -206,6 +229,21 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, nstime_t timeout) {
 
     futex_finish(addr);
     return ret;
+}
+
+static size_t wake_threads(futex_t *futex, size_t count) {
+    size_t woken = 0;
+    while (woken < count && !list_empty(&futex->waiters)) {
+        futex_waiter_t *waiter = list_first(&futex->waiters, futex_waiter_t, link);
+        list_remove(&waiter->link);
+
+        /* Don't count threads that failed sleep but hadn't removed themselves
+         * yet. */
+        if (thread_wake(waiter->thread))
+            woken++;
+    }
+
+    return woken;
 }
 
 /** Wakes up threads waiting on a futex.
@@ -217,7 +255,6 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *_woken) {
     if (!count)
         return STATUS_INVALID_ARG;
 
-    /* Find the futex. */
     futex_t *futex;
     status_t ret = futex_lookup(addr, &futex);
     if (ret != STATUS_SUCCESS)
@@ -225,13 +262,7 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *_woken) {
 
     spinlock_lock(&futex->lock);
 
-    /* Wake the threads. */
-    size_t woken = 0;
-    while (count-- && !list_empty(&futex->threads)) {
-        thread_t  *thread = list_first(&futex->threads, thread_t, wait_link);
-        thread_wake(thread);
-        woken++;
-    }
+    size_t woken = wake_threads(futex, count);
 
     spinlock_unlock(&futex->lock);
     futex_finish(addr);
@@ -262,7 +293,6 @@ status_t kern_futex_requeue(int32_t *addr1, int32_t val, size_t count, int32_t *
     if (!count)
         return STATUS_INVALID_ARG;
 
-    /* Find the futexes. */
     futex_t *source;
     ret = futex_lookup(addr1, &source);
     if (ret != STATUS_SUCCESS)
@@ -295,27 +325,14 @@ status_t kern_futex_requeue(int32_t *addr1, int32_t val, size_t count, int32_t *
     }
 
     /* Wake the specified number of threads. */
-    size_t woken = 0;
-    while (count-- && !list_empty(&source->threads)) {
-        thread_t *thread = list_first(&source->threads, thread_t, wait_link);
-        thread_wake(thread);
-        woken++;
-    }
+    size_t woken = wake_threads(source, count);
 
     if (source != dest) {
         /* Now move the remaining threads onto the destination list. */
-        list_foreach_safe(&source->threads, iter) {
-            thread_t *thread = list_entry(iter, thread_t, wait_link);
-
-            /* We don't need to lock the thread here. The members we are
-             * changing are only touched when interrupting threads under
-             * protection of wait_lock (which is the source lock). If the thread
-             * is currently being interrupted by another CPU, it may be waiting
-             * to get the wait lock. There is special handling in thread.c to
-             * handle the wait lock having changed once it manages to acquire it. */
-            assert(thread->wait_lock == &source->lock);
-            thread->wait_lock = &dest->lock;
-            list_append(&dest->threads, &thread->wait_link);
+        list_foreach_safe(&source->waiters, iter) {
+            futex_waiter_t *waiter = list_entry(iter, futex_waiter_t, link);
+            list_append(&dest->waiters, &waiter->link);
+            waiter->futex = dest;
         }
     }
 

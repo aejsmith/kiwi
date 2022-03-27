@@ -54,12 +54,14 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
             if (thread->flags & THREAD_RWLOCK_WRITER && lock->readers) {
                 break;
             } else {
-                thread_wake(thread);
+                list_remove(&thread->wait_link);
 
-                if (thread->flags & THREAD_RWLOCK_WRITER) {
-                    break;
-                } else {
-                    lock->readers++;
+                if (thread_wake(thread)) {
+                    if (thread->flags & THREAD_RWLOCK_WRITER) {
+                        break;
+                    } else {
+                        lock->readers++;
+                    }
                 }
             }
         }
@@ -87,7 +89,7 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  *                      is only possible if the timeout is not -1, or if the
  *                      SLEEP_INTERRUPTIBLE flag is set.
  */
-status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) {
+status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, uint32_t flags) {
     assert(!in_interrupt());
 
     spinlock_lock(&lock->lock);
@@ -99,7 +101,13 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) 
         if (!lock->readers || !list_empty(&lock->threads)) {
             /* Readers count will have been incremented for us upon success. */
             list_append(&lock->threads, &curr_thread->wait_link);
-            return thread_sleep(&lock->lock, timeout, lock->name, flags);
+            status_t ret = thread_sleep(&lock->lock, timeout, lock->name, flags);
+
+            /* Still on the list on interrupt or timeout. */
+            list_remove(&curr_thread->wait_link);
+
+            spinlock_unlock(&lock->lock);
+            return ret;
         }
     } else {
         lock->held = 1;
@@ -131,7 +139,7 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) 
  *                      is only possible if the timeout is not -1, or if the
  *                      SLEEP_INTERRUPTIBLE flag is set.
  */
-status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags) {
+status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, uint32_t flags) {
     assert(!in_interrupt());
 
     status_t ret = STATUS_SUCCESS;
@@ -141,23 +149,24 @@ status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, unsigned flags)
     /* Just acquire the exclusive lock. */
     if (lock->held) {
         curr_thread->flags |= THREAD_RWLOCK_WRITER;
+
         list_append(&lock->threads, &curr_thread->wait_link);
         ret = thread_sleep(&lock->lock, timeout, lock->name, flags);
+
         curr_thread->flags &= ~THREAD_RWLOCK_WRITER;
 
-        if (ret != STATUS_SUCCESS) {
-            /* Failed to acquire the lock. In this case, there may be a reader
-             * queued behind us that can be let in. */
-            spinlock_lock(&lock->lock);
-            if (lock->readers)
-                rwlock_transfer_ownership(lock);
-            spinlock_unlock(&lock->lock);
-        }
+        /* Still on the list on interrupt or timeout. */
+        list_remove(&curr_thread->wait_link);
+
+        /* If we failed to acquire the lock, there may be a reader queued
+         * behind us that can be let in. */
+        if (ret != STATUS_SUCCESS && lock->readers)
+            rwlock_transfer_ownership(lock);
     } else {
         lock->held = 1;
-        spinlock_unlock(&lock->lock);
     }
 
+    spinlock_unlock(&lock->lock);
     return ret;
 }
 

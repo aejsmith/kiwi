@@ -307,48 +307,16 @@ void thread_unwire(thread_t *thread) {
 
 static void thread_wake_unsafe(thread_t *thread) {
     assert(thread->state == THREAD_SLEEPING);
-    assert(!thread->wait_lock || spinlock_held(thread->wait_lock));
 
-    /* Stop the timer. */
     timer_stop(&thread->sleep_timer);
 
-    /* Remove the thread from the list and wake it up. */
-    list_remove(&thread->wait_link);
     thread->flags &= ~THREAD_INTERRUPTIBLE;
-    thread->wait_lock = NULL;
-
     thread->state = THREAD_READY;
     sched_insert_thread(thread);
 }
 
-static inline spinlock_t *acquire_wait_lock(thread_t *thread) {
-    spinlock_t *lock;
-
-    /* This is necessary because of kern_futex_requeue(). While we are waiting
-     * to acquire the wait lock, it could be changed underneath us. Therefore,
-     * we must check whether the lock has changed after acquiring it. */
-    while (true) {
-        lock = thread->wait_lock;
-        if (!lock)
-            break;
-
-        spinlock_lock(lock);
-        if (likely(thread->wait_lock == lock))
-            break;
-
-        spinlock_unlock(lock);
-        continue;
-    }
-
-    return lock;
-}
-
 static bool thread_timeout(void *_thread) {
     thread_t *thread = _thread;
-
-    /* To maintain the correct locking order and prevent deadlock, we must take
-     * the wait lock before the thread lock. */
-    spinlock_t *lock = acquire_wait_lock(thread);
 
     spinlock_lock(&thread->lock);
 
@@ -359,25 +327,33 @@ static bool thread_timeout(void *_thread) {
     }
 
     spinlock_unlock(&thread->lock);
-
-    if (lock)
-        spinlock_unlock(lock);
-
     return false;
 }
 
 /**
  * Wakes up a thread that is currently asleep. This function is for use in the
- * implementation of synchronization mechanisms, never call it manually. The
- * lock that thread_sleep() was called with (if any) must be held. The thread
- * will be removed from any wait list it is attached to.
+ * implementation of synchronization mechanisms, never call it manually.
  *
  * @param thread        Thread to wake up.
+ *
+ * @return              Whether the thread was woken. If this returns false,
+ *                      the thread had already been woken for another reason.
  */
-void thread_wake(thread_t *thread) {
+bool thread_wake(thread_t *thread) {
     spinlock_lock(&thread->lock);
-    thread_wake_unsafe(thread);
+
+    bool woken = thread->state == THREAD_SLEEPING;
+    if (woken) {
+        thread_wake_unsafe(thread);
+    } else {
+        /* This is a sanity check that ensures we're not doing double calls
+         * to thread_wake() on the same thread. If the thread is already awake,
+         * it should be as a result of a failure condition. */
+        assert(thread->sleep_status != STATUS_SUCCESS);
+    }
+
     spinlock_unlock(&thread->lock);
+    return woken;
 }
 
 static void thread_interrupt_internal(thread_t *thread) {
@@ -407,16 +383,12 @@ void thread_kill(thread_t *thread) {
     if (thread->owner == kernel_proc)
         return;
 
-    /* Correct locking order, see thread_timeout(). */
-    spinlock_t *lock = acquire_wait_lock(thread);
     spinlock_lock(&thread->lock);
 
     thread->flags |= THREAD_KILLED;
     thread_interrupt_internal(thread);
 
     spinlock_unlock(&thread->lock);
-    if (lock)
-        spinlock_unlock(lock);
 }
 
 /**
@@ -440,8 +412,6 @@ void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
 
     list_init(&interrupt->header);
 
-    /* Correct locking order, see thread_timeout(). */
-    spinlock_t *lock = acquire_wait_lock(thread);
     spinlock_lock(&thread->lock);
 
     /* Find where to insert the interrupt. List is ordered by highest priority
@@ -466,20 +436,22 @@ void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
         thread_interrupt_internal(thread);
 
     spinlock_unlock(&thread->lock);
-    if (lock)
-        spinlock_unlock(lock);
 }
 
 /**
  * Sends the current thread to sleep until it is either woken manually, the
- * given timeout expires, or (if interruptible) it is interrupted. When the
- * function returns, it will no longer be attached to any waiting list in all
- * cases.
+ * given timeout expires, or (if interruptible) it is interrupted. This does
+ * not affect the wait list that the thread is attached to (if any). The caller
+ * should remove it after this returns.
  *
- * @param lock          Lock protecting the list on which the thread is waiting,
- *                      if any. Must be locked with IRQ state saved. Will be
- *                      unlocked after the thread has gone to sleep, and will
- *                      not be held when the function returns. Can be NULL.
+ * If a lock is supplied, this will be unlocked once the thread has entered
+ * the sleep state. This guarantees that so long as this lock is taken before
+ * calling thread_wake(), wakeups will not be missed. Upon return (in any case),
+ * the lock will be held again with its saved IRQ state preserved, unless
+ * __SLEEP_NO_RELOCK is specified, in which case upon return the lock will not
+ * be held and its saved IRQ state will have been set.
+ *
+ * @param lock          Lock to release while the thread is sleeping.
  * @param timeout       Timeout in nanoseconds. If SLEEP_ABSOLUTE is specified,
  *                      will always be taken to be a system time at which the
  *                      sleep will time out. Otherwise, taken as the number of
@@ -496,14 +468,19 @@ void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt) {
  *                      STATUS_INTERRUPTED if interrupted.
  *                      STATUS_WOULD_BLOCK if timeout is 0.
  */
-status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsigned flags) {
-    status_t ret;
+status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, uint32_t flags) {
+    /* Disable IRQs and save the state to restore once we resume - if we were
+     * given a lock we want to restore the pre-lock state, and we must save the
+     * state out of that as it's no longer valid once we unlock it. */
+    bool irq_state = (lock) ? lock->state : local_irq_disable();
 
     assert(curr_cpu->in_interrupt == ((lock) ? 1 : 0));
 
+    spinlock_lock_noirq(&curr_thread->lock);
+
     /* If timeout is 0, we return an error immediately. */
     if (timeout == 0) {
-        ret = STATUS_WOULD_BLOCK;
+        curr_thread->sleep_status = STATUS_WOULD_BLOCK;
         goto cancel;
     }
 
@@ -511,7 +488,7 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsi
     if (flags & SLEEP_ABSOLUTE && timeout > 0) {
         timeout = timeout - system_time();
         if (timeout <= 0) {
-            ret = STATUS_TIMED_OUT;
+            curr_thread->sleep_status = STATUS_TIMED_OUT;
             goto cancel;
         }
     }
@@ -519,41 +496,48 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, unsi
     /* If interruptible and the interrupted flag is set, we also return an error
      * immediately. */
     if (flags & SLEEP_INTERRUPTIBLE && curr_thread->flags & THREAD_INTERRUPTED) {
-        ret = STATUS_INTERRUPTED;
+        curr_thread->sleep_status = STATUS_INTERRUPTED;
         goto cancel;
     }
-
-    /* We're definitely going to sleep. Get the IRQ state to restore. */
-    bool irq_state = (lock) ? lock->state : local_irq_disable();
-
-    spinlock_lock_noirq(&curr_thread->lock);
-    curr_thread->sleep_status = STATUS_SUCCESS;
-    curr_thread->wait_lock = lock;
-    curr_thread->waiting_on = name;
-    if (flags & SLEEP_INTERRUPTIBLE)
-        curr_thread->flags |= THREAD_INTERRUPTIBLE;
 
     /* Start off the timer if required. */
     if (timeout > 0)
         timer_start(&curr_thread->sleep_timer, timeout, TIMER_ONESHOT);
 
-    /* Drop the specified lock. Do not want to restore IRQ state, we saved it
-     * above and it will be restored once we're resumed by the scheduler. */
+    curr_thread->sleep_status = STATUS_SUCCESS;
+    curr_thread->waiting_on   = name;
+    curr_thread->state        = THREAD_SLEEPING;
+
+    if (flags & SLEEP_INTERRUPTIBLE)
+        curr_thread->flags |= THREAD_INTERRUPTIBLE;
+
+    /* Drop the specified lock, without restoring the IRQ state */
     if (lock)
         spinlock_unlock_noirq(lock);
 
-    curr_thread->state = THREAD_SLEEPING;
-    sched_reschedule(irq_state);
+    sched_reschedule(false);
+
+    if (lock && !(flags & __SLEEP_NO_RELOCK)) {
+        /* Locking again, take it, and set the saved state to restore later. */
+        spinlock_lock_noirq(lock);
+        lock->state = irq_state;
+    } else {
+        /* Restore the pre-lock/sleep state. */
+        local_irq_restore(irq_state);
+    }
+
     return curr_thread->sleep_status;
 
 cancel:
-    /* The thread must not be attached to the list upon return, nor must the
-     * specified lock be held. */
-    list_remove(&curr_thread->wait_link);
-    if (lock)
-        spinlock_unlock(lock);
+    spinlock_unlock_noirq(&curr_thread->lock);
 
-    return ret;
+    if (!lock) {
+        local_irq_restore(irq_state);
+    } else if (flags & __SLEEP_NO_RELOCK) {
+        spinlock_unlock(lock);
+    }
+
+    return curr_thread->sleep_status;
 }
 
 /** Yield remaining timeslice and switch to another thread. */
@@ -804,7 +788,6 @@ status_t thread_create(
     thread->max_prio             = -1;
     thread->curr_prio            = -1;
     thread->timeslice            = 0;
-    thread->wait_lock            = NULL;
     thread->last_time            = 0;
     thread->kernel_time          = 0;
     thread->user_time            = 0;

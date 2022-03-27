@@ -49,7 +49,7 @@
  *                      is only possible if the timeout is not -1, or if the
  *                      SLEEP_INTERRUPTIBLE flag is set.
  */
-status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, unsigned flags) {
+status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, uint32_t flags) {
     assert(!in_interrupt());
 
     spinlock_lock(&cv->lock);
@@ -61,6 +61,38 @@ status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, nstime_t timeout, unsig
     /* Go to sleep. */
     list_append(&cv->threads, &curr_thread->wait_link);
     status_t ret = thread_sleep(&cv->lock, timeout, cv->name, flags);
+
+    /*
+     * Still on the list on interrupt or timeout so we need to remove it.
+     * thread_sleep() takes cv->lock again.
+     *
+     * Story here in case I think to try this again in future: I attempted
+     * doing this with thread_sleep() not relocking upon return, in an attempt
+     * to remove the need to relock if the thread was already removed by a
+     * successful wakeup:
+     *
+     *   if (!list_empty(&curr_thread->wait_link)) {
+     *       spinlock_lock(&cv->lock);
+     *       list_remove(&curr_thread->wait_link);
+     *       spinlock_unlock(&cv->lock);
+     *   }
+     *
+     * This turned out to be unsafe and caused us to hit double (successful)
+     * wakeups on mutexes, which I only realised the reason for after a day
+     * of debugging. If we're woken by an interrupt/timeout and start running
+     * in the window between signal/broadcast removing us from the list and
+     * trying to wake us up in thread_wake(), we would not take the lock here
+     * because we see that wait_link is not attached. We could then proceed
+     * into mutex_lock() and wait on that mutex, in which case the
+     * signal/broadcast call that's trying to wake us would then wake us off
+     * the mutex rather than the condition variable like it intended.
+     *
+     * So, we have to take the spinlock here to synchronise with
+     * signal/broadcast.
+     */
+    list_remove(&curr_thread->wait_link);
+
+    spinlock_unlock(&cv->lock);
 
     /* Re-acquire the lock. */
     if (mutex)
@@ -94,17 +126,20 @@ void condvar_wait(condvar_t *cv, mutex_t *mutex) {
 bool condvar_signal(condvar_t *cv) {
     spinlock_lock(&cv->lock);
 
-    bool ret = false;
+    bool woken = false;
 
-    if (!list_empty(&cv->threads)) {
-        ret = true;
-
+    while (!woken && !list_empty(&cv->threads)) {
         thread_t *thread = list_first(&cv->threads, thread_t, wait_link);
-        thread_wake(thread);
+        list_remove(&thread->wait_link);
+
+        /* If the thread is already woken it means sleep failed but the thread
+         * hadn't got a chance to remove itself from the list yet, so we should
+         * try to wake another thread. */
+        woken = thread_wake(thread);
     }
 
     spinlock_unlock(&cv->lock);
-    return ret;
+    return woken;
 }
 
 /**
@@ -118,19 +153,19 @@ bool condvar_signal(condvar_t *cv) {
 bool condvar_broadcast(condvar_t *cv) {
     spinlock_lock(&cv->lock);
 
-    bool ret = false;
+    bool woken = false;
 
-    if (!list_empty(&cv->threads)) {
-        ret = true;
+    while (!list_empty(&cv->threads)) {
+        thread_t *thread = list_first(&cv->threads, thread_t, wait_link);
+        list_remove(&thread->wait_link);
 
-        while (!list_empty(&cv->threads)) {
-            thread_t *thread = list_first(&cv->threads, thread_t, wait_link);
-            thread_wake(thread);
-        }
+        /* As with condvar_signal(), return true only for threads that didn't
+         * fail sleep. */
+        woken |= thread_wake(thread);
     }
 
     spinlock_unlock(&cv->lock);
-    return ret;
+    return woken;
 }
 
 /** Initializes a condition variable.

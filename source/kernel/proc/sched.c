@@ -261,6 +261,7 @@ void sched_reschedule(bool state) {
     }
 
     assert(next->cpu == curr_cpu);
+    assert(next->state == THREAD_READY);
 
     /* Move the thread to the running state. */
     cpu->prev_thread = curr_thread;
