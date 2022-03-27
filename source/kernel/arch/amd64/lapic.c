@@ -72,8 +72,8 @@ static void lapic_spurious_interrupt(frame_t *frame) {
 /** IPI interrupt handler.
  * @param frame         Interrupt stack frame. */
 static void lapic_ipi_interrupt(frame_t *frame) {
-    smp_ipi_handler();
     lapic_eoi();
+    smp_ipi_handler();
 }
 
 /** Prepare local APIC timer tick.
