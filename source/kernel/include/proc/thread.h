@@ -149,7 +149,6 @@ enum {
     THREAD_INTERRUPTED      = (1<<1),   /**< Thread has been interrupted. */
     THREAD_KILLED           = (1<<2),   /**< Thread has been killed. */
     THREAD_PREEMPTED        = (1<<3),   /**< Thread was preempted while preemption disabled. */
-    THREAD_RWLOCK_WRITER    = (1<<3),   /**< Thread is blocked on an rwlock for writing. */
 };
 
 /**

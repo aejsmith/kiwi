@@ -30,13 +30,19 @@
 #include <cpu.h>
 #include <status.h>
 
+typedef struct rwlock_waiter {
+    list_t link;
+    thread_t *thread;
+    bool is_writer;
+} rwlock_waiter_t;
+
 /**
  * Transfers lock ownership to a waiting writer or waiting readers. Queue lock
  * should be held.
  */
 static void rwlock_transfer_ownership(rwlock_t *lock) {
     /* Check if there are any threads to transfer ownership to. */
-    if (list_empty(&lock->threads)) {
+    if (list_empty(&lock->waiters)) {
         /* There aren't. If there are still readers (it is possible for there to
          * be, because this function gets called if a writer is interrupted
          * while blocking in order to allow readers queued behind it in), then
@@ -45,19 +51,19 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
             lock->held = 0;
     } else {
         /* Go through all threads queued. */
-        list_foreach_safe(&lock->threads, iter) {
-            thread_t *thread = list_entry(iter, thread_t, wait_link);
+        list_foreach_safe(&lock->waiters, iter) {
+            rwlock_waiter_t *waiter = list_entry(iter, rwlock_waiter_t, link);
 
             /* If it is a reader, we can wake it and continue. If it is a writer
              * and the lock has no readers, wake it up and finish. If it is a
              * writer and the lock has readers, finish. */
-            if (thread->flags & THREAD_RWLOCK_WRITER && lock->readers) {
+            if (waiter->is_writer && lock->readers) {
                 break;
             } else {
-                list_remove(&thread->wait_link);
+                list_remove(&waiter->link);
 
-                if (thread_wake(thread)) {
-                    if (thread->flags & THREAD_RWLOCK_WRITER) {
+                if (thread_wake(waiter->thread)) {
+                    if (waiter->is_writer) {
                         break;
                     } else {
                         lock->readers++;
@@ -98,13 +104,18 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, nstime_t timeout, uint32_t flags) 
         /* Lock is held, check if it's held by readers. If it is, and there's
          * something waiting on the queue, we wait anyway. This is to prevent
          * starvation of writers. */
-        if (!lock->readers || !list_empty(&lock->threads)) {
+        if (!lock->readers || !list_empty(&lock->waiters)) {
+            rwlock_waiter_t waiter;
+            waiter.thread    = curr_thread;
+            waiter.is_writer = false;
+
             /* Readers count will have been incremented for us upon success. */
-            list_append(&lock->threads, &curr_thread->wait_link);
+            list_init(&waiter.link);
+            list_append(&lock->waiters, &waiter.link);
             status_t ret = thread_sleep(&lock->lock, timeout, lock->name, flags);
 
             /* Still on the list on interrupt or timeout. */
-            list_remove(&curr_thread->wait_link);
+            list_remove(&waiter.link);
 
             spinlock_unlock(&lock->lock);
             return ret;
@@ -148,15 +159,16 @@ status_t rwlock_write_lock_etc(rwlock_t *lock, nstime_t timeout, uint32_t flags)
 
     /* Just acquire the exclusive lock. */
     if (lock->held) {
-        curr_thread->flags |= THREAD_RWLOCK_WRITER;
+        rwlock_waiter_t waiter;
+        waiter.thread    = curr_thread;
+        waiter.is_writer = true;
 
-        list_append(&lock->threads, &curr_thread->wait_link);
+        list_init(&waiter.link);
+        list_append(&lock->waiters, &waiter.link);
         ret = thread_sleep(&lock->lock, timeout, lock->name, flags);
 
-        curr_thread->flags &= ~THREAD_RWLOCK_WRITER;
-
         /* Still on the list on interrupt or timeout. */
-        list_remove(&curr_thread->wait_link);
+        list_remove(&waiter.link);
 
         /* If we failed to acquire the lock, there may be a reader queued
          * behind us that can be let in. */
@@ -212,7 +224,7 @@ void rwlock_unlock(rwlock_t *lock) {
  * @param name          Name to give lock. */
 void rwlock_init(rwlock_t *lock, const char *name) {
     spinlock_init(&lock->lock, "rwlock_lock");
-    list_init(&lock->threads);
+    list_init(&lock->waiters);
 
     lock->held    = 0;
     lock->readers = 0;

@@ -30,7 +30,7 @@ typedef struct rwlock {
     unsigned held;                  /**< Whether the lock is held. */
     size_t readers;                 /**< Number of readers holding the lock. */
     spinlock_t lock;                /**< Lock to protect the thread list. */
-    list_t threads;                 /**< List of waiting threads. */
+    list_t waiters;                 /**< List of waiting threads. */
     const char *name;               /**< Name of the lock. */
 } rwlock_t;
 
@@ -40,7 +40,7 @@ typedef struct rwlock {
         .held = 0, \
         .readers = 0, \
         .lock = SPINLOCK_INITIALIZER("rwlock_lock"), \
-        .threads = LIST_INITIALIZER(_var.threads), \
+        .waiters = LIST_INITIALIZER(_var.waiters), \
         .name = _name, \
     }
 
