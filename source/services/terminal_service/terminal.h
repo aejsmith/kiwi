@@ -57,13 +57,13 @@ private:
 private:
     void thread();
 
-    bool handleEvent(object_event_t &event);
-
-    bool handleClientMessages();
+    void handleClientHangup();
+    void handleClientMessages();
     Kiwi::Core::Message handleClientOpenHandle(Kiwi::Core::Message &request);
     Kiwi::Core::Message handleClientInput(Kiwi::Core::Message &request);
 
-    bool handleFileMessages();
+    void handleFileHangup();
+    void handleFileMessages();
     status_t handleFileRead(const ipc_message_t &message);
     status_t handleFileWrite(const ipc_message_t &message, const void *data);
     status_t handleFileInfo(const ipc_message_t &message);
@@ -89,6 +89,7 @@ private:
     std::thread m_thread;
     Kiwi::Core::Handle m_userFile;
     Kiwi::Core::Handle m_userFileConnection;
+    bool m_exit;
 
     /** Pending reads that are waiting for input. */
     std::vector<ReadOperation> m_pendingReads;

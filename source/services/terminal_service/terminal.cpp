@@ -21,6 +21,8 @@
 
 #include "terminal.h"
 
+#include <kiwi/core/event_loop.h>
+
 #include <core/log.h>
 #include <core/utility.h>
 
@@ -44,6 +46,7 @@ static constexpr uint64_t kSupportedUserFileOps =
 
 Terminal::Terminal(Kiwi::Core::Connection connection) :
     m_connection         (std::move(connection)),
+    m_exit               (false),
     m_escaped            (false),
     m_inhibited          (false),
     m_inputBufferStart   (0),
@@ -95,92 +98,49 @@ void Terminal::run() {
 }
 
 void Terminal::thread() {
-    status_t ret;
+    Kiwi::Core::EventLoop eventLoop;
 
-    std::array<object_event_t, 4> events;
-    memset(events.data(), 0, sizeof(events[0]) * events.size());
-    events[0].handle = m_connection.handle();
-    events[0].event  = CONNECTION_EVENT_HANGUP;
-    events[1].handle = events[0].handle;
-    events[1].event  = CONNECTION_EVENT_MESSAGE;
-    events[2].handle = m_userFileConnection;
-    events[2].event  = CONNECTION_EVENT_HANGUP;
-    events[3].handle = m_userFileConnection;
-    events[3].event  = CONNECTION_EVENT_MESSAGE;
+    Kiwi::Core::EventRef events[4];
+    events[0] = eventLoop.addEvent(
+        m_connection.handle(), CONNECTION_EVENT_HANGUP, 0,
+        [this] (const object_event_t &) { handleClientHangup(); });
+    events[1] = eventLoop.addEvent(
+        m_connection.handle(), CONNECTION_EVENT_MESSAGE, 0,
+        [this] (const object_event_t &) { handleClientMessages(); });
+    events[2] = eventLoop.addEvent(
+        m_userFileConnection, CONNECTION_EVENT_HANGUP, 0,
+        [this] (const object_event_t &) { handleFileHangup(); });
+    events[3] = eventLoop.addEvent(
+        m_userFileConnection, CONNECTION_EVENT_MESSAGE, 0,
+        [this] (const object_event_t &) { handleFileMessages(); });
 
-    bool exit = false;
-
-    while (!exit) {
-        ret = kern_object_wait(events.data(), events.size(), 0, -1);
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_WARN, "failed to wait for events: %" PRId32, ret);
-            continue;
-        }
-
-        for (object_event_t &event : events) {
-            if (event.flags & OBJECT_EVENT_SIGNALLED) {
-                exit = handleEvent(event);
-            } else if (event.flags & OBJECT_EVENT_ERROR) {
-                core_log(CORE_LOG_WARN, "error signalled on event %" PRId32 "/%" PRId32, event.handle, event.event);
-            }
-
-            event.flags &= ~(OBJECT_EVENT_SIGNALLED | OBJECT_EVENT_ERROR);
-        }
-    }
+    while (!m_exit)
+        eventLoop.wait();
 
     core_log(CORE_LOG_DEBUG, "thread exiting");
     m_thread.detach();
     delete this;
 }
 
-bool Terminal::handleEvent(object_event_t &event) {
-    if (event.handle == m_connection.handle()) {
-        switch (event.event) {
-            case CONNECTION_EVENT_HANGUP:
-                core_log(CORE_LOG_DEBUG, "client hung up, closing terminal");
-                return true;
-
-            case CONNECTION_EVENT_MESSAGE:
-                return handleClientMessages();
-
-            default:
-                core_unreachable();
-
-        }
-    } else if (event.handle == m_userFileConnection) {
-        switch (event.event) {
-            case CONNECTION_EVENT_HANGUP:
-                /* This shouldn't happen since we have the file open ourself. */
-                core_log(CORE_LOG_ERROR, "user file connection hung up unexpectedly");
-                return true;
-
-            case CONNECTION_EVENT_MESSAGE:
-                return handleFileMessages();
-
-            default:
-                core_unreachable();
-
-        }
-    } else {
-        core_unreachable();
-    }
-
-    return false;
+void Terminal::handleClientHangup() {
+    core_log(CORE_LOG_DEBUG, "client hung up, closing terminal");
+    m_exit = true;
 }
 
-bool Terminal::handleClientMessages() {
+void Terminal::handleClientMessages() {
     while (true) {
         status_t ret;
 
         Kiwi::Core::Message message;
         ret = m_connection.receive(0, message);
         if (ret == STATUS_WOULD_BLOCK) {
-            return false;
+            return;
         } else if (ret == STATUS_CONN_HUNGUP) {
-            return true;
+            handleClientHangup();
+            return;
         } else if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_WARN, "failed to receive client message: %" PRId32, ret);
-            return false;
+            return;
         }
 
         assert(message.type() == Kiwi::Core::Message::kRequest);
@@ -251,20 +211,26 @@ Kiwi::Core::Message Terminal::handleClientInput(Kiwi::Core::Message &request) {
     return reply;
 }
 
-bool Terminal::handleFileMessages() {
+void Terminal::handleFileHangup() {
+    /* This shouldn't happen since we have the file open ourself. */
+    core_log(CORE_LOG_ERROR, "user file connection hung up unexpectedly");
+    m_exit = true;
+}
+
+void Terminal::handleFileMessages() {
     status_t ret;
 
     while (true) {
         ipc_message_t message;
         ret = kern_connection_receive(m_userFileConnection, &message, nullptr, 0);
         if (ret == STATUS_WOULD_BLOCK) {
-            return false;
+            return;
         } else if (ret == STATUS_CONN_HUNGUP) {
-            core_log(CORE_LOG_ERROR, "user file connection hung up unexpectedly");
-            return true;
+            handleFileHangup();
+            return;
         } else if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_WARN, "failed to receive file message: %" PRId32, ret);
-            return false;
+            return;
         }
 
         std::unique_ptr<uint8_t[]> data;
@@ -274,7 +240,7 @@ bool Terminal::handleFileMessages() {
             ret = kern_connection_receive_data(m_userFileConnection, data.get());
             if (ret != STATUS_SUCCESS) {
                 core_log(CORE_LOG_WARN, "failed to receive file message data: %" PRId32, ret);
-                return false;
+                return;
             }
         }
 
@@ -303,7 +269,7 @@ bool Terminal::handleFileMessages() {
 
         if (ret != STATUS_SUCCESS && ret != STATUS_CANCELLED) {
             core_log(CORE_LOG_WARN, "failed to send file message %" PRIu32 ": %" PRId32, message.id, ret);
-            return false;
+            return;
         }
     }
 }
