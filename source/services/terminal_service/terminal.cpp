@@ -97,9 +97,8 @@ void Terminal::run() {
 void Terminal::thread() {
     status_t ret;
 
-    core_log(CORE_LOG_DEBUG, "terminal started");
-
     std::array<object_event_t, 4> events;
+    memset(events.data(), 0, sizeof(events[0]) * events.size());
     events[0].handle = m_connection.handle();
     events[0].event  = CONNECTION_EVENT_HANGUP;
     events[1].handle = events[0].handle;

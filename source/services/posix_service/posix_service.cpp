@@ -116,7 +116,7 @@ void PosixService::handleConnectionEvent() {
     /* Look for an existing process. */
     auto it = m_processes.find(pid);
     if (it != m_processes.end()) {
-        core_log(CORE_LOG_NOTICE, "ignoring connection from already connected process %" PRId32);
+        core_log(CORE_LOG_NOTICE, "ignoring connection from already connected process %" PRId32, pid);
         return;
     }
 
