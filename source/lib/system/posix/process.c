@@ -26,6 +26,7 @@
  */
 
 #include <kernel/object.h>
+#include <kernel/private/process.h>
 #include <kernel/process.h>
 #include <kernel/status.h>
 
@@ -37,15 +38,6 @@
 #include <unistd.h>
 
 #include "posix/posix.h"
-
-/** Structure containing a fork handler. */
-typedef struct fork_handler {
-    core_list_t header;         /**< List link. */
-    void (*func)(void);         /**< Function to call. */
-} fork_handler_t;
-
-/** List of fork handlers. */
-static CORE_LIST_DEFINE(fork_handlers);
 
 /** List of child processes created via fork(). */
 CORE_LIST_DEFINE(child_processes);
@@ -98,12 +90,6 @@ pid_t fork(void) {
             free(child);
         }
 
-        /* Run post-fork handlers. */
-        core_list_foreach(&fork_handlers, iter) {
-            fork_handler_t *handler = core_list_entry(iter, fork_handler_t, header);
-            handler->func();
-        }
-
         return 0;
     } else {
         core_list_init(&process->header);
@@ -123,15 +109,9 @@ pid_t fork(void) {
 
 /** Registers a function to be called after a fork in the child.
  * @param func          Function to call. */
-void register_fork_handler(void (*func)(void)) {
-    fork_handler_t *handler = malloc(sizeof(*handler));
-    if (!handler)
-        libsystem_fatal("failed to register fork handler");
-
-    handler->func = func;
-
-    core_list_init(&handler->header);
-    core_list_append(&fork_handlers, &handler->header);
+void posix_register_fork_handler(void (*func)(void)) {
+    status_t ret __sys_unused = kern_process_add_clone_handler(func);
+    libsystem_assert(ret == STATUS_SUCCESS);
 }
 
 /** Convert a process exit status/reason to a POSIX status. */

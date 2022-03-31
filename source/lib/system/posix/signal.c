@@ -493,7 +493,7 @@ static bool set_signal_action(core_connection_t *conn, int32_t num, uint32_t dis
 }
 
 /** Reset signal state after a fork. */
-void posix_signal_fork(void) {
+static void posix_signal_fork(void) {
     SCOPED_SIGNAL_LOCK();
 
     /* Signal condition is not marked as inheritable. */
@@ -534,6 +534,10 @@ void posix_signal_fork(void) {
 
     if (conn)
         posix_service_put();
+}
+
+static __sys_init_prio(LIBSYSTEM_INIT_PRIO_POSIX_SIGNAL) void posix_signal_init(void) {
+    posix_register_fork_handler(posix_signal_fork);
 }
 
 /**

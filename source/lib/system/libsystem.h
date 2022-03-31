@@ -35,6 +35,14 @@ extern size_t __errno_count;
 
 extern const char *__program_name;
 
+/** Constructor function priorities. */
+#define LIBSYSTEM_INIT_PRIO_STDIO               1
+#define LIBSYSTEM_INIT_PRIO_CORE_SERVICE        2
+#define LIBSYSTEM_INIT_PRIO_POSIX_SERVICE       3
+#define LIBSYSTEM_INIT_PRIO_POSIX_SIGNAL        4
+#define LIBSYSTEM_INIT_PRIO_PTHREAD             5
+#define LIBSYSTEM_INIT_PRIO_PTHREAD_SPECIFIC    6
+
 extern void libsystem_init(struct process_args *args);
 extern void libsystem_fatal(const char *fmt, ...) __sys_noreturn __sys_hidden;
 extern void libsystem_stub(const char *name, bool fatal) __sys_hidden;

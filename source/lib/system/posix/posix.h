@@ -46,12 +46,10 @@ extern core_mutex_t __sys_hidden child_processes_lock;
 
 extern mode_t __sys_hidden current_umask;
 
-extern void register_fork_handler(void (*func)(void)) __sys_hidden;
+extern void posix_register_fork_handler(void (*func)(void)) __sys_hidden;
 
 extern core_connection_t *posix_service_get(void) __sys_hidden;
 extern void posix_service_put(void) __sys_hidden;
-
-extern void posix_signal_fork(void) __sys_hidden;
 
 extern void posix_signal_guard_begin(void) __sys_hidden;
 extern void posix_signal_guard_end(void) __sys_hidden;

@@ -39,14 +39,10 @@ static void posix_service_fork(void) {
         core_connection_destroy(posix_service_conn);
         posix_service_conn = NULL;
     }
-
-    /* This is done from here as we need to ensure it is done after destroying
-     * the service connection. */
-    posix_signal_fork();
 }
 
-static __sys_init void posix_service_init(void) {
-    register_fork_handler(posix_service_fork);
+static __sys_init_prio(LIBSYSTEM_INIT_PRIO_POSIX_SERVICE) void posix_service_init(void) {
+    posix_register_fork_handler(posix_service_fork);
 }
 
 /**
@@ -69,7 +65,7 @@ core_connection_t *posix_service_get(void) {
     if (!posix_service_conn) {
         status_t ret = core_service_open(POSIX_SERVICE_NAME, 0, 0, &posix_service_conn);
         if (ret != STATUS_SUCCESS) {
-            libsystem_log(CORE_LOG_WARN, "failed to connect to POSIX service: %" PRId32);
+            libsystem_log(CORE_LOG_WARN, "failed to connect to POSIX service: %" PRId32, ret);
 
             core_mutex_unlock(&posix_service_lock);
             posix_signal_guard_end();

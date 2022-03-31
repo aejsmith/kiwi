@@ -38,8 +38,8 @@
 /** Name of the current program. */
 const char *__program_name;
 
-/** Early system library initialisation (run in .init). */
-static __sys_init void libsystem_early_init(void) {
+/** Early stdio initialisation. */
+static __sys_init_prio(LIBSYSTEM_INIT_PRIO_STDIO) void stdio_init(void) {
     /* Attempt to open standard I/O streams from existing handles. */
     stdin  = fdopen(STDIN_FILENO, "r");
     stdout = fdopen(STDOUT_FILENO, "a");

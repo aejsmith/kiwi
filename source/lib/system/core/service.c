@@ -19,8 +19,6 @@
  * @brief               IPC service functions.
  */
 
-#include "posix/posix.h"
-
 #include <core/mutex.h>
 #include <core/service.h>
 
@@ -30,6 +28,8 @@
 #include <services/service_manager.h>
 
 #include <string.h>
+
+#include "posix/posix.h"
 
 static CORE_MUTEX_DEFINE(service_lock);
 static core_connection_t *service_manager_conn = NULL;
@@ -42,8 +42,8 @@ static void core_service_fork(void) {
     }
 }
 
-static __sys_init void core_service_init(void) {
-    register_fork_handler(core_service_fork);
+static __sys_init_prio(LIBSYSTEM_INIT_PRIO_CORE_SERVICE) void core_service_init(void) {
+    posix_register_fork_handler(core_service_fork);
 }
 
 static status_t open_service_manager(void) {

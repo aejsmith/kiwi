@@ -69,26 +69,6 @@ static int thread_trampoline(void *_create) {
     kern_thread_exit(entry(arg));
 }
 
-/**
- * Create a new thread.
- *
- * Create a new thread within the calling process and start it executing at
- * the given entry function. If a stack is provided for the thread, that will
- * be used, and the stack will not be freed when the thread exits. Otherwise,
- * a stack will be allocated for the thread with a default size, and will be
- * freed when the thread exits.
- *
- * @param name          Name to give the thread.
- * @param entry         Thread entry point.
- * @param arg           Argument to pass to the entry point.
- * @param stack         Details of the stack to use/allocate for the new thread
- *                      (optional). See the documentation for thread_stack_t
- *                      for details.
- * @param flags         Creation behaviour flags.
- * @param _handle       Where to store handle to the thread (optional).
- *
- * @return              Status code describing result of the operation.
- */
 __sys_export status_t kern_thread_create(
     const char *name, thread_entry_t entry, void *arg,
     const thread_stack_t *stack, uint32_t flags, handle_t *_handle)
@@ -123,10 +103,6 @@ __sys_export status_t kern_thread_create(
     return STATUS_SUCCESS;
 }
 
-/** Get the ID of a thread.
- * @param handle        Handle to thread, or THREAD_SELF for calling thread.
- * @param _id           Where to store ID of thread.
- * @return              Status code describing result of the operation. */
 __sys_export status_t kern_thread_id(handle_t handle, thread_id_t *_id) {
     /* We save the current thread ID to avoid having to perform a kernel call
      * just to get our own ID. */
@@ -138,8 +114,6 @@ __sys_export status_t kern_thread_id(handle_t handle, thread_id_t *_id) {
     }
 }
 
-/** Terminate the calling thread.
- * @param status        Exit status code. */
 __sys_export void kern_thread_exit(int status) {
     tls_tcb_t *tcb = arch_tls_tcb();
 
@@ -170,7 +144,7 @@ __sys_export status_t kern_thread_add_dtor(thread_dtor_t dtor) {
     for (size_t i = 0; i < THREAD_DTOR_MAX; i++) {
         if (thread_dtors[i] == dtor) {
             return STATUS_SUCCESS;
-        } else if (!thread_dtors[i]) {
+        } else if (!thread_dtors[i] && first_free == THREAD_DTOR_MAX) {
             first_free = i;
         }
     }

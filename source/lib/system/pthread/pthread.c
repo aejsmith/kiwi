@@ -54,7 +54,7 @@ static void release_pthread_self(void) {
     }
 }
 
-static __sys_init void pthread_init(void) {
+static __sys_init_prio(LIBSYSTEM_INIT_PRIO_PTHREAD) void pthread_init(void) {
     status_t ret = kern_thread_add_dtor(release_pthread_self);
     libsystem_assert(ret == STATUS_SUCCESS);
 }

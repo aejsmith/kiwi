@@ -65,7 +65,7 @@ static void run_specific_dtors(void) {
     }
 }
 
-static __sys_init void pthread_specific_init(void) {
+static __sys_init_prio(LIBSYSTEM_INIT_PRIO_PTHREAD_SPECIFIC) void pthread_specific_init(void) {
     status_t ret = kern_thread_add_dtor(run_specific_dtors);
     libsystem_assert(ret == STATUS_SUCCESS);
 }

@@ -33,6 +33,7 @@
 #define __sys_printf(a, b)  __attribute__((format(printf, a, b)))
 #define __sys_deprecated    __attribute__((deprecated))
 #define __sys_init          __attribute__((constructor))
+#define __sys_init_prio(p)  __attribute__((constructor(p)))
 #define __sys_fini          __attribute__((destructor))
 #define __sys_export        __attribute__((visibility("default")))
 #define __sys_hidden        __attribute__((visibility("hidden")))

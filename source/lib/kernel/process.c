@@ -27,28 +27,10 @@
 /** Saved ID for the current process. */
 process_id_t curr_process_id = -1;
 
-/**
- * Clone the calling process.
- *
- * Creates a clone of the calling process. The new process will have a clone of
- * the original process' address space. Data in private mappings will be copied
- * when either the parent or the child writes to the pages. Non-private mappings
- * will be shared between the processes: any modifications made be either
- * process will be visible to the other. The new process will inherit all
- * handles from the parent, including non-inheritable ones (non-inheritable
- * handles are only closed when a new program is executed with
- * kern_process_exec() or kern_process_create()).
- *
- * Threads other than the calling thread are NOT cloned. The new process will
- * have a single thread which will resume execution after the call to
- * kern_process_clone().
- *
- * @param _handle       In the parent process, the location pointed to will be
- *                      set to a handle to the child process upon success. In
- *                      the child process, it will be set to INVALID_HANDLE.
- *
- * @return              Status code describing result of the operation.
- */
+/** Process clone handler functions. */
+#define CLONE_HANDLER_MAX 8
+static process_clone_handler_t process_clone_handlers[CLONE_HANDLER_MAX] = {};
+
 __sys_export status_t kern_process_clone(handle_t *_handle) {
     status_t ret;
 
@@ -60,15 +42,16 @@ __sys_export status_t kern_process_clone(handle_t *_handle) {
     if (*_handle == INVALID_HANDLE) {
         _kern_process_id(PROCESS_SELF, &curr_process_id);
         _kern_thread_id(THREAD_SELF, &curr_thread_id);
+
+        for (size_t i = 0; i < CLONE_HANDLER_MAX; i++) {
+            if (process_clone_handlers[i])
+                process_clone_handlers[i]();
+        }
     }
 
     return STATUS_SUCCESS;
 }
 
-/** Get the ID of a process.
- * @param handle        Handle to process, or PROCESS_SELF for calling process.
- * @param _id           Where to store ID of process.
- * @return              Status code describing result of the operation. */
 __sys_export status_t kern_process_id(handle_t handle, process_id_t *_id) {
     /* We save the current process ID to avoid having to perform a kernel call
      * just to get our own ID. */
@@ -77,5 +60,34 @@ __sys_export status_t kern_process_id(handle_t handle, process_id_t *_id) {
         return STATUS_SUCCESS;
     } else {
         return _kern_process_id(handle, _id);
+    }
+}
+
+/**
+ * Add a handler function to be called in the child process after it has been
+ * cloned. If the function already exists in the list then it will not be added
+ * again.
+ *
+ * @param handler       Clone handler function.
+ *
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_NO_MEMORY if there is no space in the handler
+ *                      list.
+ */
+__sys_export status_t kern_process_add_clone_handler(process_clone_handler_t handler) {
+    size_t first_free = CLONE_HANDLER_MAX;
+    for (size_t i = 0; i < CLONE_HANDLER_MAX; i++) {
+        if (process_clone_handlers[i] == handler) {
+            return STATUS_SUCCESS;
+        } else if (!process_clone_handlers[i] && first_free == CLONE_HANDLER_MAX) {
+            first_free = i;
+        }
+    }
+
+    if (first_free < CLONE_HANDLER_MAX) {
+        process_clone_handlers[first_free] = handler;
+        return STATUS_SUCCESS;
+    } else {
+        return STATUS_NO_MEMORY;
     }
 }
