@@ -202,7 +202,7 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, uint32_t ipl
     status_t ret;
 
     frame_t *frame = curr_thread->arch.user_frame;
-    assert(frame->cs & 3);
+    assert(frame_from_user(frame));
 
     ptr_t sp;
     if (interrupt->stack.base) {
@@ -283,7 +283,7 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, uint32_t ipl
  * @return              Status code describing result of the operation. */
 status_t arch_thread_interrupt_restore(uint32_t *_ipl) {
     frame_t *frame = curr_thread->arch.user_frame;
-    assert(frame->cs & 3);
+    assert(frame_from_user(frame));
 
     /* The stack pointer should point at the context structure due to the
      * return address being popped. Copy it back. */
@@ -320,4 +320,26 @@ status_t arch_thread_interrupt_restore(uint32_t *_ipl) {
     curr_thread->arch.flags |= ARCH_THREAD_FRAME_MODIFIED | ARCH_THREAD_FRAME_RESTORED;
 
     return STATUS_SUCCESS;
+}
+
+/** Log a user backtrrace for the current thread. */
+void arch_thread_backtrace(void (*cb)(ptr_t)) {
+    frame_t *frame = curr_thread->arch.user_frame;
+    assert(frame_from_user(frame));
+
+    cb(frame->ip);
+
+    const size_t max_depth = 8;
+    ptr_t bp = frame->bp;
+    for(size_t i = 0; bp && i < max_depth; i++) {
+        stack_frame_t frame;
+        status_t ret = memcpy_from_user(&frame, (void *)bp, sizeof(frame));
+        if (ret != STATUS_SUCCESS)
+            break;
+
+        if (frame.addr)
+            cb(frame.addr);
+
+        bp = frame.next;
+    }
 }

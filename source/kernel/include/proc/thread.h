@@ -214,6 +214,7 @@ extern void arch_thread_user_setup(struct frame *frame, ptr_t entry, ptr_t sp, p
 extern void arch_thread_user_enter(struct frame *frame) __noreturn;
 extern status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, uint32_t ipl);
 extern status_t arch_thread_interrupt_restore(uint32_t *_ipl);
+extern void arch_thread_backtrace(void (*cb)(ptr_t));
 
 extern void thread_trampoline(void);
 

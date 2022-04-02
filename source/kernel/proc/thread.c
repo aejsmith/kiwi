@@ -80,8 +80,10 @@
 
 #include <assert.h>
 #include <cpu.h>
+#include <elf.h>
 #include <kdb.h>
 #include <kernel.h>
+#include <module.h>
 #include <smp.h>
 #include <status.h>
 #include <time.h>
@@ -567,6 +569,43 @@ void thread_exit(void) {
     fatal("Shouldn't get here");
 }
 
+static void thread_backtrace_cb(ptr_t addr) {
+    /* IP may point off the end of the function for the last instruction so
+     * subtract 1. */
+    const int delta = -1;
+    const int width = (sizeof(void *) * 2) + 2;
+
+    symbol_t sym = {};
+    size_t off = 0;
+    bool found = false;
+
+    MUTEX_SCOPED_LOCK(lock, &curr_proc->lock);
+
+    list_foreach(&curr_proc->images, iter) {
+        elf_image_t *image = list_entry(iter, elf_image_t, header);
+
+        found = elf_symbol_from_addr(image, addr + delta, &sym, &off);
+        if (found || sym.image)
+            break;
+    }
+
+    /* Name is a userspace string so we need to copy this. */
+    char *name __cleanup_kfree = NULL;
+    if (sym.name) {
+        /* If this fails name will be NULL so we'll print unknown. */
+        strndup_from_user(sym.name, 256, &name);
+    }
+
+    kprintf(
+        LOG_DEBUG, "  [%0*p] %s+0x%zx",
+        width, addr, (name) ? name : "<unknown>", (found) ? off - delta : 0);
+
+    if (sym.image && sym.image->load_base)
+        kprintf(LOG_DEBUG, " (%s+0x%zx)", sym.image->name, addr - sym.image->load_base);
+
+    kprintf(LOG_DEBUG, "\n");
+}
+
 /** Handle a user mode thread exception.
  * @param info          Exception information structure (will be copied). */
 void thread_exception(exception_info_t *info) {
@@ -576,9 +615,12 @@ void thread_exception(exception_info_t *info) {
 
     if (!handler || curr_thread->ipl > THREAD_IPL_EXCEPTION) {
         kprintf(
-            LOG_DEBUG,
+            LOG_NOTICE,
             "thread: killing process %" PRId32 " (%s) due to thread %" PRId32 " (%s) exception %u\n",
             curr_proc->id, curr_proc->name, curr_thread->id, curr_thread->name, info->code);
+
+        kprintf(LOG_DEBUG, "thread: backtrace:\n");
+        arch_thread_backtrace(thread_backtrace_cb);
 
         process_set_exit_status(curr_proc, EXIT_REASON_EXCEPTION, info->code);
         process_exit();

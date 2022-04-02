@@ -86,8 +86,6 @@ static void unhandled_exception(frame_t *frame, unsigned code) {
             LOG_DEBUG, "arch: thread %" PRId32 " (%s) exception %lu (%s) at %p\n",
             curr_thread->id, curr_thread->name, frame->num, string, frame->ip);
 
-        kdb_enter(KDB_REASON_USER, frame);
-
         memset(&exception, 0, sizeof(exception));
         exception.code = code;
         thread_exception(&exception);

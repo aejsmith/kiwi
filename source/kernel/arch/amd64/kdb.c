@@ -35,12 +35,6 @@
 #include <cpu.h>
 #include <kdb.h>
 
-/** Structure containing a stack frame. */
-typedef struct stack_frame {
-    ptr_t next;                 /**< Address of next stack frame. */
-    ptr_t addr;                 /**< Function return address. */
-} stack_frame_t;
-
 /** Structure containing details of a breakpoint. */
 typedef struct breakpoint {
     unsigned long dr7;          /**< Value to OR into DR7. */

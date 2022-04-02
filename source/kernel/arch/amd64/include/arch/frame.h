@@ -84,4 +84,10 @@ static inline bool frame_from_user(frame_t *frame) {
     return frame->cs & 3;
 }
 
+/** Structure containing a stack frame. */
+typedef struct stack_frame {
+    ptr_t next;                 /**< Address of next stack frame. */
+    ptr_t addr;                 /**< Function return address. */
+} stack_frame_t;
+
 #endif /* __ASM__ */
