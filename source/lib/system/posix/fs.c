@@ -20,7 +20,6 @@
  *
  * TODO:
  *  - Implement security (ownership, modes).
- *  - Preserve umask across an exec call.
  */
 
 #include <kernel/fs.h>
@@ -37,8 +36,25 @@
 
 #include "libsystem.h"
 
+/**
+ * umask inheritance across execve() is implemented by storing it in the
+ * environment.
+ */
+#define UMASK_ENV_NAME  "__POSIX_UMASK"
+#define DEFAULT_UMASK   022
+
 /** Current file mode creation mask. */
-mode_t current_umask = 022;
+mode_t current_umask = DEFAULT_UMASK;
+
+/** umask initialisation. */
+static __sys_init_prio(LIBSYSTEM_INIT_PRIO_POSIX_UMASK) void posix_umask_init(void) {
+    char *str = getenv(UMASK_ENV_NAME);
+    if (str) {
+        unsigned long val = strtoul(str, NULL, 8);
+        if (val != ULONG_MAX)
+            current_umask = val & 0777;
+    }
+}
 
 /** Checks whether access to a file is allowed.
  * @param path          Path to file to check.
@@ -438,6 +454,11 @@ void sync(void) {
 mode_t umask(mode_t mask) {
     mode_t prev = current_umask;
     current_umask = mask & 0777;
+
+    char str[5];
+    snprintf(str, sizeof(str), "%o", current_umask);
+    setenv(UMASK_ENV_NAME, str, 1);
+
     return prev;
 }
 
