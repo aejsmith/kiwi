@@ -42,52 +42,56 @@ static bool environ_alloced;
 /** Environment lock. */
 static CORE_MUTEX_DEFINE(environ_lock);
 
-/** Reallocate the contents of the environment if necessary.
- * @return              Whether succesful. */
 static bool ensure_environ_alloced(void) {
-    size_t count;
-    char **new;
-
     /* If not previously allocated, the environment is still on the stack so we
      * cannot modify it. Duplicate it and point environ to the new location. */
     if (!environ_alloced) {
         /* Get a count of what to copy. */
+        size_t count;
         for (count = 0; environ[count]; count++)
             ;
 
-        new = malloc((count + 1) * sizeof(char *));
+        char **new = malloc((count + 1) * sizeof(char *));
         if (!new)
             return false;
 
-        memcpy(new, environ, (count + 1) * sizeof(char *));
-        environ = new;
+        for (size_t i = 0; i < count; i++) {
+            new[i] = strdup(environ[i]);
+            if (!new[i]) {
+                for (size_t j = 0; j < i; j++)
+                    free(new[i]);
+
+                free(new);
+                return false;
+            }
+        }
+
+        new[count] = NULL;
+
+        environ         = new;
         environ_alloced = true;
     }
 
     return true;
 }
 
-/** Get the value of an environment variable without taking lock.
- * @param name          Name of variable to get.
- * @return              Pointer to value. */
-static char *getenv_unsafe(const char *name) {
-    char *key, *val;
-    size_t i, len;
-
+static char *getenv_unsafe(const char *name, size_t len, size_t *_index) {
     if (!environ)
         return NULL;
 
-    for (i = 0; environ[i]; i++) {
-        key = environ[i];
-        val = strchr(key, '=');
+    for (size_t i = 0; environ[i]; i++) {
+        char *key = environ[i];
+        char *val = strchr(key, '=');
 
         if (!val)
             libsystem_fatal("value '%s' found in environment without an =", key);
 
-        len = strlen(name);
         if (strncmp(key, name, len) == 0) {
-            if (environ[i][len] == '=')
+            if (environ[i][len] == '=') {
+                if (_index)
+                    *_index = i;
                 return val + 1;
+            }
         }
     }
 
@@ -95,8 +99,6 @@ static char *getenv_unsafe(const char *name) {
 }
 
 /**
- * Get the value of an environment variable.
- *
  * Gets the value of an environment variable stored in the environ array.
  * The string returned should not be modified.
  *
@@ -105,84 +107,55 @@ static char *getenv_unsafe(const char *name) {
  * @return              Pointer to value.
  */
 char *getenv(const char *name) {
-    char *ret;
-
     if (!name)
         return NULL;
 
-    core_mutex_lock(&environ_lock, -1);
-    ret = getenv_unsafe(name);
-    core_mutex_unlock(&environ_lock);
-
-    return ret;
+    CORE_MUTEX_SCOPED_LOCK(lock, &environ_lock);
+    return getenv_unsafe(name, strlen(name), NULL);
 }
 
 /**
- * Set or change an environment variable.
- *
- * Sets or changes an environment variable. The variable will be set to the
- * given string, so changing it will change the environment. The string
- * should be in the form name=value.
+ * Sets or changes an environment variable. The string should be in the form
+ * name=value.
  *
  * @param str           String to add.
  *
  * @return              0 on success, -1 on failure.
  */
 int putenv(char *str) {
-    size_t count, len, tmp, i;
-    char **new;
-
-    if (!str || !strchr(str, '=')) {
-        errno = EINVAL;
-        return -1;
-    } else if ((len = strchr(str, '=') - str) == 0) {
+    if (!str) {
         errno = EINVAL;
         return -1;
     }
 
-    core_mutex_lock(&environ_lock, -1);
-
-    /* Ensure the environment array can be modified. */
-    if (!ensure_environ_alloced()) {
-        core_mutex_unlock(&environ_lock);
+    char *val       = strchr(str, '=');
+    size_t name_len = val - str;
+    if (!val || !name_len) {
+        errno = EINVAL;
         return -1;
     }
 
-    /* Check for an existing entry with the same name. */
-    for (i = 0; environ[i]; i++) {
-        tmp = strchr(environ[i], '=') - environ[i];
+    val++;
 
-        if (len != tmp) {
-            continue;
-        } else if (strncmp(environ[i], str, len) == 0) {
-            environ[i] = str;
-
-            core_mutex_unlock(&environ_lock);
-            return 0;
-        }
-    }
-
-    /* Doesn't exist at all. Reallocate environment to fit. */
-    for (count = 0; environ[count]; count++);
-    new = realloc(environ, (count + 2) * sizeof(char *));
-    if (!new) {
-        core_mutex_unlock(&environ_lock);
+    /*
+     * This function is specified to add the given string to the environment
+     * rather than a copy so that modifying the string modifies the environment.
+     * To me, this behaviour is completely broken. It also prevents us freeing
+     * allocated environment variable strings.
+     *
+     * So, ignore the spec, and make a copy.
+     */
+    char *name __sys_cleanup_free = malloc(name_len + 1);
+    if (!name)
         return -1;
-    }
 
-    environ = new;
+    memcpy(name, str, name_len);
+    name[name_len] = 0;
 
-    /* Set new entry. */
-    environ[count] = str;
-    environ[count + 1] = NULL;
-
-    core_mutex_unlock(&environ_lock);
-    return 0;
+    return setenv(name, val, 1);
 }
 
 /**
- * Set an environment variable.
- *
  * Sets an environment variable to the given value. The strings given will
  * be duplicated.
  *
@@ -193,134 +166,96 @@ int putenv(char *str) {
  * @return              Pointer to value.
  */
 int setenv(const char *name, const char *value, int overwrite) {
-    char **new, *exist, *val;
-    size_t count, len;
-
     if (!name || name[0] == 0 || strchr(name, '=')) {
         errno = EINVAL;
         return -1;
     }
 
-    core_mutex_lock(&environ_lock, -1);
+    CORE_MUTEX_SCOPED_LOCK(lock, &environ_lock);
 
     /* Ensure the environment array can be modified. */
-    if (!ensure_environ_alloced()) {
-        core_mutex_unlock(&environ_lock);
+    if (!ensure_environ_alloced())
         return -1;
-    }
 
     /* Work out total length. */
-    len = strlen(name) + strlen(value) + 2;
+    size_t name_len  = strlen(name);
+    size_t value_len = strlen(value);
+    size_t len       = name_len + value_len + 2; /* = and terminator */
 
     /* If it exists already, and the current value is big enough, just
      * overwrite it. */
-    exist = getenv_unsafe(name);
+    size_t index;
+    char *exist = getenv_unsafe(name, name_len, &index);
     if (exist) {
         if (!overwrite) {
-            core_mutex_unlock(&environ_lock);
             return 0;
-        }
-
-        if (strlen(exist) >= strlen(value)) {
+        } else if (strlen(exist) == value_len) {
             strcpy(exist, value);
-
-            core_mutex_unlock(&environ_lock);
             return 0;
         }
-
-        /* Find the entry in the environment array and reallocate it. */
-        for (count = 0; environ[count]; count++) {
-            if (strncmp(environ[count], name, strlen(name)) != 0)
-                continue;
-
-            val = malloc(len);
-            if (!val) {
-                core_mutex_unlock(&environ_lock);
-                return -1;
-            }
-
-            sprintf(val, "%s=%s", name, value);
-            environ[count] = val;
-
-            core_mutex_unlock(&environ_lock);
-            return 0;
-        }
-
-        libsystem_fatal("shouldn't get here in setenv");
     }
 
     /* Fill out the new entry. */
-    val = malloc(len);
-    if (!val) {
-        core_mutex_unlock(&environ_lock);
+    char *str = malloc(len);
+    if (!str)
         return -1;
+
+    sprintf(str, "%s=%s", name, value);
+
+    if (exist) {
+        free(environ[index]);
+        environ[index] = str;
+    } else {
+        /* Doesn't exist at all. Reallocate environment to fit. */
+        size_t count;
+        for (count = 0; environ[count]; count++)
+            ;
+
+        char **new = realloc(environ, (count + 2) * sizeof(char *));
+        if (!new) {
+            free(str);
+            return -1;
+        }
+
+        environ = new;
+
+        /* Set new entry. */
+        environ[count] = str;
+        environ[count + 1] = NULL;
     }
 
-    sprintf(val, "%s=%s", name, value);
-
-    /* Doesn't exist at all. Reallocate environment to fit. */
-    for (count = 0; environ[count]; count++)
-        ;
-
-    new = realloc(environ, (count + 2) * sizeof(char *));
-    if (!new) {
-        free(val);
-        core_mutex_unlock(&environ_lock);
-        return -1;
-    }
-
-    environ = new;
-
-    /* Set new entry. */
-    environ[count] = val;
-    environ[count + 1] = NULL;
-
-    core_mutex_unlock(&environ_lock);
     return 0;
 }
 
-/** Unset an environment variable.
+/** Unsets an environment variable.
  * @param name          Name of variable (must not contain an = character).
  * @return              0 on success, -1 on failure. */
 int unsetenv(const char *name) {
-    char **new, *key, *val;
-    size_t i, len, count;
-
     if (!name || !name[0] || strchr(name, '=')) {
         errno = EINVAL;
         return -1;
     }
 
-    core_mutex_lock(&environ_lock, -1);
+    CORE_MUTEX_SCOPED_LOCK(lock, &environ_lock);
 
     /* Ensure the environment array can be modified. */
-    if (!ensure_environ_alloced()) {
-        core_mutex_unlock(&environ_lock);
+    if (!ensure_environ_alloced())
         return -1;
-    }
 
-    for (i = 0; environ[i]; i++) {
-        key = environ[i];
-        val = strchr(key, '=');
+    size_t index;
+    char *exist = getenv_unsafe(name, strlen(name), &index);
+    if (exist) {
+        free(environ[index]);
 
-        if (!val)
-            libsystem_fatal("value '%s' found in environment without an =", key);
-
-        len = strlen(name);
-        if (strncmp(key, name, len) == 0 && environ[i][len] == '=') {
-            for (count = 0; environ[count]; count++)
-                ;
-
-            memcpy(&environ[i], &environ[i + 1], (count - i) * sizeof(char *));
-            new = realloc(environ, count * sizeof(char *));
-            if (new)
-                environ = new;
-
-            core_mutex_unlock(&environ_lock);
-            return 0;
+        while (environ[index]) {
+            environ[index] = environ[index + 1];
+            index++;
         }
+
+        char **new = realloc(environ, index * sizeof(char *));
+        if (new)
+            environ = new;
     }
 
-    core_mutex_unlock(&environ_lock);
     return 0;
 }

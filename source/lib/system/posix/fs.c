@@ -40,7 +40,7 @@
  * umask inheritance across execve() is implemented by storing it in the
  * environment.
  */
-#define UMASK_ENV_NAME  "__POSIX_UMASK"
+#define UMASK_ENV_NAME  "__SYS_POSIX_UMASK"
 #define DEFAULT_UMASK   022
 
 /** Current file mode creation mask. */

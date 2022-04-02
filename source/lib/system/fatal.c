@@ -40,7 +40,7 @@ static void libsystem_fatal_helper(char ch, void *data) {
 void libsystem_fatal(const char *fmt, ...) {
     va_list args;
 
-    do_printf(libsystem_fatal_helper, stderr, "*** libsystem fatal: ");
+    do_printf(libsystem_fatal_helper, stderr, "%s: libsystem: fatal error: ", __program_name);
 
     va_start(args, fmt);
     do_vprintf(libsystem_fatal_helper, stderr, fmt, args);
@@ -70,7 +70,7 @@ void libsystem_stub(const char *name, bool fatal) {
  * @param line          Line number.
  * @param func          Function name. */
 void libsystem_assert_fail(const char *cond, const char *file, unsigned int line, const char *func) {
-    libsystem_fatal("assertion '%s' failed at %s:%d (%s)\n", cond, file, line, func);
+    libsystem_fatal("assertion '%s' failed at %s:%d (%s)", cond, file, line, func);
 }
 
 /** Print out an assertion fail message.
