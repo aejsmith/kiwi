@@ -55,6 +55,12 @@ namespace Kiwi {
         private:
             std::vector<object_event_t> m_events;
 
+            /**
+             * Version number used to detect handler changes while handling
+             * events.
+             */
+            uint32_t m_version;
+
             friend class EventRef;
         };
 

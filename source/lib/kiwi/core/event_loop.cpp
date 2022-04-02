@@ -30,7 +30,9 @@
 
 using namespace Kiwi::Core;
 
-EventLoop::EventLoop() {}
+EventLoop::EventLoop() :
+    m_version (0)
+{}
 
 EventLoop::~EventLoop() {}
 
@@ -61,6 +63,9 @@ EventRef EventLoop::addEvent(handle_t handle, unsigned id, uint32_t flags, Event
     EventRef ref;
     ref.m_loop    = this;
     ref.m_handler = copy;
+
+    m_version++;
+
     return ref;
 }
 
@@ -69,6 +74,7 @@ void EventLoop::removeEvent(EventHandler *handler) {
     for (auto it = m_events.begin(); it != m_events.end(); ++it) {
         if (reinterpret_cast<EventHandler *>(it->udata) == handler) {
             m_events.erase(it);
+            m_version++;
             return;
         }
     }
@@ -94,9 +100,8 @@ status_t EventLoop::wait(uint32_t flags, nstime_t timeout) {
         return ret;
     }
 
-    size_t numEvents = m_events.size();
-
-    for (size_t i = 0; i < numEvents; ) {
+    uint32_t version = m_version;
+    for (size_t i = 0; i < m_events.size(); ) {
         object_event_t &event = m_events[i];
 
         uint32_t flags = event.flags;
@@ -109,10 +114,11 @@ status_t EventLoop::wait(uint32_t flags, nstime_t timeout) {
             (*handler)(event);
         }
 
-        /* Calling the handler may change the event array, so we have to handle
-         * this - start from the beginning. */
-        if (numEvents != m_events.size()) {
-            numEvents = m_events.size();
+        /* Calling the handler may change the event array. This is indicated by
+         * the version changing. In this case, restart from the beginning of
+         * the array to make sure we don't miss anything. */
+        if (version != m_version) {
+            version = m_version;
             i = 0;
         } else {
             i++;
