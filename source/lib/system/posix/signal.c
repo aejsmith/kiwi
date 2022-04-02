@@ -548,31 +548,43 @@ static void posix_signal_fork(void) {
 static __sys_init_prio(LIBSYSTEM_INIT_PRIO_POSIX_SIGNAL) void posix_signal_init(void) {
     posix_register_fork_handler(posix_signal_fork);
 
-    char *mask_str   = getenv(SIGNAL_MASK_ENV_NAME);
-    char *ignore_str = getenv(SIGNAL_IGNORE_ENV_NAME);
+    unsigned long mask_val = 0;
+    char *mask_str = getenv(SIGNAL_MASK_ENV_NAME);
+    if (mask_str) {
+        mask_val = strtoul(mask_str, NULL, 16);
+        if (mask_val == ULONG_MAX)
+            mask_val = 0;
 
-    if (mask_str || ignore_str) {
+        unsetenv(SIGNAL_MASK_ENV_NAME);
+    }
+
+    unsigned long ignore_val = 0;
+    char *ignore_str = getenv(SIGNAL_IGNORE_ENV_NAME);
+    if (ignore_str) {
+        ignore_val = strtoul(ignore_str, NULL, 16);
+        if (ignore_val == ULONG_MAX)
+            ignore_val = 0;
+
+        unsetenv(SIGNAL_IGNORE_ENV_NAME);
+    }
+
+    if (mask_val != 0 || ignore_val != 0) {
         SCOPED_SIGNAL_LOCK();
 
         /* The service will update its state when it sees we exec(), but set it
          * again at the service anyway just to be sure. */
         core_connection_t *conn = posix_service_get();
-
-        if (conn && mask_str) {
-            unsigned long val = strtoul(mask_str, NULL, 16);
-            if (val != ULONG_MAX) {
-                if (set_signal_mask_request(conn, val)) {
-                    posix_signal_mask = val;
+        if (conn) {
+            if (mask_val != 0) {
+                if (set_signal_mask_request(conn, mask_val)) {
+                    posix_signal_mask = mask_val;
                 } else {
                     libsystem_log(CORE_LOG_ERROR, "failed to set signal mask after exec");
                 }
             }
-        }
 
-        if (conn && ignore_str) {
-            unsigned long val = strtoul(ignore_str, NULL, 16);
-            if (val != ULONG_MAX) {
-                for (int32_t i = 1; i < NSIG; i++) {
+            for (int32_t i = 1; i < NSIG; i++) {
+                if (ignore_val & (1 << i)) {
                     posix_signal_t *signal = &posix_signals[i];
 
                     if (set_signal_action(conn, i, signal->disposition, signal->action.sa_flags)) {
@@ -582,10 +594,9 @@ static __sys_init_prio(LIBSYSTEM_INIT_PRIO_POSIX_SIGNAL) void posix_signal_init(
                     }
                 }
             }
-        }
 
-        unsetenv(SIGNAL_MASK_ENV_NAME);
-        unsetenv(SIGNAL_IGNORE_ENV_NAME);
+            posix_service_put();
+        }
     }
 }
 
