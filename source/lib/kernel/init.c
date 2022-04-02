@@ -42,6 +42,8 @@ size_t page_size;
 void libkernel_init(process_args_t *args) {
     status_t ret;
 
+    process_args = args;
+
     /* Get the system page size. */
     kern_system_info(SYSTEM_INFO_PAGE_SIZE, &page_size);
 
@@ -69,8 +71,8 @@ void libkernel_init(process_args_t *args) {
     }
 
     /* Initialise the runtime loader and load the program. */
-    void (*entry)(process_args_t *);
-    ret = rtld_init(args, (void **)&entry);
+    void (*entry)();
+    ret = rtld_init((void **)&entry);
     if (ret != STATUS_SUCCESS || libkernel_dry_run)
         kern_process_exit(ret);
 
@@ -115,7 +117,7 @@ void libkernel_init(process_args_t *args) {
 
     /* Call the entry point for the program. */
     dprintf("libkernel: beginning program execution at %p...\n", entry);
-    entry(args);
+    entry();
     dprintf("libkernel: program entry point returned\n");
     kern_process_exit(0);
 }

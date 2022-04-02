@@ -25,8 +25,5 @@
 .global _start
 .type _start, @function
 _start:
-    /* Call the libsystem initialisation function. We're entered from libkernel
-     * with a pointer to the process argument block as the first argument, so
-     * this will be passed through. */
-    jmp     libsystem_init
+    jmp     libsystem_main
 .size _start, .-_start

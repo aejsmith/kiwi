@@ -101,6 +101,7 @@ extern rtld_image_t *application_image;
 
 extern __thread thread_id_t curr_thread_id;
 extern process_id_t curr_process_id;
+extern process_args_t *process_args;
 extern size_t page_size;
 
 extern bool libkernel_debug;
@@ -115,7 +116,7 @@ extern rtld_image_t *rtld_image_lookup(image_id_t id);
 extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, rtld_symbol_t *symbol);
 extern void rtld_symbol_init(rtld_image_t *image);
 extern status_t rtld_image_load(const char *name, rtld_image_t *req, rtld_image_t **_image);
-extern status_t rtld_init(process_args_t *args, void **_entry);
+extern status_t rtld_init(void **_entry);
 
 extern ptrdiff_t tls_tp_offset(rtld_image_t *image);
 extern void *tls_get_addr(size_t module, size_t offset);

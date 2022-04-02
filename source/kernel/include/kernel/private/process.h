@@ -44,8 +44,9 @@ typedef struct process_args {
 extern status_t kern_process_control(unsigned action, const void *in, void *out);
 
 typedef void (*process_clone_handler_t)(void);
-
 extern status_t kern_process_add_clone_handler(process_clone_handler_t handler);
+
+extern process_args_t *kern_process_args(void);
 
 #ifdef __LIBKERNEL
 

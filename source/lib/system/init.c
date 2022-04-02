@@ -38,6 +38,14 @@
 /** Name of the current program. */
 const char *__program_name;
 
+/** Environment initialisation. */
+static __sys_init_prio(LIBSYSTEM_INIT_PRIO_ARGS) void args_init(void) {
+    process_args_t *args = kern_process_args();
+
+    environ = args->env;
+    __program_name = core_path_basename(args->path);
+}
+
 /** Early stdio initialisation. */
 static __sys_init_prio(LIBSYSTEM_INIT_PRIO_STDIO) void stdio_init(void) {
     /* Attempt to open standard I/O streams from existing handles. */
@@ -46,15 +54,8 @@ static __sys_init_prio(LIBSYSTEM_INIT_PRIO_STDIO) void stdio_init(void) {
     stderr = fdopen(STDERR_FILENO, "a");
 }
 
-/** System library initialisation function.
- * @param args          Process arguments structure. */
-void libsystem_init(process_args_t *args) {
-    /* Save the environment pointer. */
-    environ = args->env;
-
-    /* Save the program name. */
-    __program_name = core_path_basename(args->path);
-
-    /* Call the main function. */
+/** System library main function. */
+void libsystem_main(void) {
+    process_args_t *args = kern_process_args();
     exit(main(args->arg_count, args->args, args->env));
 }

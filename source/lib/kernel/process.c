@@ -24,6 +24,9 @@
 
 #include "libkernel.h"
 
+/** Process arguments. */
+process_args_t *process_args = NULL;
+
 /** Saved ID for the current process. */
 process_id_t curr_process_id = -1;
 
@@ -90,4 +93,9 @@ __sys_export status_t kern_process_add_clone_handler(process_clone_handler_t han
     } else {
         return STATUS_NO_MEMORY;
     }
+}
+
+/** Gets the arguments for the current process. */
+__sys_export process_args_t *kern_process_args(void) {
+    return process_args;
 }

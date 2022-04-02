@@ -574,10 +574,9 @@ status_t rtld_image_load(const char *name, rtld_image_t *req, rtld_image_t **_im
 
 
 /** Initialise the runtime loader.
- * @param args          Process arguments structure pointer.
  * @param _entry        Where to store program entry point address.
  * @return              Status code describing result of the operation. */
-status_t rtld_init(process_args_t *args, void **_entry) {
+status_t rtld_init(void **_entry) {
     rtld_image_t *image;
     file_info_t file;
     elf_ehdr_t *ehdr;
@@ -588,8 +587,8 @@ status_t rtld_init(process_args_t *args, void **_entry) {
 
     /* Fill in the libkernel image structure with information we have. */
     image = &libkernel_image;
-    image->load_base = args->load_base;
-    image->load_size = core_round_up((elf_addr_t)_end - (elf_addr_t)args->load_base, page_size);
+    image->load_base = process_args->load_base;
+    image->load_size = core_round_up((elf_addr_t)_end - (elf_addr_t)process_args->load_base, page_size);
     image->dyntab = _DYNAMIC;
 
     ret = kern_fs_info(LIBKERNEL_PATH, true, &file);
@@ -617,7 +616,7 @@ status_t rtld_init(process_args_t *args, void **_entry) {
         case ELF_DT_SYMTAB:
         case ELF_DT_JMPREL:
         case ELF_DT_REL_TYPE:
-            image->dyntab[i].d_un.d_ptr += (elf_addr_t)args->load_base;
+            image->dyntab[i].d_un.d_ptr += (elf_addr_t)process_args->load_base;
             break;
         }
 
@@ -625,14 +624,14 @@ status_t rtld_init(process_args_t *args, void **_entry) {
     }
 
     /* Find out where our TLS segment is loaded to. */
-    ehdr = (elf_ehdr_t *)args->load_base;
-    phdrs = (elf_phdr_t *)(args->load_base + ehdr->e_phoff);
+    ehdr = (elf_ehdr_t *)process_args->load_base;
+    phdrs = (elf_phdr_t *)(process_args->load_base + ehdr->e_phoff);
     for (i = 0; i < ehdr->e_phnum; i++) {
         if (phdrs[i].p_type == ELF_PT_TLS) {
             if (!phdrs[i].p_memsz)
                 break;
 
-            image->tls_image = args->load_base + phdrs[i].p_vaddr;
+            image->tls_image = process_args->load_base + phdrs[i].p_vaddr;
             image->tls_filesz = phdrs[i].p_filesz;
             image->tls_memsz = phdrs[i].p_memsz;
             image->tls_align = phdrs[i].p_align;
@@ -660,8 +659,8 @@ status_t rtld_init(process_args_t *args, void **_entry) {
     }
 
     /* Load the program. */
-    dprintf("rtld: loading program %s...\n", args->path);
-    ret = load_image(args->path, NULL, ELF_ET_EXEC, _entry, &application_image);
+    dprintf("rtld: loading program %s...\n", process_args->path);
+    ret = load_image(process_args->path, NULL, ELF_ET_EXEC, _entry, &application_image);
     if (ret != STATUS_SUCCESS) {
         dprintf("rtld: failed to load binary: %d\n", ret);
         return ret;
