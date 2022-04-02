@@ -122,7 +122,7 @@ extern void core_connection_close(core_connection_t *conn);
 extern void core_connection_destroy(core_connection_t *conn);
 
 extern handle_t core_connection_handle(const core_connection_t *conn);
-
+extern bool core_connection_is_active(const core_connection_t *conn);
 extern status_t core_connection_signal(core_connection_t *conn, core_message_t *signal);
 extern status_t core_connection_request(core_connection_t *conn, core_message_t *request, core_message_t **_reply);
 extern status_t core_connection_reply(core_connection_t *conn, core_message_t *reply);

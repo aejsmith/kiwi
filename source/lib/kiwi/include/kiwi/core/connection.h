@@ -74,6 +74,7 @@ namespace Kiwi {
             void destroy();
 
             handle_t handle() const;
+            bool isActive() const;
 
             status_t signal(Message &signal);
             status_t request(Message &request, Message &_reply);
@@ -221,6 +222,11 @@ namespace Kiwi {
         /** @see                core_connection_handle(). */
         inline handle_t Connection::handle() const {
             return core_connection_handle(m_conn);
+        }
+
+        /** @see                core_connection_is_active(). */
+        inline bool Connection::isActive() const {
+            return core_connection_is_active(m_conn);
         }
 
         /** @see                core_connection_signal(). */

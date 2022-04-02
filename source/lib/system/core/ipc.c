@@ -232,6 +232,20 @@ handle_t core_connection_handle(const core_connection_t *conn) {
 }
 
 /**
+ * Checks whether a connection is still active or whether the remote end has
+ * hung up.
+ *
+ * @param conn          Connection object.
+ *
+ * @return              Whether the connection is active.
+ */
+bool core_connection_is_active(const core_connection_t *conn) {
+    libsystem_assert(conn);
+
+    return kern_connection_status(conn->handle) == STATUS_SUCCESS;
+}
+
+/**
  * Send a signal over a connection. This is sent asynchronously - there is no
  * acknowledgement that the other side has received and processed the signal.
  * This function may block if the remote message queue is full, and will time

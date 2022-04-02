@@ -1074,6 +1074,34 @@ err:
 }
 
 /**
+ * Checks whether a connection is still active or whether the remote end has
+ * hung up.
+ *
+ * @param handle        Handle to connection.
+ *
+ * @return              STATUS_SUCCESS if the connection is still active.
+ *                      STATUS_CONN_HUNGUP if the remote end has hung up.
+ */
+status_t kern_connection_status(handle_t handle) {
+    status_t ret;
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_CONNECTION, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    ipc_endpoint_t *endpoint = khandle->private;
+    ipc_connection_t *conn   = endpoint->conn;
+
+    mutex_lock(&conn->lock);
+
+    assert(conn->state != IPC_CONNECTION_SETUP);
+    ret = (conn->state == IPC_CONNECTION_CLOSED) ? STATUS_CONN_HUNGUP : STATUS_SUCCESS;
+
+    mutex_unlock(&conn->lock);
+    return ret;
+}
+
+/**
  * Queues a message at the remote end of a connection. Messages are sent
  * asynchronously. Message queues have a finite length to prevent flooding when
  * a process is not able to handle the volume of incoming messages: if the

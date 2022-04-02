@@ -65,6 +65,7 @@ extern status_t kern_connection_open(handle_t port, nstime_t timeout, handle_t *
 
 extern status_t kern_connection_open_remote(handle_t handle, handle_t *_process);
 
+extern status_t kern_connection_status(handle_t handle);
 extern status_t kern_connection_send(
     handle_t handle, const ipc_message_t *msg, const void *data,
     handle_t attached, nstime_t timeout);
