@@ -917,7 +917,12 @@ void vm_unlock_page(vm_aspace_t *as, ptr_t addr) {
  * @param access        Type of memory access that caused the fault.
  * @return              Whether the fault was handled. */
 bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
-    vm_aspace_t *as = curr_cpu->aspace;
+    /* If we're in interrupt context, this is certainly a kernel exception
+     * that we cannot handle. Just bail out now so that we crash with details
+     * of the exception rather than hitting the !in_interrupt() assert in
+     * mutex_lock(). */
+    if (in_interrupt())
+        return false;
 
     assert(!local_irq_state());
 
@@ -926,6 +931,8 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
     exception.addr = (void *)addr;
 
     bool user = frame_from_user(frame);
+
+    vm_aspace_t *as = curr_cpu->aspace;
 
     dprintf(
         "vm: %s mode page fault at %p (thread: %" PRId32 ", as: %p, reason: %d, access: 0x%" PRIx32 ")\n",
