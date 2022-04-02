@@ -34,6 +34,8 @@
 #include <unistd.h>
 #include <utime.h>
 
+#include "stdlib/environ.h"
+
 #include "libsystem.h"
 
 /**
@@ -53,7 +55,16 @@ static __sys_init_prio(LIBSYSTEM_INIT_PRIO_POSIX_UMASK) void posix_umask_init(vo
         unsigned long val = strtoul(str, NULL, 8);
         if (val != ULONG_MAX)
             current_umask = val & 0777;
+
+        unsetenv(UMASK_ENV_NAME);
     }
+}
+
+/** Save umask to the environment before an execve(). */
+void posix_fs_exec(environ_t *env) {
+    char str[5];
+    snprintf(str, sizeof(str), "%o", current_umask);
+    environ_set(env, UMASK_ENV_NAME, str, 1);
 }
 
 /** Checks whether access to a file is allowed.
@@ -454,11 +465,6 @@ void sync(void) {
 mode_t umask(mode_t mask) {
     mode_t prev = current_umask;
     current_umask = mask & 0777;
-
-    char str[5];
-    snprintf(str, sizeof(str), "%o", current_umask);
-    setenv(UMASK_ENV_NAME, str, 1);
-
     return prev;
 }
 

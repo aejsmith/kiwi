@@ -45,7 +45,12 @@ public:
 
     process_id_t pid() const { return m_pid; }
 
+    void reconnect(Kiwi::Core::Connection connection);
+
 private:
+    void initConnection();
+
+    void handleDeathEvent();
     void handleHangupEvent();
     void handleMessageEvent();
 
@@ -69,6 +74,7 @@ private:
     uint32_t m_signalMask;
     Kiwi::Core::Handle m_signalCondition;
 
+    Kiwi::Core::EventRef m_deathEvent;
     Kiwi::Core::EventRef m_hangupEvent;
     Kiwi::Core::EventRef m_messageEvent;
 };

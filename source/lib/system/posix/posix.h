@@ -34,6 +34,8 @@
 
 #include "libsystem.h"
 
+struct environ;
+
 /** Structure containing details of a POSIX process. */
 typedef struct posix_process {
     core_list_t header;             /**< Link to process list. */
@@ -48,8 +50,12 @@ extern mode_t __sys_hidden current_umask;
 
 extern void posix_register_fork_handler(void (*func)(void)) __sys_hidden;
 
+extern void posix_fs_exec(struct environ *env) __sys_hidden;
+
 extern core_connection_t *posix_service_get(void) __sys_hidden;
 extern void posix_service_put(void) __sys_hidden;
+
+extern void posix_signal_exec(struct environ *env) __sys_hidden;
 
 extern void posix_signal_guard_begin(void) __sys_hidden;
 extern void posix_signal_guard_end(void) __sys_hidden;

@@ -113,13 +113,6 @@ void PosixService::handleConnectionEvent() {
     if (ret != STATUS_SUCCESS)
         return;
 
-    /* Look for an existing process. */
-    auto it = m_processes.find(pid);
-    if (it != m_processes.end()) {
-        core_log(CORE_LOG_NOTICE, "ignoring connection from already connected process %" PRId32, pid);
-        return;
-    }
-
     Kiwi::Core::Connection connection;
     if (!connection.create(
             std::move(handle),
@@ -129,8 +122,15 @@ void PosixService::handleConnectionEvent() {
         return;
     }
 
-    auto process = std::make_unique<Process>(std::move(connection), std::move(processHandle), pid);
-    m_processes.emplace(pid, std::move(process));
+    /* Look for an existing process. */
+    auto it = m_processes.find(pid);
+    if (it != m_processes.end()) {
+        /* This may be a reconnection after an exec() which we want to handle. */
+        it->second->reconnect(std::move(connection));
+    } else {
+        auto process = std::make_unique<Process>(std::move(connection), std::move(processHandle), pid);
+        m_processes.emplace(pid, std::move(process));
+    }
 }
 
 int main(int argc, char **argv) {

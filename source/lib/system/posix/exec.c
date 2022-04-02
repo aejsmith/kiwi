@@ -31,6 +31,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "stdlib/environ.h"
+
 #include "posix/posix.h"
 
 #define ARGV_MAX    512
@@ -163,6 +165,15 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
         return do_interp(fd, path, argv, envp);
 
     close(fd);
+
+    /* For state inheritance into the child, we use the environment. We need to
+     * create a local copy of the supplied environment to be able to modify it.
+     * Any modification of the environment will */
+    environ_t env;
+    environ_init(&env, (char ***)&envp, false);
+
+    posix_fs_exec(&env);
+    posix_signal_exec(&env);
 
     /* If this returns it must have failed. */
     status_t ret = kern_process_exec(path, (const char *const *)argv, (const char *const *)envp, 0, NULL);

@@ -36,12 +36,20 @@
 #include <services/posix_service.h>
 
 #include <errno.h>
+#include <limits.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+#include "stdlib/environ.h"
+
 #include "posix/posix.h"
+
+/** Environment variable names for signal state inheritance. */
+#define SIGNAL_MASK_ENV_NAME    "__SYS_POSIX_SIGNAL_MASK"
+#define SIGNAL_IGNORE_ENV_NAME  "__SYS_POSIX_SIGNAL_IGNORE"
 
 /** Mapping of kernel exceptions to POSIX signals. */
 static int posix_exception_signals[] = {
@@ -286,7 +294,7 @@ static bool kill_request(core_connection_t *conn, pid_t pid, int num) {
 
 static bool set_signal_action(core_connection_t *conn, int32_t num, uint32_t disposition, uint32_t flags);
 
-static sigset_t make_valid_sigmask(sigset_t mask) {
+static sigset_t make_valid_signal_mask(sigset_t mask) {
     /* Restrict to valid signals. SIGKILL and SIGSTOP cannot be masked and
      * should be silently ignored. */
     mask &= ((1 << NSIG) - 1);
@@ -323,7 +331,7 @@ static void handle_signal(core_connection_t *conn, siginfo_t *info, thread_conte
     if (!(action.sa_flags & SA_NODEFER))
         mask |= (1 << info->si_signo);
 
-    mask |= make_valid_sigmask(action.sa_mask);
+    mask |= make_valid_signal_mask(action.sa_mask);
 
     if (mask != prev_mask) {
         if (set_signal_mask_request(conn, mask)) {
@@ -536,8 +544,87 @@ static void posix_signal_fork(void) {
         posix_service_put();
 }
 
+/** Signal state initialisation. */
 static __sys_init_prio(LIBSYSTEM_INIT_PRIO_POSIX_SIGNAL) void posix_signal_init(void) {
     posix_register_fork_handler(posix_signal_fork);
+
+    char *mask_str   = getenv(SIGNAL_MASK_ENV_NAME);
+    char *ignore_str = getenv(SIGNAL_IGNORE_ENV_NAME);
+
+    if (mask_str || ignore_str) {
+        SCOPED_SIGNAL_LOCK();
+
+        /* The service will update its state when it sees we exec(), but set it
+         * again at the service anyway just to be sure. */
+        core_connection_t *conn = posix_service_get();
+
+        if (conn && mask_str) {
+            unsigned long val = strtoul(mask_str, NULL, 16);
+            if (val != ULONG_MAX) {
+                if (set_signal_mask_request(conn, val)) {
+                    posix_signal_mask = val;
+                } else {
+                    libsystem_log(CORE_LOG_ERROR, "failed to set signal mask after exec");
+                }
+            }
+        }
+
+        if (conn && ignore_str) {
+            unsigned long val = strtoul(ignore_str, NULL, 16);
+            if (val != ULONG_MAX) {
+                for (int32_t i = 1; i < NSIG; i++) {
+                    posix_signal_t *signal = &posix_signals[i];
+
+                    if (set_signal_action(conn, i, signal->disposition, signal->action.sa_flags)) {
+                        signal->disposition = POSIX_SIGNAL_DISPOSITION_IGNORE;
+                    } else {
+                        libsystem_log(CORE_LOG_ERROR, "failed to set signal %" PRId32 " ignore after exec", i);
+                    }
+                }
+            }
+        }
+
+        unsetenv(SIGNAL_MASK_ENV_NAME);
+        unsetenv(SIGNAL_IGNORE_ENV_NAME);
+    }
+}
+
+/** Save current signal state to the environment before an execve(). */
+void posix_signal_exec(environ_t *env) {
+    SCOPED_SIGNAL_LOCK();
+
+    /*
+     * The state that is inherited across an execve() is the signal mask, any
+     * explicitly ignored signals, and any pending signals.
+     *
+     * The POSIX service takes care of the pending signals, and will update the
+     * state on its side. It will do this as a result of the connection being
+     * hung up when we exec().
+     *
+     * We need to pass the state to the new process for libsystem there. This
+     * is picked up in posix_signal_init().
+     */
+
+    if (posix_signal_mask != 0) {
+        // TODO: For pthreads, this should inherit the calling thread mask.
+        char str[16];
+        snprintf(str, sizeof(str), "0x%x", posix_signal_mask);
+        environ_set(env, SIGNAL_MASK_ENV_NAME, str, 1);
+    }
+
+    sigset_t ignore = 0;
+    for (int32_t i = 1; i < NSIG; i++) {
+        posix_signal_t *signal = &posix_signals[i];
+
+        if (signal->disposition == POSIX_SIGNAL_DISPOSITION_IGNORE)
+            ignore |= (1 << i);
+    }
+
+    if (ignore != 0) {
+        char str[16];
+        snprintf(str, sizeof(str), "0x%x", ignore);
+        environ_set(env, SIGNAL_IGNORE_ENV_NAME, str, 1);
+    }
 }
 
 /**
@@ -697,7 +784,7 @@ int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict old_se
         *old_set = posix_signal_mask;
 
     if (set) {
-        sigset_t val  = make_valid_sigmask(*set);
+        sigset_t val  = make_valid_signal_mask(*set);
         sigset_t mask = posix_signal_mask;
 
         switch (how) {

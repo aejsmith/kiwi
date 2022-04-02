@@ -45,7 +45,7 @@
     libsystem_fatal("dlmalloc abort");
 #define USAGE_ERROR_ACTION(m, p) \
     libsystem_fatal( \
-        "dlmalloc usage error (%s:%d): %p, %p (ret: %p)\n", \
+        "dlmalloc usage error (%s:%d): %p, %p (ret: %p)", \
         __FUNCTION__, __LINE__, m, p, __builtin_return_address(0));
 #define MALLOC_FAILURE_ACTION \
     errno = ENOMEM;

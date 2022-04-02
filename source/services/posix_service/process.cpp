@@ -57,23 +57,73 @@ Process::Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, p
 {
     debug_log("connection received from PID %" PRId32, m_pid);
 
-    handle_t connHandle = m_connection.handle();
+    m_deathEvent = g_posixService.eventLoop().addEvent(
+        m_handle, PROCESS_EVENT_DEATH, 0,
+        [this] (const object_event_t &) { handleDeathEvent(); });
 
-    m_hangupEvent = g_posixService.eventLoop().addEvent(
-        connHandle, CONNECTION_EVENT_HANGUP, 0,
-        [this] (const object_event_t &event) { handleHangupEvent(); });
-    m_messageEvent = g_posixService.eventLoop().addEvent(
-        connHandle, CONNECTION_EVENT_MESSAGE, 0,
-        [this] (const object_event_t &event) { handleMessageEvent(); });
+    initConnection();
 }
 
 Process::~Process() {}
 
-void Process::handleHangupEvent() {
-    debug_log("PID %" PRId32 " hung up connection", m_pid);
+void Process::initConnection() {
+    handle_t connHandle = m_connection.handle();
+
+    m_hangupEvent = g_posixService.eventLoop().addEvent(
+        connHandle, CONNECTION_EVENT_HANGUP, 0,
+        [this] (const object_event_t &) { handleHangupEvent(); });
+    m_messageEvent = g_posixService.eventLoop().addEvent(
+        connHandle, CONNECTION_EVENT_MESSAGE, 0,
+        [this] (const object_event_t &) { handleMessageEvent(); });
+}
+
+void Process::reconnect(Kiwi::Core::Connection connection) {
+    if (m_connection.isValid()) {
+        if (m_connection.isActive()) {
+            core_log(CORE_LOG_NOTICE, "ignoring connection from already connected process %" PRId32, m_pid);
+            return;
+        }
+
+        m_connection.close();
+    }
+
+    m_connection = std::move(connection);
+    initConnection();
+}
+
+void Process::handleDeathEvent() {
+    debug_log("PID %" PRId32 " died", m_pid);
 
     /* This destroys the Process, don't access this after. */
     g_posixService.removeProcess(this);
+}
+
+void Process::handleHangupEvent() {
+    debug_log("PID %" PRId32 " hung up connection", m_pid);
+
+    m_connection.close();
+    m_hangupEvent.remove();
+    m_messageEvent.remove();
+
+    /* We treat a hangup without the process dying as an exec(). */
+    status_t ret = kern_process_status(m_handle, nullptr, nullptr);
+    if (ret == STATUS_STILL_RUNNING) {
+        /* Across exec, we retain the signal mask, ignored signals, and any
+         * pending signals. Signals with handlers are reset to their default
+         * action. */
+        for (int num = 0; num < NSIG; num++) {
+            SignalState &signal = m_signals[num];
+
+            signal.flags = 0;
+
+            if (signal.disposition == kSignalDisposition_Handler)
+                signal.disposition = kSignalDisposition_Default;
+        }
+
+        updateSignals();
+    } else {
+        /* We should handle the death event after and destroy the process. */
+    }
 }
 
 void Process::handleMessageEvent() {
