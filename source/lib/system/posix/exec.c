@@ -167,8 +167,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     close(fd);
 
     /* For state inheritance into the child, we use the environment. We need to
-     * create a local copy of the supplied environment to be able to modify it.
-     * Any modification of the environment will */
+     * create a local copy of the supplied environment to be able to modify it. */
     environ_t env;
     environ_init(&env, (char ***)&envp, false);
 

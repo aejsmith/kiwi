@@ -62,9 +62,11 @@ static __sys_init_prio(LIBSYSTEM_INIT_PRIO_POSIX_UMASK) void posix_umask_init(vo
 
 /** Save umask to the environment before an execve(). */
 void posix_fs_exec(environ_t *env) {
-    char str[5];
-    snprintf(str, sizeof(str), "%o", current_umask);
-    environ_set(env, UMASK_ENV_NAME, str, 1);
+    if (current_umask != DEFAULT_UMASK) {
+        char str[5];
+        snprintf(str, sizeof(str), "%o", current_umask);
+        environ_set(env, UMASK_ENV_NAME, str, 1);
+    }
 }
 
 /** Checks whether access to a file is allowed.
