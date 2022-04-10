@@ -20,5 +20,7 @@ env = manager.Create(libraries = ['kernel', 'kiwi'])
 
 env.KiwiService('posix_service', [
     'posix_service.cpp',
+    'process_group.cpp',
     'process.cpp',
+    'session.cpp',
 ])

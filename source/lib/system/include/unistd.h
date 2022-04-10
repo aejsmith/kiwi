@@ -86,11 +86,11 @@ extern char *getlogin(void);
 /* int getlogin_r(char *, size_t); */
 extern int getopt(int argc, char *const argv[], const char *opts);
 //extern int getpagesize(void);
-//extern pid_t getpgid(pid_t);
-//extern pid_t getpgrp(void);
+extern pid_t getpgid(pid_t pid);
+extern pid_t getpgrp(void);
 extern pid_t getpid(void);
 extern pid_t getppid(void);
-//extern pid_t getsid(pid_t pid);
+extern pid_t getsid(pid_t pid);
 extern uid_t getuid(void);
 extern char *getwd(char *buf);
 extern int isatty(int fd);
@@ -112,11 +112,11 @@ extern int rmdir(const char *path);
 /* int setegid(gid_t); */
 /* int seteuid(uid_t); */
 extern int setgid(gid_t gid);
-/* int setpgid(pid_t, pid_t); */
-//extern pid_t setpgrp(void);
+extern int setpgid(pid_t pid, pid_t pgid);
+extern int setpgrp(void);
 /* int setregid(gid_t, gid_t); */
 /* int setreuid(uid_t, uid_t); */
-//extern pid_t setsid(void);
+extern pid_t setsid(void);
 extern int setuid(uid_t uid);
 extern unsigned int sleep(unsigned int secs);
 /* void swab(const void *restrict, void *restrict, ssize_t); */

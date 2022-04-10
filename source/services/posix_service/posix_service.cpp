@@ -29,6 +29,8 @@
 
 #include "posix_service.h"
 #include "process.h"
+#include "process_group.h"
+#include "session.h"
 
 #include <core/log.h>
 #include <core/service.h>
@@ -84,6 +86,16 @@ void PosixService::removeProcess(Process *process) {
     assert(ret->second.get() == process);
 
     m_processes.erase(ret);
+}
+
+ProcessGroup *PosixService::findProcessGroup(int32_t pgid) {
+    auto ret = m_processGroups.find(pgid);
+    return (ret != m_processGroups.end()) ? ret->second.get() : nullptr;
+}
+
+Session *PosixService::findSession(int32_t sid) {
+    auto ret = m_sessions.find(sid);
+    return (ret != m_sessions.end()) ? ret->second.get() : nullptr;
 }
 
 void PosixService::handleConnectionEvent() {

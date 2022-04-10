@@ -71,7 +71,7 @@ enum {
     POSIX_REQUEST_SET_SIGNAL_MASK = 3,
 
     /**
-     * Sends a signal to a process.
+     * Implements the kill() function.
      *
      * Request:
      *  - Data  = posix_request_kill_t
@@ -81,6 +81,51 @@ enum {
      *  - Data = posix_reply_kill_t
      */
     POSIX_REQUEST_KILL = 4,
+
+    /**
+     * Implements the getpgid() function.
+     *
+     * Request:
+     *  - Data = posix_request_getpgid_t
+     *
+     * Reply:
+     *  - Data = posix_reply_getpgid_t
+     */
+    POSIX_REQUEST_GETPGID = 5,
+
+    /**
+     * Implements the setpgid() function.
+     *
+     * Request:
+     *  - Data  = posix_request_setpgid_t
+     *  - Flags = CORE_MESSAGE_SEND_SECURITY
+     *
+     * Reply:
+     *  - Data = posix_reply_setpgid_t
+     */
+    POSIX_REQUEST_SETPGID = 6,
+
+    /**
+     * Implements the getsid() function.
+     *
+     * Request:
+     *  - Data = posix_request_getsid_t
+     *
+     * Reply:
+     *  - Data = posix_reply_getsid_t
+     */
+    POSIX_REQUEST_GETSID = 7,
+
+    /**
+     * Implements the setsid() function.
+     *
+     * Request:
+     *  - Flags = CORE_MESSAGE_SEND_SECURITY
+     *
+     * Reply:
+     *  - Data = posix_reply_setsid_t
+     */
+    POSIX_REQUEST_SETSID = 8,
 };
 
 typedef struct posix_reply_get_signal_condition {
@@ -128,3 +173,35 @@ typedef struct posix_request_kill {
 typedef struct posix_reply_kill {
     int32_t err;                    /**< Error number (0 on success). */
 } posix_reply_kill_t;
+
+typedef struct posix_request_getpgid {
+    int32_t pid;                    /**< PID to get for. */
+} posix_request_getpgid_t;
+
+typedef struct posix_reply_getpgid {
+    int32_t err;                    /**< Error number (0 on success). */
+    int32_t pgid;                   /**< PGID. */
+} posix_reply_getpgid_t;
+
+typedef struct posix_request_setpgid {
+    int32_t pid;                    /**< PID to set for. */
+    int32_t pgid;                   /**< New PGID. */
+} posix_request_setpgid_t;
+
+typedef struct posix_reply_setpgid {
+    int32_t err;                    /**< Error number (0 on success). */
+} posix_reply_setpgid_t;
+
+typedef struct posix_request_getsid {
+    int32_t pid;                    /**< PID to get for. */
+} posix_request_getsid_t;
+
+typedef struct posix_reply_getsid {
+    int32_t err;                    /**< Error number (0 on success). */
+    int32_t sid;                    /**< SID. */
+} posix_reply_getsid_t;
+
+typedef struct posix_reply_setsid {
+    int32_t err;                    /**< Error number (0 on success). */
+    int32_t sid;                    /**< SID. */
+} posix_reply_setsid_t;

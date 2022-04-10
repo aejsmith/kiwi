@@ -30,6 +30,8 @@
 #include <unordered_map>
 
 class Process;
+class ProcessGroup;
+class Session;
 
 /** Define to enable debug output from the POSIX service. */
 //#define DEBUG_POSIX_SERVICE
@@ -49,8 +51,12 @@ public:
 
     int run();
 
-    void removeProcess(Process *process);
     Process *findProcess(int32_t pid);
+    void removeProcess(Process *process);
+
+    ProcessGroup *findProcessGroup(int32_t pgid);
+
+    Session *findSession(int32_t sid);
 
 private:
     void handleConnectionEvent();
@@ -59,7 +65,9 @@ private:
     Kiwi::Core::Handle m_port;
     Kiwi::Core::EventLoop m_eventLoop;
 
-    std::unordered_map<process_id_t, std::unique_ptr<Process>> m_processes;
+    std::unordered_map<int32_t, std::unique_ptr<Process>> m_processes;
+    std::unordered_map<int32_t, std::unique_ptr<ProcessGroup>> m_processGroups;
+    std::unordered_map<int32_t, std::unique_ptr<Session>> m_sessions;
 
     Kiwi::Core::EventRef m_connectionEvent;
 };

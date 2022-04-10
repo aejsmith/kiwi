@@ -143,6 +143,10 @@ void Process::handleMessageEvent() {
         case POSIX_REQUEST_SET_SIGNAL_ACTION:       reply = handleSetSignalAction(message); break;
         case POSIX_REQUEST_SET_SIGNAL_MASK:         reply = handleSetSignalMask(message); break;
         case POSIX_REQUEST_KILL:                    reply = handleKill(message); break;
+        case POSIX_REQUEST_GETPGID:                 reply = handleGetpgid(message); break;
+        case POSIX_REQUEST_SETPGID:                 reply = handleSetpgid(message); break;
+        case POSIX_REQUEST_GETSID:                  reply = handleGetsid(message); break;
+        case POSIX_REQUEST_SETSID:                  reply = handleSetsid(message); break;
 
         default:
             core_log(
@@ -524,6 +528,103 @@ Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
     } else {
         defaultSignal(handle, requestData->num);
     }
+
+    return reply;
+}
+
+Kiwi::Core::Message Process::handleGetpgid(const Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(posix_reply_getpgid_t))) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return Kiwi::Core::Message();
+    }
+
+    auto replyData = reply.data<posix_reply_getpgid_t>();
+    replyData->err = 0;
+
+    if (request.size() != sizeof(posix_request_getpgid_t)) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    auto requestData = request.data<posix_request_getpgid_t>();
+
+    // TODO
+    replyData->err = ENOSYS;
+    (void)requestData;
+
+    return reply;
+}
+
+Kiwi::Core::Message Process::handleSetpgid(const Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(posix_reply_setpgid_t))) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return Kiwi::Core::Message();
+    }
+
+    auto replyData = reply.data<posix_reply_setpgid_t>();
+    replyData->err = 0;
+
+    const security_context_t *security = request.security();
+
+    if (request.size() != sizeof(posix_request_setpgid_t) || !security) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    auto requestData = request.data<posix_request_setpgid_t>();
+
+    // TODO
+    replyData->err = ENOSYS;
+    (void)requestData;
+
+    return reply;
+}
+
+Kiwi::Core::Message Process::handleGetsid(const Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(posix_reply_getsid_t))) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return Kiwi::Core::Message();
+    }
+
+    auto replyData = reply.data<posix_reply_getsid_t>();
+    replyData->err = 0;
+
+    if (request.size() != sizeof(posix_request_getsid_t)) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    auto requestData = request.data<posix_request_getsid_t>();
+
+    // TODO
+    replyData->err = ENOSYS;
+    (void)requestData;
+
+    return reply;
+}
+
+Kiwi::Core::Message Process::handleSetsid(const Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(posix_reply_setsid_t))) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return Kiwi::Core::Message();
+    }
+
+    auto replyData = reply.data<posix_reply_setsid_t>();
+    replyData->err = 0;
+
+    const security_context_t *security = request.security();
+
+    if (request.size() != 0 || !security) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    // TODO
+    replyData->err = ENOSYS;
 
     return reply;
 }

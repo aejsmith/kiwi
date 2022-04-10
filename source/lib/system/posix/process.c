@@ -25,10 +25,14 @@
  *  - Handle signal exit reasons.
  */
 
+#include <core/ipc.h>
+
 #include <kernel/object.h>
 #include <kernel/private/process.h>
 #include <kernel/process.h>
 #include <kernel/status.h>
+
+#include <services/posix_service.h>
 
 #include <sys/wait.h>
 
@@ -256,4 +260,227 @@ pid_t getpid(void) {
 pid_t getppid(void) {
     /* TODO. */
     return 0;
+}
+
+static bool getpgid_request(core_connection_t *conn, pid_t pid, pid_t *_pgid) {
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_GETPGID, sizeof(posix_request_getpgid_t), 0);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    posix_request_getpgid_t *request_data = core_message_data(request);
+    request_data->pid = pid;
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+        libsystem_status_to_errno(ret);
+        return false;
+    }
+
+    posix_reply_getpgid_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+
+    if (reply_err == 0)
+        *_pgid = reply_data->pgid;
+
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
+/** Gets the process group ID of a process.
+ * @param pid           PID to get for (or 0 for calling process).
+ * @return              Process group ID, or -1 on failure. */
+pid_t getpgid(pid_t pid) {
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    pid_t pgid;
+    bool success = getpgid_request(conn, pid, &pgid);
+
+    posix_service_put();
+    return (success) ? pgid : -1;
+}
+
+/** Gets the process group ID of the calling process.
+ * @return              Process group ID, or -1 on failure. */
+pid_t getpgrp(void) {
+    return getpgid(0);
+}
+
+static bool setpgid_request(core_connection_t *conn, pid_t pid, pid_t pgid) {
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_SETPGID, sizeof(posix_request_setpgid_t),
+        CORE_MESSAGE_SEND_SECURITY);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    posix_request_setpgid_t *request_data = core_message_data(request);
+    request_data->pid  = pid;
+    request_data->pgid = pgid;
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+        libsystem_status_to_errno(ret);
+        return false;
+    }
+
+    posix_reply_setpgid_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
+/** Sets the process group ID of a process.
+ * @param pid           PID to set for (or 0 for calling process).
+ * @param pgid          Process group ID (or 0 to match calling process ID).
+ * @return              0 on success, -1 on failure. */
+int setpgid(pid_t pid, pid_t pgid) {
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    bool success = setpgid_request(conn, pid, pgid);
+
+    posix_service_put();
+    return (success) ? 0 : -1;
+}
+
+/** Sets the process group ID of the calling process to its process ID.
+ * @return              0 on success, -1 on failure. */
+int setpgrp(void) {
+    return setpgid(0, 0);
+}
+
+static bool getsid_request(core_connection_t *conn, pid_t pid, pid_t *_sid) {
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_GETSID, sizeof(posix_request_getsid_t), 0);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    posix_request_getsid_t *request_data = core_message_data(request);
+    request_data->pid = pid;
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+        libsystem_status_to_errno(ret);
+        return false;
+    }
+
+    posix_reply_getsid_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+
+    if (reply_err == 0)
+        *_sid = reply_data->sid;
+
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
+/** Gets the session ID of a process.
+ * @param pid           PID to get for (or 0 for calling process).
+ * @return              Session ID, or -1 on failure. */
+pid_t getsid(pid_t pid) {
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    pid_t sid;
+    bool success = getsid_request(conn, pid, &sid);
+
+    posix_service_put();
+    return (success) ? sid : -1;
+}
+
+static bool setsid_request(core_connection_t *conn, pid_t *_sid) {
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_SETSID, 0, CORE_MESSAGE_SEND_SECURITY);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+        libsystem_status_to_errno(ret);
+        return false;
+    }
+
+    posix_reply_setsid_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+
+    if (reply_err == 0)
+        *_sid = reply_data->sid;
+
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
+/** Sets the session and process group ID of the calling process.
+ * @return              Session ID, or -1 on failure. */
+pid_t setsid(void) {
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    pid_t sid;
+    bool success = setsid_request(conn, &sid);
+
+    posix_service_put();
+    return (success) ? sid : -1;
 }

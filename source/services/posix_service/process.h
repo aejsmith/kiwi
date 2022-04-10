@@ -59,6 +59,10 @@ private:
     Kiwi::Core::Message handleSetSignalAction(const Kiwi::Core::Message &request);
     Kiwi::Core::Message handleSetSignalMask(const Kiwi::Core::Message &request);
     Kiwi::Core::Message handleKill(const Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleGetpgid(const Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleSetpgid(const Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleGetsid(const Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleSetsid(const Kiwi::Core::Message &request);
 
     uint32_t signalsDeliverable() const;
     void updateSignals();
