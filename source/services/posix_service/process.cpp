@@ -646,7 +646,7 @@ Kiwi::Core::Message Process::handleSetpgid(const Kiwi::Core::Message &request) {
                 return reply;
             }
 
-            currentGroup->addProcess(handle);
+            newGroup->addProcess(handle);
         } else if (pgid == pid) {
             newGroup = g_posixService.createProcessGroup(pgid, currentGroup->session(), handle);
             if (!newGroup) {

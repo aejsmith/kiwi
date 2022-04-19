@@ -34,7 +34,7 @@ class ProcessGroup;
 class Session;
 
 /** Define to enable debug output from the POSIX service. */
-#define DEBUG_POSIX_SERVICE
+//#define DEBUG_POSIX_SERVICE
 
 #ifdef DEBUG_POSIX_SERVICE
 #   define debug_log(fmt...)    core_log(CORE_LOG_DEBUG, fmt)
