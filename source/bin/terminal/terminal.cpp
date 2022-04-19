@@ -34,8 +34,10 @@
 #include <services/terminal_service.h>
 
 #include <assert.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <termios.h>
+#include <unistd.h>
 
 #include <array>
 
@@ -223,18 +225,35 @@ void Terminal::flushInput() {
 
 /** Spawn a process attached to the terminal. */
 status_t Terminal::spawnProcess(const char *path, Kiwi::Core::Handle &handle) {
-    process_attrib_t attrib;
-    handle_t map[][2] = { { m_terminal[0], 0 }, { m_terminal[1], 1 }, { m_terminal[1], 2 } };
-    attrib.token     = INVALID_HANDLE;
-    attrib.root_port = INVALID_HANDLE;
-    attrib.map       = map;
-    attrib.map_count = core_array_size(map);
+    status_t ret;
 
-    const char *args[] = { path, nullptr };
-    status_t ret = kern_process_create(path, args, environ, 0, &attrib, handle.attach());
+    ret = kern_process_clone(handle.attach());
     if (ret != STATUS_SUCCESS) {
-        core_log(CORE_LOG_ERROR, "failed to create process '%s': %d", path, ret);
+        core_log(CORE_LOG_ERROR, "failed to create child process: %" PRId32, ret);
         return ret;
+    }
+
+    if (!handle.isValid()) {
+        /* Child process. */
+        process_attrib_t attrib;
+        handle_t map[][2] = { { m_terminal[0], 0 }, { m_terminal[1], 1 }, { m_terminal[1], 2 } };
+        attrib.token     = INVALID_HANDLE;
+        attrib.root_port = INVALID_HANDLE;
+        attrib.map       = map;
+        attrib.map_count = core_array_size(map);
+
+        // TODO: Controlling terminal?
+
+        int err = setsid();
+        if (err < 0) {
+            core_log(CORE_LOG_ERROR, "failed to create session: %d", errno);
+            exit(EXIT_FAILURE);
+        }
+
+        const char *args[] = { path, nullptr };
+        ret = kern_process_exec(path, args, environ, 0, &attrib);
+        core_log(CORE_LOG_ERROR, "failed to execute process '%s': %d", path, ret);
+        exit(EXIT_FAILURE);
     }
 
     return STATUS_SUCCESS;
