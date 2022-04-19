@@ -396,7 +396,7 @@ void process_thread_exited(thread_t *thread) {
             notifier_run(&process->death_notifier, NULL, true);
 
         /* Remove from process groups. */
-        list_foreach(&process->groups, iter) {
+        list_foreach_safe(&process->groups, iter) {
             process_group_link_t *link = list_entry(iter, process_group_link_t, process_link);
 
             mutex_lock(&link->group->lock);
