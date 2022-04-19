@@ -29,6 +29,8 @@
 
 #include <signal.h>
 
+class ProcessGroup;
+
 struct SignalState {
     /** Signal action. */
     uint32_t disposition    = POSIX_SIGNAL_DISPOSITION_DEFAULT;
@@ -40,10 +42,11 @@ struct SignalState {
 
 class Process {
 public:
-    Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, process_id_t pid);
+    Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, pid_t id);
     ~Process();
 
-    process_id_t pid() const { return m_pid; }
+    pid_t id() const        { return m_id; }
+    handle_t handle() const { return m_handle; }
 
     void reconnect(Kiwi::Core::Connection connection);
 
@@ -71,7 +74,7 @@ private:
 private:
     Kiwi::Core::Connection m_connection;
     Kiwi::Core::Handle m_handle;
-    process_id_t m_pid;
+    pid_t m_id;
 
     SignalState m_signals[NSIG];
     uint32_t m_signalsPending;

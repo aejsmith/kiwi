@@ -20,7 +20,9 @@
  */
 
 #include "posix_service.h"
+#include "process_group.h"
 #include "process.h"
+#include "session.h"
 
 #include <core/log.h>
 
@@ -48,14 +50,47 @@ enum {
     kSignalDisposition_Continue,
 };
 
-Process::Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, process_id_t pid) :
+static int openProcess(pid_t pid, Kiwi::Core::Handle &handle) {
+    status_t ret = kern_process_open(pid, handle.attach());
+    if (ret != STATUS_SUCCESS) {
+        if (ret == STATUS_NOT_FOUND) {
+            return ESRCH;
+        } else {
+            core_log(CORE_LOG_WARN, "failed to open process %" PRId32 ": %" PRId32, pid, ret);
+            return EAGAIN;
+        }
+    }
+
+    return 0;
+}
+
+static int getProcessHandle(Process *caller, pid_t pid, Kiwi::Core::Handle &openedHandle, handle_t &handle) {
+    if (pid == caller->id()) {
+        handle = caller->handle();
+    } else {
+        Process *process = g_posixService.findProcess(pid);
+        if (process) {
+            handle = process->handle();
+        } else {
+            int err = openProcess(pid, openedHandle);
+            if (err != 0)
+                return err;
+
+            handle = openedHandle;
+        }
+    }
+
+    return 0;
+}
+
+Process::Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, pid_t pid) :
     m_connection     (std::move(connection)),
     m_handle         (std::move(handle)),
-    m_pid            (pid),
+    m_id             (pid),
     m_signalsPending (0),
     m_signalMask     (0)
 {
-    debug_log("connection received from PID %" PRId32, m_pid);
+    debug_log("connection received from PID %" PRId32, m_id);
 
     m_deathEvent = g_posixService.eventLoop().addEvent(
         m_handle, PROCESS_EVENT_DEATH, 0,
@@ -80,26 +115,28 @@ void Process::initConnection() {
 void Process::reconnect(Kiwi::Core::Connection connection) {
     if (m_connection.isValid()) {
         if (m_connection.isActive()) {
-            core_log(CORE_LOG_NOTICE, "ignoring connection from already connected process %" PRId32, m_pid);
+            core_log(CORE_LOG_NOTICE, "ignoring connection from already connected process %" PRId32, m_id);
             return;
         }
 
         m_connection.close();
     }
 
+    debug_log("PID %" PRId32 " reconnected", m_id);
+
     m_connection = std::move(connection);
     initConnection();
 }
 
 void Process::handleDeathEvent() {
-    debug_log("PID %" PRId32 " died", m_pid);
+    debug_log("PID %" PRId32 " died", m_id);
 
     /* This destroys the Process, don't access this after. */
     g_posixService.removeProcess(this);
 }
 
 void Process::handleHangupEvent() {
-    debug_log("PID %" PRId32 " hung up connection", m_pid);
+    debug_log("PID %" PRId32 " hung up connection", m_id);
 
     m_connection.close();
     m_hangupEvent.remove();
@@ -151,7 +188,7 @@ void Process::handleMessageEvent() {
         default:
             core_log(
                 CORE_LOG_NOTICE, "received unrecognised message type %" PRId32 " from client %" PRId32,
-                id, m_pid);
+                id, m_id);
             break;
     }
 
@@ -418,7 +455,7 @@ void Process::updateSignals() {
     if (m_signalCondition.isValid()) {
         status_t ret = kern_condition_set(m_signalCondition, needHandler);
         if (ret != STATUS_SUCCESS)
-            core_log(CORE_LOG_ERROR, "failed to set signal condition for PID %" PRId32 ": %" PRId32, m_pid, ret);
+            core_log(CORE_LOG_ERROR, "failed to set signal condition for PID %" PRId32 ": %" PRId32, m_id, ret);
     }
 }
 
@@ -432,7 +469,7 @@ void Process::sendSignal(int32_t num, const Process *sender, const security_cont
         memset(&signal.info, 0, sizeof(signal.info));
 
         signal.info.si_signo = num;
-        signal.info.si_pid   = sender->m_pid;
+        signal.info.si_pid   = sender->m_id;
         signal.info.si_uid   = senderSecurity->uid;
 
         m_signalsPending |= (1 << num);
@@ -462,52 +499,30 @@ Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
 
     auto requestData = request.data<posix_request_kill_t>();
 
-    debug_log("kill(%" PRId32 ", %" PRId32 ") from PID %" PRId32, requestData->pid, requestData->num, m_pid);
+    debug_log("kill(%" PRId32 ", %" PRId32 ") from PID %" PRId32, requestData->pid, requestData->num, m_id);
 
     if (requestData->num < 1 || requestData->num >= NSIG) {
         replyData->err = EINVAL;
         return reply;
     }
 
-    // TODO: Process groups etc.
+    // TODO: Process groups etc. Don't allow for default process group
     if (requestData->pid <= 0) {
         replyData->err = ENOSYS;
         return reply;
     }
 
-    Process *process = g_posixService.findProcess(requestData->pid);
-
-    /* If the process is not known, it has not connected to the service and
-     * therefore should be treated as having default signal state. We need to
-     * open a handle to it. */
     Kiwi::Core::Handle openedHandle;
     handle_t handle;
-    if (process) {
-        handle = process->m_handle;
-    } else {
-        ret = kern_process_open(requestData->pid, openedHandle.attach());
-        if (ret != STATUS_SUCCESS) {
-            if (ret == STATUS_NOT_FOUND) {
-                replyData->err = ESRCH;
-            } else {
-                core_log(
-                    CORE_LOG_WARN, "failed to open process %" PRId32 ": %" PRId32,
-                    requestData->pid, ret);
-
-                replyData->err = EAGAIN;
-            }
-
-            return reply;
-        }
-
-        handle = openedHandle;
-    }
+    replyData->err = getProcessHandle(this, requestData->pid, openedHandle, handle);
+    if (replyData->err != 0)
+        return reply;
 
     /* Check if we have sufficient privilege to signal the process. The kernel's
      * privileged access definition matches the requirement of POSIX so use
      * that. */
     // TODO: What about saved-setuid?
-    if (requestData->pid != m_pid) {
+    if (requestData->pid != m_id) {
         Kiwi::Core::TokenSetter token;
         ret = token.set(security);
         if (ret != STATUS_SUCCESS) {
@@ -523,9 +538,12 @@ Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
         }
     }
 
+    Process *process = g_posixService.findProcess(requestData->pid);
     if (process) {
         process->sendSignal(requestData->num, this, security);
     } else {
+        /* If the process is not known, it has not connected to the service and
+         * therefore should be treated as having default signal state. */
         defaultSignal(handle, requestData->num);
     }
 
@@ -540,7 +558,8 @@ Kiwi::Core::Message Process::handleGetpgid(const Kiwi::Core::Message &request) {
     }
 
     auto replyData = reply.data<posix_reply_getpgid_t>();
-    replyData->err = 0;
+    replyData->err  = 0;
+    replyData->pgid = 0;
 
     if (request.size() != sizeof(posix_request_getpgid_t)) {
         replyData->err = EINVAL;
@@ -549,9 +568,21 @@ Kiwi::Core::Message Process::handleGetpgid(const Kiwi::Core::Message &request) {
 
     auto requestData = request.data<posix_request_getpgid_t>();
 
-    // TODO
-    replyData->err = ENOSYS;
-    (void)requestData;
+    if (requestData->pid < 0) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    pid_t pid = (requestData->pid != 0) ? requestData->pid : m_id;
+
+    Kiwi::Core::Handle openedHandle;
+    handle_t handle;
+    replyData->err = getProcessHandle(this, pid, openedHandle, handle);
+    if (replyData->err != 0)
+        return reply;
+
+    ProcessGroup *group = g_posixService.findProcessGroupForProcess(handle);
+    replyData->pgid = group->id();
 
     return reply;
 }
@@ -566,18 +597,69 @@ Kiwi::Core::Message Process::handleSetpgid(const Kiwi::Core::Message &request) {
     auto replyData = reply.data<posix_reply_setpgid_t>();
     replyData->err = 0;
 
-    const security_context_t *security = request.security();
-
-    if (request.size() != sizeof(posix_request_setpgid_t) || !security) {
+    if (request.size() != sizeof(posix_request_setpgid_t)) {
         replyData->err = EINVAL;
         return reply;
     }
 
     auto requestData = request.data<posix_request_setpgid_t>();
 
-    // TODO
-    replyData->err = ENOSYS;
-    (void)requestData;
+    if (requestData->pid < 0 || requestData->pgid < 0) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    pid_t pid = (requestData->pid != 0) ? requestData->pid : m_id;
+
+    Kiwi::Core::Handle openedHandle;
+    handle_t handle;
+    replyData->err = getProcessHandle(this, pid, openedHandle, handle);
+    if (replyData->err != 0)
+        return reply;
+
+    if (pid != m_id) {
+        // TODO: Allow changing other processes. This is only allowed if the
+        // target process is a child of the caller and has not execve()'d yet.
+        // We don't currently have the capability to track this.
+        // This must also reject children in a different session to the caller.
+        replyData->err = ENOSYS;
+        return reply;
+    }
+
+    /* New group must be in the same session as the *calling* process. A process
+     * can only change the group of child processes in the same session as it,
+     * so the calling and target process sessions are the same. */
+    ProcessGroup *currentGroup = g_posixService.findProcessGroupForProcess(handle);
+
+    if (currentGroup->session()->id() == pid) {
+        replyData->err = EPERM;
+        return reply;
+    }
+
+    pid_t pgid = (requestData->pgid != 0) ? requestData->pgid : pid;
+
+    if (pgid != currentGroup->id()) {
+        ProcessGroup *newGroup = g_posixService.findProcessGroup(pgid);
+        if (newGroup) {
+            if (newGroup->session() != currentGroup->session()) {
+                replyData->err = EPERM;
+                return reply;
+            }
+
+            currentGroup->addProcess(handle);
+        } else if (pgid == pid) {
+            newGroup = g_posixService.createProcessGroup(pgid, currentGroup->session(), handle);
+            if (!newGroup) {
+                replyData->err = EAGAIN;
+                return reply;
+            }
+        } else {
+            replyData->err = EPERM;
+            return reply;
+        }
+
+        currentGroup->removeProcess(handle);
+    }
 
     return reply;
 }
@@ -599,9 +681,16 @@ Kiwi::Core::Message Process::handleGetsid(const Kiwi::Core::Message &request) {
 
     auto requestData = request.data<posix_request_getsid_t>();
 
-    // TODO
-    replyData->err = ENOSYS;
-    (void)requestData;
+    pid_t pid = (requestData->pid != 0) ? requestData->pid : m_id;
+
+    Kiwi::Core::Handle openedHandle;
+    handle_t handle;
+    replyData->err = getProcessHandle(this, pid, openedHandle, handle);
+    if (replyData->err != 0)
+        return reply;
+
+    ProcessGroup *group = g_posixService.findProcessGroupForProcess(handle);
+    replyData->sid = group->session()->id();
 
     return reply;
 }
@@ -616,15 +705,30 @@ Kiwi::Core::Message Process::handleSetsid(const Kiwi::Core::Message &request) {
     auto replyData = reply.data<posix_reply_setsid_t>();
     replyData->err = 0;
 
-    const security_context_t *security = request.security();
-
-    if (request.size() != 0 || !security) {
+    if (request.size() != 0) {
         replyData->err = EINVAL;
         return reply;
     }
 
-    // TODO
-    replyData->err = ENOSYS;
+    /* Not allowed to create a new session if there's a group with our ID. */
+    if (g_posixService.findProcessGroup(m_id)) {
+        replyData->err = EPERM;
+        return reply;
+    }
 
+    ProcessGroup *currentGroup = g_posixService.findProcessGroupForProcess(m_handle);
+
+    Session *session = g_posixService.createSession(m_id);
+
+    ProcessGroup *newGroup = g_posixService.createProcessGroup(m_id, session, m_handle);
+    if (!newGroup) {
+        /* Group destructor will have destroyed the session. */
+        replyData->err = EAGAIN;
+        return reply;
+    }
+
+    currentGroup->removeProcess(m_handle);
+
+    replyData->sid = m_id;
     return reply;
 }

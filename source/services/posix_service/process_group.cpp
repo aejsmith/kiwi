@@ -19,8 +19,82 @@
  * @brief               POSIX process group class.
  */
 
+#include "posix_service.h"
 #include "process_group.h"
+#include "session.h"
 
-ProcessGroup::ProcessGroup() {}
+#include <core/log.h>
 
-ProcessGroup::~ProcessGroup() {}
+#include <kernel/process_group.h>
+#include <kernel/status.h>
+
+#include <assert.h>
+
+ProcessGroup::ProcessGroup(pid_t id, Session *session) :
+    m_id        (id),
+    m_session   (session)
+{
+    debug_log("created process group %" PRId32 " in session %" PRId32, m_id, session->id());
+
+    m_session->addProcessGroup(this);
+}
+
+ProcessGroup::~ProcessGroup() {
+    m_session->removeProcessGroup(this);
+}
+
+bool ProcessGroup::init(handle_t leader) {
+    status_t ret;
+
+    /* Create a duplicate of the leader handle that we own, the one we're given
+     * won't necessarily live as long as the group. */
+    ret = kern_handle_duplicate(leader, INVALID_HANDLE, m_leader.attach());
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_WARN, "failed to duplicate leader handle: %" PRId32, ret);
+        return false;
+    }
+
+    ret = kern_process_group_create(PROCESS_GROUP_INHERIT_MEMBERSHIP, m_handle.attach());
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_WARN, "failed to create process group: %" PRId32, ret);
+        return false;
+    }
+
+    m_deathEvent = g_posixService.eventLoop().addEvent(
+        m_handle, PROCESS_GROUP_EVENT_DEATH, 0,
+        [this] (const object_event_t &) { handleDeathEvent(); });
+
+    addProcess(leader);
+
+    return true;
+}
+
+void ProcessGroup::handleDeathEvent() {
+    debug_log("process group %" PRId32 " died", m_id);
+
+    /* This fires when there are no more running processes in the group, which
+     * means we can remove the group. This will free the ProcessGroup. */
+    g_posixService.removeProcessGroup(this);
+}
+
+bool ProcessGroup::containsProcess(handle_t process) const {
+    /* This returns false for the default group, which has no group object. */
+    return (m_handle.isValid())
+        ? kern_process_group_query(m_handle, process) == STATUS_SUCCESS
+        : false;
+}
+
+void ProcessGroup::addProcess(handle_t handle) {
+    if (m_handle.isValid()) {
+        status_t ret __sys_unused = kern_process_group_add(m_handle, handle);
+        assert(ret == STATUS_SUCCESS || ret == STATUS_NOT_RUNNING);
+    }
+}
+
+void ProcessGroup::removeProcess(handle_t handle) {
+    if (m_handle.isValid()) {
+        /* May be NOT_FOUND if we failed to add because the process is dead. */
+        status_t ret __sys_unused = kern_process_group_remove(m_handle, handle);
+        assert(ret == STATUS_SUCCESS || ret == STATUS_NOT_FOUND);
+    }
+}

@@ -67,6 +67,15 @@ int PosixService::run() {
         m_port, PORT_EVENT_CONNECTION, 0,
         [this] (const object_event_t &event) { handleConnectionEvent(); });
 
+    /* Create default process group and session. Don't call init() on the group,
+     * this creates the kernel group and opens the leader, which we don't want
+     * for the default group. */
+    auto defaultSession = std::make_unique<Session>(kDefaultProcessGroupId);
+    auto defaultGroup   = std::make_unique<ProcessGroup>(kDefaultProcessGroupId, defaultSession.get());
+
+    m_sessions.emplace(defaultSession->id(), std::move(defaultSession));
+    m_processGroups.emplace(defaultGroup->id(), std::move(defaultGroup));
+
     while (true) {
         m_eventLoop.wait();
     }
@@ -74,13 +83,13 @@ int PosixService::run() {
     return EXIT_SUCCESS;
 }
 
-Process *PosixService::findProcess(int32_t pid) {
+Process *PosixService::findProcess(pid_t pid) const {
     auto ret = m_processes.find(pid);
     return (ret != m_processes.end()) ? ret->second.get() : nullptr;
 }
 
 void PosixService::removeProcess(Process *process) {
-    auto ret = m_processes.find(process->pid());
+    auto ret = m_processes.find(process->id());
 
     assert(ret != m_processes.end());
     assert(ret->second.get() == process);
@@ -88,14 +97,72 @@ void PosixService::removeProcess(Process *process) {
     m_processes.erase(ret);
 }
 
-ProcessGroup *PosixService::findProcessGroup(int32_t pgid) {
+/** Creates a new process group and adds the leader to it. */
+ProcessGroup *PosixService::createProcessGroup(pid_t pgid, Session *session, handle_t leader) {
+    auto group = std::make_unique<ProcessGroup>(pgid, session);
+    if (!group->init(leader))
+        return nullptr;
+
+    auto ret = m_processGroups.emplace(pgid, std::move(group));
+    assert(ret.second);
+    return ret.first->second.get();
+}
+
+ProcessGroup *PosixService::findProcessGroup(pid_t pgid) const {
     auto ret = m_processGroups.find(pgid);
     return (ret != m_processGroups.end()) ? ret->second.get() : nullptr;
 }
 
-Session *PosixService::findSession(int32_t sid) {
+/**
+ * Finds the process group that a process handle belongs to. Always returns a
+ * group, will be the default group if the process is not a member of any other
+ * group.
+ */
+ProcessGroup *PosixService::findProcessGroupForProcess(handle_t handle) const {
+    ProcessGroup *defaultGroup = nullptr;
+
+    for (const auto &it : m_processGroups) {
+        if (it.second->id() == kDefaultProcessGroupId) {
+            defaultGroup = it.second.get();
+        } else if (it.second->containsProcess(handle)) {
+            return it.second.get();
+        }
+    }
+
+    /* We've iterated all groups so should have found this. */
+    assert(defaultGroup);
+    return defaultGroup;
+}
+
+void PosixService::removeProcessGroup(ProcessGroup *group) {
+    auto ret = m_processGroups.find(group->id());
+
+    assert(ret != m_processGroups.end());
+    assert(ret->second.get() == group);
+
+    m_processGroups.erase(ret);
+}
+
+Session *PosixService::createSession(pid_t sid) {
+    auto session = std::make_unique<Session>(sid);
+
+    auto ret = m_sessions.emplace(sid, std::move(session));
+    assert(ret.second);
+    return ret.first->second.get();
+}
+
+Session *PosixService::findSession(pid_t sid) {
     auto ret = m_sessions.find(sid);
     return (ret != m_sessions.end()) ? ret->second.get() : nullptr;
+}
+
+void PosixService::removeSession(Session *session) {
+    auto ret = m_sessions.find(session->id());
+
+    assert(ret != m_sessions.end());
+    assert(ret->second.get() == session);
+
+    m_sessions.erase(ret);
 }
 
 void PosixService::handleConnectionEvent() {
@@ -108,6 +175,7 @@ void PosixService::handleConnectionEvent() {
          * between us receiving the event and calling listen, for instance. */
         if (ret != STATUS_WOULD_BLOCK)
             core_log(CORE_LOG_WARN, "failed to listen on port after connection event: %" PRId32, ret);
+
         return;
     }
 

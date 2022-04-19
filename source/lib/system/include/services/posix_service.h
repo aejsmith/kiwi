@@ -98,7 +98,6 @@ enum {
      *
      * Request:
      *  - Data  = posix_request_setpgid_t
-     *  - Flags = CORE_MESSAGE_SEND_SECURITY
      *
      * Reply:
      *  - Data = posix_reply_setpgid_t
@@ -118,9 +117,6 @@ enum {
 
     /**
      * Implements the setsid() function.
-     *
-     * Request:
-     *  - Flags = CORE_MESSAGE_SEND_SECURITY
      *
      * Reply:
      *  - Data = posix_reply_setsid_t

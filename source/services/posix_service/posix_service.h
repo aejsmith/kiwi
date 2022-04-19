@@ -34,7 +34,7 @@ class ProcessGroup;
 class Session;
 
 /** Define to enable debug output from the POSIX service. */
-//#define DEBUG_POSIX_SERVICE
+#define DEBUG_POSIX_SERVICE
 
 #ifdef DEBUG_POSIX_SERVICE
 #   define debug_log(fmt...)    core_log(CORE_LOG_DEBUG, fmt)
@@ -51,12 +51,17 @@ public:
 
     int run();
 
-    Process *findProcess(int32_t pid);
+    Process *findProcess(pid_t pid) const;
     void removeProcess(Process *process);
 
-    ProcessGroup *findProcessGroup(int32_t pgid);
+    ProcessGroup *createProcessGroup(pid_t pgid, Session *session, handle_t leader);
+    ProcessGroup *findProcessGroup(pid_t pgid) const;
+    ProcessGroup *findProcessGroupForProcess(handle_t handle) const;
+    void removeProcessGroup(ProcessGroup *group);
 
-    Session *findSession(int32_t sid);
+    Session *createSession(pid_t sid);
+    Session *findSession(pid_t sid);
+    void removeSession(Session *session);
 
 private:
     void handleConnectionEvent();
@@ -65,9 +70,9 @@ private:
     Kiwi::Core::Handle m_port;
     Kiwi::Core::EventLoop m_eventLoop;
 
-    std::unordered_map<int32_t, std::unique_ptr<Process>> m_processes;
-    std::unordered_map<int32_t, std::unique_ptr<ProcessGroup>> m_processGroups;
-    std::unordered_map<int32_t, std::unique_ptr<Session>> m_sessions;
+    std::unordered_map<pid_t, std::unique_ptr<Process>> m_processes;
+    std::unordered_map<pid_t, std::unique_ptr<ProcessGroup>> m_processGroups;
+    std::unordered_map<pid_t, std::unique_ptr<Session>> m_sessions;
 
     Kiwi::Core::EventRef m_connectionEvent;
 };

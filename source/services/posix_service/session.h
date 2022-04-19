@@ -27,9 +27,16 @@ class ProcessGroup;
 
 class Session {
 public:
-    Session();
+    explicit Session(pid_t id);
     ~Session();
 
+    pid_t id() const { return m_id; }
+
+    void addProcessGroup(ProcessGroup *group);
+    void removeProcessGroup(ProcessGroup *group);
+
 private:
+    pid_t m_id;                             /**< ID of the session. */
+
     std::vector<ProcessGroup *> m_groups;   /**< Groups in this session. */
 };

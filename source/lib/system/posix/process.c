@@ -22,7 +22,6 @@
  *  - If a new process is created while a wait()/waitpid() is in progress, it
  *    won't be added to the wait. Perhaps add a kernel event object that we wait
  *    on as well, signal that when a child is added.
- *  - Handle signal exit reasons.
  */
 
 #include <core/ipc.h>
@@ -324,8 +323,7 @@ pid_t getpgrp(void) {
 
 static bool setpgid_request(core_connection_t *conn, pid_t pid, pid_t pgid) {
     core_message_t *request = core_message_create_request(
-        POSIX_REQUEST_SETPGID, sizeof(posix_request_setpgid_t),
-        CORE_MESSAGE_SEND_SECURITY);
+        POSIX_REQUEST_SETPGID, sizeof(posix_request_setpgid_t), 0);
     if (!request) {
         errno = ENOMEM;
         return false;
@@ -436,8 +434,7 @@ pid_t getsid(pid_t pid) {
 }
 
 static bool setsid_request(core_connection_t *conn, pid_t *_sid) {
-    core_message_t *request = core_message_create_request(
-        POSIX_REQUEST_SETSID, 0, CORE_MESSAGE_SEND_SECURITY);
+    core_message_t *request = core_message_create_request(POSIX_REQUEST_SETSID, 0, 0);
     if (!request) {
         errno = ENOMEM;
         return false;
