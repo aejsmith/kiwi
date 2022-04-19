@@ -48,6 +48,7 @@ __SYS_EXTERN_C_BEGIN
 
 /** Options for waitpid(). */
 #define WNOHANG         (1<<0)      /**< Do not wait for a child. */
+#define WUNTRACED       (1<<1)      /**< Return if a child has stopped (but is not traced). */
 
 extern pid_t wait(int *_status);
 /* int waitid(idtype_t, id_t, siginfo_t *, int); */
