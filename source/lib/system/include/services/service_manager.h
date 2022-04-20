@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <kernel/types.h>
+
 /** Service manager message IDs. */
 enum {
     /**

@@ -40,6 +40,7 @@
 #include <kernel/status.h>
 
 #include <assert.h>
+#include <errno.h>
 #include <stdlib.h>
 
 PosixService g_posixService;
@@ -211,6 +212,35 @@ void PosixService::handleConnectionEvent() {
         auto process = std::make_unique<Process>(std::move(connection), std::move(processHandle), pid);
         m_processes.emplace(pid, std::move(process));
     }
+}
+
+int PosixService::openProcess(pid_t pid, Kiwi::Core::Handle &handle) const {
+    status_t ret = kern_process_open(pid, handle.attach());
+    if (ret != STATUS_SUCCESS) {
+        if (ret == STATUS_NOT_FOUND) {
+            return ESRCH;
+        } else {
+            core_log(CORE_LOG_WARN, "failed to open process %" PRId32 ": %" PRId32, pid, ret);
+            return EAGAIN;
+        }
+    }
+
+    return 0;
+}
+
+int PosixService::getProcessHandle(pid_t pid, Kiwi::Core::Handle &openedHandle, handle_t &handle) const {
+    Process *process = findProcess(pid);
+    if (process) {
+        handle = process->handle();
+    } else {
+        int err = openProcess(pid, openedHandle);
+        if (err != 0)
+            return err;
+
+        handle = openedHandle;
+    }
+
+    return 0;
 }
 
 int main(int argc, char **argv) {

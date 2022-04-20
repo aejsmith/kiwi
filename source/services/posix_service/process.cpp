@@ -50,39 +50,6 @@ enum {
     kSignalDisposition_Continue,
 };
 
-static int openProcess(pid_t pid, Kiwi::Core::Handle &handle) {
-    status_t ret = kern_process_open(pid, handle.attach());
-    if (ret != STATUS_SUCCESS) {
-        if (ret == STATUS_NOT_FOUND) {
-            return ESRCH;
-        } else {
-            core_log(CORE_LOG_WARN, "failed to open process %" PRId32 ": %" PRId32, pid, ret);
-            return EAGAIN;
-        }
-    }
-
-    return 0;
-}
-
-static int getProcessHandle(Process *caller, pid_t pid, Kiwi::Core::Handle &openedHandle, handle_t &handle) {
-    if (pid == caller->id()) {
-        handle = caller->handle();
-    } else {
-        Process *process = g_posixService.findProcess(pid);
-        if (process) {
-            handle = process->handle();
-        } else {
-            int err = openProcess(pid, openedHandle);
-            if (err != 0)
-                return err;
-
-            handle = openedHandle;
-        }
-    }
-
-    return 0;
-}
-
 Process::Process(Kiwi::Core::Connection connection, Kiwi::Core::Handle handle, pid_t pid) :
     m_connection     (std::move(connection)),
     m_handle         (std::move(handle)),
@@ -507,45 +474,85 @@ Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
         return reply;
     }
 
-    // TODO: Process groups etc. Don't allow for default process group
+    auto killProcess = [&] (handle_t handle, pid_t pid) -> bool {
+        /* Check if we have sufficient privilege to signal the process. The
+         * kernel's privileged access definition matches the requirement of
+         * POSIX so use that. */
+        // TODO: What about saved-setuid?
+        if (pid != m_id) {
+            Kiwi::Core::TokenSetter token;
+            ret = token.set(security);
+            if (ret != STATUS_SUCCESS) {
+                core_log(CORE_LOG_WARN, "failed to set security context: %" PRId32);
+                return false;
+            }
+
+            ret = kern_process_access(handle);
+            if (ret != STATUS_SUCCESS)
+                return false;
+        }
+
+        Process *process = g_posixService.findProcess(pid);
+        if (process) {
+            process->sendSignal(requestData->num, this, security);
+        } else {
+            /* If the process is not known, it has not connected to the service and
+            * therefore should be treated as having default signal state. */
+            defaultSignal(handle, requestData->num);
+        }
+
+        return true;
+    };
+
     if (requestData->pid <= 0) {
-        replyData->err = ENOSYS;
-        return reply;
-    }
+        /* Killing a process group. */
+        ProcessGroup *group = nullptr;
 
-    Kiwi::Core::Handle openedHandle;
-    handle_t handle;
-    replyData->err = getProcessHandle(this, requestData->pid, openedHandle, handle);
-    if (replyData->err != 0)
-        return reply;
-
-    /* Check if we have sufficient privilege to signal the process. The kernel's
-     * privileged access definition matches the requirement of POSIX so use
-     * that. */
-    // TODO: What about saved-setuid?
-    if (requestData->pid != m_id) {
-        Kiwi::Core::TokenSetter token;
-        ret = token.set(security);
-        if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_WARN, "failed to set security context: %" PRId32);
-            replyData->err = EPERM;
+        if (requestData->pid == 0) {
+            /* Process group of caller. */
+            group = g_posixService.findProcessGroupForProcess(m_handle);
+        } else if (requestData->pid == -1) {
+            /* Every process for which the calling process has permission to
+             * send signals, except for process 1 (init). This is currently
+             * unimplemented. */
+            replyData->err = ENOSYS;
             return reply;
+        } else {
+            group = g_posixService.findProcessGroup(-requestData->pid);
+            if (!group) {
+                replyData->err = ESRCH;
+                return reply;
+            }
         }
 
-        ret = kern_process_access(handle);
-        if (ret != STATUS_SUCCESS) {
-            replyData->err = EPERM;
-            return reply;
-        }
-    }
+        size_t failed    = 0;
+        size_t succeeded = 0;
 
-    Process *process = g_posixService.findProcess(requestData->pid);
-    if (process) {
-        process->sendSignal(requestData->num, this, security);
+        group->forEachProcess([&] (handle_t handle, pid_t pid) {
+            debug_log("kill %d in group %d", pid, group->id());
+            if (killProcess(handle, pid)) {
+                succeeded++;
+            } else {
+                failed++;
+            }
+        });
+
+        if (succeeded > 0) {
+            replyData->err = 0;
+        } else if (failed > 0) {
+            replyData->err = EPERM;
+        } else {
+            replyData->err = ESRCH;
+        }
     } else {
-        /* If the process is not known, it has not connected to the service and
-         * therefore should be treated as having default signal state. */
-        defaultSignal(handle, requestData->num);
+        /* Killing an individual process. */
+        Kiwi::Core::Handle openedHandle;
+        handle_t handle;
+        replyData->err = g_posixService.getProcessHandle(requestData->pid, openedHandle, handle);
+        if (replyData->err != 0)
+            return reply;
+
+        replyData->err = (killProcess(handle, requestData->pid)) ? 0 : EPERM;
     }
 
     return reply;
@@ -560,7 +567,6 @@ Kiwi::Core::Message Process::handleGetpgid(const Kiwi::Core::Message &request) {
 
     auto replyData = reply.data<posix_reply_getpgid_t>();
     replyData->err  = 0;
-    replyData->pgid = 0;
 
     if (request.size() != sizeof(posix_request_getpgid_t)) {
         replyData->err = EINVAL;
@@ -578,7 +584,7 @@ Kiwi::Core::Message Process::handleGetpgid(const Kiwi::Core::Message &request) {
 
     Kiwi::Core::Handle openedHandle;
     handle_t handle;
-    replyData->err = getProcessHandle(this, pid, openedHandle, handle);
+    replyData->err = g_posixService.getProcessHandle(pid, openedHandle, handle);
     if (replyData->err != 0)
         return reply;
 
@@ -614,7 +620,7 @@ Kiwi::Core::Message Process::handleSetpgid(const Kiwi::Core::Message &request) {
 
     Kiwi::Core::Handle openedHandle;
     handle_t handle;
-    replyData->err = getProcessHandle(this, pid, openedHandle, handle);
+    replyData->err = g_posixService.getProcessHandle(pid, openedHandle, handle);
     if (replyData->err != 0)
         return reply;
 
@@ -686,7 +692,7 @@ Kiwi::Core::Message Process::handleGetsid(const Kiwi::Core::Message &request) {
 
     Kiwi::Core::Handle openedHandle;
     handle_t handle;
-    replyData->err = getProcessHandle(this, pid, openedHandle, handle);
+    replyData->err = g_posixService.getProcessHandle(pid, openedHandle, handle);
     if (replyData->err != 0)
         return reply;
 

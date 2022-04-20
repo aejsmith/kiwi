@@ -34,7 +34,7 @@ class ProcessGroup;
 class Session;
 
 /** Define to enable debug output from the POSIX service. */
-//#define DEBUG_POSIX_SERVICE
+//#define DEBUG_POSIX_SERVICE     
 
 #ifdef DEBUG_POSIX_SERVICE
 #   define debug_log(fmt...)    core_log(CORE_LOG_DEBUG, fmt)
@@ -62,6 +62,9 @@ public:
     Session *createSession(pid_t sid);
     Session *findSession(pid_t sid);
     void removeSession(Session *session);
+
+    int openProcess(pid_t pid, Kiwi::Core::Handle &handle) const;
+    int getProcessHandle(pid_t pid, Kiwi::Core::Handle &openedHandle, handle_t &handle) const;
 
 private:
     void handleConnectionEvent();

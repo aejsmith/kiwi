@@ -29,6 +29,7 @@
 #include <kernel/status.h>
 
 #include <assert.h>
+#include <errno.h>
 
 ProcessGroup::ProcessGroup(pid_t id, Session *session) :
     m_id        (id),
@@ -97,4 +98,50 @@ void ProcessGroup::removeProcess(handle_t handle) {
         status_t ret __sys_unused = kern_process_group_remove(m_handle, handle);
         assert(ret == STATUS_SUCCESS || ret == STATUS_NOT_FOUND);
     }
+}
+
+bool ProcessGroup::forEachProcess(const std::function<void (handle_t, pid_t)> &func) {
+    status_t ret;
+
+    /* Shouldn't call on default group. */
+    assert(m_handle.isValid());
+
+    size_t procCount = 0;
+    ret = kern_process_group_enumerate(m_handle, nullptr, &procCount);
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_WARN, "failed to enumerate process group: %" PRId32, ret);
+        return false;
+    }
+
+    if (procCount > 0) {
+        std::vector<process_id_t> ids;
+        ids.resize(procCount);
+
+        ret = kern_process_group_enumerate(m_handle, ids.data(), &procCount);
+        if (ret != STATUS_SUCCESS) {
+            core_log(CORE_LOG_WARN, "failed to enumerate process group: %" PRId32, ret);
+            return false;
+        }
+
+        ids.resize(std::min(procCount, ids.size()));
+
+        for (process_id_t id : ids) {
+            Kiwi::Core::Handle openedHandle;
+            handle_t handle;
+            int err = g_posixService.getProcessHandle(id, openedHandle, handle);
+
+            /* Ignore ESRCH in case the process died between enumerate and open. */
+            if (err != 0 && err != ESRCH)
+                return false;
+
+            /* Recheck membership in case this is a new process that recycled
+             * the PID in between enumerate and open. */
+            if (!containsProcess(handle))
+                continue;
+
+            func(handle, id);
+        }
+    }
+
+    return true;
 }

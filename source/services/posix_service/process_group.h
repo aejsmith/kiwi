@@ -26,6 +26,7 @@
 
 #include <sys/types.h>
 
+#include <functional>
 #include <memory>
 
 class Session;
@@ -62,6 +63,8 @@ public:
 
     void addProcess(handle_t handle);
     void removeProcess(handle_t handle);
+
+    bool forEachProcess(const std::function<void (handle_t, pid_t)> &func);
 
 private:
     void handleDeathEvent();
