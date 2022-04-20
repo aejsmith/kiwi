@@ -37,7 +37,7 @@
 
 /* Define JOB_CONTROL if your operating system supports
    BSD-like job control. */
-/* #undef JOB_CONTROL */
+#define JOB_CONTROL 1
 
 /* Define ALIAS if you want the alias features. */
 #define ALIAS 1
@@ -501,7 +501,7 @@
 /* Characteristics of system calls and C library functions. */
 
 /* Define if the `getpgrp' function takes no argument.  */
-/* #undef GETPGRP_VOID */
+#define GETPGRP_VOID 1
 
 #define NAMED_PIPES_MISSING 1
 
@@ -1121,7 +1121,7 @@
 /* #undef SVR4 */
 
 /* Define if job control is unusable or unsupported. */
-#define JOB_CONTROL_MISSING 1
+/* #undef JOB_CONTROL_MISSING */
 
 /* Do we need to define _KERNEL to get the RLIMIT_* defines from
    <sys/resource.h>? */

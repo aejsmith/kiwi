@@ -68,7 +68,7 @@ sources = [
     'error.c',
     'expr.c',
     'flags.c',
-    'nojobs.c',
+    'jobs.c',
     'subst.c',
     'hashcmd.c',
     'hashlib.c',
