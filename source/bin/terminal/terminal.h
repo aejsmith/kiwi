@@ -53,7 +53,7 @@ private:
 
     void handleOutput(const Kiwi::Core::Message &message);
 
-    status_t spawnProcess(const char *path, Kiwi::Core::Handle &handle);
+    bool spawnProcess(const char *path, Kiwi::Core::Handle &handle);
 
 protected:
     TerminalWindow& m_window;

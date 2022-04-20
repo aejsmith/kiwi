@@ -101,7 +101,7 @@ bool Terminal::init() {
         core_log(CORE_LOG_WARN, "failed to set window size: %" PRId32, ret);
 
     /* Spawn a process attached to the terminal. */
-    if (spawnProcess("/system/bin/bash", m_childProcess) != STATUS_SUCCESS)
+    if (!spawnProcess("/system/bin/bash", m_childProcess))
         return false;
 
     handle_t connHandle = m_connection.handle();
@@ -224,16 +224,29 @@ void Terminal::flushInput() {
 }
 
 /** Spawn a process attached to the terminal. */
-status_t Terminal::spawnProcess(const char *path, Kiwi::Core::Handle &handle) {
+bool Terminal::spawnProcess(const char *path, Kiwi::Core::Handle &handle) {
     status_t ret;
 
     ret = kern_process_clone(handle.attach());
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_ERROR, "failed to create child process: %" PRId32, ret);
-        return ret;
+        return false;
     }
 
     if (!handle.isValid()) {
+        int sid = setsid();
+        if (sid < 0) {
+            core_log(CORE_LOG_ERROR, "failed to create session: %d", errno);
+            exit(EXIT_FAILURE);
+        }
+
+        /* Initial tcsetpgrp() sets the terminal session as well. SID == PGID. */
+        int err = tcsetpgrp(m_terminal[0], sid);
+        if (err < 0) {
+            core_log(CORE_LOG_ERROR, "failed to set foreground process group: %d", errno);
+            exit(EXIT_FAILURE);
+        }
+
         /* Child process. */
         process_attrib_t attrib;
         handle_t map[][2] = { { m_terminal[0], 0 }, { m_terminal[1], 1 }, { m_terminal[1], 2 } };
@@ -242,19 +255,11 @@ status_t Terminal::spawnProcess(const char *path, Kiwi::Core::Handle &handle) {
         attrib.map       = map;
         attrib.map_count = core_array_size(map);
 
-        // TODO: Controlling terminal?
-
-        int err = setsid();
-        if (err < 0) {
-            core_log(CORE_LOG_ERROR, "failed to create session: %d", errno);
-            exit(EXIT_FAILURE);
-        }
-
         const char *args[] = { path, nullptr };
         ret = kern_process_exec(path, args, environ, 0, &attrib);
         core_log(CORE_LOG_ERROR, "failed to execute process '%s': %d", path, ret);
         exit(EXIT_FAILURE);
     }
 
-    return STATUS_SUCCESS;
+    return true;
 }
