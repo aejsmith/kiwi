@@ -53,5 +53,6 @@ extern status_t kern_process_group_create(uint32_t flags, handle_t *_handle);
 extern status_t kern_process_group_add(handle_t handle, handle_t process);
 extern status_t kern_process_group_remove(handle_t handle, handle_t process);
 extern status_t kern_process_group_query(handle_t handle, handle_t process);
+extern status_t kern_process_group_enumerate(handle_t handle, process_id_t *_ids, size_t *_count);
 
 __KERNEL_EXTERN_C_END

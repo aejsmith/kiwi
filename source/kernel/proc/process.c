@@ -2109,3 +2109,79 @@ status_t kern_process_group_query(handle_t handle, handle_t process) {
     process_release(kprocess);
     return ret;
 }
+
+/**
+ * Gets a list of all processes in a process group. This gives the processes in
+ * the group at the time of the call. It is recommended that if it is necessary
+ * to perform operations on the processes returned, the caller should re-test
+ * group membership with kern_process_group_query() after opening a handle to a
+ * process. This is because it would be possible for a returned process to exit
+ * and have its ID reused by a new process outside of the group in between
+ * calling this function and opening the handle.
+ *
+ * @param handle        Handle to process group.
+ * @param _ids          Array of process IDs to fill in. If NULL, the function
+ *                      will only return the number of processes in the group.
+ * @param _count        If _ids is not NULL, this should point to a value
+ *                      containing the size of the provided array. Upon
+ *                      successful return, this value will be set to the current
+ *                      number of IDs, which may be greater than the original
+ *                      count if more processes have been added to the group
+ *                      since getting the count.
+ *
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_INVALID_HANDLE if group handle is invalid.
+ */
+status_t kern_process_group_enumerate(handle_t handle, process_id_t *_ids, size_t *_count) {
+    status_t ret;
+
+    if (!_count)
+        return STATUS_INVALID_ARG;
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS_GROUP, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    process_group_t *group = khandle->private;
+
+    size_t ids_count = 0;
+    process_id_t *ids __cleanup_kfree = NULL;
+    if (_ids) {
+        ret = read_user(_count, &ids_count);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+
+        // TODO: This could do with a maximum, or dynamically resize the array
+        // as we add processes, to prevent passing in a huge value and trying to
+        // allocate that.
+        if (ids_count > 0) {
+            ids = kmalloc(ids_count * sizeof(*ids), MM_USER);
+            if (!ids)
+                return STATUS_NO_MEMORY;
+        }
+    }
+
+    size_t proc_count = 0;
+
+    {
+        MUTEX_SCOPED_LOCK(group_lock, &group->lock);
+
+        list_foreach(&group->processes, iter) {
+            process_group_link_t *link = list_entry(iter, process_group_link_t, group_link);
+
+            if (proc_count < ids_count)
+                ids[proc_count] = link->process->id;
+
+            proc_count++;
+        }
+    }
+
+    if (ids_count && proc_count) {
+        ret = memcpy_to_user(_ids, ids, min(ids_count, proc_count) * sizeof(*ids));
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
+
+    return write_user(_count, proc_count);
+}
