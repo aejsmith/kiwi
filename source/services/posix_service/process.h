@@ -66,6 +66,7 @@ private:
     Kiwi::Core::Message handleSetpgid(const Kiwi::Core::Message &request);
     Kiwi::Core::Message handleGetsid(const Kiwi::Core::Message &request);
     Kiwi::Core::Message handleSetsid(const Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleGetPgrpSession(const Kiwi::Core::Message &request);
 
     uint32_t signalsDeliverable() const;
     void updateSignals();

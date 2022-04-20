@@ -184,6 +184,7 @@ void Process::handleMessageEvent() {
         case POSIX_REQUEST_SETPGID:                 reply = handleSetpgid(message); break;
         case POSIX_REQUEST_GETSID:                  reply = handleGetsid(message); break;
         case POSIX_REQUEST_SETSID:                  reply = handleSetsid(message); break;
+        case POSIX_REQUEST_GET_PGRP_SESSION:        reply = handleGetPgrpSession(message); break;
 
         default:
             core_log(
@@ -730,5 +731,33 @@ Kiwi::Core::Message Process::handleSetsid(const Kiwi::Core::Message &request) {
     currentGroup->removeProcess(m_handle);
 
     replyData->sid = m_id;
+    return reply;
+}
+
+Kiwi::Core::Message Process::handleGetPgrpSession(const Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!reply.createReply(request, sizeof(posix_reply_get_pgrp_session_t))) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return Kiwi::Core::Message();
+    }
+
+    auto replyData = reply.data<posix_reply_get_pgrp_session_t>();
+    replyData->err = 0;
+
+    if (request.size() != sizeof(posix_request_get_pgrp_session_t)) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    auto requestData = request.data<posix_request_get_pgrp_session_t>();
+
+    ProcessGroup *group = g_posixService.findProcessGroup(requestData->pgid);
+    if (!group) {
+        replyData->err = ESRCH;
+        return reply;
+    }
+
+    replyData->sid = group->session()->id();
+
     return reply;
 }

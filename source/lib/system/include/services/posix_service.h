@@ -122,6 +122,17 @@ enum {
      *  - Data = posix_reply_setsid_t
      */
     POSIX_REQUEST_SETSID = 8,
+
+    /**
+     * Implements the posix_get_pgrp_session() function.
+     *
+     * Request:
+     *  - Data = posix_request_get_pgrp_session_t
+     *
+     * Reply:
+     *  - Data = posix_reply_get_pgrp_session_t
+     */
+    POSIX_REQUEST_GET_PGRP_SESSION = 9,
 };
 
 typedef struct posix_reply_get_signal_condition {
@@ -201,3 +212,12 @@ typedef struct posix_reply_setsid {
     int32_t err;                    /**< Error number (0 on success). */
     int32_t sid;                    /**< SID. */
 } posix_reply_setsid_t;
+
+typedef struct posix_request_get_pgrp_session {
+    int32_t pgid;                   /**< PGID to get for. */
+} posix_request_get_pgrp_session_t;
+
+typedef struct posix_reply_get_pgrp_session {
+    int32_t err;                    /**< Error number (0 on success). */
+    int32_t sid;                    /**< SID. */
+} posix_reply_get_pgrp_session_t;

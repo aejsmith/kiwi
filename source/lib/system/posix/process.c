@@ -481,3 +481,59 @@ pid_t setsid(void) {
     posix_service_put();
     return (success) ? sid : -1;
 }
+
+static bool posix_get_pgrp_session_request(core_connection_t *conn, pid_t pgid, pid_t *_sid) {
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_GET_PGRP_SESSION, sizeof(posix_request_get_pgrp_session_t), 0);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    posix_request_get_pgrp_session_t *request_data = core_message_data(request);
+    request_data->pgid = pgid;
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+        libsystem_status_to_errno(ret);
+        return false;
+    }
+
+    posix_reply_get_pgrp_session_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+
+    if (reply_err == 0)
+        *_sid = reply_data->sid;
+
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
+/** Gets the ID of the session that a process group belongs to.
+ * @param pgid          Process group ID.
+ * @return              Session ID on success, -1 on failure:
+ *                       - ESRCH if PGID does not refer to a valid process
+ *                         group. */
+pid_t posix_get_pgrp_session(pid_t pgid) {
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    pid_t sid;
+    bool success = posix_get_pgrp_session_request(conn, pgid, &sid);
+
+    posix_service_put();
+    return (success) ? sid : -1;
+}

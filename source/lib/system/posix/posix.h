@@ -34,6 +34,8 @@
 
 #include "libsystem.h"
 
+__SYS_EXTERN_C_BEGIN
+
 struct environ;
 
 /** Structure containing details of a POSIX process. */
@@ -70,3 +72,12 @@ static inline void posix_signal_guard_endp(void *p) {
     uint32_t name __sys_unused __sys_cleanup(posix_signal_guard_endp) = 0;
 
 extern int posix_signal_from_exception(unsigned code) __sys_hidden;
+
+/**
+ * Exported POSIX functions, used as implementation details (e.g. by the
+ * terminal service).
+ */
+
+extern pid_t posix_get_pgrp_session(pid_t pgid);
+
+__SYS_EXTERN_C_END
