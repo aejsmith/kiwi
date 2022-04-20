@@ -84,6 +84,9 @@ private:
     size_t eraseLine();
     void clearBuffer();
 
+    status_t getProcessGroup(pid_t caller, pid_t &pgid);
+    status_t setProcessGroup(pid_t caller, pid_t pgid);
+
 private:
     Kiwi::Core::Connection m_connection;
     std::thread m_thread;
@@ -98,6 +101,8 @@ private:
     std::vector<uint64_t> m_readEvents;
 
     /** Terminal state. */
+    pid_t m_sessionId;                  /**< Session that the terminal is controlling. */
+    pid_t m_processGroupId;             /**< Foreground process group ID. */
     struct termios m_termios;           /**< Terminal I/O settings. */
     struct winsize m_winsize;           /**< Window size. */
     bool m_escaped : 1;                 /**< Whether the next input character is escaped. */

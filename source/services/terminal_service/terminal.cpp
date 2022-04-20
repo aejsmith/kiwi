@@ -26,6 +26,7 @@
 #include <core/log.h>
 #include <core/utility.h>
 
+#include <kernel/process.h>
 #include <kernel/status.h>
 #include <kernel/thread.h>
 #include <kernel/user_file.h>
@@ -33,8 +34,12 @@
 #include <services/terminal_service.h>
 
 #include <assert.h>
+#include <signal.h>
+#include <unistd.h>
 
 #include <array>
+
+#include "posix/posix.h"
 
 static constexpr uint64_t kSupportedUserFileOps =
     USER_FILE_SUPPORTED_OP_READ |
@@ -45,13 +50,15 @@ static constexpr uint64_t kSupportedUserFileOps =
     USER_FILE_SUPPORTED_OP_UNWAIT;
 
 Terminal::Terminal(Kiwi::Core::Connection connection) :
-    m_connection         (std::move(connection)),
-    m_exit               (false),
-    m_escaped            (false),
-    m_inhibited          (false),
-    m_inputBufferStart   (0),
-    m_inputBufferSize    (0),
-    m_inputBufferLines   (0)
+    m_connection        (std::move(connection)),
+    m_exit              (false),
+    m_sessionId         (0),
+    m_processGroupId    (0),
+    m_escaped           (false),
+    m_inhibited         (false),
+    m_inputBufferStart  (0),
+    m_inputBufferSize   (0),
+    m_inputBufferLines  (0)
 {
     auto toControl = [] (unsigned char ch) -> cc_t {
         return ch & 0x1f;
@@ -170,8 +177,6 @@ void Terminal::handleClientMessages() {
 }
 
 Kiwi::Core::Message Terminal::handleClientOpenHandle(Kiwi::Core::Message &request) {
-    auto requestData = request.data<terminal_request_open_handle_t>();
-
     Kiwi::Core::Message reply;
     if (!reply.createReply(request, sizeof(terminal_reply_open_handle_t))) {
         core_log(CORE_LOG_ERROR, "failed to create message");
@@ -180,6 +185,13 @@ Kiwi::Core::Message Terminal::handleClientOpenHandle(Kiwi::Core::Message &reques
 
     auto replyData = reply.data<terminal_reply_open_handle_t>();
     replyData->result = STATUS_SUCCESS;
+
+    if (request.size() != sizeof(terminal_request_open_handle_t)) {
+        replyData->result = STATUS_INVALID_ARG;
+        return reply;
+    }
+
+    auto requestData = request.data<terminal_request_open_handle_t>();
 
     handle_t handle;
     status_t ret = kern_file_reopen(m_userFile, requestData->access, 0, &handle);
@@ -420,12 +432,24 @@ status_t Terminal::handleFileRequest(const ipc_message_t &message, const void *d
         }
         case TIOCGPGRP: {
             /* tcgetpgrp(int fd) - TODO. */
-            ret = STATUS_NOT_IMPLEMENTED;
+            outDataSize = sizeof(pid_t);
+            outData.reset(new uint8_t[sizeof(pid_t)]);
+
+            ret = getProcessGroup(
+                message.args[USER_FILE_MESSAGE_ARG_PROCESS_ID],
+                *reinterpret_cast<pid_t *>(outData.get()));
             break;
         }
         case TIOCSPGRP: {
             /* tcsetpgrp(int fd, pid_t pgid) - TODO. */
-            ret = STATUS_NOT_IMPLEMENTED;
+            if (message.size != sizeof(pid_t)) {
+                ret = STATUS_INVALID_ARG;
+                break;
+            }
+
+            ret = setProcessGroup(
+                message.args[USER_FILE_MESSAGE_ARG_PROCESS_ID],
+                *reinterpret_cast<const pid_t *>(data));
             break;
         }
         case TIOCGWINSZ: {
@@ -638,12 +662,12 @@ void Terminal::addInput(unsigned char value) {
     }
 
     /* Generate signals on INTR and QUIT if ISIG is set. */
-    if (m_termios.c_lflag & ISIG) {
+    if (m_termios.c_lflag & ISIG && m_processGroupId != 0) {
         if (isControlChar(ch, VINTR)) {
-            /* TODO: Send signal. */
+            kill(-m_processGroupId, SIGINT);
             return;
         } else if (isControlChar(ch, VQUIT)) {
-            /* TODO: Send signal. */
+            kill(-m_processGroupId, SIGQUIT);
             return;
         }
     }
@@ -815,4 +839,53 @@ void Terminal::clearBuffer() {
     m_inputBufferStart = 0;
     m_inputBufferSize  = 0;
     m_inputBufferLines = 0;
+}
+
+status_t Terminal::getProcessGroup(pid_t caller, pid_t &pgid) {
+    if (getsid(caller) != m_sessionId) {
+        /* Not allowed if the terminal is not the process' controlling terminal.
+         * This is translated to ENOTTY by ioctl(). */
+        return STATUS_INVALID_REQUEST;
+    }
+
+    if (m_processGroupId == 0) {
+        /*
+         * "If there is no foreground process group, tcgetpgrp() shall return a
+         * value greater than 1 that does not match the process group ID of any
+         * existing process group"
+         */
+        pgid = INT32_MAX;
+    } else {
+        pgid = m_processGroupId;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+status_t Terminal::setProcessGroup(pid_t caller, pid_t pgid) {
+    pid_t callerSid = getsid(caller);
+    if (callerSid < 0)
+        return STATUS_NOT_FOUND;
+
+    pid_t groupSid = posix_get_pgrp_session(pgid);
+    if (groupSid < 0)
+        return STATUS_NOT_FOUND;
+
+    if (callerSid != groupSid)
+        return STATUS_PERM_DENIED;
+
+    /*
+     * We allow the first tcsetpgrp() to set the terminal as the controlling
+     * terminal for the caller's session. There is no standardized way to set
+     * a controlling terminal for a session, so this is our way.
+     */
+    if (m_sessionId == 0) {
+        m_sessionId = callerSid;
+    } else if (m_sessionId != callerSid) {
+        /* Translated to ENOTTY by ioctl(). */
+        return STATUS_INVALID_REQUEST;
+    }
+
+    m_processGroupId = pgid;
+    return STATUS_SUCCESS;
 }

@@ -116,12 +116,12 @@ int ioctl(int fd, int request, ...) {
             in_size = sizeof(struct termios);
             break;
         case TIOCGPGRP:
-            in = va_arg(args, void *);
-            in_size = sizeof(int);
+            out = va_arg(args, void *);
+            out_size = sizeof(pid_t);
             break;
         case TIOCSPGRP:
-            out = va_arg(args, void *);
-            out_size = sizeof(int);
+            in = va_arg(args, void *);
+            in_size = sizeof(pid_t);
             break;
         case TIOCGWINSZ:
             out = va_arg(args, void *);

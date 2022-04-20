@@ -16,7 +16,11 @@
 
 Import('manager')
 
-env = manager.Create(libraries = ['kernel', 'kiwi'])
+env = manager.Create(libraries = ['kernel', 'kiwi'], flags = {
+    'CPPPATH': [
+        Dir('../../lib/system'),
+    ],
+})
 
 env.KiwiService('terminal_service', [
     'terminal_service.cpp',
