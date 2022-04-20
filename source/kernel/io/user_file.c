@@ -119,7 +119,8 @@ static user_file_op_t *user_file_op_alloc(user_file_t *file, unsigned id, size_t
     op->msg->msg.id = id;
     op->event       = NULL;
 
-    op->msg->msg.args[USER_FILE_MESSAGE_ARG_SERIAL] = op->serial;
+    op->msg->msg.args[USER_FILE_MESSAGE_ARG_SERIAL]     = op->serial;
+    op->msg->msg.args[USER_FILE_MESSAGE_ARG_PROCESS_ID] = curr_proc->id;
 
     if (size > 0) {
         void *data = kmalloc(size, MM_KERNEL);
