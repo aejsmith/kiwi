@@ -19,7 +19,7 @@ from subprocess import Popen, PIPE
 from time import time
 from urllib.parse import urlparse
 
-llvm_version = '10.0.1'
+llvm_version = '14.0.0'
 
 def which(program):
     import os
@@ -136,7 +136,7 @@ class ToolchainComponent:
 # Component definition for binutils.
 class BinutilsComponent(ToolchainComponent):
     name = 'binutils'
-    version = '2.36'
+    version = '2.38'
     generic = False
     source = [
         'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
@@ -187,6 +187,7 @@ class LLVMComponent(ToolchainComponent):
         cmakeopts  = '-G "Unix Makefiles" '
         cmakeopts += '-DCMAKE_BUILD_TYPE=Release '
         cmakeopts += '-DLLVM_TARGETS_TO_BUILD="X86;AArch64" '
+        cmakeopts += '-DLLVM_INCLUDE_BENCHMARKS=OFF '
         cmakeopts += '-DCMAKE_INSTALL_PREFIX="%s" ' % (self.destdir)
 
         # Build and install it.

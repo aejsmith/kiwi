@@ -1,16 +1,16 @@
-diff -urN binutils-2.36.orig/bfd/config.bfd binutils-2.36/bfd/config.bfd
---- binutils-2.36.orig/bfd/config.bfd	2021-01-09 10:47:33.000000000 +0000
-+++ binutils-2.36/bfd/config.bfd	2021-01-31 09:51:21.048648891 +0000
-@@ -231,7 +231,7 @@
+diff -urN binutils-2.38.orig/bfd/config.bfd binutils-2.38/bfd/config.bfd
+--- binutils-2.38.orig/bfd/config.bfd	2022-01-22 12:14:07.000000000 +0000
++++ binutils-2.38/bfd/config.bfd	2022-04-21 17:25:18.530340442 +0100
+@@ -247,7 +247,7 @@
      targ_archs="$targ_archs bfd_i386_arch bfd_powerpc_arch bfd_rs6000_arch"
      want64=true
      ;;
--  aarch64-*-elf | aarch64-*-rtems*)
-+  aarch64-*-elf | aarch64-*-rtems* | aarch64-*-kiwi*)
+-  aarch64-*-elf | aarch64-*-rtems* | aarch64-*-genode*)
++  aarch64-*-elf | aarch64-*-rtems* | aarch64-*-genode* | aarch64-*-kiwi*)
      targ_defvec=aarch64_elf64_le_vec
-     targ_selvecs="aarch64_elf64_be_vec aarch64_elf32_le_vec aarch64_elf32_be_vec arm_elf32_le_vec arm_elf32_be_vec"
+     targ_selvecs="aarch64_elf64_be_vec aarch64_elf32_le_vec aarch64_elf32_be_vec arm_elf32_le_vec arm_elf32_be_vec aarch64_pei_vec"
      want64=true
-@@ -699,6 +699,11 @@
+@@ -721,6 +721,11 @@
      targ_selvecs=i386_elf32_vec
      want64=true
      ;;
@@ -22,30 +22,30 @@ diff -urN binutils-2.36.orig/bfd/config.bfd binutils-2.36/bfd/config.bfd
  #endif
    i[3-7]86-*-lynxos*)
      targ_defvec=i386_elf32_vec
-diff -urN binutils-2.36.orig/config.sub binutils-2.36/config.sub
---- binutils-2.36.orig/config.sub	2021-01-09 10:47:33.000000000 +0000
-+++ binutils-2.36/config.sub	2021-01-31 09:40:55.868499991 +0000
-@@ -1722,7 +1722,7 @@
- 	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
+diff -urN binutils-2.38.orig/config.sub binutils-2.38/config.sub
+--- binutils-2.38.orig/config.sub	2022-01-22 12:14:07.000000000 +0000
++++ binutils-2.38/config.sub	2022-04-21 17:26:01.296267110 +0100
+@@ -1754,7 +1754,7 @@
  	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
  	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
--	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx*)
-+	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | kiwi*)
+ 	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr* \
+-	     | fiwix* )
++	     | fiwix* | kiwi* )
  		;;
  	# This one is extra strict with allowed versions
  	sco3.2v2 | sco3.2v[4-9]* | sco5v6*)
-diff -urN binutils-2.36.orig/gas/configure.tgt binutils-2.36/gas/configure.tgt
---- binutils-2.36.orig/gas/configure.tgt	2021-01-09 10:47:33.000000000 +0000
-+++ binutils-2.36/gas/configure.tgt	2021-01-31 09:51:53.635619447 +0000
-@@ -125,6 +125,7 @@
- case ${generic_target} in
-   aarch64*-*-elf*)			fmt=elf;;
+diff -urN binutils-2.38.orig/gas/configure.tgt binutils-2.38/gas/configure.tgt
+--- binutils-2.38.orig/gas/configure.tgt	2022-01-22 12:14:08.000000000 +0000
++++ binutils-2.38/gas/configure.tgt	2022-04-21 17:27:17.168137009 +0100
+@@ -129,6 +129,7 @@
    aarch64*-*-fuchsia*)			fmt=elf;;
-+  aarch64*-*-kiwi*)			fmt=elf;;
+   aarch64*-*-haiku*)			fmt=elf em=haiku ;;
+   aarch64*-*-genode*)			fmt=elf;;
++  aarch64*-*-kiwi*)			    fmt=elf;;
    aarch64*-*-linux*)			fmt=elf em=linux
      case ${cpu}-${os} in
        aarch64*-linux-gnu_ilp32)		arch=aarch64:32 ;;
-@@ -234,6 +235,7 @@
+@@ -239,6 +240,7 @@
      esac ;;
    i386-*-lynxos*)			fmt=elf em=lynx ;;
    i386-*-redox*)			fmt=elf ;;
@@ -53,9 +53,9 @@ diff -urN binutils-2.36.orig/gas/configure.tgt binutils-2.36/gas/configure.tgt
    i386-*-solaris*)			fmt=elf em=solaris ;;
    i386-*-freebsd* \
    | i386-*-kfreebsd*-gnu)		fmt=elf em=freebsd ;;
-diff -urN binutils-2.36.orig/ld/configure.tgt binutils-2.36/ld/configure.tgt
---- binutils-2.36.orig/ld/configure.tgt	2021-01-09 10:47:34.000000000 +0000
-+++ binutils-2.36/ld/configure.tgt	2021-01-31 09:51:08.645660098 +0000
+diff -urN binutils-2.38.orig/ld/configure.tgt binutils-2.38/ld/configure.tgt
+--- binutils-2.38.orig/ld/configure.tgt	2022-01-22 14:19:36.000000000 +0000
++++ binutils-2.38/ld/configure.tgt	2022-04-21 17:24:49.441391221 +0100
 @@ -59,6 +59,9 @@
  aarch64-*-fuchsia*)	targ_emul=aarch64elf
  			targ_extra_emuls="aarch64elfb armelf armelfb"
@@ -66,7 +66,7 @@ diff -urN binutils-2.36.orig/ld/configure.tgt binutils-2.36/ld/configure.tgt
  aarch64_be-*-linux-gnu_ilp32)
  			targ_emul=aarch64linux32b
  			targ_extra_libpath="aarch64linuxb aarch64linux aarch64linux32 armelfb_linux_eabi armelf_linux_eabi"
-@@ -946,6 +949,9 @@
+@@ -970,6 +973,9 @@
  x86_64-*-redox*)	targ_emul=elf_x86_64
  			targ_extra_emuls=elf_i386
  			;;
