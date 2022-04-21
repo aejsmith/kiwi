@@ -70,8 +70,8 @@ static const uint16_t kbd_layout_extended[128] = {
  * @return              Translated character, or 0 if none available. */
 static uint16_t i8042_console_translate(uint8_t code) {
     static bool shift = false;
-    static bool ctrl = false;
-    static bool alt = false;
+    static bool ctrl __unused = false;
+    static bool alt __unused = false;
     static bool extended = false;
 
     /* Check for an extended code. */

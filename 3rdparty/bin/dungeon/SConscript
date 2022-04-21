@@ -18,64 +18,65 @@ Import('manager')
 
 env = manager.Create(
     flags = {
-		# Definitions controlling features.
-		'CPPDEFINES': {
-			'MORE_24': None,
-			#'ALLOW_GDT': None,
-			'TEXTFILE': '\\\"/system/data/dungeon/dtextc.dat\\\"'
-		},
+        # Definitions controlling features.
+        'CPPDEFINES': {
+            'MORE_24': None,
+            #'ALLOW_GDT': None,
+            'TEXTFILE': '\\\"/system/data/dungeon/dtextc.dat\\\"'
+        },
 
-		# Override build flags - it won't compile with our warning flags.
-		'CCFLAGS': [
-			'-Wno-format', '-Wno-missing-braces', '-Wno-parentheses',
-			'-Wno-redundant-decls', '-Wno-unused-variable',
-		],
-	}
+        # Override build flags - it won't compile with our warning flags.
+        'CCFLAGS': [
+            '-Wno-format', '-Wno-missing-braces', '-Wno-parentheses',
+            '-Wno-redundant-decls', '-Wno-unused-variable',
+            '-Wno-unused-but-set-variable',
+        ],
+    }
 )
 
 target = env.KiwiApplication('dungeon',
-	sources = [
-		'actors.c',
-		'ballop.c',
-		'clockr.c',
-		'demons.c',
-		'dgame.c',
-		'dinit.c',
-		'dmain.c',
-		'dso1.c',
-		'dso2.c',
-		'dso3.c',
-		'dso4.c',
-		'dso5.c',
-		'dso6.c',
-		'dso7.c',
-		'dsub.c',
-		'dverb1.c',
-		'dverb2.c',
-		'gdt.c',
-		'lightp.c',
-		'local.c',
-		'nobjs.c',
-		'np.c',
-		'np1.c',
-		'np2.c',
-		'np3.c',
-		'nrooms.c',
-		'objcts.c',
-		'rooms.c',
-		'sobjs.c',
-		'supp.c',
-		'sverbs.c',
-		'verbs.c',
-		'villns.c',
-	]
+    sources = [
+        'actors.c',
+        'ballop.c',
+        'clockr.c',
+        'demons.c',
+        'dgame.c',
+        'dinit.c',
+        'dmain.c',
+        'dso1.c',
+        'dso2.c',
+        'dso3.c',
+        'dso4.c',
+        'dso5.c',
+        'dso6.c',
+        'dso7.c',
+        'dsub.c',
+        'dverb1.c',
+        'dverb2.c',
+        'gdt.c',
+        'lightp.c',
+        'local.c',
+        'nobjs.c',
+        'np.c',
+        'np1.c',
+        'np2.c',
+        'np3.c',
+        'nrooms.c',
+        'objcts.c',
+        'rooms.c',
+        'sobjs.c',
+        'supp.c',
+        'sverbs.c',
+        'verbs.c',
+        'villns.c',
+    ]
 )
 
 # Build the data file.
 env.Command(
-	'dtextc.dat',
-	['dtextc.uu1', 'dtextc.uu2', 'dtextc.uu3', 'dtextc.uu4'],
-	Action('cat $SOURCES | uudecode -o $TARGET', '$GENCOMSTR'))
+    'dtextc.dat',
+    ['dtextc.uu1', 'dtextc.uu2', 'dtextc.uu3', 'dtextc.uu4'],
+    Action('cat $SOURCES | uudecode -o $TARGET', '$GENCOMSTR'))
 data = File('dtextc.dat')
 
 # Depend on the data file.
