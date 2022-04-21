@@ -16,6 +16,7 @@
 #
 
 import sys
+from collections import Counter
 
 def usage():
     sys.stderr.write('Usage: %s [--include-slab] <log file>\n' % (sys.argv[0]))
@@ -43,7 +44,7 @@ for line in f.readlines():
         continue
 
     if line[1] == 'allocated':
-        allocations[line[2]] = [line[4], line[6]]
+        allocations[line[2]] = (line[4], line[6])
     elif line[1] == 'freed':
         try:
             del allocations[line[2]]
@@ -56,10 +57,24 @@ for (k, v) in allocations.items():
     addr_width = max(addr_width, len(k))
     name_width = max(name_width, len(v[0]))
 
-print "%s %s Caller" % ("Address".ljust(addr_width), "Cache".ljust(name_width))
-print "%s %s ======" % ("=======".ljust(addr_width), "=====".ljust(name_width))
+print("Outstanding")
+print("===========")
+print()
+print("%s %s Caller" % ("Address".ljust(addr_width), "Cache".ljust(name_width)))
+print("%s %s ------" % ("-------".ljust(addr_width), "-----".ljust(name_width)))
 
 for (k, v) in allocations.items():
     slab_caches = ['slab_bufctl_cache', 'slab_mag_cache', 'slab_slab_cache']
     if include_slab or v[0] not in slab_caches:
-        print "%s %s %s" % (k.ljust(addr_width), v[0].ljust(name_width), v[1])
+        print("%s %s %s" % (k.ljust(addr_width), v[0].ljust(name_width), v[1]))
+
+print()
+print("Totals")
+print("------")
+print()
+print("Count    %s Caller" % ("Cache".ljust(name_width)))
+print("-----    %s ------" % ("-----".ljust(name_width)))
+
+counter = Counter(allocations.values())
+for (v, count) in counter.most_common():
+    print("%s %s %s" % (str(count).ljust(8), v[0].ljust(name_width), v[1]))
