@@ -580,7 +580,7 @@ status_t kern_user_file_create(
 
 err_close_conn:
     ipc_connection_close(endpoint);
-    object_handle_detach(conn);
+    object_handle_detach(conn, _conn);
 
 err_free:
     kfree(file);

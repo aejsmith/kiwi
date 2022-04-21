@@ -378,7 +378,7 @@ status_t kern_pipe_create(
         mutex_unlock(&pipe->lock);
 
         /* This should take care of cleaning up since write_open is false. */
-        object_handle_detach(read);
+        object_handle_detach(read, _read);
         return ret;
     }
 

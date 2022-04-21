@@ -1161,7 +1161,7 @@ status_t kern_thread_create(
         goto err_free_args;
 
     /* Create a handle to the thread if necessary. */
-    handle_t uhandle = -1;
+    handle_t uhandle = INVALID_HANDLE;
     if (_handle) {
         refcount_inc(&thread->count);
 
@@ -1210,7 +1210,7 @@ status_t kern_thread_create(
 
 err_free_thread:
     if (uhandle >= 0)
-        object_handle_detach(uhandle);
+        object_handle_detach(uhandle, _handle);
 
     if (thread)
         thread_release(thread);

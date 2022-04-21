@@ -88,6 +88,12 @@ namespace Kiwi {
          * be closed. This returns a pointer to the internal handle_t which
          * should be written into - this is for use with kernel functions that
          * return handles via pointer.
+         *
+         * Note that all kernel APIs are guaranteed to either not write to the
+         * given handle pointer or write INVALID_HANDLE to it upon failure.
+         * This means that when a kernel call using this function for the handle
+         * return fails, the Handle is guaranteed to be left in an invalid
+         * state (and any previous handle it held will be closed).
          */
         inline handle_t *Handle::attach() {
             close();

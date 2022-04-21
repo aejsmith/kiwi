@@ -689,7 +689,7 @@ status_t kern_socket_create_pair(
     if (ret == STATUS_SUCCESS) {
         ret = object_handle_attach(handles[1], &uhandles[1], &_handles[1]);
         if (ret != STATUS_SUCCESS)
-            object_handle_detach(uhandles[0]);
+            object_handle_detach(uhandles[0], &_handles[0]);
     }
 
     object_handle_release(handles[0]);

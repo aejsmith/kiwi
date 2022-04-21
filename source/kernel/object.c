@@ -344,13 +344,24 @@ status_t object_handle_attach(object_handle_t *handle, handle_t *_id, handle_t *
  * releases the handle.
  *
  * @param id            ID of handle to detach.
+ * @param _uid          If not NULL, a user location that the handle was written
+ *                      to. This will be set back to INVALID_HANDLE. This is
+ *                      important to maintain the guarantee made for all kernel
+ *                      APIs that if a call that returns a handle fails, we do
+ *                      not leave a valid but closed handle value in the handle
+ *                      return location. Kiwi::Core::Handle::attach() relies on
+ *                      this behaviour.
  *
  * @return              Status code describing result of the operation.
  */
-status_t object_handle_detach(handle_t id) {
+status_t object_handle_detach(handle_t id, handle_t *_uid) {
     rwlock_write_lock(&curr_proc->handles.lock);
     status_t ret = detach_handle(id);
     rwlock_unlock(&curr_proc->handles.lock);
+
+    if (_uid)
+        write_user(_uid, INVALID_HANDLE);
+
     return ret;
 }
 
@@ -1273,5 +1284,5 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *_new) {
  * @return              STATUS_SUCCESS on success.
  *                      STATUS_INVALID_HANDLE if handle does not exist. */
 status_t kern_handle_close(handle_t handle) {
-    return object_handle_detach(handle);
+    return object_handle_detach(handle, NULL);
 }

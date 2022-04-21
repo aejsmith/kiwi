@@ -1185,7 +1185,7 @@ status_t kern_process_create(
     ret = thread_create("main", process, 0, process_entry_trampoline, &load, NULL, &thread);
     if (ret != STATUS_SUCCESS) {
         if (_handle)
-            object_handle_detach(uhandle);
+            object_handle_detach(uhandle, _handle);
 
         goto out_release_process;
     }
@@ -1203,7 +1203,7 @@ status_t kern_process_create(
 
     ret = load.status;
     if (ret != STATUS_SUCCESS && _handle)
-        object_handle_detach(uhandle);
+        object_handle_detach(uhandle, _handle);
 
 out_release_process:
     process_release(process);
@@ -1453,7 +1453,7 @@ status_t kern_process_clone(handle_t *_handle) {
     object_handle_release(khandle);
     if (ret != STATUS_SUCCESS) {
         kfree(frame);
-        object_handle_detach(uhandle);
+        object_handle_detach(uhandle, _handle);
         return ret;
     }
 

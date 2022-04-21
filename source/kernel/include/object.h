@@ -136,7 +136,7 @@ static inline void __object_handle_releasep(void *p) {
 
 extern status_t object_handle_lookup(handle_t id, int type, object_handle_t **_handle);
 extern status_t object_handle_attach(object_handle_t *handle, handle_t *_id, handle_t *_uid);
-extern status_t object_handle_detach(handle_t id);
+extern status_t object_handle_detach(handle_t id, handle_t *_uid);
 extern status_t object_handle_open(const object_type_t *type, void *private, handle_t *_id, handle_t *_uid);
 
 extern void object_process_init(struct process *process);
