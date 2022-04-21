@@ -222,7 +222,7 @@ extern void device_resource_free(void *data);
 extern void device_resource_register(device_t *device, void *data);
 
 extern void device_iterate(device_t *start, device_iterate_t func, void *data);
-extern char *device_path_inplace(device_t *device, char *buf);
+extern char *device_path_inplace(device_t *device, char *buf, size_t size);
 extern char *device_path(device_t *device);
 
 extern status_t device_get(

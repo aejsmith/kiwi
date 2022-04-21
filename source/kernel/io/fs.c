@@ -796,6 +796,45 @@ static status_t fs_dentry_path(fs_dentry_t *entry, char **_path) {
     return STATUS_SUCCESS;
 }
 
+/** Get the path to a directory entry in place without locking. */
+static char *fs_dentry_path_inplace_unsafe(fs_dentry_t *entry, char *buf, size_t size) {
+    assert(size > 0);
+
+    char *path = &buf[size - 1];
+    *path = 0;
+    size_t len = 0;
+
+    while (entry != curr_proc->io.root_dir && entry != root_mount->root) {
+        if (entry == entry->mount->root)
+            entry = entry->mount->mountpoint;
+
+        size_t name_len = strlen(entry->name);
+
+        len += name_len + 1;
+        if (len > size)
+            break;
+
+        path -= name_len;
+        memcpy(path, entry->name, name_len);
+
+        path--;
+        *path = '/';
+
+        entry = entry->parent;
+        if (!entry) {
+            /* Unlinked entry. */
+            return NULL;
+        }
+    }
+
+    if (len == 0) {
+        path--;
+        *path = '/';
+    }
+
+    return path;
+}
+
 /**
  * Internal implementation functions.
  */
@@ -1007,6 +1046,26 @@ static char *fs_file_name(file_handle_t *handle) {
     return name;
 }
 
+
+
+/** Get the name of a FS object in KDB context. */
+static char *fs_file_name_unsafe(file_handle_t *handle, char *buf, size_t size) {
+    char *path = fs_dentry_path_inplace_unsafe(handle->entry, buf, size);
+    if (!path)
+        return NULL;
+
+    const char *prefix      = "fs:";
+    const size_t prefix_len = strlen(prefix);
+
+    size_t len = strlen(path) + 1;
+    if (len + prefix_len <= size) {
+        path -= prefix_len;
+        memcpy(path, prefix, prefix_len);
+    }
+
+    return path;
+}
+
 /** Signal that a file event is being waited for. */
 static status_t fs_file_wait(file_handle_t *handle, object_event_t *event) {
     /* TODO. */
@@ -1104,17 +1163,18 @@ static status_t fs_file_sync(file_handle_t *handle) {
 
 /** FS file object operations. */
 static const file_ops_t fs_file_ops = {
-    .open     = fs_file_open,
-    .close    = fs_file_close,
-    .name     = fs_file_name,
-    .wait     = fs_file_wait,
-    .unwait   = fs_file_unwait,
-    .io       = fs_file_io,
-    .map      = fs_file_map,
-    .read_dir = fs_file_read_dir,
-    .resize   = fs_file_resize,
-    .info     = fs_file_info,
-    .sync     = fs_file_sync,
+    .open           = fs_file_open,
+    .close          = fs_file_close,
+    .name           = fs_file_name,
+    .name_unsafe    = fs_file_name_unsafe,
+    .wait           = fs_file_wait,
+    .unwait         = fs_file_unwait,
+    .io             = fs_file_io,
+    .map            = fs_file_map,
+    .read_dir       = fs_file_read_dir,
+    .resize         = fs_file_resize,
+    .info           = fs_file_info,
+    .sync           = fs_file_sync,
 };
 
 /**

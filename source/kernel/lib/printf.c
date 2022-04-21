@@ -198,7 +198,9 @@ static void print_device_path(printf_state_t *state, device_t *device) {
     if (!in_kdb)
         spinlock_lock(&device_printf_lock);
 
-    char *path = device_path_inplace(device, (in_kdb) ? kdb_device_printf_buf : device_printf_buf);
+    char *path = device_path_inplace(
+        device, (in_kdb) ? kdb_device_printf_buf : device_printf_buf,
+        DEVICE_PATH_MAX);
     state->total += do_printf(state->helper, state->data, "%s", path);
 
     if (!in_kdb)

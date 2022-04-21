@@ -776,6 +776,8 @@ void object_event_notifier(void *arg1, void *arg2, void *arg3) {
     object_event_signal(arg2, (unsigned long)arg3);
 }
 
+static char kdb_handle_name_buf[512];
+
 /** Prints a list of a process' handles. */
 static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter) {
     if (kdb_help(argc, argv)) {
@@ -798,21 +800,27 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
         return KDB_FAILURE;
     }
 
-    kdb_printf("ID   Flags  Type                        Count Private\n");
-    kdb_printf("==   =====  ====                        ===== =======\n");
+    kdb_printf("ID   Flags  Type                           Count Private            Name\n");
+    kdb_printf("==   =====  ====                           ===== =======            ====\n");
 
     for (handle_t i = 0; i < HANDLE_TABLE_SIZE; i++) {
         object_handle_t *handle = process->handles.handles[i];
         if (!handle)
             continue;
 
+        const char *name = NULL;
+        if (handle->type->name_unsafe)
+            name = handle->type->name_unsafe(handle, kdb_handle_name_buf, sizeof(kdb_handle_name_buf));
+        if (!name)
+            name = "<unnamed>";
+
         kdb_printf(
-            "%-4" PRId32 " 0x%-4" PRIx32 " %-2u - %-22s %-5" PRId32 " %p\n",
+            "%-4" PRId32 " 0x%-4" PRIx32 " %-2u - %-25s %-5" PRId32 " %-18p %s\n",
             i, process->handles.flags[i], handle->type->id,
             (handle->type->id < array_size(object_type_names))
                 ? object_type_names[handle->type->id]
-                : "Unknown",
-            refcount_get(&handle->count), handle->private);
+                : "<UNKNOWN>",
+            refcount_get(&handle->count), handle->private, name);
     }
 
     return KDB_SUCCESS;

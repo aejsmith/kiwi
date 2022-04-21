@@ -44,8 +44,23 @@ typedef struct object_type {
 
     /** Get the name of an object.
      * @param handle        Handle to the object.
-     * @return              Pointer to allocated name string. */
+     * @return              Pointer to allocated name string, or NULL if not
+     *                      available. */
     char *(*name)(struct object_handle *handle);
+
+    /**
+     * Get the name of an object in KDB context. This should not take any locks
+     * or allocate any memory. The name should be built in place in the given
+     * buffer.
+     *
+     * @param handle        Handle to the object.
+     * @param buf           Buffer to write into.
+     * @param size          Size of the buffer.
+     *
+     * @return              Pointer to start of name string, or NULL if not
+     *                      available.
+     */
+    char *(*name_unsafe)(struct object_handle *handle, char *buf, size_t size);
 
     /** Called when a handle is attached to a process.
      * @param handle        Handle to the object.

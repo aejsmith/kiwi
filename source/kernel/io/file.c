@@ -53,6 +53,16 @@ static char *file_object_name(object_handle_t *handle) {
     return fhandle->file->ops->name(fhandle);
 }
 
+/** Get the name of a file object in KDB context. */
+static char *file_object_name_unsafe(object_handle_t *handle, char *buf, size_t size) {
+    file_handle_t *fhandle = handle->private;
+
+    if (!fhandle->file->ops->name_unsafe)
+        return NULL;
+
+    return fhandle->file->ops->name_unsafe(fhandle, buf, size);
+}
+
 /** Signal that a file event is being waited for. */
 static status_t file_object_wait(object_handle_t *handle, object_event_t *event) {
     file_handle_t *fhandle = handle->private;
@@ -103,13 +113,14 @@ static status_t file_object_map(object_handle_t *handle, vm_region_t *region) {
 
 /** File object type definition. */
 static const object_type_t file_object_type = {
-    .id     = OBJECT_TYPE_FILE,
-    .flags  = OBJECT_TRANSFERRABLE,
-    .close  = file_object_close,
-    .name   = file_object_name,
-    .wait   = file_object_wait,
-    .unwait = file_object_unwait,
-    .map    = file_object_map,
+    .id             = OBJECT_TYPE_FILE,
+    .flags          = OBJECT_TRANSFERRABLE,
+    .close          = file_object_close,
+    .name           = file_object_name,
+    .name_unsafe    = file_object_name_unsafe,
+    .wait           = file_object_wait,
+    .unwait         = file_object_unwait,
+    .map            = file_object_map,
 };
 
 /**

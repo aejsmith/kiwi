@@ -52,6 +52,15 @@ typedef struct file_ops {
      * @return              Pointer to allocated name string. */
     char *(*name)(struct file_handle *handle);
 
+    /** Get the name of a file in KDB context.
+     * @see                 object_type_t::name().
+     * @param handle        File handle structure.
+     * @param buf           Buffer to write into.
+     * @param size          Size of the buffer.
+     * @return              Pointer to start of name string, or NULL if not
+     *                      available. */
+    char *(*name_unsafe)(struct file_handle *handle, char *buf, size_t size);
+
     /**
      * Signals that a file event is being waited for. If the event being waited
      * for has occurred already, this function should call the callback function
