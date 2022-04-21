@@ -162,6 +162,8 @@ void EventRef::remove() {
     if (m_loop) {
         m_loop->removeEvent(m_handler);
 
+        delete m_handler;
+
         m_loop    = nullptr;
         m_handler = nullptr;
     }
