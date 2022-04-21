@@ -200,12 +200,30 @@ static void ipc_connection_release(ipc_connection_t *conn) {
     slab_cache_free(ipc_connection_cache, conn);
 }
 
-/** Close a handle to a connection. */
 static void connection_object_close(object_handle_t *handle) {
     ipc_connection_close(handle->private);
 }
 
-/** Signal that a connection event is being waited for. */
+static char *connection_object_name_unsafe(object_handle_t *handle, char *buf, size_t size) {
+    ipc_endpoint_t *endpoint = handle->private;
+    ipc_connection_t *conn   = endpoint->conn;
+
+    process_t *client = conn->endpoints[CLIENT_ENDPOINT].process;
+    process_t *server = conn->endpoints[SERVER_ENDPOINT].process;
+
+    snprintf(
+        buf, size, "%" PRId32 "<->%" PRId32,
+        (client) ? client->id : -1, (server) ? server->id : -1);
+
+    return buf;
+}
+
+static char *connection_object_name(object_handle_t *handle) {
+    char buf[32];
+    connection_object_name_unsafe(handle, buf, sizeof(buf));
+    return kstrdup(buf, MM_KERNEL);
+}
+
 static status_t connection_object_wait(object_handle_t *handle, object_event_t *event) {
     ipc_endpoint_t *endpoint = handle->private;
     status_t ret;
@@ -240,7 +258,6 @@ static status_t connection_object_wait(object_handle_t *handle, object_event_t *
     return ret;
 }
 
-/** Stop waiting for a connection event. */
 static void connection_object_unwait(object_handle_t *handle, object_event_t *event) {
     ipc_endpoint_t *endpoint = handle->private;
 
@@ -256,10 +273,12 @@ static void connection_object_unwait(object_handle_t *handle, object_event_t *ev
 
 /** Connection object type. */
 static const object_type_t connection_object_type = {
-    .id     = OBJECT_TYPE_CONNECTION,
-    .close  = connection_object_close,
-    .wait   = connection_object_wait,
-    .unwait = connection_object_unwait,
+    .id             = OBJECT_TYPE_CONNECTION,
+    .close          = connection_object_close,
+    .name           = connection_object_name,
+    .name_unsafe    = connection_object_name_unsafe,
+    .wait           = connection_object_wait,
+    .unwait         = connection_object_unwait,
 };
 
 /** Receive a message on an endpoint.
@@ -438,7 +457,7 @@ status_t ipc_connection_create(
     server->flags   = flags;
     server->ops     = ops;
     server->private = private;
-    server->process = NULL;
+    server->process = kernel_proc;
 
     client->flags   = 0;
     client->ops     = NULL;
@@ -1000,7 +1019,7 @@ status_t kern_connection_open_remote(handle_t handle, handle_t *_process) {
     {
         MUTEX_SCOPED_LOCK(lock, &endpoint->conn->lock);
 
-        if (endpoint->remote->process) {
+        if (endpoint->remote->process && endpoint->remote->process != kernel_proc) {
             ret = process_publish(endpoint->remote->process, NULL, _process);
         } else {
             ret = STATUS_NOT_FOUND;

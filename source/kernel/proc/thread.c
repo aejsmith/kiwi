@@ -1018,12 +1018,25 @@ __init_text void thread_init(void) {
  * System calls.
  */
 
-/** Closes a handle to a thread. */
 static void thread_object_close(object_handle_t *handle) {
     thread_release(handle->private);
 }
 
-/** Signal that a thread is being waited for. */
+static char *thread_object_name(object_handle_t *handle) {
+    thread_t *thread = handle->private;
+
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%" PRId32, thread->id);
+    return kstrdup(buf, MM_KERNEL);
+}
+
+static char *thread_object_name_unsafe(object_handle_t *handle, char *buf, size_t size) {
+    thread_t *thread = handle->private;
+
+    snprintf(buf, size, "%" PRId32, thread->id);
+    return buf;
+}
+
 static status_t thread_object_wait(object_handle_t *handle, object_event_t *event) {
     thread_t *thread = handle->private;
 
@@ -1044,7 +1057,6 @@ static status_t thread_object_wait(object_handle_t *handle, object_event_t *even
     }
 }
 
-/** Stop waiting for a thread. */
 static void thread_object_unwait(object_handle_t *handle, object_event_t *event) {
     thread_t *thread = handle->private;
 
@@ -1057,11 +1069,13 @@ static void thread_object_unwait(object_handle_t *handle, object_event_t *event)
 
 /** Thread object type. */
 static const object_type_t thread_object_type = {
-    .id     = OBJECT_TYPE_THREAD,
-    .flags  = OBJECT_TRANSFERRABLE,
-    .close  = thread_object_close,
-    .wait   = thread_object_wait,
-    .unwait = thread_object_unwait,
+    .id             = OBJECT_TYPE_THREAD,
+    .flags          = OBJECT_TRANSFERRABLE,
+    .name           = thread_object_name,
+    .name_unsafe    = thread_object_name_unsafe,
+    .close          = thread_object_close,
+    .wait           = thread_object_wait,
+    .unwait         = thread_object_unwait,
 };
 
 static status_t thread_handle_lookup(handle_t handle, thread_t **_thread) {
