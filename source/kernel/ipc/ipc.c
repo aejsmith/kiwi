@@ -1274,7 +1274,6 @@ status_t kern_connection_receive(
     /* Save the message if there is data or a handle to retrieve, otherwise
      * free it. */
     if (ipc_kmessage_has_attachment(kmsg)) {
-        /* Hmm, not sure whether this is actually necessary. */
         if (endpoint->pending)
             ipc_kmessage_release(endpoint->pending);
 

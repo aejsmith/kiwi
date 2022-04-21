@@ -1338,7 +1338,7 @@ static vm_region_t *alloc_region(
     candidate->access = access;
     candidate->flags  = flags;
     candidate->state  = VM_REGION_ALLOCATED;
-    candidate->name  = name;
+    candidate->name   = name;
 
     avl_tree_insert(&as->tree, candidate->start, &candidate->tree_link);
 

@@ -256,6 +256,7 @@ static status_t attach_handle(object_handle_t *handle, handle_t *_id, handle_t *
 }
 
 static void free_callback(object_wait_t *wait) {
+    object_handle_release(wait->handle);
     kfree(wait->interrupt);
     slab_cache_free(object_wait_cache, wait);
 }
