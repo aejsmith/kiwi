@@ -32,6 +32,7 @@ public:
 
 private:
     Kiwi::Core::Handle m_port;
+    size_t m_nextTerminalId;
 };
 
 extern TerminalService g_terminalService;

@@ -49,7 +49,8 @@ static constexpr uint64_t kSupportedUserFileOps =
     USER_FILE_SUPPORTED_OP_WAIT |
     USER_FILE_SUPPORTED_OP_UNWAIT;
 
-Terminal::Terminal(Kiwi::Core::Connection connection) :
+Terminal::Terminal(size_t id, Kiwi::Core::Connection connection) :
+    m_id                (id),
     m_connection        (std::move(connection)),
     m_exit              (false),
     m_sessionId         (0),
@@ -92,8 +93,12 @@ Terminal::~Terminal() {}
 void Terminal::run() {
     status_t ret;
 
+    std::string name;
+    name += "terminal-";
+    name += std::to_string(m_id);
+
     ret = kern_user_file_create(
-        FILE_TYPE_CHAR, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0,
+        name.c_str(), FILE_TYPE_CHAR, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0,
         kSupportedUserFileOps,
         m_userFileConnection.attach(), m_userFile.attach());
     if (ret != STATUS_SUCCESS) {

@@ -36,7 +36,9 @@
 
 TerminalService g_terminalService;
 
-TerminalService::TerminalService() {}
+TerminalService::TerminalService() :
+    m_nextTerminalId (0)
+{}
 
 TerminalService::~TerminalService() {}
 
@@ -70,7 +72,8 @@ int TerminalService::run() {
         }
 
         /* Each connection (terminal) runs in its own thread. */
-        Terminal *terminal = new Terminal(std::move(connection));
+        size_t id = m_nextTerminalId++;
+        Terminal *terminal = new Terminal(id, std::move(connection));
         terminal->run();
     }
 

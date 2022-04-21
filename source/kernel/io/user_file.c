@@ -41,6 +41,7 @@
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
+#include <mm/safe.h>
 #include <mm/slab.h>
 
 #include <assert.h>
@@ -67,6 +68,7 @@ typedef struct user_file {
     ipc_endpoint_t *endpoint;           /**< Endpoint for kernel side of the connection. */
     list_t ops;                         /**< Outstanding operations. */
     uint64_t next_serial;               /**< Next operation serial number. */
+    char *name;                         /**< Name of the file (can be NULL). */
 } user_file_t;
 
 static slab_cache_t *user_file_op_cache;
@@ -278,8 +280,45 @@ static void user_file_close(file_handle_t *handle) {
 
         assert(list_empty(&file->ops));
 
+        kfree(file->name);
         kfree(file);
     }
+}
+
+static char *user_file_name(file_handle_t *handle) {
+    user_file_t *file = handle->user_file;
+
+    const char *prefix      = "user";
+    const size_t prefix_len = strlen(prefix);
+
+    if (file->name) {
+        size_t name_len = strlen(file->name);
+        size_t len      = name_len + prefix_len + 2;
+        char *name      = kmalloc(len, MM_KERNEL);
+
+        memcpy(&name[0], prefix, prefix_len);
+        name[prefix_len] = ':';
+        memcpy(&name[prefix_len + 1], file->name, name_len + 1);
+
+        return name;
+    } else {
+        return kstrdup(prefix, MM_KERNEL);
+    }
+}
+
+static char *user_file_name_unsafe(file_handle_t *handle, char *buf, size_t size) {
+    user_file_t *file = handle->user_file;
+
+    const char *prefix = "user";
+
+    if (file->name) {
+        snprintf(buf, size, "%s:%s", prefix, file->name);
+    } else {
+        strncpy(buf, prefix, size);
+        buf[size - 1] = 0;
+    }
+
+    return buf;
 }
 
 static status_t user_file_wait(file_handle_t *handle, object_event_t *event) {
@@ -500,13 +539,15 @@ static status_t user_file_request(
 }
 
 static const file_ops_t user_file_ops = {
-    .open    = user_file_open,
-    .close   = user_file_close,
-    .wait    = user_file_wait,
-    .unwait  = user_file_unwait,
-    .io      = user_file_io,
-    .info    = user_file_info,
-    .request = user_file_request,
+    .open           = user_file_open,
+    .close          = user_file_close,
+    .name           = user_file_name,
+    .name_unsafe    = user_file_name_unsafe,
+    .wait           = user_file_wait,
+    .unwait         = user_file_unwait,
+    .io             = user_file_io,
+    .info           = user_file_info,
+    .request        = user_file_request,
 };
 
 /**
@@ -521,6 +562,7 @@ static const file_ops_t user_file_ops = {
  *    performed on the file will result in a message being sent by the kernel
  *    over this connection, and replies complete the operations.
  *
+ * @param name          File name for informational purposes (can be NULL).
  * @param type          Type of the file.
  * @param access        Requested access rights for the file handle.
  * @param flags         Behaviour flags for the file handle.
@@ -534,13 +576,20 @@ static const file_ops_t user_file_ops = {
  *                      handle table.
  */
 status_t kern_user_file_create(
-    file_type_t type, uint32_t access, uint32_t flags, uint64_t supported_ops,
-    handle_t *_conn, handle_t *_file)
+    const char *name, file_type_t type, uint32_t access, uint32_t flags,
+    uint64_t supported_ops, handle_t *_conn, handle_t *_file)
 {
     status_t ret;
 
     if (!_conn || !_file)
         return STATUS_INVALID_ARG;
+
+    char *kname = NULL;
+    if (name) {
+        ret = strndup_from_user(name, FS_PATH_MAX, &kname);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
 
     user_file_t *file = kmalloc(sizeof(user_file_t), MM_KERNEL);
 
@@ -553,6 +602,7 @@ status_t kern_user_file_create(
     file->supported_ops = supported_ops;
     file->endpoint      = NULL;
     file->next_serial   = 0;
+    file->name          = kname;
 
     // TODO: Initialize ACL. To what?
 
@@ -583,6 +633,7 @@ err_close_conn:
     object_handle_detach(conn, _conn);
 
 err_free:
+    kfree(file->name);
     kfree(file);
     return ret;
 }

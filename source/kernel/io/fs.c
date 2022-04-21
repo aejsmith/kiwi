@@ -1046,8 +1046,6 @@ static char *fs_file_name(file_handle_t *handle) {
     return name;
 }
 
-
-
 /** Get the name of a FS object in KDB context. */
 static char *fs_file_name_unsafe(file_handle_t *handle, char *buf, size_t size) {
     char *path = fs_dentry_path_inplace_unsafe(handle->entry, buf, size);

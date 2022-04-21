@@ -31,7 +31,7 @@
 
 class Terminal {
 public:
-    Terminal(Kiwi::Core::Connection connection);
+    Terminal(size_t id, Kiwi::Core::Connection connection);
     ~Terminal();
 
     void run();
@@ -88,6 +88,7 @@ private:
     status_t setProcessGroup(pid_t caller, pid_t pgid);
 
 private:
+    size_t m_id;
     Kiwi::Core::Connection m_connection;
     std::thread m_thread;
     Kiwi::Core::Handle m_userFile;
