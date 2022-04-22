@@ -289,7 +289,7 @@ status_t device_create_etc(
     device->file.type = (ops) ? ops->type : FILE_TYPE_CHAR;
     device->name      = kstrdup(name, MM_KERNEL);
     device->module    = module;
-    device->time      = system_time();
+    device->time      = unix_time();
     device->parent    = parent;
     device->ops       = ops;
     device->private   = private;
