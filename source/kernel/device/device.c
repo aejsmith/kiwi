@@ -1169,8 +1169,11 @@ __init_text void device_init(void) {
 
     device_ctor(device_root_dir);
 
-    device_root_dir->name = (char *)"<root>";
-    device_root_dir->time = boot_time();
+    device_root_dir->file.ops  = &device_file_ops;
+    device_root_dir->file.type = FILE_TYPE_CHAR;
+    device_root_dir->name      = (char *)"<root>";
+    device_root_dir->time      = boot_time();
+    device_root_dir->module    = &kernel_module;
 
     /* Create standard device directories. */
     ret = device_create_dir("bus", device_root_dir, &device_bus_dir);
