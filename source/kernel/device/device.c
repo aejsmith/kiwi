@@ -1125,6 +1125,36 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
     return KDB_SUCCESS;
 }
 
+static status_t null_device_io(device_t *device, file_handle_t *handle, io_request_t *request) {
+    if (request->op == IO_OP_WRITE) {
+        request->transferred = request->total;
+    } else {
+        request->transferred = 0;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+static const device_ops_t null_device_ops = {
+    .type = FILE_TYPE_CHAR,
+    .io   = null_device_io,
+};
+
+static void null_device_init(void) {
+    device_attr_t attrs[] = {
+        { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = "null" } },
+    };
+
+    device_t *device;
+    status_t ret = device_create(
+        "null", device_virtual_dir, &null_device_ops, NULL, attrs,
+        array_size(attrs), &device);
+    if (ret != STATUS_SUCCESS)
+        fatal("Failed to register null device (%d)", ret);
+
+    device_publish(device);
+}
+
 /** Early device initialization. */
 __init_text void device_early_init(void) {
     initcall_run(INITCALL_TYPE_EARLY_DEVICE);
@@ -1165,7 +1195,8 @@ __init_text void device_init(void) {
     device_publish(device_class_dir);
     device_publish(device_virtual_dir);
 
-    /* Register the KDB command. */
+    null_device_init();
+
     kdb_register_command("device", "Examine the device tree.", kdb_cmd_device);
 }
 

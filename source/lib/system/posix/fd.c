@@ -123,6 +123,8 @@ int open(const char *path, int oflag, ...) {
 
             /* Fallthrough. */
         case FILE_TYPE_REGULAR:
+        case FILE_TYPE_BLOCK:
+        case FILE_TYPE_CHAR:
             #if 0
             if (oflag & O_CREAT) {
                 /* Obtain the creation mask. */
