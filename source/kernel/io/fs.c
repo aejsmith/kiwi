@@ -519,20 +519,28 @@ static status_t fs_dentry_lookup(fs_dentry_t *parent, const char *name, fs_dentr
     return STATUS_SUCCESS;
 }
 
-/** Look up an entry in the filesystem.
- * @param path          Path string to look up (will be modified).
- * @param entry         Instantiated entry to begin lookup at (NULL for current
- *                      working directory). Will be released upon return.
- * @param flags         Lookup behaviour flags.
- * @param nest          Symbolic link nesting count.
- * @param _entry        Where to store pointer to entry found (referenced,
- *                      and locked).
- * @return              Status code describing result of the operation. */
 static status_t fs_lookup_internal(
     char *path, fs_dentry_t *entry, unsigned flags, unsigned nest,
-    fs_dentry_t **_entry)
+    fs_dentry_t **_entry, char **_dev_path)
 {
     status_t ret;
+
+    *_entry = NULL;
+    if (_dev_path)
+        *_dev_path = NULL;
+
+    const char *device_prefix      = "//@/";
+    const size_t device_prefix_len = 4;
+
+    if (strncmp(path, device_prefix, device_prefix_len) == 0) {
+        if (_dev_path) {
+            /* Keep initial '/'. */
+            *_dev_path = kstrdup(path + device_prefix_len - 1, MM_KERNEL);
+            return STATUS_SUCCESS;
+        } else {
+            return STATUS_NOT_SUPPORTED;
+        }
+    }
 
     if (path[0] == '/') {
         /* Drop the entry we were provided, if any. */
@@ -609,19 +617,21 @@ static status_t fs_lookup_internal(
             /* Recurse to find the link destination. The check above ensures we
              * do not infinitely recurse. TODO: although we have a limit on
              * this, perhaps it would be better to avoid recursion altogether. */
-            ret = fs_lookup_internal(link, prev, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, nest, &entry);
+            ret = fs_lookup_internal(link, prev, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, nest, &entry, _dev_path);
             if (ret != STATUS_SUCCESS) {
                 kfree(link);
                 return ret;
             }
 
-            /* Entry is locked and instantiated upon return. */
-            assert(entry->node);
-            node = entry->node;
+            if (entry) {
+                /* Entry is locked and instantiated upon return. */
+                assert(entry->node);
+                node = entry->node;
 
-            dprintf(
-                "fs: followed '%s' to '%s' (%" PRIu16 ":%" PRIu64 ")\n",
-                link, entry->name, entry->mount->id, node->id);
+                dprintf(
+                    "fs: followed '%s' to '%s' (%" PRIu16 ":%" PRIu64 ")\n",
+                    link, entry->name, entry->mount->id, node->id);
+            }
 
             kfree(link);
         } else if (node->file.type == FILE_TYPE_SYMLINK) {
@@ -631,12 +641,16 @@ static status_t fs_lookup_internal(
 
         if (!tok) {
             /* The last token was the last element of the path string, return
-             * the entry we're currently on. */
-            if (!(flags & FS_LOOKUP_LOCK))
+             * the entry (or device path) we're currently on. */
+            if (entry && !(flags & FS_LOOKUP_LOCK))
                 mutex_unlock(&entry->lock);
 
             *_entry = entry;
             return STATUS_SUCCESS;
+        } else if (!entry) {
+            /* We must have received a device path from a symlink lookup, we
+             * don't support descending into child devices from here. */
+            return STATUS_NOT_DIR;
         } else if (node->file.type != FILE_TYPE_DIR) {
             /* The previous token was not a directory: this means the path
              * string is trying to treat a non-directory as a directory. Reject
@@ -712,19 +726,32 @@ err_release:
 }
 
 /**
- * Looks up an entry in the filesystem. If the path is a relative path (one
- * that does not begin with a '/' character), then it will be looked up
- * relative to the current directory in the current process' I/O context.
- * Otherwise, the starting '/' character will be taken off and the path will be
- * looked up relative to the current I/O context's root.
+ * Looks up an entry in the filesystem.
+ *
+ * If the path is a relative path (one that does not begin with a '/'), then it
+ * will be looked up relative to the current directory in the current process'
+ * I/O context. Otherwise, the starting '/' character will be taken off and the
+ * path will be looked up relative to the current I/O context's root.
+ *
+ * Paths that start with "/!/" are used to open a device through the filesystem,
+ * to give device access to non-native software. They are also supported as
+ * symlink destinations. If the lookup reaches a device path, then it will be
+ * returned in the _dev_path argument, and the caller should use this to access
+ * the device.
  *
  * @param path          Path string to look up.
  * @param flags         Lookup behaviour flags.
  * @param _entry        Where to store pointer to entry found (instantiated).
+ * @param _dev_path     Where to return pointer to kmalloc()'d device path
+ *                      reached. If a non-null path is returned here upon
+ *                      success, the value in _entry will be null. Callers can
+ *                      specify null to indicate that they do not support
+ *                      devices, in which case an error will be returned if a
+ *                      device is encountered.
  *
  * @return              Status code describing result of the operation.
  */
-static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **_entry) {
+static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **_entry, char **_dev_path) {
     assert(path);
     assert(_entry);
 
@@ -740,7 +767,7 @@ static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **_entry
     char *dup = kstrdup(path, MM_KERNEL);
 
     /* Look up the path string. */
-    status_t ret = fs_lookup_internal(dup, NULL, flags, 0, _entry);
+    status_t ret = fs_lookup_internal(dup, NULL, flags, 0, _entry, _dev_path);
     kfree(dup);
     rwlock_unlock(&curr_proc->io.lock);
     return ret;
@@ -870,7 +897,7 @@ static status_t fs_create_prepare(const char *path, fs_dentry_t **_entry) {
 
     /* Look up the parent entry. */
     fs_dentry_t *parent;
-    ret = fs_lookup(dir, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, &parent);
+    ret = fs_lookup(dir, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, &parent, NULL);
     if (ret != STATUS_SUCCESS)
         goto out_free_name;
 
@@ -1211,7 +1238,8 @@ status_t fs_open(
     /* Look up the filesystem entry. */
     fs_node_t *node;
     fs_dentry_t *entry;
-    ret = fs_lookup(path, FS_LOOKUP_FOLLOW, &entry);
+    char *dev_path;
+    ret = fs_lookup(path, FS_LOOKUP_FOLLOW, &entry, &dev_path);
     if (ret != STATUS_SUCCESS) {
         if (ret != STATUS_NOT_FOUND || create == FS_OPEN)
             return ret;
@@ -1222,6 +1250,15 @@ status_t fs_open(
             return ret;
 
         node = entry->node;
+    } else if (dev_path) {
+        if (create == FS_MUST_CREATE) {
+            ret = STATUS_NOT_SUPPORTED;
+        } else {
+            ret = device_open(dev_path, access, flags, _handle);
+        }
+
+        kfree(dev_path);
+        return ret;
     } else if (create == FS_MUST_CREATE) {
         fs_dentry_release(entry);
         return STATUS_ALREADY_EXISTS;
@@ -1331,7 +1368,7 @@ status_t fs_read_symlink(const char *path, char **_target) {
 
     /* Find the link node. */
     fs_dentry_t *entry;
-    ret = fs_lookup(path, 0, &entry);
+    ret = fs_lookup(path, 0, &entry, NULL);
     if (ret != STATUS_SUCCESS)
         return ret;
 
@@ -1452,7 +1489,7 @@ status_t fs_mount(
         mountpoint = NULL;
     } else {
         /* Look up the destination mountpoint. */
-        ret = fs_lookup(path, 0, &mountpoint);
+        ret = fs_lookup(path, 0, &mountpoint, NULL);
         if (ret != STATUS_SUCCESS)
             goto err_unlock;
 
@@ -1629,7 +1666,7 @@ status_t fs_unmount(const char *path, unsigned flags) {
     mutex_lock(&fs_mount_lock);
 
     fs_dentry_t *root;
-    ret = fs_lookup(path, 0, &root);
+    ret = fs_lookup(path, 0, &root, NULL);
     if (ret != STATUS_SUCCESS)
         goto err_unlock;
 
@@ -1790,19 +1827,33 @@ status_t fs_path(object_handle_t *handle, char **_path) {
  * @param info          Information structure to fill in.
  * @return              Status code describing result of the operation. */
 status_t fs_info(const char *path, bool follow, file_info_t *info) {
+    status_t ret;
+
     assert(path);
     assert(info);
 
     fs_dentry_t *entry;
-    status_t ret = fs_lookup(path, (follow) ? FS_LOOKUP_FOLLOW : 0, &entry);
-    if (ret != STATUS_SUCCESS)
+    char *dev_path;
+    ret = fs_lookup(path, (follow) ? FS_LOOKUP_FOLLOW : 0, &entry, &dev_path);
+    if (ret != STATUS_SUCCESS) {
         return ret;
+    } else if (dev_path) {
+        object_handle_t *handle;
+        ret = device_open(dev_path, FILE_ACCESS_READ, 0, &handle);
+        kfree(dev_path);
+        if (ret != STATUS_SUCCESS)
+            return ret;
 
-    memset(info, 0, sizeof(*info));
+        ret = file_info(handle, info);
+        object_handle_release(handle);
+    } else {
+        memset(info, 0, sizeof(*info));
 
-    fs_node_info(entry->node, info);
-    fs_dentry_release(entry);
-    return STATUS_SUCCESS;
+        fs_node_info(entry->node, info);
+        fs_dentry_release(entry);
+    }
+
+    return ret;
 }
 
 /**
@@ -1820,7 +1871,7 @@ status_t fs_link(const char *path, const char *source) {
     status_t ret;
 
     fs_dentry_t *entry;
-    ret = fs_lookup(source, FS_LOOKUP_FOLLOW, &entry);
+    ret = fs_lookup(source, FS_LOOKUP_FOLLOW, &entry, NULL);
     if (ret != STATUS_SUCCESS)
         return ret;
 
@@ -1912,7 +1963,7 @@ status_t fs_unlink(const char *path) {
 
     /* Look up the parent entry. */
     fs_dentry_t *parent;
-    ret = fs_lookup(dir, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, &parent);
+    ret = fs_lookup(dir, FS_LOOKUP_FOLLOW | FS_LOOKUP_LOCK, &parent, NULL);
     if (ret != STATUS_SUCCESS)
         goto out_free_name;
 
@@ -2765,7 +2816,7 @@ status_t kern_fs_set_curr_dir(const char *path) {
         return ret;
 
     fs_dentry_t *entry;
-    ret = fs_lookup(kpath, FS_LOOKUP_FOLLOW, &entry);
+    ret = fs_lookup(kpath, FS_LOOKUP_FOLLOW, &entry, NULL);
     if (ret != STATUS_SUCCESS) {
         goto out_free;
     } else if (entry->node->file.type != FILE_TYPE_DIR) {
@@ -2819,7 +2870,7 @@ status_t kern_fs_set_root_dir(const char *path) {
         return ret;
 
     fs_dentry_t *entry;
-    ret = fs_lookup(kpath, FS_LOOKUP_FOLLOW, &entry);
+    ret = fs_lookup(kpath, FS_LOOKUP_FOLLOW, &entry, NULL);
     if (ret != STATUS_SUCCESS) {
         goto out_free;
     } else if (entry->node->file.type != FILE_TYPE_DIR) {

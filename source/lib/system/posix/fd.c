@@ -150,7 +150,7 @@ int open(const char *path, int oflag, ...) {
             /* Truncate the file if requested. */
             if (oflag & O_TRUNC) {
                 ret = kern_file_resize(handle, 0);
-                if (ret != STATUS_SUCCESS) {
+                if (ret != STATUS_SUCCESS && ret != STATUS_NOT_REGULAR) {
                     kern_handle_close(handle);
                     libsystem_status_to_errno(ret);
                     return -1;
