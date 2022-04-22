@@ -48,6 +48,11 @@
 #  include <zircon/syscalls.h>
 #endif
 
+#if defined(__Kiwi__)
+#  include <kernel/status.h>
+#  include <kernel/time.h>
+#endif
+
 #if __has_include(<mach/mach_time.h>)
 # include <mach/mach_time.h>
 #endif
@@ -279,6 +284,17 @@ static steady_clock::time_point __libcpp_steady_clock_now() noexcept {
 #    pragma comment(lib, "zircon")
 
   return steady_clock::time_point(nanoseconds(_zx_clock_get_monotonic()));
+}
+
+#  elif defined(__Kiwi__)
+
+static steady_clock::time_point __libcpp_steady_clock_now() noexcept {
+  nstime_t time;
+  status_t ret = kern_time_get(TIME_SYSTEM, &time);
+  if (ret != STATUS_SUCCESS)
+    __throw_system_error(EINVAL, "failed to get system time");
+
+  return steady_clock::time_point(nanoseconds(time));
 }
 
 #  elif defined(CLOCK_MONOTONIC)
