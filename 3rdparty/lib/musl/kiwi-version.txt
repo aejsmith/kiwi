@@ -1,0 +1,2 @@
+1.2.3
+Kiwi modifications indicated by __Kiwi__ defines (with original code in the else)
