@@ -101,10 +101,6 @@ typedef uint64_t uintmax_t;
 #   define __UINT64_C(x)    ((uint_least64_t)x ## ull)
 #endif
 
-/* ISO C99 specifies that in C++ these macros should only be defined if
- * explicitly requested */
-#if !defined(__cplusplus) || defined(__STDC_LIMIT_MACROS)
-
 #define INT8_MIN            (-128)
 #define INT8_MAX            127
 #define UINT8_MAX           255
@@ -159,11 +155,6 @@ typedef uint64_t uintmax_t;
 #   define SIZE_MAX         UINT32_MAX
 #endif
 
-#endif
-
-/* Same as above */
-#if !defined(__cplusplus) || defined(__STDC_CONSTANT_MACROS)
-
 #define INT8_C(x)           __INT8_C(x)
 #define INT16_C(x)          __INT16_C(x)
 #define INT32_C(x)          __INT32_C(x)
@@ -176,5 +167,3 @@ typedef uint64_t uintmax_t;
 
 #define INTMAX_C(x)         __INT64_C(x)
 #define UINTMAX_C(x)        __UINT64_C(x)
-
-#endif
