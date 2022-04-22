@@ -1,5 +1,5 @@
 // -*- C++ -*-
-//===--------------------------- limits.h ---------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -43,7 +43,7 @@ Macros:
 #pragma GCC system_header
 #endif
 
-#if !defined(__GNUC__) || defined(__Kiwi__)
+#ifndef __GNUC__
 #include_next <limits.h>
 #else
 // GCC header limits.h recursively includes itself through another header called
@@ -61,4 +61,4 @@ Macros:
 #include_next <limits.h>
 #endif // __GNUC__
 
-#endif  // _LIBCPP_LIMITS_H
+#endif // _LIBCPP_LIMITS_H

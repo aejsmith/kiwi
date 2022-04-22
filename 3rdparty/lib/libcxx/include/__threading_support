@@ -10,10 +10,17 @@
 #ifndef _LIBCPP_THREADING_SUPPORT
 #define _LIBCPP_THREADING_SUPPORT
 
+#include <__availability>
 #include <__config>
+#include <__thread/poll_with_backoff.h>
 #include <chrono>
-#include <iosfwd>
 #include <errno.h>
+#include <iosfwd>
+#include <limits>
+
+#ifdef __MVS__
+# include <__support/ibm/nanosleep.h>
+#endif
 
 #ifndef _LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER
 #pragma GCC system_header
@@ -47,9 +54,6 @@
 typedef ::timespec __libcpp_timespec_t;
 #endif // !defined(_LIBCPP_HAS_NO_THREADS)
 
-_LIBCPP_PUSH_MACROS
-#include <__undef_macros>
-
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 #if !defined(_LIBCPP_HAS_NO_THREADS)
@@ -70,11 +74,14 @@ typedef pthread_once_t __libcpp_exec_once_flag;
 #define _LIBCPP_EXEC_ONCE_INITIALIZER PTHREAD_ONCE_INIT
 
 // Thread id
-typedef pthread_t __libcpp_thread_id;
+#if defined(__MVS__)
+  typedef unsigned long long __libcpp_thread_id;
+#else
+  typedef pthread_t __libcpp_thread_id;
+#endif
 
 // Thread
-#define _LIBCPP_NULL_THREAD 0U
-
+#define _LIBCPP_NULL_THREAD ((__libcpp_thread_t()))
 typedef pthread_t __libcpp_thread_t;
 
 // Thread Local Storage
@@ -245,32 +252,6 @@ int __libcpp_tls_set(__libcpp_tls_key __key, void *__p);
 #if (!defined(_LIBCPP_HAS_THREAD_LIBRARY_EXTERNAL) || \
      defined(_LIBCPP_BUILDING_THREAD_LIBRARY_EXTERNAL))
 
-namespace __thread_detail {
-
-inline __libcpp_timespec_t __convert_to_timespec(const chrono::nanoseconds& __ns)
-{
-  using namespace chrono;
-  seconds __s = duration_cast<seconds>(__ns);
-  __libcpp_timespec_t __ts;
-  typedef decltype(__ts.tv_sec) __ts_sec;
-  const __ts_sec __ts_sec_max = numeric_limits<__ts_sec>::max();
-
-  if (__s.count() < __ts_sec_max)
-  {
-    __ts.tv_sec = static_cast<__ts_sec>(__s.count());
-    __ts.tv_nsec = static_cast<decltype(__ts.tv_nsec)>((__ns - __s).count());
-  }
-  else
-  {
-    __ts.tv_sec = __ts_sec_max;
-    __ts.tv_nsec = 999999999; // (10^9 - 1)
-  }
-
-  return __ts;
-}
-
-}
-
 #if defined(_LIBCPP_HAS_THREAD_API_PTHREAD)
 
 int __libcpp_recursive_mutex_init(__libcpp_recursive_mutex_t *__m)
@@ -307,7 +288,7 @@ bool __libcpp_recursive_mutex_trylock(__libcpp_recursive_mutex_t *__m)
   return pthread_mutex_trylock(__m) == 0;
 }
 
-int __libcpp_recursive_mutex_unlock(__libcpp_mutex_t *__m)
+int __libcpp_recursive_mutex_unlock(__libcpp_recursive_mutex_t *__m)
 {
   return pthread_mutex_unlock(__m);
 }
@@ -374,7 +355,7 @@ int __libcpp_execute_once(__libcpp_exec_once_flag *flag,
 // Returns non-zero if the thread ids are equal, otherwise 0
 bool __libcpp_thread_id_equal(__libcpp_thread_id t1, __libcpp_thread_id t2)
 {
-  return pthread_equal(t1, t2) != 0;
+  return t1 == t2;
 }
 
 // Returns non-zero if t1 < t2, otherwise 0
@@ -385,28 +366,33 @@ bool __libcpp_thread_id_less(__libcpp_thread_id t1, __libcpp_thread_id t2)
 
 // Thread
 bool __libcpp_thread_isnull(const __libcpp_thread_t *__t) {
-  return *__t == 0;
+  return __libcpp_thread_get_id(__t) == 0;
 }
 
 int __libcpp_thread_create(__libcpp_thread_t *__t, void *(*__func)(void *),
                            void *__arg)
 {
-  return pthread_create(__t, 0, __func, __arg);
+  return pthread_create(__t, nullptr, __func, __arg);
 }
 
 __libcpp_thread_id __libcpp_thread_get_current_id()
 {
-  return pthread_self();
+  const __libcpp_thread_t thread = pthread_self();
+  return __libcpp_thread_get_id(&thread);
 }
 
 __libcpp_thread_id __libcpp_thread_get_id(const __libcpp_thread_t *__t)
 {
+#if defined(__MVS__)
+  return __t->__;
+#else
   return *__t;
+#endif
 }
 
 int __libcpp_thread_join(__libcpp_thread_t *__t)
 {
-  return pthread_join(*__t, 0);
+  return pthread_join(*__t, nullptr);
 }
 
 int __libcpp_thread_detach(__libcpp_thread_t *__t)
@@ -421,7 +407,7 @@ void __libcpp_thread_yield()
 
 void __libcpp_thread_sleep_for(const chrono::nanoseconds& __ns)
 {
-   __libcpp_timespec_t __ts = __thread_detail::__convert_to_timespec(__ns);
+   __libcpp_timespec_t __ts = _VSTD::__convert_to_timespec<__libcpp_timespec_t>(__ns);
    while (nanosleep(&__ts, &__ts) == -1 && errno == EINTR);
 }
 
@@ -458,7 +444,7 @@ bool __libcpp_recursive_mutex_trylock(__libcpp_recursive_mutex_t *__m)
   return mtx_trylock(__m) == thrd_success;
 }
 
-int __libcpp_recursive_mutex_unlock(__libcpp_mutex_t *__m)
+int __libcpp_recursive_mutex_unlock(__libcpp_recursive_mutex_t *__m)
 {
   return mtx_unlock(__m) == thrd_success ? 0 : EINVAL;
 }
@@ -541,7 +527,7 @@ bool __libcpp_thread_id_less(__libcpp_thread_id t1, __libcpp_thread_id t2)
 
 // Thread
 bool __libcpp_thread_isnull(const __libcpp_thread_t *__t) {
-  return *__t == 0;
+  return __libcpp_thread_get_id(__t) == 0;
 }
 
 int __libcpp_thread_create(__libcpp_thread_t *__t, void *(*__func)(void *),
@@ -578,7 +564,7 @@ void __libcpp_thread_yield()
 
 void __libcpp_thread_sleep_for(const chrono::nanoseconds& __ns)
 {
-   __libcpp_timespec_t __ts = __thread_detail::__convert_to_timespec(__ns);
+   __libcpp_timespec_t __ts = _VSTD::__convert_to_timespec<__libcpp_timespec_t>(__ns);
   thrd_sleep(&__ts, nullptr);
 }
 
@@ -600,6 +586,7 @@ int __libcpp_tls_set(__libcpp_tls_key __key, void *__p)
 
 #endif
 
+
 #endif // !_LIBCPP_HAS_THREAD_LIBRARY_EXTERNAL || _LIBCPP_BUILDING_THREAD_LIBRARY_EXTERNAL
 
 class _LIBCPP_TYPE_VIS thread;
@@ -610,7 +597,7 @@ namespace this_thread
 
 _LIBCPP_INLINE_VISIBILITY __thread_id get_id() _NOEXCEPT;
 
-}  // this_thread
+} // namespace this_thread
 
 template<> struct hash<__thread_id>;
 
@@ -680,12 +667,10 @@ get_id() _NOEXCEPT
     return __libcpp_thread_get_current_id();
 }
 
-}  // this_thread
+} // namespace this_thread
 
 #endif // !_LIBCPP_HAS_NO_THREADS
 
 _LIBCPP_END_NAMESPACE_STD
-
-_LIBCPP_POP_MACROS
 
 #endif // _LIBCPP_THREADING_SUPPORT

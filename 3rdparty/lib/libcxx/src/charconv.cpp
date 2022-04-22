@@ -1,4 +1,4 @@
-//===------------------------- charconv.cpp -------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -9,30 +9,17 @@
 #include "charconv"
 #include <string.h>
 
+#include "include/ryu/digit_table.h"
+#include "include/to_chars_floating_point.h"
+
 _LIBCPP_BEGIN_NAMESPACE_STD
 
 namespace __itoa
 {
 
-static constexpr char cDigitsLut[200] = {
-    '0', '0', '0', '1', '0', '2', '0', '3', '0', '4', '0', '5', '0', '6', '0',
-    '7', '0', '8', '0', '9', '1', '0', '1', '1', '1', '2', '1', '3', '1', '4',
-    '1', '5', '1', '6', '1', '7', '1', '8', '1', '9', '2', '0', '2', '1', '2',
-    '2', '2', '3', '2', '4', '2', '5', '2', '6', '2', '7', '2', '8', '2', '9',
-    '3', '0', '3', '1', '3', '2', '3', '3', '3', '4', '3', '5', '3', '6', '3',
-    '7', '3', '8', '3', '9', '4', '0', '4', '1', '4', '2', '4', '3', '4', '4',
-    '4', '5', '4', '6', '4', '7', '4', '8', '4', '9', '5', '0', '5', '1', '5',
-    '2', '5', '3', '5', '4', '5', '5', '5', '6', '5', '7', '5', '8', '5', '9',
-    '6', '0', '6', '1', '6', '2', '6', '3', '6', '4', '6', '5', '6', '6', '6',
-    '7', '6', '8', '6', '9', '7', '0', '7', '1', '7', '2', '7', '3', '7', '4',
-    '7', '5', '7', '6', '7', '7', '7', '8', '7', '9', '8', '0', '8', '1', '8',
-    '2', '8', '3', '8', '4', '8', '5', '8', '6', '8', '7', '8', '8', '8', '9',
-    '9', '0', '9', '1', '9', '2', '9', '3', '9', '4', '9', '5', '9', '6', '9',
-    '7', '9', '8', '9', '9'};
-
 template <typename T>
 inline _LIBCPP_INLINE_VISIBILITY char*
-append1(char* buffer, T i)
+append1(char* buffer, T i) noexcept
 {
     *buffer = '0' + static_cast<char>(i);
     return buffer + 1;
@@ -40,29 +27,29 @@ append1(char* buffer, T i)
 
 template <typename T>
 inline _LIBCPP_INLINE_VISIBILITY char*
-append2(char* buffer, T i)
+append2(char* buffer, T i) noexcept
 {
-    memcpy(buffer, &cDigitsLut[(i)*2], 2);
+    memcpy(buffer, &__DIGIT_TABLE[(i)*2], 2);
     return buffer + 2;
 }
 
 template <typename T>
 inline _LIBCPP_INLINE_VISIBILITY char*
-append3(char* buffer, T i)
+append3(char* buffer, T i) noexcept
 {
     return append2(append1(buffer, (i) / 100), (i) % 100);
 }
 
 template <typename T>
 inline _LIBCPP_INLINE_VISIBILITY char*
-append4(char* buffer, T i)
+append4(char* buffer, T i) noexcept
 {
     return append2(append2(buffer, (i) / 100), (i) % 100);
 }
 
 template <typename T>
 inline _LIBCPP_INLINE_VISIBILITY char*
-append2_no_zeros(char* buffer, T v)
+append2_no_zeros(char* buffer, T v) noexcept
 {
     if (v < 10)
         return append1(buffer, v);
@@ -72,7 +59,7 @@ append2_no_zeros(char* buffer, T v)
 
 template <typename T>
 inline _LIBCPP_INLINE_VISIBILITY char*
-append4_no_zeros(char* buffer, T v)
+append4_no_zeros(char* buffer, T v) noexcept
 {
     if (v < 100)
         return append2_no_zeros(buffer, v);
@@ -84,7 +71,7 @@ append4_no_zeros(char* buffer, T v)
 
 template <typename T>
 inline _LIBCPP_INLINE_VISIBILITY char*
-append8_no_zeros(char* buffer, T v)
+append8_no_zeros(char* buffer, T v) noexcept
 {
     if (v < 10000)
     {
@@ -99,7 +86,7 @@ append8_no_zeros(char* buffer, T v)
 }
 
 char*
-__u32toa(uint32_t value, char* buffer)
+__u32toa(uint32_t value, char* buffer) noexcept
 {
     if (value < 100000000)
     {
@@ -120,7 +107,7 @@ __u32toa(uint32_t value, char* buffer)
 }
 
 char*
-__u64toa(uint64_t value, char* buffer)
+__u64toa(uint64_t value, char* buffer) noexcept
 {
     if (value < 100000000)
     {
@@ -156,5 +143,54 @@ __u64toa(uint64_t value, char* buffer)
 }
 
 }  // namespace __itoa
+
+// The original version of floating-point to_chars was written by Microsoft and
+// contributed with the following license.
+
+// Copyright (c) Microsoft Corporation.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+// This implementation is dedicated to the memory of Mary and Thavatchai.
+
+to_chars_result to_chars(char* __first, char* __last, float __value) {
+  return _Floating_to_chars<_Floating_to_chars_overload::_Plain>(__first, __last, __value, chars_format{}, 0);
+}
+
+to_chars_result to_chars(char* __first, char* __last, double __value) {
+  return _Floating_to_chars<_Floating_to_chars_overload::_Plain>(__first, __last, __value, chars_format{}, 0);
+}
+
+to_chars_result to_chars(char* __first, char* __last, long double __value) {
+  return _Floating_to_chars<_Floating_to_chars_overload::_Plain>(__first, __last, static_cast<double>(__value),
+                                                                 chars_format{}, 0);
+}
+
+to_chars_result to_chars(char* __first, char* __last, float __value, chars_format __fmt) {
+  return _Floating_to_chars<_Floating_to_chars_overload::_Format_only>(__first, __last, __value, __fmt, 0);
+}
+
+to_chars_result to_chars(char* __first, char* __last, double __value, chars_format __fmt) {
+  return _Floating_to_chars<_Floating_to_chars_overload::_Format_only>(__first, __last, __value, __fmt, 0);
+}
+
+to_chars_result to_chars(char* __first, char* __last, long double __value, chars_format __fmt) {
+  return _Floating_to_chars<_Floating_to_chars_overload::_Format_only>(__first, __last, static_cast<double>(__value),
+                                                                       __fmt, 0);
+}
+
+to_chars_result to_chars(char* __first, char* __last, float __value, chars_format __fmt, int __precision) {
+  return _Floating_to_chars<_Floating_to_chars_overload::_Format_precision>(__first, __last, __value, __fmt,
+                                                                            __precision);
+}
+
+to_chars_result to_chars(char* __first, char* __last, double __value, chars_format __fmt, int __precision) {
+  return _Floating_to_chars<_Floating_to_chars_overload::_Format_precision>(__first, __last, __value, __fmt,
+                                                                            __precision);
+}
+
+to_chars_result to_chars(char* __first, char* __last, long double __value, chars_format __fmt, int __precision) {
+  return _Floating_to_chars<_Floating_to_chars_overload::_Format_precision>(
+      __first, __last, static_cast<double>(__value), __fmt, __precision);
+}
 
 _LIBCPP_END_NAMESPACE_STD
