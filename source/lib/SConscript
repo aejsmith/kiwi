@@ -25,7 +25,7 @@ dirs = [
     'kernel',
     'system',
     'compiler-rt',
-    'libm',
+    'm',
     'cxxrt',
     'cxx',
     'kiwi',

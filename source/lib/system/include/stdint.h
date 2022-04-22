@@ -21,25 +21,15 @@
 
 #pragma once
 
-#include <system/defs.h>
-
-typedef signed char int8_t;
-typedef signed short int16_t;
-typedef signed int int32_t;
-#if __WORDSIZE == 64
-    typedef signed long int64_t;
-#else
-    typedef signed long long int64_t;
-#endif
-
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
-#if __WORDSIZE == 64
-    typedef unsigned long uint64_t;
-#else
-    typedef unsigned long long uint64_t;
-#endif
+#define __NEED_int8_t
+#define __NEED_int16_t
+#define __NEED_int32_t
+#define __NEED_int64_t
+#define __NEED_uint8_t
+#define __NEED_uint16_t
+#define __NEED_uint32_t
+#define __NEED_uint64_t
+#include <bits/alltypes.h>
 
 typedef signed char int_least8_t;
 typedef signed short int_least16_t;
