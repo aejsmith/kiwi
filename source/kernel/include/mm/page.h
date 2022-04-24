@@ -39,11 +39,6 @@ typedef struct page_ops {
      * @param page          Page to write back.
      * @return              Status code describing result of the operation. */
     status_t (*flush_page)(struct page *page);
-
-    /** Release a page.
-     * @param page          Page to release.
-     * @param phys          Physical address of page that was unmapped. */
-    void (*release_page)(struct page *page);
 } page_ops_t;
 
 /** Structure describing a page in memory. */

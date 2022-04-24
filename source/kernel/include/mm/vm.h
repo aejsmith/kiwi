@@ -64,6 +64,11 @@ typedef struct vm_region_ops {
      * @param _page         Where to store pointer to page structure.
      * @return              Status code describing result of the operation. */
     status_t (*get_page)(struct vm_region *region, offset_t offset, page_t **_page);
+
+    /** Release a page from the region.
+     * @param region        Region that page was from.
+     * @param page          Page to release. */
+    void (*release_page)(struct vm_region *region, struct page *page);
 } vm_region_ops_t;
 
 /** Structure containing an anonymous memory map. */

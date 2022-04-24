@@ -319,9 +319,19 @@ static status_t vm_cache_flush_page(page_t *page) {
     return (ret == STATUS_SUCCESS);
 }
 
+/** VM cache page operations. */
+static const page_ops_t vm_cache_page_ops = {
+    .flush_page   = vm_cache_flush_page,
+};
+
+/** Get a page from a cache. */
+static status_t vm_cache_get_page(vm_region_t *region, offset_t offset, page_t **_page) {
+    return vm_cache_get_page_internal(region->private, offset, false, _page, NULL, NULL);
+}
+
 /** Release a page in a cache. */
-static void vm_cache_release_page(page_t *page) {
-    vm_cache_t *cache = page->private;
+static void vm_cache_release_page(vm_region_t *region, page_t *page) {
+    vm_cache_t *cache = region->private;
 
     mutex_lock(&cache->lock);
 
@@ -331,20 +341,10 @@ static void vm_cache_release_page(page_t *page) {
     mutex_unlock(&cache->lock);
 }
 
-/** VM cache page operations. */
-static const page_ops_t vm_cache_page_ops = {
-    .flush_page   = vm_cache_flush_page,
-    .release_page = vm_cache_release_page,
-};
-
-/** Get a page from a cache. */
-static status_t vm_cache_get_page(vm_region_t *region, offset_t offset, page_t **_page) {
-    return vm_cache_get_page_internal(region->private, offset, false, _page, NULL, NULL);
-}
-
 /** VM region operations for mapping a VM cache. */
 const vm_region_ops_t vm_cache_region_ops = {
-    .get_page = vm_cache_get_page,
+    .get_page     = vm_cache_get_page,
+    .release_page = vm_cache_release_page,
 };
 
 /** Performs I/O on a cache.

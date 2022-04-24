@@ -429,8 +429,8 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t requeste
             /* Add the page and release the old one. */
             refcount_inc(&page->count);
             amap->pages[idx] = page;
-            if (prev && prev->ops && prev->ops->release_page)
-                prev->ops->release_page(prev);
+            if (prev && region->ops && region->ops->release_page)
+                region->ops->release_page(region, prev);
 
             amap->curr_size++;
             phys = page->addr;
@@ -578,9 +578,9 @@ static bool unmap_page(vm_region_t *region, ptr_t addr) {
         assert(region->handle);
     }
 
-    if (page && page->ops && page->ops->release_page) {
+    if (page && region->ops && region->ops->release_page) {
         offset += region->obj_offset;
-        page->ops->release_page(page);
+        region->ops->release_page(region, page);
     }
 
     return true;
