@@ -52,10 +52,9 @@ typedef struct page {
 
     /** Basic page information. */
     phys_ptr_t addr;                /**< Physical address of page. */
-    unsigned range;                 /**< Memory range that the page belongs to. */
-    unsigned state;                 /**< State of the page. */
-    bool modified : 1;              /**< Whether the page has been modified. */
-    uint8_t unused: 7;
+    uint8_t range;                  /**< Memory range that the page belongs to. */
+    uint8_t state;                  /**< State of the page. */
+    atomic_uint16_t flags;          /**< Flags for the page. */
 
     /** Information about how the page is being used. */
     const page_ops_t *ops;          /**< Operations for the page. */
@@ -66,29 +65,87 @@ typedef struct page {
 } page_t;
 
 /** Possible states of a page. */
-#define PAGE_STATE_ALLOCATED    0   /**< Allocated. */
-#define PAGE_STATE_MODIFIED     1   /**< Modified. */
-#define PAGE_STATE_CACHED       2   /**< Cached. */
-#define PAGE_STATE_FREE         3   /**< Free. */
+enum {
+    /**
+     * Pages which have been allocated are are currently in-use.
+     */
+    PAGE_STATE_ALLOCATED,
+
+    /**
+     * Pages that are not currently mapped, but are holding cached data. Pages
+     * are taken from this queue and freed up when the number of free pages
+     * gets low.
+     */
+    PAGE_STATE_CACHED_CLEAN,
+
+    /**
+     * Pages which have been modified and need to be written to their source.
+     * There is a special thread (the page writer) that periodically takes
+     * pages off this queue and writes them. This is used by the cache system
+     * to ensure that modifications to data get written to the source soon,
+     * rather than staying in memory for a long time without being written.
+     */
+    PAGE_STATE_CACHED_DIRTY,
+
+    /**
+     * Free. This state does not correspond to a page queue, since free pages
+     * are managed in separate free lists.
+     */
+    PAGE_STATE_FREE,
+
+    PAGE_STATE_COUNT,
+    PAGE_QUEUE_COUNT = PAGE_STATE_FREE,
+};
+
+/** Page flags. */
+enum {
+    /**
+     * Page has been written to. This is set when unmapping a page by arch-
+     * specific MMU code if any writes actually occurred to a page while mapped
+     * writable.
+     */
+    PAGE_FLAG_DIRTY = (1<<0),
+};
 
 /** Structure containing physical memory usage statistics. */
 typedef struct page_stats {
-    uint64_t total;                 /**< Total available memory. */
-    uint64_t allocated;             /**< Amount of memory in-use. */
-    uint64_t modified;              /**< Amount of memory containing modified data. */
-    uint64_t cached;                /**< Amount of memory being used by caches. */
-    uint64_t free;                  /**< Amount of free memory. */
+    /** Total available memory. */
+    uint64_t total;
+
+    /** Amount of memory per state. */
+    uint64_t states[PAGE_STATE_COUNT];
 } page_stats_t;
 
 extern bool page_init_done;
 
-extern void page_set_state(page_t *page, unsigned state);
+/** Atomically adds the given flag(s) to the page's flags.
+ * @param page          Page to set for.
+ * @param flags         Flag(s) to set. */
+static inline void page_set_flag(page_t *page, uint16_t flags) {
+    atomic_fetch_or(&page->flags, flags);
+}
+
+/** Atomically clears the given flag(s) from the page's flags.
+ * @param page          Page to set for.
+ * @param flags         Flag(s) to clear. */
+static inline void page_clear_flag(page_t *page, uint16_t flags) {
+    atomic_fetch_and(&page->flags, ~flags);
+}
+
+/** Gets a page's flags.
+ * @param page          Page to get from.
+ * @return              Page flags. */
+static inline uint16_t page_flags(page_t *page) {
+    return atomic_load(&page->flags);
+}
+
+extern void page_set_state(page_t *page, uint8_t state);
 extern page_t *page_lookup(phys_ptr_t addr);
 extern page_t *page_alloc(unsigned mmflag);
 extern void page_free(page_t *page);
 extern page_t *page_copy(page_t *page, unsigned mmflag);
 
-extern void page_stats_get(page_stats_t *stats);
+extern void page_stats(page_stats_t *stats);
 
 extern void page_add_memory_range(phys_ptr_t start, phys_ptr_t end, unsigned freelist);
 

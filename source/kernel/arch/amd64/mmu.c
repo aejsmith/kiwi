@@ -394,9 +394,9 @@ bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t 
 
     page_t *page = page_lookup(entry & PHYS_PAGE_MASK);
 
-    /* If the entry is dirty, set the modified flag on the page. */
+    /* If the entry is dirty, set the dirty flag on the page. */
     if (page && entry & X86_PTE_DIRTY)
-        page->modified = true;
+        page_set_flag(page, PAGE_FLAG_DIRTY);
 
     /* If the entry has been accessed, need to flush TLB entries. A processor
      * will not cache a translation without setting the accessed flag first

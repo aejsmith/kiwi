@@ -204,8 +204,11 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, page_t *page, bool
         page->addr, offset, cache);
 
     /* Mark as modified if requested. */
-    if (dirty)
-        page->modified = true;
+    if (dirty) {
+        page_set_flag(page, PAGE_FLAG_DIRTY);
+    } else {
+        dirty = page_flags(page) & PAGE_FLAG_DIRTY;
+    }
 
     /* Decrease the reference count. */
     if (refcount_dec(&page->count) == 0) {
@@ -215,11 +218,11 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, page_t *page, bool
         if (page->offset >= cache->size) {
             avl_tree_remove(&cache->pages, &page->avl_link);
             page_free(page);
-        } else if (page->modified && cache->ops && cache->ops->write_page) {
-            page_set_state(page, PAGE_STATE_MODIFIED);
+        } else if (dirty && cache->ops && cache->ops->write_page) {
+            page_set_state(page, PAGE_STATE_CACHED_DIRTY);
         } else {
-            page->modified = false;
-            page_set_state(page, PAGE_STATE_CACHED);
+            page_clear_flag(page, PAGE_FLAG_DIRTY);
+            page_set_state(page, PAGE_STATE_CACHED_CLEAN);
         }
     }
 }
@@ -228,23 +231,23 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, page_t *page, bool
 static status_t vm_cache_flush_page_internal(vm_cache_t *cache, page_t *page) {
     /* If the page is outside of the cache, it may be there because the cache
      * was shrunk but with the page in use. Ignore this. Also ignore pages that
-     * aren't modified. */
-    if (page->offset >= cache->size || !page->modified)
+     * aren't dirty. */
+    if (page->offset >= cache->size || !(page_flags(page) & PAGE_FLAG_DIRTY))
         return STATUS_SUCCESS;
 
     /* Should only end up here if the page is writable - when releasing pages
-     * the modified flag is cleared if there is no write operation. */
+     * the dirty flag is cleared if there is no write operation. */
     assert(cache->ops && cache->ops->write_page);
 
     void *mapping = phys_map(page->addr, PAGE_SIZE, MM_KERNEL);
 
     status_t ret = cache->ops->write_page(cache, mapping, page->offset);
     if (ret == STATUS_SUCCESS) {
-        /* Clear modified flag only if the page reference count is zero. This is
+        /* Clear dirty flag only if the page reference count is zero. This is
          * because the page may be mapped into an address space as read-write. */
         if (refcount_get(&page->count) == 0) {
-            page->modified = false;
-            page_set_state(page, PAGE_STATE_CACHED); 
+            page_clear_flag(page, PAGE_FLAG_DIRTY);
+            page_set_state(page, PAGE_STATE_CACHED_CLEAN); 
         }
     }
 
@@ -632,8 +635,8 @@ static kdb_status_t kdb_cmd_cache(int argc, char **argv, kdb_filter_t *filter) {
         page_t *page = avl_tree_entry(iter, page_t, avl_link);
 
         kdb_printf(
-            "  Page 0x%016" PRIxPHYS " - Offset: %-10" PRIu64 " Modified: %-1d Count: %d\n",
-            page->addr, page->offset, page->modified, refcount_get(&page->count));
+            "  Page 0x%016" PRIxPHYS " - Offset: %-10" PRIu64 " Flags: 0x%-4x Count: %d\n",
+            page->addr, page->offset, page_flags(page), refcount_get(&page->count));
     }
 
     return KDB_SUCCESS;

@@ -29,21 +29,10 @@
  * structure associated with a physical address.
  *
  * There are a number of queues that a page can be placed in depending on its
- * state, and these queues are used for various purposes. Below is a
- * description of each queue:
- *  - Allocated: Pages which have been allocated and are currently in-use.
- *  - Modified:  Pages which have been modified and need to be written to their
- *               source. There is a special thread (the page writer) that
- *               periodically takes pages off this queue and writes them. This
- *               functionality is used by the cache system to ensure that
- *               modifications to data get written to the source soon, rather
- *               than staying in memory for a long time without being written.
- *  - Cached:    Pages that are not currently mapped, but are holding cached
- *               data. Pages are taken from this queue and freed up when the
- *               number of free pages gets low.
- * The movement of pages between queues as required is mostly left up to the
- * users of the pages: pages will just be placed on the allocated queue when
- * first allocated, and must be moved manually using page_set_state().
+ * state, see PAGE_STATE_*. The movement of pages between queues as required is
+ * mostly left up to the users of the pages: pages will just be placed on the
+ * allocated queue when first allocated, and must be moved manually using
+ * page_set_state().
  *
  * Free pages are stored in a number of lists. Allocating a single page is just
  * a matter of popping a page from the first list that has free pages. The
@@ -138,9 +127,6 @@ typedef struct page_freelist {
 #define PAGE_WRITER_INTERVAL        secs_to_nsecs(4)
 #define PAGE_WRITER_MAX_PER_RUN     128
 
-/** Number of page queues. */
-#define PAGE_QUEUE_COUNT            3
-
 /** Maximum number of memory ranges. */
 #define MEMORY_RANGE_MAX            32
 
@@ -166,7 +152,7 @@ static size_t boot_range_count __init_data = 0;
 bool page_init_done;
 
 static void page_writer(void *arg1, void *arg2) {
-    page_queue_t *queue = &page_queues[PAGE_STATE_MODIFIED];
+    page_queue_t *queue = &page_queues[PAGE_STATE_CACHED_DIRTY];
     LIST_DEFINE(marker);
 
     while (true) {
@@ -227,11 +213,18 @@ static void remove_page_from_current_queue(page_t *page) {
     page_queue_remove(page->state, page);
 }
 
-/** Sets the state of a page.
- * @param page          Page to set the state of. Must not currently be free.
- * @param state         New state for the page. Must not be PAGE_STATE_FREE,
- *                      pages must be freed through page_free(). */
-void page_set_state(page_t *page, unsigned state) {
+/**
+ * Sets the state of a page. This cannot be used to move a page from or to
+ * PAGE_STATE_FREE, only between allocated states.
+ *
+ * Users of this function should implement appropriate synchronisation to
+ * ensure that concurrent calls to this function should not occur on the same
+ * page, since updates to members on the page_t are not synchronised.
+ *
+ * @param page          Page to set the state of.
+ * @param state         New state for the page.
+ */
+void page_set_state(page_t *page, uint8_t state) {
     /* Remove from current queue. */
     remove_page_from_current_queue(page);
 
@@ -321,10 +314,10 @@ static void page_free_internal(page_t *page) {
     assert(!refcount_get(&page->count));
 
     /* Reset the page structure to a clear state. */
-    page->state    = PAGE_STATE_FREE;
-    page->modified = false;
-    page->ops      = NULL;
-    page->private  = NULL;
+    atomic_store(&page->flags, 0);
+    page->state   = PAGE_STATE_FREE;
+    page->ops     = NULL;
+    page->private = NULL;
 
     /* Push it onto the appropriate list. */
     list_prepend(&free_page_lists[memory_ranges[page->range].freelist].pages, &page->header);
@@ -650,12 +643,14 @@ status_t device_phys_alloc(
 
 /** Gets physical memory usage statistics.
  * @param stats         Structure to fill in. */
-void page_stats_get(page_stats_t *stats) {
-    stats->total     = total_page_count * PAGE_SIZE;
-    stats->allocated = page_queues[PAGE_STATE_ALLOCATED].count * PAGE_SIZE;
-    stats->modified  = page_queues[PAGE_STATE_MODIFIED].count * PAGE_SIZE;
-    stats->cached    = page_queues[PAGE_STATE_CACHED].count * PAGE_SIZE;
-    stats->free      = stats->total - stats->allocated - stats->modified - stats->cached;
+void page_stats(page_stats_t *stats) {
+    stats->total                   = total_page_count * PAGE_SIZE;
+    stats->states[PAGE_STATE_FREE] = stats->total;
+
+    for (size_t i = 0; i < PAGE_QUEUE_COUNT; i++) {
+        stats->states[i]                = page_queues[i].count * PAGE_SIZE;
+        stats->states[PAGE_STATE_FREE] -= stats->states[i];
+    }
 }
 
 /** Print details about physical memory usage. */
@@ -688,12 +683,12 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
 
         kdb_printf("Page 0x%" PRIxPHYS " (%p) (Range: %u)\n", page->addr, page, page->range);
         kdb_printf("=================================================\n");
-        kdb_printf("state:    %d\n", page->state);
-        kdb_printf("modified: %d\n", page->modified);
-        kdb_printf("ops:      %ps\n", page->ops);
-        kdb_printf("private:  %p\n", page->private);
-        kdb_printf("offset:   %" PRIu64 "\n", page->offset);
-        kdb_printf("count:    %d\n", page->count);
+        kdb_printf("state:   %d\n", page->state);
+        kdb_printf("flags:   0x%x\n", page_flags(page));
+        kdb_printf("ops:     %p\n", page->ops);
+        kdb_printf("private: %p\n", page->private);
+        kdb_printf("offset:  %" PRIu64 "\n", page->offset);
+        kdb_printf("count:   %d\n", page->count);
     } else {
         kdb_printf("Start              End                Freelist Pages\n");
         kdb_printf("=====              ===                ======== =====\n");
@@ -706,15 +701,16 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
         }
 
         page_stats_t stats;
-        page_stats_get(&stats);
+        page_stats(&stats);
 
-        kdb_printf("\nUsage statistics\n");
-        kdb_printf("================\n");
-        kdb_printf("Total:     %" PRIu64 " KiB\n", stats.total / 1024);
-        kdb_printf("Allocated: %" PRIu64 " KiB\n", stats.allocated / 1024);
-        kdb_printf("Modified:  %" PRIu64 " KiB\n", stats.modified / 1024);
-        kdb_printf("Cached:    %" PRIu64 " KiB\n", stats.cached / 1024);
-        kdb_printf("Free:      %" PRIu64 " KiB\n", stats.free / 1024);
+        kdb_printf("\n");
+        kdb_printf("Statistics\n");
+        kdb_printf("==========\n");
+        kdb_printf("Total:          %" PRIu64 " KiB\n", stats.total / 1024);
+        kdb_printf("Allocated:      %" PRIu64 " KiB\n", stats.states[PAGE_STATE_ALLOCATED] / 1024);
+        kdb_printf("Cached (clean): %" PRIu64 " KiB\n", stats.states[PAGE_STATE_CACHED_CLEAN] / 1024);
+        kdb_printf("Cached (dirty): %" PRIu64 " KiB\n", stats.states[PAGE_STATE_CACHED_DIRTY] / 1024);
+        kdb_printf("Free:           %" PRIu64 " KiB\n", stats.states[PAGE_STATE_FREE] / 1024);
     }
 
     return KDB_SUCCESS;
