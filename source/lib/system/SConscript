@@ -145,6 +145,25 @@ sources = [File(f) for f in [
     'sched.c',
 ]]
 
+musl_sources = [File(f) for f in [
+    'musl/src/network/inet_addr.c',
+    'musl/src/network/inet_aton.c',
+    'musl/src/network/inet_ntoa.c',
+    'musl/src/network/inet_ntop.c',
+    'musl/src/network/inet_pton.c',
+]]
+
+musl_CPPPATH = [
+    Dir('musl/src/internal'),
+    Dir('musl/src/include'),
+] + env['CPPPATH']
+
+musl_CCFLAGS = env['CCFLAGS'] + [
+    '-Wno-sign-compare',
+]
+
+musl_objects = [env.SharedObject(f, CPPPATH = musl_CPPPATH, CCFLAGS = musl_CCFLAGS) for f in musl_sources]
+
 # Generate the error string list.
 env.Command(
     'error_list.c',
@@ -157,7 +176,7 @@ arch_sources = SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])
 
 # Build the library from this.
 env.KiwiLibrary('system',
-    sources = arch_sources + sources,
+    sources = arch_sources + sources + musl_objects,
     build_libraries = ['kernel'],
     include_paths = [
         Dir('include'),

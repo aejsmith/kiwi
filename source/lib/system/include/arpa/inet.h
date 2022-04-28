@@ -25,6 +25,8 @@
 
 #include <netinet/in.h>
 
+#include <features.h>
+
 __SYS_EXTERN_C_BEGIN
 
 #define htonl(val) core_cpu_to_be32(val)
@@ -32,11 +34,10 @@ __SYS_EXTERN_C_BEGIN
 #define ntohl(val) core_be32_to_cpu(val)
 #define ntohs(val) core_be16_to_cpu(val)
 
-// TODO. Probably best off taking these (and extra, non-POSIX-standard)
-// functions from a BSD.
-/* extern in_addr_t inet_addr(const char *str); */
-/* char *inet_ntoa(struct in_addr); */
-/* const char *inet_ntop(int, const void *__restrict, char *__restrict, socklen_t); */
-/* int inet_pton(int, const char *__restrict, void *__restrict); */
+extern in_addr_t inet_addr(const char *p);
+extern char *inet_ntoa(struct in_addr in);
+extern int inet_aton(const char *s0, struct in_addr *dest);
+extern const char *inet_ntop(int af, const void *__restrict a0, char *__restrict s, socklen_t len);
+extern int inet_pton(int af, const char *__restrict s, void *__restrict a0);
 
 __SYS_EXTERN_C_END

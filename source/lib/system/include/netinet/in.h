@@ -24,5 +24,7 @@
 #include <kernel/net/ipv4.h>
 #include <kernel/net/ipv6.h>
 
+#include <sys/socket.h>
+
 #define INET_ADDRSTRLEN     16
 #define INET6_ADDRSTRLEN    46
