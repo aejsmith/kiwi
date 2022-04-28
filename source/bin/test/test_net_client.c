@@ -32,37 +32,6 @@
 #define TEST_PORT 12345
 #define MESSAGE_MAX 128
 
-// TODO: Replace with inet_ntop
-typedef union {
-    uint32_t addr;
-    uint8_t bytes[4];
-} ip_union_t;
-#define IP_PRINT_ARGS(a) \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[0], \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[1], \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[2], \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[3]
-
-// TODO: Replace with inet_pton
-static bool parse_ipv4_addr(const char *str, uint32_t *addr) {
-    uint32_t vals[4];
-    int pos = 0;
-    int ret = sscanf(str, "%u.%u.%u.%u%n", &vals[0], &vals[1], &vals[2], &vals[3], &pos);
-    if (ret != 4 || vals[0] > 255 || vals[1] > 255 || vals[2] > 255 || vals[3] > 255 || str[pos] != 0) {
-        fprintf(stderr, "net_control: invalid address '%s'\n", str);
-        return false;
-    }
-
-    ip_union_t a;
-    a.bytes[0] = vals[0];
-    a.bytes[1] = vals[1];
-    a.bytes[2] = vals[2];
-    a.bytes[3] = vals[3];
-
-    *addr = a.addr;
-    return true;
-}
-
 static int tcp_client(struct sockaddr_in *addr) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
@@ -137,9 +106,12 @@ static int udp_client(struct sockaddr_in *addr) {
 
         msg[size] = 0;
 
+        char recv_addr_str[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &recv_addr.sin_addr, recv_addr_str, sizeof(recv_addr_str));
+
         printf(
-            "Client received %ld byte message '%s' from %u.%u.%u.%u\n",
-            size, msg, IP_PRINT_ARGS(&recv_addr));
+            "Client received %ld byte message '%s' from %s\n",
+            size, msg, recv_addr_str);
 
         sleep(1);
     }
@@ -153,9 +125,7 @@ int main(int argc, char **argv) {
         addr.sin_family      = AF_INET;
         addr.sin_port        = htons(TEST_PORT);
 
-        // TODO
-        //if (inet_pton(AF_INET, argv[1], &addr.sin_addr) != 1) {
-        if (!parse_ipv4_addr(argv[2], &addr.sin_addr.s_addr)) {
+        if (inet_pton(AF_INET, argv[2], &addr.sin_addr) != 1) {
             printf("Invalid IP address\n");
             return EXIT_FAILURE;
         }

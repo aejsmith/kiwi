@@ -32,37 +32,6 @@
 
 #define BUF_SIZE 1024
 
-// TODO: Replace with inet_ntop
-typedef union {
-    uint32_t addr;
-    uint8_t bytes[4];
-} ip_union_t;
-#define IP_PRINT_ARGS(a) \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[0], \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[1], \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[2], \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[3]
-
-// TODO: Replace with inet_pton
-static bool parse_ipv4_addr(const char *str, uint32_t *addr) {
-    uint32_t vals[4];
-    int pos = 0;
-    int ret = sscanf(str, "%u.%u.%u.%u%n", &vals[0], &vals[1], &vals[2], &vals[3], &pos);
-    if (ret != 4 || vals[0] > 255 || vals[1] > 255 || vals[2] > 255 || vals[3] > 255 || str[pos] != 0) {
-        fprintf(stderr, "net_control: invalid address '%s'\n", str);
-        return false;
-    }
-
-    ip_union_t a;
-    a.bytes[0] = vals[0];
-    a.bytes[1] = vals[1];
-    a.bytes[2] = vals[2];
-    a.bytes[3] = vals[3];
-
-    *addr = a.addr;
-    return true;
-}
-
 int main(int argc, char **argv) {
     if (argc != 3) {
         printf("Usage: %s <IP> <port>\n", argv[0]);
@@ -75,9 +44,7 @@ int main(int argc, char **argv) {
     addr.sin_family      = AF_INET;
     addr.sin_port        = htons(port);
 
-    // TODO
-    //if (inet_pton(AF_INET, argv[1], &addr.sin_addr) != 1) {
-    if (!parse_ipv4_addr(argv[1], &addr.sin_addr.s_addr)) {
+    if (inet_pton(AF_INET, argv[1], &addr.sin_addr) != 1) {
         printf("Invalid IP address\n");
         return EXIT_FAILURE;
     }
@@ -93,7 +60,10 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    printf("Connected to %u.%u.%u.%u:%u\n", IP_PRINT_ARGS(&addr), port);
+    char addr_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr.sin_addr, addr_str, sizeof(addr_str));
+
+    printf("Connected to %s:%u\n", addr_str, port);
 
     struct pollfd poll_fds[2];
     poll_fds[0].fd     = STDIN_FILENO;

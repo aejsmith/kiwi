@@ -33,18 +33,12 @@
 #define TEST_PORT 12345
 #define MESSAGE_MAX 128
 
-// TODO: Replace with inet_ntop
-typedef union {
-    uint32_t addr;
-    uint8_t bytes[4];
-} ip_union_t;
-#define IP_PRINT_ARGS(a) \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[0], \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[1], \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[2], \
-    ((ip_union_t *)&(a)->sin_addr.s_addr)->bytes[3]
-
 static void tcp_conn(int fd, const struct sockaddr_in *addr) {
+    char addr_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr->sin_addr, addr_str, sizeof(addr_str));
+
+    printf("Server connection from %s\n", addr_str);
+
     char msg[MESSAGE_MAX + 1];
     size_t msg_size = 0;
 
@@ -58,7 +52,7 @@ static void tcp_conn(int fd, const struct sockaddr_in *addr) {
             perror("recv");
             return;
         } else if (size == 0) {
-            printf("Server shutdown from %u.%u.%u.%u\n", IP_PRINT_ARGS(addr));
+            printf("Server shutdown from %s\n", addr_str);
             return;
         }
 
@@ -68,8 +62,8 @@ static void tcp_conn(int fd, const struct sockaddr_in *addr) {
             if (buf[i] == 0 || msg_size == MESSAGE_MAX) {
                 msg[msg_size] = 0;
                 printf(
-                    "Server received %lu byte (%lu receives) message '%s' from %u.%u.%u.%u\n",
-                    msg_size, recv_count, msg, IP_PRINT_ARGS(addr));
+                    "Server received %lu byte (%lu receives) message '%s' from %s\n",
+                    msg_size, recv_count, msg, addr_str);
 
                 recv_count = 0;
 
@@ -126,10 +120,6 @@ static int tcp_server(void) {
             return EXIT_FAILURE;
         }
 
-        printf(
-            "Server connection from %u.%u.%u.%u\n",
-            IP_PRINT_ARGS(&client_addr));
-
         int pid = fork();
         if (pid == 0) {
             close(fd);
@@ -171,9 +161,12 @@ static int udp_server(void) {
 
         msg[size] = 0;
 
+        char client_addr_str[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &client_addr.sin_addr, client_addr_str, sizeof(client_addr_str));
+
         printf(
-            "Server received %ld byte message '%s' from %u.%u.%u.%u\n",
-            size, msg, IP_PRINT_ARGS(&client_addr));
+            "Server received %ld byte message '%s' from %s\n",
+            size, msg, client_addr_str);
 
         size = snprintf(msg, MESSAGE_MAX, "PONG %zu", count);
         msg[size] = 0;
