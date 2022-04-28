@@ -643,7 +643,7 @@
 /* #undef HAVE_GETPAGESIZE */
 
 /* Define if you have the getpeername function.  */
-/* #undef HAVE_GETPEERNAME */
+#define HAVE_GETPEERNAME 1
 
 /* Define if you have the getpwent function. */
 #define HAVE_GETPWENT 1
@@ -679,7 +679,7 @@
 /* #undef HAVE_IMAXDIV */
 
 /* Define if you have the inet_aton function.  */
-/* #undef HAVE_INET_ATON */
+#define HAVE_INET_ATON 1
 
 /* Define if you have the isascii function. */
 #define HAVE_ISASCII 1
@@ -949,7 +949,7 @@
 /* Presence of certain system include files. */
 
 /* Define if you have the <arpa/inet.h> header file. */
-/* #undef HAVE_ARPA_INET_H */
+#define HAVE_ARPA_INET_H 1
 
 /* Define if you have the <dirent.h> header file.  */
 #define HAVE_DIRENT_H 1
@@ -988,7 +988,7 @@
 /* #undef HAVE_NETDB_H */
 
 /* Define if you have the <netinet/in.h> header file. */
-/* #undef HAVE_NETINET_IN_H */
+#define HAVE_NETINET_IN_H 1
 
 /* Define if you have the <pwd.h> header file. */
 #define HAVE_PWD_H 1
@@ -1054,7 +1054,7 @@
 /* #undef HAVE_SYS_SELECT_H */
 
 /* Define if you have the <sys/socket.h> header file.  */
-/* #undef HAVE_SYS_SOCKET_H */
+#define HAVE_SYS_SOCKET_H 1
 
 /* Define if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1

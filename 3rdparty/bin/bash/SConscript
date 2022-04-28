@@ -122,7 +122,7 @@ sources = [
     'lib/sh/shmatch.c',
     'lib/sh/eaccess.c',
     'lib/sh/netconn.c',
-    #'lib/sh/netopen.c',
+    'lib/sh/netopen.c',
     'lib/sh/timeval.c',
     'lib/sh/makepath.c',
     'lib/sh/pathcanon.c',
