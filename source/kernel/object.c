@@ -51,6 +51,25 @@
 /** Maximum number of handles. */
 #define HANDLE_TABLE_SIZE   512
 
+/**
+ * Default handle allocation base. When allocating a new handle ID, we first
+ * search forward from this base value, and only if that fails, try from 0.
+ *
+ * This behaviour is to improve POSIX compatibility. We implement POSIX file
+ * descriptors (in libsystem) directly as kernel handles. Some POSIX
+ * applications might assume that they have free reign over FD numbers and won't
+ * have other FDs allocated that they don't know about. However, our userspace
+ * POSIX implementations internally open various handles (processes, IPC
+ * connections, etc.) which use up handle IDs. Without this allocation
+ * behaviour, these internal handles get low IDs which might end up getting
+ * overwritten by the application through handle duplication. For example, bash
+ * allows users to create file descriptors by value, and we run into this issue
+ * if the user picks a number that is used by an internal handle.
+ *
+ * Moving handles to higher IDs by default reduces the chance of this happening.
+ */
+#define HANDLE_ALLOCATION_BASE 64
+
 /** Object waiter structure. */
 typedef struct object_waiter {
     list_t header;                  /**< Link to waiters list. */
@@ -212,6 +231,20 @@ static status_t lookup_handle(handle_t id, int type, object_handle_t **_handle) 
     return STATUS_SUCCESS;
 }
 
+static handle_t alloc_handle_id(handle_table_t *table, handle_t from) {
+    handle_t ret;
+
+    if (from >= 0) {
+        ret = bitmap_ffz_from(table->bitmap, HANDLE_TABLE_SIZE, from);
+    } else {
+        ret = bitmap_ffz_from(table->bitmap, HANDLE_TABLE_SIZE, HANDLE_ALLOCATION_BASE);
+        if (ret < 0)
+            ret = bitmap_ffz(table->bitmap, HANDLE_ALLOCATION_BASE);
+    }
+
+    return ret;
+}
+
 /** Attaches a handle to the current process' handle table.
  * @param handle        Handle to attach.
  * @param _id           If not NULL, a kernel location to store handle ID in.
@@ -225,7 +258,7 @@ static status_t attach_handle(object_handle_t *handle, handle_t *_id, handle_t *
     handle_table_t *table = &curr_proc->handles;
 
     /* Find a handle ID in the table. */
-    handle_t id = bitmap_ffz(table->bitmap, HANDLE_TABLE_SIZE);
+    handle_t id = alloc_handle_id(table, INVALID_HANDLE);
     if (id < 0)
         return STATUS_NO_HANDLES;
 
@@ -1248,7 +1281,7 @@ status_t kern_handle_duplicate(uint32_t mode, handle_t handle, handle_t dest, ha
     }
 
     /* Get a new handle ID according to the mode. */
-    uint32_t dup_dest = 0;
+    handle_t dup_dest = 0;
     switch (mode) {
         case HANDLE_DUPLICATE_ALLOCATE:
             if (!_new || (dest != INVALID_HANDLE && dest < 0)) {
@@ -1257,7 +1290,7 @@ status_t kern_handle_duplicate(uint32_t mode, handle_t handle, handle_t dest, ha
             }
 
             /* Try to allocate a new ID. */
-            dup_dest = bitmap_ffz_from(table->bitmap, HANDLE_TABLE_SIZE, (dest >= 0) ? dest : 0);
+            dup_dest = alloc_handle_id(table, dest);
             if (dup_dest < 0) {
                 ret = STATUS_NO_HANDLES;
                 goto out_unlock;
@@ -1289,24 +1322,26 @@ status_t kern_handle_duplicate(uint32_t mode, handle_t handle, handle_t dest, ha
             goto out_unlock;
     }
 
-    if (mode == HANDLE_DUPLICATE_EXACT) {
-        /* Close any existing handle in the slot. */
-        detach_handle(dup_dest);
+    if (dup_dest != handle) {
+        if (mode == HANDLE_DUPLICATE_EXACT) {
+            /* Close any existing handle in the slot. */
+            detach_handle(dup_dest);
+        }
+
+        object_handle_retain(khandle);
+
+        if (khandle->type->attach)
+            khandle->type->attach(khandle, curr_proc);
+
+        table->handles[dup_dest] = khandle;
+        table->flags[dup_dest]   = 0;
+
+        bitmap_set(table->bitmap, dup_dest);
+
+        dprintf(
+            "object: duplicated handle %" PRId32 " to %" PRId32 " in process %" PRId32 " (type: %u, private: %p)\n",
+            handle, dup_dest, curr_proc->id, khandle->type->id, khandle->private);
     }
-
-    object_handle_retain(khandle);
-
-    if (khandle->type->attach)
-        khandle->type->attach(khandle, curr_proc);
-
-    table->handles[dup_dest] = khandle;
-    table->flags[dup_dest]   = 0;
-
-    bitmap_set(table->bitmap, dup_dest);
-
-    dprintf(
-        "object: duplicated handle %" PRId32 " to %" PRId32 " in process %" PRId32 " (type: %u, private: %p)\n",
-        handle, dup_dest, curr_proc->id, khandle->type->id, khandle->private);
 
     ret = STATUS_SUCCESS;
 

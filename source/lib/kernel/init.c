@@ -52,13 +52,16 @@ void libkernel_init(process_args_t *args) {
 
     /* If we're the first process, open handles to the kernel console. */
     if (curr_process_id == 1) {
-        handle_t handle;
-        kern_device_open("/virtual/kconsole", FILE_ACCESS_READ, 0, &handle);
-        kern_handle_set_flags(handle, HANDLE_INHERITABLE);
-        kern_device_open("/virtual/kconsole", FILE_ACCESS_WRITE, 0, &handle);
-        kern_handle_set_flags(handle, HANDLE_INHERITABLE);
-        kern_device_open("/virtual/kconsole", FILE_ACCESS_WRITE, 0, &handle);
-        kern_handle_set_flags(handle, HANDLE_INHERITABLE);
+        uint32_t modes[] = { FILE_ACCESS_READ, FILE_ACCESS_WRITE, FILE_ACCESS_WRITE };
+        for (size_t i = 0; i < core_array_size(modes); i++) {
+            handle_t handle;
+            kern_device_open("/virtual/kconsole", modes[i], 0, &handle);
+
+            /* Move into the standard IDs and make it inheritable. */
+            kern_handle_duplicate(HANDLE_DUPLICATE_EXACT, handle, i, NULL);
+            kern_handle_set_flags(i, HANDLE_INHERITABLE);
+            kern_handle_close(handle);
+        }
     }
 
     /* Check if any of our options are set. */
