@@ -157,11 +157,24 @@ static void socket_file_unwait(file_handle_t *handle, object_event_t *event) {
         socket->ops->unwait(socket, event);
 }
 
+static void socket_file_info(file_handle_t *handle, file_info_t *info) {
+    info->block_size = 1;
+    info->size       = 0;
+    info->id         = 0;
+    info->mount      = 0;
+    info->type       = FILE_TYPE_SOCKET;
+    info->links      = 1;
+    info->created    = 0;
+    info->accessed   = 0;
+    info->modified   = 0;
+}
+
 static const file_ops_t socket_file_ops = {
     .close  = socket_file_close,
     .io     = socket_file_io,
     .wait   = socket_file_wait,
     .unwait = socket_file_unwait,
+    .info   = socket_file_info,
 };
 
 /** Validate that a handle is a socket and return its file_handle_t if so. */
