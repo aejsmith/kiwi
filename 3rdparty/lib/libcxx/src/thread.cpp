@@ -27,6 +27,11 @@
 #include <windows.h>
 #endif
 
+#if defined(__Kiwi__)
+#include <kernel/status.h>
+#include <kernel/system.h>
+#endif
+
 #if defined(__ELF__) && defined(_LIBCPP_LINK_PTHREAD_LIB)
 #pragma comment(lib, "pthread")
 #endif
@@ -86,8 +91,11 @@ thread::hardware_concurrency() noexcept
     GetSystemInfo(&info);
     return info.dwNumberOfProcessors;
 #elif defined(__Kiwi__)
-    fprintf(stderr, "TODO: hardware_concurrency");
-    return 1;
+    uint32_t num_cpus;
+    status_t ret = kern_system_info(SYSTEM_INFO_NUM_CPUS, &num_cpus);
+    if (ret != STATUS_SUCCESS)
+        return 0;
+    return num_cpus;
 #else  // defined(CTL_HW) && defined(HW_NCPU)
     // TODO: grovel through /proc or check cpuid on x86 and similar
     // instructions on other architectures.
