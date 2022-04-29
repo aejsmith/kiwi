@@ -25,6 +25,7 @@
 
 #include <mm/safe.h>
 
+#include <cpu.h>
 #include <kernel.h>
 #include <status.h>
 
@@ -46,6 +47,8 @@ status_t kern_system_info(unsigned what, void *buf) {
     switch (what) {
         case SYSTEM_INFO_PAGE_SIZE:
             return write_user((size_t *)buf, PAGE_SIZE);
+        case SYSTEM_INFO_NUM_CPUS:
+            return write_user((uint32_t *)buf, cpu_count);
         default:
             return STATUS_INVALID_ARG;
     }
