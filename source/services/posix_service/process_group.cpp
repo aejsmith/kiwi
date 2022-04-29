@@ -49,7 +49,7 @@ bool ProcessGroup::init(handle_t leader) {
 
     /* Create a duplicate of the leader handle that we own, the one we're given
      * won't necessarily live as long as the group. */
-    ret = kern_handle_duplicate(leader, INVALID_HANDLE, m_leader.attach());
+    ret = kern_handle_duplicate(HANDLE_DUPLICATE_ALLOCATE, leader, INVALID_HANDLE, m_leader.attach());
     if (ret != STATUS_SUCCESS) {
         core_log(CORE_LOG_WARN, "failed to duplicate leader handle: %" PRId32, ret);
         return false;

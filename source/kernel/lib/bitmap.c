@@ -139,40 +139,79 @@ long bitmap_ffz(const unsigned long *bitmap, size_t nbits) {
     return -1;
 }
 
-/** Find next set bit in a bitmap.
+/** Find first set bit in a bitmap starting from a given position.
  * @param bitmap        Bitmap to test in.
  * @param nbits         Size of the bitmap.
- * @param current       Current bit.
- * @return              Position of next bit set, -1 if no more set bits. */
-long bitmap_next(const unsigned long *bitmap, size_t nbits, unsigned long current) {
+ * @param from          First bit to check.
+ * @return              Position of first set bit, -1 if none set. */
+long bitmap_ffs_from(const unsigned long *bitmap, size_t nbits, unsigned long from) {
+    if (from == 0)
+        return bitmap_ffs(bitmap, nbits);
+
     unsigned long value;
     long result = 0;
 
-    /* Want to start looking from the one after. */
-    current += 1;
-
     while (nbits >= type_bits(unsigned long)) {
         value = *(bitmap++);
-        if (current < type_bits(unsigned long)) {
-            value &= ~0ul << current;
+        if (from < type_bits(unsigned long)) {
+            value &= ~0ul << from;
             if (value)
                 return result + ffs(value) - 1;
 
-            current = 0;
+            from = 0;
         } else {
-            current -= type_bits(unsigned long);
+            from -= type_bits(unsigned long);
         }
 
-        nbits -= type_bits(unsigned long);
+        nbits  -= type_bits(unsigned long);
         result += type_bits(unsigned long);
     }
 
-    if (nbits) {
+    if (nbits && from < type_bits(unsigned long)) {
         /* Select only the bits that are within the bitmap. */
         value = (*bitmap) & (~0ul >> (type_bits(unsigned long) - nbits));
-        value &= ~0ul << current;
+        value &= ~0ul << from;
         if (value)
             return result + ffs(value) - 1;
+    }
+
+    return -1;
+}
+
+/** Find first zero bit in a bitmap starting from a given position.
+ * @param bitmap        Bitmap to test in.
+ * @param nbits         Size of the bitmap.
+ * @param from          First bit to check.
+ * @return              Position of first zero bit, -1 if none zero. */
+long bitmap_ffz_from(const unsigned long *bitmap, size_t nbits, unsigned long from) {
+    if (from == 0)
+        return bitmap_ffz(bitmap, nbits);
+
+    unsigned long value;
+    long result = 0;
+
+    while (nbits >= type_bits(unsigned long)) {
+        value = *(bitmap++);
+        if (from < type_bits(unsigned long)) {
+            value |= (1 << from) - 1;
+            if (value != ~0ul)
+                return result + ffz(value) - 1;
+
+            from = 0;
+        } else {
+            from -= type_bits(unsigned long);
+        }
+
+        nbits  -= type_bits(unsigned long);
+        result += type_bits(unsigned long);
+    }
+
+    if (nbits && from < type_bits(unsigned long)) {
+        /* Select only the bits that are within the bitmap. */
+        value = (*bitmap) | (~0ul << nbits);
+        value |= (1 << from) - 1;
+        if (value != ~0ul)
+            return result + ffz(value) - 1;
     }
 
     return -1;

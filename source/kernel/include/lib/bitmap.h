@@ -39,4 +39,5 @@ extern void bitmap_clear(unsigned long *bitmap, unsigned long bit);
 extern bool bitmap_test(const unsigned long *bitmap, unsigned long bit);
 extern long bitmap_ffs(const unsigned long *bitmap, size_t nbits);
 extern long bitmap_ffz(const unsigned long *bitmap, size_t nbits);
-extern long bitmap_next(const unsigned long *bitmap, size_t nbits, unsigned long current);
+extern long bitmap_ffs_from(const unsigned long *bitmap, size_t nbits, unsigned long from);
+extern long bitmap_ffz_from(const unsigned long *bitmap, size_t nbits, unsigned long from);

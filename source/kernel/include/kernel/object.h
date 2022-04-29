@@ -77,6 +77,22 @@ enum {
     OBJECT_WAIT_ALL             = (1<<0),   /**< Wait for all the specified events to occur. */
 };
 
+/** Modes for kern_handle_duplicate(). */
+enum {
+    /**
+     * Allocate a new handle ID. If dest is INVALID_HANDLE, any available ID
+     * will be used. Otherwise, the allocated handle ID will be the first
+     * available ID greater or equal to the ID specified in dest.
+     */
+    HANDLE_DUPLICATE_ALLOCATE   = 0,
+
+    /**
+     * Use the exact ID specified in dest, closing any existing handle with
+     * that ID. In this case, _new can be NULL.
+     */
+    HANDLE_DUPLICATE_EXACT      = 1,
+};
+
 /**
  * Type of an object event callback function. The function will be called via
  * a thread interrupt when the event that is registered for occurs. While the
@@ -95,7 +111,7 @@ extern status_t kern_object_callback(object_event_t *event, object_callback_t ca
 
 extern status_t kern_handle_flags(handle_t handle, uint32_t *_flags);
 extern status_t kern_handle_set_flags(handle_t handle, uint32_t flags);
-extern status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *_new);
+extern status_t kern_handle_duplicate(uint32_t mode, handle_t handle, handle_t dest, handle_t *_new);
 extern status_t kern_handle_close(handle_t handle);
 
 __KERNEL_EXTERN_C_END

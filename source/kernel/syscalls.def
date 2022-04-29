@@ -54,7 +54,7 @@ syscall kern_object_callback(ptr_t, ptr_t, uint32_t);
 
 syscall kern_handle_flags(handle_t, ptr_t);
 syscall kern_handle_set_flags(handle_t, uint32_t);
-syscall kern_handle_duplicate(handle_t, handle_t, ptr_t);
+syscall kern_handle_duplicate(uint32_t, handle_t, handle_t, ptr_t);
 syscall kern_handle_close(handle_t);
 
 syscall kern_file_reopen(handle_t, uint32_t, uint32_t, ptr_t);

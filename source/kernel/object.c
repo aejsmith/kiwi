@@ -1216,31 +1216,26 @@ status_t kern_handle_set_flags(handle_t handle, uint32_t flags) {
  * share the same state, for example for file handles they will share the same
  * file offset, etc. The new table entry's flags will be set to 0.
  *
+ * @param mode          Duplication mode (HANDLE_DUPLICATE_*).
  * @param handle        Handle ID to duplicate.
- * @param dest          Destination handle ID. If INVALID_HANDLE is specified,
- *                      then a new handle ID is allocated. Otherwise, this
- *                      exact ID will be used and any existing handle referred
- *                      to by that ID will be closed.
- * @param _new          Where to store new handle ID. Can be NULL if dest is
- *                      not INVALID_HANDLE.
+ * @param dest          Destination handle ID. This is interpreted according to
+ *                      the specified mode.
+ * @param _new          Where to store new handle ID. Can be NULL if mode is
+ *                      HANDLE_DUPLICATE_EXACT.
  *
  * @return              STATUS_SUCCESS if successful.
  *                      STATUS_INVALID_HANDLE if handle does not exist.
- *                      STATUS_INVALID_ARG if dest is invalid, or if dest is
- *                      INVALID_HANDLE and _new is NULL.
+ *                      STATUS_INVALID_ARG if dest is invalid, or if mode is
+ *                      HANDLE_DUPLICATE_ALLOCATE and _new is NULL.
  *                      STATUS_NO_HANDLES if allocating a handle ID and the
- *                      handle table is full.
+ *                      handle table is full, or if using an exact ID and the
+ *                      given ID is larger than the maximum handle table size.
  */
-status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *_new) {
+status_t kern_handle_duplicate(uint32_t mode, handle_t handle, handle_t dest, handle_t *_new) {
+    status_t ret;
+
     if (handle < 0 || handle >= HANDLE_TABLE_SIZE)
         return STATUS_INVALID_HANDLE;
-
-    if (dest == INVALID_HANDLE) {
-        if (!_new)
-            return STATUS_INVALID_ARG;
-    } else if (dest < 0 || dest >= HANDLE_TABLE_SIZE) {
-        return STATUS_INVALID_ARG;
-    }
 
     handle_table_t *table = &curr_proc->handles;
 
@@ -1248,44 +1243,76 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, handle_t *_new) {
 
     object_handle_t *khandle = table->handles[handle];
     if (!khandle) {
-        rwlock_unlock(&table->lock);
-        return STATUS_INVALID_HANDLE;
+        ret = STATUS_INVALID_HANDLE;
+        goto out_unlock;
     }
 
-    if (dest != INVALID_HANDLE) {
+    /* Get a new handle ID according to the mode. */
+    uint32_t dup_dest = 0;
+    switch (mode) {
+        case HANDLE_DUPLICATE_ALLOCATE:
+            if (!_new || (dest != INVALID_HANDLE && dest < 0)) {
+                ret = STATUS_INVALID_ARG;
+                goto out_unlock;
+            }
+
+            /* Try to allocate a new ID. */
+            dup_dest = bitmap_ffz_from(table->bitmap, HANDLE_TABLE_SIZE, (dest >= 0) ? dest : 0);
+            if (dup_dest < 0) {
+                ret = STATUS_NO_HANDLES;
+                goto out_unlock;
+            }
+
+            break;
+
+        case HANDLE_DUPLICATE_EXACT:
+            if (dest < 0) {
+                ret = STATUS_INVALID_ARG;
+                goto out_unlock;
+            } else if (dest >= HANDLE_TABLE_SIZE) {
+                ret = STATUS_NO_HANDLES;
+                goto out_unlock;
+            }
+
+            dup_dest = dest;
+            break;
+
+        default:
+            ret = STATUS_INVALID_ARG;
+            break;
+    }
+
+    /* Do this before changing anything in case it fails. */
+    if (_new) {
+        ret = write_user(_new, dup_dest);
+        if (ret != STATUS_SUCCESS)
+            goto out_unlock;
+    }
+
+    if (mode == HANDLE_DUPLICATE_EXACT) {
         /* Close any existing handle in the slot. */
-        detach_handle(dest);
-    } else {
-        /* Try to allocate a new ID. */
-        dest = bitmap_ffz(table->bitmap, HANDLE_TABLE_SIZE);
-        if (dest < 0) {
-            rwlock_unlock(&table->lock);
-            return STATUS_NO_HANDLES;
-        }
+        detach_handle(dup_dest);
     }
 
-    status_t ret = write_user(_new, dest);
-    if (ret != STATUS_SUCCESS) {
-        rwlock_unlock(&table->lock);
-        return ret;
-    }
+    object_handle_retain(khandle);
 
     if (khandle->type->attach)
         khandle->type->attach(khandle, curr_proc);
 
-    object_handle_retain(khandle);
+    table->handles[dup_dest] = khandle;
+    table->flags[dup_dest]   = 0;
 
-    table->handles[dest] = khandle;
-    table->flags[dest]   = 0;
-
-    bitmap_set(table->bitmap, dest);
+    bitmap_set(table->bitmap, dup_dest);
 
     dprintf(
         "object: duplicated handle %" PRId32 " to %" PRId32 " in process %" PRId32 " (type: %u, private: %p)\n",
-        handle, dest, curr_proc->id, khandle->type->id, khandle->private);
+        handle, dup_dest, curr_proc->id, khandle->type->id, khandle->private);
 
+    ret = STATUS_SUCCESS;
+
+out_unlock:
     rwlock_unlock(&table->lock);
-    return STATUS_SUCCESS;
+    return ret;
 }
 
 /** Closes a handle.

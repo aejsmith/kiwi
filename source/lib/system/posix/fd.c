@@ -204,14 +204,8 @@ int close(int fd) {
 static int fcntl_dupfd(int fd, int dest, bool cloexec) {
     status_t ret;
 
-    /* TODO: Implement this. */
-    if (dest > 0) {
-        errno = ENOSYS;
-        return -1;
-    }
-
     handle_t new;
-    ret = kern_handle_duplicate(fd, INVALID_HANDLE, &new);
+    ret = kern_handle_duplicate(HANDLE_DUPLICATE_ALLOCATE, fd, (dest > 0) ? dest : INVALID_HANDLE, &new);
     if (ret != STATUS_SUCCESS) {
         libsystem_status_to_errno(ret);
         return -1;
@@ -380,7 +374,7 @@ int dup2(int fd, int newfd) {
     }
 
     handle_t new;
-    ret = kern_handle_duplicate(fd, newfd, &new);
+    ret = kern_handle_duplicate(HANDLE_DUPLICATE_EXACT, fd, newfd, &new);
     if (ret != STATUS_SUCCESS) {
         libsystem_status_to_errno(ret);
         return -1;
