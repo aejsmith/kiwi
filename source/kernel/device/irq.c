@@ -332,8 +332,7 @@ void irq_handler(unsigned num) {
     /* IRQs can happen during a user memory operation. Force the flag to off
      * while handling an IRQ so that we don't incorrectly treat faults during
      * the handler as a user memory violation. */
-    bool in_usermem = curr_thread->in_usermem;
-    curr_thread->in_usermem = false;
+    uint32_t prev_usermem = thread_clear_flag(curr_thread, THREAD_IN_USERMEM) & THREAD_IN_USERMEM;
 
     /* Execute any pre-handling function. */
     if (irq_controller->pre_handle && !irq_controller->pre_handle(num))
@@ -391,7 +390,7 @@ out_handled:
         irq_controller->post_handle(num, disable);
 
 out:
-    curr_thread->in_usermem = in_usermem;
+    thread_set_flag(curr_thread, prev_usermem);
 }
 
 /** Set the IRQ controller.

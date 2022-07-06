@@ -951,8 +951,9 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
         return false;
     }
 
-    bool in_usermem = curr_thread->in_usermem;
-    curr_thread->in_usermem = false;
+    /* Don't treat faults while handling the fault as a user memory access
+     * failure. */
+    uint32_t prev_usermem = thread_clear_flag(curr_thread, THREAD_IN_USERMEM) & THREAD_IN_USERMEM;
 
     mutex_lock(&as->lock);
 
@@ -1030,12 +1031,12 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
 
 out:
     mutex_unlock(&as->lock);
-    curr_thread->in_usermem = in_usermem;
+    thread_set_flag(curr_thread, prev_usermem);
 
     if (unlikely(exception.code)) {
         if (user) {
             thread_exception(&exception);
-        } else if (curr_thread->in_usermem && is_user_address((void *)addr)) {
+        } else if (prev_usermem && is_user_address((void *)addr)) {
             /* Handle faults in safe user memory access functions. */
             kprintf(
                 LOG_DEBUG,

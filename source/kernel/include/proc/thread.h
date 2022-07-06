@@ -69,7 +69,7 @@ typedef struct thread {
 
     /** Main thread information. */
     void *kstack;                       /**< Kernel stack pointer. */
-    uint32_t flags;                     /**< Flags for the thread. */
+    atomic_uint32_t __flags;            /**< Flags for the thread (use thread_*flags functions). */
     int priority;                       /**< Priority of the thread. */
     size_t wired;                       /**< How many calls to thread_wire() have been made. */
     size_t preempt_count;               /**< Whether preemption is disabled. */
@@ -91,10 +91,6 @@ typedef struct thread {
     nstime_t last_time;                 /**< Time that the thread entered/left the kernel. */
     nstime_t kernel_time;               /**< Total time the thread has spent in the kernel. */
     nstime_t user_time;                 /**< Total time the thread has spent in user mode. */
-
-    /** Information used by user memory functions. */
-    bool in_usermem;                    /**< Whether the thread is in the user memory access functions. */
-    jmp_buf usermem_context;            /**< Context to restore upon user memory access fault. */
 
     /**
      * Reference count for the thread. A running thread always has at least 1
@@ -125,6 +121,9 @@ typedef struct thread {
      */
     token_t *active_token;
 
+    /** Context to restore upon user memory access fault. */
+    jmp_buf usermem_context;
+
     /** Thread entry function. */
     thread_func_t func;                 /**< Entry function for the thread. */
     void *arg1;                         /**< First argument to thread entry function. */
@@ -149,6 +148,7 @@ enum {
     THREAD_INTERRUPTED      = (1<<1),   /**< Thread has been interrupted. */
     THREAD_KILLED           = (1<<2),   /**< Thread has been killed. */
     THREAD_PREEMPTED        = (1<<3),   /**< Thread was preempted while preemption disabled. */
+    THREAD_IN_USERMEM       = (1<<4),   /**< Thread is in a safe user memory access function. */
 };
 
 /**
@@ -204,6 +204,29 @@ enum {
 
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread             (arch_curr_thread())
+
+/** Atomically adds the given flag(s) to the thread's flags.
+ * @param thread        Thread to set for.
+ * @param flags         Flag(s) to set.
+ * @return              Previous thread flags. */
+static inline uint32_t thread_set_flag(thread_t *thread, uint32_t flags) {
+    return atomic_fetch_or(&thread->__flags, flags);
+}
+
+/** Atomically clears the given flag(s) from the thread's flags.
+ * @param thread        Thread to set for.
+ * @param flags         Flag(s) to clear.
+ * @return              Previous thread flags.  */
+static inline uint32_t thread_clear_flag(thread_t *thread, uint32_t flags) {
+    return atomic_fetch_and(&thread->__flags, ~flags);
+}
+
+/** Gets a thread's flags.
+ * @param thread        Thread to get from.
+ * @return              Thread flags. */
+static inline uint32_t thread_flags(thread_t *thread) {
+    return atomic_load(&thread->__flags);
+}
 
 extern void arch_thread_init(thread_t *thread);
 extern void arch_thread_destroy(thread_t *thread);

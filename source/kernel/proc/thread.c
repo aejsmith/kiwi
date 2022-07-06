@@ -312,7 +312,7 @@ static void thread_wake_unsafe(thread_t *thread) {
 
     timer_stop(&thread->sleep_timer);
 
-    thread->flags &= ~THREAD_INTERRUPTIBLE;
+    thread_clear_flag(thread, THREAD_INTERRUPTIBLE);
     thread->state = THREAD_READY;
     sched_insert_thread(thread);
 }
@@ -362,9 +362,9 @@ static void thread_interrupt_internal(thread_t *thread) {
     /* Set the interrupted flag to signal that there is an unblocked interrupt
      * pending. This flag is checked by thread_sleep() if entering interruptible
      * sleep, if it is set the call will return an error immediately. */
-    thread->flags |= THREAD_INTERRUPTED;
+    thread_set_flag(thread, THREAD_INTERRUPTED);
 
-    if (thread->state == THREAD_SLEEPING && thread->flags & THREAD_INTERRUPTIBLE) {
+    if (thread->state == THREAD_SLEEPING && thread_flags(thread) & THREAD_INTERRUPTIBLE) {
         thread->sleep_status = STATUS_INTERRUPTED;
         thread_wake_unsafe(thread);
     } else {
@@ -387,7 +387,7 @@ void thread_kill(thread_t *thread) {
 
     spinlock_lock(&thread->lock);
 
-    thread->flags |= THREAD_KILLED;
+    thread_set_flag(thread, THREAD_KILLED);
     thread_interrupt_internal(thread);
 
     spinlock_unlock(&thread->lock);
@@ -497,7 +497,7 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, uint
 
     /* If interruptible and the interrupted flag is set, we also return an error
      * immediately. */
-    if (flags & SLEEP_INTERRUPTIBLE && curr_thread->flags & THREAD_INTERRUPTED) {
+    if (flags & SLEEP_INTERRUPTIBLE && thread_flags(curr_thread) & THREAD_INTERRUPTED) {
         curr_thread->sleep_status = STATUS_INTERRUPTED;
         goto cancel;
     }
@@ -511,7 +511,7 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, uint
     curr_thread->state        = THREAD_SLEEPING;
 
     if (flags & SLEEP_INTERRUPTIBLE)
-        curr_thread->flags |= THREAD_INTERRUPTIBLE;
+        thread_set_flag(curr_thread, THREAD_INTERRUPTIBLE);
 
     /* Drop the specified lock, without restoring the IRQ state */
     if (lock)
@@ -641,7 +641,7 @@ void thread_exception(exception_info_t *info) {
     dest_info->status = info->status;
 
     thread_interrupt(curr_thread, interrupt);
-    assert(curr_thread->flags & THREAD_INTERRUPTED);
+    assert(thread_flags(curr_thread) & THREAD_INTERRUPTED);
 }
 
 /** Perform tasks necessary when a thread is entering the kernel. */
@@ -654,7 +654,7 @@ void thread_at_kernel_entry(bool interrupt) {
     /* Terminate the thread if killed on system call entry to avoid doing the
      * syscall work. Do not do this on an interrupt: we must handle the
      * interrupt first, and we'll exit in thread_at_kernel_exit(). */
-    if (!interrupt && unlikely(curr_thread->flags & THREAD_KILLED)) {
+    if (!interrupt && unlikely(thread_flags(curr_thread) & THREAD_KILLED)) {
         curr_thread->reason = EXIT_REASON_KILLED;
         thread_exit();
     }
@@ -669,9 +669,10 @@ void thread_at_kernel_exit(void) {
     }
 
     /* Check whether we have any pending interrupts to handle. */
-    if (unlikely(curr_thread->flags & THREAD_INTERRUPTED)) {
+    uint32_t flags = thread_flags(curr_thread);
+    if (unlikely(flags & THREAD_INTERRUPTED)) {
         /* Terminate the thread if killed. */
-        if (curr_thread->flags & THREAD_KILLED) {
+        if (flags & THREAD_KILLED) {
             curr_thread->reason = EXIT_REASON_KILLED;
             thread_exit();
         }
@@ -682,7 +683,7 @@ void thread_at_kernel_exit(void) {
 
         thread_interrupt_t *interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
         list_remove(&interrupt->header);
-        curr_thread->flags &= ~THREAD_INTERRUPTED;
+        thread_clear_flag(curr_thread, THREAD_INTERRUPTED);
 
         assert(interrupt->priority >= curr_thread->ipl);
 
@@ -823,7 +824,7 @@ status_t thread_create(
     thread->name[THREAD_NAME_MAX - 1] = 0;
 
     thread->state                = THREAD_CREATED;
-    thread->flags                = flags;
+    thread->__flags              = flags;
     thread->priority             = THREAD_PRIORITY_NORMAL;
     thread->wired                = 0;
     thread->preempt_count        = 0;
@@ -833,7 +834,6 @@ status_t thread_create(
     thread->last_time            = 0;
     thread->kernel_time          = 0;
     thread->user_time            = 0;
-    thread->in_usermem           = false;
     thread->ipl                  = 0;
     thread->exception_stack.base = 0;
     thread->exception_stack.size = 0;
@@ -886,6 +886,8 @@ void thread_run(thread_t *thread) {
 }
 
 static inline void dump_thread(thread_t *thread) {
+    uint32_t flags = thread_flags(thread);
+
     kdb_printf("%-5" PRId32 "%s ", thread->id, (thread == curr_thread) ? "*" : " ");
 
     switch (thread->state) {
@@ -900,7 +902,7 @@ static inline void dump_thread(thread_t *thread) {
             break;
         case THREAD_SLEEPING:
             kdb_printf("Sleeping ");
-            if (thread->flags & THREAD_INTERRUPTIBLE) {
+            if (flags & THREAD_INTERRUPTIBLE) {
                 kdb_printf("(I) ");
             } else {
                 kdb_printf("    ");
@@ -917,7 +919,7 @@ static inline void dump_thread(thread_t *thread) {
     kdb_printf(
         "%-5d %-4" PRIu32 " %-4zu %-4d %-4d 0x%-3x %-24s %-5" PRId32 " %s\n",
         refcount_get(&thread->count), (thread->cpu) ? thread->cpu->id : 0,
-        thread->wired, thread->priority, thread->curr_prio, thread->flags,
+        thread->wired, thread->priority, thread->curr_prio, flags,
         (thread->state == THREAD_SLEEPING) ? thread->waiting_on : "<none>",
         thread->owner->id, thread->name);
 }
@@ -1451,12 +1453,12 @@ status_t kern_thread_set_ipl(uint32_t mode, uint32_t ipl, uint32_t *_prev_ipl) {
 
         /* Check whether there are any pending interrupts that have now become
          * unblocked. If so, set the flag so that they will be executed when we
-         * return to user mode. */
-        curr_thread->flags &= ~THREAD_INTERRUPTED;
+         * return to user mode. The list is ordered highest priority first. */
+        thread_clear_flag(curr_thread, THREAD_INTERRUPTED);
         if (!list_empty(&curr_thread->interrupts)) {
             thread_interrupt_t *interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
             if (interrupt->priority >= ipl)
-                curr_thread->flags |= THREAD_INTERRUPTED;
+                thread_set_flag(curr_thread, THREAD_INTERRUPTED);
         }
     }
 

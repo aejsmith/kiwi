@@ -35,13 +35,13 @@
     if (setjmp(curr_thread->usermem_context) != 0) \
         return STATUS_INVALID_ADDR; \
     \
-    curr_thread->in_usermem = true; \
+    thread_set_flag(curr_thread, THREAD_IN_USERMEM); \
     compiler_barrier()
 
 /** Common exit code for userspace memory functions. */
 #define usermem_exit() \
     compiler_barrier(); \
-    curr_thread->in_usermem = false
+    thread_clear_flag(curr_thread, THREAD_IN_USERMEM)
 
 /** Code to check parameters execute a statement. */
 #define usermem_wrap(addr, count, stmt) \

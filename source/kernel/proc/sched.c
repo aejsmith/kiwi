@@ -322,7 +322,7 @@ void sched_preempt(void) {
     spinlock_lock_noirq(&curr_thread->lock);
 
     if (curr_thread->preempt_count > 0) {
-        curr_thread->flags |= THREAD_PREEMPTED;
+        thread_set_flag(curr_thread, THREAD_PREEMPTED);
         spinlock_unlock_noirq(&curr_thread->lock);
         local_irq_restore(state);
     } else {
@@ -359,8 +359,8 @@ void preempt_enable(void) {
         spinlock_lock_noirq(&curr_thread->lock);
 
         /* If a preemption was missed then preempt immediately. */
-        if (curr_thread->flags & THREAD_PREEMPTED) {
-            curr_thread->flags &= ~THREAD_PREEMPTED;
+        if (thread_flags(curr_thread) & THREAD_PREEMPTED) {
+            thread_clear_flag(curr_thread, THREAD_PREEMPTED);
             sched_reschedule(irq_state);
             return;
         }
