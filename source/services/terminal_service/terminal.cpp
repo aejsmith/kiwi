@@ -318,12 +318,16 @@ status_t Terminal::handleFileRead(const ipc_message_t &message) {
 }
 
 status_t Terminal::handleFileWrite(const ipc_message_t &message, const void *data) {
+    size_t size = message.args[USER_FILE_MESSAGE_ARG_WRITE_SIZE];
+    if (size <= USER_FILE_WRITE_INLINE_DATA_SIZE)
+        data = &message.args[USER_FILE_MESSAGE_ARG_WRITE_INLINE_DATA];
+
     /* Pass this on to the client. */
-    status_t ret = sendOutput(data, message.size);
+    status_t ret = sendOutput(data, size);
 
     ipc_message_t reply = initializeFileReply(message);
-    reply.args[USER_FILE_MESSAGE_ARG_WRITE_STATUS] = ret;
-    reply.args[USER_FILE_MESSAGE_ARG_WRITE_SIZE]   = (ret == STATUS_SUCCESS) ? message.size : 0;
+    reply.args[USER_FILE_MESSAGE_ARG_WRITE_STATUS]      = ret;
+    reply.args[USER_FILE_MESSAGE_ARG_WRITE_TRANSFERRED] = (ret == STATUS_SUCCESS) ? size : 0;
 
     return kern_connection_send(m_userFileConnection, &reply, nullptr, INVALID_HANDLE, -1);
 }
@@ -768,17 +772,18 @@ bool Terminal::readBuffer(ReadOperation &op) {
 
     /* Gather the data to return. Canonical mode cannot return anything unless
      * we have a whole line. */
-    reply.size = (!op.canon || allAvailable) ? std::min(op.size, m_inputBufferSize) : 0;
+    size_t transferSize = (!op.canon || allAvailable) ? std::min(op.size, m_inputBufferSize) : 0;
+    reply.args[USER_FILE_MESSAGE_ARG_READ_TRANSFERRED] = transferSize;
 
     std::unique_ptr<uint8_t[]> data;
-    if (reply.size > 0)
-        data.reset(new uint8_t[reply.size]);
+    if (transferSize > 0)
+        data.reset(new uint8_t[transferSize]);
 
     size_t bufferStart = m_inputBufferStart;
     size_t bufferSize  = m_inputBufferSize;
     size_t bufferLines = m_inputBufferLines;
 
-    for (size_t i = 0; i < reply.size; i++) {
+    for (size_t i = 0; i < transferSize; i++) {
         uint16_t ch = m_inputBuffer[bufferStart];
         data[i] = static_cast<uint8_t>(ch);
 
@@ -793,10 +798,16 @@ bool Terminal::readBuffer(ReadOperation &op) {
                 if (!(ch & kChar_Eof))
                     i++;
 
-                reply.size = i;
+                transferSize = i;
                 break;
             }
         }
+    }
+
+    if (transferSize > 0 && transferSize <= USER_FILE_READ_INLINE_DATA_SIZE) {
+        memcpy(&reply.args[USER_FILE_MESSAGE_ARG_READ_INLINE_DATA], data.get(), transferSize);
+    } else {
+        reply.size = transferSize;
     }
 
     status_t ret = kern_connection_send(

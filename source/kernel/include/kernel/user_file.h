@@ -45,6 +45,7 @@
 #pragma once
 
 #include <kernel/file.h>
+#include <kernel/ipc.h>
 
 __KERNEL_EXTERN_C_BEGIN
 
@@ -55,21 +56,22 @@ enum {
      *
      * Input:
      *   Arguments:
-     *     USER_FILE_MESSAGE_ARG_SERIAL      = Operation serial.
-     *     USER_FILE_MESSAGE_ARG_FLAGS       = Current handle flags.
-     *     USER_FILE_MESSAGE_ARG_READ_OFFSET = Offset in the file to read from.
-     *     USER_FILE_MESSAGE_ARG_READ_SIZE   = Size of data to read.
+     *     USER_FILE_MESSAGE_ARG_SERIAL           = Operation serial.
+     *     USER_FILE_MESSAGE_ARG_FLAGS            = Current handle flags.
+     *     USER_FILE_MESSAGE_ARG_READ_OFFSET      = Offset in the file to read
+     *                                              from.
+     *     USER_FILE_MESSAGE_ARG_READ_SIZE        = Size of data to read.
      *
      * Reply:
      *   Arguments:
-     *     USER_FILE_MESSAGE_ARG_SERIAL      = Operation serial (as input).
-     *     USER_FILE_MESSAGE_ARG_READ_STATUS = Status code.
+     *     USER_FILE_MESSAGE_ARG_SERIAL           = Operation serial (as input).
+     *     USER_FILE_MESSAGE_ARG_READ_STATUS      = Status code.
+     *     USER_FILE_MESSAGE_ARG_READ_TRANSFERRED = Actual size read.
      *   Data:
      *     Data read from the file.
      *
-     * Data size for the reply is used as the actual size read, can be less or
-     * equal (but not more) than the operation requested, as per
-     * kern_file_read().
+     * The actual size read can be less than or equal (but not more than) what
+     * the operation requested, as per kern_file_read().
      */
     USER_FILE_OP_READ = 0,
 
@@ -78,21 +80,27 @@ enum {
      *
      * Input:
      *   Arguments:
-     *     USER_FILE_MESSAGE_ARG_SERIAL       = Operation serial.
-     *     USER_FILE_MESSAGE_ARG_FLAGS        = Current handle flags.
-     *     USER_FILE_MESSAGE_ARG_WRITE_OFFSET = Offset in the file to write to.
+     *     USER_FILE_MESSAGE_ARG_SERIAL            = Operation serial.
+     *     USER_FILE_MESSAGE_ARG_FLAGS             = Current handle flags.
+     *     USER_FILE_MESSAGE_ARG_WRITE_OFFSET      = Offset in the file to write
+     *                                               to.
+     *     USER_FILE_MESSAGE_ARG_WRITE_SIZE        = Size of data to write.
      *   Data:
-     *     Data to write to the file (size specified in message).
+     *     Data to write to the file if larger than the inline data size.
      *
      * Reply:
      *   Arguments:
-     *     USER_FILE_MESSAGE_ARG_SERIAL       = Operation serial (as input).
-     *     USER_FILE_MESSAGE_ARG_WRITE_STATUS = Status code.
-     *     USER_FILE_MESSAGE_ARG_WRITE_SIZE   = Actual size written.
+     *     USER_FILE_MESSAGE_ARG_SERIAL            = Operation serial (as input).
+     *     USER_FILE_MESSAGE_ARG_WRITE_STATUS      = Status code.
+     *     USER_FILE_MESSAGE_ARG_WRITE_TRANSFERRED = Actual size written.
      *
-     * Size given in the reply is used as the actual size written, can be less
-     * or equal (but not more) than the operation requested, as per
-     * kern_file_write().
+     * If the size of the data to write is less than or equal to
+     * USER_FILE_WRITE_INLINE_DATA_SIZE, then it will be stored inline in the
+     * ipc_message_t at offset USER_FILE_MESSAGE_ARG_WRITE_INLINE_DATA.
+     * Otherwise, it will be attached as the message's data buffer.
+     *
+     * The actual size written can be less than or equal (but not more than)
+     * what the operation requested, as per kern_file_write().
      */
     USER_FILE_OP_WRITE = 1,
 
@@ -191,11 +199,15 @@ enum {
     USER_FILE_MESSAGE_ARG_READ_SIZE         = 4,
 
     USER_FILE_MESSAGE_ARG_READ_STATUS       = 2,
+    USER_FILE_MESSAGE_ARG_READ_TRANSFERRED  = 3,
+    USER_FILE_MESSAGE_ARG_READ_INLINE_DATA  = 4,
 
     USER_FILE_MESSAGE_ARG_WRITE_OFFSET      = 3,
+    USER_FILE_MESSAGE_ARG_WRITE_SIZE        = 4,
+    USER_FILE_MESSAGE_ARG_WRITE_INLINE_DATA = 5,
 
     USER_FILE_MESSAGE_ARG_WRITE_STATUS      = 2,
-    USER_FILE_MESSAGE_ARG_WRITE_SIZE        = 3,
+    USER_FILE_MESSAGE_ARG_WRITE_TRANSFERRED = 3,
 
     USER_FILE_MESSAGE_ARG_REQUEST_NUM       = 3,
 
@@ -206,6 +218,22 @@ enum {
     USER_FILE_MESSAGE_ARG_EVENT_DATA        = 4,
 
     USER_FILE_MESSAGE_ARG_EVENT_SERIAL      = 3,
+};
+
+enum {
+    /**
+     * Maximum data size that can be inlined into the ipc_message_t args for a
+     * read operation.
+     */
+    USER_FILE_READ_INLINE_DATA_SIZE =
+        (IPC_MESSAGE_ARGS_COUNT - USER_FILE_MESSAGE_ARG_READ_INLINE_DATA) * sizeof(uint64_t),
+
+    /**
+     * Maximum data size that can be inlined into the ipc_message_t args for a
+     * write operation.
+     */
+    USER_FILE_WRITE_INLINE_DATA_SIZE =
+        (IPC_MESSAGE_ARGS_COUNT - USER_FILE_MESSAGE_ARG_WRITE_INLINE_DATA) * sizeof(uint64_t),
 };
 
 /** Flags to indicate which operations are supported. */

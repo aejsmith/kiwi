@@ -401,13 +401,20 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
             op->msg->msg.args[USER_FILE_MESSAGE_ARG_READ_OFFSET] = offset;
             op->msg->msg.args[USER_FILE_MESSAGE_ARG_READ_SIZE]   = size;
         } else {
-            op = user_file_op_alloc(file, USER_FILE_OP_WRITE, size);
+            size_t msg_size = (size > USER_FILE_WRITE_INLINE_DATA_SIZE) ? size : 0;
 
-            ret = io_request_copy(request, op->msg->data, size, false);
-            if (ret != STATUS_SUCCESS)
-                break;
+            op = user_file_op_alloc(file, USER_FILE_OP_WRITE, msg_size);
 
             op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_OFFSET] = offset;
+            op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_SIZE]   = size;
+
+            void* dest = (msg_size > 0)
+                ? op->msg->data
+                : &op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_INLINE_DATA];
+
+            ret = io_request_copy(request, dest, size, false);
+            if (ret != STATUS_SUCCESS)
+                break;
         }
 
         op->msg->msg.args[USER_FILE_MESSAGE_ARG_FLAGS] = file_handle_flags(handle);
@@ -421,18 +428,31 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
         size_t transfer_size;
 
         if (request->op == IO_OP_READ) {
-            transfer_size = op->msg->msg.size;
+            transfer_size = op->msg->msg.args[USER_FILE_MESSAGE_ARG_READ_TRANSFERRED];
 
             if (transfer_size > size) {
                 ret = user_file_invalid_reply(file, op);
             } else if (transfer_size > 0) {
-                ret = io_request_copy(request, op->msg->data, transfer_size, false);
+                if (transfer_size > USER_FILE_READ_INLINE_DATA_SIZE) {
+                    if (op->msg->msg.size == transfer_size) {
+                        ret = io_request_copy(request, op->msg->data, transfer_size, false);
+                    } else {
+                        ret = user_file_invalid_reply(file, op);
+                    }
+                } else {
+                    if (op->msg->msg.size == 0) {
+                        void* src = &op->msg->msg.args[USER_FILE_MESSAGE_ARG_READ_INLINE_DATA];
+                        ret = io_request_copy(request, src, transfer_size, false);
+                    } else {
+                        ret = user_file_invalid_reply(file, op);
+                    }
+                }
             }
 
             if (ret == STATUS_SUCCESS)
                 ret = op->msg->msg.args[USER_FILE_MESSAGE_ARG_READ_STATUS];
         } else {
-            transfer_size = op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_SIZE];
+            transfer_size = op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_TRANSFERRED];
 
             if (transfer_size > size) {
                 ret           = user_file_invalid_reply(file, op);
