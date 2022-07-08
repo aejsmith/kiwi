@@ -64,6 +64,37 @@ typedef struct tcp_buffer {
     notifier_t notifier;                /**< Notifier to wait for space or data. */
 } tcp_buffer_t;
 
+/** TCP socket state. Order of this is important! */
+typedef enum tcp_state {
+    /** Socket is closed, has never been opened. */
+    TCP_STATE_CLOSED,
+
+    /** Internal: Remote host refused our connection. */
+    TCP_STATE_REFUSED,
+
+    /** Connecting states. */
+    TCP_STATE_SYN_SENT,
+    TCP_STATE_LISTEN,
+
+    TCP_STATE_ESTABLISHED,
+
+    /** Closing states. */
+    TCP_STATE_CLOSE_ACTIVE,             /**< Internal: Initiated active close. */
+    TCP_STATE_CLOSE_WAIT,
+    TCP_STATE_LAST_ACK,
+    TCP_STATE_FIN_WAIT_1,
+    TCP_STATE_FIN_WAIT_2,
+    TCP_STATE_CLOSING,
+    TCP_STATE_TIME_WAIT,
+
+    /**
+     * Internal: We've closed a connection that was previously open (due to the remote
+     * host closing it), but the socket has not been expliclitly closed by its
+     * owner.
+     */
+    TCP_STATE_CLOSE_COMPLETE,
+} tcp_state_t;
+
 /** TCP socket structure. */
 typedef struct tcp_socket {
     net_socket_t net;
@@ -77,16 +108,7 @@ typedef struct tcp_socket {
     mutex_t lock;                       /**< Lock for the socket. */
     net_port_t port;                    /**< Port allocation. */
     sockaddr_ip_t dest_addr;            /**< Destination address. */
-
-    /** Current socket state. */
-    enum {
-        TCP_STATE_CLOSED,
-        TCP_STATE_SYN_SENT,
-        TCP_STATE_LISTEN,
-        TCP_STATE_ESTABLISHED,
-        TCP_STATE_REFUSED,
-        // TODO
-    } state;
+    tcp_state_t state;                  /**< Current socket state. */
 
     /**
      * Transmit buffer and sequence state. The start of the buffer corresponds
@@ -103,6 +125,7 @@ typedef struct tcp_socket {
     uint32_t rx_seq;                    /**< Next receive sequence number. */
 
     condvar_t state_cvar;               /**< Condition to wait for state changes on. */
+    timer_t close_timer;                /**< Close timeout. */
 } tcp_socket_t;
 
 DEFINE_CLASS_CAST(tcp_socket, net_socket, net);
@@ -125,6 +148,17 @@ enum {
     /** Initial connection timeout (seconds), multiplied by 2 each retry. */
     TCP_SYN_INITIAL_TIMEOUT = 1,
 
+    /**
+     * Timeout for connection closing after which the connection will be
+     * forcibly closed. This is also used for waiting in the TIME_WAIT state for
+     * the normal close procedure.
+     *
+     * The TIME_WAIT timeout is defined by the TCP RFC as 2 * MSL = 4 minutes,
+     * but we follow Linux's default and use 1 minute, as 4 is quite
+     * overzealous.
+     */
+    TCP_CLOSE_TIMEOUT = 60,
+
     /** TCP buffer sizes. */
     TCP_TX_BUFFER_SIZE = PAGE_SIZE,
     TCP_RX_BUFFER_SIZE = PAGE_SIZE,
@@ -139,6 +173,13 @@ static void tcp_socket_retain(tcp_socket_t *socket) {
 
 static void tcp_socket_release(tcp_socket_t *socket) {
     if (refcount_dec(&socket->count) == 0) {
+        bool __unused is_closed_state =
+            socket->state == TCP_STATE_CLOSED ||
+            socket->state == TCP_STATE_CLOSE_COMPLETE;
+        assert(is_closed_state);
+
+        dprintf("tcp: freeing socket %p\n", socket);
+
         assert(socket->port.num == 0);
 
         assert(notifier_empty(&socket->tx_buffer.notifier));
@@ -254,6 +295,70 @@ static void tx_ack_packet(tcp_socket_t *socket) {
     }
 }
 
+static inline bool is_closing(tcp_socket_t *socket) {
+    return socket->state >= TCP_STATE_CLOSE_ACTIVE && socket->state < TCP_STATE_CLOSE_COMPLETE;
+}
+
+static void start_close(tcp_socket_t *socket, tcp_state_t new_state) {
+    assert(!is_closing(socket));
+
+    /* This keeps the socket alive until we either complete the close or until
+     * it times out. */
+    tcp_socket_retain(socket);
+    timer_start(&socket->close_timer, secs_to_nsecs(TCP_CLOSE_TIMEOUT), TIMER_ONESHOT);
+
+    socket->state = new_state;
+    assert(is_closing(socket));
+}
+
+static void finish_close(tcp_socket_t *socket, tcp_state_t new_state, bool is_timer) {
+    if (is_closing(socket) && !is_timer) {
+        /* timer_stop() may need to wait for a handler execution to complete,
+         * which would want to take the lock. */
+        mutex_unlock(&socket->lock);
+
+        uint32_t exec_count = timer_stop(&socket->close_timer);
+        assert(exec_count == 0 || exec_count == 1);
+
+        mutex_lock(&socket->lock);
+
+        /* The handler will have released its reference if it executed,
+         * otherwise we must drop the reference added by start_close(). */
+        if (exec_count == 0)
+            tcp_socket_release(socket);
+    }
+
+    dprintf("tcp: %" PRIu16 ": closed\n", socket->port.num);
+
+    free_port(socket);
+
+    socket->state = new_state;
+    assert(!is_closing(socket));
+}
+
+static bool close_timer_func(void *_socket) {
+    tcp_socket_t *socket = _socket;
+
+    mutex_lock(&socket->lock);
+
+    if (is_closing(socket)) {
+        if (socket->state == TCP_STATE_TIME_WAIT) {
+            dprintf("tcp: %" PRIu16 ": time wait passed\n", socket->port.num);
+        } else {
+            dprintf("tcp: %" PRIu16 ": close timeout\n", socket->port.num);
+        }
+
+        finish_close(socket, TCP_STATE_CLOSE_COMPLETE, true);
+    }
+
+    mutex_unlock(&socket->lock);
+
+    /* Drop the reference added by start_close(). This might free the
+     * socket. */
+    tcp_socket_release(socket);
+    return false;
+}
+
 /**
  * Flushes the transmit buffer. This will retransmit unacknowledged segments if
  * we determine that it is time to do so, and transmit segments for any new data
@@ -281,6 +386,9 @@ static void flush_tx_buffer(tcp_socket_t *socket) {
     mtu = min(mtu, 1500 - sizeof(ipv4_header_t));
     uint32_t max_segment_size = mtu - sizeof(tcp_header_t);
 
+    bool need_fin = socket->state == TCP_STATE_CLOSE_WAIT || socket->state == TCP_STATE_CLOSE_ACTIVE;
+    bool sent_fin = false;
+
     /* Divide the unsent data into segments. */
     while (unsent_size > 0) {
         uint32_t segment_size = min(unsent_size, max_segment_size);
@@ -294,9 +402,17 @@ static void flush_tx_buffer(tcp_socket_t *socket) {
             break;
         }
 
-        /* If this is the last segment we're going to send for now, set PSH. */
-        if (segment_size == unsent_size)
-            packet.header->flags |= TCP_PSH;
+        /* If this is the last segment we're going to send for now... */
+        if (segment_size == unsent_size) {
+            if (need_fin) {
+                /* ... send FIN if we're closing. */
+                packet.header->flags |= TCP_FIN;
+                sent_fin = true;
+            } else {
+                /* ... else set PSH. */
+                packet.header->flags |= TCP_PSH;
+            }
+        }
 
         /* Add the segment data. */
         // TODO: We're currently using external buffers here under the
@@ -329,6 +445,36 @@ static void flush_tx_buffer(tcp_socket_t *socket) {
         socket->tx_seq += segment_size;
         unsent_size    -= segment_size;
     }
+
+    if (need_fin) {
+        /* We're closing and the buffer was already empty, we'll need to send
+         * an empty FIN packet. */
+        if (!sent_fin) {
+            tcp_tx_packet_t packet;
+            ret = prepare_tx_packet(socket, &packet);
+            if (ret != STATUS_SUCCESS) {
+                kprintf(LOG_WARN, "tcp: failed to route packet: %d\n", ret);
+                return;
+            }
+
+            packet.header->flags |= TCP_FIN;
+
+            ret = tx_packet(socket, &packet, true);
+            if (ret != STATUS_SUCCESS) {
+                kprintf(LOG_WARN, "tcp: failed to transmit packet: %d\n", ret);
+                return;
+            }
+        }
+
+        dprintf("tcp: %" PRIu16 ": sent FIN\n", socket->port.num);
+
+        /* FIN increments the sequence number so we expect to have this acked. */
+        socket->tx_seq++;
+
+        socket->state = (socket->state == TCP_STATE_CLOSE_WAIT)
+            ? TCP_STATE_LAST_ACK
+            : TCP_STATE_FIN_WAIT_1;
+    }
 }
 
 /**
@@ -343,7 +489,7 @@ static void ack_tx_buffer(tcp_socket_t *socket, uint32_t ack_num) {
      *     SND.UNA < SEG.ACK =< SND.NXT
      */
     if (!TCP_SEQ_LE(socket->tx_unack, ack_num) || !TCP_SEQ_LE(ack_num, socket->tx_seq)) {
-        dprintf("tcp: received unexpected ACK sequence, ignoring\n");
+        dprintf("tcp: %" PRIu16 ": received unexpected ACK sequence, ignoring\n", socket->port.num);
         return;
     }
 
@@ -369,18 +515,21 @@ static void ack_tx_buffer(tcp_socket_t *socket, uint32_t ack_num) {
 static void tcp_socket_close(socket_t *_socket) {
     tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
 
-    // TODO: Send FIN packet. We should wait for this and not actually remove
-    // the port until it's acknowledged or timed out.
-
     mutex_lock(&socket->lock);
 
     /* If the handle is being closed, there shouldn't be any waiters on it as
      * they'd hold a reference to the handle. */
     assert(list_empty(&socket->state_cvar.threads));
 
-    free_port(socket);
-    socket->state = TCP_STATE_CLOSED;
-    // TODO. What cleanup should be done here vs tcp_socket_release().
+    if (socket->state == TCP_STATE_ESTABLISHED) {
+        dprintf("tcp: %" PRIu16 ": initiating active close\n", socket->port.num);
+
+        start_close(socket, TCP_STATE_CLOSE_ACTIVE);
+
+        /* Flush the TX buffer. The FIN will be sent once it is empty which will
+         * move to FIN_WAIT_1. */
+        flush_tx_buffer(socket);
+    }
 
     mutex_unlock(&socket->lock);
 
@@ -508,8 +657,7 @@ static status_t tcp_socket_connect(socket_t *_socket, const sockaddr_t *addr, so
                 : STATUS_TIMED_OUT;
         }
 
-        free_port(socket);
-        socket->state = TCP_STATE_CLOSED;
+        finish_close(socket, TCP_STATE_CLOSED, false);
     }
 
     return ret;
@@ -524,11 +672,11 @@ static status_t tcp_socket_send(
 
     MUTEX_SCOPED_LOCK(lock, &socket->lock);
 
-    if (socket->state != TCP_STATE_ESTABLISHED)
-        return STATUS_NOT_CONNECTED;
-
     if (addr_len > 0)
         return STATUS_ALREADY_CONNECTED;
+
+    if (socket->state != TCP_STATE_ESTABLISHED)
+        return (socket->state > TCP_STATE_ESTABLISHED) ? STATUS_SUCCESS : STATUS_NOT_CONNECTED;
 
     ret = STATUS_SUCCESS;
 
@@ -586,6 +734,7 @@ static status_t tcp_socket_send(
     }
 
     /* Flush anything we've added to the buffer. */
+    // TODO: Support batching up of data to write by not flushing immediately?
     flush_tx_buffer(socket);
 
     return STATUS_SUCCESS;
@@ -607,7 +756,7 @@ static status_t tcp_socket_receive(
     // update tcp_socket_wait.
     while (buffer->curr_size == 0) {
         if (socket->state != TCP_STATE_ESTABLISHED)
-            return STATUS_NOT_CONNECTED;
+            return (socket->state > TCP_STATE_ESTABLISHED) ? STATUS_SUCCESS : STATUS_NOT_CONNECTED;
 
         ret = condvar_wait_etc(&buffer->cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
         if (ret != STATUS_SUCCESS)
@@ -678,6 +827,7 @@ status_t tcp_socket_create(sa_family_t family, socket_t **_socket) {
     mutex_init(&socket->lock, "tcp_socket_lock", 0);
     net_port_init(&socket->port);
     condvar_init(&socket->state_cvar, "tcp_socket_state");
+    timer_init(&socket->close_timer, "tcp_close_timer", close_timer_func, socket, TIMER_THREAD);
 
     socket->net.socket.ops = &tcp_socket_ops;
     socket->net.protocol   = IPPROTO_TCP;
@@ -706,7 +856,7 @@ static void receive_syn_sent(tcp_socket_t *socket, const tcp_header_t *header, n
 
         /* tx_seq is incremented after sending a SYN, so should be equal. */
         if (ack_num != socket->tx_seq) {
-            dprintf("tcp: incorrect sequence number for SYN-ACK, dropping\n");
+            dprintf("tcp: %" PRIu16 ": incorrect sequence number for SYN-ACK, dropping\n", socket->port.num);
             return;
         }
 
@@ -723,28 +873,24 @@ static void receive_syn_sent(tcp_socket_t *socket, const tcp_header_t *header, n
     } else {
         // TODO: Do we need to handle SYN without ACK in this state? This would
         // be unexpected for a client socket.
-        dprintf("tcp: unexpected packet in SYN_SENT state, dropping\n");
+        dprintf("tcp: %" PRIu16 ": unexpected packet in SYN_SENT state, dropping\n", socket->port.num);
         return;
     }
 }
 
 /** Handles packets while in the ESTABLISHED state. */
 static void receive_established(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
-    /* Start by handling acknowledgement. Any packet received in this state
-     * should have ACK set. */
-    if (!(header->flags & TCP_ACK)) {
-        // TODO: Close connection on error?
-        dprintf("tcp: packet received in ESTABLISHED state does not have ACK set, dropping\n");
-        return;
-    }
-
+    /* Handle acknowledgement from the sender. */
     ack_tx_buffer(socket, net32_to_cpu(header->ack_num));
 
     /* data_offset is validated by tcp_receive(). */
     uint32_t data_offset = header->data_offset * sizeof(uint32_t);
     uint32_t data_size   = packet->size - data_offset;
+
+    bool should_ack = data_size > 0 || header->flags & TCP_FIN;
+
     if (data_size > 0) {
-        uint32_t seq_num  = net32_to_cpu(header->seq_num);
+        uint32_t seq_num = net32_to_cpu(header->seq_num);
 
         /* We can accept data if the start sequence is equal to rx_seq (next
          * that we're expecting), or it is less than rx_seq and seq_next is
@@ -762,7 +908,9 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
                 data_size   -= diff;
             } else {
                 /* Unexpected, drop. */
-                dprintf("tcp: dropping unexpected segment with seq %" PRIu32 " (expecting %" PRIu32 ")\n", seq_num, socket->rx_seq);
+                dprintf(
+                    "tcp: %" PRIu16 ": dropping unexpected segment with seq %" PRIu32 " (expecting %" PRIu32 ")\n",
+                    socket->port.num, seq_num, socket->rx_seq);
                 data_size = 0;
             }
         }
@@ -772,7 +920,9 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
         /* Clamp by what we can fit in the buffer. */
         uint32_t space = buffer->max_size - buffer->curr_size;
         if (data_size > 0 && data_size > space) {
-            dprintf("tcp: RX buffer full, dropping data (received %" PRIu32 " bytes, accepting %" PRIu32 ")\n", data_size, space);
+            dprintf(
+                "tcp: %" PRIu16 ": RX buffer full, dropping data (received %" PRIu32 " bytes, accepting %" PRIu32 ")\n",
+                socket->port.num, data_size, space);
             data_size = space;
         }
 
@@ -793,9 +943,89 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
             condvar_broadcast(&buffer->cvar);
             notifier_run(&buffer->notifier, NULL, false);
         }
+    }
 
-        /* Acknowledge what we've accepted (if anything). */
+    if (header->flags & TCP_FIN)
+        socket->rx_seq++;
+
+    /* Acknowledge what we've accepted (if anything). If we received a FIN, this
+     * acks it. */
+    if (should_ack)
         tx_ack_packet(socket);
+
+    if (header->flags & TCP_FIN) {
+        dprintf("tcp: %" PRIu16 ": received FIN, initiating passive close\n", socket->port.num);
+
+        /* CLOSE_WAIT is meant to be waiting until the local client closes the
+         * socket, but we immediately initiate the close. We'll move to LAST_ACK
+         * once the TX buffer is emptied. */
+        start_close(socket, TCP_STATE_CLOSE_WAIT);
+
+        /* Flush the TX buffer. The FIN will be sent once it is empty. */
+        flush_tx_buffer(socket);
+
+        /* Wake up receivers, we won't accept any more data. */
+        tcp_buffer_t *buffer = &socket->rx_buffer;
+        condvar_broadcast(&buffer->cvar);
+        notifier_run(&buffer->notifier, NULL, false);
+    }
+}
+
+/** Handles packets while in the CLOSE_WAIT state. */
+static void receive_close_wait(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
+    ack_tx_buffer(socket, net32_to_cpu(header->ack_num));
+}
+
+/** Handles packets while in the LAST_ACK state. */
+static void receive_last_ack(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
+    uint32_t ack_num = net32_to_cpu(header->ack_num);
+    if (ack_num >= socket->tx_seq) {
+        socket->tx_unack = socket->tx_seq;
+        finish_close(socket, TCP_STATE_CLOSE_COMPLETE, false);
+    }
+}
+
+/** Handles packets while in the FIN_WAIT_1 state. */
+static void receive_fin_wait_1(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
+    /* We're waiting for our FIN to be acked. */
+    uint32_t ack_num = net32_to_cpu(header->ack_num);
+    if (ack_num >= socket->tx_seq) {
+        if (header->flags & TCP_FIN) {
+            /* If this has a FIN set we might have missed the acknowledgement
+             * or received it out of order, just skip straight to TIME_WAIT. */
+            socket->rx_seq++;
+            tx_ack_packet(socket);
+            socket->state = TCP_STATE_TIME_WAIT;
+        } else {
+            socket->state = TCP_STATE_FIN_WAIT_2;
+        }
+    } else if (header->flags & TCP_FIN) {
+        /* Simultaneous close. */
+        socket->rx_seq++;
+        tx_ack_packet(socket);
+        socket->state = TCP_STATE_CLOSING;
+    }
+}
+
+/** Handles packets while in the FIN_WAIT_2 state. */
+static void receive_fin_wait_2(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
+    /* We're waiting for a FIN from the other side. */
+    uint32_t ack_num = net32_to_cpu(header->ack_num);
+    if (ack_num >= socket->tx_seq && header->flags & TCP_FIN) {
+        socket->rx_seq++;
+        tx_ack_packet(socket);
+        socket->state = TCP_STATE_TIME_WAIT;
+    }
+}
+
+/** Handles packets while in the CLOSING state. */
+static void receive_closing(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
+    /* We're waiting for our FIN to be acked. */
+    uint32_t ack_num = net32_to_cpu(header->ack_num);
+    if (ack_num >= socket->tx_seq) {
+        socket->rx_seq++;
+        tx_ack_packet(socket);
+        socket->state = TCP_STATE_TIME_WAIT;
     }
 }
 
@@ -832,17 +1062,40 @@ void tcp_receive(net_packet_t *packet, const net_addr_t *source_addr, const net_
     if (socket->port.num == dest_port) {
         assert(socket->state != TCP_STATE_CLOSED);
 
-        dprintf("tcp: received packet\n");
+        dprintf("tcp: %" PRIu16 ": received packet\n", socket->port.num);
 
-        switch (socket->state) {
-            case TCP_STATE_SYN_SENT:
-                receive_syn_sent(socket, header, packet);
-                break;
-            case TCP_STATE_ESTABLISHED:
-                receive_established(socket, header, packet);
-                break;
-            default:
-                break;
+        if (socket->state == TCP_STATE_SYN_SENT) {
+            receive_syn_sent(socket, header, packet);
+        } else if (header->flags & TCP_ACK) {
+            switch (socket->state) {
+                case TCP_STATE_ESTABLISHED:
+                    receive_established(socket, header, packet);
+                    break;
+                case TCP_STATE_CLOSE_WAIT:
+                    receive_close_wait(socket, header, packet);
+                    break;
+                case TCP_STATE_LAST_ACK:
+                    receive_last_ack(socket, header, packet);
+                    break;
+                case TCP_STATE_FIN_WAIT_1:
+                    receive_fin_wait_1(socket, header, packet);
+                    break;
+                case TCP_STATE_FIN_WAIT_2:
+                    receive_fin_wait_2(socket, header, packet);
+                    break;
+                case TCP_STATE_CLOSING:
+                    receive_closing(socket, header, packet);
+                    break;
+                case TCP_STATE_TIME_WAIT:
+                    /* Nothing to do, we're waiting for our timer to expire. */
+                    break;
+                default:
+                    dprintf("tcp: %" PRIu16 ": received packet in unhandled state %d\n", socket->port.num, socket->state);
+                    break;
+            }
+        } else {
+            // TODO: Close connection on error?
+            dprintf("tcp: %" PRIu16 ": expected ACK to be set but is not, dropping\n", socket->port.num);
         }
     }
 

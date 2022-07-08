@@ -268,6 +268,7 @@ static void timer_thread(void *arg1, void *arg2) {
             spinlock_unlock(&curr_cpu->timer_lock);
 
             timer->func(timer->data);
+            timer->exec_count++;
 
             spinlock_lock(&curr_cpu->timer_lock);
 
@@ -312,6 +313,8 @@ bool timer_tick(void) {
         } else {
             if (timer->func(timer->data))
                 preempt = true;
+
+            timer->exec_count++;
         }
 
         /* If the timer is periodic, restart it. */
@@ -349,10 +352,11 @@ void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data,
     list_init(&timer->cpu_link);
     list_init(&timer->thread_link);
 
-    timer->func  = func;
-    timer->data  = data;
-    timer->flags = flags;
-    timer->name  = name;
+    timer->func       = func;
+    timer->data       = data;
+    timer->flags      = flags;
+    timer->name       = name;
+    timer->exec_count = 0;
 }
 
 /** Start a timer.
@@ -367,9 +371,10 @@ void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
     /* Prevent curr_cpu from changing underneath us. */
     bool irq_state = local_irq_disable();
 
-    timer->cpu     = curr_cpu;
-    timer->mode    = mode;
-    timer->initial = length;
+    timer->cpu        = curr_cpu;
+    timer->mode       = mode;
+    timer->initial    = length;
+    timer->exec_count = 0;
 
     spinlock_lock_noirq(&curr_cpu->timer_lock);
 
@@ -396,8 +401,9 @@ void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
 }
 
 /** Cancel a running timer.
- * @param timer         Timer to stop. */
-void timer_stop(timer_t *timer) {
+ * @param timer         Timer to stop.
+ * @return              Number of times the handler was executed. */
+uint32_t timer_stop(timer_t *timer) {
     if (!list_empty(&timer->cpu_link)) {
         assert(timer->cpu);
 
@@ -439,6 +445,8 @@ void timer_stop(timer_t *timer) {
 
         spinlock_unlock(&timer->cpu->timer_lock);
     }
+
+    return timer->exec_count;
 }
 
 /** Sleep for a certain amount of time.
