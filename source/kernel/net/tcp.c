@@ -40,6 +40,7 @@
 #include <sync/mutex.h>
 
 #include <assert.h>
+#include <kdb.h>
 #include <status.h>
 
 /** Define to enable debug output. */
@@ -1101,4 +1102,72 @@ void tcp_receive(net_packet_t *packet, const net_addr_t *source_addr, const net_
 
     mutex_unlock(&socket->lock);
     tcp_socket_release(socket);
+}
+
+static const char *state_string(tcp_state_t state) {
+    switch (state) {
+        case TCP_STATE_CLOSED:          return "CLOSED";
+        case TCP_STATE_REFUSED:         return "REFUSED";
+        case TCP_STATE_SYN_SENT:        return "SYN_SENT";
+        case TCP_STATE_LISTEN:          return "LISTEN";
+        case TCP_STATE_ESTABLISHED:     return "ESTABLISHED";
+        case TCP_STATE_CLOSE_ACTIVE:    return "CLOSE_ACTIVE";
+        case TCP_STATE_CLOSE_WAIT:      return "CLOSE_WAIT";
+        case TCP_STATE_LAST_ACK:        return "LAST_ACK";
+        case TCP_STATE_FIN_WAIT_1:      return "FIN_WAIT_1";
+        case TCP_STATE_FIN_WAIT_2:      return "FIN_WAIT_2";
+        case TCP_STATE_CLOSING:         return "CLOSING";
+        case TCP_STATE_TIME_WAIT:       return "TIME_WAIT";
+        case TCP_STATE_CLOSE_COMPLETE:  return "CLOSE_COMPLETE";
+        default:                        return "???";
+    }
+}
+
+static kdb_status_t kdb_cmd_tcp4(int argc, char **argv, kdb_filter_t *filter) {
+    if (kdb_help(argc, argv)) {
+        kdb_printf("Usage: %s\n\n", argv[0]);
+
+        kdb_printf("Shows details of IPv4 TCP sockets.\n");
+        return KDB_SUCCESS;
+    }
+
+    kdb_printf("Port   Destination      State\n");
+    kdb_printf("====   ===========      =====\n");
+
+    list_foreach(&tcp_ipv4_space.ports, iter) {
+        net_port_t *port = list_entry(iter, net_port_t, link);
+        tcp_socket_t *socket = container_of(port, tcp_socket_t, port);
+
+        kdb_printf("%-6" PRIu16 " %-16pI4 %s\n",
+            socket->port.num, &socket->dest_addr.ipv4.sin_addr, state_string(socket->state));
+    }
+
+    return KDB_SUCCESS;
+}
+
+static kdb_status_t kdb_cmd_tcp6(int argc, char **argv, kdb_filter_t *filter) {
+    if (kdb_help(argc, argv)) {
+        kdb_printf("Usage: %s\n\n", argv[0]);
+
+        kdb_printf("Shows details of IPv6 TCP sockets.\n");
+        return KDB_SUCCESS;
+    }
+
+    kdb_printf("Port   Destination                              State\n");
+    kdb_printf("====   ===========                              =====\n");
+
+    list_foreach(&tcp_ipv6_space.ports, iter) {
+        net_port_t *port = list_entry(iter, net_port_t, link);
+        tcp_socket_t *socket = container_of(port, tcp_socket_t, port);
+
+        kdb_printf("%-6" PRIu16 " %-40pI6 %s\n",
+            socket->port.num, &socket->dest_addr.ipv6.sin6_addr, state_string(socket->state));
+    }
+
+    return KDB_SUCCESS;
+}
+
+void tcp_init(void) {
+    kdb_register_command("tcp4", "Show details of IPv4 TCP sockets.", kdb_cmd_tcp4);
+    kdb_register_command("tcp6", "Show details of IPv6 TCP sockets.", kdb_cmd_tcp6);
 }

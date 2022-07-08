@@ -27,6 +27,7 @@
 #include <net/arp.h>
 #include <net/ipv4.h>
 #include <net/packet.h>
+#include <net/tcp.h>
 
 #include <module.h>
 #include <status.h>
@@ -62,6 +63,7 @@ static status_t net_init(void) {
 
     arp_init();
     ipv4_init();
+    tcp_init();
 
     ret = socket_families_register(net_socket_families, array_size(net_socket_families));
     if (ret != STATUS_SUCCESS)

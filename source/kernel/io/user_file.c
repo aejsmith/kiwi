@@ -408,7 +408,7 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
             op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_OFFSET] = offset;
             op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_SIZE]   = size;
 
-            void* dest = (msg_size > 0)
+            void *dest = (msg_size > 0)
                 ? op->msg->data
                 : &op->msg->msg.args[USER_FILE_MESSAGE_ARG_WRITE_INLINE_DATA];
 
@@ -441,7 +441,7 @@ static status_t user_file_io(file_handle_t *handle, io_request_t *request) {
                     }
                 } else {
                     if (op->msg->msg.size == 0) {
-                        void* src = &op->msg->msg.args[USER_FILE_MESSAGE_ARG_READ_INLINE_DATA];
+                        void *src = &op->msg->msg.args[USER_FILE_MESSAGE_ARG_READ_INLINE_DATA];
                         ret = io_request_copy(request, src, transfer_size, false);
                     } else {
                         ret = user_file_invalid_reply(file, op);
