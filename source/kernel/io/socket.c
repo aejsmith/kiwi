@@ -25,6 +25,7 @@
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
+#include <mm/page.h>
 #include <mm/safe.h>
 
 #include <assert.h>
@@ -158,7 +159,7 @@ static void socket_file_unwait(file_handle_t *handle, object_event_t *event) {
 }
 
 static void socket_file_info(file_handle_t *handle, file_info_t *info) {
-    info->block_size = 1;
+    info->block_size = PAGE_SIZE;
     info->size       = 0;
     info->id         = 0;
     info->mount      = 0;

@@ -19,6 +19,7 @@
  * @brief               TCP protocol implementation.
  *
  * TODO:
+ *  - Sliding window support.
  *  - Support SACK.
  */
 
