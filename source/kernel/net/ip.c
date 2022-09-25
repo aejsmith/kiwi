@@ -28,6 +28,32 @@
 #include <assert.h>
 #include <kernel.h>
 
+/**
+ * Check if a socket address matches a packet's address/port. Useful for
+ * comparing received address/port to a socket's bound address.
+ *
+ * @param a             Socket address.
+ * @param b_addr        Address to compare with.
+ * @param b_port        Port to compare with (in network byte order).
+ *
+ * @return              Whether the addresses match.
+ */
+bool ip_sockaddr_equal(const sockaddr_ip_t *a, const net_addr_t *b_addr, uint16_t b_port) {
+    bool ret = false;
+
+    if (a->family == b_addr->family) {
+        ret = a->port == b_port;
+
+        if (a->family == AF_INET) {
+            ret &= a->ipv4.sin_addr.val == b_addr->ipv4.val;
+        } else if (a->family == AF_INET6) {
+            ret &= memcmp(a->ipv6.sin6_addr.bytes, b_addr->ipv6.bytes, sizeof(b_addr->ipv6.bytes)) == 0;
+        }
+    }
+
+    return ret;
+}
+
 static inline uint32_t add_bytes(uint8_t first, uint8_t second, uint32_t sum) {
     uint16_t val = ((uint16_t)first << 8) | second;
     sum += val;

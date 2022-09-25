@@ -43,6 +43,8 @@ typedef union sockaddr_ip {
 #define IP_EPHEMERAL_PORT_FIRST    49152
 #define IP_EPHEMERAL_PORT_LAST     65535
 
+extern bool ip_sockaddr_equal(const sockaddr_ip_t *a, const net_addr_t *b_addr, uint16_t b_port);
+
 extern uint16_t ip_checksum(const void *data, size_t size);
 
 extern uint16_t ip_checksum_pseudo(

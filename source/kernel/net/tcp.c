@@ -1228,10 +1228,12 @@ void tcp_receive(net_packet_t *packet, const net_addr_t *source_addr, const net_
 
     mutex_lock(&socket->lock);
 
-    /* Re-check port now that we've taken the lock in case it changed. */
-    if (socket->port.num == dest_port) {
-        assert(socket->state != TCP_STATE_CLOSED);
-
+    /* Check that this packet comes from where we expected. Also re-check that
+     * the port is still allocated, in case it was freed by the time we've
+     * locked. */
+    if (socket->port.num == dest_port &&
+        ip_sockaddr_equal(&socket->dest_addr, source_addr, header->source_port))
+    {
         dprintf("tcp: %" PRIu16 ": received packet\n", socket->port.num);
 
         if (socket->state == TCP_STATE_SYN_SENT) {
