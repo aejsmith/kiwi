@@ -634,7 +634,7 @@
 /* #undef HAVE_GETGROUPS */
 
 /* Define if you have the gethostbyname function.  */
-/* #undef HAVE_GETHOSTBYNAME */
+#define HAVE_GETHOSTBYNAME 1
 
 /* Define if you have the gethostname function.  */
 /* #undef HAVE_GETHOSTNAME */
@@ -985,7 +985,7 @@
 /* #undef HAVE_NDIR_H */
 
 /* Define if you have the <netdh.h> header file. */
-/* #undef HAVE_NETDB_H */
+#define HAVE_NETDB_H 1
 
 /* Define if you have the <netinet/in.h> header file. */
 #define HAVE_NETINET_IN_H 1

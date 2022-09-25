@@ -202,3 +202,31 @@ pthread_t pthread_self(void) {
 
     return pthread_self_pointer;
 }
+
+int pthread_cancel(pthread_t thread) {
+    // TODO: Implement setcancel*() and cleanup_*() with this.
+    libsystem_stub(__func__, false);
+    return ENOSYS;
+}
+
+int pthread_setcancelstate(int state, int *oldstate) {
+    if (oldstate)
+        *oldstate = PTHREAD_CANCEL_ENABLE;
+
+    return ENOSYS;
+}
+
+int pthread_setcanceltype(int type, int *oldtype) {
+    if (oldtype)
+        *oldtype = PTHREAD_CANCEL_DEFERRED;
+
+    return ENOSYS;
+}
+
+void pthread_cleanup_pop(int execute) {
+
+}
+
+void pthread_cleanup_push(void (*routine)(void*), void *arg) {
+
+}

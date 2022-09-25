@@ -46,6 +46,7 @@ sources = [File(f) for f in [
     'locale/localeconv.c',
     'locale/setlocale.c',
 
+    'net/if.c',
     'net/socket.c',
 
     'posix/alarm.c',
@@ -145,12 +146,28 @@ sources = [File(f) for f in [
     'sched.c',
 ]]
 
-musl_sources = [File(f) for f in [
-    'musl/src/network/inet_addr.c',
-    'musl/src/network/inet_aton.c',
-    'musl/src/network/inet_ntoa.c',
-    'musl/src/network/inet_ntop.c',
-    'musl/src/network/inet_pton.c',
+musl_sources = [File('musl/src/%s' % (f)) for f in [
+    'network/dn_expand.c',
+    'network/dns_parse.c',
+    'network/gethostbyname.c',
+    'network/gethostbyname_r.c',
+    'network/gethostbyname2.c',
+    'network/gethostbyname2_r.c',
+    'network/herror.c',
+    'network/h_errno.c',
+    'network/hstrerror.c',
+    'network/inet_addr.c',
+    'network/inet_aton.c',
+    'network/inet_ntoa.c',
+    'network/inet_ntop.c',
+    'network/inet_pton.c',
+    'network/lookup_ipliteral.c',
+    'network/lookup_name.c',
+    'network/res_mkquery.c',
+    'network/res_msend.c',
+    'network/res_query.c',
+    'network/res_send.c',
+    'network/resolvconf.c',
 ]]
 
 musl_CPPPATH = [

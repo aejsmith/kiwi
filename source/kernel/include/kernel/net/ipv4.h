@@ -63,6 +63,7 @@ enum {
     IPPROTO_ICMP    = 1,
     IPPROTO_TCP     = 6,
     IPPROTO_UDP     = 17,
+    IPPROTO_IPV6    = 41,
 };
 
 #define INADDR_ANY          ((in_addr_t)0x00000000)

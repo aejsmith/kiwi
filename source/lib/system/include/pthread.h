@@ -30,25 +30,37 @@ __SYS_EXTERN_C_BEGIN
 /** Process sharing attributes. */
 enum {
     /** Object is only used within the current process. */
-    PTHREAD_PROCESS_PRIVATE,
+    PTHREAD_PROCESS_PRIVATE = 0,
 
     /** Object can be shared between other processes using shared memory. */
-    PTHREAD_PROCESS_SHARED,
+    PTHREAD_PROCESS_SHARED = 1,
 };
 
 /** Mutex type attribute values. */
 enum {
     /** Normal behaviour. */
-    PTHREAD_MUTEX_NORMAL,
+    PTHREAD_MUTEX_NORMAL = 0,
 
     /** Perform additional error checks. */
-    PTHREAD_MUTEX_ERRORCHECK,
+    PTHREAD_MUTEX_ERRORCHECK = 1,
 
     /** Allow recursive locking by the holding thread. */
-    PTHREAD_MUTEX_RECURSIVE,
+    PTHREAD_MUTEX_RECURSIVE = 2,
 
     /** Implementation-defined default behaviour. */
-    PTHREAD_MUTEX_DEFAULT,
+    PTHREAD_MUTEX_DEFAULT = 3,
+};
+
+/** Cancellation states. */
+enum {
+    PTHREAD_CANCEL_ENABLE = 0,
+    PTHREAD_CANCEL_DISABLE = 1,
+};
+
+/** Cancellation types. */
+enum {
+    PTHREAD_CANCEL_DEFERRED = 0,
+    PTHREAD_CANCEL_ASYNCHRONOUS = 1,
 };
 
 /** Initializer for pthread_once_t. */
@@ -68,9 +80,9 @@ enum {
 
 //extern int pthread_atfork(void (*prepare)(void), void (*parent)(void),
 //  void (*child)(void));
-//int pthread_cancel(pthread_t);
-//void pthread_cleanup_pop(int);
-//void pthread_cleanup_push(void (*)(void*), void *);
+extern int pthread_cancel(pthread_t thread);
+extern void pthread_cleanup_pop(int execute);
+extern void pthread_cleanup_push(void (*routine)(void*), void *arg);
 extern int pthread_create(
     pthread_t *__restrict _thread, const pthread_attr_t *__restrict attr,
     void *(*start_routine)(void *), void *__restrict arg);
@@ -81,8 +93,8 @@ extern void pthread_exit(void *value_ptr) __sys_noreturn;
 extern int pthread_join(pthread_t thread, void **_value_ptr);
 extern int pthread_once(pthread_once_t *once, void (*func)(void));
 extern pthread_t pthread_self(void);
-//int pthread_setcancelstate(int, int *);
-//int pthread_setcanceltype(int, int *);
+extern int pthread_setcancelstate(int state, int *oldstate);
+extern int pthread_setcanceltype(int type, int *oldtype);
 //int pthread_setschedparam(pthread_t, int, const struct sched_param *);
 //int pthread_setschedprio(pthread_t, int);
 //void pthread_testcancel(void);

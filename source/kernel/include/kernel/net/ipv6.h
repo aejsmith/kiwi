@@ -54,4 +54,8 @@ typedef struct net_interface_addr_ipv6 {
     // TODO
 } net_interface_addr_ipv6_t;
 
+/** IPv6 socket options. */
+// TODO
+#define IPV6_V6ONLY         1
+
 __KERNEL_EXTERN_C_END
