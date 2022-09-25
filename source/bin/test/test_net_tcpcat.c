@@ -84,6 +84,8 @@ int main(int argc, char **argv) {
                 if (read_bytes < 0) {
                     perror("read");
                     return EXIT_FAILURE;
+                } else if (read_bytes == 0) {
+                    return EXIT_SUCCESS;
                 }
 
                 int out_fd = (poll_fds[i].fd == 0) ? sock_fd : 1;
@@ -102,6 +104,4 @@ int main(int argc, char **argv) {
             }
         }
     }
-
-    return EXIT_SUCCESS;
 }

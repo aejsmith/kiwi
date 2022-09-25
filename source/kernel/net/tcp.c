@@ -588,7 +588,7 @@ static status_t tcp_socket_wait(socket_t *_socket, object_event_t *event) {
     status_t ret = STATUS_SUCCESS;
     switch (event->event) {
         case FILE_EVENT_READABLE:
-            if (socket->rx_buffer.curr_size > 0) {
+            if (socket->rx_buffer.curr_size > 0 || socket->state > TCP_STATE_ESTABLISHED) {
                 object_event_signal(event, 0);
             } else {
                 notifier_register(&socket->rx_buffer.notifier, object_event_notifier, event);
