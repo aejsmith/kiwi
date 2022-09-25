@@ -48,6 +48,12 @@ struct tm {
     int tm_isdst;                   /**< Daylight Savings flag. */
 };
 
+/** Clock IDs for clock_* functions. */
+enum {
+    CLOCK_MONOTONIC = 0,
+    CLOCK_REALTIME = 1,
+};
+
 extern char *asctime(const struct tm *tm);
 extern char *asctime_r(const struct tm *__restrict tm, char *__restrict buf);
 //extern clock_t clock(void);
@@ -67,6 +73,10 @@ extern size_t strftime(
 //  const struct tm *__restrict, locale_t);
 //extern char *strptime(const char *__restrict, const char *__restrict, struct tm *__restrict);
 extern time_t time(time_t *timep);
+
+//extern int clock_getres(clockid_t clock_id, struct timespec *res);
+extern int clock_gettime(clockid_t clock_id, struct timespec *tp);
+//extern int clock_settime(clockid_t clock_id, const struct timespec *tp);
 
 // FIXME: Needed for libcxx
 #ifdef __cplusplus

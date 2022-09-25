@@ -29,6 +29,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "libsystem.h"
+
 /** Gets the current time.
  * @param tv            Structure to fill with time since epoch.
  * @param tz            Pointer to timezone (ignored).
@@ -43,25 +45,32 @@ int gettimeofday(struct timeval *tv, void *tz) {
     return 0;
 }
 
+static inline nstime_t nstime_from_timespec(const struct timespec *tp) {
+    return ((nstime_t)tp->tv_sec * 1000000000) + tp->tv_nsec;
+}
+
+static inline void nstime_to_timespec(nstime_t time, struct timespec *tp) {
+    tp->tv_nsec = time % 1000000000;
+    tp->tv_sec  = time / 1000000000;
+}
+
 /** High resolution sleep.
  * @param rqtp          Requested sleep time.
  * @param rmtp          Where to store remaining time if interrupted.
  * @return              0 on success, -1 on failure. */
 int nanosleep(const struct timespec *rqtp, struct timespec *rmtp) {
-    if (rqtp->tv_sec < 0 || rqtp->tv_nsec < 0 || rqtp->tv_nsec >= 1000000000) {
+    if (!rqtp || rqtp->tv_sec < 0 || rqtp->tv_nsec < 0 || rqtp->tv_nsec >= 1000000000) {
         errno = EINVAL;
         return -1;
     }
 
-    nstime_t ns = ((nstime_t)rqtp->tv_sec * 1000000000) + rqtp->tv_nsec;
+    nstime_t ns = nstime_from_timespec(rqtp);
 
     nstime_t rem;
     status_t ret = kern_thread_sleep(ns, &rem);
     if (ret == STATUS_INTERRUPTED) {
-        if (rmtp) {
-            rmtp->tv_nsec = rem % 1000000000;
-            rmtp->tv_sec  = rem / 1000000000;
-        }
+        if (rmtp)
+            nstime_to_timespec(rem, rmtp);
 
         errno = EINTR;
         return -1;
@@ -81,5 +90,40 @@ unsigned int sleep(unsigned int secs) {
     if (nanosleep(&ts, &ts) == -1 && errno == EINTR)
         return ts.tv_sec;
 
+    return 0;
+}
+
+/** Retrieve the time of the specified clock.
+ * @param clock_id      Clock ID.
+ * @param tp            Structure to fill with the results.
+ * @return              0 on success, -1 on failure. */
+int clock_gettime(clockid_t clock_id, struct timespec *tp) {
+    if (!tp) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    unsigned source;
+
+    switch (clock_id) {
+        case CLOCK_MONOTONIC:
+            source = TIME_SYSTEM;
+            break;
+        case CLOCK_REALTIME:
+            source = TIME_REAL;
+            break;
+        default:
+            errno = EINVAL;
+            return -1;
+    }
+
+    nstime_t ktime;
+    status_t ret = kern_time_get(source, &ktime);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
+
+    nstime_to_timespec(ktime, tp);
     return 0;
 }

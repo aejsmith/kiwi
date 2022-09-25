@@ -40,6 +40,7 @@ typedef uint64_t ino_t;             /**< Used to store a filesystem node number.
 typedef uint32_t nlink_t;           /**< Used to store a number of blocks. */
 typedef uint32_t uid_t;             /**< Used to store a user ID. */
 typedef uint32_t gid_t;             /**< Used to store a group ID. */
+typedef uint32_t clockid_t;         /**< Used to store a clock ID for clock_* functions. */
 
 /** Other type definitions. */
 typedef unsigned char u_char;
@@ -47,7 +48,6 @@ typedef unsigned short u_short;
 typedef unsigned int u_int;
 typedef unsigned long u_long;
 
-/* clockid_t */
 /* [XSI] fsblkcnt_t */
 /* [XSI] fsfilcnt_t */
 /* id_t */
