@@ -822,7 +822,7 @@ static bool tcp_buffer_init(tcp_buffer_t *buffer, uint32_t size, const char *nam
 status_t tcp_socket_create(sa_family_t family, socket_t **_socket) {
     assert(family == AF_INET || family == AF_INET6);
 
-    tcp_socket_t *socket = kmalloc(sizeof(tcp_socket_t), MM_KERNEL | MM_ZERO);
+    tcp_socket_t *socket = kmalloc(sizeof(*socket), MM_KERNEL | MM_ZERO);
 
     refcount_set(&socket->count, 1);
     mutex_init(&socket->lock, "tcp_socket_lock", 0);
@@ -888,11 +888,12 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
     uint32_t data_offset = header->data_offset * sizeof(uint32_t);
     uint32_t data_size   = packet->size - data_offset;
 
-    bool should_ack = data_size > 0 || header->flags & TCP_FIN;
+    uint32_t seq_num  = net32_to_cpu(header->seq_num);
+    uint32_t seq_next = seq_num + data_size;
+
+    uint32_t initial_rx_seq = socket->rx_seq;
 
     if (data_size > 0) {
-        uint32_t seq_num = net32_to_cpu(header->seq_num);
-
         /* We can accept data if the start sequence is equal to rx_seq (next
          * that we're expecting), or it is less than rx_seq and seq_next is
          * greater than rx_seq. */
@@ -902,7 +903,6 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
         // know once we've got contiguous data. For now, we'll rely on
         // retransmission if we get things out of order.
         if (seq_num != socket->rx_seq) {
-            uint32_t seq_next = seq_num + data_size;
             if (TCP_SEQ_LT(seq_num, socket->rx_seq) && TCP_SEQ_GT(seq_next, socket->rx_seq)) {
                 uint32_t diff = socket->rx_seq - seq_num;
                 data_offset += diff;
@@ -946,16 +946,17 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
         }
     }
 
-    if (header->flags & TCP_FIN)
+    /* If we've got a FIN, and we accepted everything up to it, accept/ack the
+     * FIN as well. */
+    bool accepted_fin = header->flags & TCP_FIN && socket->rx_seq == seq_next;
+    if (accepted_fin)
         socket->rx_seq++;
 
-    /* Acknowledge what we've accepted (if anything). If we received a FIN, this
-     * acks it. */
-    if (should_ack)
+    if (socket->rx_seq != initial_rx_seq)
         tx_ack_packet(socket);
 
-    if (header->flags & TCP_FIN) {
-        dprintf("tcp: %" PRIu16 ": received FIN, initiating passive close\n", socket->port.num);
+    if (accepted_fin) {
+        dprintf("tcp: %" PRIu16 ": accepted FIN, initiating passive close\n", socket->port.num);
 
         /* CLOSE_WAIT is meant to be waiting until the local client closes the
          * socket, but we immediately initiate the close. We'll move to LAST_ACK
