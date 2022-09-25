@@ -1091,7 +1091,8 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
         notifier_run(&buffer->notifier, NULL, false);
     }
 
-    tx_ack_packet(socket);
+    if (accepted_fin || received_size > 0)
+        tx_ack_packet(socket);
 
     if (accepted_fin) {
         dprintf("tcp: %" PRIu16 ": accepted FIN, initiating passive close\n", socket->port.num);
