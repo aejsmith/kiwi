@@ -19,8 +19,11 @@
  * @brief               TCP protocol implementation.
  *
  * TODO:
- *  - Sliding window support.
+ *  - Respect remote host sliding window.
+ *  - Retransmission.
  *  - Support SACK.
+ *  - Can free RX/TX buffers early during close.
+ *  - Handle received RST.
  */
 
 #include <io/request.h>
@@ -120,6 +123,7 @@ typedef struct tcp_socket {
     uint32_t initial_tx_seq;            /**< Initial transmit sequence. */
     uint32_t tx_seq;                    /**< Next transmit sequence number. */
     uint32_t tx_unack;                  /**< First unacknowledged transmit sequence number. */
+    uint16_t last_sent_window;          /**< Last window size we sent. */
 
     /** Receive buffer and sequence state. */
     tcp_buffer_t rx_buffer;
@@ -183,6 +187,12 @@ enum {
     /** TCP buffer sizes. */
     TCP_TX_BUFFER_SIZE = PAGE_SIZE,
     TCP_RX_BUFFER_SIZE = PAGE_SIZE,
+
+    /**
+     * Amount by which free RX buffer space should increase since we last sent
+     * a window size before we send an explicit window size update.
+     */
+    TCP_RX_WINDOW_UPDATE_THRESHOLD = 256,
 };
 
 static net_port_space_t tcp_ipv4_space = NET_PORT_SPACE_INITIALIZER(tcp_ipv4_space);
@@ -259,6 +269,12 @@ static void alloc_initial_tx_seq(tcp_socket_t *socket) {
     socket->initial_tx_seq = random_get32();
 }
 
+/** Calculate the RX window size to advertise. */
+static uint16_t calc_rx_window_size(tcp_socket_t *socket) {
+    uint32_t buffer_space = socket->rx_buffer.max_size - socket->rx_buffer.curr_size;
+    return min(buffer_space, UINT16_MAX);
+}
+
 /**
  * Routes, allocates and initialises a packet to transmit. The header is filled
  * out with initial information from the socket, which can be adjusted as
@@ -285,7 +301,7 @@ static status_t prepare_tx_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet)
     header->reserved    = 0;
     header->data_offset = sizeof(*header) / sizeof(uint32_t);
     header->flags       = TCP_ACK;
-    header->window_size = cpu_to_net16(0xffff); // TODO: Window size
+    header->window_size = cpu_to_net16(calc_rx_window_size(socket));
     header->checksum    = 0;
     header->urg_ptr     = 0;
 
@@ -294,6 +310,8 @@ static status_t prepare_tx_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet)
 
 /** Checksums and transmits a previously prepared packet. */
 static status_t tx_packet(tcp_socket_t *socket, tcp_tx_packet_t *packet, bool release) {
+    socket->last_sent_window = net16_to_cpu(packet->header->window_size);
+
     /* Checksum the packet based on checksum set to 0. */
     assert(packet->header->checksum == 0);
     packet->header->checksum = ip_checksum_packet_pseudo(
@@ -814,6 +832,17 @@ static status_t tcp_socket_receive(
     buffer->curr_size -= size;
 
     net_socket_addr_copy(&socket->net, (const sockaddr_t *)&socket->dest_addr, max_addr_len, _addr, _addr_len);
+
+    /* If we have increased the buffer space available since we last advertised
+     * a window size, then send an explicit window size update. */
+    uint16_t new_window_size = calc_rx_window_size(socket);
+    if (socket->state == TCP_STATE_ESTABLISHED &&
+        new_window_size > socket->last_sent_window &&
+        new_window_size - socket->last_sent_window > TCP_RX_WINDOW_UPDATE_THRESHOLD)
+    {
+        tx_ack_packet(socket);
+    }
+
     return STATUS_SUCCESS;
 }
 
