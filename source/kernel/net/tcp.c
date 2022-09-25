@@ -124,6 +124,7 @@ typedef struct tcp_socket {
     tcp_buffer_t rx_buffer;
     uint32_t initial_rx_seq;            /**< Initial receive sequence. */
     uint32_t rx_seq;                    /**< Next receive sequence number. */
+    list_t rx_ooo;                      /**< Segments received out of order. */
 
     condvar_t state_cvar;               /**< Condition to wait for state changes on. */
     timer_t close_timer;                /**< Close timeout. */
@@ -140,6 +141,24 @@ typedef struct tcp_tx_packet {
     net_packet_t *packet;
     tcp_header_t *header;
 } tcp_tx_packet_t;
+
+/**
+ * Structure tracking a segment received out of order. We store OOO segment
+ * in the RX buffer up to the available space, with this tracking structure to
+ * allow us to reassemble data once we receive intermediate data.
+ */
+typedef struct tcp_rx_ooo {
+    list_t link;
+
+    uint32_t seq_num;                   /**< Start sequence number. */
+    uint32_t seq_next;                  /**< Next sequence number after this segment. */
+
+    /**
+     * Whether the segment had FIN set. Will only be true if we were able to
+     * store all of the data in the segment in the buffer.
+     */
+    bool fin : 1;
+} tcp_rx_ooo_t;
 
 /** TCP parameters. TODO: Make these configurable. */
 enum {
@@ -185,6 +204,11 @@ static void tcp_socket_release(tcp_socket_t *socket) {
 
         assert(notifier_empty(&socket->tx_buffer.notifier));
         assert(notifier_empty(&socket->rx_buffer.notifier));
+
+        while (!list_empty(&socket->rx_ooo)) {
+            tcp_rx_ooo_t *ooo = list_pop_first(&socket->rx_ooo, tcp_rx_ooo_t, link);
+            kfree(ooo);
+        }
 
         kfree(socket->tx_buffer.data);
         kfree(socket->rx_buffer.data);
@@ -827,6 +851,7 @@ status_t tcp_socket_create(sa_family_t family, socket_t **_socket) {
     refcount_set(&socket->count, 1);
     mutex_init(&socket->lock, "tcp_socket_lock", 0);
     net_port_init(&socket->port);
+    list_init(&socket->rx_ooo);
     condvar_init(&socket->state_cvar, "tcp_socket_state");
     timer_init(&socket->close_timer, "tcp_close_timer", close_timer_func, socket, TIMER_THREAD);
 
@@ -879,56 +904,154 @@ static void receive_syn_sent(tcp_socket_t *socket, const tcp_header_t *header, n
     }
 }
 
+static void record_rx_ooo(
+    tcp_socket_t *socket, uint32_t seq_num, uint32_t received_size,
+    uint32_t data_size, uint8_t flags)
+{
+    // TODO: Slab cache.
+    tcp_rx_ooo_t *ooo = kmalloc(sizeof(*ooo), MM_KERNEL);
+    list_init(&ooo->link);
+    ooo->seq_num  = seq_num;
+    ooo->seq_next = seq_num + data_size;
+
+    /* Don't take FIN if we aren't able to buffer all of the data. */
+    ooo->fin = data_size == received_size && flags & TCP_FIN;
+
+    dprintf(
+        "tcp: %" PRIu16 ": received %" PRIu32 " bytes OOO data (%" PRIu32 ", expected %" PRIu32 ")\n",
+        socket->port.num, data_size, seq_num, socket->rx_seq);
+
+    /* Try to find where to insert the segment in the list. */
+    list_foreach(&socket->rx_ooo, iter) {
+        tcp_rx_ooo_t *other = list_entry(iter, tcp_rx_ooo_t, link);
+        if (ooo->seq_num <= other->seq_num) {
+            list_add_before(&other->link, &ooo->link);
+            break;
+        }
+    }
+
+    /* Not before any existing segment, goes at the end of the list. */
+    if (list_empty(&ooo->link))
+        list_append(&socket->rx_ooo, &ooo->link);
+
+    /* Merge into the previous segment if this overlapped any part of it. */
+    if (ooo != list_first(&socket->rx_ooo, tcp_rx_ooo_t, link)) {
+        tcp_rx_ooo_t *other = list_prev(ooo, link);
+
+        if (TCP_SEQ_LE(ooo->seq_num, other->seq_next)) {
+            ooo->seq_num = other->seq_num;
+            if (TCP_SEQ_GT(other->seq_next, ooo->seq_next)) {
+                ooo->seq_next = other->seq_next;
+
+                /* Really, FIN position should be consistent and we should not
+                 * receive any data following it. But combine them just to be
+                 * on the safe side. */
+                ooo->fin |= other->fin;
+            }
+
+            list_remove(&other->link);
+            kfree(other);
+        }
+    }
+
+    /* Merge into any following segments that this overlapped. */
+    list_foreach_safe(&ooo->link, iter) {
+        if (iter == &socket->rx_ooo)
+            break;
+
+        tcp_rx_ooo_t *other = list_entry(iter, tcp_rx_ooo_t, link);
+
+        if (TCP_SEQ_GT(other->seq_num, ooo->seq_next)) {
+            break;
+        } else {
+            if (TCP_SEQ_GT(other->seq_next, ooo->seq_next)) {
+                ooo->seq_next = other->seq_next;
+                ooo->fin |= other->fin;
+            }
+
+            list_remove(&other->link);
+            kfree(other);
+        }
+    }
+}
+
+static bool process_rx_ooo(tcp_socket_t *socket) {
+    bool accepted_fin = false;
+
+    while (!accepted_fin && !list_empty(&socket->rx_ooo)) {
+        tcp_rx_ooo_t *ooo = list_first(&socket->rx_ooo, tcp_rx_ooo_t, link);
+
+        if (TCP_SEQ_GT(ooo->seq_num, socket->rx_seq)) {
+            /* Still missing intermediate data. */
+            break;
+        } else {
+            socket->rx_seq = ooo->seq_next;
+            accepted_fin   = ooo->fin;
+
+            list_remove(&ooo->link);
+            kfree(ooo);
+        }
+    }
+
+    return accepted_fin;
+}
+
 /** Handles packets while in the ESTABLISHED state. */
 static void receive_established(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
     /* Handle acknowledgement from the sender. */
     ack_tx_buffer(socket, net32_to_cpu(header->ack_num));
 
+    tcp_buffer_t *buffer = &socket->rx_buffer;
+
     /* data_offset is validated by tcp_receive(). */
-    uint32_t data_offset = header->data_offset * sizeof(uint32_t);
-    uint32_t data_size   = packet->size - data_offset;
+    uint32_t data_offset   = header->data_offset * sizeof(uint32_t);
+    uint32_t received_size = packet->size - data_offset;
+    uint32_t data_size     = received_size;
 
     uint32_t seq_num  = net32_to_cpu(header->seq_num);
     uint32_t seq_next = seq_num + data_size;
 
-    uint32_t initial_rx_seq = socket->rx_seq;
-
     if (data_size > 0) {
-        /* We can accept data if the start sequence is equal to rx_seq (next
-         * that we're expecting), or it is less than rx_seq and seq_next is
-         * greater than rx_seq. */
-        // TODO: Accept data with a start sequence greater than what we are
-        // expecting - this can happen if packets arrive out of order. We'll
-        // need to keep track of segments that we've received so that we can
-        // know once we've got contiguous data. For now, we'll rely on
-        // retransmission if we get things out of order.
+        /*
+         * If the start sequence is equal to rx_seq (next that we're expecting),
+         * or it is less than rx_seq and seq_next is greater than rx_seq, then
+         * this is in-order data that we can accept immediately.
+         *
+         * If the start sequence is greater than rx_seq, it is out-of-order
+         * data. We can store this so long as we have enough space in the
+         * buffer. We track what we've received OOO with tracking structures and
+         * reassemble once we've got all the preceding data.
+         */
+        uint32_t ooo_offset = 0;
         if (seq_num != socket->rx_seq) {
             if (TCP_SEQ_LT(seq_num, socket->rx_seq) && TCP_SEQ_GT(seq_next, socket->rx_seq)) {
+                /* We've already accepted part of this data, trim it. */
                 uint32_t diff = socket->rx_seq - seq_num;
                 data_offset += diff;
                 data_size   -= diff;
+            } else if (TCP_SEQ_GT(seq_num, socket->rx_seq)) {
+                ooo_offset = seq_num - socket->rx_seq;
             } else {
-                /* Unexpected, drop. */
-                dprintf(
-                    "tcp: %" PRIu16 ": dropping unexpected segment with seq %" PRIu32 " (expecting %" PRIu32 ")\n",
-                    socket->port.num, seq_num, socket->rx_seq);
+                /* May be retransmitted data that we've already received
+                 * completely, just ignore it. */
                 data_size = 0;
             }
         }
 
-        tcp_buffer_t *buffer = &socket->rx_buffer;
-
-        /* Clamp by what we can fit in the buffer. */
-        uint32_t space = buffer->max_size - buffer->curr_size;
-        if (data_size > 0 && data_size > space) {
+        /* Clamp by what we can fit in the buffer. Make sure we don't overflow
+         * if ooo_offset is way outside of what we can accept. */
+        ooo_offset = min(ooo_offset, buffer->max_size);
+        uint32_t buffer_offset = min(buffer->curr_size + ooo_offset, buffer->max_size);
+        uint32_t buffer_space  = buffer->max_size - buffer_offset;
+        if (data_size > 0 && data_size > buffer_space) {
             dprintf(
                 "tcp: %" PRIu16 ": RX buffer full, dropping data (received %" PRIu32 " bytes, accepting %" PRIu32 ")\n",
-                socket->port.num, data_size, space);
-            data_size = space;
+                socket->port.num, data_size, buffer_space);
+            data_size = buffer_space;
         }
 
         if (data_size > 0) {
-            uint32_t pos = (buffer->start + buffer->curr_size) & (buffer->max_size - 1);
+            uint32_t pos = (buffer->start + buffer_offset) & (buffer->max_size - 1);
             if (pos + data_size > buffer->max_size) {
                 /* Straddles the end of the circular buffer, split into 2 copies. */
                 uint32_t split = buffer->max_size - pos;
@@ -938,22 +1061,36 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
                 net_packet_copy_from(packet, &buffer->data[pos], data_offset, data_size);
             }
 
-            socket->rx_seq    += data_size;
-            buffer->curr_size += data_size;
-
-            condvar_broadcast(&buffer->cvar);
-            notifier_run(&buffer->notifier, NULL, false);
+            if (ooo_offset > 0) {
+                /* Out-of-order, queue it up to process later. */
+                record_rx_ooo(socket, seq_num, received_size, data_size, header->flags);
+            } else {
+                /* In-order data. */
+                socket->rx_seq    += data_size;
+                buffer->curr_size += data_size;
+            }
         }
     }
 
-    /* If we've got a FIN, and we accepted everything up to it, accept/ack the
-     * FIN as well. */
-    bool accepted_fin = header->flags & TCP_FIN && socket->rx_seq == seq_next;
-    if (accepted_fin)
-        socket->rx_seq++;
+    /* See if there's any OOO data that can now be accepted. If there was a FIN
+     * in there that can be accepted, we'll handle it here. */
+    bool accepted_fin = process_rx_ooo(socket);
 
-    if (socket->rx_seq != initial_rx_seq)
-        tx_ack_packet(socket);
+    /* Handle FIN in the current packet if we accepted everything up to it. */
+    accepted_fin |= header->flags & TCP_FIN && socket->rx_seq == seq_next;
+
+    if (accepted_fin) {
+        /* Increments the sequence number so that we ACK the FIN. */
+        socket->rx_seq++;
+    }
+
+    /* Make data available to receivers. */
+    if (buffer->curr_size != 0) {
+        condvar_broadcast(&buffer->cvar);
+        notifier_run(&buffer->notifier, NULL, false);
+    }
+
+    tx_ack_packet(socket);
 
     if (accepted_fin) {
         dprintf("tcp: %" PRIu16 ": accepted FIN, initiating passive close\n", socket->port.num);

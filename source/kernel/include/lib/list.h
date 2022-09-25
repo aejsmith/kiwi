@@ -213,3 +213,31 @@ static inline void list_splice_after(list_t *position, list_t *list) {
         list_init(list);
     }
 }
+
+/** Remove the first structure in a list and return a pointer to it.
+ * @note                Does not check if the list is empty.
+ * @param list          Head of the list.
+ * @param type          Type of the structure.
+ * @param member        Name of the list node member in the structure.
+ * @return              Pointer to the removed structure. */
+#define list_pop_first(list, type, member) \
+    __extension__ \
+    ({ \
+        type *__entry = list_first((list), type, member); \
+        list_remove(&__entry->member); \
+        __entry; \
+    })
+
+/** Remove the last structure in a list and return a pointer to it.
+ * @note                Does not check if the list is empty.
+ * @param list          Head of the list.
+ * @param type          Type of the structure.
+ * @param member        Name of the list node member in the structure.
+ * @return              Pointer to the removed structure. */
+#define list_pop_last(list, type, member) \
+    __extension__ \
+    ({ \
+        type *__entry = list_last((list), type, member); \
+        list_remove(&__entry->member); \
+        __entry; \
+    })
