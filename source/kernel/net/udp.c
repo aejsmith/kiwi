@@ -62,8 +62,8 @@ typedef struct udp_rx_packet {
 typedef struct udp_socket {
     net_socket_t net;
 
+    mutex_t lock;                   /**< Lock for the socket. */
     net_port_t port;                /**< Port allocation. */
-    mutex_t rx_lock;                /**< Receive queue lock. */
     condvar_t rx_cvar;              /**< Condition to wait for RX packets on. */
     uint32_t rx_size;               /**< Total amount of data in the RX queue. */
     list_t rx_queue;                /**< List of received packets. */
@@ -82,11 +82,8 @@ static net_port_space_t *get_packet_port_space(net_packet_t *packet) {
     return (packet->type == NET_PACKET_TYPE_IPV6) ? &udp_ipv6_space : &udp_ipv4_space;
 }
 
-/**
- * Finds the socket bound to a given number, if any, and takes its receive
- * lock.
- */
-static udp_socket_t *find_rx_socket(net_packet_t *packet, uint16_t num) {
+/** Finds the socket bound to a given number, if any, and takes its lock. */
+static udp_socket_t *find_socket(net_packet_t *packet, uint16_t num) {
     net_port_space_t *space = get_packet_port_space(packet);
     net_port_space_read_lock(space);
 
@@ -94,7 +91,7 @@ static udp_socket_t *find_rx_socket(net_packet_t *packet, uint16_t num) {
     net_port_t *port = net_port_lookup_unsafe(space, num);
     if (port) {
         socket = container_of(port, udp_socket_t, port);
-        mutex_lock(&socket->rx_lock);
+        mutex_lock(&socket->lock);
     }
 
     net_port_space_unlock(space);
@@ -112,7 +109,7 @@ static void udp_socket_close(socket_t *_socket) {
     net_port_space_t *space = get_socket_port_space(socket);
     net_port_free(space, &socket->port);
 
-    mutex_lock(&socket->rx_lock);
+    mutex_lock(&socket->lock);
 
     /* Empty anything in the RX queue. */
     while (!list_empty(&socket->rx_queue)) {
@@ -121,9 +118,37 @@ static void udp_socket_close(socket_t *_socket) {
         kfree(rx);
     }
 
-    mutex_unlock(&socket->rx_lock);
+    mutex_unlock(&socket->lock);
 
     kfree(socket);
+}
+
+static status_t udp_socket_bind(socket_t *_socket, const sockaddr_t *addr, socklen_t addr_len) {
+    udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
+    status_t ret;
+
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+
+    ret = net_socket_addr_valid(&socket->net, addr, addr_len);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    /* Already bound. */
+    if (socket->port.num != 0)
+        return STATUS_INVALID_ARG;
+
+    ret = STATUS_NOT_SUPPORTED;
+
+    /* We only support this for now. */
+    const sockaddr_ip_t *ip_addr = (const sockaddr_ip_t *)addr;
+    if (ip_addr->family == AF_INET &&
+        ip_addr->ipv4.sin_addr.val == INADDR_ANY &&
+        ip_addr->ipv4.sin_port == 0)
+    {
+        ret = alloc_ephemeral_port(socket);
+    }
+
+    return ret;
 }
 
 static status_t udp_socket_send(
@@ -133,45 +158,53 @@ static status_t udp_socket_send(
     udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
     status_t ret;
 
+    mutex_lock(&socket->lock);
+
     const sockaddr_ip_t *dest_addr;
     if (addr_len == 0) {
         // TODO: connect() should be able to set a default address if this is NULL.
-        return STATUS_DEST_ADDR_REQUIRED;
+        ret = STATUS_DEST_ADDR_REQUIRED;
+        goto err_unlock;
     } else {
         ret = net_socket_addr_valid(&socket->net, addr, addr_len);
         if (ret != STATUS_SUCCESS)
-            return ret;
+            goto err_unlock;
 
         dest_addr = (const sockaddr_ip_t *)addr;
     }
 
     /* Check packet size. */
     size_t packet_size = sizeof(udp_header_t) + request->total;
-    if (packet_size > UDP_MAX_PACKET_SIZE || packet_size > socket->net.family->mtu)
-        return STATUS_MSG_TOO_LONG;
+    if (packet_size > UDP_MAX_PACKET_SIZE || packet_size > socket->net.family->mtu) {
+        ret = STATUS_MSG_TOO_LONG;
+        goto err_unlock;
+    }
 
     udp_header_t *header;
     net_packet_t *packet = net_packet_kmalloc(packet_size, MM_USER, (void **)&header);
-    if (!packet)
-        return STATUS_NO_MEMORY;
+    if (!packet) {
+        ret = STATUS_NO_MEMORY;
+        goto err_unlock;
+    }
 
     void *data = &header[1];
     ret = io_request_copy(request, data, request->total, false);
     if (ret != STATUS_SUCCESS)
-        goto out;
+        goto err_release;
 
     /* Calculate a route for the packet. */
-// TODO: For sockets bound to a specific address use that source.
+    // TODO: For sockets bound to a specific address use that source. We don't
+    // support address binding yet.
     net_route_t route;
     ret = net_socket_route(&socket->net, (const sockaddr_t *)dest_addr, &route);
     if (ret != STATUS_SUCCESS)
-        goto out;
+        goto err_release;
 
     /* Allocate an ephemeral port if we're not already bound. */
     if (socket->port.num == 0) {
         ret = alloc_ephemeral_port(socket);
         if (ret != STATUS_SUCCESS)
-            goto out;
+            goto err_release;
     }
 
     /* Initialise header. */
@@ -179,6 +212,8 @@ static status_t udp_socket_send(
     header->dest_port   = dest_addr->port;
     header->source_port = cpu_to_net16(socket->port.num);
     header->checksum    = 0;
+
+    mutex_unlock(&socket->lock);
 
     /* Calculate checksum based on header with checksum initialised to 0. */
     header->checksum = ip_checksum_pseudo(header, packet_size, IPPROTO_UDP, &route.source_addr, &route.dest_addr);
@@ -191,8 +226,14 @@ static status_t udp_socket_send(
     if (ret == STATUS_SUCCESS)
         request->transferred += request->total;
 
-out:
     net_packet_release(packet);
+    return ret;
+
+err_release:
+    net_packet_release(packet);
+
+err_unlock:
+    mutex_unlock(&socket->lock);
     return ret;
 }
 
@@ -203,13 +244,13 @@ static status_t udp_socket_receive(
     udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
     status_t ret;
 
-    mutex_lock(&socket->rx_lock);
+    mutex_lock(&socket->lock);
 
     /* Wait for a packet. */
     while (list_empty(&socket->rx_queue)) {
-        ret = condvar_wait_etc(&socket->rx_cvar, &socket->rx_lock, -1, SLEEP_INTERRUPTIBLE);
+        ret = condvar_wait_etc(&socket->rx_cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
         if (ret != STATUS_SUCCESS) {
-            mutex_unlock(&socket->rx_lock);
+            mutex_unlock(&socket->lock);
             return ret;
         }
     }
@@ -222,7 +263,7 @@ static status_t udp_socket_receive(
 
     socket->rx_size -= rx->size;
 
-    mutex_unlock(&socket->rx_lock);
+    mutex_unlock(&socket->lock);
 
     net_socket_addr_copy(&socket->net, (const sockaddr_t *)&rx->source_addr, max_addr_len, _addr, _addr_len);
 
@@ -232,6 +273,7 @@ static status_t udp_socket_receive(
 
 static const socket_ops_t udp_socket_ops = {
     .close   = udp_socket_close,
+    .bind    = udp_socket_bind,
     .send    = udp_socket_send,
     .receive = udp_socket_receive,
 };
@@ -243,7 +285,7 @@ status_t udp_socket_create(sa_family_t family, socket_t **_socket) {
     udp_socket_t *socket = kmalloc(sizeof(udp_socket_t), MM_KERNEL);
 
     net_port_init(&socket->port);
-    mutex_init(&socket->rx_lock, "udp_rx_lock", 0);
+    mutex_init(&socket->lock, "udp_lock", 0);
     condvar_init(&socket->rx_cvar, "udp_rx_cvar");
     list_init(&socket->rx_queue);
 
@@ -278,8 +320,8 @@ void udp_receive(net_packet_t *packet, const net_addr_t *source_addr, const net_
         }
     }
 
-    /* Look for the socket. */
-    udp_socket_t *socket = find_rx_socket(packet, dest_port);
+    /* Look for the socket and lock it. */
+    udp_socket_t *socket = find_socket(packet, dest_port);
     if (!socket) {
         dprintf("udp: dropping packet: destination port not bound (%" PRIu16 ")\n", dest_port);
         return;
@@ -327,5 +369,5 @@ void udp_receive(net_packet_t *packet, const net_addr_t *source_addr, const net_
         dprintf("udp: dropping packet: socket %" PRIu16 " receive buffer is full\n", dest_port);
     }
 
-    mutex_unlock(&socket->rx_lock);
+    mutex_unlock(&socket->lock);
 }

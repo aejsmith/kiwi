@@ -49,6 +49,13 @@ typedef struct socket_ops {
      * @param event         Event that is being waited for. */
     void (*unwait)(struct socket *socket, object_event_t *event);
 
+    /** Bind a socket to a local address.
+     * @param socket        Socket to bind.
+     * @param addr          Local address to bind.
+     * @param addr_len      Length of local address.
+     * @return              Status code describing result of the operation. */
+    status_t (*bind)(struct socket *socket, const sockaddr_t *addr, socklen_t addr_len);
+
     /** Initiate a connection on a socket.
      * @param socket        Socket to connect.
      * @param addr          Destination address.
