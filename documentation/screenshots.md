@@ -12,3 +12,7 @@ Kernel debugger inspecting process/thread state:
 Early bring-up of ARM64 port on a Raspberry Pi:
 
 <a href="https://raw.githubusercontent.com/aejsmith/kiwi/master/documentation/screenshots/3.jpg"><img src="https://raw.githubusercontent.com/aejsmith/kiwi/master/documentation/screenshots/3_small.jpg"></a>
+
+TCP/IP networking with DNS:
+
+![Networking](screenshots/4.png)

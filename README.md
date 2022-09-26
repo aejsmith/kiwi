@@ -30,10 +30,10 @@ Features:
  * Partial POSIX compatibility implemented over the native API
  * Multi-core CPU support
  * Shared library support
+ * Networking (IPv4, TCP, UDP, DNS)
 
 Planned features (in rough priority order):
 
- * Networking (in progress)
  * Common hardware support (disk devices, USB input)
  * Finish ARM64 port
  * Port additional software
