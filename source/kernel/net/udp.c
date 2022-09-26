@@ -311,8 +311,9 @@ void udp_receive(net_packet_t *packet, const net_addr_t *source_addr, const net_
             rx->source_addr.ipv4.sin_addr.val = source_addr->ipv4.val;
         }
 
-        rx->source_addr.port = header->source_port;
-        rx->size             = data_size;
+        rx->source_addr.family = source_addr->family;
+        rx->source_addr.port   = header->source_port;
+        rx->size               = data_size;
 
         net_packet_copy_from(packet, rx->data, sizeof(*header), rx->size);
 
