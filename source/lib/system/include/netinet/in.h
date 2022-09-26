@@ -21,13 +21,23 @@
 
 #pragma once
 
+#include <core/endian.h>
+
 #include <kernel/net/ipv4.h>
 #include <kernel/net/ipv6.h>
 
 #include <sys/socket.h>
 
+#define htonl(val) core_cpu_to_be32(val)
+#define htons(val) core_cpu_to_be16(val)
+#define ntohl(val) core_be32_to_cpu(val)
+#define ntohs(val) core_be16_to_cpu(val)
+
 #define INET_ADDRSTRLEN     16
 #define INET6_ADDRSTRLEN    46
+
+#define IN6ADDR_LOOPBACK_INIT \
+    {{{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }}}
 
 #define IN6_IS_ADDR_UNSPECIFIED(a) \
     (((uint32_t *)(a))[0] == 0 && \

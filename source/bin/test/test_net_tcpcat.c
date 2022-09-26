@@ -23,6 +23,7 @@
 
 #include <sys/socket.h>
 
+#include <netdb.h>
 #include <poll.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -32,36 +33,78 @@
 
 #define BUF_SIZE 1024
 
+static int connect_host(
+    const char *host, const char *service, int type,
+    struct sockaddr_storage *_addr, socklen_t *_addr_len)
+{
+    struct addrinfo hints = {};
+    hints.ai_family   = AF_UNSPEC;
+    hints.ai_socktype = type;
+
+    struct addrinfo *result;
+    int ret = getaddrinfo(host, service, &hints, &result);
+    if (ret != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(ret));
+        return -1;
+    }
+
+    int sock_fd;
+
+    for (struct addrinfo *addr = result; addr; addr = addr->ai_next) {
+        sock_fd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+        if (sock_fd < 0) {
+            if (addr->ai_next)
+                continue;
+
+            perror("socket");
+            goto out;
+        }
+
+        if (connect(sock_fd, addr->ai_addr, addr->ai_addrlen) < 0) {
+            close(sock_fd);
+            sock_fd = -1;
+
+            if (addr->ai_next)
+                continue;
+
+            perror("connect");
+            goto out;
+        }
+
+        memcpy(_addr, addr->ai_addr, addr->ai_addrlen);
+        *_addr_len = addr->ai_addrlen;
+        break;
+    }
+
+out:
+    freeaddrinfo(result);
+    return sock_fd;
+}
+
 int main(int argc, char **argv) {
     if (argc != 3) {
         printf("Usage: %s <IP> <port>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    uint16_t port = strtol(argv[2], NULL, 10);
+    struct sockaddr_storage addr_storage;
+    socklen_t addr_len;
 
-    struct sockaddr_in addr = {};
-    addr.sin_family      = AF_INET;
-    addr.sin_port        = htons(port);
-
-    if (inet_pton(AF_INET, argv[1], &addr.sin_addr) != 1) {
-        printf("Invalid IP address\n");
+    int sock_fd = connect_host(argv[1], argv[2], SOCK_STREAM, &addr_storage, &addr_len);
+    if (sock_fd < 0)
         return EXIT_FAILURE;
-    }
 
-    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock_fd < 0) {
-        perror("socket");
-        return EXIT_FAILURE;
+    char addr_str[INET6_ADDRSTRLEN] = {};
+    uint16_t port = 0;
+    if (addr_storage.ss_family == AF_INET) {
+        struct sockaddr_in *addr = (struct sockaddr_in *)&addr_storage;
+        inet_ntop(AF_INET, &addr->sin_addr, addr_str, sizeof(addr_str));
+        port = ntohs(addr->sin_port);
+    } else if (addr_storage.ss_family == AF_INET6) {
+        struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&addr_storage;
+        inet_ntop(AF_INET6, &addr->sin6_addr, addr_str, sizeof(addr_str));
+        port = ntohs(addr->sin6_port);
     }
-
-    if (connect(sock_fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
-        perror("connect");
-        return EXIT_FAILURE;
-    }
-
-    char addr_str[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &addr.sin_addr, addr_str, sizeof(addr_str));
 
     printf("Connected to %s:%u\n", addr_str, port);
 

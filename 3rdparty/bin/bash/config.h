@@ -622,7 +622,7 @@
 #define HAVE_DECL_FPURGE 0
 
 /* Define if you have the getaddrinfo function. */
-/* #undef HAVE_GETADDRINFO */
+#define HAVE_GETADDRINFO 1
 
 /* Define if you have the getcwd function.  */
 #define HAVE_GETCWD 1

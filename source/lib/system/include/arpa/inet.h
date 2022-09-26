@@ -21,18 +21,11 @@
 
 #pragma once
 
-#include <core/endian.h>
-
 #include <netinet/in.h>
 
 #include <features.h>
 
 __SYS_EXTERN_C_BEGIN
-
-#define htonl(val) core_cpu_to_be32(val)
-#define htons(val) core_cpu_to_be16(val)
-#define ntohl(val) core_be32_to_cpu(val)
-#define ntohs(val) core_be16_to_cpu(val)
 
 extern in_addr_t inet_addr(const char *p);
 extern char *inet_ntoa(struct in_addr in);

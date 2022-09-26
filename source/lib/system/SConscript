@@ -149,10 +149,14 @@ sources = [File(f) for f in [
 musl_sources = [File('musl/src/%s' % (f)) for f in [
     'network/dn_expand.c',
     'network/dns_parse.c',
+    'network/freeaddrinfo.c',
+    'network/gai_strerror.c',
+    'network/getaddrinfo.c',
     'network/gethostbyname.c',
     'network/gethostbyname_r.c',
     'network/gethostbyname2.c',
     'network/gethostbyname2_r.c',
+    'network/getnameinfo.c',
     'network/herror.c',
     'network/h_errno.c',
     'network/hstrerror.c',
@@ -163,6 +167,7 @@ musl_sources = [File('musl/src/%s' % (f)) for f in [
     'network/inet_pton.c',
     'network/lookup_ipliteral.c',
     'network/lookup_name.c',
+    'network/lookup_serv.c',
     'network/res_mkquery.c',
     'network/res_msend.c',
     'network/res_query.c',
@@ -177,6 +182,7 @@ musl_CPPPATH = [
 
 musl_CCFLAGS = env['CCFLAGS'] + [
     '-Wno-sign-compare',
+    '-Wno-incompatible-pointer-types-discards-qualifiers',
 ]
 
 musl_objects = [env.SharedObject(f, CPPPATH = musl_CPPPATH, CCFLAGS = musl_CCFLAGS) for f in musl_sources]

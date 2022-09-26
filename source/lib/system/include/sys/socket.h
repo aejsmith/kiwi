@@ -27,6 +27,12 @@
 
 __SYS_EXTERN_C_BEGIN
 
+/** Ancient name compatibility. */
+#define PF_UNSPEC       AF_UNSPEC
+#define PF_INET         AF_INET
+#define PF_INET6        AF_INET6
+#define PF_UNIX         AF_UNIX
+
 /** Linux-compatible flags for socket()/socketpair() type argument. */
 #define SOCK_CLOEXEC    (1<<16)
 #define SOCK_NONBLOCK   (1<<17)

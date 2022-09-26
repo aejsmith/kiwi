@@ -30,12 +30,12 @@ __KERNEL_EXTERN_C_BEGIN
 /** Type used to store an IPv6 address. */
 typedef struct in6_addr {
     union {
+        uint8_t bytes[IPV6_ADDR_LEN];
+        uint8_t s6_addr[IPV6_ADDR_LEN];
         struct {
             uint64_t high;
             uint64_t low;
         } val;
-        uint8_t bytes[IPV6_ADDR_LEN];
-        uint8_t s6_addr[IPV6_ADDR_LEN];
     };
 } net_addr_ipv6_t;
 
