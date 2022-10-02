@@ -86,6 +86,17 @@ typedef struct socket_ops {
     status_t (*receive)(
         struct socket *socket, struct io_request *request, int flags,
         socklen_t max_addr_len, sockaddr_t *_addr, socklen_t *_addr_len);
+
+    /** Set a socket option.
+     * @param socket        Socket to set option on.
+     * @param level         Level to set option at.
+     * @param opt_name      Option to set.
+     * @param opt_value     Option value.
+     * @param opt_len       Option length.
+     * @return              Status code describing result of the operation. */
+    status_t (*setsockopt)(
+        struct socket *socket, int level, int opt_name, const void *opt_value,
+        socklen_t opt_len);
 } socket_ops_t;
 
 /** Base socket structure (embedded in protocol-specific implementation). */

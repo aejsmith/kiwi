@@ -847,12 +847,13 @@ static status_t tcp_socket_receive(
 }
 
 static const socket_ops_t tcp_socket_ops = {
-    .close   = tcp_socket_close,
-    .wait    = tcp_socket_wait,
-    .unwait  = tcp_socket_unwait,
-    .connect = tcp_socket_connect,
-    .send    = tcp_socket_send,
-    .receive = tcp_socket_receive,
+    .close      = tcp_socket_close,
+    .wait       = tcp_socket_wait,
+    .unwait     = tcp_socket_unwait,
+    .connect    = tcp_socket_connect,
+    .send       = tcp_socket_send,
+    .receive    = tcp_socket_receive,
+    .setsockopt = net_socket_setsockopt,
 };
 
 static bool tcp_buffer_init(tcp_buffer_t *buffer, uint32_t size, const char *name) {

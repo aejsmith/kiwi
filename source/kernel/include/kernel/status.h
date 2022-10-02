@@ -85,6 +85,7 @@
 #define STATUS_CONNECTION_REFUSED   60  /**< Destination refused the connection. */
 #define STATUS_NOT_CONNECTED        61  /**< Socket is not connected. */
 #define STATUS_ADDR_IN_USE          62  /**< Address is already in use. */
+#define STATUS_UNKNOWN_SOCKET_OPT   63  /**< The socket option/level is unknown. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 

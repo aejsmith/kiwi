@@ -35,9 +35,16 @@ typedef struct net_socket {
     socket_t socket;                    /**< Socket header. */
     const net_family_t *family;         /**< Address family. */
     int protocol;                       /**< Family-specific protocol number. */
+
+    /** Socket options. */
+    uint32_t bound_interface_id;        /**< SO_BINDTOINTERFACE. */
 } net_socket_t;
 
 DEFINE_CLASS_CAST(net_socket, socket, socket);
+
+extern status_t net_socket_setsockopt(
+    socket_t *socket, int level, int opt_name, const void *opt_value,
+    socklen_t opt_len);
 
 /** Checks if an address is valid for the given socket.
  * @param socket        Socket to check for.

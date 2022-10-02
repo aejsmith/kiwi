@@ -68,6 +68,13 @@ typedef struct sockaddr_storage {
 #define SO_SNDTIMEO             15
 #define SO_TYPE                 16
 
+/**
+ * Kiwi-specific: Bind to a given interface number (uint32_t). The socket will
+ * bypass routing and instead send directly on that interface. Using
+ * NET_INTERFACE_INVALID_ID unbinds the socket.
+ */
+#define SO_BINDTOINTERFACE      17
+
 #define SOMAXCONN               4096
 
 #define MSG_CTRUNC              (1<<0)

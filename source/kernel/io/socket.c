@@ -36,6 +36,12 @@ static MUTEX_DEFINE(socket_families_lock, 0);
 
 static const file_ops_t socket_file_ops;
 
+/**
+ * Maximum option value for *sockopt(). Don't know if this is appropriate for
+ * everything, but need to stop users passing in a giant buffer size.
+ */
+#define SOCKOPT_LEN_MAX     128
+
 /** Look up a socket family (lock must be held). */
 static socket_family_t *socket_family_lookup(sa_family_t id) {
     list_foreach(&socket_families, iter) {
@@ -364,11 +370,27 @@ status_t socket_getsockopt(
     return STATUS_NOT_IMPLEMENTED;
 }
 
+/** Set a socket option.
+ * @param handle        Handle to socket.
+ * @param level         Level to set option at.
+ * @param opt_name      Option to set.
+ * @param opt_value     Option value.
+ * @param opt_len       Option length.
+ * @return              Status code describing result of the operation. */
 status_t socket_setsockopt(
     object_handle_t *handle, int level, int opt_name, const void *opt_value,
     socklen_t opt_len)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    file_handle_t *fhandle = get_socket_handle(handle);
+    if (!fhandle)
+        return STATUS_INVALID_HANDLE;
+
+    socket_t *socket = fhandle->socket;
+
+    if (!socket->ops->setsockopt)
+        return STATUS_NOT_SUPPORTED;
+
+    return socket->ops->setsockopt(socket, level, opt_name, opt_value, opt_len);
 }
 
 status_t socket_shutdown(object_handle_t *handle, int how) {
@@ -669,11 +691,34 @@ status_t kern_socket_getsockopt(
     return STATUS_NOT_IMPLEMENTED;
 }
 
+/** Set a socket option.
+ * @param handle        Handle to socket.
+ * @param level         Level to set option at.
+ * @param opt_name      Option to set.
+ * @param opt_value     Option value.
+ * @param opt_len       Option length.
+ * @return              Status code describing result of the operation. */
 status_t kern_socket_setsockopt(
     handle_t handle, int level, int opt_name, const void *opt_value,
     socklen_t opt_len)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    status_t ret;
+
+    if (!opt_value || opt_len == 0 || opt_len > SOCKOPT_LEN_MAX)
+        return STATUS_INVALID_ARG;
+
+    void *kopt_value __cleanup_kfree = kmalloc(opt_len, MM_KERNEL);
+
+    ret = memcpy_from_user(kopt_value, opt_value, opt_len);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    return socket_setsockopt(khandle, level, opt_name, kopt_value, opt_len);
 }
 
 status_t kern_socket_shutdown(handle_t handle, int how) {

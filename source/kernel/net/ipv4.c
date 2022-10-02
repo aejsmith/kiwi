@@ -255,6 +255,38 @@ static void ipv4_interface_remove_addr(net_interface_t *interface, const net_int
     ipv4_remove_route(&route, true);
 }
 
+static status_t route_bound_interface(net_socket_t *socket, const sockaddr_in_t *dest_addr, net_route_t *route) {
+    status_t ret;
+
+    route->interface_id          = socket->bound_interface_id;
+    route->dest_addr.ipv4.val    = dest_addr->sin_addr.val;
+    route->gateway_addr.ipv4.val = dest_addr->sin_addr.val;
+
+    net_interface_read_lock();
+
+    net_interface_t *interface = net_interface_get(route->interface_id);
+    if (interface) {
+        /* Pick a source address from the interface. Use empty if we don't have
+         * one configured. */
+        route->source_addr.ipv4.val = INADDR_ANY;
+        for (size_t i = 0; i < interface->addrs.count; i++) {
+            const net_interface_addr_t *interface_addr = array_entry(&interface->addrs, net_interface_addr_t, i);
+
+            if (interface_addr->family == AF_INET) {
+                route->source_addr.ipv4.val = interface_addr->ipv4.addr.val;
+                break;
+            }
+        }
+
+        ret = STATUS_SUCCESS;
+    } else {
+        ret = STATUS_NET_DOWN;
+    }
+
+    net_interface_unlock();
+    return ret;
+}
+
 static status_t ipv4_socket_route(net_socket_t *socket, const sockaddr_t *_dest_addr, net_route_t *route) {
     const sockaddr_in_t *dest_addr = (const sockaddr_in_t *)_dest_addr;
 
@@ -262,7 +294,13 @@ static status_t ipv4_socket_route(net_socket_t *socket, const sockaddr_t *_dest_
     route->dest_addr.family    = AF_INET;
     route->gateway_addr.family = AF_INET;
 
+    if (socket->bound_interface_id != NET_INTERFACE_INVALID_ID)
+        return route_bound_interface(socket, dest_addr, route);
+
     rwlock_read_lock(&ipv4_route_lock);
+
+    // TODO: We should disallow sending to broadcast addresses unless
+    // SO_BROADCAST is set.
 
     /* This is sorted most-specific to least specific, so pick the first match. */
     status_t ret = STATUS_NET_UNREACHABLE;
@@ -302,11 +340,16 @@ static status_t ipv4_socket_transmit(net_socket_t *socket, net_packet_t *packet,
     const net_addr_ipv4_t *dest_addr    = &route->dest_addr.ipv4;
     const net_addr_ipv4_t *gateway_addr = &route->gateway_addr.ipv4;
 
-    /* Find our destination hardware address. */
     uint8_t dest_hw_addr[NET_DEVICE_ADDR_MAX];
-    ret = arp_lookup(route->interface_id, source_addr, gateway_addr, dest_hw_addr);
-    if (ret != STATUS_SUCCESS)
-        return ret;
+
+    /* Unless we're broadcasting, look up destination hardware address. */
+    // TODO: Subnet broadcast address.
+    bool is_broadcast = dest_addr->val == INADDR_BROADCAST;
+    if (!is_broadcast) {
+        ret = arp_lookup(route->interface_id, source_addr, gateway_addr, dest_hw_addr);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
 
     net_interface_read_lock();
 
@@ -317,6 +360,9 @@ static status_t ipv4_socket_transmit(net_socket_t *socket, net_packet_t *packet,
     }
 
     net_device_t *device = net_device_from_interface(interface);
+
+    if (is_broadcast)
+        memcpy(dest_hw_addr, interface->link_ops->broadcast_addr, device->hw_addr_len);
 
     // TODO: Fragmentation.
     if (packet->size + sizeof(ipv4_header_t) > device->mtu) {

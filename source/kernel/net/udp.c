@@ -280,10 +280,11 @@ static status_t udp_socket_receive(
 }
 
 static const socket_ops_t udp_socket_ops = {
-    .close   = udp_socket_close,
-    .bind    = udp_socket_bind,
-    .send    = udp_socket_send,
-    .receive = udp_socket_receive,
+    .close      = udp_socket_close,
+    .bind       = udp_socket_bind,
+    .send       = udp_socket_send,
+    .receive    = udp_socket_receive,
+    .setsockopt = net_socket_setsockopt,
 };
 
 /** Creates a UDP socket. */

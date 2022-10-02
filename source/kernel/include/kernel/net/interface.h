@@ -32,4 +32,7 @@ enum {
     NET_INTERFACE_UP = (1<<0),
 };
 
+/** Specifies an invalid network interface. */
+#define NET_INTERFACE_INVALID_ID    UINT32_MAX
+
 __KERNEL_EXTERN_C_END

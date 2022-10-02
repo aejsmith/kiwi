@@ -93,8 +93,6 @@ typedef struct net_interface {
     array_t addrs;                      /**< Array of addresses. */
 } net_interface_t;
 
-#define NET_INTERFACE_INVALID_ID    UINT32_MAX
-
 extern list_t net_interface_list;
 
 extern void net_interface_read_lock(void);

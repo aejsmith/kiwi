@@ -31,6 +31,7 @@ mod_env.Module('net', [
     'net.c',
     'packet.c',
     'port.c',
+    'socket.c',
     'tcp.c',
     'udp.c',
 ])
