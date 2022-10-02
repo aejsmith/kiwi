@@ -64,6 +64,13 @@ static status_t request_interface_id(net_device_t *device, void **_out, size_t *
     return ret;
 }
 
+static status_t request_hw_addr(net_device_t *device, void **_out, size_t *_out_size) {
+    *_out      = kmemdup(device->hw_addr, device->hw_addr_len, MM_KERNEL);
+    *_out_size = device->hw_addr_len;
+
+    return STATUS_SUCCESS;
+}
+
 /** Copy and validate a net_interface_addr_t according to its family. */
 static status_t copy_net_interface_addr(const void *in, size_t in_size, net_interface_addr_t *addr) {
     /*
@@ -128,6 +135,10 @@ static status_t net_device_request(
 
         case NET_DEVICE_REQUEST_INTERFACE_ID:
             ret = request_interface_id(device, _out, _out_size);
+            break;
+
+        case NET_DEVICE_REQUEST_HW_ADDR:
+            ret = request_hw_addr(device, _out, _out_size);
             break;
 
         case NET_DEVICE_REQUEST_ADD_ADDR:

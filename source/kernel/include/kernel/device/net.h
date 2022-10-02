@@ -55,6 +55,14 @@ enum {
     NET_DEVICE_REQUEST_INTERFACE_ID = DEVICE_CLASS_REQUEST_START + 2,
 
     /**
+     * Get the hardware address.
+     *
+     * Output:              Hardware address. Size based on the hardware type,
+     *                      up to a maximum of NET_DEVICE_ADDR_MAX.
+     */
+    NET_DEVICE_REQUEST_HW_ADDR      = DEVICE_CLASS_REQUEST_START + 3,
+
+    /**
      * Adds an address to the network interface.
      *
      * Input:               A net_interface_addr_*_t structure corresponding to
@@ -68,7 +76,7 @@ enum {
      *                      not supported.
      *                      STATUS_NET_DOWN if the interface is down.
      */
-    NET_DEVICE_REQUEST_ADD_ADDR     = DEVICE_CLASS_REQUEST_START + 3,
+    NET_DEVICE_REQUEST_ADD_ADDR     = DEVICE_CLASS_REQUEST_START + 4,
 
     /**
      * Removes an address from the network interface.
@@ -84,7 +92,7 @@ enum {
      *                      not supported.
      *                      STATUS_NET_DOWN if the interface is down.
      */
-    NET_DEVICE_REQUEST_REMOVE_ADDR  = DEVICE_CLASS_REQUEST_START + 4,
+    NET_DEVICE_REQUEST_REMOVE_ADDR  = DEVICE_CLASS_REQUEST_START + 5,
 };
 
 __KERNEL_EXTERN_C_END
