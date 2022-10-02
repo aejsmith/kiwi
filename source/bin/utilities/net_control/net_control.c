@@ -21,73 +21,35 @@
 
 #include <core/utility.h>
 
-#include <device/net.h>
-
-#include <kernel/device/ipv4_control.h>
-#include <kernel/net/ipv4.h>
 #include <kernel/status.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-static net_device_t *net_device;
-static handle_t ipv4_control_device;
+#include "net_control.h"
 
-static void usage(void) {
-    printf("Usage: net_control command [args...]\n");
-    printf("\n");
-    printf("command is one of the following:\n\n");
-    printf("  add_ipv4_addr dev_path addr netmask [broadcast_addr]\n");
-    printf("    Adds a new IPv4 address to the network device at dev_path.\n");
-    printf("  add_ipv4_route dev_path addr netmask gateway source\n");
-    printf("    Adds a new IPv4 routing table entry.\n");
-    printf("  down dev_path\n");
-    printf("    Shuts down the network device at dev_path.\n");
-    printf("  remove_ipv4_addr dev_path addr netmask\n");
-    printf("    Removes the specified IPv4 address from the network device at dev_path.\n");
-    printf("  remove_ipv4_route dev_path addr netmask gateway source\n");
-    printf("    Removes an IPv4 routing table entry.\n");
-    printf("  up dev_path\n");
-    printf("    Brings up the network device at dev_path.\n");
-    printf("\n");
-}
-
-static bool open_net_device(const char *path) {
-    status_t ret = net_device_open(path, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &net_device);
-    if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to open device '%s': %s\n", path, kern_status_string(ret));
-        return false;
-    }
-
-    return true;
-}
-
-static bool open_ipv4_control_device(void) {
-    status_t ret = kern_device_open("/virtual/net/control/ipv4", FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &ipv4_control_device);
-    if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to open IPv4 control device: %s\n", kern_status_string(ret));
-        return false;
-    }
-
-    return true;
-}
-
-static bool parse_ipv4_address(const char *str, net_addr_ipv4_t *addr) {
-    uint32_t vals[4];
-    int pos = 0;
-    int ret = sscanf(str, "%u.%u.%u.%u%n", &vals[0], &vals[1], &vals[2], &vals[3], &pos);
-    if (ret != 4 || vals[0] > 255 || vals[1] > 255 || vals[2] > 255 || vals[3] > 255 || str[pos] != 0) {
-        fprintf(stderr, "net_control: invalid address '%s'\n", str);
-        return false;
-    }
-
-    addr->bytes[0] = vals[0];
-    addr->bytes[1] = vals[1];
-    addr->bytes[2] = vals[2];
-    addr->bytes[3] = vals[3];
-
-    return true;
+void usage(void) {
+    printf(
+        "Usage: net_control command [args...]\n"
+        "\n"
+        "command is one of the following:\n\n"
+        "  add_ipv4_addr dev_path addr netmask [broadcast_addr]\n"
+        "    Adds a new IPv4 address to the network device at dev_path.\n"
+        "  add_ipv4_route dev_path addr netmask gateway source\n"
+        "    Adds a new IPv4 routing table entry.\n"
+        "  dhcp dev_path\n"
+        "    Configure IPv4 address and route via DHCP on the network device at dev_path.\n"
+        "  down dev_path\n"
+        "    Shuts down the network device at dev_path.\n"
+        "  remove_ipv4_addr dev_path addr netmask\n"
+        "    Removes the specified IPv4 address from the network device at dev_path.\n"
+        "  remove_ipv4_route dev_path addr netmask gateway source\n"
+        "    Removes an IPv4 routing table entry.\n"
+        "  up dev_path\n"
+        "    Brings up the network device at dev_path.\n"
+        "\n");
 }
 
 static bool command_up(int argc, char **argv) {
@@ -246,6 +208,7 @@ static struct {
     { "remove_ipv4_addr",   command_remove_ipv4_addr },
     { "add_ipv4_route",     command_add_ipv4_route },
     { "remove_ipv4_route",  command_remove_ipv4_route },
+    { "dhcp",               command_dhcp },
 };
 
 int main(int argc, char **argv) {
@@ -253,6 +216,9 @@ int main(int argc, char **argv) {
         usage();
         return EXIT_SUCCESS;
     }
+
+    /* Used by DHCP. */
+    srand(time(NULL));
 
     for (size_t i = 0; i < core_array_size(command_funcs); i++) {
         if (strcmp(command_funcs[i].name, argv[1]) == 0)

@@ -16,13 +16,10 @@
 
 Import('manager')
 
-dirs = [
-    'net_control',
-]
+env = manager.Create(libraries = ['device', 'kernel'])
 
-SConscript(dirs = dirs)
-
-env = manager.Create(libraries = ['kernel'])
-
-env.KiwiApplication('mount', ['mount.c'])
-env.KiwiApplication('unmount', ['unmount.c'])
+env.KiwiApplication('net_control', [
+    'dhcp.c',
+    'net_control.c',
+    'utility.c',
+])
