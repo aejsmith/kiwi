@@ -106,7 +106,6 @@ sources = [File(f) for f in [
     'stdlib/mkstemp.c',
     'stdlib/multibyte.c',
     'stdlib/qsort.c',
-    'stdlib/rand.c',
     'stdlib/strtod.c',
     'stdlib/strtoul.c',
     'stdlib/system.c',
@@ -173,6 +172,9 @@ musl_sources = [File('musl/src/%s' % (f)) for f in [
     'network/res_query.c',
     'network/res_send.c',
     'network/resolvconf.c',
+
+    'prng/rand.c',
+    'prng/rand_r.c',
 ]]
 
 musl_CPPPATH = [

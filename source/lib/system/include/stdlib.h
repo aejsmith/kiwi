@@ -34,7 +34,7 @@
 
 __SYS_EXTERN_C_BEGIN
 
-#define RAND_MAX        32767
+#define RAND_MAX        0x7fffffff
 #define ATEXIT_MAX      32
 #define EXIT_SUCCESS    0
 #define EXIT_FAILURE    1
