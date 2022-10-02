@@ -68,5 +68,6 @@ static inline void net_port_space_unlock(net_port_space_t *space) {
 
 extern net_port_t *net_port_lookup_unsafe(net_port_space_t *space, uint16_t num);
 
+extern status_t net_port_alloc(net_port_space_t *space, net_port_t *port, uint16_t num);
 extern status_t net_port_alloc_ephemeral(net_port_space_t *space, net_port_t *port);
 extern void net_port_free(net_port_space_t *space, net_port_t *port);

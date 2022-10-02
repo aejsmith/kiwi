@@ -39,6 +39,27 @@ net_port_t *net_port_lookup_unsafe(net_port_space_t *space, uint16_t num) {
     return NULL;
 }
 
+/** Allocates a port from a port space.
+ * @param space         Space to allocate from.
+ * @param port          Port to allocate for.
+ * @param num           Port number to allocate.
+ * @return              STATUS_SUCCESS if successful.
+ *                      STATUS_ADDR_IN_USE if port is already allocated. */
+status_t net_port_alloc(net_port_space_t *space, net_port_t *port, uint16_t num) {
+    assert(list_empty(&port->link));
+    assert(port->num == 0);
+
+    rwlock_write_lock(&space->lock);
+
+    if (!net_port_lookup_unsafe(space, num)) {
+        port->num = num;
+        list_append(&space->ports, &port->link);
+    }
+
+    rwlock_unlock(&space->lock);
+    return (port->num != 0) ? STATUS_SUCCESS : STATUS_ADDR_IN_USE;
+}
+
 /** Allocates an ephemeral port from a port space.
  * @param space         Space to allocate from.
  * @param port          Port to allocate for.

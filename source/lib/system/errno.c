@@ -97,6 +97,7 @@ static int status_to_errno_table[] = {
     [STATUS_ALREADY_CONNECTED]      = EISCONN,
     [STATUS_CONNECTION_REFUSED]     = ECONNREFUSED,
     [STATUS_NOT_CONNECTED]          = ENOTCONN,
+    [STATUS_ADDR_IN_USE]            = EADDRINUSE,
 };
 
 /** Real location of errno. */

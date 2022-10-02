@@ -137,15 +137,23 @@ static status_t udp_socket_bind(socket_t *_socket, const sockaddr_t *addr, sockl
     if (socket->port.num != 0)
         return STATUS_INVALID_ARG;
 
-    ret = STATUS_NOT_SUPPORTED;
+    net_port_space_t *space = get_socket_port_space(socket);
 
-    /* We only support this for now. */
+    /* We only support binding any address for now. */
     const sockaddr_ip_t *ip_addr = (const sockaddr_ip_t *)addr;
-    if (ip_addr->family == AF_INET &&
-        ip_addr->ipv4.sin_addr.val == INADDR_ANY &&
-        ip_addr->ipv4.sin_port == 0)
-    {
-        ret = alloc_ephemeral_port(socket);
+    if (ip_addr->family == AF_INET && ip_addr->ipv4.sin_addr.val == INADDR_ANY) {
+        if (ip_addr->ipv4.sin_port != 0) {
+            ret = net_port_alloc(space, &socket->port, net16_to_cpu(ip_addr->ipv4.sin_port));
+        } else {
+            ret = net_port_alloc_ephemeral(space, &socket->port);
+            if (ret == STATUS_TRY_AGAIN) {
+                /* This should be returned for ephemeral port allocation failure
+                 * here. */
+                ret = STATUS_ADDR_IN_USE;
+            }
+        }
+    } else {
+        ret = STATUS_NOT_SUPPORTED;
     }
 
     return ret;

@@ -84,6 +84,7 @@
 #define STATUS_ALREADY_CONNECTED    59  /**< Socket is already connected. */
 #define STATUS_CONNECTION_REFUSED   60  /**< Destination refused the connection. */
 #define STATUS_NOT_CONNECTED        61  /**< Socket is not connected. */
+#define STATUS_ADDR_IN_USE          62  /**< Address is already in use. */
 
 #if !defined(__KERNEL) && !defined(__ASM__)
 
