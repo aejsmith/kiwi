@@ -67,6 +67,7 @@ typedef struct udp_socket {
     condvar_t rx_cvar;              /**< Condition to wait for RX packets on. */
     uint32_t rx_size;               /**< Total amount of data in the RX queue. */
     list_t rx_queue;                /**< List of received packets. */
+    notifier_t rx_notifier;         /**< Notifier for RX packets. */
 } udp_socket_t;
 
 DEFINE_CLASS_CAST(udp_socket, net_socket, net);
@@ -121,6 +122,47 @@ static void udp_socket_close(socket_t *_socket) {
     mutex_unlock(&socket->lock);
 
     kfree(socket);
+}
+
+static status_t udp_socket_wait(socket_t *_socket, object_event_t *event) {
+    udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
+
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+
+    status_t ret = STATUS_SUCCESS;
+    switch (event->event) {
+        case FILE_EVENT_READABLE:
+            if (!list_empty(&socket->rx_queue)) {
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&socket->rx_notifier, object_event_notifier, event);
+            }
+
+            break;
+
+        case FILE_EVENT_WRITABLE:
+            // TODO: Change this when we add transmit buffering.
+            object_event_signal(event, 0);
+            break;
+
+        default:
+            ret = STATUS_INVALID_EVENT;
+            break;
+    }
+
+    return ret;
+}
+
+static void udp_socket_unwait(socket_t *_socket, object_event_t *event) {
+    udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
+
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+
+    switch (event->event) {
+        case FILE_EVENT_READABLE:
+            notifier_unregister(&socket->rx_notifier, object_event_notifier, event);
+            break;
+    }
 }
 
 static status_t udp_socket_bind(socket_t *_socket, const sockaddr_t *addr, socklen_t addr_len) {
@@ -281,6 +323,8 @@ static status_t udp_socket_receive(
 
 static const socket_ops_t udp_socket_ops = {
     .close      = udp_socket_close,
+    .wait       = udp_socket_wait,
+    .unwait     = udp_socket_unwait,
     .bind       = udp_socket_bind,
     .send       = udp_socket_send,
     .receive    = udp_socket_receive,
@@ -297,6 +341,7 @@ status_t udp_socket_create(sa_family_t family, socket_t **_socket) {
     mutex_init(&socket->lock, "udp_lock", 0);
     condvar_init(&socket->rx_cvar, "udp_rx_cvar");
     list_init(&socket->rx_queue);
+    notifier_init(&socket->rx_notifier, socket);
 
     socket->net.socket.ops = &udp_socket_ops;
     socket->net.protocol   = IPPROTO_UDP;
@@ -373,7 +418,8 @@ void udp_receive(net_packet_t *packet, const net_addr_t *source_addr, const net_
 
         socket->rx_size += rx->size;
 
-        condvar_signal(&socket->rx_cvar);
+        condvar_broadcast(&socket->rx_cvar);
+        notifier_run(&socket->rx_notifier, NULL, false);
     } else {
         dprintf("udp: dropping packet: socket %" PRIu16 " receive buffer is full\n", dest_port);
     }
