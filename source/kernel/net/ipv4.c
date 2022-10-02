@@ -495,7 +495,7 @@ void ipv4_receive(net_interface_t *interface, net_packet_t *packet) {
     }
 
     /* Check whether this packet is destined for us. */
-    bool found_addr = false;
+    bool found_addr = header->dest_addr == INADDR_BROADCAST;
     for (size_t i = 0; i < interface->addrs.count && !found_addr; i++) {
         const net_interface_addr_t *interface_addr = array_entry(&interface->addrs, net_interface_addr_t, i);
 
