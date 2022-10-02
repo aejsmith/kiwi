@@ -447,7 +447,10 @@ status_t ipv4_socket_create(sa_family_t family, int type, int protocol, socket_t
         return ret;
 
     net_socket_t *socket = cast_net_socket(*_socket);
-    socket->family = &ipv4_net_family;
+
+    socket->family             = &ipv4_net_family;
+    socket->bound_interface_id = NET_INTERFACE_INVALID_ID;
+
     return STATUS_SUCCESS;
 }
 
