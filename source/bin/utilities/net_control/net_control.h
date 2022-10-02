@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <core/log.h>
+
 #include <device/net.h>
 
 #include <kernel/device/ipv4_control.h>

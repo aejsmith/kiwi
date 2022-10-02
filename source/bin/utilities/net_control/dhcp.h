@@ -52,7 +52,9 @@ typedef struct dhcp_header {
 
 #define DHCP_OPTION_SUBNET_MASK     1
 #define DHCP_OPTION_ROUTER          3
+#define DHCP_OPTION_REQUESTED_ADDR  50
 #define DHCP_OPTION_MESSAGE_TYPE    53
+#define DHCP_OPTION_SERVER_ID       54
 #define DHCP_OPTION_PARAM_REQUEST   55
 #define DHCP_OPTION_END             255
 

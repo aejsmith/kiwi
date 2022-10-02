@@ -30,7 +30,7 @@ Features:
  * Partial POSIX compatibility implemented over the native API
  * Multi-core CPU support
  * Shared library support
- * Networking (IPv4, TCP, UDP, DNS)
+ * Networking (IPv4, TCP, UDP, DHCP, DNS)
 
 Planned features (in rough priority order):
 

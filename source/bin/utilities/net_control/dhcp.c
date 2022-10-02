@@ -19,6 +19,8 @@
  * @brief               Network device control utility.
  */
 
+#include <arpa/inet.h>
+
 #include <core/time.h>
 #include <core/utility.h>
 
@@ -38,11 +40,14 @@
 
 static uint8_t hw_addr[NET_DEVICE_ADDR_MAX];
 static size_t hw_addr_len;
-
 static handle_t socket_handle;
 static sockaddr_in_t broadcast_addr;
 static nstime_t abs_timeout;
 static uint32_t transaction_id;
+static net_addr_ipv4_t offer_server_addr;
+static net_addr_ipv4_t offer_client_addr;
+static net_addr_ipv4_t offer_subnet_mask;
+static net_addr_ipv4_t offer_router;
 
 static const uint8_t *find_option(const dhcp_header_t *packet, size_t size, uint8_t find) {
     size_t options_size = size - sizeof(dhcp_header_t);
@@ -66,9 +71,38 @@ static const uint8_t *find_option(const dhcp_header_t *packet, size_t size, uint
     return NULL;
 }
 
-static bool send_discover(void) {
-    status_t ret;
+static dhcp_header_t *alloc_packet(size_t options_size, size_t *_packet_size) {
+    size_t size = sizeof(dhcp_header_t) + options_size;
+    dhcp_header_t *packet = calloc(1, size);
 
+    packet->op    = DHCP_OP_BOOTREQUEST;
+    packet->htype = 1;
+    packet->hlen  = 6;
+    packet->xid   = htonl(transaction_id);
+    packet->magic = htonl(DHCP_MAGIC);
+
+    memcpy(packet->chaddr, hw_addr, hw_addr_len);
+
+    *_packet_size = size;
+    return packet;
+}
+
+static bool send_packet(dhcp_header_t *packet, size_t packet_size) {
+    status_t ret = kern_socket_sendto(
+        socket_handle, packet, packet_size, 0, (sockaddr_t *)&broadcast_addr,
+        sizeof(broadcast_addr), NULL);
+
+    free(packet);
+
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_ERROR, "failed to send packet: %s", kern_status_string(ret));
+        return false;
+    }
+
+    return true;
+}
+
+static bool send_discover(void) {
     uint8_t options[] = {
         DHCP_OPTION_MESSAGE_TYPE,
         1, /* length */
@@ -84,29 +118,44 @@ static bool send_discover(void) {
         0
     };
 
-    size_t size = sizeof(dhcp_header_t) + sizeof(options);
-    dhcp_header_t *packet = calloc(1, size);
-    packet->op    = DHCP_OP_BOOTREQUEST;
-    packet->htype = 1;
-    packet->hlen  = 6;
-    packet->xid   = htonl(transaction_id);
-    packet->magic = htonl(DHCP_MAGIC);
+    core_log(CORE_LOG_NOTICE, "sending DHCPDISCOVER");
 
-    memcpy(packet->chaddr, hw_addr, hw_addr_len);
+    size_t packet_size;
+    dhcp_header_t *packet = alloc_packet(sizeof(options), &packet_size);
+
     memcpy(packet->options, options, sizeof(options));
 
-    ret = kern_socket_sendto(
-        socket_handle, packet, size, 0, (sockaddr_t *)&broadcast_addr,
-        sizeof(broadcast_addr), NULL);
+    return send_packet(packet, packet_size);
+}
 
-    free(packet);
+static bool send_request(void) {
+    uint8_t options[] = {
+        DHCP_OPTION_MESSAGE_TYPE,
+        1, /* length */
+        DHCP_MESSAGE_DHCPREQUEST,
 
-    if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to send DHCPDISCOVER: %s\n", kern_status_string(ret));
-        return false;
-    }
+        DHCP_OPTION_REQUESTED_ADDR,
+        4,
+        offer_client_addr.bytes[0], offer_client_addr.bytes[1],
+        offer_client_addr.bytes[2], offer_client_addr.bytes[3],
 
-    return true;
+        DHCP_OPTION_SERVER_ID,
+        4,
+        offer_server_addr.bytes[0], offer_server_addr.bytes[1],
+        offer_server_addr.bytes[2], offer_server_addr.bytes[3],
+
+        DHCP_OPTION_END,
+        0
+    };
+
+    core_log(CORE_LOG_NOTICE, "sending DHCPREQUEST");
+
+    size_t packet_size;
+    dhcp_header_t *packet = alloc_packet(sizeof(options), &packet_size);
+
+    memcpy(packet->options, options, sizeof(options));
+
+    return send_packet(packet, packet_size);
 }
 
 static status_t wait_message(uint8_t type, dhcp_header_t **_packet, size_t *_size) {
@@ -126,8 +175,11 @@ static status_t wait_message(uint8_t type, dhcp_header_t **_packet, size_t *_siz
 
         ret = kern_object_wait(&event, 1, 0, timeout);
         if (ret != STATUS_SUCCESS) {
-            if (ret != STATUS_TIMED_OUT)
-                fprintf(stderr, "net_control: failed to wait for message: %s\n", kern_status_string(ret));
+            if (ret == STATUS_TIMED_OUT) {
+                core_log(CORE_LOG_WARN, "timed out, retrying");
+            } else {
+                core_log(CORE_LOG_ERROR, "failed to wait for message: %s", kern_status_string(ret));
+            }
 
             free(packet);
             return ret;
@@ -135,7 +187,7 @@ static status_t wait_message(uint8_t type, dhcp_header_t **_packet, size_t *_siz
 
         ret = kern_socket_recvfrom(socket_handle, packet, MAX_MESSAGE_SIZE, 0, 0, &size, NULL, NULL);
         if (ret != STATUS_SUCCESS) {
-            fprintf(stderr, "net_control: failed to receive message: %s\n", kern_status_string(ret));
+            core_log(CORE_LOG_ERROR, "failed to receive message: %s", kern_status_string(ret));
 
             free(packet);
             return ret;
@@ -158,6 +210,62 @@ static status_t wait_message(uint8_t type, dhcp_header_t **_packet, size_t *_siz
     return STATUS_SUCCESS;
 }
 
+static status_t receive_offer(void) {
+    dhcp_header_t *offer;
+    size_t offer_size;
+    status_t ret = wait_message(DHCP_MESSAGE_DHCPOFFER, &offer, &offer_size);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    char server_str[INET_ADDRSTRLEN] = {};
+    inet_ntop(AF_INET, &offer->siaddr, server_str, sizeof(server_str));
+    core_log(CORE_LOG_NOTICE, "received DHCPOFFER from %s", server_str);
+    offer_server_addr.val = offer->siaddr;
+
+    char addr_str[INET_ADDRSTRLEN] = {};
+    inet_ntop(AF_INET, &offer->yiaddr, addr_str, sizeof(addr_str));
+    core_log(CORE_LOG_NOTICE, "address: %s", addr_str);
+    offer_client_addr.val = offer->yiaddr;
+
+    const uint8_t *subnet_option = find_option(offer, offer_size, DHCP_OPTION_SUBNET_MASK);
+    if (subnet_option && subnet_option[1] >= IPV4_ADDR_LEN) {
+        char subnet_str[INET_ADDRSTRLEN] = {};
+        inet_ntop(AF_INET, &subnet_option[2], subnet_str, sizeof(subnet_str));
+        core_log(CORE_LOG_NOTICE, "subnet mask: %s", subnet_str);
+        offer_subnet_mask.val = *(const uint32_t *)&subnet_option[2];
+    } else {
+        offer_subnet_mask.val = INADDR_BROADCAST;
+    }
+
+    const uint8_t *router_option = find_option(offer, offer_size, DHCP_OPTION_ROUTER);
+    if (router_option && router_option[1] >= IPV4_ADDR_LEN) {
+        char router_str[INET_ADDRSTRLEN] = {};
+        inet_ntop(AF_INET, &router_option[2], router_str, sizeof(router_str));
+        core_log(CORE_LOG_NOTICE, "router: %s", router_str);
+        offer_router.val = *(const uint32_t *)&router_option[2];
+    }
+
+    free(offer);
+
+    return STATUS_SUCCESS;
+}
+
+static status_t receive_ack(void) {
+    dhcp_header_t *ack;
+    size_t ack_size;
+    status_t ret = wait_message(DHCP_MESSAGE_DHCPACK, &ack, &ack_size);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    char server_str[INET_ADDRSTRLEN] = {};
+    inet_ntop(AF_INET, &ack->siaddr, server_str, sizeof(server_str));
+    core_log(CORE_LOG_NOTICE, "received DHCPACK from %s", server_str);
+
+    free(ack);
+
+    return STATUS_SUCCESS;
+}
+
 bool command_dhcp(int argc, char **argv) {
     status_t ret;
 
@@ -170,42 +278,45 @@ bool command_dhcp(int argc, char **argv) {
     if (!open_net_device(path))
         return false;
 
+    if (!open_ipv4_control_device())
+        return false;
+
     /* Bring it down in case it's up to clear any existing configuration. */
     ret = net_device_down(net_device);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to shut down '%s': %s\n", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to shut down '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
     ret = net_device_up(net_device);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to bring up '%s': %s\n", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to bring up '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
     ret = net_device_hw_addr(net_device, hw_addr, &hw_addr_len);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to get HW address for '%s': %s\n", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to get HW address for '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
     uint32_t interface_id;
     ret = net_device_interface_id(net_device, &interface_id);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to get interface ID for '%s': %s\n", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to get interface ID for '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
     ret = kern_socket_create(AF_INET, SOCK_DGRAM, 0, 0, &socket_handle);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to create socket: %s\n", kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to create socket: %s", kern_status_string(ret));
         return false;
     }
 
     /* Bind specifically to this interface. This allows us to broadcast on it. */
     ret = kern_socket_setsockopt(socket_handle, SOL_SOCKET, SO_BINDTOINTERFACE, &interface_id, sizeof(interface_id));
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to bind socket to interface: %s\n", kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to bind socket to interface: %s", kern_status_string(ret));
         return false;
     }
 
@@ -216,7 +327,7 @@ bool command_dhcp(int argc, char **argv) {
 
     ret = kern_socket_bind(socket_handle, (sockaddr_t *)&client_addr, sizeof(client_addr));
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to bind port: %s\n", kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to bind port: %s", kern_status_string(ret));
         return false;
     }
 
@@ -241,10 +352,8 @@ bool command_dhcp(int argc, char **argv) {
         if (!send_discover())
             return false;
 
-        /* Wait for an offer. */
-        dhcp_header_t *offer;
-        size_t offer_size;
-        ret = wait_message(DHCP_MESSAGE_DHCPOFFER, &offer, &offer_size);
+        /* Wait for DHCPOFFER. */
+        ret = receive_offer();
         if (ret != STATUS_SUCCESS) {
             if (ret == STATUS_TIMED_OUT) {
                 continue;
@@ -253,8 +362,54 @@ bool command_dhcp(int argc, char **argv) {
             }
         }
 
-        printf("Got offer\n");
+        /* Send DHCPREQUEST. */
+        if (!send_request())
+            return false;
+
+        /* Wait for DHCPACK. If we get a DHCPNAK this'll just time out and we'll
+         * retry. */
+        ret = receive_ack();
+        if (ret != STATUS_SUCCESS) {
+            if (ret == STATUS_TIMED_OUT) {
+                continue;
+            } else {
+                return false;
+            }
+        }
+
+        break;
     }
 
+    /* We now have a configuration to set on the device. */
+    net_interface_addr_ipv4_t interface_addr = {};
+    interface_addr.family        = AF_INET;
+    interface_addr.addr.val      = offer_client_addr.val;
+    interface_addr.netmask.val   = offer_subnet_mask.val;
+    interface_addr.broadcast.val = offer_client_addr.val | ~(offer_subnet_mask.val);
+
+    ret = net_device_add_addr(net_device, &interface_addr, sizeof(interface_addr));
+    if (ret != STATUS_SUCCESS) {
+        core_log(CORE_LOG_ERROR, "failed to add address for '%s': %s", path, kern_status_string(ret));
+        return false;
+    }
+
+    if (offer_router.val != INADDR_ANY) {
+        ipv4_route_t route = {};
+        route.addr.val     = INADDR_ANY;
+        route.netmask.val  = INADDR_ANY;
+        route.gateway.val  = offer_router.val;
+        route.source.val   = offer_client_addr.val;
+        route.interface_id = interface_id;
+
+        ret = kern_file_request(
+            ipv4_control_device, IPV4_CONTROL_DEVICE_REQUEST_ADD_ROUTE, &route,
+            sizeof(route), NULL, 0, NULL);
+        if (ret != STATUS_SUCCESS) {
+            core_log(CORE_LOG_ERROR, "failed to add route for '%s': %s", path, kern_status_string(ret));
+            return false;
+        }
+    }
+
+    core_log(CORE_LOG_NOTICE, "configured '%s'", path);
     return true;
 }

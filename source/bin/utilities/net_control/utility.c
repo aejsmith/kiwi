@@ -24,12 +24,12 @@
 #include "net_control.h"
 
 net_device_t *net_device;
-handle_t ipv4_control_device;
+handle_t ipv4_control_device = INVALID_HANDLE;
 
 bool open_net_device(const char *path) {
     status_t ret = net_device_open(path, FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &net_device);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to open device '%s': %s\n", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to open device '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
@@ -39,7 +39,7 @@ bool open_net_device(const char *path) {
 bool open_ipv4_control_device(void) {
     status_t ret = kern_device_open("/virtual/net/control/ipv4", FILE_ACCESS_READ | FILE_ACCESS_WRITE, 0, &ipv4_control_device);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to open IPv4 control device: %s\n", kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to open IPv4 control device: %s", kern_status_string(ret));
         return false;
     }
 
@@ -48,7 +48,7 @@ bool open_ipv4_control_device(void) {
 
 bool parse_ipv4_address(const char *str, net_addr_ipv4_t *addr) {
     if (inet_pton(AF_INET, str, addr) != 1) {
-        fprintf(stderr, "net_control: invalid address '%s'\n", str);
+        core_log(CORE_LOG_ERROR, "invalid address '%s'", str);
         return false;
     }
 

@@ -64,7 +64,7 @@ static bool command_up(int argc, char **argv) {
 
     status_t ret = net_device_up(net_device);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to bring up '%s': %s\n", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to bring up '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
@@ -83,7 +83,7 @@ static bool command_down(int argc, char **argv) {
 
     status_t ret = net_device_down(net_device);
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to shut down '%s': %s\n", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to shut down '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
@@ -113,7 +113,7 @@ static bool command_add_ipv4_addr(int argc, char **argv) {
 
     status_t ret = net_device_add_addr(net_device, &addr, sizeof(addr));
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to add address for '%s': %s\n", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to add address for '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
@@ -138,7 +138,7 @@ static bool command_remove_ipv4_addr(int argc, char **argv) {
 
     status_t ret = net_device_remove_addr(net_device, &addr, sizeof(addr));
     if (ret != STATUS_SUCCESS) {
-        fprintf(stderr, "net_control: failed to remove address for '%s': %s\n", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to remove address for '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
@@ -172,16 +172,14 @@ static bool command_ipv4_route(int argc, char **argv, unsigned request) {
 
     ret = net_device_interface_id(net_device, &route.interface_id);
     if (ret != STATUS_SUCCESS) {
-        fprintf(
-            stderr, "net_control: failed to get interface ID for '%s': %s\n",
-            path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "failed to get interface ID for '%s': %s", path, kern_status_string(ret));
         return false;
     }
 
     ret = kern_file_request(ipv4_control_device, request, &route, sizeof(route), NULL, 0, NULL);
     if (ret != STATUS_SUCCESS) {
-        fprintf(
-            stderr, "net_control: failed to %s route for '%s': %s\n",
+        core_log(
+            CORE_LOG_ERROR, "failed to %s route for '%s': %s",
             (request == IPV4_CONTROL_DEVICE_REQUEST_ADD_ROUTE) ? "add" : "remove",
             path, kern_status_string(ret));
         return false;
@@ -225,6 +223,6 @@ int main(int argc, char **argv) {
             return command_funcs[i].func(argc - 2, &argv[2]) ? EXIT_SUCCESS : EXIT_FAILURE;
     }
 
-    fprintf(stderr, "Unknown command '%s'\n", argv[1]);
+    core_log(CORE_LOG_ERROR, "unknown command '%s'", argv[1]);
     return EXIT_FAILURE;
 }
