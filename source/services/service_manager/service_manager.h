@@ -44,7 +44,7 @@ public:
 
     Service *findService(const std::string &name);
 
-    status_t spawnProcess(const char *path, Kiwi::Core::Handle *_handle = nullptr) const;
+    status_t spawnProcess(const std::vector<std::string> &args, Kiwi::Core::Handle *_handle = nullptr) const;
 
 private:
     void addService(std::string name, std::string path, uint32_t flags);

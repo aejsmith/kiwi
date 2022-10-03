@@ -87,7 +87,7 @@ bool Service::start() {
     }
 
     if (!m_process.isValid()) {
-        ret = g_serviceManager.spawnProcess(m_path.c_str(), &m_process);
+        ret = g_serviceManager.spawnProcess({ m_path }, &m_process);
         if (ret != STATUS_SUCCESS) {
             core_log(CORE_LOG_WARN, "failed to start service '%s': %d", m_name.c_str(), ret);
             return false;

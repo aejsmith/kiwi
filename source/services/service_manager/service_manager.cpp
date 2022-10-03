@@ -66,7 +66,8 @@ int ServiceManager::run() {
     addService("org.kiwi.test", "/system/services/test", Service::kIpc | Service::kOnDemand);
     addService("org.kiwi.terminal", "/system/services/terminal_service", Service::kIpc | Service::kOnDemand);
 
-    spawnProcess("/system/bin/terminal");
+    /* TODO: One day this should be replaced with service manager functionality. */
+    spawnProcess({"/system/bin/bash", "/system/etc/init.sh"});
 
     while (true) {
         m_eventLoop.wait();
@@ -91,7 +92,7 @@ Service* ServiceManager::findService(const std::string &name) {
     }
 }
 
-status_t ServiceManager::spawnProcess(const char *path, Kiwi::Core::Handle *_handle) const {
+status_t ServiceManager::spawnProcess(const std::vector<std::string> &args, Kiwi::Core::Handle *_handle) const {
     process_attrib_t attrib;
     handle_t map[][2] = { { 0, 0 }, { 1, 1 }, { 2, 2 } };
     attrib.token     = INVALID_HANDLE;
@@ -99,12 +100,17 @@ status_t ServiceManager::spawnProcess(const char *path, Kiwi::Core::Handle *_han
     attrib.map       = map;
     attrib.map_count = core_array_size(map);
 
-    const char *args[] = { path, nullptr };
+    std::vector<const char *> kernArgs;
+    kernArgs.reserve(args.size() + 1);
+    for (const std::string &arg : args)
+        kernArgs.emplace_back(arg.c_str());
+    kernArgs.emplace_back(nullptr);
+
     status_t ret = kern_process_create(
-        path, args, environ, 0, &attrib,
+        kernArgs[0], kernArgs.data(), environ, 0, &attrib,
         (_handle) ? _handle->attach() : nullptr);
     if (ret != STATUS_SUCCESS) {
-        core_log(CORE_LOG_ERROR, "failed to create process '%s': %d", path, ret);
+        core_log(CORE_LOG_ERROR, "failed to create process '%s': %d", kernArgs[0], ret);
         return ret;
     }
 
