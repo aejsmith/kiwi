@@ -212,7 +212,7 @@ void kdb_printf(const char *fmt, ...) {
  */
 void kdb_print_symbol(ptr_t addr, int delta) {
     /* Zero pad up to the width of a pointer. */
-    int width = (sizeof(void *) * 2) + 2;
+    const int width = sizeof(void *) * 2;
 
     symbol_t sym;
     size_t off;
@@ -231,7 +231,7 @@ void kdb_print_symbol(ptr_t addr, int delta) {
         }
     }
 
-    kdb_printf("[%0*p] %s+0x%zx", width, addr, sym.name, (ret) ? off - delta : 0);
+    kdb_printf("[0x%0*zx] %s+0x%zx", width, addr, sym.name, (ret) ? off - delta : 0);
     if (sym.image && sym.image->load_base)
         kdb_printf(" (%s+0x%zx)", sym.image->name, addr - sym.image->load_base);
 }
@@ -335,7 +335,7 @@ kdb_status_t kdb_parse_expression(char *exp, uint64_t *_val, char **_str) {
         }
 
         /* Find the length of the component. */
-        size_t len = 0;
+        int len = 0;
         while (!isoperator(exp[len]) && exp[len] != 0)
             len++;
 
@@ -741,7 +741,7 @@ static bool kdb_line_parse(char *line, kdb_line_t *data) {
  * @param frame         Exception frame. */
 void kdb_exception(const char *name, frame_t *frame) {
     current_filter = NULL;
-    kdb_printf("KDB: %s exception occurred during command (%p)\n", name, frame->ip);
+    kdb_printf("KDB: %s exception occurred during command (0x%zx)\n", name, frame->ip);
     longjmp(kdb_fault_context, 1);
 }
 
@@ -822,7 +822,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, frame_t *frame, unsigned index) {
         kdb_printf("\nBreakpoint %u at ", index);
         kdb_print_symbol(frame->ip, 0);
     } else if (reason == KDB_REASON_WATCH) {
-        kdb_printf("\nWatchpoint %u hit by ");
+        kdb_printf("\nWatchpoint %u hit by ", index);
         kdb_print_symbol(frame->ip, 0);
     } else if (reason == KDB_REASON_STEP) {
         kdb_printf("Stepped to ");
@@ -1151,16 +1151,16 @@ static kdb_status_t kdb_cmd_examine(int argc, char **argv, kdb_filter_t *filter)
         /* Print it out. Don't put a newline between each value for strings. */
         switch (fmt) {
             case 'x':
-                kdb_printf("%p: 0x%" PRIx64 "\n", addr, val);
+                kdb_printf("0x%zx: 0x%" PRIx64 "\n", addr, val);
                 break;
             case 'i':
-                kdb_printf("%p: %"   PRId64 "\n", addr, val);
+                kdb_printf("0x%zx: %"   PRId64 "\n", addr, val);
                 break;
             case 'o':
-                kdb_printf("%p: 0%"  PRIo64 "\n", addr, val);
+                kdb_printf("0x%zx: 0%"  PRIo64 "\n", addr, val);
                 break;
             case 'u':
-                kdb_printf("%p: %"   PRIu64 "\n", addr, val);
+                kdb_printf("0x%zx: %"   PRIu64 "\n", addr, val);
                 break;
             case 's':
                 kdb_printf("%c", (char)val);
@@ -1454,7 +1454,7 @@ static kdb_status_t kdb_cmd_break(int argc, char **argv, kdb_filter_t *filter) {
         if (ret < 0)
             return KDB_FAILURE;
 
-        kdb_printf("Created breakpoint %d %pS\n", ret, addr);
+        kdb_printf("Created breakpoint %d %pS\n", ret, (void *)addr);
     } else if (strcmp(argv[1], "list") == 0) {
         if (argc != 2) {
             kdb_printf("Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
@@ -1466,7 +1466,7 @@ static kdb_status_t kdb_cmd_break(int argc, char **argv, kdb_filter_t *filter) {
             if (!arch_kdb_get_breakpoint(i, &addr))
                 continue;
 
-            kdb_printf("%u: %pS\n", i, addr);
+            kdb_printf("%u: %pS\n", i, (void *)addr);
         }
     } else if (strcmp(argv[1], "delete") == 0) {
         if (argc != 3) {
@@ -1544,7 +1544,7 @@ static kdb_status_t kdb_cmd_watch(int argc, char **argv, kdb_filter_t *filter) {
 
         kdb_printf(
             "Created %zu byte %swrite watchpoint %d %pS\n",
-            size, (rw) ? "read-" : "", ret, addr);
+            size, (rw) ? "read-" : "", ret, (void *)addr);
     } else if (strcmp(argv[1], "list") == 0) {
         if (argc != 2) {
             kdb_printf("Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
@@ -1558,7 +1558,7 @@ static kdb_status_t kdb_cmd_watch(int argc, char **argv, kdb_filter_t *filter) {
             if (!arch_kdb_get_watchpoint(i, &addr, &size, &rw))
                 continue;
 
-            kdb_printf("%u: %zu byte %swrite %pS\n", i, size, (rw) ? "read-" : "", addr);
+            kdb_printf("%u: %zu byte %swrite %pS\n", i, size, (rw) ? "read-" : "", (void *)addr);
         }
     } else if (strcmp(argv[1], "delete") == 0) {
         if (argc != 3) {

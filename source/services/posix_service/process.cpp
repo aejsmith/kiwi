@@ -182,7 +182,7 @@ Kiwi::Core::Message Process::handleGetSignalCondition(const Kiwi::Core::Message 
     if (!m_signalCondition.isValid()) {
         ret = kern_condition_create(m_signalCondition.attach());
         if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_WARN, "failed to create signal condition: %" PRId32);
+            core_log(CORE_LOG_WARN, "failed to create signal condition: %" PRId32, ret);
             replyData->err = ENOMEM;
             return reply;
         }
@@ -483,7 +483,7 @@ Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
             Kiwi::Core::TokenSetter token;
             ret = token.set(security);
             if (ret != STATUS_SUCCESS) {
-                core_log(CORE_LOG_WARN, "failed to set security context: %" PRId32);
+                core_log(CORE_LOG_WARN, "failed to set security context: %" PRId32, ret);
                 return false;
             }
 

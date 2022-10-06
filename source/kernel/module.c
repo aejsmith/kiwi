@@ -89,7 +89,7 @@ ptr_t module_mem_alloc(size_t size) {
             &kernel_mmu_context, addr + i, page->addr,
             MMU_ACCESS_RW | MMU_ACCESS_EXECUTE, MM_USER);
         if (ret != STATUS_SUCCESS) {
-            kprintf(LOG_DEBUG, "module: failed to map page 0x%" PRIxPHYS " to %p\n", page->addr, addr + i);
+            kprintf(LOG_DEBUG, "module: failed to map page 0x%" PRIxPHYS " to 0x%zx\n", page->addr, addr + i);
             page_free(page);
             goto fail;
         }

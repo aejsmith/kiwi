@@ -63,6 +63,9 @@ for kboot_target in config['KBOOT_TARGETS'].split(','):
             'CCFLAGS': [
                 '-nostdlib', '-nostdinc', '-ffreestanding', '-fno-stack-protector',
                 '-fno-optimize-sibling-calls',
+
+                # TODO: Remove this when KBoot has been fixed for -Wformat.
+                '-Wno-format',
             ],
             'ASFLAGS': ['-nostdinc'],
             'LINKFLAGS': ['-nostdlib'],

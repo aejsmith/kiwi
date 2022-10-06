@@ -853,7 +853,7 @@ static kdb_status_t kdb_cmd_images(int argc, char **argv, kdb_filter_t *filter) 
         image = list_entry(iter, elf_image_t, header);
 
         kdb_printf(
-            "%-6" PRIu16 " %-18p 0x%-8zx %s\n",
+            "%-6" PRIu16 " 0x%-16zx 0x%-8zx %s\n",
             image->id, image->load_base, image->load_size, image->name);
     }
 

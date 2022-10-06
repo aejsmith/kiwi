@@ -403,7 +403,7 @@ static void scan_bars(pci_device_t *device) {
                 width = 32;
                 mask  = 0xfffffffcul;
             #else
-                device_kprintf(device->bus.node, LOG_WARN, "BAR %zu is PIO but PIO is unsupported, ignoring...\n");
+                device_kprintf(device->bus.node, LOG_WARN, "BAR %zu is PIO but PIO is unsupported, ignoring...\n", i);
                 continue;
             #endif
         } else {
@@ -416,7 +416,7 @@ static void scan_bars(pci_device_t *device) {
                 width = 64;
                 mask  = 0xfffffffffffffff0ul;
             } else {
-                device_kprintf(device->bus.node, LOG_WARN, "BAR %zu has unrecognized memory type, ignoring...\n");
+                device_kprintf(device->bus.node, LOG_WARN, "BAR %zu has unrecognized memory type, ignoring...\n", i);
                 continue;
             }
 

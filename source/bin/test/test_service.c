@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
 
     core_message_destroy(signal);
 
-    printf("Client received start signal (handle: %d)\n", conn);
+    printf("Client received start signal\n");
 
     unsigned int count = 0;
     while (count < TEST_PING_COUNT) {
@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
 
         test_request_ping_t *ping = (test_request_ping_t *)core_message_data(request);
         ping->index = count;
-        snprintf(ping->string, sizeof(ping->string), "PING %" PRIu64, ping->index);
+        snprintf(ping->string, sizeof(ping->string), "PING %" PRIu32, ping->index);
 
         core_message_t *reply;
         ret = core_connection_request(conn, request, &reply);
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
         test_request_ping_t *pong = (test_request_ping_t *)core_message_data(reply);
         pong->string[sizeof(pong->string) - 1] = 0;
 
-        printf("Client received: %u '%s' (timestamp: %" PRIu64 ")\n", pong->index, pong->string, timestamp);
+        printf("Client received: %" PRIu32 " '%s' (timestamp: %" PRIu64 ")\n", pong->index, pong->string, timestamp);
 
         core_message_destroy(request);
         core_message_destroy(reply);

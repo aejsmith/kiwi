@@ -24,6 +24,7 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -122,13 +123,13 @@ static const char *process_mode(struct stat *st, char mode[11]) {
 
 static void convert_size(off_t size, char *buf, size_t count) {
     if (size < 1024) {
-        snprintf(buf, count, "%llu", size);
+        snprintf(buf, count, "%" PRId64, size);
     } else if (size < (1024 * 1024)) {
-        snprintf(buf, count, "%lluK", (size / 1024));
+        snprintf(buf, count, "%" PRId64 "K", (size / 1024));
     } else if (size < (1024 * 1024 * 1024)) {
-        snprintf(buf, count, "%lluM", (size / 1024 / 1024));
+        snprintf(buf, count, "%" PRId64 "M", (size / 1024 / 1024));
     } else {
-        snprintf(buf, count, "%lluG", (size / 1024 / 1024 / 1024));
+        snprintf(buf, count, "%" PRId64 "G", (size / 1024 / 1024 / 1024));
     }
 }
 
@@ -186,7 +187,7 @@ static void do_list_long(dir_entries_t *dents, const char *dir) {
             convert_size(dents->stat[i].st_size, size_str, sizeof(size_str));
             printf("%12s ", size_str);
         } else {
-            printf("%12llu ", dents->stat[i].st_size);
+            printf("%12" PRId64 " ", dents->stat[i].st_size);
         }
 
         printf("%s %s%s%s", date, colour, dents->dents[i]->d_name, RESET_COLOUR);

@@ -53,7 +53,7 @@ bool Keyboard::init(const char *path) {
         core_log(CORE_LOG_ERROR, "failed to open input device: %" PRId32, ret);
         return false;
     } else if (input_device_type(m_device) != INPUT_DEVICE_KEYBOARD) {
-        core_log(CORE_LOG_ERROR, "input device is not a keyboard", ret);
+        core_log(CORE_LOG_ERROR, "input device is not a keyboard");
         return false;
     }
 

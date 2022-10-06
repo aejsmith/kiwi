@@ -804,7 +804,7 @@ static status_t slab_cache_init(
     }
 
     kprintf(
-        LOG_DEBUG, "slab: created cache %s (obj_size: %u, slab_size: %u, align: %u)\n",
+        LOG_DEBUG, "slab: created cache %s (obj_size: %zu, slab_size: %zu, align: %zu)\n",
         cache->name, cache->obj_size, cache->slab_size, cache->align);
 
     mutex_unlock(&slab_caches_lock);

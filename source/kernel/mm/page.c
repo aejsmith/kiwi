@@ -512,7 +512,7 @@ status_t phys_alloc(
         : phys_alloc_slowpath(count, align, boundary, min_addr, max_addr);
     if (unlikely(!pages)) {
         if (mmflag & MM_BOOT) {
-            fatal("Unable to satisfy boot allocation of %zu page(s)", count);
+            fatal("Unable to satisfy boot allocation of %" PRIu32 " page(s)", count);
         } else if (mmflag & MM_WAIT) {
             fatal("TODO: Reclaim/wait for memory");
         }
@@ -861,14 +861,14 @@ __init_text void page_init(void) {
     kprintf(LOG_NOTICE, "page: free list coverage:\n");
     for (size_t i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
         kprintf(
-            LOG_NOTICE, " %u: 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS "\n",
+            LOG_NOTICE, " %zu: 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS "\n",
             i, free_page_lists[i].min_addr, free_page_lists[i].max_addr);
     }
 
     /* Determine how much space we need for the page database. */
     size_t pages_size = round_up(sizeof(page_t) * total_page_count, PAGE_SIZE);
     kprintf(
-        LOG_NOTICE, "page: have %zu pages, using %" PRIuPHYS "KiB for page database\n",
+        LOG_NOTICE, "page: have %" PRIu32 " pages, using %" PRIuPHYS "KiB for page database\n",
         total_page_count, pages_size / 1024);
     if (pages_size > KERNEL_PDB_SIZE)
         fatal("Available RAM exceeds maximum page database size");

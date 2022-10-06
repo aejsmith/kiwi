@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
 
         test_request_ping_t *pong = (test_request_ping_t *)core_message_data(reply);
         pong->index = ping->index;
-        snprintf(pong->string, sizeof(pong->string), "PONG %" PRIu64, ping->index);
+        snprintf(pong->string, sizeof(pong->string), "PONG %" PRIu32, ping->index);
 
         ret = core_connection_reply(conn, reply);
         if (ret != STATUS_SUCCESS) {

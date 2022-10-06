@@ -44,7 +44,7 @@ static bool exiting;
 static int thread_func(void *id) {
     std::unique_lock<std::mutex> lock(test_lock);
 
-    if (reinterpret_cast<unsigned long>(id) == 0) {
+    if (reinterpret_cast<uintptr_t>(id) == 0) {
         while (!exiting) {
             lock.unlock();
             sleep(1);
@@ -55,9 +55,9 @@ static int thread_func(void *id) {
         }
     } else {
         while (!exiting) {
-            printf("Thread %u waiting\n", reinterpret_cast<unsigned long>(id));
+            printf("Thread %zu waiting\n", reinterpret_cast<uintptr_t>(id));
             test_cond.wait(lock);
-            printf("Thread %u woken\n", reinterpret_cast<unsigned long>(id));
+            printf("Thread %zu woken\n", reinterpret_cast<uintptr_t>(id));
         }
     }
 

@@ -509,7 +509,7 @@ static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) 
         timer_t *timer = list_entry(iter, timer_t, cpu_link);
 
         kdb_printf(
-            "%-20s %-16llu %-18p %p\n",
+            "%-20s %-16" PRIu64 " %-18p %p\n",
             timer->name, timer->target, timer->func, timer->data);
     }
 
@@ -526,7 +526,7 @@ static kdb_status_t kdb_cmd_uptime(int argc, char **argv, kdb_filter_t *filter) 
     }
 
     nstime_t time = system_time();
-    kdb_printf("%llu seconds (%llu nanoseconds)\n", nsecs_to_secs(time), time);
+    kdb_printf("%" PRIu64 " seconds (%" PRIu64 " nanoseconds)\n", nsecs_to_secs(time), time);
     return KDB_SUCCESS;
 }
 

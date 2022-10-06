@@ -230,10 +230,10 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
     /* Search for the allocation and check if it is as expected. */
     kmem_range_t *range = kmem_hash_find(addr, size);
     if (unlikely(!range)) {
-        fatal("Invalid free of %p", addr);
+        fatal("Invalid free of 0x%zx", addr);
     } else if (unlikely(range->size != size)) {
         fatal(
-            "Incorrect size for allocation %p (given: %zu, actual: %zu)",
+            "Incorrect size for allocation 0x%zx (given: %zu, actual: %zu)",
             addr, size, range->size);
     }
 
@@ -249,12 +249,12 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
         for (size_t i = 0; i < size; i += PAGE_SIZE) {
             page_t *page;
             if (!mmu_context_unmap(&kernel_mmu_context, addr + i, shared, &page))
-                fatal("Address %p was not mapped while freeing", addr + i);
+                fatal("Address 0x%zx was not mapped while freeing", addr + i);
 
             if (free)
                 page_free(page);
 
-            dprintf("kmem: unmapped page 0x%" PRIxPHYS " from %p\n", page, addr + i);
+            dprintf("kmem: unmapped page 0x%" PRIxPHYS " from 0x%zx\n", page, addr + i);
         }
 
         mmu_context_unlock(&kernel_mmu_context);
@@ -291,7 +291,7 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
 
     mutex_unlock(&kmem_lock);
 
-    dprintf("kmem: freed range [%p,%p)\n", addr, (ptr_t)addr + size);
+    dprintf("kmem: freed range [0x%zx,0x%zx)\n", addr, addr + size);
 }
 
 /** Allocates a range of unmapped kernel memory.
@@ -342,7 +342,7 @@ ptr_t kmem_raw_alloc(size_t size, unsigned mmflag) {
     range->allocated = true;
     kmem_hash_insert(range);
 
-    dprintf("kmem: allocated range [%p,%p)\n", range->addr, range->addr + size);
+    dprintf("kmem: allocated range [0x%zx,0x%zx)\n", range->addr, range->addr + size);
     mutex_unlock(&kmem_lock);
     return range->addr;
 }
@@ -416,12 +416,12 @@ void *kmem_alloc_etc(size_t size, uint32_t mmu_flags, unsigned mmflag) {
             &kernel_mmu_context, addr + i, page->addr, mmu_flags,
             mmflag & MM_FLAG_MASK);
         if (ret != STATUS_SUCCESS) {
-            kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n", page->addr, addr + i);
+            kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to 0x%zx\n", page->addr, addr + i);
             page_free(page);
             goto fail;
         }
 
-        dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", page->addr, addr + i);
+        dprintf("kmem: mapped page 0x%" PRIxPHYS " at 0x%zx\n", page->addr, addr + i);
     }
 
     /* Zero the range if requested. */
@@ -486,11 +486,11 @@ void *kmem_map(phys_ptr_t base, size_t size, uint32_t flags, unsigned mmflag) {
             &kernel_mmu_context, addr + i, base + i, flags,
             mmflag & MM_FLAG_MASK);
         if (ret != STATUS_SUCCESS) {
-            kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n", base + i, addr + i);
+            kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to 0x%zx\n", base + i, addr + i);
             goto fail;
         }
 
-        dprintf("kmem: mapped page 0x%" PRIxPHYS " at %p\n", base + i, addr + i);
+        dprintf("kmem: mapped page 0x%" PRIxPHYS " at 0x%zx\n", base + i, addr + i);
     }
 
     mmu_context_unlock(&kernel_mmu_context);

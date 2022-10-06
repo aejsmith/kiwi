@@ -254,7 +254,7 @@ __init_text void lapic_init_percpu(void) {
     /* Figure out the timer conversion factor. */
     curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000000;
     kprintf(
-        LOG_NOTICE, "lapic: timer conversion factor for CPU %u is %u (freq: %" PRIu64 "MHz)\n",
+        LOG_NOTICE, "lapic: timer conversion factor for CPU %u is %" PRIu64 " (freq: %" PRIu64 "MHz)\n",
         curr_cpu->id, curr_cpu->arch.lapic_timer_cv,
         curr_cpu->arch.lapic_freq / 1000000);
 

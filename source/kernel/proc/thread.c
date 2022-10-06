@@ -573,7 +573,7 @@ static void thread_backtrace_cb(ptr_t addr) {
     /* IP may point off the end of the function for the last instruction so
      * subtract 1. */
     const int delta = -1;
-    const int width = (sizeof(void *) * 2) + 2;
+    const int width = sizeof(void *) * 2;
 
     symbol_t sym = {};
     size_t off = 0;
@@ -597,7 +597,7 @@ static void thread_backtrace_cb(ptr_t addr) {
     }
 
     kprintf(
-        LOG_DEBUG, "  [%0*p] %s+0x%zx",
+        LOG_DEBUG, "  [0x%0*zx] %s+0x%zx",
         width, addr, (name) ? name : "<unknown>", (found) ? off - delta : 0);
 
     if (sym.image && sym.image->load_base)

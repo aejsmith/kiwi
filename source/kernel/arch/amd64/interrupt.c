@@ -83,7 +83,7 @@ static void unhandled_exception(frame_t *frame, unsigned code) {
         kdb_exception(string, frame);
     } else if (code && frame_from_user(frame)) {
         kprintf(
-            LOG_DEBUG, "arch: thread %" PRId32 " (%s) exception %lu (%s) at %p\n",
+            LOG_DEBUG, "arch: thread %" PRId32 " (%s) exception %lu (%s) at 0x%zx\n",
             curr_thread->id, curr_thread->name, frame->num, string, frame->ip);
 
         memset(&exception, 0, sizeof(exception));
@@ -232,7 +232,7 @@ static void pf_exception(frame_t *frame) {
 
     /* Check if a reserved bit fault. This is always fatal. */
     if (frame->err_code & (1 << 3))
-        fatal("Reserved bit page fault exception at %p", addr);
+        fatal("Reserved bit page fault exception at 0x%zx", addr);
 
     if (!vm_fault(frame, addr, reason, access))
         unhandled_exception(frame, 0);

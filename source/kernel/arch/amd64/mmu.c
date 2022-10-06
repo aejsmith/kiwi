@@ -326,7 +326,7 @@ status_t arch_mmu_context_map(
     /* Check that the mapping doesn't already exist. */
     unsigned pte = (virt % 0x200000) / PAGE_SIZE;
     if (unlikely(ptbl[pte] & X86_PTE_PRESENT))
-        fatal("Mapping %p which is already mapped", virt);
+        fatal("Mapping 0x%zx which is already mapped", virt);
 
     /* Set the PTE. */
     set_pte(&ptbl[pte], calc_page_pte(ctx, phys, flags));
@@ -564,7 +564,7 @@ static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t flags)
         }
     }
 
-    kprintf(LOG_NOTICE, " %s: [%p,%p) -> 0x%" PRIxPHYS" (0x%x)\n", name, start, end, phys, flags);
+    kprintf(LOG_NOTICE, " %s: [0x%zx,0x%zx) -> 0x%" PRIxPHYS" (0x%x)\n", name, start, end, phys, flags);
 }
 
 /** Create the kernel MMU context. */

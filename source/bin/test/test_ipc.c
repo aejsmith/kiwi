@@ -150,7 +150,7 @@ static int test_server(void) {
 
         test_request_ping_t *pong = (test_request_ping_t *)core_message_data(reply);
         pong->index = ping->index;
-        snprintf(pong->string, sizeof(pong->string), "PONG %" PRIu64, ping->index);
+        snprintf(pong->string, sizeof(pong->string), "PONG %" PRIu32, ping->index);
 
         ret = core_connection_reply(conn, reply);
         if (ret != STATUS_SUCCESS) {
@@ -195,7 +195,7 @@ static int test_client(void) {
 
     core_message_destroy(signal);
 
-    printf("Client received start signal (handle: %" PRId32 ")\n", conn);
+    printf("Client received start signal\n");
 
     unsigned int count = 0;
     while (count < TEST_PING_COUNT) {
@@ -203,7 +203,7 @@ static int test_client(void) {
 
         test_request_ping_t *ping = (test_request_ping_t *)core_message_data(request);
         ping->index = count;
-        snprintf(ping->string, sizeof(ping->string), "PING %" PRIu64, ping->index);
+        snprintf(ping->string, sizeof(ping->string), "PING %" PRIu32, ping->index);
 
         core_message_t *reply;
         ret = core_connection_request(conn, request, &reply);

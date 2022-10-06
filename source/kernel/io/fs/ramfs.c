@@ -313,7 +313,7 @@ static status_t ramfs_read_node(fs_mount_t *mount, fs_node_t *_node) {
      * ramfs_node_create() and will exist in the node cache until they are
      * removed, so this function should never be called. */
     if (unlikely(_node->id != RAMFS_ROOT_NODE))
-        fatal("Should not be here (%" PRIu16 ":%" PRIu64 ")", mount, _node->id);
+        fatal("Should not be here (%" PRIu16 ":%" PRIu64 ")", mount->id, _node->id);
 
     ramfs_node_t *node = kmalloc(sizeof(*node), MM_KERNEL);
 

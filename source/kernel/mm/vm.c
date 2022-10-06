@@ -211,7 +211,7 @@ static vm_amap_t *vm_amap_create(size_t size) {
     map->pages     = kcalloc(map->max_size, sizeof(*map->pages), MM_KERNEL);
     map->rref      = kcalloc(map->max_size, sizeof(*map->rref), MM_KERNEL);
 
-    dprintf("vm: created anonymous map %p (size: %zu, pages: %zu)\n", map,size, map->max_size);
+    dprintf("vm: created anonymous map %p (size: %zu, pages: %zu)\n", map, size, map->max_size);
 
     return map;
 }
@@ -476,14 +476,14 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t requeste
      * set correctly. If there is an existing mapping, remove it. */
     if (exist) {
         if (!mmu_context_unmap(region->as->mmu, addr, true, NULL))
-            fatal("Could not remove previous mapping for %p", addr);
+            fatal("Could not remove previous mapping for 0x%zx", addr);
     }
 
     /* Map the entry in. Should always succeed with MM_KERNEL set. */
     mmu_context_map(region->as->mmu, addr, phys, access, MM_KERNEL);
 
     dprintf(
-        "vm: mapped 0x%" PRIxPHYS " at %p (as: %p, access: 0x%x)\n",
+        "vm: mapped 0x%" PRIxPHYS " at 0x%zx (as: %p, access: 0x%" PRIx32 ")\n",
         phys, addr, region->as, access);
 
     mutex_unlock(&amap->lock);
@@ -532,7 +532,7 @@ static status_t map_object_page(vm_region_t *region, ptr_t addr, phys_ptr_t *_ph
     mmu_context_map(region->as->mmu, addr, page->addr, region->access, MM_KERNEL);
 
     dprintf(
-        "vm: mapped 0x%" PRIxPHYS " at %p (as: %p, access: 0x%x)\n",
+        "vm: mapped 0x%" PRIxPHYS " at 0x%zx (as: %p, access: 0x%" PRIx32 ")\n",
         page->addr, addr, region->as, region->access);
 
     if (_phys)
@@ -897,7 +897,7 @@ void vm_unlock_page(vm_aspace_t *as, ptr_t addr) {
      * should exist. */
     vm_region_t *region = vm_region_find(as, addr, false);
     if (!region || region->state != VM_REGION_ALLOCATED)
-        fatal("Invalid call to vm_unlock_page(%p)", addr);
+        fatal("Invalid call to vm_unlock_page(0x%zx)", addr);
 
     /* Unblock any threads waiting for the region to be unlocked. */
     assert(region->locked);
@@ -935,7 +935,7 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
     vm_aspace_t *as = curr_cpu->aspace;
 
     dprintf(
-        "vm: %s mode page fault at %p (thread: %" PRId32 ", as: %p, reason: %d, access: 0x%" PRIx32 ")\n",
+        "vm: %s mode page fault at 0x%zx (thread: %" PRId32 ", as: %p, reason: %d, access: 0x%" PRIx32 ")\n",
         (user) ? "user" : "kernel", addr, curr_thread->id, as, reason, access);
 
     /* If we don't have an address space, don't do anything. There won't be
@@ -947,7 +947,7 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
      * only held within the functions in this file, and they should not incur a
      * page fault (if they do there's something wrong!). */
     if (unlikely(mutex_held(&as->lock) && as->lock.holder == curr_thread)) {
-        kprintf(LOG_WARN, "vm: fault on %p with lock held at %pS\n", as, frame->ip);
+        kprintf(LOG_WARN, "vm: fault on %p with lock held at %pS\n", as, (void *)frame->ip);
         return false;
     }
 
@@ -964,7 +964,7 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
     vm_region_t *region = vm_region_find(as, base, false);
     if (unlikely(!region)) {
         kprintf(
-            LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at %p: no region found\n",
+            LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at 0x%zx: no region found\n",
             curr_thread->id, curr_thread->name, addr);
 
         exception.code = EXCEPTION_ADDR_UNMAPPED;
@@ -978,7 +978,7 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
     if (!(region->access & access)) {
         kprintf(
             LOG_NOTICE,
-            "vm: thread %" PRId32 " (%s) page fault at %p: access violation (access: 0x%x, allowed: 0x%x)\n",
+            "vm: thread %" PRId32 " (%s) page fault at 0x%zx: access violation (access: 0x%x, allowed: 0x%x)\n",
             curr_thread->id, curr_thread->name, addr, access, region->access);
 
         exception.code = EXCEPTION_ACCESS_VIOLATION;
@@ -991,7 +991,7 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
     if (region->flags & VM_MAP_STACK && base == region->start) {
         kprintf(
             LOG_NOTICE,
-            "vm: thread %" PRId32 " (%s) page fault at %p: hit stack guard page\n",
+            "vm: thread %" PRId32 " (%s) page fault at 0x%zx: hit stack guard page\n",
             curr_thread->id, curr_thread->name, addr);
 
         exception.code = EXCEPTION_STACK_OVERFLOW;
@@ -1007,9 +1007,9 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
          * occur on non-private regions, either. */
         if (reason == VM_FAULT_ACCESS) {
             if (access != VM_ACCESS_WRITE) {
-                fatal("Non-write access fault at %p on %p (%d)", addr, region->amap, access);
+                fatal("Non-write access fault at 0x%zx on %p (%d)", addr, region->amap, access);
             } else if (!(region->flags & VM_MAP_PRIVATE)) {
-                fatal("Copy-on-write fault at %p on non-private region", addr);
+                fatal("Copy-on-write fault at 0x%zx on non-private region", addr);
             }
         }
 
@@ -1025,7 +1025,7 @@ bool vm_fault(frame_t *frame, ptr_t addr, int reason, uint32_t access) {
         exception.code = EXCEPTION_PAGE_ERROR;
 
         kprintf(
-            LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at %p: failed to map page: %d\n",
+            LOG_NOTICE, "vm: thread %" PRId32 " (%s) page fault at 0x%zx: failed to map page: %d\n",
             curr_thread->id, curr_thread->name, addr, exception.status);
     }
 
@@ -1040,7 +1040,7 @@ out:
             /* Handle faults in safe user memory access functions. */
             kprintf(
                 LOG_DEBUG,
-                "vm: thread %" PRId32 " (%s) faulted in user memory access at %p (ip: %p)\n",
+                "vm: thread %" PRId32 " (%s) faulted in user memory access at 0x%zx (ip: 0x%zx)\n",
                 curr_thread->id, curr_thread->name, addr, frame->ip);
 
             longjmp(curr_thread->usermem_context, 1);
@@ -1344,7 +1344,7 @@ static vm_region_t *alloc_region(
     avl_tree_insert(&as->tree, candidate->start, &candidate->tree_link);
 
     dprintf(
-        "vm: allocated region [%p,%p) in %p\n",
+        "vm: allocated region [0x%zx,0x%zx) in %p\n",
         candidate->start, candidate->start + candidate->size, as);
 
     return candidate;
@@ -1529,7 +1529,7 @@ status_t vm_map(
     }
 
     dprintf(
-        "vm: mapped region [%p,%p) in %p (spec: %u, access: 0x%" PRIx32 ", flags: 0x%"
+        "vm: mapped region [0x%zx,0x%zx) in %p (spec: %u, access: 0x%" PRIx32 ", flags: 0x%"
             PRIx32 ", handle: %p, offset: 0x%" PRIx64 ")\n",
         region->start, region->start + region->size, as, spec, access,
         flags, handle, offset);
@@ -1563,7 +1563,7 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 
     insert_region(as, create_free_region(as, start, size, VM_REGION_FREE));
 
-    dprintf("vm: unmapped region [%p,%p) in %p\n", start, start + size, as);
+    dprintf("vm: unmapped region [0x%zx,0x%zx) in %p\n", start, start + size, as);
     mutex_unlock(&as->lock);
     return STATUS_SUCCESS;
 }
@@ -1592,7 +1592,7 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 
     insert_region(as, create_free_region(as, start, size, VM_REGION_RESERVED));
 
-    dprintf("vm: reserved region [%p,%p) in %p\n", start, start + size, as);
+    dprintf("vm: reserved region [0x%zx,0x%zx) in %p\n", start, start + size, as);
     mutex_unlock(&as->lock);
     return STATUS_SUCCESS;
 }
@@ -1814,7 +1814,7 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
     kdb_printf("Region %p (%s)\n", region, (region->name) ? region->name : "<unnamed>");
     kdb_printf("=================================================\n");
     kdb_printf("as:          %p\n", region->as);
-    kdb_printf("start:       %p\n", region->start);
+    kdb_printf("start:       0x%zx\n", region->start);
     kdb_printf("size:        0x%zx\n", region->size);
     kdb_printf(
         "access:      %c%c%c (0x%" PRIx32 ")\n",
@@ -1862,7 +1862,7 @@ static kdb_status_t kdb_cmd_region(int argc, char **argv, kdb_filter_t *filter) 
  * @param region    Region to display. */
 static void dump_region(vm_region_t *region) {
     kdb_printf(
-        "%-18p 0x%-12zx %c%c%c     0x%-3" PRIx32 " ",
+        "0x%-18zx 0x%-12zx %c%c%c     0x%-3" PRIx32 " ",
         region->start, region->size,
         (region->access & VM_ACCESS_READ) ? 'R' : '-',
         (region->access & VM_ACCESS_WRITE) ? 'W' : '-',
