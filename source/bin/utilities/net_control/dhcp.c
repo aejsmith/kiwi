@@ -118,7 +118,7 @@ static bool send_discover(void) {
         0
     };
 
-    core_log(CORE_LOG_NOTICE, "sending DHCPDISCOVER");
+    core_log(CORE_LOG_NOTICE, "%s: sending DHCPDISCOVER", net_device_path);
 
     size_t packet_size;
     dhcp_header_t *packet = alloc_packet(sizeof(options), &packet_size);
@@ -148,7 +148,7 @@ static bool send_request(void) {
         0
     };
 
-    core_log(CORE_LOG_NOTICE, "sending DHCPREQUEST");
+    core_log(CORE_LOG_NOTICE, "%s: sending DHCPREQUEST", net_device_path);
 
     size_t packet_size;
     dhcp_header_t *packet = alloc_packet(sizeof(options), &packet_size);
@@ -176,7 +176,7 @@ static status_t wait_message(uint8_t type, dhcp_header_t **_packet, size_t *_siz
         ret = kern_object_wait(&event, 1, 0, timeout);
         if (ret != STATUS_SUCCESS) {
             if (ret == STATUS_TIMED_OUT) {
-                core_log(CORE_LOG_WARN, "timed out, retrying");
+                core_log(CORE_LOG_WARN, "%s: timed out, retrying", net_device_path);
             } else {
                 core_log(CORE_LOG_ERROR, "failed to wait for message: %s", kern_status_string(ret));
             }
@@ -219,19 +219,19 @@ static status_t receive_offer(void) {
 
     char server_str[INET_ADDRSTRLEN] = {};
     inet_ntop(AF_INET, &offer->siaddr, server_str, sizeof(server_str));
-    core_log(CORE_LOG_NOTICE, "received DHCPOFFER from %s", server_str);
+    core_log(CORE_LOG_NOTICE, "%s: received DHCPOFFER from %s", net_device_path, server_str);
     offer_server_addr.val = offer->siaddr;
 
     char addr_str[INET_ADDRSTRLEN] = {};
     inet_ntop(AF_INET, &offer->yiaddr, addr_str, sizeof(addr_str));
-    core_log(CORE_LOG_NOTICE, "address: %s", addr_str);
+    core_log(CORE_LOG_NOTICE, "%s: address: %s", net_device_path, addr_str);
     offer_client_addr.val = offer->yiaddr;
 
     const uint8_t *subnet_option = find_option(offer, offer_size, DHCP_OPTION_SUBNET_MASK);
     if (subnet_option && subnet_option[1] >= IPV4_ADDR_LEN) {
         char subnet_str[INET_ADDRSTRLEN] = {};
         inet_ntop(AF_INET, &subnet_option[2], subnet_str, sizeof(subnet_str));
-        core_log(CORE_LOG_NOTICE, "subnet mask: %s", subnet_str);
+        core_log(CORE_LOG_NOTICE, "%s: subnet mask: %s", net_device_path, subnet_str);
         offer_subnet_mask.val = *(const uint32_t *)&subnet_option[2];
     } else {
         offer_subnet_mask.val = INADDR_BROADCAST;
@@ -241,7 +241,7 @@ static status_t receive_offer(void) {
     if (router_option && router_option[1] >= IPV4_ADDR_LEN) {
         char router_str[INET_ADDRSTRLEN] = {};
         inet_ntop(AF_INET, &router_option[2], router_str, sizeof(router_str));
-        core_log(CORE_LOG_NOTICE, "router: %s", router_str);
+        core_log(CORE_LOG_NOTICE, "%s: router: %s", net_device_path, router_str);
         offer_router.val = *(const uint32_t *)&router_option[2];
     }
 
@@ -259,7 +259,7 @@ static status_t receive_ack(void) {
 
     char server_str[INET_ADDRSTRLEN] = {};
     inet_ntop(AF_INET, &ack->siaddr, server_str, sizeof(server_str));
-    core_log(CORE_LOG_NOTICE, "received DHCPACK from %s", server_str);
+    core_log(CORE_LOG_NOTICE, "%s: received DHCPACK from %s", net_device_path, server_str);
 
     free(ack);
 
@@ -389,7 +389,7 @@ bool command_dhcp(int argc, char **argv) {
 
     ret = net_device_add_addr(net_device, &interface_addr, sizeof(interface_addr));
     if (ret != STATUS_SUCCESS) {
-        core_log(CORE_LOG_ERROR, "failed to add address for '%s': %s", path, kern_status_string(ret));
+        core_log(CORE_LOG_ERROR, "%s: failed to add address: %s", path, kern_status_string(ret));
         return false;
     }
 
@@ -405,11 +405,11 @@ bool command_dhcp(int argc, char **argv) {
             ipv4_control_device, IPV4_CONTROL_DEVICE_REQUEST_ADD_ROUTE, &route,
             sizeof(route), NULL, 0, NULL);
         if (ret != STATUS_SUCCESS) {
-            core_log(CORE_LOG_ERROR, "failed to add route for '%s': %s", path, kern_status_string(ret));
+            core_log(CORE_LOG_ERROR, "%s: failed to add route: %s", path, kern_status_string(ret));
             return false;
         }
     }
 
-    core_log(CORE_LOG_NOTICE, "configured '%s'", path);
+    core_log(CORE_LOG_NOTICE, "%s: configured", path);
     return true;
 }

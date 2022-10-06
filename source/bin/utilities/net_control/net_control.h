@@ -32,6 +32,7 @@
 #include <stdio.h>
 
 extern net_device_t *net_device;
+extern const char *net_device_path;
 extern handle_t ipv4_control_device;
 
 extern void usage(void);
