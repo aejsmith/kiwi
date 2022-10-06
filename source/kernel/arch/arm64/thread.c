@@ -100,3 +100,8 @@ status_t arch_thread_interrupt_setup(thread_interrupt_t *interrupt, uint32_t ipl
 status_t arch_thread_interrupt_restore(uint32_t *_ipl) {
     fatal_todo();
 }
+
+/** Log a user backtrrace for the current thread. */
+void arch_thread_backtrace(void (*cb)(ptr_t)) {
+    fatal_todo();
+}

@@ -22,8 +22,8 @@
 #pragma once
 
 /** Format character definitions for printf(). */
-#define PRIxPHYS        "llx"       /**< Format for phys_ptr_t (hexadecimal). */
-#define PRIuPHYS        "llu"       /**< Format for phys_ptr_t. */
+#define PRIxPHYS        "lx"        /**< Format for phys_ptr_t (hexadecimal). */
+#define PRIuPHYS        "lu"        /**< Format for phys_ptr_t. */
 
 /** Integer type that can represent a pointer. */
 typedef unsigned long ptr_t;

@@ -226,7 +226,7 @@ status_t arch_mmu_context_map(
 
     unsigned ttl3e = (virt % ARM64_TTL3_RANGE) / PAGE_SIZE;
     if (unlikely(ttl3[ttl3e] & ARM64_TTE_PRESENT))
-        fatal("Mapping %p which is already mapped", virt);
+        fatal("Mapping 0x%zx which is already mapped", virt);
 
     ttl3[ttl3e] = phys | ARM64_TTE_PAGE | calc_tte_flags(ctx, flags);
     return STATUS_SUCCESS;
@@ -298,7 +298,7 @@ static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t flags)
         }
     }
 
-    kprintf(LOG_NOTICE, " %s: [%p,%p) -> 0x%" PRIxPHYS" (0x%x)\n", name, start, end, phys, flags);
+    kprintf(LOG_NOTICE, " %s: [0x%zx,0x%zx) -> 0x%" PRIxPHYS" (0x%x)\n", name, start, end, phys, flags);
 }
 
 static void map_pmap(void) {
