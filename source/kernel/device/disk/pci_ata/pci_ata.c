@@ -255,7 +255,7 @@ static void add_channel(pci_ata_channel_t *channel, const char *mode) {
 
     device_kprintf(
         node, LOG_NOTICE, "%s mode (cmd: %pR, ctrl: %pR, bus_master: %pR)\n",
-        mode, channel->cmd, channel->ctrl, channel->bus_master);
+        mode, &channel->cmd, &channel->ctrl, &channel->bus_master);
 
     /* Allocate a PRDT. */
     device_dma_alloc(node, PRDT_SIZE, &channel->sff.ata.dma_constraints, MM_KERNEL, &channel->prdt_addr);

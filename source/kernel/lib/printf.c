@@ -321,13 +321,15 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
      *  - %pM     = Print a 6 byte (Ethernet) MAC address.
      *              arg = pointer to 6 byte buffer
      *  - %pR     = Print an I/O region handle as <MMIO/PIO>@addr.
+     *              arg = pointer to io_region_t
      *  - %pS     = Print a symbol: [<addr>] <name>+<offset>
      *              arg = address
      *  - %ps     = Print a symbol: [<addr>] <name>
      *              arg = address
-     *  - %pu     = Print a little-endian (i.e. EFI) UUID, arg is pointer to
-     *              16-byte UUID.
-     *  - %pU     = Print a big-endian UUID, arg is pointer to 16-byte UUID.
+     *  - %pu     = Print a little-endian (i.e. EFI) UUID.
+     *              arg = pointer to 16-byte UUID
+     *  - %pU     = Print a big-endian UUID.
+     *              arg = pointer to 16-byte UUID
      */
     switch ((*fmt)[1]) {
         case 'B':
@@ -359,14 +361,16 @@ static void print_pointer(printf_state_t *state, const char **fmt, void *ptr) {
         case 'R':
             (*fmt)++;
 
-            if (io_is_pio((io_region_t)ptr)) {
+            io_region_t region = *(io_region_t *)ptr;
+
+            if (io_is_pio(region)) {
                 print_string(state, "PIO @ ", 6);
             } else {
                 print_string(state, "MMIO @ ", 7);
             }
 
             state->base = 16;
-            print_number(state, io_addr((io_region_t)ptr));
+            print_number(state, io_addr(region));
             break;
         case 'u':
         case 'U':
