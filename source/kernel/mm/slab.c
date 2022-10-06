@@ -69,6 +69,14 @@ typedef struct slab_magazine {
 typedef struct __cacheline_aligned slab_percpu {
     slab_magazine_t *loaded;            /**< Current (loaded) magazine. */
     slab_magazine_t *previous;          /**< Previous magazine. */
+
+    /**
+     * Version number. This is incremented on every completed operation on the
+     * per-CPU cache. It is used to handle thread switches that occur during
+     * blocking operations when we have to go to the depot. volatile to ensure
+     * the compiler does not cache its value.
+     */
+    volatile uint32_t version;
 } slab_percpu_t;
 
 /**
@@ -396,49 +404,89 @@ static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *m
 
 /** Allocate an object from the magazine layer. */
 static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
-    void *ret = NULL;
-
-    /* We do not need locking on the per-CPU cache as it will not be used by
-     * any other CPUs. We do however need to disable preemption to avoid a
-     * thread switch or CPU migration from occurring mid-operation. Disabling
-     * IRQs is not sufficient: even with them disabled, slab_magazine_get_full()
-     * can result in a CPU migration as it can block. */
+    /*
+     * We do not have locking on the per-CPU cache as it will not be used by
+     * any other CPUs. However there is the possibility that a thread switch
+     * will occur on this CPU. Furthermore, normally, a thread switch could
+     * result in this thread migrating to a different CPU when it resumes.
+     *
+     * A thread switch staying on the CPU means that our cache state might have
+     * changed when we resume, due to another thread that ran using the cache.
+     * A CPU switch would mean that the cache we're using is no longer correct
+     * for the CPU we're running on.
+     *
+     * To prevent these issues, we firstly disable preemption around the
+     * operation. This prevents CPU migration and preemption by timer.
+     *
+     * That still leaves the possibility that going to the depot will result in
+     * a thread switch, as those operations take a mutex and could block.
+     *
+     * So, each per-CPU cache has a version number, that is incremented upon
+     * completion of an operation on it. We check whether this number has
+     * changed after we have called a depot operation. If it has, it means
+     * another thread ran and modified this cache. In that case, we drop what
+     * we were doing and go back to the start.
+     */
     preempt_disable();
 
     slab_percpu_t *cc = &cache->cpu_caches[curr_cpu->id];
 
-    /* Check if we have a magazine to allocate from. */
-    if (likely(cc->loaded)) {
-        if (cc->loaded->rounds) {
-            ret = cc->loaded->objects[--cc->loaded->rounds];
-            goto out;
-        } else if (cc->previous && cc->previous->rounds) {
-            /* Previous has rounds, exchange loaded with previous and allocate
-             * from it. */
-            swap(cc->loaded, cc->previous);
-            ret = cc->loaded->objects[--cc->loaded->rounds];
-            goto out;
+    void *ret = NULL;
+    while (true) {
+        uint32_t version = cc->version;
+
+        /* Check if we have a magazine to allocate from. */
+        if (likely(cc->loaded)) {
+            if (cc->loaded->rounds) {
+                /* Loaded has rounds, allocate from it. */
+                ret = cc->loaded->objects[--cc->loaded->rounds];
+                cc->version++;
+                break;
+            } else if (cc->previous && cc->previous->rounds) {
+                /* Previous has rounds, exchange them and allocate. */
+                swap(cc->loaded, cc->previous);
+                ret = cc->loaded->objects[--cc->loaded->rounds];
+                cc->version++;
+                break;
+            }
         }
-    }
 
-    /* Try to get a full magazine from the depot. */
-    slab_magazine_t *mag = slab_magazine_get_full(cache);
-    assert(cc == &cache->cpu_caches[arch_curr_cpu_volatile()->id]);
-    if (unlikely(!mag))
-        goto out;
+        /* Try to get a full magazine from the depot. */
+        slab_magazine_t *mag = slab_magazine_get_full(cache);
 
-    /* Return previous to the depot. */
-    if (cc->previous) {
-        slab_magazine_put_empty(cache, cc->previous);
+        /* Validate that we have not changed CPU. */
         assert(cc == &cache->cpu_caches[arch_curr_cpu_volatile()->id]);
+
+        /* Failed to allocate so just give up. */
+        if (unlikely(!mag))
+            break;
+
+        /* If version has changed, another thread ran, return the magazine and
+         * try again. */
+        if (version != cc->version) {
+            slab_magazine_put_full(cache, mag);
+            continue;
+        }
+
+        slab_magazine_t *previous = cc->previous;
+
+        assert(!previous || !previous->rounds);
+
+        /* Load the magazine. */
+        cc->previous = cc->loaded;
+        cc->loaded   = mag;
+
+        ret = cc->loaded->objects[--cc->loaded->rounds];
+        cc->version++;
+
+        /* Return previous to the depot. This must be done after allocating,
+         * because it can block again. */
+        if (likely(previous))
+            slab_magazine_put_empty(cache, previous);
+
+        break;
     }
 
-    cc->previous = cc->loaded;
-    cc->loaded   = mag;
-
-    ret = cc->loaded->objects[--cc->loaded->rounds];
-
-out:
     preempt_enable();
     return ret;
 }
@@ -450,42 +498,63 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 
     slab_percpu_t *cc = &cache->cpu_caches[curr_cpu->id];
 
-    /* If the loaded magazine has spare slots, just put the object there and
-     * return. */
-    if (likely(cc->loaded)) {
-        if (cc->loaded->rounds < SLAB_MAGAZINE_SIZE) {
-            cc->loaded->objects[cc->loaded->rounds++] = obj;
-            goto success;
-        } else if (cc->previous && cc->previous->rounds < SLAB_MAGAZINE_SIZE) {
-            /* Previous has spare slots, exchange them and insert the object. */
-            swap(cc->loaded, cc->previous);
-            cc->loaded->objects[cc->loaded->rounds++] = obj;
-            goto success;
+    bool ret = true;
+    while (true) {
+        uint32_t version = cc->version;
+
+        if (likely(cc->loaded)) {
+            if (cc->loaded->rounds < SLAB_MAGAZINE_SIZE) {
+                /* Loaded magazine has space, insert the object there. */
+                cc->loaded->objects[cc->loaded->rounds++] = obj;
+                cc->version++;
+                break;
+            } else if (cc->previous && cc->previous->rounds < SLAB_MAGAZINE_SIZE) {
+                /* Previous has space, exchange them and insert. */
+                swap(cc->loaded, cc->previous);
+                cc->loaded->objects[cc->loaded->rounds++] = obj;
+                cc->version++;
+                break;
+            }
         }
-    }
 
-    /* Get a new empty magazine. */
-    slab_magazine_t *mag = slab_magazine_get_empty(cache);
-    assert(cc == &cache->cpu_caches[arch_curr_cpu_volatile()->id]);
-    if (unlikely(!mag)) {
-        preempt_enable();
-        return false;
-    }
+        /* Get a new empty magazine. */
+        slab_magazine_t *mag = slab_magazine_get_empty(cache);
 
-    /* Load the new magazine, and free the previous. */
-    if (likely(cc->previous)) {
-        slab_magazine_put_full(cache, cc->previous);
+        /* Validate that we have not changed CPU. */
         assert(cc == &cache->cpu_caches[arch_curr_cpu_volatile()->id]);
+
+        if (unlikely(!mag)) {
+            ret = false;
+            break;
+        }
+
+        /* If version has changed, another thread ran, return the magazine and
+         * try again. */
+        if (version != cc->version) {
+            slab_magazine_put_empty(cache, mag);
+            continue;
+        }
+
+        slab_magazine_t *previous = cc->previous;
+
+        assert(!previous || previous->rounds == SLAB_MAGAZINE_SIZE);
+
+        /* Load the magazine. */
+        cc->previous = cc->loaded;
+        cc->loaded   = mag;
+
+        cc->loaded->objects[cc->loaded->rounds++] = obj;
+        cc->version++;
+
+        /* Return previous. */
+        if (likely(previous))
+            slab_magazine_put_full(cache, previous);
+
+        break;
     }
 
-    cc->previous = cc->loaded;
-    cc->loaded   = mag;
-
-    cc->loaded->objects[cc->loaded->rounds++] = obj;
-
-success:
     preempt_enable();
-    return true;
+    return ret;
 }
 
 #if CONFIG_SLAB_TRACING
