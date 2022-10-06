@@ -107,8 +107,8 @@ if ARGUMENTS.get('IGNORE_SUBMODULES') != '1' and not vcs.check_submodules():
     raise SCons.Errors.StopError(
         "Submodules outdated. Please run 'git submodule update --init'.")
 
-# Change the Decider to MD5-timestamp to speed up the build a bit.
-Decider('MD5-timestamp')
+# Change the Decider to content-timestamp to speed up the build a bit.
+Decider('content-timestamp')
 
 host_env = Environment(ENV = os.environ, tools = ['default', 'textfile'])
 target_env = Environment(platform = 'posix', ENV = os.environ, tools = ['default', 'textfile'])
