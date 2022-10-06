@@ -252,7 +252,7 @@ static status_t virtio_net_device_up(net_device_t *_device) {
             /* Queue up all available RX buffers to the device. */
             for (uint16_t j = 0; j < desc_count; j++) {
                 uint16_t desc_index;
-                struct vring_desc *desc = virtio_queue_alloc(queue->queue, &desc_index);
+                struct vring_desc *desc __unused = virtio_queue_alloc(queue->queue, &desc_index);
                 assert(desc);
 
                 virtio_net_queue_rx(device, desc_index, false);

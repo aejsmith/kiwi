@@ -1626,8 +1626,6 @@ void vm_aspace_switch(vm_aspace_t *as) {
 /** Create a new address space.
  * @return              Pointer to address space structure. */
 vm_aspace_t *vm_aspace_create(void) {
-    status_t ret;
-
     vm_aspace_t *as = slab_cache_alloc(vm_aspace_cache, MM_KERNEL);
 
     as->mmu        = mmu_context_create(MM_KERNEL);
@@ -1656,7 +1654,7 @@ vm_aspace_t *vm_aspace_create(void) {
 
     /* Mark the first page of the address space as reserved to catch NULL
      * pointer accesses. This should not fail. */
-    ret = vm_reserve(as, 0x0, PAGE_SIZE);
+    status_t ret __unused = vm_reserve(as, 0x0, PAGE_SIZE);
     assert(ret == STATUS_SUCCESS);
 
     return as;
