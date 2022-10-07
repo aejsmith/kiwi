@@ -96,6 +96,8 @@ for kboot_target in config['KBOOT_TARGETS'].split(','):
     # Add all output binaries to the distribution environment.
     dist['KBOOT'] += kboot_env.Glob('${OUTDIR}/*')
 
+Alias('kboot', dist['KBOOT'])
+
 ####################
 # Userspace build. #
 ####################
@@ -103,41 +105,3 @@ for kboot_target in config['KBOOT_TARGETS'].split(','):
 # Build userspace.
 if config['SYS_SUPPORTS_USERSPACE']:
     SConscript(dirs = ['lib', 'services', 'bin'])
-
-###############
-# Image build #
-###############
-
-# Always build the filesystem image to make sure new stuff is copied into it.
-fsimage = dist.FSImage('fsimage.tar', [])
-AlwaysBuild(fsimage)
-dist['FSIMAGE'] = File('fsimage.tar')
-
-# Add aliases and set the default target.
-Alias('kernel', dist['KERNEL'])
-Alias('modules', dist['MODULES'])
-Alias('fsimage', dist['FSIMAGE'])
-Alias('kboot', dist['KBOOT'])
-
-# Add arch-specific targets to generate bootable images.
-qemu_binary = config['QEMU_BINARY_' + config['ARCH'].upper()]
-qemu_opts  = config['QEMU_OPTS_' + config['ARCH'].upper()]
-if config['ARCH'] == 'amd64':
-    Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
-
-    Alias('qemu', dist.Command('__qemu', ['cdrom.iso'], Action(
-        qemu_binary + ' -cdrom $SOURCE -boot d ' + qemu_opts,
-        None)))
-else:
-    Default(Alias('bootimage', dist.BootImage('boot.img', [])))
-
-    Alias('qemu', dist.Command('__qemu', [dist['KBOOT'][0], 'boot.img'], Action(
-        qemu_binary + ' -kernel ${SOURCES[0]} -initrd ${SOURCES[1]} ' + qemu_opts,
-        None)))
-
-# Helper to run GDB attached to QEMU with the appropriate options for the
-# current configuration.
-Alias('qgdb', dist.Command('__qgdb', [], Action(
-    'gdb --eval-command="symbol-file %s" --eval-command="set architecture %s" --eval-command="target remote localhost:1234"' %
-        ('build/%s-%s/kernel/kernel-unstripped' % (config['ARCH'], config['BUILD']), config['GDB_ARCH']),
-    None)))

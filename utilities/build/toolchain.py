@@ -22,7 +22,6 @@ from urllib.parse import urlparse
 llvm_version = '14.0.0'
 
 def which(program):
-    import os
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 

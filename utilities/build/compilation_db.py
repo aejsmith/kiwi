@@ -31,6 +31,7 @@ which is the name that most clang tools search for by default.
 
 import json
 import itertools
+from re import S
 import SCons
 
 from SCons.Tool.cxx import CXXSuffixes
@@ -240,8 +241,10 @@ def generate(env, **kwargs):
         action=SCons.Action.Action(compilation_db_entry_action, None),
     )
 
+    #comstr ="$COMPILATIONDB_COMSTR"
+    comstr = None
     env["BUILDERS"]["CompilationDatabase"] = SCons.Builder.Builder(
-        action=SCons.Action.Action(write_compilation_db, "$COMPILATIONDB_COMSTR"),
+        action=SCons.Action.Action(write_compilation_db, comstr),
         target_scanner=SCons.Scanner.Scanner(
             function=scan_compilation_db, node_class=None
         ),

@@ -14,6 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+###############
+# Build flags #
+###############
+
 # Release information.
 version = {
     'KIWI_VER_RELEASE': 0,
@@ -70,12 +74,14 @@ host_flags = {
     'YACCFLAGS': ['-d'],
 }
 
-#########################
-# Internal build setup. #
-#########################
+########################
+# Internal build setup #
+########################
 
-import os, sys, SCons.Errors
 import multiprocessing
+import os
+import SCons.Errors
+import sys
 
 SetOption('duplicate', 'soft-hard-copy')
 
@@ -218,12 +224,72 @@ target_env['RANLIB']  = toolchain.tool_path('ranlib')
 target_env['OBJCOPY'] = toolchain.tool_path('objcopy')
 target_env['LD']      = toolchain.tool_path('ld')
 
-build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['BUILD']))
+#######################
+# Target system build #
+#######################
 
-# Build the target system.
+build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['BUILD']))
 SConscript('source/SConscript', variant_dir = build_dir)
 
+###############
+# Image build #
+###############
+
+dist = manager['dist']
+
+# Images are built into a separate directory since the built disk image is
+# persistent, we preserve user data in it. Using a separate directory allows
+# the build directory to be easily cleared without losing the image.
+images_dir = os.path.join('images', config['ARCH'])
+
+# Add our loose data into the manifest.
+#
+# All files in there are currently tracked as dependencies. If we end up with a
+# large amount of data in here it may become expensive for SCons to do
+# dependency tracking on all of it. Stuff should be moved out to packages where
+# possible instead of putting it in there.
+dist['MANIFEST'].add_from_dir_tree(dist, 'data')
+
+# Target for a filesystem image TAR file.
+fs_image_path = os.path.join(images_dir, 'fs.tar')
+dist.FSImage(fs_image_path)
+dist['FS_IMAGE'] = File(fs_image_path)
+
+# Add arch-specific targets to generate bootable images.
+qemu_binary = config['QEMU_BINARY_' + config['ARCH'].upper()]
+qemu_opts  = config['QEMU_OPTS_' + config['ARCH'].upper()]
+if config['ARCH'] == 'amd64':
+    iso_image_path = os.path.join(images_dir, 'kiwi.iso')
+    iso_image = dist.ISOImage(iso_image_path)
+    Alias('iso_image', iso_image)
+    Default(iso_image)
+
+    Alias('qemu', dist.Command('__qemu', [iso_image_path], Action(
+        qemu_binary + ' -cdrom $SOURCE -boot d ' + qemu_opts,
+        None)))
+else:
+    boot_image_path = os.path.join(images_dir, 'boot.img')
+    boot_image = dist.BootImage(boot_image_path)
+    Alias('boot_image', boot_image)
+    Default(boot_image)
+
+    Alias('qemu', dist.Command('__qemu', [dist['KBOOT'][0], boot_image_path], Action(
+        qemu_binary + ' -kernel ${SOURCES[0]} -initrd ${SOURCES[1]} ' + qemu_opts,
+        None)))
+
+# Helper to run GDB attached to QEMU with the appropriate options for the
+# current configuration.
+Alias('qgdb', dist.Command('__qgdb', [], Action(
+    'gdb --eval-command="symbol-file %s" --eval-command="set architecture %s" --eval-command="target remote localhost:1234"' %
+        (os.path.join(build_dir, 'kernel', 'kernel-unstripped'), config['GDB_ARCH']),
+    None)))
+
+###############
+# Final steps #
+###############
+
 # Now that we have information of all libraries, update the toolchain sysroot.
+# TODO: Use a manifest to do this so we don't do it unless necessary.
 toolchain.update_sysroot(manager)
 
 # Generation compilation database.

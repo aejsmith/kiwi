@@ -15,7 +15,7 @@
 #
 
 from SCons.Script import *
-import builders, image
+import builders, image, manifest
 
 class BuildManager:
     def __init__(self, host_template, target_template):
@@ -34,21 +34,20 @@ class BuildManager:
         def compile_str_func(msg, target, source, env):
             return '\033[0;32m%8s\033[0m %s' % (msg, str(target[0]))
 
-        self.AddVariable('ARCOMSTR',             compile_str('AR'))
-        self.AddVariable('ASCOMSTR',             compile_str('ASM'))
-        self.AddVariable('ASPPCOMSTR',           compile_str('ASM'))
-        self.AddVariable('CCCOMSTR',             compile_str('CC'))
-        self.AddVariable('SHCCCOMSTR',           compile_str('CC'))
-        self.AddVariable('CXXCOMSTR',            compile_str('CXX'))
-        self.AddVariable('SHCXXCOMSTR',          compile_str('CXX'))
-        self.AddVariable('YACCCOMSTR',           compile_str('YACC'))
-        self.AddVariable('LEXCOMSTR',            compile_str('LEX'))
-        self.AddVariable('LINKCOMSTR',           compile_str('LINK'))
-        self.AddVariable('SHLINKCOMSTR',         compile_str('SHLINK'))
-        self.AddVariable('RANLIBCOMSTR',         compile_str('RANLIB'))
-        self.AddVariable('GENCOMSTR',            compile_str('GEN'))
-        self.AddVariable('STRIPCOMSTR',          compile_str('STRIP'))
-        self.AddVariable('COMPILATIONDB_COMSTR', compile_str('DB'))
+        self.AddVariable('ARCOMSTR',     compile_str('AR'))
+        self.AddVariable('ASCOMSTR',     compile_str('ASM'))
+        self.AddVariable('ASPPCOMSTR',   compile_str('ASM'))
+        self.AddVariable('CCCOMSTR',     compile_str('CC'))
+        self.AddVariable('SHCCCOMSTR',   compile_str('CC'))
+        self.AddVariable('CXXCOMSTR',    compile_str('CXX'))
+        self.AddVariable('SHCXXCOMSTR',  compile_str('CXX'))
+        self.AddVariable('YACCCOMSTR',   compile_str('YACC'))
+        self.AddVariable('LEXCOMSTR',    compile_str('LEX'))
+        self.AddVariable('LINKCOMSTR',   compile_str('LINK'))
+        self.AddVariable('SHLINKCOMSTR', compile_str('SHLINK'))
+        self.AddVariable('RANLIBCOMSTR', compile_str('RANLIB'))
+        self.AddVariable('GENCOMSTR',    compile_str('GEN'))
+        self.AddVariable('STRIPCOMSTR',  compile_str('STRIP'))
 
         if not verbose:
             # Substfile doesn't provide a method to override the output. Hack around.
@@ -62,20 +61,15 @@ class BuildManager:
         # Create the distribution environment and various methods to add data
         # to an image.
         dist = self.CreateBare(name = 'dist', flags = {
-            'FILES': [],
-            'LINKS': [],
+            'MANIFEST': manifest.Manifest(),
         })
-        def add_file_method(env, target, path):
-            env['FILES'].append((path, target))
-        def add_link_method(env, target, path):
-            env['LINKS'].append((path, target))
-        dist.AddMethod(add_file_method, 'AddFile')
-        dist.AddMethod(add_link_method, 'AddLink')
 
-        # Add image builders.
-        dist['BUILDERS']['FSImage'] = image.fs_image_builder
-        dist['BUILDERS']['BootImage'] = image.boot_image_builder
-        dist['BUILDERS']['ISOImage'] = image.iso_image_builder
+        dist.AddMethod(manifest.add_file_method, 'AddFile')
+        dist.AddMethod(manifest.add_link_method, 'AddLink')
+        dist.AddMethod(manifest.manifest_method, 'Manifest')
+        dist.AddMethod(image.fs_image_method, 'FSImage')
+        dist.AddMethod(image.iso_image_method, 'ISOImage')
+        dist.AddMethod(image.boot_image_method, 'BootImage')
 
     def __getitem__(self, key):
         """Get an environment by name."""

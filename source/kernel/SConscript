@@ -100,9 +100,11 @@ mod_env = manager.Clone(kern_env, name = 'module', flags = {
     'CCFLAGS': ['-fno-common', '-fvisibility=hidden'],
 })
 
-# The emitter adds all modules to the distribution environment's module list.
+# The emitter adds all modules to the distribution environment's module list
+# and to the filesystem.
 def mod_emitter(target, source, env):
-    manager['dist']['MODULES'].append(target[0])
+    dist_env['MODULES'].append(target[0])
+    dist_env.AddFile(target[0], 'system/kernel/%s' % (target[0].name))
     return target, source
 mod_env['BUILDERS']['Module'] = Builder(
     action = [
@@ -149,5 +151,11 @@ kern_env.Command(['kernel', 'kernel.lst', 'kernel.rde', 'kernel.sym'], 'kernel-u
     Action('$NM -C $SOURCE | sort > ${TARGETS[3]}', None),
 ])
 
-# Let the distribution environment know where the kernel is.
+# Let the distribution environment know where the kernel is, and add it to the
+# filesystem.
 dist_env['KERNEL'] = File('kernel')
+dist_env.AddFile(dist_env['KERNEL'], 'system/kernel/kernel')
+
+# Add aliases.
+Alias('kernel', dist_env['KERNEL'])
+Alias('modules', dist_env['MODULES'])

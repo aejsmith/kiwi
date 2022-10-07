@@ -14,8 +14,15 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+from manifest import *
 from SCons.Script import *
-import io, tarfile, glob, os, tempfile, shutil, time
+import glob
+import io
+import os
+import shutil
+import tarfile
+import tempfile
+import time
 
 class TARArchive:
     def __init__(self, path):
@@ -60,76 +67,78 @@ class TARArchive:
 
         self.tar.addfile(tarinfo, file)
 
+    def add_file(self, path, target):
+        path = os.path.normpath(path).lstrip('/')
+
+        self.make_dir(os.path.dirname(path))
+
+        with open(str(target), 'rb') as file:
+            tarinfo = self.tar.gettarinfo(None, path, file)
+            tarinfo.uid   = 0
+            tarinfo.gid   = 0
+            tarinfo.uname = "root"
+            tarinfo.gname = "root"
+
+            self.tar.addfile(tarinfo, file)
+
     def add_files(self, files):
         for (path, target) in files:
-            while path[0] == '/':
-                path = path[1:]
+            self.add_file(path, target)
 
-            self.make_dir(os.path.dirname(path))
+    def add_link(self, path, target):
+        path = os.path.normpath(path).lstrip('/')
 
-            with open(str(target), 'rb') as file:
-                tarinfo = self.tar.gettarinfo(None, path, file)
-                tarinfo.uid   = 0
-                tarinfo.gid   = 0
-                tarinfo.uname = "root"
-                tarinfo.gname = "root"
+        self.make_dir(os.path.dirname(path))
 
-                self.tar.addfile(tarinfo, file)
+        tarinfo = tarfile.TarInfo(path)
+        tarinfo.type     = tarfile.SYMTYPE
+        tarinfo.linkname = target
+        tarinfo.mtime    = int(time.time())
+        tarinfo.mode     = 0o644
+        tarinfo.uid      = 0
+        tarinfo.gid      = 0
+        tarinfo.uname    = "root"
+        tarinfo.gname    = "root"
+
+        self.tar.addfile(tarinfo)
 
     def add_links(self, links):
         for (path, target) in links:
-            while path[0] == '/':
-                path = path[1:]
+            self.add_link(path, target)
 
-            self.make_dir(os.path.dirname(path))
-
-            tarinfo = tarfile.TarInfo(path)
-            tarinfo.type     = tarfile.SYMTYPE
-            tarinfo.linkname = target
-            tarinfo.mtime    = int(time.time())
-            tarinfo.mode     = 0o644
-            tarinfo.uid      = 0
-            tarinfo.gid      = 0
-            tarinfo.uname    = "root"
-            tarinfo.gname    = "root"
-
-            self.tar.addfile(tarinfo)
-
-    def add_dir_tree(self, path):
-        for f in glob.glob(os.path.join(path, '*')):
-            self.tar.add(f, arcname = os.path.relpath(f, path))
-
-# Create a TAR archive containing the filesystem tree.
-def fs_image_func(target, source, env):
-    config = env['_CONFIG']
+# Create a TAR archive containing the contents of the manifest.
+def fs_image_action(target, source, env):
+    manifest = env['MANIFEST']
 
     tar = TARArchive(str(target[0]))
 
-    tar.add_files(env['FILES'])
-    tar.add_links(env['LINKS'])
-    tar.add_dir_tree(str(Dir('#/data')))
-
-    # Add in extra stuff from the directory specified in the configuration.
-    if len(config['EXTRA_FSIMAGE']) > 0:
-        tar.add_dir_tree(config['EXTRA_FSIMAGE'])
+    for (path, entry) in manifest.entries.items():
+        if entry.entry_type == ManifestEntryType.File:
+            tar.add_file(path, entry.target)
+        elif entry.entry_type == ManifestEntryType.Link:
+            tar.add_link(path, entry.target)
 
     tar.finish()
     return 0
-def fs_image_emitter(target, source, env):
-    # We must depend on every file that goes into the image.
-    deps = [f for (p, f) in env['FILES']]
-    return (target, source + deps)
-fs_image_builder = Builder(action = Action(fs_image_func, '$GENCOMSTR'), emitter = fs_image_emitter)
+def fs_image_method(env, target):
+    # Build a manifest file.
+    manifest_path = '%s.manifest' % (str(target))
+    manifest_file = env.Manifest(manifest_path)
+
+    # Depend on the manifest file, which builds the image content. The manifest
+    # will change when any of the content changes and cause the image to
+    # rebuild.
+    return env.Command(target, [manifest_file], Action(fs_image_action, '$GENCOMSTR'))
 
 # Create a boot image.
-def boot_image_func(target, source, env):
+def boot_image_action(target, source, env):
     config = env['_CONFIG']
 
     tar = TARArchive(str(target[0]))
 
     files = [
         ('kernel', env['KERNEL']),
-        ('modules/fsimage.tar', env['FSIMAGE']),
+        ('modules/fs.tar', env['FS_IMAGE']),
     ]
 
     for mod in env['MODULES']:
@@ -142,15 +151,15 @@ def boot_image_func(target, source, env):
 
     tar.finish()
     return 0
-def boot_image_emitter(target, source, env):
-    return (target, [env['KERNEL']] + env['MODULES'] + env['KBOOT'] + [env['FSIMAGE']])
-boot_image_builder = Builder(action = Action(boot_image_func, '$GENCOMSTR'), emitter = boot_image_emitter)
+def boot_image_method(env, target):
+    dependencies = [env['KERNEL']] + env['MODULES'] + env['KBOOT'] + [env['FS_IMAGE']]
+    return env.Command(target, dependencies, Action(boot_image_action, '$GENCOMSTR'))
 
 # Function to generate an ISO image.
-def iso_image_func(target, source, env):
+def iso_image_action(target, source, env):
     config = env['_CONFIG']
 
-    fsimage = str(env['FSIMAGE'])
+    fs_image = str(env['FS_IMAGE'])
     kernel = str(env['KERNEL'])
 
     # Create the work directory.
@@ -160,7 +169,7 @@ def iso_image_func(target, source, env):
 
     # Copy stuff into it.
     shutil.copy(kernel, os.path.join(tmpdir, 'kiwi'))
-    shutil.copy(fsimage, os.path.join(tmpdir, 'kiwi', 'modules'))
+    shutil.copy(fs_image, os.path.join(tmpdir, 'kiwi', 'modules'))
     for mod in env['MODULES']:
         shutil.copy(str(mod), os.path.join(tmpdir, 'kiwi', 'modules'))
 
@@ -183,6 +192,6 @@ def iso_image_func(target, source, env):
 
     shutil.rmtree(tmpdir)
     return ret
-def iso_image_emitter(target, source, env):
-    return (target, [env['KERNEL']] + env['MODULES'] + env['KBOOT'] + [env['FSIMAGE']] + [env['KBOOT_MKISO']])
-iso_image_builder = Builder(action = Action(iso_image_func, '$GENCOMSTR'), emitter = iso_image_emitter)
+def iso_image_method(env, target):
+    dependencies = [env['KERNEL']] + env['MODULES'] + env['KBOOT'] + [env['FS_IMAGE']] + [env['KBOOT_MKISO']]
+    return env.Command(target, dependencies, Action(iso_image_action, '$GENCOMSTR'))

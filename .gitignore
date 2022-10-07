@@ -3,6 +3,7 @@
 .DS_Store
 /.config*
 /build
+/images
 /.sconsign.dblite
 /documentation/markdown/output
 /.gdb_history
