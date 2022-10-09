@@ -44,11 +44,12 @@ Building
 
 To build Kiwi you need the following prerequisites:
 
- * SCons 3.x
+ * SCons 4.x
  * ncurses
  * xorriso
  * mtools
  * dosfstools
+ * e2fsprogs
 
 Kiwi makes use of git submodules to include various pieces of 3rd party
 software it uses. These must be cloned after this repository has been cloned
@@ -75,10 +76,24 @@ Finally, build the system with:
 
     $ scons
 
-This should produce a bootable ISO image in `build/amd64-pc`. To boot this
-image in QEMU, you can run:
+Running
+-------
+
+Once the system is built, you can run in QEMU with:
 
     $ scons qemu
+
+The `qemu` target runs with a persistent disk image that is incrementally
+updated with changes to the built system, and preserves other user data in the
+image.
+
+You can also build disk images with:
+
+    # Bootable ISO image (BIOS + EFI).
+    $ scons images/amd64/cdrom.iso
+    
+    # Bootable disk image (BIOS + EFI).
+    $ scons images/amd64/disk.img
 
 License
 -------
