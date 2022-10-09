@@ -14,16 +14,23 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'env', 'manager')
+Import('config', 'manager')
 
-# Add sysgen to the build environments.
-manager.AddVariable('SYSGEN', env.Program('sysgen', [
+env = manager.CreateHost()
+
+# Warnings that occur in generated code.
+env['CCFLAGS'] += ['-Wno-redundant-decls', '-Wno-unused-function']
+
+sysgen = env.Program('sysgen', [
     'amd64_target.cpp',
     'arm64_target.cpp',
     'parser.y',
     'lexer.l',
     'main.cpp',
-]))
+])
+
+# Add sysgen to the build environments.
+manager.AddVariable('SYSGEN', sysgen)
 manager.AddVariable('SYSGENFLAGS', [])
 
 # Add builders to generate system call code.

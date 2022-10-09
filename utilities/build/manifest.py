@@ -115,6 +115,20 @@ class Manifest:
 
         self.finalised = True
 
+    # Get a sorted list of directories needed for the manifest's contents.
+    def get_dirs(self):
+        dirs = set()
+        for path in self.entries.keys():
+            while True:
+                path = os.path.dirname(path)
+                if path != '':
+                    dirs.add(path)
+                else:
+                    break
+        dirs = list(dirs)
+        dirs.sort()
+        return dirs
+
     # Serialise the manifest to a file.
     def serialise(self, dest_path):
         if not self.finalised:
@@ -138,7 +152,7 @@ def manifest_method(env, target):
 
     # Depend on the tracked files in the manifest. This causes everything it
     # refers to to be built.
-    result = env.Command(target, manifest.dependencies, Action(manifest_action, None))
+    result = env.Command(target, manifest.dependencies, Action(manifest_action, '$GENCOMSTR'))
 
     # We always write the manifest, so that:
     #  1. We update untracked files, which aren't dependencies.

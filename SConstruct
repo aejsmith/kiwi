@@ -62,15 +62,14 @@ target_type_flags = {
     },
 }
 
-# Variables to set in host environments. Don't build C code with our normal
-# warning flags, Kconfig and Flex/Bison code won't compile with them. Also
-# older host G++ versions don't support some flags.
+# Variables to set in host environments. Remove flags unsupported by some older
+# host G++ versions.
 host_flags = {
-    'CCFLAGS': ['-pipe'],
-    'CFLAGS': ['-std=gnu99'],
-    'CXXFLAGS': [f for f in cc_warning_flags if f not in [
+    'CCFLAGS': ['-pipe'] + [f for f in cc_warning_flags if f not in [
         '-Wmissing-declarations', '-Wno-variadic-macros',
         '-Wno-unused-but-set-variable']],
+    'CFLAGS': ['-std=gnu99'],
+    'CXXFLAGS': ['-std=c++17'],
     'YACCFLAGS': ['-d'],
 }
 
@@ -228,19 +227,10 @@ target_env['LD']      = toolchain.tool_path('ld')
 # Target system build #
 #######################
 
-build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['BUILD']))
-SConscript('source/SConscript', variant_dir = build_dir)
-
-###############
-# Image build #
-###############
-
 dist = manager['dist']
 
-# Images are built into a separate directory since the built disk image is
-# persistent, we preserve user data in it. Using a separate directory allows
-# the build directory to be easily cleared without losing the image.
-images_dir = os.path.join('images', config['ARCH'])
+build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['BUILD']))
+SConscript('source/SConscript', variant_dir = build_dir)
 
 # Add our loose data into the manifest.
 #
@@ -250,30 +240,53 @@ images_dir = os.path.join('images', config['ARCH'])
 # possible instead of putting it in there.
 dist['MANIFEST'].add_from_dir_tree(dist, 'data')
 
-# Target for a filesystem image TAR file.
-fs_image_path = os.path.join(images_dir, 'fs.tar')
-dist.FSImage(fs_image_path)
-dist['FS_IMAGE'] = File(fs_image_path)
+# Build a manifest as our default target which builds the whole system.
+system_manifest = dist.Manifest(os.path.join(build_dir, 'system.manifest'))
+Default(system_manifest)
 
-# Add arch-specific targets to generate bootable images.
+###############
+# Image build #
+###############
+
+# Images are built into a separate directory since the built disk image is
+# persistent, we preserve user data in it. Using a separate directory allows
+# the build directory to be easily cleared without losing the image.
+images_dir = os.path.join('images', config['ARCH'])
+
+# Target for a filesystem archive file.
+fs_archive_path = os.path.join(images_dir, 'fs.tar')
+dist.FSArchive(fs_archive_path)
+dist['FS_ARCHIVE'] = File(fs_archive_path)
+
+# Add arch-specific targets to generate images.
 qemu_binary = config['QEMU_BINARY_' + config['ARCH'].upper()]
 qemu_opts  = config['QEMU_OPTS_' + config['ARCH'].upper()]
 if config['ARCH'] == 'amd64':
-    iso_image_path = os.path.join(images_dir, 'kiwi.iso')
+    iso_image_path = os.path.join(images_dir, 'cdrom.iso')
     iso_image = dist.ISOImage(iso_image_path)
     Alias('iso_image', iso_image)
-    Default(iso_image)
 
-    Alias('qemu', dist.Command('__qemu', [iso_image_path], Action(
-        qemu_binary + ' -cdrom $SOURCE -boot d ' + qemu_opts,
+    disk_image_path = os.path.join(images_dir, 'disk.img')
+    disk_image = dist.DiskImage(disk_image_path)
+    Alias('disk_image', disk_image)
+
+    # TODO: persistent user image.
+
+    # The QEMU target runs with the separate image parts. The reason for this
+    # is to reduce build times. The .parts file is a dummy file whose build
+    # function builds the separate image parts files without depending on them.
+    # This means SCons doesn't end up checksumming the whole image files every
+    # time we run.
+    disk_image_parts = File(disk_image_path + '.parts')
+    Alias('qemu', dist.Command('__qemu', [disk_image_parts], Action(
+        '%s -drive format=raw,file="%s" %s' % (qemu_binary, disk_image_path + '.system', qemu_opts),
         None)))
 else:
-    boot_image_path = os.path.join(images_dir, 'boot.img')
-    boot_image = dist.BootImage(boot_image_path)
-    Alias('boot_image', boot_image)
-    Default(boot_image)
+    boot_archive_path = os.path.join(images_dir, 'boot.tar')
+    boot_archive = dist.BootArchive(boot_archive_path)
+    Alias('boot_archive', boot_archive)
 
-    Alias('qemu', dist.Command('__qemu', [dist['KBOOT'][0], boot_image_path], Action(
+    Alias('qemu', dist.Command('__qemu', [dist['KBOOT'][0], boot_archive_path], Action(
         qemu_binary + ' -kernel ${SOURCES[0]} -initrd ${SOURCES[1]} ' + qemu_opts,
         None)))
 
@@ -295,4 +308,4 @@ toolchain.update_sysroot(manager)
 # Generation compilation database.
 compile_commands = env.CompilationDatabase(os.path.join('build', 'compile_commands.json'))
 env.Default(compile_commands)
-env.Alias("compiledb", compile_commands)
+env.Alias("compile_commands", compile_commands)

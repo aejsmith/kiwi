@@ -104,7 +104,7 @@ mod_env = manager.Clone(kern_env, name = 'module', flags = {
 # and to the filesystem.
 def mod_emitter(target, source, env):
     dist_env['MODULES'].append(target[0])
-    dist_env.AddFile(target[0], 'system/kernel/%s' % (target[0].name))
+    dist_env.AddFile(target[0], 'system/kernel/modules/%s' % (target[0].name))
     return target, source
 mod_env['BUILDERS']['Module'] = Builder(
     action = [

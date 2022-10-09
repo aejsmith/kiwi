@@ -67,9 +67,10 @@ class BuildManager:
         dist.AddMethod(manifest.add_file_method, 'AddFile')
         dist.AddMethod(manifest.add_link_method, 'AddLink')
         dist.AddMethod(manifest.manifest_method, 'Manifest')
-        dist.AddMethod(image.fs_image_method, 'FSImage')
+        dist.AddMethod(image.fs_archive_method, 'FSArchive')
+        dist.AddMethod(image.boot_archive_method, 'BootArchive')
         dist.AddMethod(image.iso_image_method, 'ISOImage')
-        dist.AddMethod(image.boot_image_method, 'BootImage')
+        dist.AddMethod(image.disk_image_method, 'DiskImage')
 
     def __getitem__(self, key):
         """Get an environment by name."""

@@ -21,7 +21,11 @@ manager.AddVariable('GENERRLIST', File('../../utilities/generrlist.py'))
 manager.AddVariable('BIN2HEX', File('../../utilities/bin2hex.py'))
 
 # Visit subdirectories.
-SConscript(dirs = ['kconfig', 'sysgen'], exports = ['env'])
+SConscript(exports = ['env'], dirs = [
+    'image_tool',
+    'kconfig',
+    'sysgen'
+])
 
 # Build KBoot utilities.
 kboot_env = manager.CreateHost(
@@ -33,6 +37,7 @@ kboot_env = manager.CreateHost(
             'KBOOT_LIBDIR': '\\"${LIBDIR}\\"',
             'KBOOT_LOADER_VERSION': '\\"${VERSION}\\"',
         },
+        'CCFLAGS': ['-Wno-format'],
     }
 )
 

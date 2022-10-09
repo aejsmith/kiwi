@@ -84,7 +84,7 @@
 #   define dprintf(fmt...)
 #endif
 
-KBOOT_BOOLEAN_OPTION("force_fsimage", "Force filesystem image usage", false);
+KBOOT_BOOLEAN_OPTION("force_fs_archive", "Force filesystem archive usage", false);
 
 /** Filesystem lookup behaviour flags. */
 #define FS_LOOKUP_FOLLOW    (1<<0)      /**< If final path component is a symlink, follow it. */
@@ -2423,7 +2423,7 @@ static void mount_root_device(kboot_tag_bootdev_t *tag) {
     device_iterate(device, mount_root_device_iterate_cb, tag);
 }
 
-static void mount_root_fsimage(void) {
+static void mount_root_fs_archive(void) {
     status_t ret;
 
     kboot_tag_foreach(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
@@ -2432,7 +2432,7 @@ static void mount_root_fsimage(void) {
         object_handle_t *handle = memory_file_create(mapping, tag->size);
 
         if (!root_mount) {
-            /* Mount a ramfs if this is the first image. */
+            /* Mount a ramfs if this is the first archive. */
             ret = fs_mount(NULL, "/", "ramfs", 0, NULL);
             if (ret != STATUS_SUCCESS)
                 fatal("Could not mount ramfs for root (%d)", ret);
@@ -2453,7 +2453,7 @@ static void mount_root_fsimage(void) {
 
 /** Try to find the root filesystem. */
 __init_text void fs_mount_root(void) {
-    if (!kboot_boolean_option("force_fsimage")) {
+    if (!kboot_boolean_option("force_fs_archive")) {
         /* Look for the KBoot boot device. */
         kboot_tag_bootdev_t *tag = kboot_tag_iterate(KBOOT_TAG_BOOTDEV, NULL);
         if (tag) {
@@ -2469,9 +2469,9 @@ __init_text void fs_mount_root(void) {
     }
 
     if (!root_mount) {
-        /* If we didn't find a device or want to use the FS image, load any
-         * images supplied. */
-        mount_root_fsimage();
+        /* If we didn't find a device or want to use the FS archive, load any
+         * archives supplied. */
+        mount_root_fs_archive();
     }
 
     if (!root_mount)

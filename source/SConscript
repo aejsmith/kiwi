@@ -96,6 +96,10 @@ for kboot_target in config['KBOOT_TARGETS'].split(','):
     # Add all output binaries to the distribution environment.
     dist['KBOOT'] += kboot_env.Glob('${OUTDIR}/*')
 
+# Add binaries to the manifest.
+for file in dist['KBOOT']:
+    dist.AddFile(file, 'system/boot/%s' % (file.name))
+
 Alias('kboot', dist['KBOOT'])
 
 ####################
