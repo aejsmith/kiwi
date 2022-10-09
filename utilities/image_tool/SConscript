@@ -21,7 +21,9 @@ env.Command(
     ['mbr.bin'],
     Action('$BIN2HEX $SOURCE mbr_bin > $TARGET', '$GENCOMSTR'))
 
-manager.AddVariable('IMAGE_TOOL', env.Program('image_tool', [
+env.Program('image_tool', [
     'image_tool.c',
     'mbr.bin.c',
-]))
+])
+
+manager.AddVariable('IMAGE_TOOL', File('image_tool'))

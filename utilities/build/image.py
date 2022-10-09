@@ -14,6 +14,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+from genericpath import isfile
 from manifest import *
 from SCons.Script import *
 import io
@@ -30,7 +31,9 @@ def run_command(command):
         verbose = ''
     else:
         verbose = ' >> /dev/null 2>&1'
-    return os.system('%s%s' % (command, verbose))
+    ret = os.system('%s%s' % (command, verbose))
+    if ret != 0:
+        raise Exception('Command failed (%d): %s' % (ret, command))
 
 class TARArchive:
     def __init__(self, path):
@@ -114,7 +117,6 @@ class TARArchive:
         for (path, target) in links:
             self.add_link(path, target)
 
-# Create a TAR archive containing the contents of the manifest.
 def fs_archive_action(target, source, env):
     manifest = env['MANIFEST']
 
@@ -128,6 +130,8 @@ def fs_archive_action(target, source, env):
 
     tar.finish()
     return 0
+
+# Create a TAR archive containing the contents of the manifest.
 def fs_archive_method(env, target):
     # Build a manifest file.
     manifest_path = '%s.manifest' % (str(target))
@@ -138,7 +142,6 @@ def fs_archive_method(env, target):
     # rebuild.
     return env.Command(target, [manifest_file], Action(fs_archive_action, '$GENCOMSTR'))
 
-# Create a boot archive.
 def boot_archive_action(target, source, env):
     config = env['_CONFIG']
 
@@ -159,11 +162,12 @@ def boot_archive_action(target, source, env):
 
     tar.finish()
     return 0
+
+# Create a boot archive.
 def boot_archive_method(env, target):
     dependencies = [env['KERNEL']] + env['MODULES'] + env['KBOOT'] + [env['FS_ARCHIVE']]
     return env.Command(target, dependencies, Action(boot_archive_action, '$GENCOMSTR'))
 
-# Function to generate an ISO image.
 def iso_image_action(target, source, env):
     config = env['_CONFIG']
     fs_archive = str(env['FS_ARCHIVE'])
@@ -191,11 +195,15 @@ def iso_image_action(target, source, env):
             kboot_file.write('}\n')
 
         # Create the ISO.
-        return run_command(
+        run_command(
             '%s --bin-dir=build/%s-%s/boot/bin --targets="%s" --label="Kiwi CDROM" %s %s' %
                 (env['KBOOT_MKISO'], config['ARCH'], config['BUILD'], config['KBOOT_TARGETS'], target[0], tmp_dir))
     finally:
         shutil.rmtree(tmp_dir)
+
+    return 0
+
+# Function to generate an ISO image.
 def iso_image_method(env, target):
     dependencies = [env['KERNEL']] + env['MODULES'] + env['KBOOT'] + [env['FS_ARCHIVE']] + [env['KBOOT_MKISO']]
     return env.Command(target, dependencies, Action(iso_image_action, '$GENCOMSTR'))
@@ -209,8 +217,7 @@ SYSTEM_IMAGE_SIZE = IMAGE_SIZE - EFI_IMAGE_SIZE - 4096
 def escape(s):
     return s.replace('"', '\\"')
 
-# Function to generate disk image parts (system filesystem + EFI boot filesystem).
-def disk_image_parts_action(target, source, env):
+def do_disk_image_parts(target, source, env, persistent):
     config = env['_CONFIG']
     manifest = env['MANIFEST']
 
@@ -218,16 +225,51 @@ def disk_image_parts_action(target, source, env):
     system_path = parts_path[:-6] + '.system'
     uuid_path = parts_path[:-6] + '.uuid'
     efi_path = parts_path[:-6] + '.efi'
+    manifest_path = parts_path[:-6] + '.manifest'
+
+    system_uuid = ''
+    create = True
+    if persistent:
+        # Check if the file already exists.
+        if os.path.isfile(system_path):
+            # We should not recreate it.
+            create = False
+
+            # We should have a file containing the filesystem UUID.
+            try:
+                with open(uuid_path, 'r') as uuid_file:
+                    system_uuid = uuid_file.readlines()[0].strip()
+            except:
+                pass
+            if not system_uuid:
+                # If we can't get the UUID, we cannot update it. Fail instead
+                # of just blowing away the image.
+                raise Exception('Cannot get image UUID, will not update')
+    if create:
+        # Make a UUID.
+        system_uuid = uuid.uuid1()
+        if persistent:
+            with open(uuid_path, 'w') as uuid_file:
+                uuid_file.write('%s\n' % (system_uuid))
 
     # Create a temporary work directory.
     tmp_dir = tempfile.mkdtemp('.kiwiimg')
     try:
-        commands = []
+        # If updating the image, fetch its current manifest.
+        orig_manifest = None
+        if not create:
+            orig_manifest_path = os.path.join(tmp_dir, 'orig.manifest')
+            debugfs_path = os.path.join(tmp_dir, 'debugfs_manifest.txt')
+            with open(debugfs_path, 'w') as debugfs_file:
+                debugfs_file.write('dump ".manifest" "%s"\n' % (escape(orig_manifest_path)))
 
-        # Make a UUID.
-        system_uuid = uuid.uuid1()
-        with open(uuid_path, 'w') as uuid_file:
-            uuid_file.write('%s\n' % (system_uuid))
+            run_command('debugfs -w -f "%s" "%s"' % (debugfs_path, system_path))
+
+            orig_manifest = Manifest()
+            orig_manifest.deserialise(orig_manifest_path)
+
+        # Get the manifest actions to apply.
+        actions = manifest.get_actions(orig_manifest)
 
         # Write a KBoot configuration for the system image.
         kboot_system_path = os.path.join(tmp_dir, 'kboot_system.cfg')
@@ -249,35 +291,40 @@ def disk_image_parts_action(target, source, env):
         debugfs_path = os.path.join(tmp_dir, 'debugfs.txt')
         with open(debugfs_path, 'w') as debugfs_file:
             # We first need to create the directory hierarchy for the manifest.
-            manifest_dirs = manifest.get_dirs()
-            for dir in manifest_dirs:
+            for dir in actions.dirs:
                 debugfs_file.write('mkdir "%s"\n' % (escape(dir)))
 
-            # Now write each entry.
-            for (path, entry) in manifest.entries.items():
-                if entry.entry_type == ManifestEntryType.File:
-                    debugfs_file.write('write "%s" "%s"\n' % (escape(str(entry.target)), escape(path)))
-                elif entry.entry_type == ManifestEntryType.Link:
-                    debugfs_file.write('symlink "%s" "%s"\n' % (escape(path), escape(entry.target)))
-                else:
-                    raise Exception("Unhandled ManifestEntryType")
+            # Remove removed/changed files.
+            for remove in actions.removes:
+                debugfs_file.write('rm "%s"\n' % (escape(remove)))
+
+            # Write files/links.
+            for (path, target) in actions.files:
+                debugfs_file.write('write "%s" "%s"\n' % (escape(str(target)), escape(path)))
+            for (path, target) in actions.links:
+                debugfs_file.write('symlink "%s" "%s"\n' % (escape(path), escape(target)))
 
             # Write KBoot config. Binaries are already in the manifest.
+            debugfs_file.write('rm "system/boot/kboot.cfg"\n')
             debugfs_file.write('write "%s" "system/boot/kboot.cfg"\n' % (escape(kboot_system_path)))
 
-        # Create new empty system image file.
-        with open(system_path, 'wb') as system_file:
-            system_file.truncate(SYSTEM_IMAGE_SIZE)
+            # Write the manifest.
+            debugfs_file.write('rm ".manifest"\n')
+            debugfs_file.write('write "%s" ".manifest"\n' % (escape(manifest_path)))
 
-        # Format the system image.
-        commands.append('mke2fs -t ext2 -L Kiwi -U %s -F "%s"' % (system_uuid, system_path))
+        # If creating, create and format new system image file.
+        if create:
+            with open(system_path, 'wb') as system_file:
+                system_file.truncate(SYSTEM_IMAGE_SIZE)
+
+            run_command('mke2fs -t ext2 -L Kiwi -U %s -F "%s"' % (system_uuid, system_path))
 
         # Write the contents.
-        commands.append('debugfs -w -f "%s" "%s"' % (debugfs_path, system_path))
+        run_command('debugfs -w -f "%s" "%s"' % (debugfs_path, system_path))
 
         # Install the boot sector.
         if config['ARCH'] == 'amd64':
-            commands.append(
+            run_command(
                 '%s --bin-dir=build/%s-%s/boot/bin --target=bios --image="%s" --offset=0 --path=system/boot/kboot.bin' %
                     (env['KBOOT_INSTALL'], config['ARCH'], config['BUILD'], system_path))
 
@@ -286,25 +333,19 @@ def disk_image_parts_action(target, source, env):
             efi_file.truncate(EFI_IMAGE_SIZE)
 
         # Format the EFI image.
-        commands.append('mkdosfs "%s"' % (efi_path))
+        run_command('mkdosfs "%s"' % (efi_path))
 
         # Add its contents (config and all EFI binaries).
-        commands.append('mmd -i "%s" ::/EFI' % (efi_path))
-        commands.append('mmd -i "%s" ::/EFI/BOOT' % (efi_path))
-        commands.append('mcopy -i "%s" "%s" ::/EFI/BOOT/kboot.cfg' % (efi_path, kboot_efi_path))
+        run_command('mmd -i "%s" ::/EFI' % (efi_path))
+        run_command('mmd -i "%s" ::/EFI/BOOT' % (efi_path))
+        run_command('mcopy -i "%s" "%s" ::/EFI/BOOT/kboot.cfg' % (efi_path, kboot_efi_path))
         for file in env['KBOOT']:
             name = file.name.lower()
             if name.endswith('.efi'):
                 # Need to rename 'kboot<arch.efi>' to 'boot<arch>.efi' to be in
                 # the default boot location.
                 name = name.replace('kboot', 'boot')
-                commands.append('mcopy -i "%s" "%s" "::/EFI/BOOT/%s"' % (efi_path, str(file), name))
-
-        # Run the commands.
-        for command in commands:
-            ret = run_command(command)
-            if ret != 0:
-                return ret
+                run_command('mcopy -i "%s" "%s" "::/EFI/BOOT/%s"' % (efi_path, str(file), name))
     finally:
         shutil.rmtree(tmp_dir)
 
@@ -314,10 +355,38 @@ def disk_image_parts_action(target, source, env):
             parts_file.write('%s\n' % (f.get_csig()))
 
     return 0
-def disk_image_action(target, source, env):
 
+def disk_image_parts_action(target, source, env, func = do_disk_image_parts):
+    # There doesn't seem to be a way to pass an argument to an Action function
+    # in SCons so we have to use separate functions for persistent/non-
+    # persistent. However, on its own, that means SCons won't rebuild when
+    # do_disk_image_parts changes. To work around this, we pass it in a default
+    # argument. SCons includes default arguments in the checksum for a function.
+    return func(target, source, env, False)
+
+def disk_image_parts_persistent_action(target, source, env, func = do_disk_image_parts):
+    return func(target, source, env, True)
+
+def do_disk_image(target, source, env):
+    image_tool = str(env['IMAGE_TOOL'])
+    image_path = str(target[0])
+    efi_path = image_path + '.efi'
+    system_path = image_path + '.system'
+    run_command('%s %s %s %s' % (image_tool, image_path, efi_path, system_path))
     return 0
-def disk_image_method(env, target):
+
+def disk_image_action(target, source, env, func = do_disk_image):
+    return func(target, source, env)
+
+def disk_image_persistent_action(target, source, env, func = do_disk_image):
+    # Warn about this. Users should not expect their changes to the combined
+    # image to persist.
+    print('Warning: Changes to user.img will NOT be persistent. Instead, changes to')
+    print('user.img.system will be mirrored to user.img each time it is built.')
+    return func(target, source, env)
+
+# Function to generate a disk image.
+def disk_image_method(env, target, persistent = False):
     image_path = str(target)
 
     # Build a manifest file.
@@ -348,13 +417,13 @@ def disk_image_method(env, target):
     # rebuild. Also depend on KBoot binaries and installer.
     parts_path = '%s.parts' % (image_path)
     parts_dependencies = [manifest_file, env['KBOOT_INSTALL']] + env['KBOOT']
-    parts_file = env.Command(parts_path, parts_dependencies, Action(disk_image_parts_action, '$GENCOMSTR'))
+    parts_action = disk_image_parts_persistent_action if persistent else disk_image_parts_action
+    parts_file = env.Command(parts_path, parts_dependencies, Action(parts_action, '$GENCOMSTR'))
 
     # Build the combined image.
     image_dependencies = [parts_file, env['IMAGE_TOOL']]
-    image_file = env.Command(
-        image_path, image_dependencies,
-        Action('$IMAGE_TOOL $TARGET ${TARGET}.efi ${TARGET}.system', '$GENCOMSTR'))
+    image_action = disk_image_persistent_action if persistent else disk_image_action
+    image_file = env.Command(image_path, image_dependencies, Action(image_action, '$GENCOMSTR'))
 
     # For now, we set the combined image as AlwaysBuild. We definitely want this
     # for the persistent user image, as we want user changes to the parts to be

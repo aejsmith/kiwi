@@ -248,9 +248,10 @@ Default(system_manifest)
 # Image build #
 ###############
 
-# Images are built into a separate directory since the built disk image is
-# persistent, we preserve user data in it. Using a separate directory allows
-# the build directory to be easily cleared without losing the image.
+# Images are built into a separate directory since we build a persistent disk
+# image that we preserve user data in. Using a separate directory allows the
+# build directory to be easily cleared without users losing their persistent
+# image.
 images_dir = os.path.join('images', config['ARCH'])
 
 # Target for a filesystem archive file.
@@ -264,22 +265,26 @@ qemu_opts  = config['QEMU_OPTS_' + config['ARCH'].upper()]
 if config['ARCH'] == 'amd64':
     iso_image_path = os.path.join(images_dir, 'cdrom.iso')
     iso_image = dist.ISOImage(iso_image_path)
-    Alias('iso_image', iso_image)
 
     disk_image_path = os.path.join(images_dir, 'disk.img')
     disk_image = dist.DiskImage(disk_image_path)
-    Alias('disk_image', disk_image)
 
-    # TODO: persistent user image.
+    # Persistent image that we do in-place updates on rather than rebuilding
+    # from scratch. This preserves user data while updating the installed
+    # system.
+    user_image_path = os.path.join(images_dir, 'user.img')
+    user_image = dist.DiskImage(user_image_path, persistent = True)
 
-    # The QEMU target runs with the separate image parts. The reason for this
-    # is to reduce build times. The .parts file is a dummy file whose build
-    # function builds the separate image parts files without depending on them.
-    # This means SCons doesn't end up checksumming the whole image files every
-    # time we run.
-    disk_image_parts = File(disk_image_path + '.parts')
-    Alias('qemu', dist.Command('__qemu', [disk_image_parts], Action(
-        '%s -drive format=raw,file="%s" %s' % (qemu_binary, disk_image_path + '.system', qemu_opts),
+    # The QEMU target runs with the separate image parts. This is for two
+    # reasons:
+    #  1. We can't do in-place updates on the combined image.
+    #  2. To reduce build times. The .parts file is a dummy file whose build
+    #     function builds the separate image parts files without depending on
+    #     them. This means SCons doesn't end up checksumming the whole image
+    #     files every time we run.
+    user_image_parts = File(user_image_path + '.parts')
+    Alias('qemu', dist.Command('__qemu', [user_image_parts], Action(
+        '%s -drive format=raw,file="%s" %s' % (qemu_binary, user_image_path + '.system', qemu_opts),
         None)))
 else:
     boot_archive_path = os.path.join(images_dir, 'boot.tar')

@@ -26,7 +26,7 @@ class ManifestEntryType(Enum):
     Link = 2
 
 class ManifestEntry:
-    def __init__(self, entry_type, target, checksum = None):
+    def __init__(self, entry_type = None, target = None, checksum = None):
         self.entry_type = entry_type
         self.target = target
         self.checksum = checksum
@@ -36,9 +36,34 @@ class ManifestEntry:
         result['type'] = self.entry_type.name
         if self.entry_type == ManifestEntryType.File:
             result['checksum'] = self.checksum
-        else:
+        elif self.entry_type == ManifestEntryType.Link:
             result['target'] = str(self.target)
         return result
+
+    def deserialise(self, values):
+        self.entry_type = ManifestEntryType[values['type']]
+        if self.entry_type == ManifestEntryType.File:
+            self.checksum = str(values['checksum'])
+        elif self.entry_type == ManifestEntryType.Link:
+            self.target = str(values['target'])
+
+    def compare(self, other):
+        if self.entry_type == other.entry_type:
+            if self.entry_type == ManifestEntryType.File:
+                return self.checksum == other.checksum
+            elif self.entry_type == ManifestEntryType.Link:
+                return self.target == other.target
+        return False
+
+# List of actions to apply a manifest to an image, optionally from a current
+# manifest.
+class ManifestActions:
+    def __init__(self):
+        # Apply actions in this order:
+        self.dirs = []      # 1. (path) Create directories in the order specified.
+        self.removes = []   # 2. (path) Remove existing files/links.
+        self.files = []     # 3. (path, target) Write files.
+        self.links = []     # 4. (path, target) Create links.
 
 class Manifest:
     def __init__(self):
@@ -115,8 +140,7 @@ class Manifest:
 
         self.finalised = True
 
-    # Get a sorted list of directories needed for the manifest's contents.
-    def get_dirs(self):
+    def _get_dirs(self):
         dirs = set()
         for path in self.entries.keys():
             while True:
@@ -128,6 +152,47 @@ class Manifest:
         dirs = list(dirs)
         dirs.sort()
         return dirs
+
+    # Get a set of actions needed to apply the manifest. Optionally, this takes
+    # an original manifest, in which case the returned set of actions will apply
+    # the difference between the original and new manifest.
+    def get_actions(self, orig_manifest = None):
+        actions = ManifestActions()
+
+        # Create all directories for files in the new manifest. We don't
+        # currently remove any directories that are no longer needed in the old
+        # manifest.
+        actions.dirs = self._get_dirs()
+
+        # Generate remove actions based on the original manifest. We explicitly
+        # remove changed files, since the ext2 image write needs this (debugfs
+        # does not handle overwriting).
+        if orig_manifest != None:
+            for (path, orig_entry) in orig_manifest.entries.items():
+                if path in self.entries:
+                    entry = self.entries[path]
+                    if not entry.compare(orig_entry):
+                        # Changed, remove it.
+                        actions.removes.append(path)
+                else:
+                    # Not in new manifest, remove it.
+                    actions.removes.append(path)
+
+        for (path, entry) in self.entries.items():
+            # Don't do anything if hasn't changed from the previous manifest.
+            changed = True
+            if orig_manifest != None and path in orig_manifest.entries:
+                changed = not entry.compare(orig_manifest.entries[path])
+
+            if changed:
+                if entry.entry_type == ManifestEntryType.File:
+                    actions.files.append((path, entry.target))
+                elif entry.entry_type == ManifestEntryType.Link:
+                    actions.links.append((path, entry.target))
+                else:
+                    raise Exception("Unhandled ManifestEntryType")
+
+        return actions
 
     # Serialise the manifest to a file.
     def serialise(self, dest_path):
@@ -141,6 +206,23 @@ class Manifest:
         # Sort so we have stable output.
         with open(dest_path, 'w') as dest_file:
             dest_file.write(json.dumps(result, sort_keys = True, indent = 4))
+
+    # Deserialise from a file. Deserialised manifests do not have target files
+    # and are only useful for comparison.
+    def deserialise(self, source_path):
+        if self.entries or self.finalised:
+            raise Exception('Deserialsing to non-empty manifest')
+
+        result = {}
+        with open(source_path, 'r') as source_file:
+            result = json.loads(source_file.read())
+
+        for (path, values) in result.items():
+            entry = ManifestEntry()
+            entry.deserialise(values)
+            self.entries[path] = entry
+
+        self.finalised = True
 
 def manifest_action(target, source, env):
     manifest = env['MANIFEST']
