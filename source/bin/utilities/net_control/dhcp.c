@@ -35,8 +35,10 @@
 #include "dhcp.h"
 #include "net_control.h"
 
-#define RETRIES             5
-#define MAX_MESSAGE_SIZE    512
+/* Fewer retries than mandated by the spec so we don't sit around for too long. */
+#define RETRIES 3
+
+#define MAX_MESSAGE_SIZE 512
 
 static uint8_t hw_addr[NET_DEVICE_ADDR_MAX];
 static size_t hw_addr_len;
@@ -337,7 +339,8 @@ bool command_dhcp(int argc, char **argv) {
 
     nstime_t next_timeout = core_secs_to_nsecs(4);
 
-    for (size_t i = 0; i < RETRIES; i++) {
+    size_t i = 0;
+    for (i = 0; i < RETRIES; i++) {
         nstime_t curr_time;
         kern_time_get(TIME_SYSTEM, &curr_time);
         abs_timeout = curr_time + next_timeout;
@@ -378,6 +381,11 @@ bool command_dhcp(int argc, char **argv) {
         }
 
         break;
+    }
+
+    if (i == RETRIES) {
+        core_log(CORE_LOG_ERROR, "%s: did not receive DHCP response", path);
+        return false;
     }
 
     /* We now have a configuration to set on the device. */
