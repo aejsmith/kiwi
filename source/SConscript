@@ -29,13 +29,10 @@ for (k, v) in config.items():
         raise Exception("Unsupported type %s in config" % (type(v)))
 f.close()
 
-dist = manager['dist']
-
 #################
 # Kernel build. #
 #################
 
-# Build the kernel.
 SConscript(dirs = ['kernel'])
 
 ################
@@ -45,7 +42,8 @@ SConscript(dirs = ['kernel'])
 # Determine available KBoot configurations.
 kboot_configs = SConscript('../../3rdparty/kboot/config/SConscript')
 
-dist['KBOOT'] = []
+dist_env = manager['dist']
+dist_env['KBOOT'] = []
 
 # Build all required configurations.
 for kboot_target in config['KBOOT_TARGETS'].split(','):
@@ -94,18 +92,17 @@ for kboot_target in config['KBOOT_TARGETS'].split(','):
         exports = {'env': kboot_env, 'config': kboot_config})
 
     # Add all output binaries to the distribution environment.
-    dist['KBOOT'] += kboot_env.Glob('${OUTDIR}/*')
+    dist_env['KBOOT'] += kboot_env.Glob('${OUTDIR}/*')
 
 # Add binaries to the manifest.
-for file in dist['KBOOT']:
-    dist.AddFile(file, 'system/boot/%s' % (file.name))
+for file in dist_env['KBOOT']:
+    dist_env.AddFile(file, 'system/boot/%s' % (file.name))
 
-Alias('kboot', dist['KBOOT'])
+Alias('kboot', dist_env['KBOOT'])
 
 ####################
 # Userspace build. #
 ####################
 
-# Build userspace.
 if config['SYS_SUPPORTS_USERSPACE']:
     SConscript(dirs = ['lib', 'services', 'bin'])

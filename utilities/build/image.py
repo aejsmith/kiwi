@@ -14,7 +14,6 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-from genericpath import isfile
 from manifest import *
 from SCons.Script import *
 import io
@@ -143,7 +142,7 @@ def fs_archive_method(env, target):
     return env.Command(target, [manifest_file], Action(fs_archive_action, '$GENCOMSTR'))
 
 def boot_archive_action(target, source, env):
-    config = env['_CONFIG']
+    config = env['CONFIG']
 
     tar = TARArchive(str(target[0]))
 
@@ -169,7 +168,7 @@ def boot_archive_method(env, target):
     return env.Command(target, dependencies, Action(boot_archive_action, '$GENCOMSTR'))
 
 def iso_image_action(target, source, env):
-    config = env['_CONFIG']
+    config = env['CONFIG']
     fs_archive = str(env['FS_ARCHIVE'])
     kernel = str(env['KERNEL'])
 
@@ -218,7 +217,7 @@ def escape(s):
     return s.replace('"', '\\"')
 
 def do_disk_image_parts(target, source, env, persistent):
-    config = env['_CONFIG']
+    config = env['CONFIG']
     manifest = env['MANIFEST']
 
     parts_path = str(target[0])

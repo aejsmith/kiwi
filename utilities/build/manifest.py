@@ -16,6 +16,8 @@
 
 from enum import Enum
 from SCons.Script import *
+import copy
+import hashlib
 import json
 import os
 import SCons
@@ -58,12 +60,11 @@ class ManifestEntry:
 # List of actions to apply a manifest to an image, optionally from a current
 # manifest.
 class ManifestActions:
-    def __init__(self):
-        # Apply actions in this order:
-        self.dirs = []      # 1. (path) Create directories in the order specified.
-        self.removes = []   # 2. (path) Remove existing files/links.
-        self.files = []     # 3. (path, target) Write files.
-        self.links = []     # 4. (path, target) Create links.
+    # Apply actions in this order:
+    dirs    = []    # 1. (path) Create directories in the order specified.
+    removes = []    # 2. (path) Remove existing files/links.
+    files   = []    # 3. (path, target) Write files.
+    links   = []    # 4. (path, target) Create links.
 
 class Manifest:
     def __init__(self):
@@ -71,15 +72,23 @@ class Manifest:
         self.dependencies = []
         self.finalised = False
 
-    # Add a file to the manifest. The untracked flag means that the file will
-    # not be added as a dependency when the manifest is built.
-    def add_file(self, path, target, untracked = False):
-        if type(target) != SCons.Node.FS.File:
-            raise Exception('Must be a SCons.Node.FS.File instance')
+    # Add a file to the manifest.
+    #
+    # If tracked is True, the given target must be a SCons File instance, and
+    # the file will be added as a dependency when the manifest is built.
+    # 
+    # If tracked is False, the target can be a plain path string, and the file
+    # will not be added as a dependency when the manifest is built. This can be
+    # used when we are guaranteeing that the file exists by some other way, to
+    # avoid declaring files to SCons and therefore avoiding overhead from its
+    # checksumming and other tracking. The package system uses this.
+    def add_file(self, path, target, tracked = True):
+        if not isinstance(target, SCons.Node.FS.File) and (tracked or not isinstance(target, str)):
+            raise Exception('Target is not valid')
 
         self._add_entry(path, ManifestEntry(ManifestEntryType.File, target))
 
-        if not untracked:
+        if tracked:
             # Keep dependencies ordered by the insertion order. Some of the
             # userspace build relies on the core libraries being built first.
             self.dependencies.append(target)
@@ -100,8 +109,14 @@ class Manifest:
 
         self.entries[path] = entry
 
-    # Add an existing directory tree to the manifest.
-    def add_from_dir_tree(self, env, source_path, dest_path = ''):
+    # Add an existing directory tree to the manifest. The paths within the
+    # manifest will be set as the path relative to source_path.
+    #
+    # If tracked is True, files will be tracked as per add_file(). env must be
+    # a valid SCons environment.
+    #
+    # If tracked is False, env need not be specified.
+    def add_from_dir_tree(self, source_path, env = None, tracked = True, dest_path = ''):
         try:
             entries = os.listdir(source_path)
         except:
@@ -116,14 +131,40 @@ class Manifest:
                 st = os.lstat(entry_source_path)
 
                 if stat.S_ISDIR(st.st_mode):
-                    self.add_from_dir_tree(env, entry_source_path, entry_dest_path)
+                    self.add_from_dir_tree(entry_source_path, env, tracked, entry_dest_path)
                 elif stat.S_ISLNK(st.st_mode):
                     link = os.readlink(entry_source_path)
                     self.add_link(entry_dest_path, link)
                 elif stat.S_ISREG(st.st_mode):
-                    self.add_file(entry_dest_path, env.File(entry_source_path))
+                    if tracked:
+                        self.add_file(entry_dest_path, env.File(entry_source_path), tracked = True)
+                    else:
+                        self.add_file(entry_dest_path, entry_source_path, tracked = False)
             except OSError:
                 continue
+
+    def _checksum_file(self, path):
+        hash = hashlib.md5()
+        with open(path, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash.update(chunk)
+        return hash.hexdigest()
+
+    # Add another manifest's contents into this manifest.
+    def combine(self, other):
+        if self.finalised:
+            raise Exception('Manifest is already finalised')
+        elif not other.finalised:
+            raise Exception('Source manifest is not finalised')
+
+        for (path, entry) in other.entries.items():
+            if path in self.entries:
+                raise Exception("Duplicate manifest entries for '%s' when combining" % (path))
+
+            self.entries[path] = copy.copy(entry)
+
+            if entry.target in other.dependencies:
+                self.dependencies.append(entry.target)
 
     # Get checksums for all files.
     def finalise(self):
@@ -136,7 +177,10 @@ class Manifest:
                 # recalculate it for files that we are building. This seems to
                 # be public API as it is used in the example Decider function
                 # in the man page.
-                entry.checksum = entry.target.get_csig()
+                if isinstance(entry.target, SCons.Node.FS.File):
+                    entry.checksum = entry.target.get_csig()
+                else:
+                    entry.checksum = self._checksum_file(entry.target)
 
         self.finalised = True
 
@@ -207,9 +251,15 @@ class Manifest:
         with open(dest_path, 'w') as dest_file:
             dest_file.write(json.dumps(result, sort_keys = True, indent = 4))
 
-    # Deserialise from a file. Deserialised manifests do not have target files
-    # and are only useful for comparison.
-    def deserialise(self, source_path):
+    # Deserialise from a file.
+    #
+    # Optionally, the manifest can be loaded with a root path, in which case
+    # all files loaded will have their target set as an untracked file relative
+    # to that root path.
+    # 
+    # If no root is specified, files will not have targets, and therefore the
+    # manifest will only be useful for comparison.
+    def deserialise(self, source_path, root_path = None):
         if self.entries or self.finalised:
             raise Exception('Deserialsing to non-empty manifest')
 
@@ -220,6 +270,10 @@ class Manifest:
         for (path, values) in result.items():
             entry = ManifestEntry()
             entry.deserialise(values)
+
+            if root_path and entry.entry_type == ManifestEntryType.File:
+                entry.target = os.path.join(root_path, path)
+
             self.entries[path] = entry
 
         self.finalised = True
@@ -229,6 +283,7 @@ def manifest_action(target, source, env):
     manifest.finalise()
     manifest.serialise(str(target[0]))
     return 0
+
 def manifest_method(env, target):
     manifest = env['MANIFEST']
 

@@ -1,3 +1,6 @@
 [submodule "3rdparty/kboot"]
 	path = 3rdparty/kboot
 	url = https://github.com/aejsmith/kboot.git
+[submodule "packages"]
+	path = packages
+	url = https://github.com/aejsmith/kiwi-packages.git

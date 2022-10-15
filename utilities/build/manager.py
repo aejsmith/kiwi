@@ -28,30 +28,26 @@ class BuildManager:
         self.AddVariable('_MANAGER', self)
 
         # Create compile strings that will be added to all environments.
-        verbose = ARGUMENTS.get('V') == '1'
-        def compile_str(msg):
-            return None if verbose else '\033[0;32m%8s\033[0m $TARGET' % (msg)
-        def compile_str_func(msg, target, source, env):
-            return '\033[0;32m%8s\033[0m %s' % (msg, str(target[0]))
+        self.verbose = ARGUMENTS.get('V') == '1'
 
-        self.AddVariable('ARCOMSTR',     compile_str('AR'))
-        self.AddVariable('ASCOMSTR',     compile_str('ASM'))
-        self.AddVariable('ASPPCOMSTR',   compile_str('ASM'))
-        self.AddVariable('CCCOMSTR',     compile_str('CC'))
-        self.AddVariable('SHCCCOMSTR',   compile_str('CC'))
-        self.AddVariable('CXXCOMSTR',    compile_str('CXX'))
-        self.AddVariable('SHCXXCOMSTR',  compile_str('CXX'))
-        self.AddVariable('YACCCOMSTR',   compile_str('YACC'))
-        self.AddVariable('LEXCOMSTR',    compile_str('LEX'))
-        self.AddVariable('LINKCOMSTR',   compile_str('LINK'))
-        self.AddVariable('SHLINKCOMSTR', compile_str('SHLINK'))
-        self.AddVariable('RANLIBCOMSTR', compile_str('RANLIB'))
-        self.AddVariable('GENCOMSTR',    compile_str('GEN'))
-        self.AddVariable('STRIPCOMSTR',  compile_str('STRIP'))
+        self.AddVariable('ARCOMSTR',     self.compile_str('AR'))
+        self.AddVariable('ASCOMSTR',     self.compile_str('ASM'))
+        self.AddVariable('ASPPCOMSTR',   self.compile_str('ASM'))
+        self.AddVariable('CCCOMSTR',     self.compile_str('CC'))
+        self.AddVariable('SHCCCOMSTR',   self.compile_str('CC'))
+        self.AddVariable('CXXCOMSTR',    self.compile_str('CXX'))
+        self.AddVariable('SHCXXCOMSTR',  self.compile_str('CXX'))
+        self.AddVariable('YACCCOMSTR',   self.compile_str('YACC'))
+        self.AddVariable('LEXCOMSTR',    self.compile_str('LEX'))
+        self.AddVariable('LINKCOMSTR',   self.compile_str('LINK'))
+        self.AddVariable('SHLINKCOMSTR', self.compile_str('SHLINK'))
+        self.AddVariable('RANLIBCOMSTR', self.compile_str('RANLIB'))
+        self.AddVariable('GENCOMSTR',    self.compile_str('GEN'))
+        self.AddVariable('STRIPCOMSTR',  self.compile_str('STRIP'))
 
-        if not verbose:
+        if not self.verbose:
             # Substfile doesn't provide a method to override the output. Hack around.
-            func = lambda t, s, e: compile_str_func('GEN', t, s, e)
+            func = lambda t, s, e: self.compile_str_func('GEN', t, s, e)
             self.host_template['BUILDERS']['Substfile'].action.strfunction = func
             self.target_template['BUILDERS']['Substfile'].action.strfunction = func
 
@@ -146,7 +142,7 @@ class BuildManager:
         libraries = kwargs['libraries'] if 'libraries' in kwargs else []
 
         env = self.target_template.Clone()
-        config = env['_CONFIG']
+        config = env['CONFIG']
 
         # Get the compiler include directory which contains some standard
         # headers.
@@ -190,7 +186,7 @@ class BuildManager:
         # Set up emitters to set dependencies on default libraries.
         def add_library_deps(target, source, env):
             if not '-nostdlib' in env['LINKFLAGS']:
-                Depends(target[0], env['_LIBOUTDIR'].File('libclang_rt.builtins-%s.a' % (env['_CONFIG']['TOOLCHAIN_ARCH'])))
+                Depends(target[0], env['_LIBOUTDIR'].File('libclang_rt.builtins-%s.a' % (env['CONFIG']['TOOLCHAIN_ARCH'])))
             if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
                 Depends(target[0], env['_LIBOUTDIR'].glob('*crt*.o'))
             if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
@@ -235,3 +231,15 @@ class BuildManager:
             else:
                 env[k] = v
         env.MergeFlags(merge)
+
+    def compile_str(self, msg):
+        return None if self.verbose else '\033[0;32m%8s\033[0m $TARGET' % (msg)
+
+    def compile_str_func(self, msg, target, source, env):
+        return '\033[0;32m%8s\033[0m %s' % (msg, str(target[0]))
+
+    def compile_log(self, method, prefix, name):
+        if self.verbose:
+            print('%s("%s")' % (method, name))
+        else:
+            print('\033[0;32m%8s\033[0m %s' % (prefix, name))
