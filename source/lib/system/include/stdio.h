@@ -110,9 +110,9 @@ extern int getchar(void);
 /* ssize_t getline(char **__restrict, size_t *__restrict, FILE *__restrict); */
 extern char *gets(char *s);
 /* FILE *open_memstream(char **, size_t *); */
-/* int pclose(FILE *); */
+extern int pclose(FILE *stream);
 extern void perror(const char *s);
-/* FILE *popen(const char *, const char *); */
+extern FILE *popen(const char *command, const char *mode);
 extern int printf(const char *__restrict fmt, ...);
 extern int putc(int ch, FILE *stream);
 extern int putchar(int ch);
