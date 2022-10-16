@@ -538,13 +538,3 @@ pid_t posix_get_pgrp_session(pid_t pgid) {
     posix_service_put();
     return (success) ? sid : -1;
 }
-
-FILE *popen(const char *command, const char *mode) {
-    libsystem_stub(__func__, false);
-    return NULL;
-}
-
-int pclose(FILE *stream) {
-    libsystem_stub(__func__, false);
-    return -1;
-}

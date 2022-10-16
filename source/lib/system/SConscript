@@ -63,6 +63,7 @@ sources = [File(f) for f in [
     'posix/pwd.c',
     'posix/select.c',
     'posix/signal.c',
+    'posix/stubs.c',
     'posix/termios.c',
     'posix/time.c',
     'posix/uidgid.c',

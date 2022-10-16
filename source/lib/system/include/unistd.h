@@ -81,7 +81,7 @@ extern uid_t geteuid(void);
 extern gid_t getgid(void);
 /* int getgroups(int, gid_t []); */
 /* long gethostid(void); */
-/* int gethostname(char *, size_t); */
+extern int gethostname(char *name, size_t len);
 extern char *getlogin(void);
 /* int getlogin_r(char *, size_t); */
 extern int getopt(int argc, char *const argv[], const char *opts);
