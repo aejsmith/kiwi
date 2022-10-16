@@ -31,7 +31,7 @@ __SYS_EXTERN_C_BEGIN
 
 #define FD_SETSIZE              1024
 #define __FD_SET_BITS_PER_WORD  (8 * sizeof(unsigned long))
-#define __FD_SET_WORDS      (   FD_SETSIZE / __FD_SET_BITS_PER_WORD)
+#define __FD_SET_WORDS          (FD_SETSIZE / __FD_SET_BITS_PER_WORD)
 
 typedef struct fd_set {
     unsigned long words[__FD_SET_WORDS];
