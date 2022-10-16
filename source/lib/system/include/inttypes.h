@@ -269,8 +269,8 @@ typedef struct {
 
 /* intmax_t imaxabs(intmax_t); */
 /* imaxdiv_t imaxdiv(intmax_t, intmax_t); */
-/* intmax_t strtoimax(const char *restrict, char **restrict, int); */
-/* uintmax_t strtoumax(const char *restrict, char **restrict, int); */
+extern intmax_t strtoimax(const char *__restrict cp, char **__restrict endp, int base);
+extern uintmax_t strtoumax(const char *__restrict cp, char **__restrict endp, int base);
 /* intmax_t wcstoimax(const wchar_t *restrict, wchar_t **restrict, int); */
 /* uintmax_t wcstoumax(const wchar_t *restrict, wchar_t **restrict, int); */
 

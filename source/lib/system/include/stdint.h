@@ -133,11 +133,15 @@ typedef uint64_t uintmax_t;
 
 #define INT_FAST32_MIN      INT32_MIN
 #define INT_FAST32_MAX      INT32_MAX
-#define UINT_FAST32_MAX     UINT32_MIN
+#define UINT_FAST32_MAX     UINT32_MAX
 
 #define INT_FAST64_MIN      INT64_MIN
 #define INT_FAST64_MAX      INT64_MAX
-#define UINT_FAST64_MAX     UINT64_MIN
+#define UINT_FAST64_MAX     UINT64_MAX
+
+#define INTMAX_MIN          INT64_MIN
+#define INTMAX_MAX          INT64_MAX
+#define UINTMAX_MAX         UINT64_MAX
 
 #if __WORDSIZE == 64
 #   define SIZE_MAX         UINT64_MAX

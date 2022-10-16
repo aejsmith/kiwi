@@ -92,6 +92,10 @@ unsigned long long int strtoull(const char *restrict cp, char **restrict endp, i
     return __strtoux(unsigned long long int, ULLONG_MAX, cp, endp, base);
 }
 
+uintmax_t strtoumax(const char *__restrict cp, char **__restrict endp, int base) {
+    return strtoull(cp, endp, base);
+}
+
 /** Convert a string to a signed long long.
  * @param cp            The start of the string.
  * @param endp          Pointer to the end of the parsed string placed here.
@@ -102,4 +106,8 @@ long long int strtoll(const char *restrict cp, char **restrict endp, int base) {
         return -strtoull(cp + 1, endp, base);
 
     return strtoull(cp, endp, base);
+}
+
+intmax_t strtoimax(const char *__restrict cp, char **__restrict endp, int base) {
+    return strtoll(cp, endp, base);
 }
