@@ -722,7 +722,7 @@ int raise(int num) {
  * @param old_act       Pointer to location to store previous action in (can
  *                      be NULL).
  * @return              0 on success, -1 on failure. */
-int sigaction(int num, const sigaction_t *restrict act, sigaction_t *restrict old_act) {
+int sigaction(int num, const sigaction_t *__restrict act, sigaction_t *__restrict old_act) {
     if (num < 1 || num >= NSIG) {
         errno = EINVAL;
         return -1;
@@ -788,7 +788,7 @@ sighandler_t signal(int num, sighandler_t handler) {
  * @param set           Signal set to mask (can be NULL).
  * @param old_set       Where to store previous masked signal set (can be NULL).
  * @return              0 on success, -1 on failure. */
-int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict old_set) {
+int sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict old_set) {
     SCOPED_SIGNAL_LOCK();
 
     if (old_set)
@@ -845,7 +845,7 @@ int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict old_se
  *
  * @return              0 on success, -1 on failure.
  */
-int sigaltstack(const stack_t *restrict ss, stack_t *restrict old_ss) {
+int sigaltstack(const stack_t *__restrict ss, stack_t *__restrict old_ss) {
     libsystem_stub("sigaltstack", false);
     return -1;
 }
@@ -855,37 +855,18 @@ int sigsuspend(const sigset_t *mask) {
     return -1;
 }
 
-/**
- * Saves the current execution environment to be restored by a call to
- * siglongjmp(). If specified, the current signal mask will also be saved.
- *
- * @param env           Buffer to save to.
- * @param save_mask     If not 0, the current signal mask will be saved.
- *
- * @return              0 if returning from direct invocation, non-zero if
- *                      returning from siglongjmp().
- */
-int sigsetjmp(sigjmp_buf env, int save_mask) {
+/** Save signal state for sigsetjmp. */
+void sigsetjmp_save(sigjmp_buf env, int save_mask) {
     if (save_mask)
         sigprocmask(SIG_BLOCK, NULL, &env->mask);
 
     env->restore_mask = save_mask;
-    return setjmp(env->buf);
 }
 
-/**
- * Restores an execution environment saved by a previous call to sigsetjmp().
- * If the original call to sigsetjmp() specified savemask as non-zero, the
- * signal mask at the time of the call will be restored.
- *
- * @param env           Buffer to restore.
- * @param val           Value that the original sigsetjmp() call should return.
- */
-void siglongjmp(sigjmp_buf env, int val) {
+/** Restore signal state for siglongjmp. */
+void siglongjmp_restore(sigjmp_buf env) {
     if (env->restore_mask)
         sigprocmask(SIG_SETMASK, &env->mask, NULL);
-
-    longjmp(env->buf, val);
 }
 
 /** Adds a signal to a signal set.

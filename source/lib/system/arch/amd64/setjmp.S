@@ -50,6 +50,17 @@ FUNCTION_START(setjmp)
     ret
 FUNCTION_END(setjmp)
 
+FUNCTION_START(sigsetjmp)
+    /* For alignment. */
+    subq    $8, %rsp
+    push    %rdi
+    call    sigsetjmp_save
+    pop     %rdi
+    addq    $8, %rsp
+
+    jmp     setjmp
+FUNCTION_END(sigsetjmp)
+
 FUNCTION_START(longjmp)
     /* Restore new callee-save registers. */
     movq    JMP_OFF_R15(%rdi), %r15
@@ -71,3 +82,13 @@ FUNCTION_START(longjmp)
 1:  movl    %esi, %eax
     ret
 FUNCTION_END(longjmp)
+
+FUNCTION_START(siglongjmp)
+    push    %rdi
+    push    %rsi
+    call    siglongjmp_restore
+    pop     %rsi
+    pop     %rdi
+
+    jmp     longjmp
+FUNCTION_END(siglongjmp)

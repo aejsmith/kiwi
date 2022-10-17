@@ -29,6 +29,7 @@
 #include <kernel/status.h>
 #include <kernel/thread.h>
 
+#include <setjmp.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -72,6 +73,9 @@ static inline void posix_signal_guard_endp(void *p) {
     uint32_t name __sys_unused __sys_cleanup(posix_signal_guard_endp) = 0;
 
 extern int posix_signal_from_exception(unsigned code) __sys_hidden;
+
+extern void sigsetjmp_save(sigjmp_buf env, int save_mask) __sys_hidden;
+extern void siglongjmp_restore(sigjmp_buf env) __sys_hidden;
 
 /**
  * Exported POSIX functions, used as implementation details (e.g. by the
