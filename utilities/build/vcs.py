@@ -14,25 +14,23 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+import subprocess
+
 # Obtain the revision number from the Git repository.
 def revision_id():
-    from subprocess import Popen, PIPE
-    git = Popen(['git', 'rev-parse', '--short', 'HEAD'], stdout = PIPE, stderr = PIPE)
-    revision = git.communicate()[0].strip().decode('utf-8')
+    git = subprocess.Popen(['git', 'rev-parse', '--short', 'HEAD'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    revision = git.communicate()[0].decode('utf-8').strip()
     if git.returncode != 0:
         return None
     return revision
 
-# Check whether submodules are up to date.
+# Check whether submodules are checked out.
 def check_submodules():
-    # FIXME: If SHA does not match, should check if it is ahead or behind
-    # the one set in the repo. If it is ahead, that's acceptable.
     try:
-        from subprocess import Popen, PIPE
-        git = Popen(['git', 'submodule', 'status'], stdout = PIPE, stderr = PIPE)
-        modules = git.communicate()[0].split('\n').decode('utf-8')
+        git = subprocess.Popen(['git', 'submodule', 'status'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        modules = git.communicate()[0].decode('utf-8').split('\n')
         for module in modules:
-            if len(module) and module[0] != ' ':
+            if len(module) and module[0] == '-':
                 return False
         return True
     except:
