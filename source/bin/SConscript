@@ -15,7 +15,6 @@
 #
 
 dirs = [
-    'bash',
     'dungeon',
     'posix',
     'terminal',
