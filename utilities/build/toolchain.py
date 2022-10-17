@@ -14,9 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-import os, sys, shutil
-from subprocess import Popen, PIPE
-from time import time
+import os
+import shutil
+import time
 from urllib.parse import urlparse
 
 llvm_version = '14.0.0'
@@ -62,19 +62,19 @@ def makedirs(path):
 # Base class of a toolchain component definition.
 class ToolchainComponent:
     def __init__(self, manager):
-        self.manager = manager
-        self.destdir = manager.genericdir if self.generic else manager.targetdir
+        self.manager  = manager
+        self.dest_dir = manager.generic_dir if self.generic else manager.target_dir
 
     # Check if the component requires updating.
     def check(self):
-        path = os.path.join(self.destdir, '.%s-%s-installed' % (self.name, self.version))
+        path = os.path.join(self.dest_dir, '.%s-%s-installed' % (self.name, self.version))
         if not os.path.exists(path):
             return True
 
         # Check if any of the patches are newer.
         mtime = os.stat(path).st_mtime
         for p in self.patches:
-            if os.stat(os.path.join(self.manager.srcdir, p[0])).st_mtime > mtime:
+            if os.stat(os.path.join(self.manager.src_dir, p[0])).st_mtime > mtime:
                 return True
         return False
 
@@ -82,7 +82,7 @@ class ToolchainComponent:
     def download(self):
         for url in self.source:
             name = urlparse(url).path.split('/')[-1]
-            target = os.path.join(self.manager.destdir, name)
+            target = os.path.join(self.manager.dest_dir, name)
             if not os.path.exists(target):
                 msg(' Downloading source file: %s' % (name))
 
@@ -93,11 +93,11 @@ class ToolchainComponent:
 
             # Unpack if this is a tarball.
             if name[-8:] == '.tar.bz2':
-                self.execute('tar -C %s -xjf %s' % (self.manager.builddir, target))
+                self.execute('tar -C %s -xjf %s' % (self.manager.build_dir, target))
             elif name[-7:] == '.tar.gz':
-                self.execute('tar -C %s -xzf %s' % (self.manager.builddir, target))
+                self.execute('tar -C %s -xzf %s' % (self.manager.build_dir, target))
             elif name[-7:] == '.tar.xz':
-                self.execute('tar -C %s -xJf %s' % (self.manager.builddir, target))
+                self.execute('tar -C %s -xJf %s' % (self.manager.build_dir, target))
 
     # Helper function to execute a command and throw an exception if required
     # status not returned.
@@ -113,7 +113,7 @@ class ToolchainComponent:
     # Apply all patches for this component.
     def patch(self):
         for (p, d, s) in self.patches:
-            name = os.path.join(self.manager.srcdir, p)
+            name = os.path.join(self.manager.src_dir, p)
             self.execute('patch -Np%d -i %s' % (s, name), d)
 
     # Performs all required tasks to update this component.
@@ -122,13 +122,13 @@ class ToolchainComponent:
         self.download()
 
         # Measure time taken to build.
-        start = time()
+        start = time.time()
         self.build()
-        end = time()
+        end = time.time()
         self.manager.totaltime += (end - start)
 
         # Signal that we've updated this.
-        f = open(os.path.join(self.destdir, '.%s-%s-installed' % (self.name, self.version)), 'w')
+        f = open(os.path.join(self.dest_dir, '.%s-%s-installed' % (self.name, self.version)), 'w')
         f.write('')
         f.close()
 
@@ -148,19 +148,19 @@ class BinutilsComponent(ToolchainComponent):
         self.patch()
 
         # Work out configure options to use.
-        confopts  = '--prefix="%s" ' % (self.destdir)
-        confopts += '--target=%s ' % (self.manager.target)
-        confopts += '--disable-werror '
-        confopts += '--with-sysroot="%s" ' % (os.path.join(self.destdir, 'sysroot'))
-        confopts += '--with-lib-path="=/system/lib:=/lib"'
+        conf_opts  = '--prefix="%s" ' % (self.dest_dir)
+        conf_opts += '--target=%s ' % (self.manager.target)
+        conf_opts += '--disable-werror '
+        conf_opts += '--with-sysroot="%s" ' % (os.path.join(self.dest_dir, 'sysroot'))
+        conf_opts += '--with-lib-path="=/system/lib:=/lib"'
 
         # gold has bugs which cause the generated kernel image to be huge.
-        #confopts += '--enable-gold=default '
+        #conf_opts += '--enable-gold=default '
 
         # Build and install it.
         os.mkdir('binutils-build')
-        self.execute('../binutils-%s/configure %s' % (self.version, confopts), 'binutils-build')
-        self.execute('make -j%d' % (self.manager.makejobs), 'binutils-build')
+        self.execute('../binutils-%s/configure %s' % (self.version, conf_opts), 'binutils-build')
+        self.execute('make -j%d' % (self.manager.make_jobs), 'binutils-build')
         self.execute('make install', 'binutils-build')
 
 # Component definition for LLVM/Clang.
@@ -183,16 +183,16 @@ class LLVMComponent(ToolchainComponent):
         self.patch()
 
         # Work out CMake options to use.
-        cmakeopts  = '-G "Unix Makefiles" '
-        cmakeopts += '-DCMAKE_BUILD_TYPE=Release '
-        cmakeopts += '-DLLVM_TARGETS_TO_BUILD="X86;AArch64" '
-        cmakeopts += '-DLLVM_INCLUDE_BENCHMARKS=OFF '
-        cmakeopts += '-DCMAKE_INSTALL_PREFIX="%s" ' % (self.destdir)
+        cmake_opts  = '-G "Unix Makefiles" '
+        cmake_opts += '-DCMAKE_BUILD_TYPE=Release '
+        cmake_opts += '-DLLVM_TARGETS_TO_BUILD="X86;AArch64" '
+        cmake_opts += '-DLLVM_INCLUDE_BENCHMARKS=OFF '
+        cmake_opts += '-DCMAKE_INSTALL_PREFIX="%s" ' % (self.dest_dir)
 
         # Build and install it.
         os.mkdir('llvm-build')
-        self.execute('cmake %s ../llvm-%s.src' % (cmakeopts, self.version), 'llvm-build')
-        self.execute('make -j%d' % (self.manager.makejobs), 'llvm-build')
+        self.execute('cmake %s ../llvm-%s.src' % (cmake_opts, self.version), 'llvm-build')
+        self.execute('make -j%d' % (self.manager.make_jobs), 'llvm-build')
         self.execute('make install', 'llvm-build')
 
 # Base class for a toolchain.
@@ -217,22 +217,22 @@ class LLVMToolchain(Toolchain):
         # name for clang to the wrapper script path - this allows clang to
         # determine the target and the tool directory properly.
         for name in ['clang', 'clang++']:
-            path = os.path.join(manager.genericdir, 'bin', name)
-            wrapper = os.path.join(manager.targetdir, 'bin', '%s-%s' % (manager.target, name))
+            path = os.path.join(manager.generic_dir, 'bin', name)
+            wrapper = os.path.join(manager.target_dir, 'bin', '%s-%s' % (manager.target, name))
             f = open(wrapper, 'w')
             f.write('#!/bin/bash\n\n')
-            f.write('exec -a "$0" "%s" --sysroot="%s/sysroot" "$@"\n' % (path, manager.targetdir))
+            f.write('exec -a "$0" "%s" --sysroot="%s/sysroot" "$@"\n' % (path, manager.target_dir))
             f.close()
             os.chmod(wrapper, 0o755)
         try:
             os.symlink('%s-clang' % (manager.target),
-                os.path.join(manager.targetdir, 'bin', '%s-cc' % (manager.target)))
+                os.path.join(manager.target_dir, 'bin', '%s-cc' % (manager.target)))
             os.symlink('%s-clang' % (manager.target),
-                os.path.join(manager.targetdir, 'bin', '%s-gcc' % (manager.target)))
+                os.path.join(manager.target_dir, 'bin', '%s-gcc' % (manager.target)))
             os.symlink('%s-clang++' % (manager.target),
-                os.path.join(manager.targetdir, 'bin', '%s-c++' % (manager.target)))
+                os.path.join(manager.target_dir, 'bin', '%s-c++' % (manager.target)))
             os.symlink('%s-clang++' % (manager.target),
-                os.path.join(manager.targetdir, 'bin', '%s-g++' % (manager.target)))
+                os.path.join(manager.target_dir, 'bin', '%s-g++' % (manager.target)))
         except:
             pass
 
@@ -241,73 +241,55 @@ class ToolchainManager:
     def __init__(self, config):
         self.arch           = config['ARCH']
         self.build          = config['BUILD']
-        self.destdir        = config['TOOLCHAIN_DIR']
+        self.dest_dir       = config['TOOLCHAIN_DIR']
         self.target         = config['TOOLCHAIN_TARGET']
         self.toolchain_arch = config['TOOLCHAIN_ARCH']
-        self.makejobs       = config['TOOLCHAIN_MAKE_JOBS']
+        self.make_jobs      = config['TOOLCHAIN_MAKE_JOBS']
 
-        self.srcdir     = os.path.join(os.getcwd(), 'utilities', 'toolchain')
-        self.genericdir = os.path.join(self.destdir, 'generic')
-        self.targetdir  = os.path.join(self.destdir, self.target)
-        self.builddir   = os.path.join(self.destdir, 'build-tmp')
+        self.src_dir     = os.path.join(os.getcwd(), 'utilities', 'toolchain')
+        self.generic_dir = os.path.join(self.dest_dir, 'generic')
+        self.target_dir  = os.path.join(self.dest_dir, self.target)
+        self.build_dir   = os.path.join(self.dest_dir, 'build-tmp')
 
         self.totaltime = 0
 
         self.toolchain = LLVMToolchain(self)
 
     # Set up the toolchain sysroot.
-    def update_sysroot(self, manager):
-        sysrootdir = os.path.join(self.targetdir, 'sysroot')
-        libdir     = os.path.join(sysrootdir, 'lib')
-        includedir = os.path.join(sysrootdir, 'include')
-        builddir   = os.path.join(os.getcwd(), 'build', '%s-%s' % (self.arch, self.build))
+    def sysroot_action(self, target, source, env):
+        manifest    = env['MANIFEST']
+        sysroot_dir = os.path.join(self.target_dir, 'sysroot')
+        build_dir   = os.path.join(os.getcwd(), 'build', '%s-%s' % (self.arch, self.build))
 
         # Remove any existing sysroot.
-        remove(sysrootdir)
-        makedirs(sysrootdir)
+        remove(sysroot_dir)
+        makedirs(sysroot_dir)
 
-        # All libraries get placed into a single directory, just link to it.
-        os.symlink(os.path.join(builddir, 'lib'), libdir)
-
-        # Now create the include directory. We create symbolic links back to
-        # the source tree for the contents of all libraries' header paths.
-        makedirs(includedir)
-        for (name, lib) in manager.libraries.items():
-            for dir in lib['include_paths']:
-                def link_tree(targetdir, dir):
-                    makedirs(dir)
-                    for entry in os.listdir(targetdir):
-                        target = os.path.join(targetdir, entry)
-                        path = os.path.join(dir, entry)
-                        if os.path.isdir(target):
-                            link_tree(target, path)
-                        else:
-                            os.symlink(target, path)
-                if type(dir) == tuple:
-                    # Link the directory to a specific location.
-                    target = os.path.join(os.getcwd(), str(dir[0].srcnode()))
-                    path = os.path.join(includedir, dir[1])
-                    link_tree(target, path)
-                else:
-                    # Link everything in the root of the directory into the
-                    # root of the sysroot.
-                    target = os.path.join(os.getcwd(), str(dir.srcnode()))
-                    link_tree(target, includedir)
+        # Add contents. We symlink back to the target files so we don't have to
+        # rebuild just to change contents of the file.
+        actions = manifest.get_actions()
+        for path in actions.dirs:
+            makedirs(os.path.join(sysroot_dir, path))
+        for (path, target) in actions.links:
+            os.symlink(target, os.path.join(sysroot_dir, path))
+        for (path, target) in actions.files:
+            target = os.path.join(os.getcwd(), str(target))
+            os.symlink(target, os.path.join(sysroot_dir, path))
 
         # Create a symlink to the compiler-rt builtins library in the build tree.
-        runtime_dir = os.path.join(self.genericdir, 'lib', 'clang', llvm_version, 'lib', 'kiwi')
+        runtime_dir = os.path.join(self.generic_dir, 'lib', 'clang', llvm_version, 'lib', 'kiwi')
         makedirs(runtime_dir)
         runtime_name = 'libclang_rt.builtins-%s.a' % (self.toolchain_arch)
         runtime_lib = os.path.join(runtime_dir, runtime_name)
         remove(runtime_lib)
-        os.symlink(os.path.join(builddir, 'lib', runtime_name), runtime_lib)
+        os.symlink(os.path.join(build_dir, 'lib', runtime_name), runtime_lib)
 
     # Build a component.
     def build_component(self, c):
         # Create the target directory and change into it.
-        makedirs(self.builddir)
+        makedirs(self.build_dir)
         olddir = os.getcwd()
-        os.chdir(self.builddir)
+        os.chdir(self.build_dir)
 
         # Perform the actual build.
         try:
@@ -315,11 +297,11 @@ class ToolchainManager:
         finally:
             # Change to the old directory and clean up the build directory.
             os.chdir(olddir)
-            remove(self.builddir)
+            remove(self.build_dir)
 
     # Get the path to a toolchain utility.
     def tool_path(self, name):
-        return os.path.join(self.targetdir, 'bin', self.target + '-' + name)
+        return os.path.join(self.target_dir, 'bin', self.target + '-' + name)
 
     # Check if an update is required.
     def check(self):
@@ -327,7 +309,7 @@ class ToolchainManager:
             if c.check():
                 return True
 
-        remove(self.builddir)
+        remove(self.build_dir)
         return False
 
     # Rebuilds the toolchain if required.
@@ -337,9 +319,9 @@ class ToolchainManager:
             return 0
 
         # Create destination directory.
-        makedirs(self.genericdir)
-        makedirs(self.targetdir)
-        makedirs(os.path.join(self.targetdir, 'bin'))
+        makedirs(self.generic_dir)
+        makedirs(self.target_dir)
+        makedirs(os.path.join(self.target_dir, 'bin'))
 
         self.toolchain.pre_update(self)
 
@@ -352,7 +334,7 @@ class ToolchainManager:
             msg('Exception during toolchain build: \033[0;0m%s' % (str(e)))
             return 1
 
-        remove(self.builddir)
+        remove(self.build_dir)
         self.toolchain.post_update(self)
 
         msg('Toolchain updated in %d seconds' % (self.totaltime))

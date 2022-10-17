@@ -89,10 +89,8 @@ kern_env = manager.CreateBare(name = 'kernel', flags = {
 })
 
 # Add the compiler include directory for some standard headers.
-from subprocess import Popen, PIPE
-incdir = Popen([kern_env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip().decode('utf-8')
-kern_env['CCFLAGS'] += ['-isystem', incdir]
-kern_env['ASFLAGS'] += ['-isystem', incdir]
+kern_env['CCFLAGS'] += ['-isystem', kern_env['TOOLCHAIN_INCLUDE']]
+kern_env['ASFLAGS'] += ['-isystem', kern_env['TOOLCHAIN_INCLUDE']]
 
 # Create the module environment.
 mod_env = manager.Clone(kern_env, name = 'module', flags = {

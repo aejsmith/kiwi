@@ -113,10 +113,11 @@ class Manifest:
     # manifest will be set as the path relative to source_path.
     #
     # If tracked is True, files will be tracked as per add_file(). env must be
-    # a valid SCons environment.
+    # a valid SCons environment. If tracked is False, env need not be specified.
     #
-    # If tracked is False, env need not be specified.
-    def add_from_dir_tree(self, source_path, env = None, tracked = True, dest_path = ''):
+    # If follow_links is True, links will be added as files, else they will be
+    # added as links with the exact same target path as their original.
+    def add_from_dir_tree(self, source_path, env = None, tracked = True, dest_path = '', follow_links = False):
         try:
             entries = os.listdir(source_path)
         except:
@@ -128,18 +129,19 @@ class Manifest:
             entry_source_path = os.path.join(source_path, entry)
             entry_dest_path = os.path.join(dest_path, entry)
             try:
-                st = os.lstat(entry_source_path)
+                if follow_links:
+                    st = os.stat(entry_source_path)
+                else:
+                    st = os.lstat(entry_source_path)
 
                 if stat.S_ISDIR(st.st_mode):
-                    self.add_from_dir_tree(entry_source_path, env, tracked, entry_dest_path)
+                    self.add_from_dir_tree(entry_source_path, env, tracked, entry_dest_path, follow_links)
                 elif stat.S_ISLNK(st.st_mode):
                     link = os.readlink(entry_source_path)
                     self.add_link(entry_dest_path, link)
                 elif stat.S_ISREG(st.st_mode):
-                    if tracked:
-                        self.add_file(entry_dest_path, env.File(entry_source_path), tracked = True)
-                    else:
-                        self.add_file(entry_dest_path, entry_source_path, tracked = False)
+                    entry_source = env.File(entry_source_path) if tracked else entry_source_path
+                    self.add_file(entry_dest_path, entry_source, tracked = tracked)
             except OSError:
                 continue
 

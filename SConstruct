@@ -80,6 +80,7 @@ host_flags = {
 import multiprocessing
 import os
 import SCons.Errors
+import subprocess
 import sys
 
 SetOption('duplicate', 'soft-hard-copy')
@@ -223,6 +224,11 @@ target_template['RANLIB']  = toolchain.tool_path('ranlib')
 target_template['OBJCOPY'] = toolchain.tool_path('objcopy')
 target_template['LD']      = toolchain.tool_path('ld')
 
+# Get the compiler include directory which contains some standard headers.
+toolchain_cmd = [target_template['CC'], '-print-file-name=include']
+with subprocess.Popen(toolchain_cmd, stdout = subprocess.PIPE) as proc:
+    target_template['TOOLCHAIN_INCLUDE'] = proc.communicate()[0].decode('utf-8').strip()
+
 #######################
 # Target system build #
 #######################
@@ -331,9 +337,13 @@ Alias('qgdb', dist_env.Command('__qgdb', [], Action(
 # Final steps #
 ###############
 
-# Now that we have information of all libraries, update the toolchain sysroot.
-# TODO: Use a manifest to do this so we don't do it unless necessary.
-toolchain.update_sysroot(manager)
+sysroot_env = manager['sysroot']
+sysroot_manifest = sysroot_env.Manifest(os.path.join(build_dir, 'sysroot.manifest'))
+
+# Command to update the toolchain sysroot.
+Alias('sysroot',
+    sysroot_env.Command('__sysroot', [sysroot_manifest],
+        Action(lambda target, source, env: toolchain.sysroot_action(target, source, env), None)))
 
 # Generation compilation database.
 compile_commands = host_env.CompilationDatabase(os.path.join('build', 'compile_commands.json'))

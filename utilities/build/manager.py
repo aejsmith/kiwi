@@ -15,7 +15,9 @@
 #
 
 from SCons.Script import *
-import builders, image, manifest
+import builders
+import image
+import manifest
 
 class BuildManager:
     def __init__(self, host_template, target_template):
@@ -67,6 +69,15 @@ class BuildManager:
         dist.AddMethod(image.boot_archive_method, 'BootArchive')
         dist.AddMethod(image.iso_image_method, 'ISOImage')
         dist.AddMethod(image.disk_image_method, 'DiskImage')
+
+        # Create an environment for building the sysroot.
+        sysroot = self.CreateBare(name = 'sysroot', flags = {
+            'MANIFEST': manifest.Manifest(),
+        })
+
+        sysroot.AddMethod(manifest.add_file_method, 'AddFile')
+        sysroot.AddMethod(manifest.add_link_method, 'AddLink')
+        sysroot.AddMethod(manifest.manifest_method, 'Manifest')
 
     def __getitem__(self, key):
         """Get an environment by name."""
@@ -144,19 +155,14 @@ class BuildManager:
         env = self.target_template.Clone()
         config = env['CONFIG']
 
-        # Get the compiler include directory which contains some standard
-        # headers.
-        from subprocess import Popen, PIPE
-        incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip().decode('utf-8')
-
         # Specify -nostdinc to prevent the compiler from using the automatically
         # generated sysroot. That only needs to be used when compiling outside
         # the build system, we manage all the header paths internally. We do
         # need to add the compiler's own include directory to the path, though.
         self.merge_flags(env, {
-            'ASFLAGS': ['-nostdinc', '-isystem', incdir, '-include',
+            'ASFLAGS': ['-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'], '-include',
                 'build/%s-%s/config.h' % (config['ARCH'], config['BUILD'])],
-            'CCFLAGS': ['-nostdinc', '-isystem', incdir, '-include',
+            'CCFLAGS': ['-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'], '-include',
                 'build/%s-%s/config.h' % (config['ARCH'], config['BUILD'])],
             'LIBPATH': [env['_LIBOUTDIR']],
             'LIBS': libraries,

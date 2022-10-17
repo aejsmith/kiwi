@@ -67,5 +67,20 @@ def kiwi_library_method(env, name, sources, **kwargs):
     dist = manager['dist']
     dist.AddFile(target, 'system/lib/lib%s.so' % (name))
 
+    # Add the library and its includes to the sysroot manifest. Don't need
+    # tracking on the includes.
+    sysroot = manager['sysroot']
+    sysroot.AddFile(target, 'lib/lib%s.so' % (name))
+    for path in include_paths:
+        if isinstance(path, tuple):
+            source_path = str(path[0].srcnode())
+            dest_path   = 'include/%s' % (path[1])
+        else:
+            source_path = str(path.srcnode())
+            dest_path   = 'include'
+        sysroot['MANIFEST'].add_from_dir_tree(
+            source_path = source_path, dest_path = dest_path, tracked = False,
+            follow_links = True)
+
     # Build the library.
     return env.SharedLibrary(target, sources, **override_flags)
