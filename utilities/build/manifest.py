@@ -115,8 +115,9 @@ class Manifest:
     # If tracked is True, files will be tracked as per add_file(). env must be
     # a valid SCons environment. If tracked is False, env need not be specified.
     #
-    # If follow_links is True, links will be added as files, else they will be
-    # added as links with the exact same target path as their original.
+    # If follow_links is True, links will be followed such that their target
+    # is added in place of the link itself, else they will be added as links
+    # with the exact same target path as their original.
     def add_from_dir_tree(self, source_path, env = None, tracked = True, dest_path = '', follow_links = False):
         try:
             entries = os.listdir(source_path)

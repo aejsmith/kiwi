@@ -126,6 +126,10 @@ packages.load()
 # changed.
 packages.extract()
 
+# Add libraries to the build manager.
+packages.add_libraries()
+
+# Build the target system.
 build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['BUILD']))
 SConscript('source/SConscript', variant_dir = build_dir)
 

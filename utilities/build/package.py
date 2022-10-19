@@ -14,6 +14,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+from distutils.command.build import build
 from manifest import *
 from SCons.Script import *
 import glob
@@ -22,16 +23,21 @@ import json
 import os
 import shutil
 
+# Default locations to add for libraries.
+DEFAULT_INCLUDE_PATH = 'system/devel/include'
+DEFAULT_LIB_PATH = 'system/lib'
+
 class Package:
     # Path and checksum of the .package file.
     path     = ''
     checksum = ''
 
     # Deserialised properties.
-    name     = ''
-    version  = ''
-    revision = ''
-    archs    = []
+    name      = ''
+    version   = ''
+    revision  = ''
+    archs     = []
+    libraries = {}
 
     # Full name: <name>-<version>-<revision>
     full_name = ''
@@ -48,16 +54,24 @@ class Package:
             self.checksum = hashlib.md5(contents.encode('utf-8')).hexdigest()
             result = json.loads(contents)
 
-        self.name     = result['name']
-        self.version  = result['version']
-        self.revision = result['revision']
-        self.archs    = result['archs']
+        self.name      = result.get('name', None)
+        self.version   = result.get('version', None)
+        self.revision  = result.get('revision', None)
+        self.archs     = result.get('archs', [])
+        self.libraries = result.get('libraries', {})
 
         is_valid = True
         is_valid = is_valid and (self.name and isinstance(self.name, str))
         is_valid = is_valid and (self.version and isinstance(self.version, str))
         is_valid = is_valid and (self.revision and isinstance(self.revision, str))
-        is_valid = is_valid and (self.archs and isinstance(self.archs, list))
+        is_valid = is_valid and (isinstance(self.archs, list))
+        is_valid = is_valid and (isinstance(self.libraries, dict))
+
+        if is_valid:
+            for (name, lib) in self.libraries.items():
+                is_valid = is_valid and (isinstance(lib, dict))
+                is_valid = is_valid and (isinstance(lib.get('build_libraries', []), list))
+                is_valid = is_valid and (isinstance(lib.get('include_paths', []), list))
 
         if not is_valid:
             raise Exception('Invalid package metadata')
@@ -193,6 +207,44 @@ class PackageRepository:
 
         for package in self.packages.values():
             self._extract_package(package)
+
+    # Add library records to the build manager and sysroot.
+    def add_libraries(self):
+        env     = self.manager.target_template
+        sysroot = self.manager['sysroot']['MANIFEST']
+
+        for package in self.packages.values():
+            work_package_dir = os.path.join(self.work_dir, package.name)
+
+            for (name, lib) in package.libraries.items():
+                build_libraries = lib.get('build_libraries', [])
+                include_paths   = lib.get('include_paths', [])
+                lib_paths       = lib.get('lib_paths', [])
+
+                # Add default locations.
+                include_paths.append(DEFAULT_INCLUDE_PATH)
+                lib_paths.append(DEFAULT_LIB_PATH)
+
+                # Map paths into the extracted package.
+                include_paths = [os.path.join(work_package_dir, p) for p in include_paths]
+                lib_paths     = [os.path.join(work_package_dir, p) for p in lib_paths]
+
+                # Add library record.
+                self.manager.add_library(
+                    name            = name,
+                    build_libraries = build_libraries,
+                    include_paths   = [env.Dir(p) for p in include_paths],
+                    lib_paths       = [env.Dir(p) for p in lib_paths])
+
+                # Add to the sysroot.
+                for path in include_paths:
+                    sysroot.add_from_dir_tree(
+                        source_path = path, dest_path = 'include', tracked = False,
+                        follow_links = True)
+                for path in lib_paths:
+                    sysroot.add_from_dir_tree(
+                        source_path = path, dest_path = 'lib', tracked = False,
+                        follow_links = True)
 
     # Add package manifests to a combined manifest.
     def add_manifests(self, manifest):

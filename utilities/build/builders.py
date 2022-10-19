@@ -23,6 +23,11 @@ ld_script_builder = Builder(action = Action(
     '$GENCOMSTR'))
 
 # Custom method to build a Kiwi application.
+#
+# name            = Name of the target.
+# sources         = Source files.
+# override_flags  = Flags to pass to the SCons SharedLibrary builder, which
+#                   completed replace the environment flags it contains.
 def kiwi_application_method(env, name, sources, **kwargs):
     override_flags = kwargs['override_flags'] if 'override_flags' in kwargs else {}
 
@@ -36,6 +41,11 @@ def kiwi_application_method(env, name, sources, **kwargs):
     return env.Program(target, sources, **override_flags)
 
 # Custom method to build a Kiwi service.
+#
+# name            = Name of the target.
+# sources         = Source files.
+# override_flags  = Flags to pass to the SCons SharedLibrary builder, which
+#                   completed replace the environment flags it contains.
 def kiwi_service_method(env, name, sources, **kwargs):
     override_flags = kwargs['flags'] if 'flags' in kwargs else {}
 
@@ -49,6 +59,16 @@ def kiwi_service_method(env, name, sources, **kwargs):
     return env.Program(target, sources, **override_flags)
 
 # Custom method to build a Kiwi library.
+#
+# name            = Name of the library.
+# sources         = Source files.
+# build_libraries = Other libraries required for building against this library.
+# include_paths   = List of include paths for the library. Each entry is
+#                   either a SCons Dir instance, or a tuple of
+#                   (Dir, sysroot location). The tuple form allows installing
+#                   the directory to a different location in the sysroot.
+# override_flags  = Flags to pass to the SCons SharedLibrary builder, which
+#                   completed replace the environment flags it contains.
 def kiwi_library_method(env, name, sources, **kwargs):
     manager = env['MANAGER']
 
@@ -60,7 +80,8 @@ def kiwi_library_method(env, name, sources, **kwargs):
     manager.add_library(name, build_libraries, include_paths)
 
     # Modify the target path so that libraries all get placed in the build
-    # library directory.
+    # library directory. This is necessary for default libraries (libkernel,
+    # libsystem, etc) 
     target = File('%s/lib%s.so' % (str(env['_LIBOUTDIR']), name))
 
     # Add the library to the distribution environment.

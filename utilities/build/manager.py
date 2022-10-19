@@ -175,8 +175,8 @@ class BuildManager:
         self.target_template['SHCCFLAGS']   = '$CCFLAGS -fPIC -DSHARED'
         self.target_template['SHLINKFLAGS'] = '$LINKFLAGS -shared -Wl,-soname,${TARGET.name}'
 
-        # Override default assembler - it uses as directly, we want to go through the
-        # compiler.
+        # Override default assembler - it uses as directly, we want to go
+        # through the compiler.
         self.target_template['ASCOM'] = '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES'
 
         # Add an action for ASM files in a shared library.
@@ -220,7 +220,8 @@ class BuildManager:
         self.target_template['OBJCOPY'] = toolchain.tool_path('objcopy')
         self.target_template['LD']      = toolchain.tool_path('ld')
 
-        # Get the compiler include directory which contains some standard headers.
+        # Get the compiler include directory which contains some standard
+        # headers.
         toolchain_cmd = [self.target_template['CC'], '-print-file-name=include']
         with subprocess.Popen(toolchain_cmd, stdout = subprocess.PIPE) as proc:
             self.target_template['TOOLCHAIN_INCLUDE'] = proc.communicate()[0].decode('utf-8').strip()
@@ -251,14 +252,13 @@ class BuildManager:
             return (target, source)
         self.add_builder(name, Builder(action = act, emitter = dep_emitter))
 
-    # Add a record of a library to be referenced when creating an environment.
-    # build_libraries = Other libraries required for building against this
-    #                   library.
-    # include_paths   = List of include paths for the library.
-    def add_library(self, name, build_libraries, include_paths):
+    # Add a record of a library that can be referenced when creating an
+    # environment. See builders.kiwi_library_method().
+    def add_library(self, name, build_libraries, include_paths, lib_paths = []):
         self.libraries[name] = {
             'build_libraries': build_libraries,
             'include_paths': include_paths,
+            'lib_paths': lib_paths,
         }
 
     # Create an environment for building for the host system.
@@ -288,41 +288,52 @@ class BuildManager:
         libraries = kwargs['libraries'] if 'libraries' in kwargs else []
 
         env = self.target_template.Clone()
-        config = env['CONFIG']
 
-        # Specify -nostdinc to prevent the compiler from using the automatically
-        # generated sysroot. That only needs to be used when compiling outside
-        # the build system, we manage all the header paths internally. We do
-        # need to add the compiler's own include directory to the path, though.
         self.merge_flags(env, {
-            'ASFLAGS': ['-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'], '-include',
-                'build/%s-%s/config.h' % (config['ARCH'], config['BUILD'])],
-            'CCFLAGS': ['-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'], '-include',
-                'build/%s-%s/config.h' % (config['ARCH'], config['BUILD'])],
-            'LIBPATH': [env['_LIBOUTDIR']],
+            # Specify -nostdinc to prevent the compiler from using the
+            # automatically generated sysroot. That only needs to be used when
+            # compiling outside the build system, we manage all the header
+            # paths internally. We do need to add the compiler's own include
+            # directory to the path, though.
+            'ASFLAGS': [
+                '-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'],
+                '-include', 'build/%s-%s/config.h' % (self.config['ARCH'], self.config['BUILD'])
+            ],
+            'CCFLAGS': [
+                '-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'],
+                '-include', 'build/%s-%s/config.h' % (self.config['ARCH'], self.config['BUILD'])
+            ],
+
+            # Link to the specified libraries and set up the library path.
             'LIBS': libraries,
+            'LIBPATH': [env['_LIBOUTDIR']],
         })
 
-        # Add in specified flags.
+        # Add in caller-specified flags.
         self.merge_flags(env, flags)
 
-        # Add paths for dependencies.
-        def add_library(lib):
+        # Add paths for library dependencies.
+        def add_library_flags(lib):
             if lib in self.libraries:
-                paths = [d[0] if type(d) == tuple else d for d in self.libraries[lib]['include_paths']]
-                self.merge_flags(env, {'CPPPATH': paths})
+                lib_spec = self.libraries[lib]
+
+                self.merge_flags(env, {
+                    'CPPPATH': [d[0] if isinstance(d, tuple) else d for d in lib_spec['include_paths']],
+                    'LIBPATH': lib_spec['lib_paths']
+                })
+
                 for dep in self.libraries[lib]['build_libraries']:
-                    add_library(dep)
+                    add_library_flags(dep)
         for lib in libraries:
-            add_library(lib)
+            add_library_flags(lib)
 
         # Add paths for default libraries. Technically we shouldn't add libc++
         # here if what we're building isn't C++, but we don't know that here,
         # so just add it - it's not a big deal.
         if not 'CCFLAGS' in flags or '-nostdinc' not in flags['CCFLAGS']:
-            add_library('c++')
-            add_library('m')
-            add_library('system')
+            add_library_flags('c++')
+            add_library_flags('m')
+            add_library_flags('system')
 
         # Set up emitters to set dependencies on default libraries.
         def add_library_deps(target, source, env):
