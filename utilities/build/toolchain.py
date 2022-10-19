@@ -257,7 +257,9 @@ class ToolchainManager:
 
     # Set up the toolchain sysroot.
     def sysroot_action(self, target, source, env):
-        manifest    = env['MANIFEST']
+        manifest = env['MANIFEST']
+        manifest.finalise()
+
         sysroot_dir = os.path.join(self.target_dir, 'sysroot')
         build_dir   = os.path.join(os.getcwd(), 'build', '%s-%s' % (self.arch, self.build))
 

@@ -338,11 +338,11 @@ Alias('qgdb', dist_env.Command('__qgdb', [], Action(
 ###############
 
 sysroot_env = manager['sysroot']
-sysroot_manifest = sysroot_env.Manifest(os.path.join(build_dir, 'sysroot.manifest'))
+sysroot_manifest = sysroot_env['MANIFEST']
 
 # Command to update the toolchain sysroot.
 Alias('sysroot',
-    sysroot_env.Command('__sysroot', [sysroot_manifest],
+    sysroot_env.Command('__sysroot', sysroot_manifest.dependencies,
         Action(lambda target, source, env: toolchain.sysroot_action(target, source, env), None)))
 
 # Generation compilation database.
