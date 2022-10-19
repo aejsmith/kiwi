@@ -15,7 +15,7 @@
 #
 
 Import('config', 'mod_env')
-from util import FeatureDirs
+from util import feature_dirs
 
 mod_env.Module('virtio', [
     'virtio.c',

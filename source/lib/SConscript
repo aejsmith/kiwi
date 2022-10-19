@@ -17,7 +17,7 @@
 Import('manager')
 
 # Set the library output directory.
-manager.AddVariable('_LIBOUTDIR', Dir('.'))
+manager.add_variable('_LIBOUTDIR', Dir('.'))
 
 dirs = [
     # Core runtime libraries (must be first).

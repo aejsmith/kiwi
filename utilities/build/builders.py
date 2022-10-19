@@ -29,7 +29,7 @@ def kiwi_application_method(env, name, sources, **kwargs):
     target = File(name)
 
     # Add the application to the image.
-    dist = env['_MANAGER']['dist']
+    dist = env['MANAGER']['dist']
     dist.AddFile(target, 'system/bin/%s' % (name))
 
     # Build the application.
@@ -42,7 +42,7 @@ def kiwi_service_method(env, name, sources, **kwargs):
     target = File(name)
 
     # Add the application to the image.
-    dist = env['_MANAGER']['dist']
+    dist = env['MANAGER']['dist']
     dist.AddFile(target, 'system/services/%s' % (name))
 
     # Build the application.
@@ -50,14 +50,14 @@ def kiwi_service_method(env, name, sources, **kwargs):
 
 # Custom method to build a Kiwi library.
 def kiwi_library_method(env, name, sources, **kwargs):
-    manager = env['_MANAGER']
+    manager = env['MANAGER']
 
     build_libraries = kwargs['build_libraries'] if 'build_libraries' in kwargs else []
     include_paths = kwargs['include_paths'] if 'include_paths' in kwargs else []
     override_flags = kwargs['override_flags'] if 'override_flags' in kwargs else {}
 
     # Register this library with the build manager.
-    manager.AddLibrary(name, build_libraries, include_paths)
+    manager.add_library(name, build_libraries, include_paths)
 
     # Modify the target path so that libraries all get placed in the build
     # library directory.

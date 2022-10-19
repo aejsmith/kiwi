@@ -26,4 +26,4 @@ env.Program('image_tool', [
     'mbr.bin.c',
 ])
 
-manager.AddVariable('IMAGE_TOOL', File('image_tool'))
+manager.add_variable('IMAGE_TOOL', File('image_tool'))

@@ -18,7 +18,7 @@ import os
 
 Import('manager', 'config')
 
-env = manager.Create(libraries = ['system'])
+env = manager.create(libraries = ['system'])
 
 generic_sources = [
     'absvdi2.c',

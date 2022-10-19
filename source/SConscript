@@ -55,7 +55,7 @@ for kboot_target in config['KBOOT_TARGETS'].split(','):
         kboot_config['DEBUG'] = True
 
     # Create a build environment.
-    kboot_env = manager.CreateBare(
+    kboot_env = manager.create_bare(
         flags = {
             'LIBS': [],
             'CCFLAGS': [

@@ -15,7 +15,7 @@
 #
 
 Import('config', 'kern_sources', 'mod_env')
-from util import FeatureSources
+from util import feature_sources
 
 mod_env.Module('net', [
     # The network device class code is under device/ just for consistency but

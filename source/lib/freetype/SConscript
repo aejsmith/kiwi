@@ -21,7 +21,7 @@ Import('manager', 'config')
 # build tree.
 include_dir = Dir('#source/lib/freetype/include')
 
-env = manager.Create(
+env = manager.create(
     libraries = ['z'],
     flags = {
         'CPPPATH': [include_dir],

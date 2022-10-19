@@ -21,7 +21,7 @@ if config['ARCH'] == 'amd64':
 else:
     raise Exception('Unsupported architecture')
 
-env = manager.Create(flags = {
+env = manager.create(flags = {
     'CPPPATH': [
         Dir('include'),
         Dir('musl/arch/generic'),

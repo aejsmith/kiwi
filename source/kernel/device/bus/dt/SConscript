@@ -15,7 +15,7 @@
 #
 
 Import('config', 'kern_env', 'kern_sources', 'mod_env')
-from util import FeatureSources
+from util import feature_sources
 
 # See device/bus/{dt,fdt}.h, there are two parts to DT support: the low-level
 # libfdt-based interface used by core kernel functionality that needs to use
@@ -24,7 +24,7 @@ from util import FeatureSources
 for env in [kern_env, mod_env]:
     env['CPPPATH'] += [Dir('fdt/include')]
 
-kern_sources += FeatureSources(config, [
+kern_sources += feature_sources(config, [
     'fdt/fdt_addresses.c',
     'fdt/fdt.c',
     'fdt/fdt_check.c',

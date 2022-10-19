@@ -18,7 +18,7 @@ Import('manager', 'config')
 
 zconf = File('include/zconf.h')
 
-env = manager.Create(
+env = manager.create(
     flags = {
         'CFLAGS': ['-include', '%s' % (zconf.path)],
         'CPPDEFINES': {'PIC': None},

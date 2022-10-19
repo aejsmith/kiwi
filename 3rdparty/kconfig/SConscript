@@ -34,4 +34,4 @@ env['MCONF'] = env.Program('mconf', mconf_sources,
     CPPDEFINES = ['KBUILD_NO_NLS'])
 
 # Add a config menu builder.
-manager.AddTool('ConfigMenu', env['MCONF'], Action('$MCONF $SOURCE', None))
+manager.add_tool('ConfigMenu', env['MCONF'], Action('$MCONF $SOURCE', None))

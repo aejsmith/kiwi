@@ -19,7 +19,7 @@ import util
 
 Import('manager', 'config')
 
-env = manager.Create(flags = {
+env = manager.create(flags = {
     'LINKFLAGS': ['-nostdlib', '-Wl,-e,libkernel_start', '-Wl,-Bsymbolic'],
 
     # The default visibility is set to hidden, as the majority of functions in

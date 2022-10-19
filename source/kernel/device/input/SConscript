@@ -15,12 +15,12 @@
 #
 
 Import('config', 'mod_env')
-from util import FeatureDirs
+from util import feature_dirs
 
 mod_env.Module('input', [
     'input.c',
 ])
 
-SConscript(dirs = FeatureDirs(config, [
+SConscript(dirs = feature_dirs(config, [
     ('DEVICE_INPUT_I8042', 'i8042'),
 ]))

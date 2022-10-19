@@ -15,9 +15,9 @@
 #
 
 Import('config')
-from util import FeatureDirs
+from util import feature_dirs
 
-SConscript(dirs = FeatureDirs(config, [
+SConscript(dirs = feature_dirs(config, [
     ('DEVICE_BUS_DT',       'dt'),
     ('DEVICE_BUS_PCI',      'pci'),
     ('DEVICE_BUS_VIRTIO',   'virtio'),

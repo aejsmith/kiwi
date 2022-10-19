@@ -15,12 +15,12 @@
 #
 
 Import('config', 'kern_sources')
-from util import FeatureDirs, FeatureSources
+from util import feature_dirs, feature_sources
 
-kern_sources += FeatureSources(config, [
+kern_sources += feature_sources(config, [
     'ramfs.c',
 ])
 
-SConscript(dirs = FeatureDirs(config, [
+SConscript(dirs = feature_dirs(config, [
     ('FS_EXT2', 'ext2'),
 ]))

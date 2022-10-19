@@ -15,9 +15,9 @@
 #
 
 Import('config', 'manager', 'version')
-from util import FeatureSources, FeatureDirs
+from util import feature_sources, feature_dirs
 
-base_sources = FeatureSources(config, [
+base_sources = feature_sources(config, [
     'cpu.c',
     'elf.c',
     'fatal.c',
@@ -34,7 +34,7 @@ base_sources = FeatureSources(config, [
     'version.c',
 ])
 
-dirs = FeatureDirs(config, [
+dirs = feature_dirs(config, [
     # Architecture must be first as they may change build flags which must
     # apply to all other subdirectories.
     'arch/%s' % (config['ARCH']),
@@ -61,7 +61,7 @@ dist_env = manager['dist']
 dist_env['MODULES'] = []
 
 # Create the kernel environment.
-kern_env = manager.CreateBare(name = 'kernel', flags = {
+kern_env = manager.create_bare(name = 'kernel', flags = {
     'LIBS': [],
     'CPPPATH': [
         Dir('include'),
@@ -93,7 +93,7 @@ kern_env['CCFLAGS'] += ['-isystem', kern_env['TOOLCHAIN_INCLUDE']]
 kern_env['ASFLAGS'] += ['-isystem', kern_env['TOOLCHAIN_INCLUDE']]
 
 # Create the module environment.
-mod_env = manager.Clone(kern_env, name = 'module', flags = {
+mod_env = manager.clone(kern_env, name = 'module', flags = {
     # Modules default to not exporting symbols.
     'CCFLAGS': ['-fno-common', '-fvisibility=hidden'],
 })

@@ -15,10 +15,10 @@
 #
 
 Import('config', 'mod_env')
-from util import FeatureDirs
+from util import feature_dirs
 
 # Note that net.c is compiled as part of the net module.
 
-SConscript(dirs = FeatureDirs(config, [
+SConscript(dirs = feature_dirs(config, [
     ('DEVICE_NET_VIRTIO_NET', 'virtio_net'),
 ]))

@@ -16,5 +16,5 @@
 
 Import('manager', 'config')
 
-env = manager.Create()
+env = manager.create()
 SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])

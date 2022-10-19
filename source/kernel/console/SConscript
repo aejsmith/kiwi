@@ -15,9 +15,9 @@
 #
 
 Import('config', 'kern_env', 'kern_sources')
-from util import FeatureSources
+from util import feature_sources
 
-kern_sources += FeatureSources(config, [
+kern_sources += feature_sources(config, [
     'console.c',
     'fb.c',
     'font.c',

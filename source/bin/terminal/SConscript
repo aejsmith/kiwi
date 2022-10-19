@@ -16,7 +16,7 @@
 
 Import('manager')
 
-env = manager.Create(libraries = ['device', 'freetype', 'kernel', 'kiwi'])
+env = manager.create(libraries = ['device', 'freetype', 'kernel', 'kiwi'])
 
 env.KiwiApplication('terminal', [
     'font.cpp',

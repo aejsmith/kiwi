@@ -22,7 +22,7 @@ dirs = [
 
 SConscript(dirs = dirs)
 
-env = manager.Create(libraries = ['kernel'])
+env = manager.create(libraries = ['kernel'])
 
 env.KiwiApplication('mount', ['mount.c'])
 env.KiwiApplication('unmount', ['unmount.c'])

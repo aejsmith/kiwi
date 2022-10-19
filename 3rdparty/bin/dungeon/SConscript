@@ -16,7 +16,7 @@
 
 Import('manager')
 
-env = manager.Create(
+env = manager.create(
     flags = {
         # Definitions controlling features.
         'CPPDEFINES': {

@@ -16,7 +16,7 @@
 
 Import('manager', 'config')
 
-env = manager.Create(
+env = manager.create(
     libraries = ['system', 'cxxrt', 'm'],
     flags = {
         'CPPPATH': [Dir('include'), Dir('src')],

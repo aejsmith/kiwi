@@ -14,10 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-from util import FeatureSources
+from util import feature_sources
 Import('config', 'kern_env', 'kern_sources', 'mod_env')
 
-kern_sources += FeatureSources(config, [
+kern_sources += feature_sources(config, [
     'ap_boot.bin.c',
     'acpi.c',
     'arch.c',

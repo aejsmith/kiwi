@@ -16,7 +16,7 @@
 
 Import('manager')
 
-env = manager.Create(libraries = ['device', 'kernel'])
+env = manager.create(libraries = ['device', 'kernel'])
 
 env.KiwiApplication('net_control', [
     'dhcp.c',

@@ -16,7 +16,7 @@
 
 Import('manager', 'config')
 
-env = manager.Create(libraries = ['system'], flags = {
+env = manager.create(libraries = ['system'], flags = {
     'CPPPATH': [Dir('include')],
     'CCFLAGS': [
         '-Wno-missing-field-initializers', '-Wno-sometimes-uninitialized',

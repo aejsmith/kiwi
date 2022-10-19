@@ -16,7 +16,7 @@
 
 Import('config', 'manager')
 
-env = manager.CreateHost()
+env = manager.create_host()
 
 # Warnings that occur in generated code.
 env['CCFLAGS'] += ['-Wno-redundant-decls', '-Wno-unused-function']
@@ -30,16 +30,16 @@ sysgen = env.Program('sysgen', [
 ])
 
 # Add sysgen to the build environments.
-manager.AddVariable('SYSGEN', sysgen)
-manager.AddVariable('SYSGENFLAGS', [])
+manager.add_variable('SYSGEN', sysgen)
+manager.add_variable('SYSGENFLAGS', [])
 
 # Add builders to generate system call code.
-manager.AddTool('SyscallTable', env['SYSGEN'], Action(
+manager.add_tool('SyscallTable', env['SYSGEN'], Action(
     '$SYSGEN $SYSGENFLAGS -t $TABLE -o $TARGET %s $SOURCES' % (config['ARCH']),
     '$GENCOMSTR'))
-manager.AddTool('SyscallHeader', env['SYSGEN'], Action(
+manager.add_tool('SyscallHeader', env['SYSGEN'], Action(
     '$SYSGEN $SYSGENFLAGS -n $GUARD -o $TARGET %s $SOURCES' % (config['ARCH']),
     '$GENCOMSTR'))
-manager.AddTool('Syscalls', env['SYSGEN'], Action(
+manager.add_tool('Syscalls', env['SYSGEN'], Action(
     '$SYSGEN $SYSGENFLAGS -o $TARGET %s $SOURCES' % (config['ARCH']),
     '$GENCOMSTR'))

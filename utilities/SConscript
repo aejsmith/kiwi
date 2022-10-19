@@ -17,8 +17,8 @@
 Import('env', 'manager', 'version')
 
 # Set paths to build utilities.
-manager.AddVariable('GENERRLIST', File('../../utilities/generrlist.py'))
-manager.AddVariable('BIN2HEX', File('../../utilities/bin2hex.py'))
+manager.add_variable('GENERRLIST', File('../../utilities/generrlist.py'))
+manager.add_variable('BIN2HEX', File('../../utilities/bin2hex.py'))
 
 # Visit subdirectories.
 SConscript(exports = ['env'], dirs = [
@@ -28,7 +28,7 @@ SConscript(exports = ['env'], dirs = [
 ])
 
 # Build KBoot utilities.
-kboot_env = manager.CreateHost(
+kboot_env = manager.create_host(
     flags = {
         'OUTDIR': Dir('boot'),
         'LIBDIR': '/tmp/kboot/lib',
@@ -43,5 +43,5 @@ kboot_env = manager.CreateHost(
 
 SConscript(dirs = ['boot'], exports = {'env': kboot_env})
 
-manager.AddVariable('KBOOT_INSTALL', File('boot/kboot-install'))
-manager.AddVariable('KBOOT_MKISO', File('boot/kboot-mkiso'))
+manager.add_variable('KBOOT_INSTALL', File('boot/kboot-install'))
+manager.add_variable('KBOOT_MKISO', File('boot/kboot-mkiso'))

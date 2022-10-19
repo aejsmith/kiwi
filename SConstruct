@@ -14,9 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-###############
-# Build flags #
-###############
+import multiprocessing
+import os
+import SCons.Errors
+import sys
 
 # Release information.
 version = {
@@ -25,65 +26,13 @@ version = {
     'KIWI_VER_REVISION': 0,
 }
 
-# C/C++ warning flags.
-cc_warning_flags = [
-    '-Wall', '-Wextra', '-Wno-variadic-macros', '-Wno-unused-parameter',
-    '-Wwrite-strings', '-Wmissing-declarations', '-Wredundant-decls',
-    '-Werror', '-Wno-error=unused',
-]
-
-# C++ warning flags.
-cxx_warning_flags = [
-    '-Wsign-promo',
-]
-
-# Variables to set in target environments.
-#
-# TODO: -fno-omit-frame-pointer should really be restricted to kernel builds
-# but for now we use it everywhere since that's all we have for doing
-# backtraces.
-target_flags = {
-    'CCFLAGS': cc_warning_flags + ['-pipe', '-fno-omit-frame-pointer'],
-    'CFLAGS': ['-std=gnu11'],
-    'CXXFLAGS': cxx_warning_flags + ['-std=c++20'],
-    'ASFLAGS': ['-D__ASM__'],
-}
-
-# Per-build-type target flags.
-target_type_flags = {
-    'debug': {
-        'CCFLAGS': ['-gdwarf-2', '-O0'],
-    },
-    'debugopt': {
-        'CCFLAGS': ['-gdwarf-2', '-O2'],
-    },
-    'release': {
-        'CCFLAGS': ['-O2'],
-    },
-}
-
-# Variables to set in host environments. Remove flags unsupported by some older
-# host G++ versions.
-host_flags = {
-    'CCFLAGS': ['-pipe'] + [f for f in cc_warning_flags if f not in [
-        '-Wmissing-declarations', '-Wno-variadic-macros',
-        '-Wno-unused-but-set-variable']],
-    'CFLAGS': ['-std=gnu99'],
-    'CXXFLAGS': ['-std=c++17'],
-    'YACCFLAGS': ['-d'],
-}
-
-########################
-# Internal build setup #
-########################
-
-import multiprocessing
-import os
-import SCons.Errors
-import subprocess
-import sys
-
+# Symlink rather than hardlink in the build tree. This helps VSCode to resolve
+# includes to the location in the original source tree rather than opening the
+# hardlinked version under the build tree.
 SetOption('duplicate', 'soft-hard-copy')
+
+# Change the Decider to content-timestamp to speed up the build a bit.
+Decider('content-timestamp')
 
 # Option to set -j option automatically for the VS project, since SCons doesn't
 # have this itself.
@@ -100,9 +49,7 @@ import util
 import vcs
 
 # Set the version string.
-version['KIWI_VER_STRING'] = '%d.%d' % (
-    version['KIWI_VER_RELEASE'],
-    version['KIWI_VER_UPDATE'])
+version['KIWI_VER_STRING'] = '%d.%d' % (version['KIWI_VER_RELEASE'], version['KIWI_VER_UPDATE'])
 if version['KIWI_VER_REVISION']:
     version['KIWI_VER_STRING'] += '.%d' % (version['KIWI_VER_REVISION'])
 revision = vcs.revision_id()
@@ -114,34 +61,16 @@ if ARGUMENTS.get('IGNORE_SUBMODULES') != '1' and not vcs.check_submodules():
     raise SCons.Errors.StopError(
         "Submodules outdated. Please run 'git submodule update --init'.")
 
-# Change the Decider to content-timestamp to speed up the build a bit.
-Decider('content-timestamp')
-
-host_template = Environment(ENV = os.environ, tools = ['default', 'textfile'])
-target_template = Environment(platform = 'posix', ENV = os.environ, tools = ['default', 'textfile'])
-
-host_template.Tool('compilation_db', toolpath = ['utilities/build'])
-target_template.Tool('compilation_db', toolpath = ['utilities/build'])
-
-manager = BuildManager(host_template, target_template)
-
 # Load the build configuration (if it exists yet).
 config = ConfigParser('.config')
-manager.AddVariable('CONFIG', config)
+
+# Create the build manager.
+manager = BuildManager(config)
 
 Export('config', 'manager', 'version')
 
-# Set up the host environment template.
-for (k, v) in host_flags.items():
-    host_template[k] = v
-
-# Darwin hosts probably have needed libraries in /opt.
-if os.uname()[0] == 'Darwin':
-    host_template['CPPPATH'] = ['/opt/local/include']
-    host_template['LIBPATH'] = ['/opt/local/lib']
-
 # Create the host environment and build host utilities.
-host_env = manager.CreateHost(name = 'host')
+host_env = manager.create_host(name = 'host')
 SConscript(
     'utilities/SConscript',
     variant_dir = os.path.join('build', 'host'), exports = {'env': host_env})
@@ -154,7 +83,7 @@ Alias('config', host_env.ConfigMenu('__config', ['Kconfig']))
 # error to notify the user that they need to configure if they are not trying
 # to do so, and don't run the rest of the build.
 if not config.configured() or 'config' in COMMAND_LINE_TARGETS:
-    util.RequireTarget('config', "Configuration missing or out of date. Please update using 'config' target.")
+    util.require_target('config', "Configuration missing or out of date. Please update using 'config' target.")
     Return()
 
 # Initialise the toolchain manager and add the toolchain build target.
@@ -163,75 +92,17 @@ Alias('toolchain', Command('__toolchain', [], Action(toolchain.update, None)))
 
 # If the toolchain is out of date, only allow it to be built.
 if toolchain.check() or 'toolchain' in COMMAND_LINE_TARGETS:
-    util.RequireTarget('toolchain', "Toolchain out of date. Update using the 'toolchain' target.")
+    util.require_target('toolchain', "Toolchain out of date. Update using the 'toolchain' target.")
     Return()
 
 # Now set up the target template environment.
-for (k, v) in target_flags.items():
-    target_template[k] = v
-for (k, v) in target_type_flags[config['BUILD']].items():
-    target_template[k] += v
-
-# Clang's integrated assembler doesn't support 16-bit code.
-target_template['ASFLAGS'] = ['-D__ASM__', '-no-integrated-as']
-
-# Set correct shared library link flags.
-target_template['SHCCFLAGS']   = '$CCFLAGS -fPIC -DSHARED'
-target_template['SHLINKFLAGS'] = '$LINKFLAGS -shared -Wl,-soname,${TARGET.name}'
-
-# Override default assembler - it uses as directly, we want to go through the
-# compiler.
-target_template['ASCOM'] = '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES'
-
-# Add an action for ASM files in a shared library.
-from SCons.Tool import createObjBuilders
-static_obj, shared_obj = createObjBuilders(target_template)
-shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
-
-# Add in extra compilation flags from the configuration.
-if 'ARCH_ASFLAGS' in config:
-    target_template['ASFLAGS'] += config['ARCH_ASFLAGS'].split()
-if 'ARCH_CCFLAGS' in config:
-    target_template['CCFLAGS'] += config['ARCH_CCFLAGS'].split()
-
-target_template['CCFLAGS']  += config['EXTRA_CCFLAGS'].split()
-target_template['CFLAGS']   += config['EXTRA_CFLAGS'].split()
-target_template['CXXFLAGS'] += config['EXTRA_CXXFLAGS'].split()
-
-# Set paths to toolchain components.
-if 'CC' in os.environ and os.path.basename(os.environ['CC']) == 'ccc-analyzer':
-    target_template['CC'] = os.environ['CC']
-    target_template['ENV']['CCC_CC'] = toolchain.tool_path('clang')
-
-    # Force a rebuild when doing static analysis.
-    def decide_if_changed(dependency, target, prev_ni):
-        return True
-    target_template.Decider(decide_if_changed)
-else:
-    target_template['CC'] = toolchain.tool_path('clang')
-if 'CXX' in os.environ and os.path.basename(os.environ['CXX']) == 'c++-analyzer':
-    target_template['CXX'] = os.environ['CXX']
-    target_template['ENV']['CCC_CXX'] = toolchain.tool_path('clang++')
-else:
-    target_template['CXX'] = toolchain.tool_path('clang++')
-target_template['AS']      = toolchain.tool_path('as')
-target_template['OBJDUMP'] = toolchain.tool_path('objdump')
-target_template['READELF'] = toolchain.tool_path('readelf')
-target_template['NM']      = toolchain.tool_path('nm')
-target_template['STRIP']   = toolchain.tool_path('strip')
-target_template['AR']      = toolchain.tool_path('ar')
-target_template['RANLIB']  = toolchain.tool_path('ranlib')
-target_template['OBJCOPY'] = toolchain.tool_path('objcopy')
-target_template['LD']      = toolchain.tool_path('ld')
-
-# Get the compiler include directory which contains some standard headers.
-toolchain_cmd = [target_template['CC'], '-print-file-name=include']
-with subprocess.Popen(toolchain_cmd, stdout = subprocess.PIPE) as proc:
-    target_template['TOOLCHAIN_INCLUDE'] = proc.communicate()[0].decode('utf-8').strip()
+manager.init_target(toolchain)
 
 #######################
 # Target system build #
 #######################
+
+dist_env = manager['dist']
 
 # First we need to set up packages. Parts of the userspace build depend on
 # libraries in packages so we need to have this all set up before we run the
@@ -254,8 +125,6 @@ packages.load()
 # manifests. This only does anything when packages are determined to have
 # changed.
 packages.extract()
-
-dist_env = manager['dist']
 
 build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['BUILD']))
 SConscript('source/SConscript', variant_dir = build_dir)

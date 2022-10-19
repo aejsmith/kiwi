@@ -20,7 +20,7 @@ from functools import reduce
 
 # Helpers for creating source lists with certain files only enabled by config
 # settings.
-def FeatureSources(config, files):
+def feature_sources(config, files):
     output = []
     for f in files:
         if type(f) is tuple:
@@ -29,7 +29,7 @@ def FeatureSources(config, files):
         else:
             output.append(File(f))
     return output
-def FeatureDirs(config, dirs):
+def feature_dirs(config, dirs):
     output = []
     for f in dirs:
         if type(f) is tuple:
@@ -39,8 +39,11 @@ def FeatureDirs(config, dirs):
             output.append(Dir(f))
     return output
 
+# KBoot compatibility
+FeatureSources = feature_sources
+
 # Raise an error if a certain target is not specified.
-def RequireTarget(target, error):
+def require_target(target, error):
     if GetOption('help') or target in COMMAND_LINE_TARGETS:
         return
     raise SCons.Errors.StopError(error)

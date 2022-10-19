@@ -16,5 +16,5 @@
 
 Import('manager')
 
-env = manager.Create(libraries = ['kernel'])
+env = manager.create(libraries = ['kernel'])
 env.KiwiService('test', ['main.c'])
