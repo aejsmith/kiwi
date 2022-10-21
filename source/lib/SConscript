@@ -33,7 +33,6 @@ dirs = [
     # Other libraries.
     'device',
     'zlib',
-    'freetype',
 ]
 
 SConscript(dirs = dirs)
