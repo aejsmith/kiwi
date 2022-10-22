@@ -294,7 +294,7 @@ void interrupt_handler(frame_t *frame) {
         /* Save the user-mode interrupt frame pointer, used by the signal frame
          * setup/restore code. */
         curr_thread->arch.user_frame = frame;
-        thread_at_kernel_entry(true);
+        thread_at_kernel_entry(NULL);
     }
 
     /* Call the handler. */
@@ -305,7 +305,7 @@ void interrupt_handler(frame_t *frame) {
         sched_preempt();
 
     if (user) {
-        thread_at_kernel_exit();
+        thread_at_kernel_exit(NULL, 0);
 
         /* We must clear the ARCH_THREAD_FRAME_MODIFIED flag if it has been set.
          * This is used in the SYSCALL handler below so that it knows whether to

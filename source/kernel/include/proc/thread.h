@@ -41,6 +41,7 @@
 struct cpu;
 struct frame;
 struct process;
+struct syscall;
 struct thread_interrupt;
 
 /** Entry function for a thread. */
@@ -253,8 +254,8 @@ extern void thread_interrupt(thread_t *thread, thread_interrupt_t *interrupt);
 
 extern status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, uint32_t flags);
 extern void thread_yield(void);
-extern void thread_at_kernel_entry(bool interrupt);
-extern void thread_at_kernel_exit(void);
+extern void thread_at_kernel_entry(struct syscall *syscall);
+extern void thread_at_kernel_exit(struct syscall *syscall, unsigned long ret);
 extern void thread_exception(exception_info_t *info);
 extern void thread_exit(void) __noreturn;
 

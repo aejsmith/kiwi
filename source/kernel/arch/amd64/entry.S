@@ -219,20 +219,26 @@ FUNCTION_START(syscall_entry)
     /* Save the user-mode interrupt frame pointer. */
     movq    %rsp, %gs:ARCH_THREAD_OFF_USER_FRAME
 
+    /* Get system call table entry. */
+    xorq    %rbx, %rbx
+    movq    FRAME_OFF_AX(%rsp), %rax
+    cmpq    syscall_table_size, %rax
+    jae     1f
+    shlq    $4, %rax
+    leaq    syscall_table(%rax), %rbx
+1:
     /* Perform kernel entry work and enable interrupts. */
-    xorl    %edi, %edi
+    movq    %rbx, %rdi
     call    thread_at_kernel_entry
     sti
 
-    /* Get back the call number and check whether it is valid. */
-    movq    FRAME_OFF_AX(%rsp), %rbx
-    cmp     syscall_table_size, %rbx
-    jae     .Linvalid_syscall
+    /* If it was invalid, return that. */
+    testq   %rbx, %rbx
+    jz      .Linvalid_syscall
 
     /* Check the argument count. If there are more than 6 arguments, we must
      * copy from the stack. */
-    shl     $4, %rbx
-    movq    syscall_table + 8(,%rbx,1), %rdx
+    movq    8(%rbx), %rdx
     cmpq    $6, %rdx
     ja      .Lstack_args
 
@@ -244,7 +250,7 @@ FUNCTION_START(syscall_entry)
     movq    FRAME_OFF_R10(%rsp), %rcx
     movq    FRAME_OFF_R8(%rsp), %r8
     movq    FRAME_OFF_R9(%rsp), %r9
-    call    *syscall_table(,%rbx,1)
+    call    *(%rbx)
 .Lreturn:
     /* Save the return value of the system call, unless we're returning out of
      * kern_thread_restore(), in which case we shouldn't clobber the restored
@@ -255,6 +261,8 @@ FUNCTION_START(syscall_entry)
 1:
     /* Disable interrupts and perform kernel exit work. */
     cli
+    movq    %rbx, %rdi
+    movq    %rax, %rsi
     call    thread_at_kernel_exit
 
     /* If we're going to execute a user-mode interrupt handler, or we have
@@ -278,7 +286,7 @@ FUNCTION_START(syscall_entry)
     sysretq
 .Lstack_args:
     /* Work out how many bytes to copy and reserve space on the stack.
-     *  RDX = argument count, RBX = call table offset, R12 = saved SP.
+     *  RDX = argument count, RBX = syscall_t pointer, R12 = saved SP.
      * RDX is in the correct location to pass to memcpy_from_user() after
      * modifying, RBX and R12 are callee-save so they won't be clobbered by any
      * called functions. */
@@ -302,7 +310,7 @@ FUNCTION_START(syscall_entry)
     movq    FRAME_OFF_R10(%r12), %rcx
     movq    FRAME_OFF_R8(%r12), %r8
     movq    FRAME_OFF_R9(%r12), %r9
-    call    *syscall_table(,%rbx,1)
+    call    *(%rbx)
 
     /* Restore stack pointer then return. */
     movq    %r12, %rsp

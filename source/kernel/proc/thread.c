@@ -86,10 +86,14 @@
 #include <module.h>
 #include <smp.h>
 #include <status.h>
+#include <syscall.h>
 #include <time.h>
 
 /** Define to enable debug output on thread creation/deletion. */
 //#define DEBUG_THREAD
+
+/** Define to enable system call tracing for a given process name. */
+//#define SYSCALL_TRACE_PROCESS     "/system/bin/terminal"
 
 #ifdef DEBUG_THREAD
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
@@ -644,8 +648,10 @@ void thread_exception(exception_info_t *info) {
     assert(thread_flags(curr_thread) & THREAD_INTERRUPTED);
 }
 
-/** Perform tasks necessary when a thread is entering the kernel. */
-void thread_at_kernel_entry(bool interrupt) {
+/** Perform tasks necessary when a thread is entering the kernel.
+ * @param syscall       System call that the thread is making. NULL if interrupt
+ *                      or an invalid system call was made. */
+void thread_at_kernel_entry(syscall_t *syscall) {
     /* Update accounting information. */
     nstime_t now = system_time();
     curr_thread->user_time += now - curr_thread->last_time;
@@ -654,14 +660,35 @@ void thread_at_kernel_entry(bool interrupt) {
     /* Terminate the thread if killed on system call entry to avoid doing the
      * syscall work. Do not do this on an interrupt: we must handle the
      * interrupt first, and we'll exit in thread_at_kernel_exit(). */
-    if (!interrupt && unlikely(thread_flags(curr_thread) & THREAD_KILLED)) {
+    if (syscall && unlikely(thread_flags(curr_thread) & THREAD_KILLED)) {
         curr_thread->reason = EXIT_REASON_KILLED;
         thread_exit();
     }
+
+    #ifdef SYSCALL_TRACE_PROCESS
+        if (syscall && strcmp(curr_proc->name, SYSCALL_TRACE_PROCESS) == 0) {
+            kprintf(
+                LOG_DEBUG, "thread: %s (%" PRId32 ") %s (%" PRId32 "): syscall: %ps\n",
+                curr_proc->name, curr_proc->id, curr_thread->name, curr_thread->id,
+                (void *)syscall->addr);
+        }
+    #endif
 }
 
-/** Perform tasks necessary when a thread is returning to userspace. */
-void thread_at_kernel_exit(void) {
+/** Perform tasks necessary when a thread is returning to userspace.
+ * @param syscall       System call that the thread is making. NULL if interrupt
+ *                      or an invalid system call was made.
+ * @param ret           System call return value. */
+void thread_at_kernel_exit(syscall_t *syscall, unsigned long ret) {
+    #ifdef SYSCALL_TRACE_PROCESS
+        if (syscall && strcmp(curr_proc->name, SYSCALL_TRACE_PROCESS) == 0) {
+            kprintf(
+                LOG_DEBUG, "thread: %s (%" PRId32 ") %s (%" PRId32 "): return:  %ps = %lu\n",
+                curr_proc->name, curr_proc->id, curr_thread->name, curr_thread->id,
+                (void *)syscall->addr, ret);
+        }
+    #endif
+
     /* Clear active security token. */
     if (unlikely(curr_thread->active_token)) {
         token_release(curr_thread->active_token);
