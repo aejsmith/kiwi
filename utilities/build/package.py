@@ -221,9 +221,11 @@ class PackageRepository:
                 include_paths   = lib.get('include_paths', [])
                 lib_paths       = lib.get('lib_paths', [])
 
-                # Add default locations.
-                include_paths.append(DEFAULT_INCLUDE_PATH)
-                lib_paths.append(DEFAULT_LIB_PATH)
+                # Use default locations if not specified.
+                if not include_paths:
+                    include_paths = [DEFAULT_INCLUDE_PATH]
+                if not lib_paths:
+                    lib_paths = [DEFAULT_LIB_PATH]
 
                 # Map paths into the extracted package.
                 include_paths = [os.path.join(work_package_dir, p) for p in include_paths]

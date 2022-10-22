@@ -32,7 +32,6 @@ dirs = [
 
     # Other libraries.
     'device',
-    'zlib',
 ]
 
 SConscript(dirs = dirs)
