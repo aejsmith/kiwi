@@ -59,7 +59,7 @@ if revision:
 # Check if Git submodules are up-to-date.
 if ARGUMENTS.get('IGNORE_SUBMODULES') != '1' and not vcs.check_submodules():
     raise SCons.Errors.StopError(
-        "Submodules outdated. Please run 'git submodule update --init'.")
+        "Submodules outdated. Please run 'git submodule update --init', or run with 'IGNORE_SUBMODULES=1' on the command line.")
 
 # Load the build configuration (if it exists yet).
 config = ConfigParser('.config')

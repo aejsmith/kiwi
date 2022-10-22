@@ -30,7 +30,7 @@ def check_submodules():
         git = subprocess.Popen(['git', 'submodule', 'status'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         modules = git.communicate()[0].decode('utf-8').split('\n')
         for module in modules:
-            if len(module) and module[0] == '-':
+            if len(module) and module[0] != ' ':
                 return False
         return True
     except:
