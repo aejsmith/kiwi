@@ -92,8 +92,12 @@
 /** Define to enable debug output on thread creation/deletion. */
 //#define DEBUG_THREAD
 
-/** Define to enable system call tracing for a given process name. */
+/**
+ * Define to enable system call tracing for a given process name. ONLY_ERROR
+ * will only log system calls with return value that is not STATUS_SUCCESS.
+ */
 //#define SYSCALL_TRACE_PROCESS     "/system/bin/terminal"
+//#define SYSCALL_TRACE_ONLY_ERROR
 
 #ifdef DEBUG_THREAD
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
@@ -665,7 +669,7 @@ void thread_at_kernel_entry(syscall_t *syscall) {
         thread_exit();
     }
 
-    #ifdef SYSCALL_TRACE_PROCESS
+    #if defined(SYSCALL_TRACE_PROCESS) && !defined(SYSCALL_TRACE_ONLY_ERROR)
         if (syscall && strcmp(curr_proc->name, SYSCALL_TRACE_PROCESS) == 0) {
             kprintf(
                 LOG_DEBUG, "thread: %s (%" PRId32 ") %s (%" PRId32 "): syscall: %ps\n",
@@ -681,7 +685,11 @@ void thread_at_kernel_entry(syscall_t *syscall) {
  * @param ret           System call return value. */
 void thread_at_kernel_exit(syscall_t *syscall, unsigned long ret) {
     #ifdef SYSCALL_TRACE_PROCESS
-        if (syscall && strcmp(curr_proc->name, SYSCALL_TRACE_PROCESS) == 0) {
+        bool trace = syscall && strcmp(curr_proc->name, SYSCALL_TRACE_PROCESS) == 0;
+        #ifdef SYSCALL_TRACE_ONLY_ERROR
+            trace &= ret != STATUS_SUCCESS;
+        #endif
+        if (trace) {
             kprintf(
                 LOG_DEBUG, "thread: %s (%" PRId32 ") %s (%" PRId32 "): return:  %ps = %lu\n",
                 curr_proc->name, curr_proc->id, curr_thread->name, curr_thread->id,
