@@ -97,7 +97,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 
         switch (type) {
             case OBJECT_TYPE_FILE:
-                if (fds[i].events & ~(POLLIN | POLLOUT)) {
+                if (fds[i].events & ~(POLLIN | POLLOUT | POLLPRI)) {
                     errno = ENOTSUP;
                     return -1;
                 }
@@ -119,6 +119,9 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
                         return -1;
                     }
                 }
+
+                // TODO: POLLPRI. This is probably only relevant for out of
+                // band data on sockets.
 
                 break;
             default:
