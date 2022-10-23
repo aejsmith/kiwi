@@ -38,7 +38,7 @@
 #include <assert.h>
 
 /** Define to enable debug output. */
-#define DEBUG_UDP
+//#define DEBUG_UDP
 
 #ifdef DEBUG_UDP
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)

@@ -48,7 +48,7 @@
 #include <status.h>
 
 /** Define to enable debug output. */
-#define DEBUG_TCP
+//#define DEBUG_TCP
 
 #ifdef DEBUG_TCP
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)

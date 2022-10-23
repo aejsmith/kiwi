@@ -36,7 +36,7 @@
 #include <time.h>
 
 /** Define to enable debug output. */
-#define DEBUG_ARP
+//#define DEBUG_ARP
 
 #ifdef DEBUG_ARP
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
@@ -299,9 +299,9 @@ void arp_receive(net_interface_t *interface, net_packet_t *packet) {
     addrs += device->hw_addr_len;
     const net_addr_ipv4_t *proto_sender = (const net_addr_ipv4_t *)addrs;
     addrs += IPV4_ADDR_LEN;
-    const uint8_t *hw_target = addrs;
+    const uint8_t *hw_target __unused = addrs;
     addrs += device->hw_addr_len;
-    const net_addr_ipv4_t *proto_target = (const net_addr_ipv4_t *)addrs;
+    const net_addr_ipv4_t *proto_target __unused = (const net_addr_ipv4_t *)addrs;
 
     dprintf(
         "arp: received packet 0x%" PRIx16 " (hw_sender: %pM, proto_sender, %pI4, hw_target: %pM, proto_target: %pI4)\n",

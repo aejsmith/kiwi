@@ -39,7 +39,7 @@
 #include <status.h>
 
 /** Define to enable debug output. */
-#define DEBUG_IPV4
+//#define DEBUG_IPV4
 
 #ifdef DEBUG_IPV4
 #   define dprintf(fmt...)  kprintf(LOG_DEBUG, fmt)
