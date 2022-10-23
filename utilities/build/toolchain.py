@@ -250,33 +250,15 @@ class ToolchainManager:
         self.generic_dir = os.path.join(self.dest_dir, 'generic')
         self.target_dir  = os.path.join(self.dest_dir, self.target)
         self.build_dir   = os.path.join(self.dest_dir, 'build-tmp')
+        self.sysroot_dir = os.path.join(self.target_dir, 'sysroot')
 
         self.totaltime = 0
 
         self.toolchain = LLVMToolchain(self)
 
-    # Set up the toolchain sysroot.
-    def sysroot_action(self, target, source, env):
-        manifest = env['MANIFEST']
-        manifest.finalise()
-
-        sysroot_dir = os.path.join(self.target_dir, 'sysroot')
-        build_dir   = os.path.join(os.getcwd(), 'build', '%s-%s' % (self.arch, self.build))
-
-        # Remove any existing sysroot.
-        remove(sysroot_dir)
-        makedirs(sysroot_dir)
-
-        # Add contents. We symlink back to the target files so we don't have to
-        # rebuild just to change contents of the file.
-        actions = manifest.get_actions()
-        for path in actions.dirs:
-            makedirs(os.path.join(sysroot_dir, path))
-        for (path, target) in actions.links:
-            os.symlink(target, os.path.join(sysroot_dir, path))
-        for (path, target) in actions.files:
-            target = os.path.join(os.getcwd(), str(target))
-            os.symlink(target, os.path.join(sysroot_dir, path))
+    # Set up toolchain links that must always be up to date.
+    def setup_required_links(self):
+        build_dir = os.path.join(os.getcwd(), 'build', '%s-%s' % (self.arch, self.build))
 
         # Create a symlink to the compiler-rt builtins library in the build tree.
         runtime_dir = os.path.join(self.generic_dir, 'lib', 'clang', llvm_version, 'lib', 'kiwi')
@@ -285,6 +267,26 @@ class ToolchainManager:
         runtime_lib = os.path.join(runtime_dir, runtime_name)
         remove(runtime_lib)
         os.symlink(os.path.join(build_dir, 'lib', runtime_name), runtime_lib)
+
+    # Set up the toolchain sysroot.
+    def sysroot_action(self, target, source, env):
+        manifest = env['MANIFEST']
+        manifest.finalise()
+
+        # Remove any existing sysroot.
+        remove(self.sysroot_dir)
+        makedirs(self.sysroot_dir)
+
+        # Add contents. We symlink back to the target files so we don't have to
+        # rebuild just to change contents of the file.
+        actions = manifest.get_actions()
+        for path in actions.dirs:
+            makedirs(os.path.join(self.sysroot_dir, path))
+        for (path, target) in actions.links:
+            os.symlink(target, os.path.join(self.sysroot_dir, path))
+        for (path, target) in actions.files:
+            target = os.path.join(os.getcwd(), str(target))
+            os.symlink(target, os.path.join(self.sysroot_dir, path))
 
     # Build a component.
     def build_component(self, c):
@@ -300,6 +302,10 @@ class ToolchainManager:
             # Change to the old directory and clean up the build directory.
             os.chdir(olddir)
             remove(self.build_dir)
+
+    # Get the path to a generic toolchain utility.
+    def generic_tool_path(self, name):
+        return os.path.join(self.generic_dir, 'bin', name)
 
     # Get the path to a toolchain utility.
     def tool_path(self, name):

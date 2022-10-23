@@ -95,6 +95,10 @@ if toolchain.check() or 'toolchain' in COMMAND_LINE_TARGETS:
     util.require_target('toolchain', "Toolchain out of date. Update using the 'toolchain' target.")
     Return()
 
+# Ensure required links for compiler-rt are set up to point to the current
+# build tree.
+toolchain.setup_required_links()
+
 # Now set up the target template environment.
 manager.init_target(toolchain)
 
@@ -210,7 +214,7 @@ Alias('qgdb', dist_env.Command('__qgdb', [], Action(
 # Final steps #
 ###############
 
-sysroot_env = manager['sysroot']
+sysroot_env      = manager['sysroot']
 sysroot_manifest = sysroot_env['MANIFEST']
 
 # Command to update the toolchain sysroot.

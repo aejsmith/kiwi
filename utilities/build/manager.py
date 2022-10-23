@@ -85,6 +85,7 @@ class BuildManager:
         self.libraries = {}
         self.verbose = ARGUMENTS.get('V') == '1'
         self.config = config
+        self.target_build_dir = os.path.join('build', '%s-%s' % (self.config['ARCH'], self.config['BUILD']))
 
         # Add a reference to ourself to all environments.
         self.add_variable('MANAGER', self)
@@ -168,6 +169,23 @@ class BuildManager:
         for (k, v) in target_type_flags[self.config['BUILD']].items():
             self.target_template[k] += v
 
+        # We don't use the toolchain generated "<target>-clang" wrappers, as
+        # this sets the sysroot to the external one, which isn't always set up.
+        # We want to use our internal build tree only. Make wrappers to use
+        # during build.
+        build_sysroot_dir   = os.path.join(os.getcwd(), self.target_build_dir)
+        build_toolchain_dir = os.path.join(os.getcwd(), 'build', 'toolchain')
+        os.makedirs(build_toolchain_dir, exist_ok = True)
+        def tool_wrapper_path(name):
+            return os.path.join(build_toolchain_dir, '%s-%s' % (toolchain.target, name))
+        for name in ['clang', 'clang++']:
+            path    = toolchain.generic_tool_path(name)
+            wrapper = tool_wrapper_path(name)
+            with open(wrapper, 'w') as f:
+                f.write('#!/bin/bash\n\n')
+                f.write('exec -a "$0" "%s" --sysroot="%s" "$@"\n' % (path, build_sysroot_dir))
+            os.chmod(wrapper, 0o755)
+
         # Clang's integrated assembler doesn't support 16-bit code.
         self.target_template['ASFLAGS'] = ['-D__ASM__', '-no-integrated-as']
 
@@ -204,12 +222,12 @@ class BuildManager:
                 return True
             self.target_template.Decider(decide_if_changed)
         else:
-            self.target_template['CC'] = toolchain.tool_path('clang')
+            self.target_template['CC'] = tool_wrapper_path('clang')
         if 'CXX' in os.environ and os.path.basename(os.environ['CXX']) == 'c++-analyzer':
             self.target_template['CXX'] = os.environ['CXX']
-            self.target_template['ENV']['CCC_CXX'] = toolchain.tool_path('clang++')
+            self.target_template['ENV']['CCC_CXX'] = tool_wrapper_path('clang++')
         else:
-            self.target_template['CXX'] = toolchain.tool_path('clang++')
+            self.target_template['CXX'] = tool_wrapper_path('clang++')
         self.target_template['AS']      = toolchain.tool_path('as')
         self.target_template['OBJDUMP'] = toolchain.tool_path('objdump')
         self.target_template['READELF'] = toolchain.tool_path('readelf')
@@ -297,11 +315,11 @@ class BuildManager:
             # directory to the path, though.
             'ASFLAGS': [
                 '-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'],
-                '-include', 'build/%s-%s/config.h' % (self.config['ARCH'], self.config['BUILD'])
+                '-include', '%s/config.h' % (self.target_build_dir)
             ],
             'CCFLAGS': [
                 '-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'],
-                '-include', 'build/%s-%s/config.h' % (self.config['ARCH'], self.config['BUILD'])
+                '-include', '%s/config.h' % (self.target_build_dir)
             ],
 
             # Link to the specified libraries and set up the library path.
@@ -313,17 +331,27 @@ class BuildManager:
         self.merge_flags(env, flags)
 
         # Add paths for library dependencies.
-        def add_library_flags(lib):
+        def add_library_flags(lib, is_build = False):
             if lib in self.libraries:
                 lib_spec = self.libraries[lib]
 
                 self.merge_flags(env, {
                     'CPPPATH': [d[0] if isinstance(d, tuple) else d for d in lib_spec['include_paths']],
-                    'LIBPATH': lib_spec['lib_paths']
                 })
 
+                # If it's a direct library dependency, add to LIBPATH so that
+                # the linker can find it. For indirect dependencies, we need to
+                # specify '-rpath-link' to the linker so that it knows where to
+                # find the libraries used by the library we're linking to - it
+                # does not search paths specified with -L for this.
+                for lib_path in lib_spec['lib_paths']:
+                    if is_build:
+                        self.merge_flags(env, {'LINKFLAGS': ['-Wl,-rpath-link=%s' % (str(lib_path))]})
+                    else:
+                        self.merge_flags(env, {'LIBPATH': [lib_path]})
+
                 for dep in self.libraries[lib]['build_libraries']:
-                    add_library_flags(dep)
+                    add_library_flags(dep, True)
         for lib in libraries:
             add_library_flags(lib)
 
