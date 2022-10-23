@@ -240,11 +240,28 @@ status_t socket_connect(object_handle_t *handle, const sockaddr_t *addr, socklen
     return socket->ops->connect(socket, addr, addr_len);
 }
 
+/** Get the address of the peer that a socket is connected to.
+ * @param handle        Handle to the socket.
+ * @param max_len       Maximum length of returned address (size of buffer).
+ * @param _addr         Where to return address of the peer (can be NULL).
+ * @param _addr_len     Where to return actual size of the peer address. Can
+ *                      be larger than max_addr_len, in which case the address
+ *                      will have been truncated.
+ * @return              Status code describing result of the operation. */
 status_t socket_getpeername(
     object_handle_t *handle, socklen_t max_len, sockaddr_t *_addr,
     socklen_t *_addr_len)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    file_handle_t *fhandle = get_socket_handle(handle);
+    if (!fhandle)
+        return STATUS_INVALID_HANDLE;
+
+    socket_t *socket = fhandle->socket;
+
+    if (!socket->ops->getpeername)
+        return STATUS_NOT_SUPPORTED;
+
+    return socket->ops->getpeername(socket, max_len, _addr, _addr_len);
 }
 
 status_t socket_getsockname(
@@ -532,11 +549,42 @@ status_t kern_socket_connect(handle_t handle, const sockaddr_t *addr, socklen_t 
     return socket_connect(khandle, kaddr, addr_len);
 }
 
+/** Get the address of the peer that a socket is connected to.
+ * @param handle        Handle to the socket.
+ * @param max_len       Maximum length of returned address (size of buffer).
+ * @param _addr         Where to return address of the peer (can be NULL).
+ * @param _addr_len     Where to return actual size of the peer address. Can
+ *                      be larger than max_addr_len, in which case the address
+ *                      will have been truncated.
+ * @return              Status code describing result of the operation. */
 status_t kern_socket_getpeername(
     handle_t handle, socklen_t max_len, sockaddr_t *_addr,
     socklen_t *_addr_len)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    status_t ret;
+
+    if (!_addr || !_addr_len || max_len == 0 || max_len > SOCKADDR_STORAGE_SIZE)
+        return STATUS_INVALID_ARG;
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    void *kaddr __cleanup_kfree = kmalloc(max_len, MM_KERNEL);
+
+    socklen_t kaddr_len = 0;
+    ret = socket_getpeername(khandle, max_len, kaddr, &kaddr_len);
+    if (ret == STATUS_SUCCESS) {
+        ret = write_user(_addr_len, kaddr_len);
+        if (ret == STATUS_SUCCESS) {
+            /* Address can be truncated if family addresses are larger than
+             * max_len. */
+            ret = memcpy_to_user(_addr, kaddr, min(kaddr_len, max_len));
+        }
+    }
+
+    return ret;
 }
 
 status_t kern_socket_getsockname(
@@ -718,12 +766,12 @@ status_t kern_socket_getsockopt(
     if (!_opt_value || !_opt_len || max_len == 0 || max_len > SOCKOPT_LEN_MAX)
         return STATUS_INVALID_ARG;
 
-    void *kopt_value __cleanup_kfree = kmalloc(max_len, MM_KERNEL);
-
     object_handle_t *khandle __cleanup_object_handle = NULL;
     ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
     if (ret != STATUS_SUCCESS)
         return ret;
+
+    void *kopt_value __cleanup_kfree = kmalloc(max_len, MM_KERNEL);
 
     socklen_t kopt_len = 0;
     ret = socket_getsockopt(khandle, level, opt_name, max_len, kopt_value, &kopt_len);
