@@ -722,6 +722,28 @@ static status_t tcp_socket_getpeername(
     return STATUS_SUCCESS;
 }
 
+static status_t tcp_socket_getsockname(
+    socket_t *_socket, socklen_t max_len, sockaddr_t *_addr,
+    socklen_t *_addr_len)
+{
+    tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
+
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+
+    if (socket->state == TCP_STATE_CLOSED)
+        return STATUS_NOT_CONNECTED;
+
+    // TODO: Properly implement this when we have bind support. Return
+    // IN(6)ADDR_ANY.
+    sockaddr_ip_t sock_addr;
+    memset(&sock_addr, 0, sizeof(sock_addr));
+    sock_addr.family = socket->net.socket.family;
+    sock_addr.port   = socket->port.num;
+
+    net_socket_addr_copy(&socket->net, (const sockaddr_t *)&sock_addr, max_len, _addr, _addr_len);
+    return STATUS_SUCCESS;
+}
+
 static status_t tcp_socket_send(
     socket_t *_socket, io_request_t *request, int flags, const sockaddr_t *addr,
     socklen_t addr_len)
@@ -867,6 +889,7 @@ static const socket_ops_t tcp_socket_ops = {
     .unwait      = tcp_socket_unwait,
     .connect     = tcp_socket_connect,
     .getpeername = tcp_socket_getpeername,
+    .getsockname = tcp_socket_getsockname,
     .send        = tcp_socket_send,
     .receive     = tcp_socket_receive,
     .getsockopt  = net_socket_getsockopt,

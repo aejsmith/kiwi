@@ -73,6 +73,16 @@ typedef struct socket_ops {
         struct socket *socket, socklen_t max_len, sockaddr_t *_addr,
         socklen_t *_addr_len);
 
+    /** Get the address that a socket is bound to.
+     * @param handle        Socket to get address from.
+     * @param max_len       Maximum length of returned address (size of buffer).
+     * @param _addr         Where to return address of the socket (can be NULL).
+     * @param _addr_len     Where to return actual size of the socket address.
+     * @return              Status code describing result of the operation. */
+    status_t (*getsockname)(
+        struct socket *socket, socklen_t max_len, sockaddr_t *_addr,
+        socklen_t *_addr_len);
+
     /** Sends data on the socket.
      * @param socket        Socket to send on.
      * @param request       I/O request containing data.
