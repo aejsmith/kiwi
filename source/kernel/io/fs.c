@@ -606,9 +606,9 @@ static status_t fs_lookup_internal(
 
             dprintf(
                 "fs: following symbolic link '%s' (%" PRIu16 ":%" PRIu64
-                ") in '%s' (%" PRIu64 ":%" PRIu16 ") to '%s' (nest: %u)\n",
+                ") in '%s' (%" PRIu16 ":%" PRIu64 ") to '%s' (nest: %u)\n",
                 entry->name, entry->mount->id, node->id, prev->name,
-                prev->mount->id, prev->node->id, nest);
+                prev->mount->id, prev->node->id, link, nest);
 
             /* Don't need this entry any more. The previous iteration of the
              * loop left a reference on the previous entry. */
@@ -907,7 +907,7 @@ static status_t fs_create_prepare(const char *path, fs_dentry_t **_entry) {
     }
 
     /* Cannot create within an unlinked directory. */
-    if (parent != root_mount->root && !parent->parent) {
+    if (parent != parent->mount->root && !parent->parent) {
         ret = STATUS_NOT_FOUND;
         goto out_release_parent;
     }
