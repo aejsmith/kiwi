@@ -853,6 +853,7 @@ static const socket_ops_t tcp_socket_ops = {
     .connect    = tcp_socket_connect,
     .send       = tcp_socket_send,
     .receive    = tcp_socket_receive,
+    .getsockopt = net_socket_getsockopt,
     .setsockopt = net_socket_setsockopt,
 };
 

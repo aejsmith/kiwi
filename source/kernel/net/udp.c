@@ -328,6 +328,7 @@ static const socket_ops_t udp_socket_ops = {
     .bind       = udp_socket_bind,
     .send       = udp_socket_send,
     .receive    = udp_socket_receive,
+    .getsockopt = net_socket_getsockopt,
     .setsockopt = net_socket_setsockopt,
 };
 

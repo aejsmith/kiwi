@@ -42,6 +42,9 @@ typedef struct net_socket {
 
 DEFINE_CLASS_CAST(net_socket, socket, socket);
 
+extern status_t net_socket_getsockopt(
+    socket_t *socket, int level, int opt_name, socklen_t max_len,
+    void *_opt_value, socklen_t *_opt_len);
 extern status_t net_socket_setsockopt(
     socket_t *socket, int level, int opt_name, const void *opt_value,
     socklen_t opt_len);

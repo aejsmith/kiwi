@@ -363,11 +363,28 @@ out:
     return ret;
 }
 
+/** Get a socket option.
+ * @param handle        Handle to socket.
+ * @param level         Level to get option from.
+ * @param max_len       Maximum length to return.
+ * @param opt_name      Option to get.
+ * @param _opt_value    Where to store option value.
+ * @param _opt_len      Where to store option length.
+ * @return              Status code describing result of the operation. */
 status_t socket_getsockopt(
     object_handle_t *handle, int level, int opt_name, socklen_t max_len,
     void *_opt_value, socklen_t *_opt_len)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    file_handle_t *fhandle = get_socket_handle(handle);
+    if (!fhandle)
+        return STATUS_INVALID_HANDLE;
+
+    socket_t *socket = fhandle->socket;
+
+    if (!socket->ops->getsockopt)
+        return STATUS_NOT_SUPPORTED;
+
+    return socket->ops->getsockopt(socket, level, opt_name, max_len, _opt_value, _opt_len);
 }
 
 /** Set a socket option.
@@ -684,11 +701,39 @@ out:
     return ret;
 }
 
+/** Get a socket option.
+ * @param handle        Handle to socket.
+ * @param level         Level to get option from.
+ * @param max_len       Maximum length to return.
+ * @param opt_name      Option to get.
+ * @param _opt_value    Where to store option value.
+ * @param _opt_len      Where to store option length.
+ * @return              Status code describing result of the operation. */
 status_t kern_socket_getsockopt(
     handle_t handle, int level, int opt_name, socklen_t max_len,
     void *_opt_value, socklen_t *_opt_len)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    status_t ret;
+
+    if (!_opt_value || !_opt_len || max_len == 0 || max_len > SOCKOPT_LEN_MAX)
+        return STATUS_INVALID_ARG;
+
+    void *kopt_value __cleanup_kfree = kmalloc(max_len, MM_KERNEL);
+
+    object_handle_t *khandle __cleanup_object_handle = NULL;
+    ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, &khandle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    socklen_t kopt_len = 0;
+    ret = socket_getsockopt(khandle, level, opt_name, max_len, kopt_value, &kopt_len);
+    if (ret == STATUS_SUCCESS) {
+        ret = write_user(_opt_len, kopt_len);
+        if (ret == STATUS_SUCCESS)
+            ret = memcpy_to_user(_opt_value, kopt_value, kopt_len);
+    }
+
+    return ret;
 }
 
 /** Set a socket option.
