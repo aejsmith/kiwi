@@ -568,6 +568,11 @@ static void tcp_socket_close(socket_t *_socket) {
     if (socket->state == TCP_STATE_ESTABLISHED) {
         dprintf("tcp: %" PRIu16 ": initiating active close\n", socket->port.num);
 
+        /* Nuke our receive buffer contents so that we advertise a full window,
+         * which will allow us to discard any more data from the other side
+         * more quickly. */
+        socket->rx_buffer.curr_size = 0;
+
         start_close(socket, TCP_STATE_CLOSE_ACTIVE);
 
         /* Flush the TX buffer. The FIN will be sent once it is empty which will
@@ -1196,8 +1201,29 @@ static void receive_last_ack(tcp_socket_t *socket, const tcp_header_t *header, n
     }
 }
 
+/**
+ * Handle received data that we don't care about. Returns whether to send an
+ * ACK packet.
+ */
+static bool discard_rx_data(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
+    uint32_t data_offset = header->data_offset * sizeof(uint32_t);
+    uint32_t data_size   = packet->size - data_offset;
+    uint32_t seq_num     = net32_to_cpu(header->seq_num);
+    uint32_t seq_next    = seq_num + data_size;
+
+    if (TCP_SEQ_GT(seq_next, socket->rx_seq)) {
+        socket->rx_seq = seq_next;
+        return true;
+    } else {
+        return false;
+    }
+}
+
 /** Handles packets while in the FIN_WAIT_1 state. */
 static void receive_fin_wait_1(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
+    /* We don't care about data we receive after an active close, just ack it. */
+    bool need_ack = discard_rx_data(socket, header, packet);
+
     /* We're waiting for our FIN to be acked. */
     uint32_t ack_num = net32_to_cpu(header->ack_num);
     if (ack_num >= socket->tx_seq) {
@@ -1205,7 +1231,7 @@ static void receive_fin_wait_1(tcp_socket_t *socket, const tcp_header_t *header,
             /* If this has a FIN set we might have missed the acknowledgement
              * or received it out of order, just skip straight to TIME_WAIT. */
             socket->rx_seq++;
-            tx_ack_packet(socket);
+            need_ack      = true;
             socket->state = TCP_STATE_TIME_WAIT;
         } else {
             socket->state = TCP_STATE_FIN_WAIT_2;
@@ -1213,20 +1239,29 @@ static void receive_fin_wait_1(tcp_socket_t *socket, const tcp_header_t *header,
     } else if (header->flags & TCP_FIN) {
         /* Simultaneous close. */
         socket->rx_seq++;
-        tx_ack_packet(socket);
+        need_ack      = true;
         socket->state = TCP_STATE_CLOSING;
     }
+
+    if (need_ack)
+        tx_ack_packet(socket);
 }
 
 /** Handles packets while in the FIN_WAIT_2 state. */
 static void receive_fin_wait_2(tcp_socket_t *socket, const tcp_header_t *header, net_packet_t *packet) {
+    /* We don't care about data we receive after an active close, just ack it. */
+    bool need_ack = discard_rx_data(socket, header, packet);
+
     /* We're waiting for a FIN from the other side. */
     uint32_t ack_num = net32_to_cpu(header->ack_num);
     if (ack_num >= socket->tx_seq && header->flags & TCP_FIN) {
         socket->rx_seq++;
-        tx_ack_packet(socket);
+        need_ack      = true;
         socket->state = TCP_STATE_TIME_WAIT;
     }
+
+    if (need_ack)
+        tx_ack_packet(socket);
 }
 
 /** Handles packets while in the CLOSING state. */
