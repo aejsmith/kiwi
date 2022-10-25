@@ -137,8 +137,11 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 
     ret = kern_object_wait(events, count, 0, (timeout < 0) ? -1 : core_msecs_to_nsecs(timeout));
 
-    /* INVALID_EVENT would signal ERROR on the corresponding handle. */
-    if (ret != STATUS_SUCCESS && ret != STATUS_INVALID_EVENT) {
+    if (ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK) {
+        /* If these are returned, no events should have been returned. */
+    } else if (ret == STATUS_INVALID_EVENT) {
+        /* INVALID_EVENT would signal ERROR on the corresponding handle. */
+    } else if (ret != STATUS_SUCCESS) {
         libsystem_status_to_errno(ret);
         return -1;
     }

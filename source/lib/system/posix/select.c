@@ -118,7 +118,9 @@ int pselect(
         if (sigmask)
             sigprocmask(SIG_SETMASK, &orig_mask, NULL);
 
-        if (ret != STATUS_SUCCESS) {
+        if (ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK) {
+            /* If these are returned, no events should have been returned. */
+        } else if (ret != STATUS_SUCCESS) {
             libsystem_status_to_errno(ret);
             return -1;
         }
