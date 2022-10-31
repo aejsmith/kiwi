@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <system/defs.h>
+
 __SYS_EXTERN_C_BEGIN
 
 /** Mode flags for dlopen(). */
@@ -28,11 +30,6 @@ __SYS_EXTERN_C_BEGIN
 #define RTLD_NOW        (1<<1)      /**< Relocations are performed immediately. */
 #define RTLD_GLOBAL     (1<<2)      /**< Module is available for linking to other modules. */
 #define RTLD_LOCAL      (1<<3)      /**< Module is not available for linking to other modules. */
-
-/* extern int dlclose(void *); */
-/* extern char *dlerror(void); */
-/* extern void *dlopen(const char *, int); */
-/* extern void *dlsym(void *restrict, const char *restrict); */
 
 /** Symbol information. */
 typedef struct dl_info {
@@ -42,6 +39,10 @@ typedef struct dl_info {
     void *dli_saddr;                /**< Exact address of named symbol. */
 } Dl_info;
 
-static inline int dladdr(void *addr, Dl_info *info) { return 0; }
+extern int dlclose(void *handle);
+extern char *dlerror(void);
+extern void *dlopen(const char *file, int mode);
+extern void *dlsym(void *__restrict handle, const char *__restrict name);
+extern int dladdr(void *addr, Dl_info *info);
 
 __SYS_EXTERN_C_END

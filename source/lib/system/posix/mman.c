@@ -104,3 +104,18 @@ int munmap(void *start, size_t size) {
 
     return 0;
 }
+
+int mprotect(void *addr, size_t len, int prot) {
+    libsystem_stub(__func__, false);
+    return -1;
+}
+
+int mlock(const void *addr, size_t len) {
+    libsystem_stub(__func__, false);
+    return -1;
+}
+
+int munlock(const void *addr, size_t len) {
+    libsystem_stub(__func__, false);
+    return -1;
+}

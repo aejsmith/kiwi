@@ -37,12 +37,15 @@ typedef struct sockaddr {
     char sa_data[];
 } sockaddr_t;
 
-#define SOCKADDR_STORAGE_SIZE   128
-
 typedef struct sockaddr_storage {
     sa_family_t ss_family;
     char sa_data[SOCKADDR_STORAGE_SIZE - sizeof(sa_family_t)];
 } __kernel_aligned(sizeof(void *)) sockaddr_storage_t;
+
+typedef struct linger {
+    int l_onoff;
+    int l_linger;
+} linger_t;
 
 #define SOCK_DGRAM              1
 #define SOCK_RAW                2

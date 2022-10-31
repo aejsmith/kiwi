@@ -40,12 +40,12 @@ __SYS_EXTERN_C_BEGIN
 /** Value returned by mmap() on failure. */
 #define MAP_FAILED      ((void *)-1l)
 
-/* int mlock(const void *, size_t); */
+extern int mlock(const void *addr, size_t len);
 /* int mlockall(int); */
 extern void *mmap(void *start, size_t size, int prot, int flags, int fd, off_t offset);
-/* int mprotect(void *, size_t, int); */
+extern int mprotect(void *addr, size_t len, int prot);
 /* int msync(void *, size_t, int); */
-/* int munlock(const void *, size_t); */
+extern int munlock(const void *addr, size_t len);
 /* int munlockall(void); */
 extern int munmap(void *start, size_t size);
 /* int posix_madvise(void *, size_t, int); */

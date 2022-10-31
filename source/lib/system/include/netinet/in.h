@@ -28,6 +28,8 @@
 
 #include <sys/socket.h>
 
+__SYS_EXTERN_C_BEGIN
+
 #define htonl(val) core_cpu_to_be32(val)
 #define htons(val) core_cpu_to_be16(val)
 #define ntohl(val) core_be32_to_cpu(val)
@@ -95,3 +97,5 @@
 
 #define IN6_IS_ADDR_MC_GLOBAL(a) \
     (IN6_IS_ADDR_MULTICAST(a) && ((((uint8_t *)(a))[1] & 0xf) == 0xe))
+
+__SYS_EXTERN_C_END

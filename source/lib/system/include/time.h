@@ -49,10 +49,8 @@ struct tm {
 };
 
 /** Clock IDs for clock_* functions. */
-enum {
-    CLOCK_MONOTONIC = 0,
-    CLOCK_REALTIME = 1,
-};
+#define CLOCK_MONOTONIC     0
+#define CLOCK_REALTIME      1
 
 extern char *asctime(const struct tm *tm);
 extern char *asctime_r(const struct tm *__restrict tm, char *__restrict buf);

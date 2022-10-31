@@ -16,23 +16,33 @@
 
 /**
  * @file
- * @brief               Address family definitions.
+ * @brief               Dynamic linking functions.
  */
 
-#pragma once
+#include <dlfcn.h>
 
-#include <kernel/types.h>
+#include "libsystem.h"
 
-__KERNEL_EXTERN_C_BEGIN
+void *dlopen(const char *file, int mode) {
+    libsystem_stub(__func__, false);
+    return NULL;
+}
 
-typedef uint16_t sa_family_t;
+int dlclose(void *handle) {
+    libsystem_stub(__func__, false);
+    return 0;
+}
 
-#define AF_UNSPEC               0
-#define AF_INET                 1
-#define AF_INET6                2
-#define AF_UNIX                 3
-#define __AF_COUNT              4
+char *dlerror(void) {
+    return (char *)"<UNIMPLEMENTED>";
+}
 
-#define SOCKADDR_STORAGE_SIZE   128
+void *dlsym(void *__restrict handle, const char *__restrict name) {
+    libsystem_stub(__func__, false);
+    return NULL;
+}
 
-__KERNEL_EXTERN_C_END
+int dladdr(void *addr, Dl_info *info) {
+    libsystem_stub(__func__, false);
+    return 0;
+}
