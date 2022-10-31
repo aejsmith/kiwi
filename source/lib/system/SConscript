@@ -159,6 +159,10 @@ musl_sources = [File('musl/src/%s' % (f)) for f in [
     'network/gethostbyname2.c',
     'network/gethostbyname2_r.c',
     'network/getnameinfo.c',
+    'network/getservbyname.c',
+    'network/getservbyname_r.c',
+    'network/getservbyport.c',
+    'network/getservbyport_r.c',
     'network/herror.c',
     'network/h_errno.c',
     'network/hstrerror.c',
@@ -175,6 +179,7 @@ musl_sources = [File('musl/src/%s' % (f)) for f in [
     'network/res_query.c',
     'network/res_send.c',
     'network/resolvconf.c',
+    'network/serv.c',
 
     'prng/rand.c',
     'prng/rand_r.c',
