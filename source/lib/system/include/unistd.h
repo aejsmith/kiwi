@@ -131,6 +131,7 @@ extern char *ttyname(int fd);
 /* int ttyname_r(int, char *, size_t); */
 extern int unlink(const char *path);
 //extern int unlinkat(int, const char *, int);
+extern int usleep(useconds_t usecs);
 extern ssize_t write(int fd, const void *buf, size_t count);
 
 __SYS_EXTERN_C_END

@@ -19,6 +19,8 @@
  * @brief               POSIX time functions.
  */
 
+#include <core/time.h>
+
 #include <kernel/status.h>
 #include <kernel/thread.h>
 #include <kernel/time.h>
@@ -89,6 +91,19 @@ unsigned int sleep(unsigned int secs) {
 
     if (nanosleep(&ts, &ts) == -1 && errno == EINTR)
         return ts.tv_sec;
+
+    return 0;
+}
+
+/** Sleep for a certain interval.
+ * @param usecs         Number of microseconds to sleep for.
+ * @return              0 on success, -1 on failure. */
+int usleep(useconds_t usecs) {
+    status_t ret = kern_thread_sleep(core_usecs_to_nsecs(usecs), NULL);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
 
     return 0;
 }
