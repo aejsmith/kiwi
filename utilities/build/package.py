@@ -216,6 +216,9 @@ class PackageRepository:
         for package in self.packages.values():
             work_package_dir = os.path.join(self.work_dir, package.name)
 
+            unique_include_paths = set()
+            unique_lib_paths     = set()
+
             for (name, lib) in package.libraries.items():
                 build_libraries = lib.get('build_libraries', [])
                 include_paths   = lib.get('include_paths', [])
@@ -238,15 +241,19 @@ class PackageRepository:
                     include_paths   = [env.Dir(p) for p in include_paths],
                     lib_paths       = [env.Dir(p) for p in lib_paths])
 
-                # Add to the sysroot.
-                for path in include_paths:
-                    sysroot.add_from_dir_tree(
-                        source_path = path, dest_path = 'include', tracked = False,
-                        follow_links = True)
-                for path in lib_paths:
-                    sysroot.add_from_dir_tree(
-                        source_path = path, dest_path = 'lib', tracked = False,
-                        follow_links = True)
+                unique_include_paths.update(include_paths)
+                unique_lib_paths.update(lib_paths)
+
+            # Add everything to the sysroot. For multiple library records with
+            # the same directory, we should only add once.
+            for path in unique_include_paths:
+                sysroot.add_from_dir_tree(
+                    source_path = path, dest_path = 'include', tracked = False,
+                    follow_links = True)
+            for path in unique_lib_paths:
+                sysroot.add_from_dir_tree(
+                    source_path = path, dest_path = 'lib', tracked = False,
+                    follow_links = True)
 
     # Add package manifests to a combined manifest.
     def add_manifests(self, manifest):
