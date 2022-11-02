@@ -43,6 +43,6 @@ void *dlsym(void *__restrict handle, const char *__restrict name) {
 }
 
 int dladdr(void *addr, Dl_info *info) {
-    libsystem_stub(__func__, false);
+    //libsystem_stub(__func__, false);
     return 0;
 }

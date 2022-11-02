@@ -167,17 +167,12 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 
 /** Load an image.
  * @param path          Path to image file.
- * @param req           Image that requires this image. This is used to work
- *                      out where to place the new image in the image list.
  * @param type          Required ELF type.
  * @param _entry        Where to store entry point for binary, if type is
  *                      ELF_ET_EXEC.
  * @param _image        Where to store pointer to image structure.
  * @return              Status code describing result of the operation. */
-static status_t load_image(
-    const char *path, rtld_image_t *req, int type, void **_entry,
-    rtld_image_t **_image)
-{
+static status_t load_image(const char *path, int type, void **_entry, rtld_image_t **_image) {
     handle_t handle;
     file_info_t file;
     rtld_image_t *exist, *image = NULL;
@@ -264,6 +259,11 @@ static status_t load_image(
         ret = STATUS_NO_MEMORY;
         goto fail;
     }
+
+    /* This must be written immediately - it is used to set application_image
+     * which is checked in symbol lookup. */
+    if (_image)
+        *_image = image;
 
     /* Allocate an image ID. */
     image->id = (ehdr.e_type == ELF_ET_EXEC) ? APPLICATION_IMAGE_ID : next_image_id++;
@@ -445,13 +445,7 @@ static status_t load_image(
         }
     }
 
-    /* Add the library into the library list before checking dependencies so
-     * that we can check if something has a cyclic dependency. */
-    if (req) {
-        core_list_add_before(&req->header, &image->header);
-    } else {
-        core_list_append(&loaded_images, &image->header);
-    }
+    core_list_append(&loaded_images, &image->header);
 
     /* Load libraries that we depend on. */
     for (i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
@@ -460,7 +454,7 @@ static status_t load_image(
 
         dep = (const char *)(image->dyntab[i].d_un.d_ptr + image->dynamic[ELF_DT_STRTAB]);
         dprintf("rtld: %s: dependency on %s\n", path, dep);
-        ret = rtld_image_load(dep, image, NULL);
+        ret = rtld_image_load(dep, NULL);
         if (ret != STATUS_SUCCESS) {
             if (ret == STATUS_NOT_FOUND) {
                 printf(
@@ -503,9 +497,6 @@ static status_t load_image(
     if (_entry)
         *_entry = (void *)ehdr.e_entry;
 
-    if (_image)
-        *_image = image;
-
     kern_handle_close(handle);
     return STATUS_SUCCESS;
 
@@ -547,10 +538,9 @@ static bool path_exists(const char *path) {
  * @param name          Name of library to load. If this contains a '/', it is
  *                      interpreted as an exact path. Otherwise, the library
  *                      search paths will be searched.
- * @param req           Image that requires this library.
  * @param _image        Where to store pointer to image structure.
  * @return              Status code describing result of the operation. */
-status_t rtld_image_load(const char *name, rtld_image_t *req, rtld_image_t **_image) {
+status_t rtld_image_load(const char *name, rtld_image_t **_image) {
     char buf[FS_PATH_MAX];
     size_t i;
 
@@ -563,15 +553,14 @@ status_t rtld_image_load(const char *name, rtld_image_t *req, rtld_image_t **_im
             strcat(buf, "/");
             strcat(buf, name);
             if (path_exists(buf))
-                return load_image(buf, req, ELF_ET_DYN, NULL, _image);
+                return load_image(buf, ELF_ET_DYN, NULL, _image);
         }
 
         return STATUS_NOT_FOUND;
     } else {
-        return load_image(name, req, ELF_ET_DYN, NULL, _image);
+        return load_image(name, ELF_ET_DYN, NULL, _image);
     }
 }
-
 
 /** Initialise the runtime loader.
  * @param _entry        Where to store program entry point address.
@@ -660,7 +649,7 @@ status_t rtld_init(void **_entry) {
 
     /* Load the program. */
     dprintf("rtld: loading program %s...\n", process_args->path);
-    ret = load_image(process_args->path, NULL, ELF_ET_EXEC, _entry, &application_image);
+    ret = load_image(process_args->path, ELF_ET_EXEC, _entry, &application_image);
     if (ret != STATUS_SUCCESS) {
         dprintf("rtld: failed to load binary: %d\n", ret);
         return ret;

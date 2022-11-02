@@ -86,10 +86,18 @@ typedef struct rtld_symbol {
     rtld_image_t *image;            /**< Image containing symbol. */
 } rtld_symbol_t;
 
+/** Symbol lookup flags. */
+enum {
+    /** Exclude the application in the lookup (e.g. for COPY relocs). */
+    SYMBOL_LOOKUP_EXCLUDE_APP   = (1<< 0),
+};
+
 /** Pre-defined image IDs. */
-#define APPLICATION_IMAGE_ID    1   /**< Application always has module ID 1. */
-#define LIBKERNEL_IMAGE_ID      2   /**< If libkernel has TLS, this will be its ID. */
-#define DYNAMIC_IMAGE_START     3   /**< Start of dynamically allocated IDs. */
+enum {
+    APPLICATION_IMAGE_ID    = 1,    /**< Application always has module ID 1. */
+    LIBKERNEL_IMAGE_ID      = 2,    /**< If libkernel has TLS, this will be its ID. */
+    DYNAMIC_IMAGE_START     = 3,    /**< Start of dynamically allocated IDs. */
+};
 
 extern elf_dyn_t _DYNAMIC[];
 extern char _end[];
@@ -113,9 +121,9 @@ extern bool libkernel_dry_run;
 extern status_t arch_rtld_image_relocate(rtld_image_t *image);
 
 extern rtld_image_t *rtld_image_lookup(image_id_t id);
-extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, rtld_symbol_t *symbol);
+extern bool rtld_symbol_lookup(const char *name, uint32_t flags, rtld_symbol_t *symbol);
 extern void rtld_symbol_init(rtld_image_t *image);
-extern status_t rtld_image_load(const char *name, rtld_image_t *req, rtld_image_t **_image);
+extern status_t rtld_image_load(const char *name, rtld_image_t **_image);
 extern status_t rtld_init(void **_entry);
 
 extern ptrdiff_t tls_tp_offset(rtld_image_t *image);

@@ -39,55 +39,33 @@ static unsigned long hash_symbol(const unsigned char *name) {
     return h;
 }
 
-/**
- * Look up a symbol.
- *
- * Looks up a symbol in all loaded images. Assumes that the image that the
- * symbol is being looked up for is in the loaded images list.
- *
- * @param start         Image to look up symbol for.
+/** Looks up a symbol in all loaded images.
  * @param name          Name of symbol to look up.
+ * @param flags         Behaviour flags (SYMBOL_LOOKUP_*).
  * @param symbol        Structure to fill in with symbol information.
- *
- * @return              Whether the symbol was found.
- */
-bool rtld_symbol_lookup(rtld_image_t *start, const char *name, rtld_symbol_t *symbol) {
-    unsigned long hash;
-    core_list_t *iter;
-    rtld_image_t *image;
-    elf_sym_t *symtab;
-    const char *strtab;
-    Elf32_Word i;
-    uint8_t type;
+ * @return              Whether the symbol was found. */
+bool rtld_symbol_lookup(const char *name, uint32_t flags, rtld_symbol_t *symbol) {
+    unsigned long hash = hash_symbol((const unsigned char *)name);
 
-    hash = hash_symbol((const unsigned char *)name);
+    core_list_foreach(&loaded_images, iter) {
+        rtld_image_t *image = core_list_entry(iter, rtld_image_t, header);
 
-    /* Iterate through all images, starting at the image after the image that
-     * requires the symbol. */
-    iter = start->header.next;
-    do {
-        if (iter == &loaded_images) {
-            iter = iter->next;
+        if (flags & SYMBOL_LOOKUP_EXCLUDE_APP && image == application_image)
             continue;
-        }
-
-        image = core_list_entry(iter, rtld_image_t, header);
-        iter = iter->next;
 
         /* If the hash table is empty we do not need to do anything. */
         if (image->h_nbucket == 0)
             continue;
 
-        symtab = (elf_sym_t *)image->dynamic[ELF_DT_SYMTAB];
-        strtab = (const char *)image->dynamic[ELF_DT_STRTAB];
+        elf_sym_t *symtab  = (elf_sym_t *)image->dynamic[ELF_DT_SYMTAB];
+        const char *strtab = (const char *)image->dynamic[ELF_DT_STRTAB];
 
         /* Loop through all hash table entries. */
-        for (
-            i = image->h_buckets[hash % image->h_nbucket];
-            i != ELF_STN_UNDEF;
-            i = image->h_chains[i])
+        for (Elf32_Word i = image->h_buckets[hash % image->h_nbucket];
+             i != ELF_STN_UNDEF;
+             i = image->h_chains[i])
         {
-            type = ELF_ST_TYPE(symtab[i].st_info);
+            uint8_t type = ELF_ST_TYPE(symtab[i].st_info);
 
             if ((symtab[i].st_value == 0 && type != ELF_STT_TLS) ||
                 (symtab[i].st_shndx == ELF_SHN_UNDEF) ||
@@ -113,7 +91,7 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, rtld_symbol_t *sy
             symbol->image = image;
             return true;
         }
-    } while (iter != start->header.next);
+    }
 
     return false;
 }
@@ -121,14 +99,15 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, rtld_symbol_t *sy
 /** Initialise symbol fields in an image.
  * @param image         Image to initialise. */
 void rtld_symbol_init(rtld_image_t *image) {
-    Elf32_Word *addr;
-
     if (image->dynamic[ELF_DT_HASH]) {
-        addr = (Elf32_Word *)image->dynamic[ELF_DT_HASH];
+        Elf32_Word *addr = (Elf32_Word *)image->dynamic[ELF_DT_HASH];
+
         image->h_nbucket = *addr++;
         image->h_nchain  = *addr++;
         image->h_buckets = addr;
+
         addr += image->h_nbucket;
+
         image->h_chains = addr;
     }
 }
