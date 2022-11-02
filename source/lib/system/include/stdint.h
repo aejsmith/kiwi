@@ -73,22 +73,22 @@ typedef unsigned long uintptr_t;
 typedef int64_t intmax_t;
 typedef uint64_t uintmax_t;
 
-#define __INT8_C(x)         ((int_least8_t)x)
-#define __INT16_C(x)        ((int_least16_t)x)
-#define __INT32_C(x)        ((int_least32_t)x)
+#define __INT8_C(x)         x
+#define __INT16_C(x)        x
+#define __INT32_C(x)        x
 #if __WORDSIZE == 64
-#   define __INT64_C(x)     ((int_least64_t)x ## l)
+#   define __INT64_C(x)     x ## l
 #else
-#   define __INT64_C(x)     ((int_least64_t)x ## ll)
+#   define __INT64_C(x)     x ## ll
 #endif
 
-#define __UINT8_C(x)        ((uint_least8_t)x)
-#define __UINT16_C(x)       ((uint_least16_t)x)
-#define __UINT32_C(x)       ((uint_least32_t)x)
+#define __UINT8_C(x)        x ## u
+#define __UINT16_C(x)       x ## u
+#define __UINT32_C(x)       x ## u
 #if __WORDSIZE == 64
-#   define __UINT64_C(x)    ((uint_least64_t)x ## ul)
+#   define __UINT64_C(x)    x ## ul
 #else
-#   define __UINT64_C(x)    ((uint_least64_t)x ## ull)
+#   define __UINT64_C(x)    x ## ull
 #endif
 
 #define INT8_MIN            (-128)
