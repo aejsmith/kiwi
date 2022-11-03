@@ -107,16 +107,15 @@ static status_t do_relocations(rtld_image_t *image, elf_rela_t *relocs, size_t s
  * @param image         Image to relocate.
  * @return              Status code describing result of the operation. */
 status_t arch_rtld_image_relocate(rtld_image_t *image) {
-    elf_rela_t *relocs;
     status_t ret;
 
     /* First perform RELA relocations. */
-    relocs = (elf_rela_t *)image->dynamic[ELF_DT_REL_TYPE];
-    ret = do_relocations(image, relocs, image->dynamic[ELF_DT_RELSZ_TYPE]);
+    elf_rela_t *rela = (elf_rela_t *)image->dynamic[ELF_DT_REL_TYPE];
+    ret = do_relocations(image, rela, image->dynamic[ELF_DT_RELSZ_TYPE]);
     if (ret != STATUS_SUCCESS)
         return ret;
 
     /* Then PLT relocations. */
-    relocs = (elf_rela_t *)image->dynamic[ELF_DT_JMPREL];
-    return do_relocations(image, relocs, image->dynamic[ELF_DT_PLTRELSZ]);
+    elf_rela_t *plt = (elf_rela_t *)image->dynamic[ELF_DT_JMPREL];
+    return do_relocations(image, plt, image->dynamic[ELF_DT_PLTRELSZ]);
 }

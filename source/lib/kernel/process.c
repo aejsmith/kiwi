@@ -35,9 +35,7 @@ process_id_t curr_process_id = -1;
 static process_clone_handler_t process_clone_handlers[CLONE_HANDLER_MAX] = {};
 
 __sys_export status_t kern_process_clone(handle_t *_handle) {
-    status_t ret;
-
-    ret = _kern_process_clone(_handle);
+    status_t ret = _kern_process_clone(_handle);
     if (ret != STATUS_SUCCESS)
         return ret;
 

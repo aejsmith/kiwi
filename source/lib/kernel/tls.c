@@ -42,10 +42,8 @@
 static ptr_t static_dtv_size;
 
 /**
- * Get a TLS address.
- *
- * This is not called directly by code, it is called from an architecture-
- * specific wrapper (__tls_get_addr on most architectures).
+ * Gets a TLS address. This is not called directly by code, it is called from
+ * an architecture-specific wrapper (__tls_get_addr on most architectures).
  *
  * @param module        Module ID.
  * @param offset        Offset of object.
@@ -54,10 +52,9 @@ static ptr_t static_dtv_size;
  */
 void *tls_get_addr(size_t module, size_t offset) {
     tls_tcb_t *tcb = arch_tls_tcb();
-    size_t size;
 
     /* Check if the DTV contains this module. */
-    size = (size_t)tcb->dtv[0];
+    size_t size = (size_t)tcb->dtv[0];
     if (module >= size) {
         printf("DTV resizing is not yet implemented\n");
         return NULL;
@@ -71,16 +68,13 @@ void *tls_get_addr(size_t module, size_t offset) {
 
 #ifdef TLS_VARIANT_2
 
-/** Work out the size to allocate for the initial TLS block.
- * @return              Size to allocate. */
+/** Work out the size to allocate for the initial TLS block. */
 static size_t initial_block_size(void) {
-    rtld_image_t *image;
-    size_t i, size = 0;
-
-    /* tlsoffset(1) = round(tlssize(1), align(1))
+    /* tlsoffset(1)   = round(tlssize(1), align(1))
      * tlsoffset(m+1) = round(tlsoffset(m) + tlssize(m+1), align(m+1)) */
-    for (i = 1; i < static_dtv_size; i++) {
-        image = rtld_image_lookup(i);
+    size_t size = 0;
+    for (size_t i = 1; i < static_dtv_size; i++) {
+        rtld_image_t *image = rtld_image_lookup(i);
         if (image && image->tls_memsz)
             size = core_round_up(size + image->tls_memsz, image->tls_align);
     }
@@ -90,16 +84,10 @@ static size_t initial_block_size(void) {
     return size;
 }
 
-/** Initialise the initial TLS block.
- * @param base          Base address of block.
- * @param dtv           Dynamic thread vector.
- * @return              TCB pointer. */
+/** Initialise the initial TLS block. */
 static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
-    rtld_image_t *image;
-    size_t i;
-
-    for (i = static_dtv_size - 1; i >= 1; i--) {
-        image = rtld_image_lookup(i);
+    for (size_t i = static_dtv_size - 1; i >= 1; i--) {
+        rtld_image_t *image = rtld_image_lookup(i);
         if (!image || !image->tls_memsz)
             continue;
 
@@ -130,17 +118,14 @@ static tls_tcb_t *initial_block_init(ptr_t base, ptr_t *dtv) {
  * @return              Offset from thread pointer, or 0 if the image is not
  *                      an initial image. */
 ptrdiff_t tls_tp_offset(rtld_image_t *image) {
-    ptrdiff_t offset = 0;
-    image_id_t i;
-    rtld_image_t *exist;
-
     if (static_dtv_size)
         return 0;
 
-    /* tlsoffset(1) = round(tlssize(1), align(1))
+    /* tlsoffset(1)   = round(tlssize(1), align(1))
      * tlsoffset(m+1) = round(tlsoffset(m) + tlssize(m+1), align(m+1)) */
-    for (i = 1; i < image->id; i++) {
-        exist = rtld_image_lookup(i);
+    ptrdiff_t offset = 0;
+    for (image_id_t i = 1; i < image->id; i++) {
+        rtld_image_t *exist = rtld_image_lookup(i);
         if (exist && exist->tls_memsz)
             offset = core_round_up(offset + exist->tls_memsz, exist->tls_align);
     }
@@ -163,12 +148,6 @@ ptrdiff_t tls_tp_offset(rtld_image_t *image) {
  * @param _tcb          Where to store TCB address.
  * @return              Status code describing result of the operation. */
 status_t tls_alloc(tls_tcb_t **_tcb) {
-    ptr_t *dtv;
-    tls_tcb_t *tcb;
-    size_t size;
-    void *alloc;
-    status_t ret;
-
     /*
      * All initial modules (the executable itself and the libraries loaded along
      * with it) must have their TLS blocks allocated statically. Any modules
@@ -183,7 +162,7 @@ status_t tls_alloc(tls_tcb_t **_tcb) {
         static_dtv_size = next_image_id;
 
     /* Create the dynamic thread vector. */
-    dtv = malloc(static_dtv_size * sizeof(ptr_t));
+    ptr_t *dtv = malloc(static_dtv_size * sizeof(ptr_t));
     if (!dtv)
         return STATUS_NO_MEMORY;
 
@@ -191,9 +170,10 @@ status_t tls_alloc(tls_tcb_t **_tcb) {
     dtv[0] = static_dtv_size;
 
     /* Allocate the TLS block. */
-    size = core_round_up(initial_block_size(), page_size);
+    size_t size = core_round_up(initial_block_size(), page_size);
 
-    ret = kern_vm_map(
+    void *alloc;
+    status_t ret = kern_vm_map(
         &alloc, size, 0, VM_ADDRESS_ANY, VM_ACCESS_READ | VM_ACCESS_WRITE,
         VM_MAP_PRIVATE, INVALID_HANDLE, 0, NULL);
     if (ret != STATUS_SUCCESS) {
@@ -201,9 +181,11 @@ status_t tls_alloc(tls_tcb_t **_tcb) {
         return ret;
     }
 
-    tcb = initial_block_init((ptr_t)alloc, dtv);
+    tls_tcb_t *tcb = initial_block_init((ptr_t)alloc, dtv);
+
     arch_tls_tcb_init(tcb);
-    tcb->dtv = dtv;
+
+    tcb->dtv  = dtv;
     tcb->base = alloc;
 
     *_tcb = tcb;

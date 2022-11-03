@@ -45,7 +45,8 @@ static inline void printf_print_string(const char *str) {
 /** Print a hexadecimal value.
  * @param val           Value to print. */
 static inline void printf_print_base16(unsigned long val) {
-    char buf[20], *pos = buf + sizeof(buf);
+    char buf[20];
+    char *pos = buf + sizeof(buf);
 
     *--pos = 0;
     do {
@@ -81,66 +82,68 @@ static inline void printf_print_base10(unsigned long val) {
  * @param format        Format string.
  * @param ...           Format arguments. */
 static void do_printf(const char *format, va_list args) {
-    int state = 0, dec;
-    unsigned int udec;
-    const char *str;
-    void *ptr;
+    int state = 0;
 
     for (; *format; format++) {
+        int dec;
+        unsigned int udec;
+        const char *str;
+        void *ptr;
+
         switch (state) {
-        case 0:
-            if (*format == '%') {
-                state = 1;
-                break;
-            }
-
-            printf_print_char(format[0]);
-            break;
-        case 1:
-            /* Handle literal %. */
-            if (*format == '%') {
-                printf_print_char('%');
-                state = 0;
-                break;
-            }
-
-            /* Handle conversion characters. */
-            switch (*format) {
-            case 's':
-                str = va_arg(args, const char *);
-                printf_print_string(str);
-                break;
-            case 'c':
-                dec = va_arg(args, int);
-                printf_print_char(dec);
-                break;
-            case 'd':
-                dec = va_arg(args, int);
-                if (dec < 0) {
-                    printf_print_string("-");
-                    dec = -dec;
+            case 0:
+                if (*format == '%') {
+                    state = 1;
+                    break;
                 }
 
-                printf_print_base10((unsigned long)dec);
+                printf_print_char(format[0]);
                 break;
-            case 'u':
-                udec = va_arg(args, unsigned int);
-                printf_print_base10((unsigned long)udec);
-                break;
-            case 'x':
-                udec = va_arg(args, unsigned int);
-                printf_print_base16((unsigned long)udec);
-                break;
-            case 'p':
-                ptr = va_arg(args, void *);
-                printf_print_base16((unsigned long)ptr);
-                break;
-            case 'z':
-                continue;
-            }
+            case 1:
+                /* Handle literal %. */
+                if (*format == '%') {
+                    printf_print_char('%');
+                    state = 0;
+                    break;
+                }
 
-            state = 0;
-            break;
+                /* Handle conversion characters. */
+                switch (*format) {
+                    case 's':
+                        str = va_arg(args, const char *);
+                        printf_print_string(str);
+                        break;
+                    case 'c':
+                        dec = va_arg(args, int);
+                        printf_print_char(dec);
+                        break;
+                    case 'd':
+                        dec = va_arg(args, int);
+                        if (dec < 0) {
+                            printf_print_string("-");
+                            dec = -dec;
+                        }
+
+                        printf_print_base10((unsigned long)dec);
+                        break;
+                    case 'u':
+                        udec = va_arg(args, unsigned int);
+                        printf_print_base10((unsigned long)udec);
+                        break;
+                    case 'x':
+                        udec = va_arg(args, unsigned int);
+                        printf_print_base16((unsigned long)udec);
+                        break;
+                    case 'p':
+                        ptr = va_arg(args, void *);
+                        printf_print_base16((unsigned long)ptr);
+                        break;
+                    case 'z':
+                        continue;
+                }
+
+                state = 0;
+                break;
         }
     }
 }

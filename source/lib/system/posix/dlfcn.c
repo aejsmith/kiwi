@@ -23,6 +23,8 @@
 
 #include "libsystem.h"
 
+/* TODO: Move dl_iterate_phdr here from libkernel. */
+
 void *dlopen(const char *file, int mode) {
     libsystem_stub(__func__, false);
     return NULL;
