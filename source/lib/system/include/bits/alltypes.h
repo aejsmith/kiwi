@@ -99,3 +99,13 @@
     typedef double double_t;
     #define __DEFINED_double_t
 #endif
+
+#if defined(__NEED_locale_t) && !defined(__DEFINED_locale_t)
+    typedef struct __locale *locale_t;
+    #define __DEFINED_locale_t
+#endif
+
+#if defined(__NEED_FILE) && !defined(__DEFINED_FILE)
+    typedef struct __fstream_internal FILE;
+    #define __DEFINED_FILE
+#endif

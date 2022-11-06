@@ -23,9 +23,10 @@
 
 #include <system/defs.h>
 
-__SYS_EXTERN_C_BEGIN
+#define __NEED_locale_t
+#include <bits/alltypes.h>
 
-struct __locale;
+__SYS_EXTERN_C_BEGIN
 
 /** Locale information structure. */
 struct lconv {
@@ -54,9 +55,6 @@ struct lconv {
     char p_sign_posn;
     char *thousands_sep;
 };
-
-/** Type representing a locale object. */
-typedef struct __locale *locale_t;
 
 /** Categories for setlocale(). */
 #define LC_COLLATE          0

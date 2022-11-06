@@ -21,10 +21,14 @@
 
 #pragma once
 
-#include <sys/types.h>
-
 #define __need_NULL
 #include <stddef.h>
+
+#define __NEED_FILE
+#include <bits/alltypes.h>
+
+#include <sys/types.h>
+
 #include <stdarg.h>
 
 __SYS_EXTERN_C_BEGIN
@@ -58,9 +62,6 @@ struct __fstream_internal;
 #define SEEK_SET        0           /**< Set the offset to the exact position specified. */
 #define SEEK_CUR        1           /**< Add the supplied value to the current offset. */
 #define SEEK_END        2           /**< Set the offset to the end of the file plus the supplied value. */
-
-/** Type describing an open file stream. */
-typedef struct __fstream_internal FILE;
 
 /** Type describing a file offset. */
 typedef off_t fpos_t;

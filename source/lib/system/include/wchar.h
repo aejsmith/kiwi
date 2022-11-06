@@ -21,11 +21,14 @@
 
 #pragma once
 
-#include <locale.h>
-#include <stdarg.h>
 #define __need_wint_t
 #include <stddef.h>
-#include <stdio.h>
+
+#define __NEED_locale_t
+#define __NEED_FILE
+#include <bits/alltypes.h>
+
+#include <stdarg.h>
 
 __SYS_EXTERN_C_BEGIN
 
