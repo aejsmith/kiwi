@@ -337,12 +337,13 @@ void Xterm::output(uint8_t raw) {
         }
         case 4: {
             /* Handle DEC Private Mode Set/Reset. */
-
             if (isdigit(raw)) {
-                m_escParams[m_escParamSize] *= 10;
-                m_escParams[m_escParamSize] += (raw - '0');
+                m_escParams[0] *= 10;
+                m_escParams[0] += (raw - '0');
                 return;
             }
+
+            bool handled = true;
 
             if (raw == 'h') {
                 /* DEC Private Mode Set. */
@@ -363,6 +364,12 @@ void Xterm::output(uint8_t raw) {
                         m_savedX = cursorX;
                         m_savedY = cursorY;
                         break;
+                    case 2004:
+                        /* Bracketed Paste Mode. Ignored for now. */
+                        break;
+                    default:
+                        handled = false;
+                        break;
                 }
             } else if (raw == 'l') {
                 /* DEC Private Mode Reset. */
@@ -381,8 +388,19 @@ void Xterm::output(uint8_t raw) {
                         /* Restore Cursor. */
                         buffer.moveCursor(m_savedX, m_savedY);
                         break;
+                    case 2004:
+                        /* Bracketed Paste Mode. */
+                        break;
+                    default:
+                        handled = false;
+                        break;
                 }
+            } else {
+                handled = false;
             }
+
+            if (!handled)
+                core_log(CORE_LOG_WARN, "xterm: unhandled DEC Private Mode %d%c", m_escParams[0], raw);
 
             break;
         }
