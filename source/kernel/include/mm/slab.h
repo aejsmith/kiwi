@@ -33,7 +33,7 @@ struct slab_percpu;
 struct slab_bufctl;
 
 /** Allocator limitations/settings. */
-#define SLAB_NAME_MAX           25      /**< Maximum slab cache name length. */
+#define SLAB_NAME_MAX           32      /**< Maximum slab cache name length. */
 #define SLAB_MAGAZINE_SIZE      16      /**< Initial magazine size (resizing currently not supported). */
 #define SLAB_HASH_SIZE          64      /**< Allocation hash table size. */
 #define SLAB_ALIGN_MIN          8       /**< Minimum alignment. */
