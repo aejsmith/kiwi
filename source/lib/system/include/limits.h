@@ -23,14 +23,12 @@
 
 #include <kernel/limits.h>
 
-/** Maximum length of a path string. */
 #define PATH_MAX            FS_PATH_MAX
-
-/** Maximum length of a symbolic link destination. */
 #define SYMLINK_MAX         FS_PATH_MAX
-
-/** POSIX thread limitations. */
-#define PTHREAD_KEYS_MAX    1024    /**< Maximum number of thread-specific data keys. */
+#define NAME_MAX            FS_PATH_MAX
+#define PIPE_BUF            4096
+#define FILESIZEBITS        64
+#define PTHREAD_KEYS_MAX    1024
 
 #ifndef _GCC_LIMITS_H_
 #   include_next <limits.h>

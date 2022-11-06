@@ -23,6 +23,7 @@
  */
 
 #include <core/path.h>
+#include <core/utility.h>
 
 #include <kernel/fs.h>
 #include <kernel/status.h>
@@ -34,6 +35,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
 #include <utime.h>
 
@@ -502,6 +504,44 @@ int unlink(const char *path) {
 int utime(const char *path, const struct utimbuf *times) {
     libsystem_stub("utime", false);
     return -1;
+}
+
+/** Get configurable pathname variables. */
+long fpathconf(int fd, int name) {
+    static const long values[] = {
+        [_PC_2_SYMLINKS]           = 1,
+        [_PC_ALLOC_SIZE_MIN]       = 4096,
+        [_PC_ASYNC_IO]             = -1,
+        [_PC_CHOWN_RESTRICTED]     = 1,
+        [_PC_FILESIZEBITS]         = FILESIZEBITS,
+        [_PC_LINK_MAX]             = 8,
+        [_PC_MAX_CANON]            = 255,
+        [_PC_MAX_INPUT]            = 255,
+        [_PC_NAME_MAX]             = NAME_MAX,
+        [_PC_NO_TRUNC]             = 1,
+        [_PC_PATH_MAX]             = PATH_MAX,
+        [_PC_PIPE_BUF]             = PIPE_BUF,
+        [_PC_PRIO_IO]              = -1,
+        [_PC_REC_INCR_XFER_SIZE]   = 4096,
+        [_PC_REC_MAX_XFER_SIZE]    = 4096,
+        [_PC_REC_MIN_XFER_SIZE]    = 4096,
+        [_PC_REC_XFER_ALIGN]       = 4096,
+        [_PC_SYMLINK_MAX]          = SYMLINK_MAX,
+        [_PC_SYNC_IO]              = 1,
+        [_PC_VDISABLE]             = _POSIX_VDISABLE,
+    };
+
+    if ((size_t)name >= core_array_size(values)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    return values[name];
+}
+
+/** Get configurable pathname variables. */
+long pathconf(const char *path, int name) {
+    return fpathconf(-1, name);
 }
 
 /** Get the file name part of a path. */

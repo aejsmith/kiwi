@@ -29,21 +29,43 @@ __SYS_EXTERN_C_BEGIN
 
 /** POSIX version/feature definitions.
  * @note                Not actually compliant to these versions yet. :P */
-#define _POSIX_VERSION      200809l
-#define _POSIX2_VERSION     200809l
-#define _XOPEN_VERSION      700
-#define _XOPEN_UNIX         1
+#define _POSIX_VERSION              200809l
+#define _POSIX2_VERSION             200809l
+#define _XOPEN_VERSION              700
+#define _XOPEN_UNIX                 1
 
 /** Standard stream file descriptor numbers. */
-#define STDIN_FILENO        0
-#define STDOUT_FILENO       1
-#define STDERR_FILENO       2
+#define STDIN_FILENO                0
+#define STDOUT_FILENO               1
+#define STDERR_FILENO               2
 
 /** Mode flags for access(). */
-#define F_OK                0       /**< Check for file existance. */
-#define R_OK                0x0001  /**< Check for read permission. */
-#define W_OK                0x0002  /**< Check for write permission. */
-#define X_OK                0x0004  /**< Check for execute permission. */
+#define F_OK                        0
+#define R_OK                        0x0001
+#define W_OK                        0x0002
+#define X_OK                        0x0004
+
+/** Names for *pathconf(). */
+#define _PC_2_SYMLINKS              0
+#define _PC_ALLOC_SIZE_MIN          1
+#define _PC_ASYNC_IO                2
+#define _PC_CHOWN_RESTRICTED        3
+#define _PC_FILESIZEBITS            4
+#define _PC_LINK_MAX                5
+#define _PC_MAX_CANON               6
+#define _PC_MAX_INPUT               7
+#define _PC_NAME_MAX                8
+#define _PC_NO_TRUNC                9
+#define _PC_PATH_MAX                10
+#define _PC_PIPE_BUF                11
+#define _PC_PRIO_IO                 12
+#define _PC_REC_INCR_XFER_SIZE      13
+#define _PC_REC_MAX_XFER_SIZE       14
+#define _PC_REC_MIN_XFER_SIZE       15
+#define _PC_REC_XFER_ALIGN          16
+#define _PC_SYMLINK_MAX             17
+#define _PC_SYNC_IO                 18
+#define _PC_VDISABLE                19
 
 extern char *optarg;
 extern int optind, opterr, optopt;
@@ -72,7 +94,7 @@ extern int fchown(int fd, uid_t uid, gid_t gid);
 /* int fdatasync(int); */
 /* int fexecve(int, char *const [], char *const []); */
 extern pid_t fork(void);
-/* long fpathconf(int, int); */
+extern long fpathconf(int fd, int name);
 extern int fsync(int fd);
 /* int ftruncate(int, off_t); */
 extern char *getcwd(char *buf, size_t size);
@@ -100,7 +122,7 @@ extern int link(const char *source, const char *dest);
 /* int lockf(int, int, off_t); */
 extern off_t lseek(int fd, off_t off, int act);
 /* int nice(int); */
-/* long pathconf(const char *, int); */
+extern long pathconf(const char *path, int name);
 /* int pause(void); */
 extern int pipe(int fds[2]);
 extern ssize_t pread(int fd, void *buf, size_t count, off_t offset);
