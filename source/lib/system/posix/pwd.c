@@ -22,19 +22,21 @@
  *  - Implement all of this.
  */
 
+#include <errno.h>
 #include <pwd.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "libsystem.h"
 
 static struct passwd stub_pwd = {
-    .pw_name = (char *)"admin",
+    .pw_name   = (char *)"admin",
     .pw_passwd = (char *)"meow",
-    .pw_uid = 0,
-    .pw_gid = 0,
-    .pw_dir = (char *)"/users/admin",
-    .pw_shell = (char *)"/system/bin/bash",
-    .pw_gecos = (char *)"Administrator",
+    .pw_uid    = 0,
+    .pw_gid    = 0,
+    .pw_dir    = (char *)"/users/admin",
+    .pw_shell  = (char *)"/system/bin/bash",
+    .pw_gecos  = (char *)"Administrator",
 };
 
 static bool getpwent_called;
@@ -57,8 +59,22 @@ void setpwent(void) {
     return;
 }
 
+struct passwd *getpwnam(const char *name) {
+    if (strcmp(name, stub_pwd.pw_name) == 0) {
+        return &stub_pwd;
+    } else {
+        errno = ENOENT;
+        return NULL;
+    }
+}
+
 struct passwd *getpwuid(uid_t uid) {
-    return &stub_pwd;
+    if (uid == stub_pwd.pw_uid) {
+        return &stub_pwd;
+    } else {
+        errno = ENOENT;
+        return NULL;
+    }
 }
 
 char *getlogin(void) {
