@@ -39,7 +39,7 @@
 
 #include "stdlib/environ.h"
 
-#include "libsystem.h"
+#include "posix/posix.h"
 
 /**
  * umask inheritance across execve() is implemented by storing it in the
@@ -50,6 +50,9 @@
 
 /** Current file mode creation mask. */
 mode_t current_umask = DEFAULT_UMASK;
+
+static char basename_buf[PATH_MAX];
+static char dirname_buf[PATH_MAX];
 
 /** umask initialisation. */
 static __sys_init_prio(LIBSYSTEM_INIT_PRIO_POSIX_UMASK) void posix_umask_init(void) {
@@ -330,11 +333,12 @@ static void file_info_to_stat(file_info_t *info, struct stat *restrict st) {
     st->st_nlink   = info->links;
     st->st_size    = info->size;
     st->st_blksize = info->block_size;
-    st->st_atime   = (info->accessed / 1000000000);
-    st->st_mtime   = (info->modified / 1000000000);
-    st->st_ctime   = (info->created / 1000000000);
     st->st_uid     = 0;//security->uid;
     st->st_gid     = 0;//security->gid;
+
+    nstime_to_timespec(info->accessed, &st->st_atim);
+    nstime_to_timespec(info->modified, &st->st_mtim);
+    nstime_to_timespec(info->created,  &st->st_ctim);
 
     /* TODO. */
     st->st_blocks = 0;
@@ -500,8 +504,6 @@ int utime(const char *path, const struct utimbuf *times) {
     return -1;
 }
 
-static char basename_buf[PATH_MAX];
-
 /** Get the file name part of a path. */
 char *basename(char *path) {
     /* Convert this bad API to our good one (it is not specified that return
@@ -518,8 +520,6 @@ char *basename(char *path) {
     basename_buf[PATH_MAX - 1] = 0;
     return basename_buf;
 }
-
-static char dirname_buf[PATH_MAX];
 
 /** Get the directory part of a path. */
 char *dirname(char *path) {

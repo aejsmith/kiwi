@@ -31,7 +31,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "libsystem.h"
+#include "posix/posix.h"
 
 /** Gets the current time.
  * @param tv            Structure to fill with time since epoch.
@@ -45,15 +45,6 @@ int gettimeofday(struct timeval *tv, void *tz) {
     tv->tv_usec = (ktime % 1000000000) / 1000;
 
     return 0;
-}
-
-static inline nstime_t nstime_from_timespec(const struct timespec *tp) {
-    return ((nstime_t)tp->tv_sec * 1000000000) + tp->tv_nsec;
-}
-
-static inline void nstime_to_timespec(nstime_t time, struct timespec *tp) {
-    tp->tv_nsec = time % 1000000000;
-    tp->tv_sec  = time / 1000000000;
 }
 
 /** High resolution sleep.

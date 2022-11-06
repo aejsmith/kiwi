@@ -21,6 +21,10 @@
 
 #pragma once
 
+#define __NEED_struct_timespec
+#define __NEED_time_t
+#include <bits/alltypes.h>
+
 #include <core/ipc.h>
 #include <core/list.h>
 #include <core/mutex.h>
@@ -39,6 +43,13 @@ __SYS_EXTERN_C_BEGIN
 
 struct environ;
 
+extern core_connection_t *posix_service_get(void) __sys_hidden;
+extern void posix_service_put(void) __sys_hidden;
+
+/**
+ * Processes.
+ */
+
 /** Structure containing details of a POSIX process. */
 typedef struct posix_process {
     core_list_t header;             /**< Link to process list. */
@@ -49,14 +60,19 @@ typedef struct posix_process {
 extern core_list_t __sys_hidden child_processes;
 extern core_mutex_t __sys_hidden child_processes_lock;
 
-extern mode_t __sys_hidden current_umask;
-
 extern void posix_register_fork_handler(void (*func)(void)) __sys_hidden;
+
+/**
+ * Filesystem.
+ */
+
+extern mode_t __sys_hidden current_umask;
 
 extern void posix_fs_exec(struct environ *env) __sys_hidden;
 
-extern core_connection_t *posix_service_get(void) __sys_hidden;
-extern void posix_service_put(void) __sys_hidden;
+/**
+ * Signals.
+ */
 
 extern void posix_signal_exec(struct environ *env) __sys_hidden;
 
@@ -76,6 +92,19 @@ extern int posix_signal_from_exception(unsigned code) __sys_hidden;
 
 extern void sigsetjmp_save(sigjmp_buf env, int save_mask) __sys_hidden;
 extern void siglongjmp_restore(sigjmp_buf env) __sys_hidden;
+
+/**
+ * Time.
+ */
+
+static inline nstime_t nstime_from_timespec(const struct timespec *tp) {
+    return ((nstime_t)tp->tv_sec * 1000000000) + tp->tv_nsec;
+}
+
+static inline void nstime_to_timespec(nstime_t time, struct timespec *tp) {
+    tp->tv_nsec = time % 1000000000;
+    tp->tv_sec  = time / 1000000000;
+}
 
 /**
  * Exported POSIX functions, used as implementation details (e.g. by the

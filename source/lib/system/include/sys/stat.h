@@ -21,6 +21,10 @@
 
 #pragma once
 
+#define __NEED_struct_timespec
+#define __NEED_time_t
+#include <bits/alltypes.h>
+
 #include <sys/types.h>
 
 __SYS_EXTERN_C_BEGIN
@@ -71,12 +75,16 @@ struct stat {
     gid_t st_gid;                   /**< Group ID of owner. */
     dev_t st_rdev;                  /**< Device ID (if special file). */
     off_t st_size;                  /**< Total size, in bytes. */
-    time_t st_atime;                /**< Time of last access. */
-    time_t st_mtime;                /**< Time of last modification. */
-    time_t st_ctime;                /**< Time of last status change. */
+    struct timespec st_atim;        /**< Time of last access. */
+    struct timespec st_mtim;        /**< Time of last modification. */
+    struct timespec st_ctim;        /**< Time of last status change. */
     blksize_t st_blksize;           /**< Blocksize for filesystem I/O. */
     blkcnt_t st_blocks;             /**< Number of blocks allocated. */
 };
+
+#define st_atime st_atim.tv_sec
+#define st_mtime st_mtim.tv_sec
+#define st_ctime st_ctim.tv_sec
 
 extern int chmod(const char *path, mode_t mode);
 extern int fchmod(int fd, mode_t mode);
