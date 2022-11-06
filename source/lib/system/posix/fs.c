@@ -22,12 +22,15 @@
  *  - Implement security (ownership, modes).
  */
 
+#include <core/path.h>
+
 #include <kernel/fs.h>
 #include <kernel/status.h>
 
 #include <sys/stat.h>
 
 #include <errno.h>
+#include <libgen.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -495,4 +498,36 @@ int unlink(const char *path) {
 int utime(const char *path, const struct utimbuf *times) {
     libsystem_stub("utime", false);
     return -1;
+}
+
+static char basename_buf[PATH_MAX];
+
+/** Get the file name part of a path. */
+char *basename(char *path) {
+    /* Convert this bad API to our good one (it is not specified that return
+     * string must be freed so we must copy to a static buffer). */
+    char *ret = core_path_basename(path);
+    if (!ret) {
+        /* This function is not specified to fail so to be on the safe side,
+         * abort if we fail, since returning an empty string could break in the
+         * caller. */
+        libsystem_fatal("basename() failed");
+    }
+
+    strncpy(basename_buf, ret, PATH_MAX);
+    basename_buf[PATH_MAX - 1] = 0;
+    return basename_buf;
+}
+
+static char dirname_buf[PATH_MAX];
+
+/** Get the directory part of a path. */
+char *dirname(char *path) {
+    char *ret = core_path_dirname(path);
+    if (!ret)
+        libsystem_fatal("dirname() failed");
+
+    strncpy(dirname_buf, ret, PATH_MAX);
+    dirname_buf[PATH_MAX - 1] = 0;
+    return dirname_buf;
 }
