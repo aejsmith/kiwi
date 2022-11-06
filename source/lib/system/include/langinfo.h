@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <system/defs.h>
+
 __SYS_EXTERN_C_BEGIN
 
 

@@ -21,7 +21,10 @@
 
 #pragma once
 
-#include <locale.h>
+#define __NEED_locale_t
+#include <bits/alltypes.h>
+
+#include <stdint.h>
 #include <wchar.h>
 
 __SYS_EXTERN_C_BEGIN

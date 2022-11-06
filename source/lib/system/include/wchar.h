@@ -21,6 +21,7 @@
 
 #pragma once
 
+#define __need_wchar_t
 #define __need_wint_t
 #include <stddef.h>
 
