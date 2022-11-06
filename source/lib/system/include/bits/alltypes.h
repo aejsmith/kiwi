@@ -28,6 +28,12 @@
 #define __LITTLE_ENDIAN     __ORDER_LITTLE_ENDIAN__
 #define __BIG_ENDIAN        __ORDER_BIG_ENDIAN__
 
+#if __WORDSIZE == 64
+    #define __int64 long
+#else
+    #define __int64 long long
+#endif
+
 #if defined(__NEED_int8_t) && !defined(__DEFINED_int8_t)
     typedef signed char int8_t;
     #define __DEFINED_int8_t
@@ -44,11 +50,7 @@
 #endif
 
 #if defined(__NEED_int64_t) && !defined(__DEFINED_int64_t)
-    #if __WORDSIZE == 64
-        typedef signed long int64_t;
-    #else
-        typedef signed long long int64_t;
-    #endif
+    typedef signed __int64 int64_t;
     #define __DEFINED_int64_t
 #endif
 
@@ -68,11 +70,7 @@
 #endif
 
 #if defined(__NEED_uint64_t) && !defined(__DEFINED_uint64_t)
-    #if __WORDSIZE == 64
-        typedef unsigned long uint64_t;
-    #else
-        typedef unsigned long long uint64_t;
-    #endif
+    typedef unsigned __int64 uint64_t;
     #define __DEFINED_uint64_t
 #endif
 
@@ -100,6 +98,81 @@
     #define __DEFINED_double_t
 #endif
 
+#if defined(__NEED_time_t) && !defined(__DEFINED_time_t)
+    typedef __int64 time_t;
+    #define __DEFINED_time_t
+#endif
+
+#if defined(__NEED_clock_t) && !defined(__DEFINED_clock_t)
+    typedef __int64 clock_t;
+    #define __DEFINED_clock_t
+#endif
+
+#if defined(__NEED_pid_t) && !defined(__DEFINED_pid_t)
+    typedef int pid_t;
+    #define __DEFINED_pid_t
+#endif
+
+#if defined(__NEED_off_t) && !defined(__DEFINED_off_t)
+    typedef __int64 off_t;
+    #define __DEFINED_off_t
+#endif
+
+#if defined(__NEED_mode_t) && !defined(__DEFINED_mode_t)
+    typedef unsigned int mode_t;
+    #define __DEFINED_mode_t
+#endif
+
+#if defined(__NEED_suseconds_t) && !defined(__DEFINED_suseconds_t)
+    typedef __int64 suseconds_t;
+    #define __DEFINED_suseconds_t
+#endif
+
+#if defined(__NEED_useconds_t) && !defined(__DEFINED_useconds_t)
+    typedef unsigned __int64 useconds_t;
+    #define __DEFINED_useconds_t
+#endif
+
+#if defined(__NEED_blkcnt_t) && !defined(__DEFINED_blkcnt_t)
+    typedef int blkcnt_t;
+    #define __DEFINED_blkcnt_t
+#endif
+
+#if defined(__NEED_blksize_t) && !defined(__DEFINED_blksize_t)
+    typedef int blksize_t;
+    #define __DEFINED_blksize_t
+#endif
+
+#if defined(__NEED_dev_t) && !defined(__DEFINED_dev_t)
+    typedef unsigned int dev_t;
+    #define __DEFINED_dev_t
+#endif
+
+#if defined(__NEED_ino_t) && !defined(__DEFINED_ino_t)
+    typedef unsigned __int64 ino_t;
+    #define __DEFINED_ino_t
+#endif
+
+#if defined(__NEED_nlink_t) && !defined(__DEFINED_nlink_t)
+    typedef unsigned int nlink_t;
+    #define __DEFINED_nlink_t
+#endif
+
+#if defined(__NEED_uid_t) && !defined(__DEFINED_uid_t)
+    typedef unsigned int uid_t;
+    #define __DEFINED_uid_t
+#endif
+
+#if defined(__NEED_gid_t) && !defined(__DEFINED_gid_t)
+    typedef unsigned int gid_t;
+    #define __DEFINED_gid_t
+#endif
+
+#if defined(__NEED_clockid_t) && !defined(__DEFINED_clockid_t)
+    typedef unsigned int clockid_t;
+    #define __DEFINED_clockid_t
+#endif
+
 #if defined(__NEED_locale_t) && !defined(__DEFINED_locale_t)
     typedef struct __locale *locale_t;
     #define __DEFINED_locale_t
@@ -109,3 +182,15 @@
     typedef struct __fstream_internal FILE;
     #define __DEFINED_FILE
 #endif
+
+#if defined(__NEED_struct_timespec) && !defined(__DEFINED_struct_timespec)
+    /** Time specification structure. */
+    struct timespec {
+        time_t tv_sec;                  /**< Seconds. */
+        long tv_nsec;                   /**< Additional nanoseconds since. */
+    };
+
+    #define __DEFINED_struct_timespec
+#endif
+
+#undef __int64

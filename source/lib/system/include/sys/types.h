@@ -21,26 +21,28 @@
 
 #pragma once
 
-#include <kernel/types.h>
+#define __NEED_time_t
+#define __NEED_clock_t
+#define __NEED_pid_t
+#define __NEED_off_t
+#define __NEED_mode_t
+#define __NEED_suseconds_t
+#define __NEED_useconds_t
+#define __NEED_blkcnt_t
+#define __NEED_blksize_t
+#define __NEED_dev_t
+#define __NEED_ino_t
+#define __NEED_nlink_t
+#define __NEED_uid_t
+#define __NEED_gid_t
+#define __NEED_clockid_t
+#include <bits/alltypes.h>
 
 #include <system/pthread.h>
 
-/** POSIX type definitions. */
-typedef int64_t time_t;             /**< Used for UNIX timestamps. */
-typedef int64_t clock_t;            /**< Used to store clock ticks since process start. */
-typedef int32_t pid_t;              /**< Used to store a POSIX process ID. */
-typedef int64_t off_t;              /**< Used for file sizes/offsets. */
-typedef uint32_t mode_t;            /**< Used to store file attributes. */
-typedef int64_t suseconds_t;        /**< Used to store a (signed) number of microseconds. */
-typedef uint64_t useconds_t;        /**< Used to store a number of microseconds. */
-typedef int32_t blkcnt_t;           /**< Used to store a count of blocks. */
-typedef int32_t blksize_t;          /**< Used to store the size of a block. */
-typedef uint32_t dev_t;             /**< Used to store a device number. */
-typedef uint64_t ino_t;             /**< Used to store a filesystem node number. */
-typedef uint32_t nlink_t;           /**< Used to store a number of blocks. */
-typedef uint32_t uid_t;             /**< Used to store a user ID. */
-typedef uint32_t gid_t;             /**< Used to store a group ID. */
-typedef uint32_t clockid_t;         /**< Used to store a clock ID for clock_* functions. */
+#include <stdint.h>
+
+__SYS_EXTERN_C_BEGIN
 
 /** Other type definitions. */
 typedef unsigned char u_char;
@@ -53,3 +55,5 @@ typedef unsigned long u_long;
 /* id_t */
 /* [XSI] key_t */
 /* timer_t */
+
+__SYS_EXTERN_C_END

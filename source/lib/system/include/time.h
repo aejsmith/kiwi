@@ -21,19 +21,18 @@
 
 #pragma once
 
-#include <sys/types.h>
 #define __need_NULL
+#define __need_size_t
 #include <stddef.h>
 
-#include <locale.h>
+#define __NEED_clock_t
+#define __NEED_clockid_t
+#define __NEED_locale_t
+#define __NEED_struct_timespec
+#define __NEED_time_t
+#include <bits/alltypes.h>
 
 __SYS_EXTERN_C_BEGIN
-
-/** Time specification structure. */
-struct timespec {
-    time_t tv_sec;                  /**< Seconds. */
-    long tv_nsec;                   /**< Additional nanoseconds since. */
-};
 
 /** Structure containing a time. */
 struct tm {
