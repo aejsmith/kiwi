@@ -73,6 +73,16 @@ typedef struct process_attrib {
     ssize_t map_count;
 } process_attrib_t;
 
+/** Process arguments. */
+typedef struct process_args {
+    char *path;                             /**< Path to program. */
+    char **args;                            /**< Argument array. */
+    char **env;                             /**< Environment variable array. */
+    size_t arg_count;                       /**< Number of entries in argument array (excluding NULL). */
+    size_t env_count;                       /**< Number of entries in environment array (excluding NULL). */
+    void *load_base;                        /**< Load base of libkernel. */
+} process_args_t;
+
 /** Handle value used to refer to the current process. */
 #define PROCESS_SELF            INVALID_HANDLE
 
@@ -92,6 +102,8 @@ enum {
 enum {
     PROCESS_CREATE_CRITICAL     = (1<<0),   /**< Process is a critical system process. */
 };
+
+extern const process_args_t *kern_process_args(void);
 
 extern status_t kern_process_create(
     const char *path, const char *const args[], const char *const env[],

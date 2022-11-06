@@ -94,6 +94,6 @@ __sys_export status_t kern_process_add_clone_handler(process_clone_handler_t han
 }
 
 /** Gets the arguments for the current process. */
-__sys_export process_args_t *kern_process_args(void) {
+__sys_export const process_args_t *kern_process_args(void) {
     return process_args;
 }

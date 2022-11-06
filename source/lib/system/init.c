@@ -21,7 +21,7 @@
 
 #include <core/path.h>
 
-#include <kernel/private/process.h>
+#include <kernel/process.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,7 +40,7 @@ const char *__program_name;
 
 /** Environment initialisation. */
 static __sys_init_prio(LIBSYSTEM_INIT_PRIO_ARGS) void args_init(void) {
-    process_args_t *args = kern_process_args();
+    const process_args_t *args = kern_process_args();
 
     environ = args->env;
     __program_name = core_path_basename(args->path);
@@ -56,6 +56,6 @@ static __sys_init_prio(LIBSYSTEM_INIT_PRIO_STDIO) void stdio_init(void) {
 
 /** System library main function. */
 void libsystem_main(void) {
-    process_args_t *args = kern_process_args();
+    const process_args_t *args = kern_process_args();
     exit(main(args->arg_count, args->args, args->env));
 }

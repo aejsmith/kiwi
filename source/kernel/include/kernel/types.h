@@ -42,7 +42,6 @@
 #define __kernel_aligned(a)         __attribute__((aligned(a)))
 #define __kernel_noreturn           __attribute__((noreturn))
 
-
 /** Type used to store a kernel status code. */
 typedef int32_t status_t;
 
