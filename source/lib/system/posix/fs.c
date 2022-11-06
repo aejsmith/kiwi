@@ -506,6 +506,49 @@ int utime(const char *path, const struct utimbuf *times) {
     return -1;
 }
 
+/** Resolves an absolute pathname. */
+char *realpath(const char *__restrict file_name, char *__restrict resolved_name) {
+    status_t ret;
+
+    if (!file_name) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    char *buf;
+    if (resolved_name) {
+        buf = resolved_name;
+    } else {
+        buf = malloc(PATH_MAX);
+        if (!buf)
+            return NULL;
+    }
+
+    handle_t handle;
+    ret = kern_fs_open(file_name, 0, 0, FS_OPEN, &handle);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        goto err_free;
+    }
+
+    ret = kern_fs_path(handle, buf, PATH_MAX);
+
+    kern_handle_close(handle);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        goto err_free;
+    }
+
+    return buf;
+
+err_free:
+    if (!resolved_name)
+        free(buf);
+
+    return NULL;
+}
+
 /** Get configurable pathname variables. */
 long fpathconf(int fd, int name) {
     static const long values[] = {

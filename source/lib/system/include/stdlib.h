@@ -92,6 +92,7 @@ extern void qsort(
 extern int rand(void);
 extern int rand_r(unsigned int *seed);
 extern void *realloc(void *ptr, size_t size);
+extern char *realpath(const char *__restrict file_name, char *__restrict resolved_name);
 extern int setenv(const char *name, const char *value, int overwrite);
 extern void srand(unsigned int seed);
 extern double strtod(const char *__restrict s, char **__restrict endptr);
