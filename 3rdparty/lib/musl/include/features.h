@@ -9,6 +9,16 @@
 #define _BSD_SOURCE 1
 #endif
 
+#if defined(__Kiwi__)
+#if defined(__cplusplus)
+// libcxx uses some things not enabled below when using __STRICT_ANSI__ (which
+// is set with -std=c++*). To fix this we effectively ignore __STRICT_ANSI__
+// for C++.
+#define _BSD_SOURCE 1
+#define _XOPEN_SOURCE 700
+#endif
+#endif
+
 #if !defined(_POSIX_SOURCE) && !defined(_POSIX_C_SOURCE) \
  && !defined(_XOPEN_SOURCE) && !defined(_GNU_SOURCE) \
  && !defined(_BSD_SOURCE) && !defined(__STRICT_ANSI__)

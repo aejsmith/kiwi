@@ -15,6 +15,11 @@
  */
 
 /**
+ * This file is partly derived from musl. See 3rdparty/lib/musl/COPYRIGHT for
+ * license.
+ */
+
+/**
  * @file
  * @brief               Standard type defintions.
  */
@@ -55,6 +60,11 @@
 
 #if defined(__NEED_va_list) || defined(__NEED___isoc_va_list)
     #include <stdarg.h>
+
+    #if defined(__NEED___isoc_va_list) && !defined(__DEFINED___isoc_va_list)
+        typedef va_list __isoc_va_list;
+        #define __DEFINED___isoc_va_list
+    #endif
 #endif
 
 /**
@@ -210,14 +220,28 @@
     #define __DEFINED_clockid_t
 #endif
 
+#if defined(__NEED_wctype_t) && !defined(__DEFINED_wctype_t)
+    typedef unsigned long wctype_t;
+    #define __DEFINED_wctype_t
+#endif
+
 #if defined(__NEED_locale_t) && !defined(__DEFINED_locale_t)
-    typedef struct __locale *locale_t;
+    typedef struct __locale_struct *locale_t;
     #define __DEFINED_locale_t
 #endif
 
 #if defined(__NEED_FILE) && !defined(__DEFINED_FILE)
     typedef struct __fstream_internal FILE;
     #define __DEFINED_FILE
+#endif
+
+#if defined(__NEED_mbstate_t) && !defined(__DEFINED_mbstate_t)
+    typedef struct __mbstate_t {
+        unsigned __opaque1;
+        unsigned __opaque2;
+    } mbstate_t;
+
+    #define __DEFINED_mbstate_t
 #endif
 
 #if defined(__NEED_struct_timespec) && !defined(__DEFINED_struct_timespec)
