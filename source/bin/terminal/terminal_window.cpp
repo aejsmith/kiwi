@@ -189,49 +189,77 @@ void TerminalWindow::bufferUpdated(uint16_t x, uint16_t y, uint16_t width, uint1
         for (uint16_t offX = 0; offX < width; offX++) {
             uint16_t currX = x + offX;
 
-            TerminalBuffer::Character ch = buffer.charAt(currX, currY);
-
-            uint32_t fg = kColourTable[kDefaultForegroundColour];
-            uint32_t bg = kColourTable[kDefaultBackgroundColour];
-
-            const uint32_t *colours = (ch.attributes & TerminalBuffer::kAttribute_Bold)
-                ? kColourTableBold
-                : kColourTable;
-
-            if (ch.fg != TerminalBuffer::kColour_Default)
-                fg = colours[ch.fg];
-            if (ch.bg != TerminalBuffer::kColour_Default)
-                bg = colours[ch.bg];
-
-            /* Handle inversed colours. */
-            if (ch.attributes & TerminalBuffer::kAttribute_Inverse)
-                std::swap(fg, bg);
-
-            /* Swap colours for the cursor. */
-            if (currX == buffer.cursorX() && currY == buffer.cursorY())
-                std::swap(fg, bg);
-
-            drawCharacter(currX, currY, ch.ch, fg, bg);
+            drawBufferCharacter(buffer, currX, currY);
         }
     }
 }
 
 void TerminalWindow::bufferScrolled(uint16_t top, uint16_t bottom, bool up) {
-    Framebuffer &fb = g_terminalApp.framebuffer();
-    Font &font      = g_terminalApp.font();
+    if (this != &g_terminalApp.activeWindow())
+        return;
+
+    TerminalBuffer &buffer = m_terminal->activeBuffer();
+    Framebuffer &fb        = g_terminalApp.framebuffer();
+    Font &font             = g_terminalApp.font();
 
     uint16_t y      = top * font.height();
-    uint16_t height = (bottom - top) * font.height();
+    uint16_t rows   = bottom - top;
+    uint16_t height = rows * font.height();
+
+    uint16_t cursorX = buffer.cursorX();
+    uint16_t cursorY = buffer.cursorY();
 
     if (up) {
         /* Scroll up - move the contents down. */
-        fb.copyRect(0, y + font.height(), 0, y, fb.width(), height);
+        if (rows > 1)
+            fb.copyRect(0, y + font.height(), 0, y, fb.width(), height);
         fb.fillRect(0, y, fb.width(), font.height(), 0);
+
+        /* If the cursor was on the top row, redraw it and the character below
+         * (which we have copied the cursor to). */
+        if (cursorY == top) {
+            drawBufferCharacter(buffer, cursorX, cursorY);
+            if (rows > 1)
+                drawBufferCharacter(buffer, cursorX, cursorY + 1);
+        }
     } else {
         /* Scroll down - move the contents up. */
-        fb.copyRect(0, y, 0, y + font.height(), fb.width(), height);
+        if (rows > 1)
+            fb.copyRect(0, y, 0, y + font.height(), fb.width(), height);
         fb.fillRect(0, y + height, fb.width(), font.height(), 0);
+
+        if (cursorY == bottom - 1) {
+            drawBufferCharacter(buffer, cursorX, cursorY);
+            if (rows > 1)
+                drawBufferCharacter(buffer, cursorX, cursorY - 1);
+        }
     }
+}
+
+void TerminalWindow::drawBufferCharacter(TerminalBuffer &buffer, uint16_t x, uint16_t y) {
+    TerminalBuffer::Character ch = buffer.charAt(x, y);
+
+    uint32_t fg = kColourTable[kDefaultForegroundColour];
+    uint32_t bg = kColourTable[kDefaultBackgroundColour];
+
+    const uint32_t *colours = (ch.attributes & TerminalBuffer::kAttribute_Bold)
+        ? kColourTableBold
+        : kColourTable;
+
+    if (ch.fg != TerminalBuffer::kColour_Default)
+        fg = colours[ch.fg];
+    if (ch.bg != TerminalBuffer::kColour_Default)
+        bg = colours[ch.bg];
+
+    /* Handle inversed colours. */
+    if (ch.attributes & TerminalBuffer::kAttribute_Inverse)
+        std::swap(fg, bg);
+
+    /* Swap colours for the cursor. */
+    if (x == buffer.cursorX() && y == buffer.cursorY())
+        std::swap(fg, bg);
+
+    drawCharacter(x, y, ch.ch, fg, bg);
 }
 
 static inline uint32_t blend(uint32_t fg, uint32_t bg, uint8_t alpha) {

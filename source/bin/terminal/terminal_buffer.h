@@ -73,8 +73,10 @@ public:
 
     Character charAt(uint16_t x, int16_t y);
 
+    void insertLines(uint16_t count);
     void clearLine(uint16_t startX, uint16_t endX);
     void clearLines(uint16_t startY, uint16_t endY);
+    void deleteChars(uint16_t count);
     void scrollUp();
     void scrollDown();
     void setScrollRegion(int16_t top, int16_t bottom);

@@ -123,7 +123,7 @@ void Xterm::output(uint8_t raw) {
                     buffer.scrollUp();
                     break;
                 default:
-                    core_log(CORE_LOG_WARN, "xterm: unknown character 0x%x at state 1", raw);
+                    core_log(CORE_LOG_WARN, "xterm: unknown character %c at state 1", raw);
                     break;
             }
 
@@ -219,6 +219,20 @@ void Xterm::output(uint8_t raw) {
                             break;
                     }
 
+                    break;
+                case 'L':
+                    /* Insert Lines (default 1). */
+                    if (m_escParamSize < 0)
+                        m_escParams[0] = 1;
+
+                    buffer.insertLines(m_escParams[0]);
+                    break;
+                case 'P':
+                    /* Delete Characters (default 1). */
+                    if (m_escParamSize < 0)
+                        m_escParams[0] = 1;
+
+                    buffer.deleteChars(m_escParams[0]);
                     break;
                 case 'm':
                     if (m_escParamSize < 0)
@@ -335,8 +349,12 @@ void Xterm::output(uint8_t raw) {
 
                     buffer.setScrollRegion(m_escParams[0] - 1, m_escParams[1] - 1);
                     break;
+                case 'l':
+                    /* Reset Mode. Ignore this for now while we don't have
+                     * Set Mode (h) implemented. */
+                    break;
                 default:
-                    core_log(CORE_LOG_WARN, "xterm: unknown character 0x%x at state 3", raw);
+                    core_log(CORE_LOG_WARN, "xterm: unknown character %c at state 3", raw);
                     break;
             }
 
@@ -355,6 +373,9 @@ void Xterm::output(uint8_t raw) {
             if (raw == 'h') {
                 /* DEC Private Mode Set. */
                 switch (m_escParams[0]) {
+                    case 1:
+                        /* Enable Cursor Keys Application Mode. Ignored for now. */
+                        break;
                     case 1049:
                         /* Save Cursor and Use Alternative Screen Buffer. */
                         m_savedX = cursorX;
@@ -381,6 +402,9 @@ void Xterm::output(uint8_t raw) {
             } else if (raw == 'l') {
                 /* DEC Private Mode Reset. */
                 switch (m_escParams[0]) {
+                    case 1:
+                        /* Disable Cursor Keys Application Mode. Ignored for now. */
+                        break;
                     case 1049:
                         /* Restore Cursor and Use Normal Screen Buffer. */
                         buffer.moveCursor(m_savedX, m_savedY);

@@ -78,6 +78,16 @@ void TerminalBuffer::setChar(uint16_t x, uint16_t y, Character ch) {
     line[x] = ch;
 }
 
+/** Insert lines at the current cursor position. */
+void TerminalBuffer::insertLines(uint16_t count) {
+    for (uint16_t i = 0; i < count; i++) {
+        m_lines.insert(m_lines.begin() + m_cursorY, std::make_unique<Line>());
+        m_lines.pop_back();
+    }
+
+    m_window.bufferUpdated(0, m_cursorY, m_window.cols(), count);
+}
+
 /** Clear part of the current line (inclusive). */
 void TerminalBuffer::clearLine(uint16_t startX, uint16_t endX) {
     assert(startX <= endX);
@@ -98,6 +108,18 @@ void TerminalBuffer::clearLines(uint16_t startY, uint16_t endY) {
         m_lines[i]->clear();
 
     m_window.bufferUpdated(0, startY, m_window.cols(), (endY - startY) + 1);
+}
+
+/** Delete characters right of the current position and shift in spaces. */
+void TerminalBuffer::deleteChars(uint16_t count) {
+    Line &line = *m_lines[m_cursorY];
+
+    uint16_t start = std::min(line.size(), static_cast<size_t>(m_cursorX));
+    uint16_t end   = std::min(line.size(), static_cast<size_t>(m_cursorX + count));
+
+    line.erase(line.begin() + start, line.begin() + end);
+
+    m_window.bufferUpdated(m_cursorX, m_cursorY, m_window.cols() - m_cursorX, 1);
 }
 
 /** Scroll the buffer up (move contents down). */
@@ -129,8 +151,8 @@ void TerminalBuffer::scrollDown() {
         m_lines.pop_front();
         m_lines.emplace_back(std::make_unique<Line>());
     } else {
-        /* Insert a new line at the end of the scroll region, then
-         * remove the line at the top of it. */
+        /* Insert a new line at the end of the scroll region, then remove the
+         * line at the top of it. */
         m_lines.insert(m_lines.begin() + (m_scrollBottom + 1), std::make_unique<Line>());
         m_lines.erase(m_lines.begin() + m_scrollTop);
     }
