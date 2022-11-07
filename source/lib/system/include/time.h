@@ -21,13 +21,11 @@
 
 #pragma once
 
-#define __need_NULL
-#define __need_size_t
-#include <stddef.h>
-
 #define __NEED_clock_t
 #define __NEED_clockid_t
 #define __NEED_locale_t
+#define __NEED_NULL
+#define __NEED_size_t
 #define __NEED_struct_timespec
 #define __NEED_time_t
 #include <bits/alltypes.h>

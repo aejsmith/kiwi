@@ -21,8 +21,8 @@
 
 #pragma once
 
-#define __need_size_t
-#include <stddef.h>
+#define __NEED_size_t
+#include <bits/alltypes.h>
 
 __SYS_EXTERN_C_BEGIN
 

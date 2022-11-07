@@ -21,8 +21,45 @@
 
 #include <system/defs.h>
 
-// TODO: This file is added for musl compatibility. We should move more stuff
-// into here.
+/**
+ * Compiler definitions, supported here for musl compatibility.
+ */
+
+#if defined(__NEED_NULL) || \
+    defined(__NEED_size_t) || \
+    defined(__NEED_ptrdiff_t) || \
+    defined(__NEED_wchar_t) || \
+    defined(__NEED_wint_t)
+    #if defined(__NEED_NULL)
+        #define __need_NULL
+    #endif
+
+    #if defined(__NEED_size_t)
+        #define __need_size_t
+    #endif
+
+    #if defined(__NEED_ptrdiff_t)
+        #define __need_ptrdiff_t
+    #endif
+
+    #if defined(__NEED_wchar_t)
+        #define __need_wchar_t
+    #endif
+
+    #if defined(__NEED_wint_t)
+        #define __need_wint_t
+    #endif
+
+    #include <stddef.h>
+#endif
+
+#if defined(__NEED_va_list) || defined(__NEED___isoc_va_list)
+    #include <stdarg.h>
+#endif
+
+/**
+ * Other definitions.
+ */
 
 #define __BYTE_ORDER        __BYTE_ORDER__
 #define __LITTLE_ENDIAN     __ORDER_LITTLE_ENDIAN__

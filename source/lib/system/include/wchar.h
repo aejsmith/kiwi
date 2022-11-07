@@ -21,12 +21,13 @@
 
 #pragma once
 
-#define __need_wchar_t
-#define __need_wint_t
+
 #include <stddef.h>
 
-#define __NEED_locale_t
 #define __NEED_FILE
+#define __NEED_locale_t
+#define __NEED_wchar_t
+#define __NEED_wint_t
 #include <bits/alltypes.h>
 
 #include <stdarg.h>

@@ -21,10 +21,8 @@
 
 #pragma once
 
-#define __need_NULL
-#include <stddef.h>
-
 #define __NEED_FILE
+#define __NEED_NULL
 #include <bits/alltypes.h>
 
 #include <sys/types.h>

@@ -21,14 +21,12 @@
 
 #pragma once
 
+#define __NEED_size_t
+#include <bits/alltypes.h>
+
 #include <string.h>
 
 __SYS_EXTERN_C_BEGIN
-
-/* Get size_t and NULL from stddef.h. I would love to know why stdc defines
- * size_t and NULL in 3 headers. */
-#define __need_size_t
-#include <stddef.h>
 
 #define bzero(b, len)       (memset((b), '\0', (len)), (void)0)
 #define bcopy(b1, b2, len)  (memmove((b2), (b1), (len)), (void)0)

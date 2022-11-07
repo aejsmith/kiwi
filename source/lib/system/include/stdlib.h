@@ -21,16 +21,13 @@
 
 #pragma once
 
-#define __need_size_t
-#define __need_wchar_t
-#define __need_NULL
-#include <stddef.h>
+#define __NEED_locale_t
+#define __NEED_NULL
+#define __NEED_size_t
+#define __NEED_wchar_t
+#include <bits/alltypes.h>
 
 #include <sys/wait.h>
-
-#include <system/defs.h>
-
-#include <locale.h>
 
 __SYS_EXTERN_C_BEGIN
 

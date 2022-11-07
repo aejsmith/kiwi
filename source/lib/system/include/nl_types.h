@@ -21,10 +21,11 @@
 
 #pragma once
 
+#define __NEED_wint_t
+#include <bits/alltypes.h>
+
 #include <locale.h>
 #include <stdarg.h>
-#define __need_wint_t
-#include <stddef.h>
 #include <stdio.h>
 
 __SYS_EXTERN_C_BEGIN
