@@ -242,8 +242,12 @@ void Xterm::output(uint8_t raw) {
                                 m_attributes.attributes &= ~TerminalBuffer::kAttribute_Bold;
                                 break;
                             case 7:
-                                /* Reverse colours. */
-                                std::swap(m_attributes.fg, m_attributes.bg);
+                                /* Inverse colours. */
+                                m_attributes.attributes |= TerminalBuffer::kAttribute_Inverse;
+                                break;
+                            case 27:
+                                /* Not inverse colours. */
+                                m_attributes.attributes &= ~TerminalBuffer::kAttribute_Inverse;
                                 break;
                             case 30 ... 37:
                                 /* Set foreground colour. */
@@ -260,6 +264,9 @@ void Xterm::output(uint8_t raw) {
                             case 49:
                                 /* Reset background to default. */
                                 m_attributes.bg = TerminalBuffer::kColour_Default;
+                                break;
+                            default:
+                                core_log(CORE_LOG_WARN, "xterm: unhandled attribute code %d", m_escParams[i]);
                                 break;
                         }
                     }

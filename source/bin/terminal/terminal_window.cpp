@@ -203,6 +203,10 @@ void TerminalWindow::bufferUpdated(uint16_t x, uint16_t y, uint16_t width, uint1
             if (ch.bg != TerminalBuffer::kColour_Default)
                 bg = colours[ch.bg];
 
+            /* Handle inversed colours. */
+            if (ch.attributes & TerminalBuffer::kAttribute_Inverse)
+                std::swap(fg, bg);
+
             /* Swap colours for the cursor. */
             if (currX == buffer.cursorX() && currY == buffer.cursorY())
                 std::swap(fg, bg);

@@ -51,7 +51,8 @@ public:
     };
 
     enum Attribute : uint8_t {
-        kAttribute_Bold = (1<<0),
+        kAttribute_Bold     = (1<<0),
+        kAttribute_Inverse  = (1<<1),
     };
 
     struct Character {
