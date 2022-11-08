@@ -227,6 +227,13 @@ void Xterm::output(uint8_t raw) {
 
                     buffer.insertLines(m_escParams[0]);
                     break;
+                case 'M':
+                    /* Delete Lines (default 1). */
+                    if (m_escParamSize < 0)
+                        m_escParams[0] = 1;
+
+                    buffer.deleteLines(m_escParams[0]);
+                    break;
                 case 'P':
                     /* Delete Characters (default 1). */
                     if (m_escParamSize < 0)

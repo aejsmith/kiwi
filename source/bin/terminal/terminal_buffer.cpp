@@ -80,12 +80,36 @@ void TerminalBuffer::setChar(uint16_t x, uint16_t y, Character ch) {
 
 /** Insert lines at the current cursor position. */
 void TerminalBuffer::insertLines(uint16_t count) {
+    /* Only affects the scroll region. If the cursor is outside it, ignore it. */
+    if (m_cursorY < m_scrollTop || m_cursorY > m_scrollBottom)
+        return;
+
     for (uint16_t i = 0; i < count; i++) {
+        /* Erase from the bottom, insert at current position. */
+        m_lines.erase(m_lines.begin() + m_scrollBottom);
         m_lines.insert(m_lines.begin() + m_cursorY, std::make_unique<Line>());
-        m_lines.pop_back();
     }
 
-    m_window.bufferUpdated(0, m_cursorY, m_window.cols(), count);
+    /* Have to update from the current line to the rest of the scroll region. */
+    // TODO: We could use bufferScrolled if count == 1 which might be faster.
+    m_window.bufferUpdated(0, m_cursorY, m_window.cols(), (m_scrollBottom - m_cursorY) + 1);
+}
+
+/** Delete lines at the current cursor position. */
+void TerminalBuffer::deleteLines(uint16_t count) {
+    /* Only affects the scroll region. If the cursor is outside it, ignore it. */
+    if (m_cursorY < m_scrollTop || m_cursorY > m_scrollBottom)
+        return;
+
+    for (uint16_t i = 0; i < count; i++) {
+        /* Erase from the current position, insert at the bottom. */
+        m_lines.erase(m_lines.begin() + m_cursorY);
+        m_lines.insert(m_lines.begin() + m_scrollBottom, std::make_unique<Line>());
+    }
+
+    /* Have to update from the current line to the rest of the scroll region. */
+    // TODO: We could use bufferScrolled if count == 1 which might be faster.
+    m_window.bufferUpdated(0, m_cursorY, m_window.cols(), (m_scrollBottom - m_cursorY) + 1);
 }
 
 /** Clear part of the current line (inclusive). */
