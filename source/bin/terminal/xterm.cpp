@@ -101,6 +101,12 @@ void Xterm::output(uint8_t raw) {
                     /* Designate G0/1 Character Set. */
                     m_escState = 5;
                     return;
+                case '=':
+                    /* Application Keypad. TODO. */
+                    break;
+                case '>':
+                    /* Normal Keypad. TODO. */
+                    break;
                 case '7':
                     /* Save current cursor position. */
                     m_savedX = cursorX;
@@ -109,12 +115,6 @@ void Xterm::output(uint8_t raw) {
                 case '8':
                     /* Restore saved cursor position. */
                     buffer.moveCursor(m_savedX, m_savedY);
-                    break;
-                case '=':
-                    /* Application Keypad. TODO. */
-                    break;
-                case '>':
-                    /* Normal Keypad. TODO. */
                     break;
                 case 'D':
                     buffer.scrollDown();
@@ -137,6 +137,9 @@ void Xterm::output(uint8_t raw) {
             bool fall = false;
 
             switch (raw) {
+                case '?':
+                    m_escState = 4;
+                    return;
                 case 's':
                     /* Save current cursor position. */
                     m_savedX = cursorX;
@@ -146,9 +149,6 @@ void Xterm::output(uint8_t raw) {
                     /* Restore saved cursor position. */
                     buffer.moveCursor(m_savedX, m_savedY);
                     break;
-                case '?':
-                    m_escState = 4;
-                    return;
                 default:
                     fall = true;
                     break;
@@ -184,6 +184,52 @@ void Xterm::output(uint8_t raw) {
 
             /* Handle the code. */
             switch (raw) {
+                case 'A':
+                    /* Cursor Up. */
+                    if (m_escParamSize < 0)
+                        m_escParams[0] = 1;
+
+                    buffer.moveCursor(cursorX, cursorY - m_escParams[0]);
+                    break;
+                case 'B':
+                    /* Cursor Down. */
+                    if (m_escParamSize < 0)
+                        m_escParams[0] = 1;
+
+                    buffer.moveCursor(cursorX, cursorY + m_escParams[0]);
+                    break;
+                case 'C':
+                    /* Cursor Forward. */
+                    if (m_escParamSize < 0)
+                        m_escParams[0] = 1;
+
+                    buffer.moveCursor(cursorX + m_escParams[0], cursorY);
+                    break;
+                case 'D':
+                    /* Cursor Backward. */
+                    if (m_escParamSize < 0)
+                        m_escParams[0] = 1;
+
+                    buffer.moveCursor(cursorX - m_escParams[0], cursorY);
+                    break;
+                case 'G':
+                    /* Cursor Character Absolute. */
+                    if (m_escParamSize < 0)
+                        m_escParams[0] = 1;
+
+                    buffer.moveCursor(m_escParams[0] - 1, cursorY);
+                    break;
+                case 'H':
+                case 'f':
+                    /* Move cursor - ESC[{row};{column}H */
+                    if (m_escParamSize < 1) {
+                        m_escParams[1] = 1;
+                        if (m_escParamSize < 0)
+                            m_escParams[0] = 1;
+                    }
+
+                    buffer.moveCursor(m_escParams[1] - 1, m_escParams[0] - 1);
+                    break;
                 case 'J':
                     /* Erase in Display. */
                     switch (m_escParams[0]) {
@@ -241,6 +287,17 @@ void Xterm::output(uint8_t raw) {
 
                     buffer.deleteChars(m_escParams[0]);
                     break;
+                case 'd':
+                    /* Line Position Absolute. */
+                    if (m_escParamSize < 0)
+                        m_escParams[0] = 1;
+
+                    buffer.moveCursor(cursorX, m_escParams[0] - 1);
+                    break;
+                case 'l':
+                    /* Reset Mode. Ignore this for now while we don't have
+                     * Set Mode (h) implemented. */
+                    break;
                 case 'm':
                     if (m_escParamSize < 0)
                         m_escParamSize = 0;
@@ -293,59 +350,6 @@ void Xterm::output(uint8_t raw) {
                     }
 
                     break;
-                case 'H':
-                case 'f':
-                    /* Move cursor - ESC[{row};{column}H */
-                    if (m_escParamSize < 1) {
-                        m_escParams[1] = 1;
-                        if (m_escParamSize < 0)
-                            m_escParams[0] = 1;
-                    }
-
-                    buffer.moveCursor(m_escParams[1] - 1, m_escParams[0] - 1);
-                    break;
-                case 'A':
-                    /* Cursor Up. */
-                    if (m_escParamSize < 0)
-                        m_escParams[0] = 1;
-
-                    buffer.moveCursor(cursorX, cursorY - m_escParams[0]);
-                    break;
-                case 'B':
-                    /* Cursor Down. */
-                    if (m_escParamSize < 0)
-                        m_escParams[0] = 1;
-
-                    buffer.moveCursor(cursorX, cursorY + m_escParams[0]);
-                    break;
-                case 'C':
-                    /* Cursor Forward. */
-                    if (m_escParamSize < 0)
-                        m_escParams[0] = 1;
-
-                    buffer.moveCursor(cursorX + m_escParams[0], cursorY);
-                    break;
-                case 'D':
-                    /* Cursor Backward. */
-                    if (m_escParamSize < 0)
-                        m_escParams[0] = 1;
-
-                    buffer.moveCursor(cursorX - m_escParams[0], cursorY);
-                    break;
-                case 'd':
-                    /* Line Position Absolute. */
-                    if (m_escParamSize < 0)
-                        m_escParams[0] = 1;
-
-                    buffer.moveCursor(cursorX, m_escParams[0] - 1);
-                    break;
-                case 'G':
-                    /* Cursor Character Absolute. */
-                    if (m_escParamSize < 0)
-                        m_escParams[0] = 1;
-
-                    buffer.moveCursor(m_escParams[0] - 1, cursorY);
-                    break;
                 case 'r':
                     /* Set Scrolling Region. */
                     if (m_escParamSize < 1) {
@@ -355,10 +359,6 @@ void Xterm::output(uint8_t raw) {
                     }
 
                     buffer.setScrollRegion(m_escParams[0] - 1, m_escParams[1] - 1);
-                    break;
-                case 'l':
-                    /* Reset Mode. Ignore this for now while we don't have
-                     * Set Mode (h) implemented. */
                     break;
                 default:
                     core_log(CORE_LOG_WARN, "xterm: unknown character %c at state 3", raw);
