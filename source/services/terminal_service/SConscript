@@ -16,7 +16,7 @@
 
 Import('manager')
 
-env = manager.create(libraries = ['kernel', 'kiwi'], flags = {
+env = manager.create(libraries = ['kiwi'], flags = {
     'CPPPATH': [
         Dir('../../lib/system'),
     ],

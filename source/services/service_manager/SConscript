@@ -16,7 +16,7 @@
 
 Import('manager')
 
-env = manager.create(libraries = ['kernel', 'kiwi'])
+env = manager.create(libraries = ['kiwi'])
 
 env.KiwiService('service_manager', [
     'client.cpp',

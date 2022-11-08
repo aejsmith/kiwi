@@ -16,7 +16,7 @@
 
 Import('manager', 'config')
 
-env = manager.create(libraries = ['kernel'], flags = {
+env = manager.create(flags = {
     'CPPPATH': [
         Dir('include'),
     ],
