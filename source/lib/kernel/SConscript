@@ -79,6 +79,7 @@ env.Command(
 arch_sources = SConscript(dirs = ['arch/%s' % (config['ARCH'])], exports = ['env'])
 
 env.KiwiLibrary('kernel',
-    sources = arch_sources + sources + libsystem_objects,
+    version       = None, # libkernel is unversioned.
+    sources       = arch_sources + sources + libsystem_objects,
     include_paths = [Dir('include')],
 )

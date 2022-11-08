@@ -370,9 +370,9 @@ class BuildManager:
             if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
                 Depends(target[0], env['_LIBOUTDIR'].glob('*crt*.o'))
             if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
-                Depends(target[0], env['_LIBOUTDIR'].File('libsystem.so'))
+                Depends(target[0], env['_LIBOUTDIR'].File('libsystem.so.1'))
                 if env['SMARTLINK'](source, target, env, None) == '$CXX':
-                    Depends(target[0], env['_LIBOUTDIR'].File('libc++.so'))
+                    Depends(target[0], env['_LIBOUTDIR'].File('libc++.so.1'))
             return target, source
         env.Append(SHLIBEMITTER = [add_library_deps])
         env.Append(PROGEMITTER = [add_library_deps])
