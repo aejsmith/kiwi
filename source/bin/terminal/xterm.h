@@ -39,8 +39,9 @@ private:
     TerminalBuffer m_altBuffer;
     bool m_usingAltBuffer;
 
-    /** Current character attributes. */
+    /** Current character/output attributes. */
     TerminalBuffer::Character m_attributes;
+    uint32_t m_outputFlags;
 
     /** Escape code state. */
     int m_escState;

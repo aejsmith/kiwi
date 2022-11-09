@@ -38,6 +38,7 @@ Xterm::Xterm(TerminalWindow &window) :
     m_mainBuffer     (window, true),
     m_altBuffer      (window, false),
     m_usingAltBuffer (false),
+    m_outputFlags    (0),
     m_escState       (0),
     m_escParamSize   (0),
     m_savedX         (0),
@@ -79,7 +80,7 @@ void Xterm::output(uint8_t raw) {
                  * normal character. */
                 TerminalBuffer::Character ch = m_attributes;
                 ch.ch = raw;
-                buffer.output(ch);
+                buffer.output(ch, m_outputFlags);
             }
 
             return;
@@ -294,9 +295,27 @@ void Xterm::output(uint8_t raw) {
 
                     buffer.moveCursor(cursorX, m_escParams[0] - 1);
                     break;
+                case 'h':
+                    /* Set Mode. */
+                    switch (m_escParams[0]) {
+                        case 4:
+                            /* Insert Mode. */
+                            m_outputFlags |= TerminalBuffer::kOutput_Insert;
+                            break;
+                        default:
+                            core_log(CORE_LOG_WARN, "xterm: unhandled mode %d", m_escParams[0]);
+                            break;
+                    }
+
+                    break;
                 case 'l':
-                    /* Reset Mode. Ignore this for now while we don't have
-                     * Set Mode (h) implemented. */
+                    /* Reset Mode. */
+                    switch (m_escParams[0]) {
+                        case 4:
+                            m_outputFlags &= ~TerminalBuffer::kOutput_Insert;
+                            break;
+                    }
+
                     break;
                 case 'm':
                     if (m_escParamSize < 0)
@@ -361,7 +380,7 @@ void Xterm::output(uint8_t raw) {
                     buffer.setScrollRegion(m_escParams[0] - 1, m_escParams[1] - 1);
                     break;
                 default:
-                    core_log(CORE_LOG_WARN, "xterm: unknown character %c at state 3", raw);
+                    core_log(CORE_LOG_WARN, "xterm: unknown character %d%c at state 3", m_escParams[0], raw);
                     break;
             }
 

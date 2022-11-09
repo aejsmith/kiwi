@@ -134,6 +134,21 @@ void TerminalBuffer::clearLines(uint16_t startY, uint16_t endY) {
     m_window.bufferUpdated(0, startY, m_window.cols(), (endY - startY) + 1);
 }
 
+/** Insert spaces right of the current position. */
+void TerminalBuffer::insertChars(uint16_t count) {
+    Line &line = *m_lines[m_cursorY];
+
+    if (m_cursorX >= line.size())
+        return;
+
+    line.insert(line.begin() + m_cursorX, count, kEmptyCharacter);
+
+    while (line.size() > m_window.cols())
+        line.pop_back();
+
+    m_window.bufferUpdated(m_cursorX, m_cursorY, line.size() - m_cursorX, 1);
+}
+
 /** Delete characters right of the current position and shift in spaces. */
 void TerminalBuffer::deleteChars(uint16_t count) {
     Line &line = *m_lines[m_cursorY];
@@ -217,7 +232,7 @@ void TerminalBuffer::moveCursor(int16_t x, int16_t y) {
     m_window.bufferUpdated(m_cursorX, m_cursorY, 1, 1);
 }
 
-void TerminalBuffer::output(Character ch) {
+void TerminalBuffer::output(Character ch, uint32_t flags) {
     uint16_t cols = m_window.cols();
 
     uint16_t prevX = m_cursorX;
@@ -249,6 +264,9 @@ void TerminalBuffer::output(Character ch) {
         default:
             /* If it is a non-printing character, ignore it. */
             if (ch.ch >= ' ') {
+                if (flags & kOutput_Insert)
+                    insertChars(1);
+
                 setChar(m_cursorX, m_cursorY, ch);
                 m_cursorX++;
             }

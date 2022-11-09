@@ -55,6 +55,12 @@ public:
         kAttribute_Inverse  = (1<<1),
     };
 
+    /** Output behaviour flags. */
+    enum Output {
+        /** Insert rather than overwriting characters. */
+        kOutput_Insert = (1<<0),
+    };
+
     struct Character {
         // TODO: Unicode.
         uint8_t ch;
@@ -77,12 +83,13 @@ public:
     void deleteLines(uint16_t count);
     void clearLine(uint16_t startX, uint16_t endX);
     void clearLines(uint16_t startY, uint16_t endY);
+    void insertChars(uint16_t count);
     void deleteChars(uint16_t count);
     void scrollUp();
     void scrollDown();
     void setScrollRegion(int16_t top, int16_t bottom);
     void moveCursor(int16_t x, int16_t y);
-    void output(Character ch);
+    void output(Character ch, uint32_t flags = 0);
 
 private:
     using Line      = std::vector<Character>;
