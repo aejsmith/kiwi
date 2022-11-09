@@ -91,19 +91,24 @@ __init_text void random_init(void) {
     #endif
 }
 
+/* Read in chunks so we're not copying bytes at a time, but not huge chunks so
+ * that we hold on to the spinlock for too long. */
+static const size_t pseudo_random_chunk_size = 128;
+
+static void pseudo_random_device_size(device_t *device, offset_t *_size, size_t *_block_size) {
+    *_size       = 0;
+    *_block_size = pseudo_random_chunk_size;
+}
+
 static status_t pseudo_random_device_io(device_t *device, file_handle_t *handle, io_request_t *request) {
     if (request->op == IO_OP_WRITE)
         return STATUS_NOT_SUPPORTED;
 
-    /* Read in chunks so we're not copying bytes at a time, but not huge chunks
-     * so that we hold on to the spinlock for too long. */
-    static const size_t max_chunk_size = 128;
-
-    uint64_t *buf __cleanup_kfree = kmalloc(max_chunk_size, MM_KERNEL);
+    uint64_t *buf __cleanup_kfree = kmalloc(pseudo_random_chunk_size, MM_KERNEL);
 
     while (request->transferred < request->total) {
         size_t remaining   = request->total - request->transferred;
-        size_t chunk_size  = min(remaining, max_chunk_size);
+        size_t chunk_size  = min(remaining, pseudo_random_chunk_size);
         size_t chunk_words = round_up_pow2(chunk_size, sizeof(uint64_t)) / sizeof(uint64_t);
 
         spinlock_lock(&random_lock);
@@ -123,6 +128,7 @@ static status_t pseudo_random_device_io(device_t *device, file_handle_t *handle,
 
 static const device_ops_t pseudo_random_device_ops = {
     .type = FILE_TYPE_CHAR,
+    .size = pseudo_random_device_size,
     .io   = pseudo_random_device_io,
 };
 

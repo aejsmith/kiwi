@@ -185,9 +185,11 @@ static status_t device_file_map(file_handle_t *handle, vm_region_t *region) {
 static void device_file_info(file_handle_t *handle, file_info_t *info) {
     device_t *device = handle->device;
 
-    /* TODO. */
-    info->block_size = 1;
     info->size       = 0;
+    info->block_size = 1;
+
+    if (device->ops && device->ops->size)
+        device->ops->size(device, &info->size, &info->block_size);
 
     info->id         = 0;
     info->mount      = 0;

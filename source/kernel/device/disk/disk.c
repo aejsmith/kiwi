@@ -44,6 +44,13 @@ static void disk_device_destroy_impl(device_t *node) {
     fatal("TODO");
 }
 
+static void disk_device_size(device_t *node, offset_t *_size, size_t *_block_size) {
+    disk_device_t *device = node->private;
+
+    *_size       = device->block_count * device->block_size;
+    *_block_size = device->block_size;
+}
+
 /** Allocate a block buffer suitable for transfers to/from the device. */
 static void *alloc_block_buffer(disk_device_t *device, dma_ptr_t *_dma) {
     if (device->flags & DISK_DEVICE_DMA) {
@@ -217,6 +224,7 @@ const device_ops_t disk_device_ops = {
     .type    = FILE_TYPE_BLOCK,
 
     .destroy = disk_device_destroy_impl,
+    .size    = disk_device_size,
     .io      = disk_device_io,
 };
 

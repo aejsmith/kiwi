@@ -59,6 +59,19 @@ typedef struct device_ops {
      * @param handle        File handle structure. */
     void (*close)(struct device *device, file_handle_t *handle);
 
+    /**
+     * Get device size properties. If NULL, size will be set to 0, block_size
+     * will be set to 1.
+     *
+     * @param device        Device to get size of.
+     * @param _size         Where to return device size.
+     * @param _block_size   Where to return device block size (optimal size for
+     *                      I/O operations).
+     */
+    // TODO: This should eventually be replaced with a device attribute query
+    // once the device attribute system is improved.
+    void (*size)(struct device *device, offset_t *_size, size_t *_block_size);
+
     /** Signal that a device event is being waited for.
      * @note                If the event being waited for has occurred
      *                      already, this function should call the callback
