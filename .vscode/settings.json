@@ -1,7 +1,10 @@
 {
     "files.associations": {
         "SConscript": "python",
-        "SConstruct": "python"
+        "SConstruct": "python",
+        "package.build": "shellscript",
+        "*.package": "json",
+        "*.manifest": "json"
     },
     "files.exclude": {
         ".sconsign.dblite": true
