@@ -21,6 +21,12 @@
 # functionality.
 #
 
+# Mount a ramfs at /users/admin as a stopgap until we have ext2 write support.
+mkdir -p /users/admin
+mount -t ramfs /users/admin
+shopt -s dotglob
+cp -R /users/template/* /users/admin/
+
 # Initialise network with DHCP.
 net_control dhcp /class/net/0
 
