@@ -266,7 +266,7 @@ static void free_port(tcp_socket_t *socket) {
 /** Allocates an initial sequence number for a socket. */
 static void alloc_initial_tx_seq(tcp_socket_t *socket) {
     // TODO: https://datatracker.ietf.org/doc/html/rfc1948.html
-    socket->initial_tx_seq = random_get_s32();
+    socket->initial_tx_seq = random_get_u32();
 }
 
 /** Calculate the RX window size to advertise. */
