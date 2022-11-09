@@ -94,8 +94,9 @@ Service* ServiceManager::findService(const std::string &name) {
 
 status_t ServiceManager::spawnProcess(const std::vector<std::string> &args, Kiwi::Core::Handle *_handle) const {
     process_attrib_t attrib;
+    process_attrib_init(&attrib);
+
     handle_t map[][2] = { { 0, 0 }, { 1, 1 }, { 2, 2 } };
-    attrib.token     = INVALID_HANDLE;
     attrib.root_port = m_port;
     attrib.map       = map;
     attrib.map_count = core_array_size(map);

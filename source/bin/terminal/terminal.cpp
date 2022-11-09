@@ -257,9 +257,15 @@ bool Terminal::spawnProcess(const char *path, Kiwi::Core::Handle &handle) {
         }
 
         process_attrib_t attrib;
-        handle_t map[][2] = { { m_terminal[0], 0 }, { m_terminal[1], 1 }, { m_terminal[1], 2 } };
-        attrib.token     = INVALID_HANDLE;
-        attrib.root_port = INVALID_HANDLE;
+        process_attrib_init(&attrib);
+
+        /* Set up standard I/O handles. */
+        handle_t map[][2] = {
+            { m_terminal[0], 0 },
+            { m_terminal[1], 1 },
+            { m_terminal[1], 2 },
+        };
+
         attrib.map       = map;
         attrib.map_count = core_array_size(map);
 

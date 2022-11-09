@@ -28,11 +28,12 @@
 
 __KERNEL_EXTERN_C_BEGIN
 
-/** Extended attributes for process creation. */
+/**
+ * Extended attributes for process creation. Use process_attrib_init() to
+ * ensure that this is initialised to sane defaults.
+ */
 typedef struct process_attrib {
     /**
-     * Security token for new process.
-     *
      * Token containing the security context for the new process. If set to
      * INVALID_HANDLE, or no attributes structure is given, the new process
      * will inherit the security context of the calling process.
@@ -40,8 +41,6 @@ typedef struct process_attrib {
     handle_t token;
 
     /**
-     * Root port for the new process.
-     *
      * Handle to root port for the new process. If set to INVALID_HANDLE, or no
      * attributes structure is given, the new process will inherit the calling
      * process' root port.
@@ -49,8 +48,6 @@ typedef struct process_attrib {
     handle_t root_port;
 
     /**
-     * Handle map.
-     *
      * Array containing a mapping of handles to duplicate into the new process
      * from the calling process. The first ID of each entry specifies the handle
      * in the caller, and the second specifies the ID to give it in the child.
@@ -63,8 +60,6 @@ typedef struct process_attrib {
     handle_t (*map)[2];
 
     /**
-     * Size of handle map.
-     *
      * Number of entries in the handle map. If 0, no handles will be duplicated
      * to the child process. If negative, or no attributes structure is given,
      * handles will be duplicated into the new process according to the
@@ -73,7 +68,23 @@ typedef struct process_attrib {
     ssize_t map_count;
 } process_attrib_t;
 
-/** Process arguments. */
+/**
+ * Constructor for process_attrib_t with default values that will behave as
+ * though no attrib structure was passed.
+ *
+ * @param attrib        Attributes to initialise.
+ */
+static inline void process_attrib_init(process_attrib_t *attrib) {
+    attrib->token     = INVALID_HANDLE;
+    attrib->root_port = INVALID_HANDLE;
+    attrib->map       = NULL;
+    attrib->map_count = -1;
+}
+
+/**
+ * Process arguments. This is what is passed into a process at launch. It is
+ * saved in libkernel and can be retrieved with kern_process_args().
+ */
 typedef struct process_args {
     char *path;                             /**< Path to program. */
     char **args;                            /**< Argument array. */

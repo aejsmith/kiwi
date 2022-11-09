@@ -47,12 +47,9 @@ typedef struct test_request_ping {
 } test_request_ping_t;
 
 static bool spawn_client(handle_t port) {
-    handle_t map[3][2] = { { 0, 0 }, { 1, 1 }, { 2, 2 } };
     process_attrib_t attrib;
-    attrib.token     = INVALID_HANDLE;
+    process_attrib_init(&attrib);
     attrib.root_port = port;
-    attrib.map       = map;
-    attrib.map_count = 3;
 
     const char *args[] = { "/system/bin/test_ipc", "--client", NULL };
     status_t ret = kern_process_create(args[0], args, (const char *const *)environ, 0, &attrib, NULL);
