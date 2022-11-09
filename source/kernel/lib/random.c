@@ -14,77 +14,131 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*-
- * Copyright (c) 1990, 1993
- *  The Regents of the University of California.  All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
-
 /**
  * @file
  * @brief               Random number generation.
  *
- * Generator implementation taken from NetBSD lib/libc/stdlib/rand.c.
+ * MT19937-64 implementation taken from:
+ * http://www.math.sci.hiroshima-u.ac.jp/m-mat/MT/VERSIONS/C-LANG/mt19937-64.c
  *
  * TODO:
- *  - We could do quite a lot better here.
+ *  - This is not suitable for cryptographic usage. Really, we should replace
+ *    this eventually with something like Linux has which sources entropy from
+ *    system activity and other things.
  */
 
+#include <io/request.h>
+
 #include <lib/random.h>
+#include <lib/utility.h>
+
+#include <device/device.h>
+
+#include <mm/malloc.h>
 
 #include <sync/spinlock.h>
 
 #include <assert.h>
+#include <status.h>
 #include <time.h>
 
+#include "mt19937-64.h"
+
 static SPINLOCK_DEFINE(random_lock);
-static unsigned long random_seed = 1;
 
 #if CONFIG_DEBUG
 static bool random_inited = false;
 #endif
 
-#define RAND_MAX 0x7fffffff
+static inline uint64_t random_get_locked(void) {
+    return genrand64_int64();
+}
 
-/** Gets a 32-bit random number. */
-int32_t random_get32(void) {
+/** Gets a 64-bit unsigned random number (range 0, UINT64_MAX). */
+uint64_t random_get_u64(void) {
     spinlock_lock(&random_lock);
 
     assert(random_inited);
-    int32_t ret = (int32_t)((random_seed = random_seed * 1103515245 + 12345) % ((unsigned long)RAND_MAX + 1));
+
+    unsigned long ret = random_get_locked();
 
     spinlock_unlock(&random_lock);
-
     return ret;
 }
 
+/** Gets a 64-bit signed random number (range 0, INT64_MAX). */
+int64_t random_get_s64(void) {
+    return (int64_t)(random_get_u64() >> 1);
+}
+
+/** Gets a 32-bit unsigned random number (range 0, UINT32_MAX). */
+uint32_t random_get_u32(void) {
+    return (uint32_t)(random_get_u64() >> 32);
+}
+
+/** Gets a 32-bit signed random number (range 0, INT32_MAX). */
+int32_t random_get_s32(void) {
+    return (int32_t)(random_get_u64() >> 33);
+}
+
 __init_text void random_init(void) {
-    random_seed = unix_time();
+    (void)init_by_array64;
+
+    init_genrand64(unix_time());
 
     #if CONFIG_DEBUG
         random_inited = true;
     #endif
 }
+
+static status_t pseudo_random_device_io(device_t *device, file_handle_t *handle, io_request_t *request) {
+    if (request->op == IO_OP_WRITE)
+        return STATUS_NOT_SUPPORTED;
+
+    /* Read in chunks so we're not copying bytes at a time, but not huge chunks
+     * so that we hold on to the spinlock for too long. */
+    static const size_t max_chunk_size = 128;
+
+    uint64_t *buf __cleanup_kfree = kmalloc(max_chunk_size, MM_KERNEL);
+
+    while (request->transferred < request->total) {
+        size_t remaining   = request->total - request->transferred;
+        size_t chunk_size  = min(remaining, max_chunk_size);
+        size_t chunk_words = round_up_pow2(chunk_size, sizeof(uint64_t)) / sizeof(uint64_t);
+
+        spinlock_lock(&random_lock);
+
+        for (size_t i = 0; i < chunk_words; i++)
+            buf[i] = random_get_locked();
+
+        spinlock_unlock(&random_lock);
+
+        status_t ret = io_request_copy(request, buf, chunk_size, true);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+static const device_ops_t pseudo_random_device_ops = {
+    .type = FILE_TYPE_CHAR,
+    .io   = pseudo_random_device_io,
+};
+
+static void pseudo_random_device_init(void) {
+    device_attr_t attrs[] = {
+        { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = "pseudo_random" } },
+    };
+
+    device_t *device;
+    status_t ret = device_create(
+        "pseudo_random", device_virtual_dir, &pseudo_random_device_ops, NULL,
+        attrs, array_size(attrs), &device);
+    if (ret != STATUS_SUCCESS)
+        fatal("Failed to register pseudo_random device (%d)", ret);
+
+    device_publish(device);
+}
+
+INITCALL(pseudo_random_device_init);

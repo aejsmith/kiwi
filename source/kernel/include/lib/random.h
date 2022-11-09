@@ -23,6 +23,9 @@
 
 #include <types.h>
 
-extern int32_t random_get32(void);
+extern uint64_t random_get_u64(void);
+extern int64_t random_get_s64(void);
+extern uint32_t random_get_u32(void);
+extern int32_t random_get_s32(void);
 
 extern void random_init(void);
