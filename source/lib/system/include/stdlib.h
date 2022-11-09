@@ -101,8 +101,8 @@ extern unsigned long strtoul(const char *__restrict cp, char **__restrict endp, 
 extern unsigned long long int strtoull(const char *__restrict cp, char **__restrict endp, int base);
 extern int system(const char *command);
 extern int unsetenv(const char *name);
-//extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);
-//extern int wctomb(char *s, wchar_t wc);
+extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);
+extern int wctomb(char *s, wchar_t wc);
 
 /** Helper for __sys_cleanup_free. */
 static inline void __sys_freep(void *p) {
@@ -117,8 +117,6 @@ static inline void __sys_freep(void *p) {
 
 extern float strtof(const char *__restrict s, char **__restrict endptr);
 extern lldiv_t lldiv(long long numerator, long long denominator);
-extern int wctomb(char *s, wchar_t wc);
-extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);
 extern long strtol_l(const char *__restrict, char **__restrict, int, locale_t);
 extern long long strtoll_l(const char *__restrict, char **__restrict, int, locale_t);
 extern unsigned long strtoul_l(const char *__restrict, char **__restrict, int, locale_t);
