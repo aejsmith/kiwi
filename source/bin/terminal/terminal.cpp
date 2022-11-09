@@ -27,7 +27,7 @@
 #include <core/service.h>
 #include <core/utility.h>
 
-#include <kernel/file.h>
+#include <kernel/fs.h>
 #include <kernel/process.h>
 #include <kernel/status.h>
 
@@ -36,6 +36,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <stdlib.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -247,7 +248,14 @@ bool Terminal::spawnProcess(const char *path, Kiwi::Core::Handle &handle) {
             exit(EXIT_FAILURE);
         }
 
-        /* Child process. */
+        /* Change to the home directory. */
+        char *home = getenv("HOME");
+        if (home) {
+            ret = kern_fs_set_curr_dir(home);
+            if (ret != STATUS_SUCCESS)
+                core_log(CORE_LOG_WARN, "failed to set working directory '%s': %d", home, ret);
+        }
+
         process_attrib_t attrib;
         handle_t map[][2] = { { m_terminal[0], 0 }, { m_terminal[1], 1 }, { m_terminal[1], 2 } };
         attrib.token     = INVALID_HANDLE;
