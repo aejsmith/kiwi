@@ -55,6 +55,7 @@ status_t io_request_init(
     io_request_t *request, const io_vec_t *vecs, size_t count, offset_t offset,
     io_op_t op, io_target_t target)
 {
+    request->flags       = 0;
     request->offset      = offset;
     request->total       = 0;
     request->transferred = 0;

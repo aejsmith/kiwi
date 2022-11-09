@@ -268,7 +268,7 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
         goto out;
     }
 
-    uint32_t flags = file_handle_flags(fhandle);
+    request->flags = file_handle_flags(fhandle);
 
     /* Determine the offset to perform the I/O at and handle the FILE_APPEND
      * flag. TODO: We don't handle atomicity at all here. For regular files,
@@ -276,7 +276,7 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
      * do I/O while this is in progress? */
     if (is_seekable(fhandle->file)) {
         if (request->offset < 0) {
-            if (request->op == IO_OP_WRITE && flags & FILE_APPEND) {
+            if (request->op == IO_OP_WRITE && request->flags & FILE_APPEND) {
                 mutex_lock(&fhandle->lock);
 
                 file_info_t info;

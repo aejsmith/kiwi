@@ -39,6 +39,7 @@ typedef enum io_target {
 
 /** Structure containing information for an I/O request. */
 typedef struct io_request {
+    uint32_t flags;                 /**< File handle flags. */
     io_vec_t *vecs;                 /**< I/O vectors. */
     size_t count;                   /**< Number of I/O vectors. */
     offset_t offset;                /**< Offset in the object. */

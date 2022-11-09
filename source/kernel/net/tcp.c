@@ -779,21 +779,26 @@ static status_t tcp_socket_send(
         uint32_t size    = min(remaining, (size_t)space);
 
         if (size == 0) {
-            /* We need to wait for some space to become available. Flush
-             * anything we've added and wait. */
-            flush_tx_buffer(socket);
-
-            ret = condvar_wait_etc(&buffer->cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
-            if (ret != STATUS_SUCCESS)
+            if (request->flags & FILE_NONBLOCK) {
+                ret = (request->transferred > 0) ? STATUS_SUCCESS : STATUS_WOULD_BLOCK;
                 break;
+            } else {
+                /* We need to wait for some space to become available. Flush
+                 * anything we've added and wait. */
+                flush_tx_buffer(socket);
 
-            /* Check that we're still connected after waiting for space. */
-            if (socket->state != TCP_STATE_ESTABLISHED) {
-                ret = STATUS_NOT_CONNECTED;
-                break;
+                ret = condvar_wait_etc(&buffer->cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
+                if (ret != STATUS_SUCCESS)
+                    break;
+
+                /* Check that we're still connected after waiting for space. */
+                if (socket->state != TCP_STATE_ESTABLISHED) {
+                    ret = STATUS_NOT_CONNECTED;
+                    break;
+                }
+
+                continue;
             }
-
-            continue;
         }
 
         uint32_t pos = (buffer->start + buffer->curr_size) & (buffer->max_size - 1);
@@ -823,7 +828,7 @@ static status_t tcp_socket_send(
     // TODO: Support batching up of data to write by not flushing immediately?
     flush_tx_buffer(socket);
 
-    return STATUS_SUCCESS;
+    return ret;
 }
 
 static status_t tcp_socket_receive(
@@ -844,9 +849,13 @@ static status_t tcp_socket_receive(
         if (socket->state != TCP_STATE_ESTABLISHED)
             return (socket->state > TCP_STATE_ESTABLISHED) ? STATUS_SUCCESS : STATUS_NOT_CONNECTED;
 
-        ret = condvar_wait_etc(&buffer->cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
-        if (ret != STATUS_SUCCESS)
-            return ret;
+        if (request->flags & FILE_NONBLOCK) {
+            return STATUS_WOULD_BLOCK;
+        } else {
+            ret = condvar_wait_etc(&buffer->cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
+            if (ret != STATUS_SUCCESS)
+                return ret;
+        }
     }
 
     assert(request->transferred == 0);

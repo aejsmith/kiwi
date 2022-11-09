@@ -298,7 +298,12 @@ static status_t udp_socket_receive(
 
     /* Wait for a packet. */
     while (list_empty(&socket->rx_queue)) {
-        ret = condvar_wait_etc(&socket->rx_cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
+        if (request->flags & FILE_NONBLOCK) {
+            ret = STATUS_WOULD_BLOCK;
+        } else {
+            ret = condvar_wait_etc(&socket->rx_cvar, &socket->lock, -1, SLEEP_INTERRUPTIBLE);
+        }
+
         if (ret != STATUS_SUCCESS) {
             mutex_unlock(&socket->lock);
             return ret;

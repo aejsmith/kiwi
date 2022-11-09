@@ -335,6 +335,8 @@ status_t socket_recvfrom(
     if (ret != STATUS_SUCCESS)
         goto out;
 
+    request.flags = file_handle_flags(fhandle);
+
     ret = socket_do_receive(
         fhandle, &request, flags, max_addr_len,
         (max_addr_len > 0) ? _addr : NULL, (max_addr_len > 0) ? _addr_len : NULL);
@@ -385,6 +387,8 @@ status_t socket_sendto(
     ret = io_request_init(&request, &vec, 1, 0, IO_OP_WRITE, IO_TARGET_KERNEL);
     if (ret != STATUS_SUCCESS)
         goto out;
+
+    request.flags = file_handle_flags(fhandle);
 
     ret = socket_do_send(fhandle, &request, flags, addr, addr_len);
 
@@ -698,6 +702,8 @@ status_t kern_socket_recvfrom(
     if (ret != STATUS_SUCCESS)
         goto out;
 
+    request.flags = file_handle_flags(fhandle);
+
     if (max_addr_len > 0)
         kaddr = kmalloc(max_addr_len, MM_KERNEL);
 
@@ -782,6 +788,8 @@ status_t kern_socket_sendto(
     ret = io_request_init(&request, &vec, 1, 0, IO_OP_WRITE, IO_TARGET_USER);
     if (ret != STATUS_SUCCESS)
         goto out;
+
+    request.flags = file_handle_flags(fhandle);
 
     ret = socket_do_send(fhandle, &request, flags, kaddr, addr_len);
 
