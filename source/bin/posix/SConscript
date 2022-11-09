@@ -19,6 +19,7 @@ Import('manager')
 env = manager.create()
 
 env.KiwiApplication('cat', ['cat.c'])
+env.KiwiApplication('cp', ['cp.c'])
 env.KiwiApplication('ln', ['ln.c'])
 env.KiwiApplication('ls', ['ls.c'])
 env.KiwiApplication('mkdir', ['mkdir.c'])
