@@ -344,7 +344,7 @@ status_t file_read(
     status_t ret;
 
     assert(handle);
-    assert(buf);
+    assert(size == 0 || buf);
 
     io_vec_t vec;
     vec.buffer = buf;
@@ -400,7 +400,7 @@ status_t file_write(
     status_t ret;
 
     assert(handle);
-    assert(buf);
+    assert(size == 0 || buf);
 
     io_vec_t vec;
     vec.buffer = (void *)buf;
@@ -884,7 +884,7 @@ status_t kern_file_read(
     io_request_t request;
     request.transferred = 0;
 
-    if (!buf) {
+    if (size > 0 && !buf) {
         ret = STATUS_INVALID_ARG;
         goto out;
     }
@@ -948,7 +948,7 @@ status_t kern_file_write(
     io_request_t request;
     request.transferred = 0;
 
-    if (!buf) {
+    if (size > 0 && !buf) {
         ret = STATUS_INVALID_ARG;
         goto out;
     }
