@@ -21,16 +21,15 @@
 
 #pragma once
 
+#define __NEED_struct_timeval
+#define __NEED_suseconds_t
+#define __NEED_time_t
+#include <bits/alltypes.h>
+
 #include <sys/select.h>
 #include <sys/types.h>
 
 __SYS_EXTERN_C_BEGIN
-
-/** Time value structure. */
-struct timeval {
-    time_t tv_sec;                  /**< Seconds. */
-    suseconds_t tv_usec;            /**< Additional microseconds since. */
-};
 
 #define timerisset(t) \
     ((t)->tv_sec || (t)->tv_usec)
@@ -64,5 +63,7 @@ struct timeval {
     } while (0)
 
 extern int gettimeofday(struct timeval *tv, void *tz);
+
+extern int utimes(const char *path, const struct timeval times[2]);
 
 __SYS_EXTERN_C_END

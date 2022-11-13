@@ -254,4 +254,14 @@
     #define __DEFINED_struct_timespec
 #endif
 
+#if defined(__NEED_struct_timeval) && !defined(__DEFINED_struct_timeval)
+    /** Time value structure. */
+    struct timeval {
+        time_t tv_sec;                  /**< Seconds. */
+        suseconds_t tv_usec;            /**< Additional microseconds since. */
+    };
+
+    #define __DEFINED_struct_timeval
+#endif
+
 #undef __int64
