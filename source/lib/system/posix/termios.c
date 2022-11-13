@@ -304,3 +304,41 @@ pid_t tcgetpgrp(int fd) {
 int tcsetpgrp(int fd, pid_t pgid) {
     return ioctl(fd, TIOCSPGRP, &pgid);
 }
+
+/** Input a password from the terminal. */
+char *getpass(const char *prompt) {
+    static char buf[256];
+
+    /* This function is specified to read from /dev/tty (controlling terminal),
+     * but we don't have that, so use stderr/stdin instead. */
+    if (!isatty(STDIN_FILENO)) {
+        errno = ENXIO;
+        return NULL;
+    }
+
+    struct termios orig_tio;
+    tcgetattr(STDIN_FILENO, &orig_tio);
+
+    struct termios new_tio = orig_tio;
+    new_tio.c_lflag = (new_tio.c_lflag & ~(ECHO | ISIG)) | ICANON;
+    new_tio.c_iflag = (new_tio.c_iflag & ~(INLCR | IGNCR)) | ICRNL;
+
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &new_tio);
+    tcdrain(STDIN_FILENO);
+
+    fprintf(stderr, "%s", prompt);
+
+    ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
+    if (ret >= 0) {
+        if (ret > 0 && (buf[ret - 1] == '\n' || ret == sizeof(buf)))
+            ret--;
+
+        buf[ret] = 0;
+    }
+
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_tio);
+
+    fprintf(stderr, "\n");
+
+    return (ret >= 0) ? buf : NULL;
+}

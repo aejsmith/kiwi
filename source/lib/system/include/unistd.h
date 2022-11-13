@@ -107,6 +107,7 @@ extern int gethostname(char *name, size_t len);
 extern char *getlogin(void);
 /* int getlogin_r(char *, size_t); */
 extern int getopt(int argc, char *const argv[], const char *opts);
+extern char *getpass(const char *prompt);
 //extern int getpagesize(void);
 extern pid_t getpgid(pid_t pid);
 extern pid_t getpgrp(void);
