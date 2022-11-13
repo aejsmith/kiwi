@@ -48,7 +48,7 @@ static void vsnprintf_helper(char ch, void *_data) {
 int vsnprintf(char *restrict buf, size_t size, const char *restrict fmt, va_list args) {
     struct vsnprintf_data data;
     data.buf  = buf;
-    data.size = size - 1;
+    data.size = (size > 0) ? size - 1 : 0;
     data.off  = 0;
 
     int ret = do_vprintf(vsnprintf_helper, &data, fmt, args);
