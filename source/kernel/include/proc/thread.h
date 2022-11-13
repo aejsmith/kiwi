@@ -150,6 +150,7 @@ enum {
     THREAD_KILLED           = (1<<2),   /**< Thread has been killed. */
     THREAD_PREEMPTED        = (1<<3),   /**< Thread was preempted while preemption disabled. */
     THREAD_IN_USERMEM       = (1<<4),   /**< Thread is in a safe user memory access function. */
+    THREAD_KDB_BREAK        = (1<<5),   /**< Break into KDB when possible. */
 };
 
 /**

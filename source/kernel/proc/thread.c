@@ -376,9 +376,15 @@ static void thread_interrupt_internal(thread_t *thread) {
         thread->sleep_status = STATUS_INTERRUPTED;
         thread_wake_unsafe(thread);
     } else {
-        /* If the thread is running on a different CPU, interrupt it. */
-        if (thread->cpu->id != curr_cpu->id && thread->state == THREAD_RUNNING)
+        /* If the thread is running on a different CPU, interrupt it. Not needed
+         * (and not safe to do) if we're in KDB - when we resume, on it's way
+         * out of the kernel, it'll pick up the flag in thread_at_kernel_exit(). */
+        if (thread->cpu->id != curr_cpu->id &&
+            thread->state == THREAD_RUNNING &&
+            atomic_load(&kdb_running) == 0)
+        {
             smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
+        }
     }
 }
 
@@ -536,6 +542,11 @@ status_t thread_sleep(spinlock_t *lock, nstime_t timeout, const char *name, uint
         local_irq_restore(irq_state);
     }
 
+    if (thread_flags(curr_thread) & THREAD_KDB_BREAK) {
+        kdb_enter(KDB_REASON_USER, NULL);
+        thread_clear_flag(curr_thread, THREAD_KDB_BREAK);
+    }
+
     return curr_thread->sleep_status;
 
 cancel:
@@ -661,10 +672,17 @@ void thread_at_kernel_entry(syscall_t *syscall) {
     curr_thread->user_time += now - curr_thread->last_time;
     curr_thread->last_time  = now;
 
+    uint32_t flags = thread_flags(curr_thread);
+
+    if (flags & THREAD_KDB_BREAK) {
+        kdb_enter(KDB_REASON_USER, NULL);
+        thread_clear_flag(curr_thread, THREAD_KDB_BREAK);
+    }
+
     /* Terminate the thread if killed on system call entry to avoid doing the
      * syscall work. Do not do this on an interrupt: we must handle the
      * interrupt first, and we'll exit in thread_at_kernel_exit(). */
-    if (syscall && unlikely(thread_flags(curr_thread) & THREAD_KILLED)) {
+    if (syscall && unlikely(flags & THREAD_KILLED)) {
         curr_thread->reason = EXIT_REASON_KILLED;
         thread_exit();
     }
@@ -697,6 +715,13 @@ void thread_at_kernel_exit(syscall_t *syscall, unsigned long ret) {
         }
     #endif
 
+    uint32_t flags = thread_flags(curr_thread);
+
+    if (flags & THREAD_KDB_BREAK) {
+        kdb_enter(KDB_REASON_USER, NULL);
+        thread_clear_flag(curr_thread, THREAD_KDB_BREAK);
+    }
+
     /* Clear active security token. */
     if (unlikely(curr_thread->active_token)) {
         token_release(curr_thread->active_token);
@@ -704,7 +729,6 @@ void thread_at_kernel_exit(syscall_t *syscall, unsigned long ret) {
     }
 
     /* Check whether we have any pending interrupts to handle. */
-    uint32_t flags = thread_flags(curr_thread);
     if (unlikely(flags & THREAD_INTERRUPTED)) {
         /* Terminate the thread if killed. */
         if (flags & THREAD_KILLED) {
@@ -714,40 +738,43 @@ void thread_at_kernel_exit(syscall_t *syscall, unsigned long ret) {
 
         spinlock_lock(&curr_thread->lock);
 
-        assert(!list_empty(&curr_thread->interrupts));
+        if (!list_empty(&curr_thread->interrupts)) {
+            thread_interrupt_t *interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
+            list_remove(&interrupt->header);
+            thread_clear_flag(curr_thread, THREAD_INTERRUPTED);
 
-        thread_interrupt_t *interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
-        list_remove(&interrupt->header);
-        thread_clear_flag(curr_thread, THREAD_INTERRUPTED);
+            assert(interrupt->priority >= curr_thread->ipl);
 
-        assert(interrupt->priority >= curr_thread->ipl);
+            /* Raise the IPL to block further interrupts. */
+            uint32_t ipl = curr_thread->ipl;
+            curr_thread->ipl = interrupt->priority + 1;
 
-        /* Raise the IPL to block further interrupts. */
-        uint32_t ipl = curr_thread->ipl;
-        curr_thread->ipl = interrupt->priority + 1;
+            spinlock_unlock(&curr_thread->lock);
 
-        spinlock_unlock(&curr_thread->lock);
+            status_t ret = arch_thread_interrupt_setup(interrupt, ipl);
 
-        status_t ret = arch_thread_interrupt_setup(interrupt, ipl);
+            if (interrupt->post_cb) {
+                interrupt->post_cb(interrupt);
+            } else {
+                kfree(interrupt);
+            }
 
-        if (interrupt->post_cb) {
-            interrupt->post_cb(interrupt);
+            if (unlikely(ret != STATUS_SUCCESS)) {
+                /* TODO: Once there is a way to use an alternate stack for an
+                 * exception handler we should queue up an exception and retry
+                 * to execute that instead. No point doing so for the moment
+                 * because trying to do that will just fail again. When
+                 * implementing this make sure to preserve the original IPL
+                 * properly. */
+                kprintf(
+                    LOG_WARN, "thread: failed to set up interrupt for thread %" PRId32 " (%" PRId32 "), killing process %" PRId32 "\n",
+                    curr_thread->id, ret, curr_proc->id);
+
+                process_set_exit_status(curr_proc, EXIT_REASON_KILLED, 0);
+                process_exit();
+            }
         } else {
-            kfree(interrupt);
-        }
-
-        if (unlikely(ret != STATUS_SUCCESS)) {
-            /* TODO: Once there is a way to use an alternate stack for an
-             * exception handler we should queue up an exception and retry to
-             * execute that instead. No point doing so for the moment because
-             * trying to do that will just fail again. When implementing this
-             * make sure to preserve the original IPL properly. */
-            kprintf(
-                LOG_WARN, "thread: failed to set up interrupt for thread %" PRId32 " (%" PRId32 "), killing process %" PRId32 "\n",
-                curr_thread->id, ret, curr_proc->id);
-
-            process_set_exit_status(curr_proc, EXIT_REASON_KILLED, 0);
-            process_exit();
+            spinlock_unlock(&curr_thread->lock);
         }
     }
 
@@ -1004,10 +1031,10 @@ static kdb_status_t kdb_cmd_thread(int argc, char **argv, kdb_filter_t *filter) 
 /** Kill a thread. */
 static kdb_status_t kdb_cmd_kill(int argc, char **argv, kdb_filter_t *filter) {
     if (kdb_help(argc, argv)) {
-        kdb_printf("Usage: %s [<thread ID>]\n\n", argv[0]);
+        kdb_printf("Usage: %s <thread ID>\n\n", argv[0]);
 
-        kdb_printf("Schedules a currently running thread to be killed once KDB exits.\n");
-        kdb_printf("Note that this has no effect on kernel threads.\n");
+        kdb_printf("Schedules a thread to be killed once KDB exits. Note that this cannot kill\n");
+        kdb_printf("kernel threads.\n");
         return KDB_SUCCESS;
     } else if (argc != 2) {
         kdb_printf("Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
@@ -1022,9 +1049,61 @@ static kdb_status_t kdb_cmd_kill(int argc, char **argv, kdb_filter_t *filter) {
     if (!thread) {
         kdb_printf("Invalid thread ID.\n");
         return KDB_FAILURE;
+    } else if (thread->owner == kernel_proc) {
+        kdb_printf("Cannot interrupt kernel threads.\n");
+        return KDB_FAILURE;
     }
 
     thread_kill(thread);
+    return KDB_SUCCESS;
+}
+
+/** Interrupt a thread. */
+static kdb_status_t kdb_cmd_interrupt(int argc, char **argv, kdb_filter_t *filter) {
+    if (kdb_help(argc, argv)) {
+        kdb_printf("Usage: %s [-b] <thread ID>\n\n", argv[0]);
+
+        kdb_printf("Schedules a thread sleep to be interrupted once KDB exits. This cannot wake\n");
+        kdb_printf("threads in non-interruptible sleep.\n\n");
+
+        kdb_printf("Optionally, if the -b flag is specified, the thread will break into KDB at the\n");
+        kdb_printf("earliest opportunity. This will either be once the thread wakes from sleep, or\n");
+        kdb_printf("at kernel entry/exit, whichever comes first.\n\n");
+
+        kdb_printf("This cannot do anything on kernel threads.\n");
+        return KDB_SUCCESS;
+    } else if (argc != 2 && argc != 3) {
+        kdb_printf("Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
+        return KDB_FAILURE;
+    }
+
+    bool set_break = false;
+
+    if (argc == 3) {
+        if (strcmp(argv[1], "-b") == 0) {
+            set_break = true;
+        } else {
+            kdb_printf("Unknown argments. See 'help %s' for help.\n", argv[0]);
+        }
+    }
+
+    uint64_t tid;
+    if (kdb_parse_expression(argv[argc - 1], &tid, NULL) != KDB_SUCCESS)
+        return KDB_FAILURE;
+
+    thread_t *thread = thread_lookup_unsafe(tid);
+    if (!thread) {
+        kdb_printf("Invalid thread ID.\n");
+        return KDB_FAILURE;
+    } else if (thread->owner == kernel_proc) {
+        kdb_printf("Cannot interrupt kernel threads.\n");
+        return KDB_FAILURE;
+    }
+
+    if (set_break)
+        thread_set_flag(thread, THREAD_KDB_BREAK);
+
+    thread_interrupt_internal(thread);
     return KDB_SUCCESS;
 }
 
@@ -1040,7 +1119,8 @@ __init_text void thread_init(void) {
 
     /* Register our KDB commands. */
     kdb_register_command("thread", "Print information about threads.", kdb_cmd_thread);
-    kdb_register_command("kill", "Kill a running user thread.", kdb_cmd_kill);
+    kdb_register_command("kill", "Kill a user thread.", kdb_cmd_kill);
+    kdb_register_command("interrupt", "Interrupt a user thread.", kdb_cmd_interrupt);
 
     /* Initialize the scheduler. */
     sched_init();
