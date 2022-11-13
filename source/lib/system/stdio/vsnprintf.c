@@ -53,11 +53,7 @@ int vsnprintf(char *restrict buf, size_t size, const char *restrict fmt, va_list
 
     int ret = do_vprintf(vsnprintf_helper, &data, fmt, args);
 
-    if (data.off < data.size) {
-        data.buf[data.off] = 0;
-    } else {
-        data.buf[data.size - 1] = 0;
-    }
+    data.buf[(data.off < data.size) ? data.off : data.size] = 0;
 
     return ret;
 }
