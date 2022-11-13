@@ -96,7 +96,7 @@ extern int fchown(int fd, uid_t uid, gid_t gid);
 extern pid_t fork(void);
 extern long fpathconf(int fd, int name);
 extern int fsync(int fd);
-/* int ftruncate(int, off_t); */
+extern int ftruncate(int fd, off_t length);
 extern char *getcwd(char *buf, size_t size);
 extern gid_t getegid(void);
 extern uid_t geteuid(void);
@@ -149,7 +149,7 @@ extern void sync(void);
 /* long sysconf(int); */
 extern pid_t tcgetpgrp(int fd);
 extern int tcsetpgrp(int fd, pid_t pgid);
-/* int truncate(const char *, off_t); */
+extern int truncate(const char *path, off_t length);
 extern char *ttyname(int fd);
 /* int ttyname_r(int, char *, size_t); */
 extern int unlink(const char *path);

@@ -468,6 +468,40 @@ void sync(void) {
     kern_fs_sync();
 }
 
+/** Truncate a file to a specified length. */
+int ftruncate(int fd, off_t length) {
+    status_t ret = kern_file_resize(fd, length);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+/** Truncate a file to a specified length. */
+int truncate(const char *path, off_t length) {
+    status_t ret;
+
+    handle_t handle;
+    ret = kern_fs_open(path, FILE_ACCESS_WRITE, 0, 0, &handle);
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
+
+    ret = kern_file_resize(handle, length);
+
+    kern_handle_close(handle);
+
+    if (ret != STATUS_SUCCESS) {
+        libsystem_status_to_errno(ret);
+        return -1;
+    }
+
+    return 0;
+}
+
 /** Sets the file mode creation mask.
  * @param mask          New mask.
  * @return              Previous mask. */
