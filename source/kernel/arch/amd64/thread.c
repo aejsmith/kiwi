@@ -56,10 +56,11 @@ static_assert(offsetof(arch_thread_t, flags)      == ARCH_THREAD_OFF_FLAGS,     
 /** Initialize AMD64-specific thread data.
  * @param thread        Thread to initialize. */
 void arch_thread_init(thread_t *thread) {
-    thread->arch.parent    = thread;
-    thread->arch.flags     = 0;
-    thread->arch.tls_base  = 0;
-    thread->arch.fpu_count = 0;
+    thread->arch.parent     = thread;
+    thread->arch.flags      = 0;
+    thread->arch.tls_base   = 0;
+    thread->arch.fpu_count  = 0;
+    thread->arch.user_frame = NULL;
 
     /* Point the RSP for SYSCALL entry at the top of the stack. */
     thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;

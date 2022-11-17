@@ -843,7 +843,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, frame_t *frame, unsigned index) {
 
     /* Dump some information when we come from a fatal error. */
     if (reason == KDB_REASON_FATAL) {
-        arch_kdb_dump_registers();
+        arch_kdb_dump_registers(false);
 
         kdb_printf("Backtrace:\n");
         kdb_backtrace_cb(frame->ip);
@@ -1025,15 +1025,21 @@ static kdb_status_t kdb_cmd_reboot(int argc, char **argv, kdb_filter_t *filter) 
 /** Dump the register state. */
 static kdb_status_t kdb_cmd_regs(int argc, char **argv, kdb_filter_t *filter) {
     if (kdb_help(argc, argv)) {
-        kdb_printf("Usage: %s\n\n", argv[0]);
+        kdb_printf("Usage: %s [-u]\n\n", argv[0]);
 
         kdb_printf("Prints out the values contained in the current CPU register set. If you wish\n");
-        kdb_printf("to get the value of a single register, use the 'print' command instead.\n");
+        kdb_printf("to get the value of a single register, use the 'print' command instead. If -u\n");
+        kdb_printf("is specified, will print out user registers for the current thread.");
 
         return KDB_SUCCESS;
     }
 
-    arch_kdb_dump_registers();
+    bool user = false;
+
+    if (argc > 1)
+        user = strcmp(argv[1], "-u") == 0;
+
+    arch_kdb_dump_registers(user);
     return KDB_SUCCESS;
 }
 

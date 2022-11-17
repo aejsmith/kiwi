@@ -363,47 +363,53 @@ bool arch_kdb_register_value(const char *name, size_t len, unsigned long *_reg) 
 }
 
 /** Print out all registers. */
-void arch_kdb_dump_registers(void) {
-    kdb_printf(
-        "RAX: 0x%016lx  RBX: 0x%016lx  RCX: 0x%016lx\n",
-        curr_kdb_frame->ax, curr_kdb_frame->bx, curr_kdb_frame->cx);
-    kdb_printf(
-        "RDX: 0x%016lx  RDI: 0x%016lx  RSI: 0x%016lx\n",
-        curr_kdb_frame->dx, curr_kdb_frame->di, curr_kdb_frame->si);
-    kdb_printf(
-        "RBP: 0x%016lx  R8:  0x%016lx  R9:  0x%016lx\n",
-        curr_kdb_frame->bp, curr_kdb_frame->r8, curr_kdb_frame->r9);
-    kdb_printf(
-        "R10: 0x%016lx  R11: 0x%016lx  R12: 0x%016lx\n",
-        curr_kdb_frame->r10, curr_kdb_frame->r11, curr_kdb_frame->r12);
-    kdb_printf(
-        "R13: 0x%016lx  R14: 0x%016lx  R15: 0x%016lx\n",
-        curr_kdb_frame->r13, curr_kdb_frame->r14, curr_kdb_frame->r15);
-    kdb_printf(
-        "RIP: 0x%016lx  RSP: 0x%016lx  RFL: 0x%016lx\n",
-        curr_kdb_frame->ip, curr_kdb_frame->sp, curr_kdb_frame->flags);
-    kdb_printf(
-        "CS:  0x%04lx  SS: 0x%04lx\n", curr_kdb_frame->cs,
-        curr_kdb_frame->ss);
+void arch_kdb_dump_registers(bool user) {
+    frame_t *frame = NULL;
 
-    switch (curr_kdb_frame->num) {
-        case X86_EXCEPTION_PF:
-            kdb_printf(
-                "EC:  0x%04lx (%s/%s%s%s)\n", curr_kdb_frame->err_code,
-                (curr_kdb_frame->err_code & (1 << 0)) ? "protection" : "not-present",
-                (curr_kdb_frame->err_code & (1 << 1)) ? "write" : "read",
-                (curr_kdb_frame->err_code & (1 << 3)) ? "/reserved-bit" : "",
-                (curr_kdb_frame->err_code & (1 << 4)) ? "/execute" : "");
-            kdb_printf("CR2: 0x%016lx\n", x86_read_cr2());
-            break;
-        case X86_EXCEPTION_DF:
-        case X86_EXCEPTION_TS:
-        case X86_EXCEPTION_NP:
-        case X86_EXCEPTION_SS:
-        case X86_EXCEPTION_GP:
-        case X86_EXCEPTION_AC:
-            kdb_printf("EC:  0x%04lx\n", curr_kdb_frame->err_code);
-            break;
+    if (user) {
+        thread_t *thread = curr_thread;
+        if (thread) {
+            frame = thread->arch.user_frame;
+            if (thread->arch.user_frame && frame_from_user(thread->arch.user_frame))
+                frame = thread->arch.user_frame;
+        }
+
+        if (!frame) {
+            kdb_printf("No user frame available\n");
+            return;
+        }
+    } else {
+        frame = curr_kdb_frame;
+    }
+
+    kdb_printf("RAX: 0x%016lx  RBX: 0x%016lx  RCX: 0x%016lx\n", frame->ax, frame->bx, frame->cx);
+    kdb_printf("RDX: 0x%016lx  RDI: 0x%016lx  RSI: 0x%016lx\n", frame->dx, frame->di, frame->si);
+    kdb_printf("RBP: 0x%016lx  R8:  0x%016lx  R9:  0x%016lx\n", frame->bp, frame->r8, frame->r9);
+    kdb_printf("R10: 0x%016lx  R11: 0x%016lx  R12: 0x%016lx\n", frame->r10, frame->r11, frame->r12);
+    kdb_printf("R13: 0x%016lx  R14: 0x%016lx  R15: 0x%016lx\n", frame->r13, frame->r14, frame->r15);
+    kdb_printf("RIP: 0x%016lx  RSP: 0x%016lx  RFL: 0x%016lx\n", frame->ip, frame->sp, frame->flags);
+    kdb_printf("CS:  0x%04lx  SS: 0x%04lx\n", frame->cs, frame->ss);
+
+    if (!user) {
+        switch (frame->num) {
+            case X86_EXCEPTION_PF:
+                kdb_printf(
+                    "EC:  0x%04lx (%s/%s%s%s)\n", frame->err_code,
+                    (frame->err_code & (1 << 0)) ? "protection" : "not-present",
+                    (frame->err_code & (1 << 1)) ? "write" : "read",
+                    (frame->err_code & (1 << 3)) ? "/reserved-bit" : "",
+                    (frame->err_code & (1 << 4)) ? "/execute" : "");
+                kdb_printf("CR2: 0x%016lx\n", x86_read_cr2());
+                break;
+            case X86_EXCEPTION_DF:
+            case X86_EXCEPTION_TS:
+            case X86_EXCEPTION_NP:
+            case X86_EXCEPTION_SS:
+            case X86_EXCEPTION_GP:
+            case X86_EXCEPTION_AC:
+                kdb_printf("EC:  0x%04lx\n", frame->err_code);
+                break;
+        }
     }
 }
 

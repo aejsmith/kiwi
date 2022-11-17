@@ -93,7 +93,7 @@ extern bool arch_kdb_get_breakpoint(unsigned index, ptr_t *_addr);
 extern bool arch_kdb_get_watchpoint(unsigned index, ptr_t *_addr, size_t *_size, bool *_rw);
 extern void arch_kdb_backtrace(struct thread *thread, kdb_backtrace_cb_t cb);
 extern bool arch_kdb_register_value(const char *name, size_t len, unsigned long *_reg);
-extern void arch_kdb_dump_registers(void);
+extern void arch_kdb_dump_registers(bool user);
 extern void arch_kdb_trap_cpus(void);
 
 extern kdb_status_t kdb_main(kdb_reason_t reason, struct frame *frame, unsigned index);
