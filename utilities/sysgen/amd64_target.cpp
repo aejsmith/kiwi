@@ -63,10 +63,12 @@ void AMD64Target::generate(std::ostream &stream, const SyscallList &calls) {
         stream << ".global " << name << endl;
         stream << ".type " << name << ", @function" << endl;
         stream << name << ':' << endl;
+        stream << "    .cfi_startproc" << endl;
         stream << "    movq     %rcx, %r10" << endl;
         stream << "    movq     $" << call->id() << ", %rax" << endl;
         stream << "    syscall" << endl;
         stream << "    ret" << endl;
+        stream << "    .cfi_endproc" << endl;
         stream << ".size " << name << ", .-" << name << endl;
     }
 }

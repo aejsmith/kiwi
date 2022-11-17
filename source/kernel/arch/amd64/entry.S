@@ -47,6 +47,28 @@
     push    %r15
 .endm
 
+.macro PUSH_REGS_CFI
+    .cfi_remember_state
+    .cfi_def_cfa    rsp, FRAME_SIZE
+    .cfi_rel_offset rsp, FRAME_OFF_SP
+    .cfi_rel_offset rip, FRAME_OFF_IP
+    .cfi_rel_offset rax, FRAME_OFF_AX
+    .cfi_rel_offset rbx, FRAME_OFF_BX
+    .cfi_rel_offset rcx, FRAME_OFF_CX
+    .cfi_rel_offset rdx, FRAME_OFF_DX
+    .cfi_rel_offset rdi, FRAME_OFF_DI
+    .cfi_rel_offset rsi, FRAME_OFF_SI
+    .cfi_rel_offset rbp, FRAME_OFF_BP
+    .cfi_rel_offset r8,  FRAME_OFF_R8
+    .cfi_rel_offset r9,  FRAME_OFF_R9
+    .cfi_rel_offset r10, FRAME_OFF_R10
+    .cfi_rel_offset r11, FRAME_OFF_R11
+    .cfi_rel_offset r12, FRAME_OFF_R12
+    .cfi_rel_offset r13, FRAME_OFF_R13
+    .cfi_rel_offset r14, FRAME_OFF_R14
+    .cfi_rel_offset r15, FRAME_OFF_R15
+.endm
+
 /** Pop registers from the stack. */
 .macro POP_REGS
     pop     %r15
@@ -64,6 +86,10 @@
     pop     %rcx
     pop     %rbx
     pop     %rax
+.endm
+
+.macro POP_REGS_CFI
+    .cfi_restore_state
 .endm
 
 /**
@@ -142,7 +168,11 @@ FUNCTION_END(isr_array)
 
 /** Common ISR handling code. */
 PRIVATE_FUNCTION_START(isr_common)
-    .cfi_startproc
+    .cfi_startproc simple
+    .cfi_def_cfa rsp, 0
+    /* This is necessary when tracing into user code to stop GDB from bailing
+     * out because the new stack pointer is lower than the previous one. */
+    .cfi_signal_frame
 
     /* If coming from user-mode, need to load the kernel GS segment base. */
     testl   $3, 24(%rsp)
@@ -151,16 +181,12 @@ PRIVATE_FUNCTION_START(isr_common)
 1:
     /* Create the interrupt frame structure on the stack. */
     PUSH_REGS
-    .cfi_adjust_cfa_offset FRAME_SIZE
-    .cfi_rel_offset rip, FRAME_OFF_IP
+    PUSH_REGS_CFI
 
     /* Clear direction flag. */
     cld
 
     /* Set up a standard stack frame so we can backtrace over this. */
-    .cfi_rel_offset rdi, FRAME_OFF_DI
-    .cfi_rel_offset rax, FRAME_OFF_AX
-    .cfi_rel_offset rbp, FRAME_OFF_BP
     movq    %rsp, %rdi
     movq    FRAME_OFF_IP(%rsp), %rax
     pushq   %rax
@@ -175,11 +201,7 @@ PRIVATE_FUNCTION_START(isr_common)
     addq    $16, %rsp
     .cfi_adjust_cfa_offset -16
     POP_REGS
-    .cfi_restore rbp
-    .cfi_restore rax
-    .cfi_restore rdi
-    .cfi_restore rip
-    .cfi_adjust_cfa_offset -FRAME_SIZE
+    POP_REGS_CFI
 
     /* Get rid of the error code and interrupt number, restore the previous GS
      * base if returning to user-mode, and return. */
@@ -193,6 +215,11 @@ FUNCTION_END(isr_common)
 
 /** SYSCALL entry point. */
 FUNCTION_START(syscall_entry)
+    .cfi_startproc simple
+    .cfi_def_cfa rsp, 0
+    /* See isr_common. */
+    .cfi_signal_frame
+
     /* Swap to the kernel GS base address, which points at the current CPU's
      * architecture data. The second pointer in this is our kernel stack
      * pointer. The third pointer is a temporary scratch space for us to save
@@ -215,6 +242,7 @@ FUNCTION_START(syscall_entry)
     push    $0
     push    $0
     PUSH_REGS
+    PUSH_REGS_CFI
 
     /* Save the user-mode interrupt frame pointer. */
     movq    %rsp, %gs:ARCH_THREAD_OFF_USER_FRAME
@@ -275,6 +303,7 @@ FUNCTION_START(syscall_entry)
     /* Restore saved registers, RFLAGS/RIP for SYSRET, and the userspace stack
      * pointer. */
     POP_REGS
+    POP_REGS_CFI
     add     $16, %rsp
     pop     %rcx
     add     $8, %rsp
@@ -333,6 +362,8 @@ FUNCTION_START(syscall_entry)
 .Linvalid_syscall:
     movq    $STATUS_INVALID_SYSCALL, %rax
     jmp     .Lreturn
+
+    .cfi_endproc
 FUNCTION_END(syscall_entry)
 
 /** Enter user mode in the current thread.
