@@ -122,8 +122,15 @@ bool arch_kdb_register_value(const char *name, size_t len, unsigned long *_reg) 
 }
 
 /** Print out all registers. */
-void arch_kdb_dump_registers(void) {
-    frame_t *frame = curr_kdb_frame;
+void arch_kdb_dump_registers(bool user) {
+    frame_t *frame = NULL;
+
+    if (user) {
+        kdb_printf("TODO");
+        return;
+    } else {
+        frame = curr_kdb_frame;
+    }
 
     unsigned long far = arm64_read_sysreg(far_el1);
     unsigned long esr = arm64_read_sysreg(esr_el1);
