@@ -163,13 +163,15 @@ void pipe_wait(pipe_t *pipe, bool write, object_event_t *event) {
     mutex_lock(&pipe->lock);
 
     if (write) {
-        if (pipe->count < PIPE_SIZE) {
+        /* Pipe is not writable if the other end is closed. */
+        if (pipe->count < PIPE_SIZE && pipe->read_open) {
             object_event_signal(event, 0);
         } else {
             notifier_register(&pipe->space_notifier, object_event_notifier, event);
         }
     } else {
-        if (pipe->count > 0) {
+        /* Consider the pipe readable if the other end is closed. */
+        if (pipe->count > 0 || !pipe->write_open) {
             object_event_signal(event, 0);
         } else {
             notifier_register(&pipe->data_notifier, object_event_notifier, event);
@@ -209,6 +211,7 @@ static void pipe_file_close(file_handle_t *handle) {
 
         /* Wake anyone waiting for data so that they can fail. */
         condvar_broadcast(&pipe->data_cvar);
+        notifier_run(&pipe->data_notifier, NULL, false);
     }
 
     bool destroy = !pipe->read_open && !pipe->write_open;
@@ -225,10 +228,15 @@ static status_t pipe_file_wait(file_handle_t *handle, object_event_t *event) {
 
     switch (event->event) {
         case FILE_EVENT_READABLE:
-            pipe_wait(pipe, false, event);
+            /* It'll never become readable if this isn't the read end. */
+            if (handle->access & FILE_ACCESS_READ)
+                pipe_wait(pipe, false, event);
+
             return STATUS_SUCCESS;
         case FILE_EVENT_WRITABLE:
-            pipe_wait(pipe, true, event);
+            if (handle->access & FILE_ACCESS_WRITE)
+                pipe_wait(pipe, true, event);
+
             return STATUS_SUCCESS;
         default:
             return STATUS_INVALID_EVENT;
