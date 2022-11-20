@@ -57,6 +57,13 @@ class ManifestEntry:
                 return self.target == other.target
         return False
 
+    def __str__(self):
+        if self.entry_type == ManifestEntryType.File:
+            return 'File(%s)' % (self.checksum)
+        elif self.entry_type == ManifestEntryType.Link:
+            return 'Link(%s)' % (self.target)
+        return 'Unknown'
+
 # List of actions to apply a manifest to an image, optionally from a current
 # manifest.
 class ManifestActions:
@@ -240,6 +247,22 @@ class Manifest:
                     raise Exception("Unhandled ManifestEntryType")
 
         return actions
+
+    # Print differences between manifests.
+    def print_diff(self, orig_manifest):
+        for (path, orig_entry) in orig_manifest.entries.items():
+            if not path in self.entries:
+                print('Remove(%s): %s' % (path, str(orig_entry)))
+
+        for (path, entry) in self.entries.items():
+            if not path in orig_manifest.entries:
+                print('Add(%s): %s' % (path, str(entry)))
+
+        for (path, entry) in self.entries.items():
+            if path in orig_manifest.entries:
+                orig_entry = orig_manifest.entries[path]
+                if not entry.compare(orig_entry):
+                    print('Change(%s): %s -> %s' % (path, str(orig_entry), str(entry)))
 
     # Serialise the manifest to a file.
     def serialise(self, dest_path):

@@ -267,6 +267,9 @@ def do_disk_image_parts(target, source, env, persistent):
             orig_manifest = Manifest()
             orig_manifest.deserialise(orig_manifest_path)
 
+            if ARGUMENTS.get('MANIFEST_DIFF') == '1':
+                manifest.print_diff(orig_manifest)
+
         # Get the manifest actions to apply.
         actions = manifest.get_actions(orig_manifest)
 
