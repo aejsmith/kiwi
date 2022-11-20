@@ -44,8 +44,11 @@ private:
     void handleHangupEvent();
     void handleMessageEvent();
 
+    void sendReply(Kiwi::Core::Message &reply);
+
     void handleConnect(Kiwi::Core::Message &request);
     void handleRegisterPort(Kiwi::Core::Message &request);
+    void handleGetProcess(Kiwi::Core::Message &request);
 
 private:
     Kiwi::Core::Connection m_connection;

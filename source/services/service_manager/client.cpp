@@ -83,6 +83,9 @@ void Client::handleMessageEvent() {
         case SERVICE_MANAGER_REQUEST_REGISTER_PORT:
             handleRegisterPort(message);
             break;
+        case SERVICE_MANAGER_REQUEST_GET_PROCESS:
+            handleGetProcess(message);
+            break;
         default:
             core_log(
                 CORE_LOG_NOTICE, "received unrecognised message type %" PRId32 " from client %" PRId32,
@@ -91,12 +94,25 @@ void Client::handleMessageEvent() {
     }
 }
 
+static inline bool createReply(Kiwi::Core::Message &reply, const Kiwi::Core::Message &request, size_t size) {
+    if (!reply.createReply(request, size)) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return false;
+    }
+
+    return true;
+}
+
+void Client::sendReply(Kiwi::Core::Message &reply) {
+    status_t ret = m_connection.reply(reply);
+    if (ret != STATUS_SUCCESS)
+        core_log(CORE_LOG_WARN, "failed to send reply message: %" PRId32, ret);
+}
+
 void Client::handleConnect(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(service_manager_reply_connect_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(service_manager_reply_connect_t)))
         return;
-    }
 
     auto replyData = reply.data<service_manager_reply_connect_t>();
 
@@ -146,22 +162,18 @@ void Client::finishConnect(Service *service, Kiwi::Core::Message &reply) {
         m_pendingConnects.remove(service);
     }
 
-    status_t ret = m_connection.reply(reply);
-    if (ret != STATUS_SUCCESS)
-        core_log(CORE_LOG_WARN, "failed to send reply message: %" PRId32, ret);
+    sendReply(reply);
 }
 
 void Client::handleRegisterPort(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(service_manager_reply_register_port_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(service_manager_reply_register_port_t)))
         return;
-    }
 
     auto replyData = reply.data<service_manager_reply_register_port_t>();
 
     if (m_service) {
-        Kiwi::Core::Handle port(request.detachHandle());
+        Kiwi::Core::Handle port = request.detachHandle();
 
         if (port.isValid()) {
             if (m_service->setPort(std::move(port))) {
@@ -176,7 +188,43 @@ void Client::handleRegisterPort(Kiwi::Core::Message &request) {
         replyData->result = STATUS_INVALID_REQUEST;
     }
 
-    status_t ret = m_connection.reply(reply);
-    if (ret != STATUS_SUCCESS)
-        core_log(CORE_LOG_WARN, "failed to send reply message: %" PRId32, ret);
+    sendReply(reply);
+}
+
+void Client::handleGetProcess(Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!createReply(reply, request, sizeof(service_manager_reply_get_process_t)))
+        return;
+
+    auto replyData     = reply.data<service_manager_reply_get_process_t>();
+    size_t requestSize = request.size();
+    Service *service   = nullptr;
+
+    if (requestSize <= sizeof(service_manager_request_get_process_t)) {
+        replyData->result = STATUS_INVALID_ARG;
+    } else {
+        auto requestData = request.data<service_manager_request_get_process_t>();
+
+        size_t nameSize = requestSize - sizeof(service_manager_request_get_process_t);
+        requestData->name[nameSize - 1] = 0;
+
+        service = g_serviceManager.findService(requestData->name);
+        if (service) {
+            replyData->result = STATUS_NOT_RUNNING;
+
+            Client *client = service->client();
+            if (client && client->m_connection.isValid()) {
+                Kiwi::Core::Handle process;
+                status_t ret = kern_connection_open_remote(client->m_connection.handle(), process.attach());
+                if (ret == STATUS_SUCCESS) {
+                    reply.attachHandle(std::move(process));
+                    replyData->result = STATUS_SUCCESS;
+                }
+            }
+        } else {
+            replyData->result = STATUS_NOT_FOUND;
+        }
+    }
+
+    sendReply(reply);
 }

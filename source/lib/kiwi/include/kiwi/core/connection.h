@@ -66,7 +66,7 @@ namespace Kiwi {
              * core_connection API wrappers.
              */
 
-            bool create(Kiwi::Core::Handle handle, uint32_t flags);
+            bool create(Handle &&handle, uint32_t flags);
             bool create(handle_t handle, uint32_t flags);
             status_t open(handle_t port, nstime_t timeout, uint32_t flags);
             status_t openService(const char *name, uint32_t service_flags, uint32_t conn_flags);
@@ -141,7 +141,7 @@ namespace Kiwi {
          * @return              Whether the connection was successfully
          *                      created.
          */
-        inline bool Connection::create(Kiwi::Core::Handle handle, uint32_t flags) {
+        inline bool Connection::create(Handle &&handle, uint32_t flags) {
             close();
 
             m_conn = core_connection_create(handle, flags);

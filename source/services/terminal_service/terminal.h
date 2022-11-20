@@ -22,6 +22,7 @@
 #pragma once
 
 #include <kiwi/core/connection.h>
+#include <kiwi/core/event_loop.h>
 #include <kiwi/core/handle.h>
 
 #include <termios.h>
@@ -86,6 +87,7 @@ private:
 
     status_t getProcessGroup(pid_t caller, pid_t &pgid);
     status_t setProcessGroup(pid_t caller, pid_t pgid);
+    void handleSessionLeaderDeath();
 
 private:
     size_t m_id;
@@ -93,6 +95,7 @@ private:
     std::thread m_thread;
     Kiwi::Core::Handle m_userFile;
     Kiwi::Core::Handle m_userFileConnection;
+    Kiwi::Core::EventLoop m_eventLoop;
     bool m_exit;
 
     /** Pending reads that are waiting for input. */
@@ -102,16 +105,21 @@ private:
     std::vector<uint64_t> m_readEvents;
 
     /** Terminal state. */
-    pid_t m_sessionId;                  /**< Session that the terminal is controlling. */
-    pid_t m_processGroupId;             /**< Foreground process group ID. */
     struct termios m_termios;           /**< Terminal I/O settings. */
     struct winsize m_winsize;           /**< Window size. */
     bool m_escaped : 1;                 /**< Whether the next input character is escaped. */
     bool m_inhibited : 1;               /**< Whether output has been stopped. */
+
+    /** Controlling process info. */
+    Kiwi::Core::Handle m_sessionLeader; /**< Session leader process. */
+    pid_t m_sessionId;                  /**< Session that the terminal is controlling. */
+    pid_t m_processGroupId;             /**< Foreground process group ID. */
 
     /** Circular input buffer. */
     uint16_t m_inputBuffer[kInputBufferMax];
     size_t m_inputBufferStart;
     size_t m_inputBufferSize;
     size_t m_inputBufferLines;
+
+    Kiwi::Core::EventRef m_sessionLeaderDeathEvent;
 };

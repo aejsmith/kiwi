@@ -26,15 +26,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "posix/posix.h"
 
-/** Converts POSIX open() flags to kernel flags.
- * @param oflag         POSIX open flags.
- * @param _kaccess      Where to store kernel access rights.
- * @param _kflags       Where to store kernel flags.
- * @param _kcreate      Where to store kernel creation flags. */
+/** Converts POSIX open() flags to kernel flags. */
 static void convert_open_flags(int oflag, uint32_t *_kaccess, uint32_t *_kflags, unsigned *_kcreate) {
     uint32_t kaccess = 0;
     uint32_t kflags = 0;
@@ -60,6 +57,35 @@ static void convert_open_flags(int oflag, uint32_t *_kaccess, uint32_t *_kflags,
     }
 }
 
+/** Finalise a POSIX FD. */
+static int finalise_open_fd(handle_t handle, int oflag) {
+    /* Mark the handle as inheritable if not opening with O_CLOEXEC. */
+    if (!(oflag & O_CLOEXEC))
+        kern_handle_set_flags(handle, HANDLE_INHERITABLE);
+
+    return (int)handle;
+}
+
+/** Open /dev/tty. */
+static int open_dev_tty(int oflag) {
+    if ((oflag & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL)) {
+        errno = EEXIST;
+        return -1;
+    }
+
+    /* Convert the flags to kernel flags. */
+    uint32_t kaccess, kflags;
+    unsigned kcreate;
+    convert_open_flags(oflag, &kaccess, &kflags, &kcreate);
+
+    /* Get controlling terminal handle. */
+    handle_t handle;
+    if (posix_get_terminal(kaccess, kflags, &handle) != 0)
+        return -1;
+
+    return finalise_open_fd(handle, oflag);
+}
+
 /** Opens a file or directory.
  * @param path          Path to file to open.
  * @param oflag         Flags controlling how to open the file.
@@ -83,6 +109,11 @@ int open(const char *path, int oflag, ...) {
         errno = EACCES;
         return -1;
     }
+
+    // TODO: One day, we should implement this as a proper device using a
+    // future user-mode driver API. For now, we implement it as a hack here.
+    if (strcmp(path, "/dev/tty") == 0)
+        return open_dev_tty(oflag);
 
     /* If O_CREAT is specified, we assume that we're going to be opening a file.
      * Although POSIX doesn't specify anything about O_CREAT with a directory,
@@ -166,11 +197,7 @@ int open(const char *path, int oflag, ...) {
             return -1;
     }
 
-    /* Mark the handle as inheritable if not opening with O_CLOEXEC. */
-    if (!(oflag & O_CLOEXEC))
-        kern_handle_set_flags(handle, HANDLE_INHERITABLE);
-
-    return (int)handle;
+    return finalise_open_fd(handle, oflag);
 }
 
 /**

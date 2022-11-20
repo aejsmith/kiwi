@@ -25,7 +25,9 @@
 #include <sys/ioctl.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
+#include <string.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -309,26 +311,39 @@ int tcsetpgrp(int fd, pid_t pgid) {
 char *getpass(const char *prompt) {
     static char buf[256];
 
-    /* This function is specified to read from /dev/tty (controlling terminal),
-     * but we don't have that, so use stderr/stdin instead. */
-    if (!isatty(STDIN_FILENO)) {
-        errno = ENXIO;
-        return NULL;
+    int in_fd;
+    int out_fd;
+
+    /* Get the controlling terminal, but fallback on stdin/stderr. */
+    int opened_fd = open("/dev/tty", O_RDWR | O_NOCTTY);
+    if (opened_fd >= 0) {
+        in_fd  = opened_fd;
+        out_fd = opened_fd;
+    } else {
+        __asm__ volatile("ud2a");
+
+        in_fd  = STDIN_FILENO;
+        out_fd = STDOUT_FILENO;
+
+        if (!isatty(in_fd)) {
+            errno = ENXIO;
+            return NULL;
+        }
     }
 
     struct termios orig_tio;
-    tcgetattr(STDIN_FILENO, &orig_tio);
+    tcgetattr(in_fd, &orig_tio);
 
     struct termios new_tio = orig_tio;
     new_tio.c_lflag = (new_tio.c_lflag & ~(ECHO | ISIG)) | ICANON;
     new_tio.c_iflag = (new_tio.c_iflag & ~(INLCR | IGNCR)) | ICRNL;
 
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &new_tio);
-    tcdrain(STDIN_FILENO);
+    tcsetattr(in_fd, TCSAFLUSH, &new_tio);
+    tcdrain(in_fd);
 
-    fprintf(stderr, "%s", prompt);
+    write(out_fd, prompt, strlen(prompt));
 
-    ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
+    ssize_t ret = read(in_fd, buf, sizeof(buf));
     if (ret >= 0) {
         if (ret > 0 && (buf[ret - 1] == '\n' || ret == sizeof(buf)))
             ret--;
@@ -336,9 +351,12 @@ char *getpass(const char *prompt) {
         buf[ret] = 0;
     }
 
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_tio);
+    tcsetattr(in_fd, TCSAFLUSH, &orig_tio);
 
-    fprintf(stderr, "\n");
+    write(out_fd, "\n", 1);
+
+    if (opened_fd >= 0)
+        close(opened_fd);
 
     return (ret >= 0) ? buf : NULL;
 }

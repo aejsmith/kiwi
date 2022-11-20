@@ -36,7 +36,7 @@ __SYS_EXTERN_C_BEGIN
 /** File creation flags for open(). */
 #define O_CREAT         0x0004      /**< Create file if it does not exist. */
 #define O_EXCL          0x0008      /**< Exclusive use flag. */
-//#define O_NOCTTY      0x0010      /**< Do not assign controlling terminal. */
+#define O_NOCTTY        0x0010      /**< Do not assign controlling terminal. */
 #define O_TRUNC         0x0020      /**< Truncate flag. */
 
 /** File status flags for open() and fcntl(). */

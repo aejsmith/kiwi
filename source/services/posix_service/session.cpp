@@ -53,3 +53,7 @@ void Session::removeProcessGroup(ProcessGroup *group) {
         }
     }
 }
+
+void Session::setTerminal(Kiwi::Core::Handle handle) {
+    m_terminal = std::move(handle);
+}

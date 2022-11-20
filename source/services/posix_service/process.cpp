@@ -25,14 +25,17 @@
 #include "session.h"
 
 #include <core/log.h>
+#include <core/service.h>
 
 #include <kernel/condition.h>
+#include <kernel/file.h>
 #include <kernel/process.h>
 #include <kernel/status.h>
 
 #include <kiwi/core/token_setter.h>
 
 #include <services/posix_service.h>
+#include <services/terminal_service.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -152,6 +155,8 @@ void Process::handleMessageEvent() {
         case POSIX_REQUEST_GETSID:                  reply = handleGetsid(message); break;
         case POSIX_REQUEST_SETSID:                  reply = handleSetsid(message); break;
         case POSIX_REQUEST_GET_PGRP_SESSION:        reply = handleGetPgrpSession(message); break;
+        case POSIX_REQUEST_SET_SESSION_TERMINAL:    reply = handleSetSessionTerminal(message); break;
+        case POSIX_REQUEST_GET_TERMINAL:            reply = handleGetTerminal(message); break;
 
         default:
             core_log(
@@ -167,14 +172,21 @@ void Process::handleMessageEvent() {
     }
 }
 
-Kiwi::Core::Message Process::handleGetSignalCondition(const Kiwi::Core::Message &request) {
+static inline bool createReply(Kiwi::Core::Message &reply, const Kiwi::Core::Message &request, size_t size) {
+    if (!reply.createReply(request, size)) {
+        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+        return false;
+    }
+
+    return true;
+}
+
+Kiwi::Core::Message Process::handleGetSignalCondition(Kiwi::Core::Message &request) {
     status_t ret;
 
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_get_signal_condition_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_get_signal_condition_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_get_signal_condition_t>();
     replyData->err = 0;
@@ -192,12 +204,10 @@ Kiwi::Core::Message Process::handleGetSignalCondition(const Kiwi::Core::Message 
     return reply;
 }
 
-Kiwi::Core::Message Process::handleGetPendingSignal(const Kiwi::Core::Message &request) {
+Kiwi::Core::Message Process::handleGetPendingSignal(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_get_pending_signal_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_get_pending_signal_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_get_pending_signal_t>();
 
@@ -224,12 +234,10 @@ Kiwi::Core::Message Process::handleGetPendingSignal(const Kiwi::Core::Message &r
     return reply;
 }
 
-Kiwi::Core::Message Process::handleSetSignalAction(const Kiwi::Core::Message &request) {
+Kiwi::Core::Message Process::handleSetSignalAction(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_set_signal_action_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_set_signal_action_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_set_signal_action_t>();
     replyData->err = 0;
@@ -280,12 +288,10 @@ Kiwi::Core::Message Process::handleSetSignalAction(const Kiwi::Core::Message &re
     return reply;
 }
 
-Kiwi::Core::Message Process::handleSetSignalMask(const Kiwi::Core::Message &request) {
+Kiwi::Core::Message Process::handleSetSignalMask(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_set_signal_mask_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_set_signal_mask_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_set_signal_mask_t>();
     replyData->err = 0;
@@ -446,14 +452,12 @@ void Process::sendSignal(int32_t num, const Process *sender, const security_cont
     }
 }
 
-Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
+Kiwi::Core::Message Process::handleKill(Kiwi::Core::Message &request) {
     status_t ret;
 
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_kill_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_kill_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_kill_t>();
     replyData->err = 0;
@@ -558,12 +562,10 @@ Kiwi::Core::Message Process::handleKill(const Kiwi::Core::Message &request) {
     return reply;
 }
 
-Kiwi::Core::Message Process::handleGetpgid(const Kiwi::Core::Message &request) {
+Kiwi::Core::Message Process::handleGetpgid(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_getpgid_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_getpgid_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_getpgid_t>();
     replyData->err  = 0;
@@ -594,12 +596,10 @@ Kiwi::Core::Message Process::handleGetpgid(const Kiwi::Core::Message &request) {
     return reply;
 }
 
-Kiwi::Core::Message Process::handleSetpgid(const Kiwi::Core::Message &request) {
+Kiwi::Core::Message Process::handleSetpgid(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_setpgid_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_setpgid_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_setpgid_t>();
     replyData->err = 0;
@@ -671,12 +671,10 @@ Kiwi::Core::Message Process::handleSetpgid(const Kiwi::Core::Message &request) {
     return reply;
 }
 
-Kiwi::Core::Message Process::handleGetsid(const Kiwi::Core::Message &request) {
+Kiwi::Core::Message Process::handleGetsid(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_getsid_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_getsid_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_getsid_t>();
     replyData->err = 0;
@@ -702,12 +700,10 @@ Kiwi::Core::Message Process::handleGetsid(const Kiwi::Core::Message &request) {
     return reply;
 }
 
-Kiwi::Core::Message Process::handleSetsid(const Kiwi::Core::Message &request) {
+Kiwi::Core::Message Process::handleSetsid(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_setsid_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_setsid_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_setsid_t>();
     replyData->err = 0;
@@ -740,12 +736,10 @@ Kiwi::Core::Message Process::handleSetsid(const Kiwi::Core::Message &request) {
     return reply;
 }
 
-Kiwi::Core::Message Process::handleGetPgrpSession(const Kiwi::Core::Message &request) {
+Kiwi::Core::Message Process::handleGetPgrpSession(Kiwi::Core::Message &request) {
     Kiwi::Core::Message reply;
-    if (!reply.createReply(request, sizeof(posix_reply_get_pgrp_session_t))) {
-        core_log(CORE_LOG_WARN, "failed to allocate reply message");
+    if (!createReply(reply, request, sizeof(posix_reply_get_pgrp_session_t)))
         return Kiwi::Core::Message();
-    }
 
     auto replyData = reply.data<posix_reply_get_pgrp_session_t>();
     replyData->err = 0;
@@ -764,6 +758,101 @@ Kiwi::Core::Message Process::handleGetPgrpSession(const Kiwi::Core::Message &req
     }
 
     replyData->sid = group->session()->id();
+
+    return reply;
+}
+
+bool Process::isTerminalService() {
+    status_t ret;
+
+    /* Only look this up when we need to know, it'd be a waste of time to
+     * check this each time a process connects. */
+    if (!m_isTerminalService.has_value()) {
+        m_isTerminalService = false;
+
+        Kiwi::Core::Handle service;
+        ret = core_service_get_process(TERMINAL_SERVICE_NAME, service.attach());
+        if (ret == STATUS_SUCCESS) {
+            process_id_t id;
+            ret = kern_process_id(service, &id);
+            if (ret == STATUS_SUCCESS)
+                m_isTerminalService = id == m_id;
+        }
+    }
+
+    return *m_isTerminalService;
+}
+
+Kiwi::Core::Message Process::handleSetSessionTerminal(Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!createReply(reply, request, sizeof(posix_reply_set_session_terminal_t)))
+        return Kiwi::Core::Message();
+
+    auto replyData = reply.data<posix_reply_set_session_terminal_t>();
+    replyData->err = 0;
+
+    if (request.size() != sizeof(posix_request_set_session_terminal_t)) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    /* This interface is for use by terminal_service only. */
+    if (!isTerminalService()) {
+        replyData->err = EPERM;
+        return reply;
+    }
+
+    auto requestData = request.data<posix_request_set_session_terminal_t>();
+
+    /* Native processes shouldn't be trying to set a controlling terminal. */
+    if (requestData->sid == kDefaultProcessGroupId) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    Session *session = g_posixService.findSession(requestData->sid);
+    if (!session) {
+        replyData->err = ESRCH;
+        return reply;
+    }
+
+    session->setTerminal(request.detachHandle());
+
+    return reply;
+}
+
+Kiwi::Core::Message Process::handleGetTerminal(Kiwi::Core::Message &request) {
+    Kiwi::Core::Message reply;
+    if (!createReply(reply, request, sizeof(posix_reply_get_terminal_t)))
+        return Kiwi::Core::Message();
+
+    auto replyData = reply.data<posix_reply_get_terminal_t>();
+    replyData->err = 0;
+
+    if (request.size() != sizeof(posix_request_get_terminal_t)) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    auto requestData = request.data<posix_request_get_terminal_t>();
+    replyData->err = ENXIO;
+
+    ProcessGroup *group = g_posixService.findProcessGroupForProcess(m_handle);
+
+    if (group) {
+        Session *session = group->session();
+
+        if (session->terminal().isValid()) {
+            Kiwi::Core::Handle handle;
+            status_t ret = kern_file_reopen(session->terminal(), requestData->access, requestData->flags, handle.attach());
+            if (ret != STATUS_SUCCESS) {
+                replyData->err = EAGAIN;
+            } else {
+                replyData->err = 0;
+                reply.attachHandle(std::move(handle));
+            }
+        }
+    }
 
     return reply;
 }

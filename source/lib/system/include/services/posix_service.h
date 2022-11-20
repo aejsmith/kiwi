@@ -133,6 +133,30 @@ enum {
      *  - Data = posix_reply_get_pgrp_session_t
      */
     POSIX_REQUEST_GET_PGRP_SESSION = 9,
+
+    /**
+     * Implements the posix_set_session_terminal() function.
+     *
+     * Request:
+     *  - Data   = posix_request_set_session_terminal_t
+     *  - Handle = Read+write handle to terminal
+     *
+     * Reply:
+     *  - Data   = posix_reply_set_session_terminal_t
+     */
+    POSIX_REQUEST_SET_SESSION_TERMINAL = 10,
+
+    /**
+     * Gets a handle to the controlling terminal for the calling process.
+     *
+     * Request:
+     *  - Data   = posix_request_get_terminal_t
+     *
+     * Reply:
+     *  - Data   = posix_reply_get_terminal_t
+     *  - Handle = Controlling terminal handle (on success)
+     */
+    POSIX_REQUEST_GET_TERMINAL = 11,
 };
 
 typedef struct posix_reply_get_signal_condition {
@@ -221,3 +245,20 @@ typedef struct posix_reply_get_pgrp_session {
     int32_t err;                    /**< Error number (0 on success). */
     int32_t sid;                    /**< SID. */
 } posix_reply_get_pgrp_session_t;
+
+typedef struct posix_request_set_session_terminal {
+    int32_t sid;                    /**< SID to set for. */
+} posix_request_set_session_terminal_t;
+
+typedef struct posix_reply_set_session_terminal {
+    int32_t err;                    /**< Error number (0 on success). */
+} posix_reply_set_session_terminal_t;
+
+typedef struct posix_request_get_terminal {
+    uint32_t access;                /**< Access flags (kernel). */
+    uint32_t flags;                 /**< Handle flags (kernel). */
+} posix_request_get_terminal_t;
+
+typedef struct posix_reply_get_terminal {
+    int32_t err;                    /**< Error number (0 on success). */
+} posix_reply_get_terminal_t;

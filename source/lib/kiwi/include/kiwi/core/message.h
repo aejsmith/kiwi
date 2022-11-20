@@ -23,6 +23,8 @@
 
 #include <core/ipc.h>
 
+#include <kiwi/core/handle.h>
+
 namespace Kiwi {
     namespace Core {
         /**
@@ -79,7 +81,8 @@ namespace Kiwi {
             template <typename T = void> const T *data() const;
 
             void attachHandle(handle_t handle, bool own = false);
-            handle_t detachHandle();
+            void attachHandle(Handle &&handle);
+            Handle detachHandle();
 
         private:
             core_message_t *m_message;
@@ -232,9 +235,14 @@ namespace Kiwi {
             core_message_attach_handle(m_message, handle, own);
         }
 
+        /** @see                core_message_attach_handle(). */
+        inline void Message::attachHandle(Handle &&handle) {
+            core_message_attach_handle(m_message, handle.detach(), true);
+        }
+
         /** @see                core_message_detach_handle(). */
-        inline handle_t Message::detachHandle() {
-            return core_message_detach_handle(m_message);
+        inline Handle Message::detachHandle() {
+            return Handle(core_message_detach_handle(m_message));
         }
     }
 }

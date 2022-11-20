@@ -21,8 +21,6 @@
 
 #include "terminal.h"
 
-#include <kiwi/core/event_loop.h>
-
 #include <core/log.h>
 #include <core/utility.h>
 
@@ -53,10 +51,10 @@ Terminal::Terminal(size_t id, Kiwi::Core::Connection connection) :
     m_id                (id),
     m_connection        (std::move(connection)),
     m_exit              (false),
-    m_sessionId         (0),
-    m_processGroupId    (0),
     m_escaped           (false),
     m_inhibited         (false),
+    m_sessionId         (0),
+    m_processGroupId    (0),
     m_inputBufferStart  (0),
     m_inputBufferSize   (0),
     m_inputBufferLines  (0)
@@ -88,7 +86,12 @@ Terminal::Terminal(size_t id, Kiwi::Core::Connection connection) :
     m_winsize.ws_row       = 25;
 }
 
-Terminal::~Terminal() {}
+Terminal::~Terminal() {
+    if (m_sessionId != 0) {
+        if (posix_set_session_terminal(m_sessionId, INVALID_HANDLE) != 0)
+            core_log(CORE_LOG_ERROR, "failed to clear session %" PRId32 " terminal: %d", m_sessionId, errno);
+    }
+}
 
 void Terminal::run() {
     status_t ret;
@@ -110,24 +113,24 @@ void Terminal::run() {
 }
 
 void Terminal::thread() {
-    Kiwi::Core::EventLoop eventLoop;
+    {
+        Kiwi::Core::EventRef events[4];
+        events[0] = m_eventLoop.addEvent(
+            m_connection.handle(), CONNECTION_EVENT_HANGUP, 0,
+            [this] (const object_event_t &) { handleClientHangup(); });
+        events[1] = m_eventLoop.addEvent(
+            m_connection.handle(), CONNECTION_EVENT_MESSAGE, 0,
+            [this] (const object_event_t &) { handleClientMessages(); });
+        events[2] = m_eventLoop.addEvent(
+            m_userFileConnection, CONNECTION_EVENT_HANGUP, 0,
+            [this] (const object_event_t &) { handleFileHangup(); });
+        events[3] = m_eventLoop.addEvent(
+            m_userFileConnection, CONNECTION_EVENT_MESSAGE, 0,
+            [this] (const object_event_t &) { handleFileMessages(); });
 
-    Kiwi::Core::EventRef events[4];
-    events[0] = eventLoop.addEvent(
-        m_connection.handle(), CONNECTION_EVENT_HANGUP, 0,
-        [this] (const object_event_t &) { handleClientHangup(); });
-    events[1] = eventLoop.addEvent(
-        m_connection.handle(), CONNECTION_EVENT_MESSAGE, 0,
-        [this] (const object_event_t &) { handleClientMessages(); });
-    events[2] = eventLoop.addEvent(
-        m_userFileConnection, CONNECTION_EVENT_HANGUP, 0,
-        [this] (const object_event_t &) { handleFileHangup(); });
-    events[3] = eventLoop.addEvent(
-        m_userFileConnection, CONNECTION_EVENT_MESSAGE, 0,
-        [this] (const object_event_t &) { handleFileMessages(); });
-
-    while (!m_exit)
-        eventLoop.wait();
+        while (!m_exit)
+            m_eventLoop.wait();
+    }
 
     core_log(CORE_LOG_DEBUG, "thread exiting");
     m_thread.detach();
@@ -198,12 +201,12 @@ Kiwi::Core::Message Terminal::handleClientOpenHandle(Kiwi::Core::Message &reques
 
     auto requestData = request.data<terminal_request_open_handle_t>();
 
-    handle_t handle;
-    status_t ret = kern_file_reopen(m_userFile, requestData->access, 0, &handle);
+    Kiwi::Core::Handle handle;
+    status_t ret = kern_file_reopen(m_userFile, requestData->access, 0, handle.attach());
     if (ret != STATUS_SUCCESS) {
         replyData->result = STATUS_TRY_AGAIN;
     } else {
-        reply.attachHandle(handle, true);
+        reply.attachHandle(std::move(handle));
     }
 
     return reply;
@@ -229,7 +232,8 @@ Kiwi::Core::Message Terminal::handleClientInput(Kiwi::Core::Message &request) {
 }
 
 void Terminal::handleFileHangup() {
-    /* This shouldn't happen since we have the file open ourself. */
+    /* This shouldn't happen since we have the file open ourself. The POSIX
+     * service may also be holding onto the file as a controlling terminal. */
     core_log(CORE_LOG_ERROR, "user file connection hung up unexpectedly");
     m_exit = true;
 }
@@ -857,6 +861,14 @@ void Terminal::clearBuffer() {
     m_inputBufferLines = 0;
 }
 
+void Terminal::handleSessionLeaderDeath() {
+    m_sessionId      = 0;
+    m_processGroupId = 0;
+
+    m_sessionLeader.close();
+    m_sessionLeaderDeathEvent.remove();
+}
+
 status_t Terminal::getProcessGroup(pid_t caller, pid_t &pgid) {
     if (getsid(caller) != m_sessionId) {
         /* Not allowed if the terminal is not the process' controlling terminal.
@@ -879,15 +891,15 @@ status_t Terminal::getProcessGroup(pid_t caller, pid_t &pgid) {
 }
 
 status_t Terminal::setProcessGroup(pid_t caller, pid_t pgid) {
-    pid_t callerSid = getsid(caller);
-    if (callerSid < 0)
+    pid_t sid = getsid(caller);
+    if (sid < 0)
         return STATUS_NOT_FOUND;
 
     pid_t groupSid = posix_get_pgrp_session(pgid);
     if (groupSid < 0)
         return STATUS_NOT_FOUND;
 
-    if (callerSid != groupSid)
+    if (sid != groupSid)
         return STATUS_PERM_DENIED;
 
     /*
@@ -896,8 +908,23 @@ status_t Terminal::setProcessGroup(pid_t caller, pid_t pgid) {
      * a controlling terminal for a session, so this is our way.
      */
     if (m_sessionId == 0) {
-        m_sessionId = callerSid;
-    } else if (m_sessionId != callerSid) {
+        Kiwi::Core::Handle leader;
+        status_t ret = kern_process_open(sid, leader.attach());
+        if (ret != STATUS_SUCCESS) {
+            core_log(CORE_LOG_ERROR, "failed to open session %" PRId32 " leader: %" PRId32, sid, ret);
+            return STATUS_TRY_AGAIN;
+        } else if (posix_set_session_terminal(sid, m_userFile) != 0) {
+            core_log(CORE_LOG_ERROR, "failed to set session %" PRId32 " terminal: %d", sid, errno);
+            return STATUS_TRY_AGAIN;
+        }
+
+        m_sessionLeaderDeathEvent = m_eventLoop.addEvent(
+            leader, PROCESS_EVENT_DEATH, 0,
+            [this] (const object_event_t &) { handleSessionLeaderDeath(); });
+
+        m_sessionId     = sid;
+        m_sessionLeader = std::move(leader);
+    } else if (m_sessionId != sid) {
         /* Translated to ENOTTY by ioctl(). */
         return STATUS_INVALID_REQUEST;
     }

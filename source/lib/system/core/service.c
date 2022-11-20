@@ -186,3 +186,64 @@ status_t core_service_register_port(handle_t port) {
 
     return ret;
 }
+
+/**
+ * Gets a handle to the process for a running service. If the service is not
+ * running, this will fail.
+ *
+ * @param name          Service name.
+ * @param _handle       Where to store handle to process.
+ *
+ * @return              STATUS_SUCCESS on success.
+ *                      STATUS_NOT_RUNNING if not running.
+ *                      Any error returned by core_connection_request().
+ */
+status_t core_service_get_process(const char *name, handle_t *_handle) {
+    status_t ret;
+
+    CORE_MUTEX_SCOPED_LOCK(lock, &service_lock);
+
+    ret = open_service_manager();
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    size_t name_len = strlen(name);
+    libsystem_assert(name_len > 0);
+    name_len++;
+
+    core_message_t *request = core_message_create_request(
+        SERVICE_MANAGER_REQUEST_GET_PROCESS,
+        sizeof(service_manager_request_get_process_t) + name_len, 0);
+    if (!request)
+        return STATUS_NO_MEMORY;
+
+    service_manager_request_get_process_t *request_data =
+        (service_manager_request_get_process_t *)core_message_data(request);
+
+    memcpy(request_data->name, name, name_len);
+
+    core_message_t *reply;
+    ret = core_connection_request(service_manager_conn, request, &reply);
+    if (ret == STATUS_SUCCESS) {
+        libsystem_assert(core_message_size(reply) == sizeof(service_manager_reply_get_process_t));
+
+        const service_manager_reply_get_process_t *reply_data =
+            (const service_manager_reply_get_process_t *)core_message_data(reply);
+
+        ret = reply_data->result;
+
+        if (ret == STATUS_SUCCESS) {
+            handle_t handle = core_message_detach_handle(reply);
+
+            libsystem_assert(handle != INVALID_HANDLE);
+
+            *_handle = handle;
+        }
+
+        core_message_destroy(reply);
+    }
+
+    core_message_destroy(request);
+
+    return ret;
+}

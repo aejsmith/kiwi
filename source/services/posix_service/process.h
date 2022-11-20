@@ -29,6 +29,8 @@
 
 #include <signal.h>
 
+#include <optional>
+
 class ProcessGroup;
 
 struct SignalState {
@@ -57,25 +59,30 @@ private:
     void handleHangupEvent();
     void handleMessageEvent();
 
-    Kiwi::Core::Message handleGetSignalCondition(const Kiwi::Core::Message &request);
-    Kiwi::Core::Message handleGetPendingSignal(const Kiwi::Core::Message &request);
-    Kiwi::Core::Message handleSetSignalAction(const Kiwi::Core::Message &request);
-    Kiwi::Core::Message handleSetSignalMask(const Kiwi::Core::Message &request);
-    Kiwi::Core::Message handleKill(const Kiwi::Core::Message &request);
-    Kiwi::Core::Message handleGetpgid(const Kiwi::Core::Message &request);
-    Kiwi::Core::Message handleSetpgid(const Kiwi::Core::Message &request);
-    Kiwi::Core::Message handleGetsid(const Kiwi::Core::Message &request);
-    Kiwi::Core::Message handleSetsid(const Kiwi::Core::Message &request);
-    Kiwi::Core::Message handleGetPgrpSession(const Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleGetSignalCondition(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleGetPendingSignal(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleSetSignalAction(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleSetSignalMask(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleKill(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleGetpgid(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleSetpgid(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleGetsid(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleSetsid(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleGetPgrpSession(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleSetSessionTerminal(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleGetTerminal(Kiwi::Core::Message &request);
 
     uint32_t signalsDeliverable() const;
     void updateSignals();
     void sendSignal(int32_t num, const Process *sender, const security_context_t *senderSecurity);
 
+    bool isTerminalService();
+
 private:
     Kiwi::Core::Connection m_connection;
     Kiwi::Core::Handle m_handle;
     pid_t m_id;
+    std::optional<bool> m_isTerminalService;
 
     SignalState m_signals[NSIG];
     uint32_t m_signalsPending;

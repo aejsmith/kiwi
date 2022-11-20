@@ -137,11 +137,8 @@ static bool get_signal_condition_request(core_connection_t *conn, handle_t *_han
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_get_signal_condition_t *reply_data = core_message_data(reply);
     int reply_err = reply_data->err;
@@ -172,11 +169,8 @@ static bool get_pending_signal_request(core_connection_t *conn, siginfo_t *_info
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_get_pending_signal_t *reply_data = core_message_data(reply);
     memcpy(_info, &reply_data->info, sizeof(*_info));
@@ -202,11 +196,8 @@ static bool set_signal_action_request(core_connection_t *conn, int32_t num, uint
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_set_signal_action_t *reply_data = core_message_data(reply);
     int reply_err = reply_data->err;
@@ -235,11 +226,8 @@ static bool set_signal_mask_request(core_connection_t *conn, uint32_t mask) {
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_set_signal_mask_t *reply_data = core_message_data(reply);
     int reply_err = reply_data->err;
@@ -270,11 +258,8 @@ static bool kill_request(core_connection_t *conn, pid_t pid, int num) {
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_kill_t *reply_data = core_message_data(reply);
     int reply_err = reply_data->err;

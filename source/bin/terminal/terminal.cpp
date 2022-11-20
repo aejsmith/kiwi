@@ -86,7 +86,7 @@ bool Terminal::init() {
             return false;
         }
 
-        m_terminal[i].attach(reply.detachHandle());
+        m_terminal[i] = reply.detachHandle();
         assert(m_terminal[i] != INVALID_HANDLE);
 
         kern_handle_set_flags(m_terminal[i], HANDLE_INHERITABLE);

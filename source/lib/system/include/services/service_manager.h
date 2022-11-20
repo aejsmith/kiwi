@@ -29,10 +29,10 @@ enum {
      * Connect to a service.
      *
      * Request:
-     *  - Data = service_manager_request_connect_t
+     *  - Data   = service_manager_request_connect_t
      *
      * Reply:
-     *  - Data = service_manager_reply_connect_t
+     *  - Data   = service_manager_reply_connect_t
      *  - Handle = Service port (if successful)
      */
     SERVICE_MANAGER_REQUEST_CONNECT = 0,
@@ -47,6 +47,18 @@ enum {
      *  - Data = service_manager_reply_register_port_t
      */
     SERVICE_MANAGER_REQUEST_REGISTER_PORT = 1,
+
+    /**
+     * Get a handle to the process for a running service.
+     *
+     * Request:
+     *  - Data = service_manager_request_get_process_t
+     *
+     * Reply:
+     *  - Data   = service_manager_reply_get_process_t
+     *  - Handle = Service process (if successful)
+     */
+    SERVICE_MANAGER_REQUEST_GET_PROCESS = 2,
 };
 
 typedef struct service_manager_request_connect {
@@ -61,3 +73,12 @@ typedef struct service_manager_reply_connect {
 typedef struct service_manager_reply_register_port {
     status_t result;
 } service_manager_reply_register_port_t;
+
+typedef struct service_manager_request_get_process {
+    uint8_t _dummy;
+    char name[];
+} service_manager_request_get_process_t;
+
+typedef struct service_manager_reply_get_process {
+    status_t result;
+} service_manager_reply_get_process_t;

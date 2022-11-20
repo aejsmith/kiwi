@@ -46,6 +46,12 @@ struct environ;
 extern core_connection_t *posix_service_get(void) __sys_hidden;
 extern void posix_service_put(void) __sys_hidden;
 
+static inline bool posix_request_failed(int32_t ret) {
+    libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
+    libsystem_status_to_errno(ret);
+    return false;
+}
+
 /**
  * Processes.
  */
@@ -61,6 +67,8 @@ extern core_list_t __sys_hidden child_processes;
 extern core_mutex_t __sys_hidden child_processes_lock;
 
 extern void posix_register_fork_handler(void (*func)(void)) __sys_hidden;
+
+extern int posix_get_terminal(uint32_t access, uint32_t flags, handle_t *_handle) __sys_hidden;
 
 /**
  * Filesystem.
@@ -112,5 +120,6 @@ static inline void nstime_to_timespec(nstime_t time, struct timespec *tp) {
  */
 
 extern pid_t posix_get_pgrp_session(pid_t pgid);
+extern int posix_set_session_terminal(pid_t sid, handle_t handle);
 
 __SYS_EXTERN_C_END

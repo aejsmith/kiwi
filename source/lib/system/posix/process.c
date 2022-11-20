@@ -277,11 +277,8 @@ static bool getpgid_request(core_connection_t *conn, pid_t pid, pid_t *_pgid) {
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_getpgid_t *reply_data = core_message_data(reply);
     int reply_err = reply_data->err;
@@ -338,11 +335,8 @@ static bool setpgid_request(core_connection_t *conn, pid_t pid, pid_t pgid) {
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_setpgid_t *reply_data = core_message_data(reply);
     int reply_err = reply_data->err;
@@ -395,11 +389,8 @@ static bool getsid_request(core_connection_t *conn, pid_t pid, pid_t *_sid) {
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_getsid_t *reply_data = core_message_data(reply);
     int reply_err = reply_data->err;
@@ -445,11 +436,8 @@ static bool setsid_request(core_connection_t *conn, pid_t *_sid) {
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_setsid_t *reply_data = core_message_data(reply);
     int reply_err = reply_data->err;
@@ -498,11 +486,8 @@ static bool posix_get_pgrp_session_request(core_connection_t *conn, pid_t pgid, 
     status_t ret = core_connection_request(conn, request, &reply);
     core_message_destroy(request);
 
-    if (ret != STATUS_SUCCESS) {
-        libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
-        libsystem_status_to_errno(ret);
-        return false;
-    }
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
 
     posix_reply_get_pgrp_session_t *reply_data = core_message_data(reply);
     int reply_err = reply_data->err;
@@ -537,4 +522,112 @@ pid_t posix_get_pgrp_session(pid_t pgid) {
 
     posix_service_put();
     return (success) ? sid : -1;
+}
+
+static bool posix_set_session_terminal_request(core_connection_t *conn, pid_t sid, handle_t handle) {
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_SET_SESSION_TERMINAL, sizeof(posix_request_set_session_terminal_t), 0);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    posix_request_set_session_terminal_t *request_data = core_message_data(request);
+    request_data->sid = sid;
+
+    core_message_attach_handle(request, handle, false);
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
+
+    posix_reply_get_pgrp_session_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Sets the controlling terminal for a session. Internal interface only callable
+ * by the terminal service.
+ *
+ * @param sid           Session ID.
+ * @param handle        Read+write handle to terminal.
+ *
+ * @return              0 on success, -1 on failure.
+ */
+int posix_set_session_terminal(pid_t sid, handle_t handle) {
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    bool success = posix_set_session_terminal_request(conn, sid, handle);
+
+    posix_service_put();
+    return (success) ? 0 : -1;
+}
+
+static bool posix_get_terminal_request(core_connection_t *conn, uint32_t access, uint32_t flags, handle_t *_handle) {
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_GET_TERMINAL, sizeof(posix_request_get_terminal_t), 0);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    posix_request_get_terminal_t *request_data = core_message_data(request);
+    request_data->access = access;
+    request_data->flags  = flags;
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
+
+    posix_reply_get_pgrp_session_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+
+    if (reply_err == 0)
+        *_handle = core_message_detach_handle(reply);
+
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
+/** Gets a handle to the controlling terminal for the calling process.
+ * @param access        Access flags (kernel).
+ * @param flags         Handle flags (kernel).
+ * @param _handle       Where to store handle to terminal.
+ * @return              0 on success, -1 on failure. */
+int posix_get_terminal(uint32_t access, uint32_t flags, handle_t *_handle) {
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    bool success = posix_get_terminal_request(conn, access, flags, _handle);
+
+    posix_service_put();
+    return (success) ? 0 : -1;
 }
