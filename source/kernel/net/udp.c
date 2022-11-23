@@ -124,6 +124,28 @@ static void udp_socket_close(socket_t *_socket) {
     kfree(socket);
 }
 
+static char *udp_socket_name_unsafe(socket_t *_socket, char *buf, size_t size) {
+    udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
+
+    snprintf(buf, size, "udp%d:%" PRIu16, (socket->net.socket.family == AF_INET6) ? 6 : 4, socket->port.num);
+    return buf;
+}
+
+static char *udp_socket_name(socket_t *_socket) {
+    udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
+
+    /* udp[4|6]:[source port] */
+    const size_t prefix_len  = strlen("udp");
+    const size_t u16_max_len = 5;
+    const size_t len         = prefix_len + 2 + u16_max_len + 1;
+
+    char *name = kmalloc(len, MM_KERNEL);
+
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+    udp_socket_name_unsafe(_socket, name, len);
+    return name;
+}
+
 static status_t udp_socket_wait(socket_t *_socket, object_event_t *event) {
     udp_socket_t *socket = cast_udp_socket(cast_net_socket(_socket));
 
@@ -327,14 +349,16 @@ static status_t udp_socket_receive(
 }
 
 static const socket_ops_t udp_socket_ops = {
-    .close      = udp_socket_close,
-    .wait       = udp_socket_wait,
-    .unwait     = udp_socket_unwait,
-    .bind       = udp_socket_bind,
-    .send       = udp_socket_send,
-    .receive    = udp_socket_receive,
-    .getsockopt = net_socket_getsockopt,
-    .setsockopt = net_socket_setsockopt,
+    .close       = udp_socket_close,
+    .name        = udp_socket_name,
+    .name_unsafe = udp_socket_name_unsafe,
+    .wait        = udp_socket_wait,
+    .unwait      = udp_socket_unwait,
+    .bind        = udp_socket_bind,
+    .send        = udp_socket_send,
+    .receive     = udp_socket_receive,
+    .getsockopt  = net_socket_getsockopt,
+    .setsockopt  = net_socket_setsockopt,
 };
 
 /** Creates a UDP socket. */
