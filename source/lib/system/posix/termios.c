@@ -320,8 +320,6 @@ char *getpass(const char *prompt) {
         in_fd  = opened_fd;
         out_fd = opened_fd;
     } else {
-        __asm__ volatile("ud2a");
-
         in_fd  = STDIN_FILENO;
         out_fd = STDOUT_FILENO;
 

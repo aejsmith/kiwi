@@ -273,6 +273,38 @@ static bool kill_request(core_connection_t *conn, pid_t pid, int num) {
     return true;
 }
 
+static bool alarm_request(core_connection_t *conn, unsigned int seconds, unsigned int *_remaining) {
+    core_message_t *request = core_message_create_request(
+        POSIX_REQUEST_ALARM, sizeof(posix_request_alarm_t), 0);
+    if (!request) {
+        errno = ENOMEM;
+        return false;
+    }
+
+    posix_request_alarm_t *request_data = core_message_data(request);
+    request_data->seconds = seconds;
+
+    core_message_t *reply;
+    status_t ret = core_connection_request(conn, request, &reply);
+    core_message_destroy(request);
+
+    if (ret != STATUS_SUCCESS)
+        return posix_request_failed(ret);
+
+    posix_reply_alarm_t *reply_data = core_message_data(reply);
+    int reply_err = reply_data->err;
+    *_remaining   = reply_data->remaining;
+
+    core_message_destroy(reply);
+
+    if (reply_err != 0) {
+        errno = reply_err;
+        return false;
+    }
+
+    return true;
+}
+
 /**
  * Internal implementation details.
  */
@@ -838,6 +870,31 @@ int sigaltstack(const stack_t *__restrict ss, stack_t *__restrict old_ss) {
 int sigsuspend(const sigset_t *mask) {
     libsystem_stub("sigsuspend", true);
     return -1;
+}
+
+/** Arrange for a SIGALRM signal to be delivered after a certain time.
+ * @param seconds       Seconds to wait for.
+ * @return              Seconds until previously scheduled alarm was to be
+ *                      delivered, or 0 if no previous alarm. */
+unsigned int alarm(unsigned int seconds) {
+    core_connection_t *conn = posix_service_get();
+    if (!conn) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    unsigned int remaining = 0;
+    bool success = alarm_request(conn, seconds, &remaining);
+    posix_service_put();
+
+    if (success) {
+        return remaining;
+    } else {
+        /* This function does not allow errors, but our implementation can have
+         * them. Best we can do is make some noise. */
+        libsystem_log(CORE_LOG_ERROR, "failed to set alarm: %d", errno);
+        return 0;
+    }
 }
 
 /** Save signal state for sigsetjmp. */

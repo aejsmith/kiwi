@@ -46,7 +46,7 @@ struct environ;
 extern core_connection_t *posix_service_get(void) __sys_hidden;
 extern void posix_service_put(void) __sys_hidden;
 
-static inline bool posix_request_failed(int32_t ret) {
+static inline bool posix_request_failed(status_t ret) {
     libsystem_log(CORE_LOG_ERROR, "failed to make POSIX request: %" PRId32, ret);
     libsystem_status_to_errno(ret);
     return false;

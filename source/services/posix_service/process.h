@@ -58,12 +58,14 @@ private:
     void handleDeathEvent();
     void handleHangupEvent();
     void handleMessageEvent();
+    void handleAlarmEvent();
 
     Kiwi::Core::Message handleGetSignalCondition(Kiwi::Core::Message &request);
     Kiwi::Core::Message handleGetPendingSignal(Kiwi::Core::Message &request);
     Kiwi::Core::Message handleSetSignalAction(Kiwi::Core::Message &request);
     Kiwi::Core::Message handleSetSignalMask(Kiwi::Core::Message &request);
     Kiwi::Core::Message handleKill(Kiwi::Core::Message &request);
+    Kiwi::Core::Message handleAlarm(Kiwi::Core::Message &request);
     Kiwi::Core::Message handleGetpgid(Kiwi::Core::Message &request);
     Kiwi::Core::Message handleSetpgid(Kiwi::Core::Message &request);
     Kiwi::Core::Message handleGetsid(Kiwi::Core::Message &request);
@@ -88,8 +90,10 @@ private:
     uint32_t m_signalsPending;
     uint32_t m_signalMask;
     Kiwi::Core::Handle m_signalCondition;
+    Kiwi::Core::Handle m_alarmTimer;
 
     Kiwi::Core::EventRef m_deathEvent;
     Kiwi::Core::EventRef m_hangupEvent;
     Kiwi::Core::EventRef m_messageEvent;
+    Kiwi::Core::EventRef m_alarmEvent;
 };

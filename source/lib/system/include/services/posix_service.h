@@ -83,6 +83,17 @@ enum {
     POSIX_REQUEST_KILL = 4,
 
     /**
+     * Implements the alarm() function.
+     *
+     * Request:
+     *  - Data = posix_request_alarm_t
+     *
+     * Reply:
+     *  - Data = posix_reply_alarm_t
+     */
+    POSIX_REQUEST_ALARM = 5,
+
+    /**
      * Implements the getpgid() function.
      *
      * Request:
@@ -91,7 +102,7 @@ enum {
      * Reply:
      *  - Data = posix_reply_getpgid_t
      */
-    POSIX_REQUEST_GETPGID = 5,
+    POSIX_REQUEST_GETPGID = 6,
 
     /**
      * Implements the setpgid() function.
@@ -102,7 +113,7 @@ enum {
      * Reply:
      *  - Data = posix_reply_setpgid_t
      */
-    POSIX_REQUEST_SETPGID = 6,
+    POSIX_REQUEST_SETPGID = 7,
 
     /**
      * Implements the getsid() function.
@@ -113,7 +124,7 @@ enum {
      * Reply:
      *  - Data = posix_reply_getsid_t
      */
-    POSIX_REQUEST_GETSID = 7,
+    POSIX_REQUEST_GETSID = 8,
 
     /**
      * Implements the setsid() function.
@@ -121,7 +132,7 @@ enum {
      * Reply:
      *  - Data = posix_reply_setsid_t
      */
-    POSIX_REQUEST_SETSID = 8,
+    POSIX_REQUEST_SETSID = 9,
 
     /**
      * Implements the posix_get_pgrp_session() function.
@@ -132,7 +143,7 @@ enum {
      * Reply:
      *  - Data = posix_reply_get_pgrp_session_t
      */
-    POSIX_REQUEST_GET_PGRP_SESSION = 9,
+    POSIX_REQUEST_GET_PGRP_SESSION = 10,
 
     /**
      * Implements the posix_set_session_terminal() function.
@@ -144,7 +155,7 @@ enum {
      * Reply:
      *  - Data   = posix_reply_set_session_terminal_t
      */
-    POSIX_REQUEST_SET_SESSION_TERMINAL = 10,
+    POSIX_REQUEST_SET_SESSION_TERMINAL = 11,
 
     /**
      * Gets a handle to the controlling terminal for the calling process.
@@ -156,7 +167,7 @@ enum {
      *  - Data   = posix_reply_get_terminal_t
      *  - Handle = Controlling terminal handle (on success)
      */
-    POSIX_REQUEST_GET_TERMINAL = 11,
+    POSIX_REQUEST_GET_TERMINAL = 12,
 };
 
 typedef struct posix_reply_get_signal_condition {
@@ -204,6 +215,15 @@ typedef struct posix_request_kill {
 typedef struct posix_reply_kill {
     int32_t err;                    /**< Error number (0 on success). */
 } posix_reply_kill_t;
+
+typedef struct posix_request_alarm {
+    uint32_t seconds;               /**< Number of seconds to signal in. */
+} posix_request_alarm_t;
+
+typedef struct posix_reply_alarm {
+    int32_t err;                    /**< Error number (0 on success). */
+    uint32_t remaining;             /**< Previous remaining time. */
+} posix_reply_alarm_t;
 
 typedef struct posix_request_getpgid {
     int32_t pid;                    /**< PID to get for. */

@@ -49,7 +49,6 @@ sources = [File(f) for f in [
     'net/if.c',
     'net/socket.c',
 
-    'posix/alarm.c',
     'posix/dlfcn.c',
     'posix/exec.c',
     'posix/fd.c',

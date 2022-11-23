@@ -26,11 +26,13 @@
 
 #include <core/log.h>
 #include <core/service.h>
+#include <core/time.h>
 
 #include <kernel/condition.h>
 #include <kernel/file.h>
 #include <kernel/process.h>
 #include <kernel/status.h>
+#include <kernel/time.h>
 
 #include <kiwi/core/token_setter.h>
 
@@ -150,6 +152,7 @@ void Process::handleMessageEvent() {
         case POSIX_REQUEST_SET_SIGNAL_ACTION:       reply = handleSetSignalAction(message); break;
         case POSIX_REQUEST_SET_SIGNAL_MASK:         reply = handleSetSignalMask(message); break;
         case POSIX_REQUEST_KILL:                    reply = handleKill(message); break;
+        case POSIX_REQUEST_ALARM:                   reply = handleAlarm(message); break;
         case POSIX_REQUEST_GETPGID:                 reply = handleGetpgid(message); break;
         case POSIX_REQUEST_SETPGID:                 reply = handleSetpgid(message); break;
         case POSIX_REQUEST_GETSID:                  reply = handleGetsid(message); break;
@@ -443,8 +446,8 @@ void Process::sendSignal(int32_t num, const Process *sender, const security_cont
         memset(&signal.info, 0, sizeof(signal.info));
 
         signal.info.si_signo = num;
-        signal.info.si_pid   = sender->m_id;
-        signal.info.si_uid   = senderSecurity->uid;
+        signal.info.si_pid   = (sender) ? sender->m_id : 0;
+        signal.info.si_uid   = (sender) ? senderSecurity->uid : 0;
 
         m_signalsPending |= (1 << num);
 
@@ -557,6 +560,69 @@ Kiwi::Core::Message Process::handleKill(Kiwi::Core::Message &request) {
             return reply;
 
         replyData->err = (killProcess(handle, requestData->pid)) ? 0 : EPERM;
+    }
+
+    return reply;
+}
+
+void Process::handleAlarmEvent() {
+    /* Clear the fired state. */
+    kern_timer_stop(m_alarmTimer, nullptr);
+
+    sendSignal(SIGALRM, nullptr, nullptr);
+
+    m_alarmEvent.remove();
+    m_alarmTimer.close();
+}
+
+Kiwi::Core::Message Process::handleAlarm(Kiwi::Core::Message &request) {
+    status_t ret;
+
+    Kiwi::Core::Message reply;
+    if (!createReply(reply, request, sizeof(posix_reply_alarm_t)))
+        return Kiwi::Core::Message();
+
+    auto replyData = reply.data<posix_reply_alarm_t>();
+    replyData->err       = 0;
+    replyData->remaining = 0;
+
+    if (request.size() != sizeof(posix_request_alarm_t)) {
+        replyData->err = EINVAL;
+        return reply;
+    }
+
+    auto requestData = request.data<posix_request_alarm_t>();
+
+    if (m_alarmTimer.isValid()) {
+        nstime_t remaining = 0;
+        kern_timer_stop(m_alarmTimer, &remaining);
+        replyData->remaining = core_nsecs_to_secs(remaining);
+    }
+
+    if (requestData->seconds > 0) {
+        if (!m_alarmTimer.isValid()) {
+            ret = kern_timer_create(TIMER_ONESHOT, m_alarmTimer.attach());
+            if (ret != STATUS_SUCCESS) {
+                core_log(CORE_LOG_WARN, "failed to create alarm timer: %" PRId32, ret);
+                replyData->err = EAGAIN;
+                return reply;
+            }
+
+            m_alarmEvent = g_posixService.eventLoop().addEvent(
+                m_alarmTimer, TIMER_EVENT, 0,
+                [this] (const object_event_t &) { handleAlarmEvent(); });
+        }
+
+        nstime_t nsecs = core_secs_to_nsecs(requestData->seconds);
+        ret = kern_timer_start(m_alarmTimer, nsecs, TIMER_ONESHOT);
+        if (ret != STATUS_SUCCESS) {
+            core_log(CORE_LOG_WARN, "failed to start alarm timer: %" PRId32, ret);
+            replyData->err = EAGAIN;
+            return reply;
+        }
+    } else {
+        m_alarmEvent.remove();
+        m_alarmTimer.close();
     }
 
     return reply;
