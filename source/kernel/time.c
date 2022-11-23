@@ -715,7 +715,6 @@ status_t kern_timer_stop(handle_t handle, nstime_t *_rem) {
 
     if (!list_empty(&timer->timer.cpu_link)) {
         timer_stop(&timer->timer);
-        timer->fired = false;
 
         if (_rem) {
             nstime_t rem = system_time() - timer->timer.target;
@@ -724,6 +723,8 @@ status_t kern_timer_stop(handle_t handle, nstime_t *_rem) {
     } else if (_rem) {
         ret = write_user(_rem, 0);
     }
+
+    timer->fired = false;
 
     mutex_unlock(&timer->lock);
 
