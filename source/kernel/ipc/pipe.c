@@ -23,6 +23,7 @@
 
 #include <ipc/pipe.h>
 
+#include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/kmem.h>
@@ -34,6 +35,9 @@
 #include <kernel.h>
 #include <object.h>
 #include <status.h>
+
+/** Next pipe ID (for debug naming). */
+static atomic_uint32_t next_pipe_id = 0;
 
 /** Waits for any amount of data. */
 static status_t wait_data(pipe_t *pipe, bool nonblock) {
@@ -190,7 +194,25 @@ void pipe_unwait(pipe_t *pipe, bool write, object_event_t *event) {
     notifier_unregister(notifier, object_event_notifier, event);
 }
 
-/** Closes a pipe handle. */
+static char *pipe_file_name(file_handle_t *handle) {
+    pipe_t *pipe = handle->pipe;
+
+    const size_t prefix_len  = strlen("pipe");
+    const size_t u32_max_len = 10;
+    const size_t len         = prefix_len + u32_max_len + 2;
+
+    char *name = kmalloc(len, MM_KERNEL);
+    snprintf(name, len, "pipe:%" PRIu32, pipe->id);
+    return name;
+}
+
+static char *pipe_file_name_unsafe(file_handle_t *handle, char *buf, size_t size) {
+    pipe_t *pipe = handle->pipe;
+
+    snprintf(buf, size, "pipe:%" PRIu32, pipe->id);
+    return buf;
+}
+
 static void pipe_file_close(file_handle_t *handle) {
     pipe_t *pipe = handle->pipe;
 
@@ -222,7 +244,6 @@ static void pipe_file_close(file_handle_t *handle) {
         pipe_destroy(pipe);
 }
 
-/** Signals that a pipe event is being waited for. */
 static status_t pipe_file_wait(file_handle_t *handle, object_event_t *event) {
     pipe_t *pipe = handle->pipe;
 
@@ -243,7 +264,6 @@ static status_t pipe_file_wait(file_handle_t *handle, object_event_t *event) {
     }
 }
 
-/** Stops waiting for a pipe event. */
 static void pipe_file_unwait(file_handle_t *handle, object_event_t *event) {
     pipe_t *pipe = handle->pipe;
 
@@ -257,14 +277,12 @@ static void pipe_file_unwait(file_handle_t *handle, object_event_t *event) {
     }
 }
 
-/** Performs I/O on a pipe. */
 static status_t pipe_file_io(file_handle_t *handle, io_request_t *request) {
     pipe_t *pipe   = handle->pipe;
     uint32_t flags = file_handle_flags(handle);
     return pipe_io(pipe, request, flags & FILE_NONBLOCK);
 }
 
-/** Gets information about a pipe. */
 static void pipe_file_info(file_handle_t *handle, file_info_t *info) {
     info->type       = FILE_TYPE_PIPE;
     info->links      = 1;
@@ -272,11 +290,13 @@ static void pipe_file_info(file_handle_t *handle, file_info_t *info) {
 }
 
 static const file_ops_t pipe_file_ops = {
-    .close    = pipe_file_close,
-    .wait     = pipe_file_wait,
-    .unwait   = pipe_file_unwait,
-    .io       = pipe_file_io,
-    .info     = pipe_file_info,
+    .close       = pipe_file_close,
+    .name        = pipe_file_name,
+    .name_unsafe = pipe_file_name_unsafe,
+    .wait        = pipe_file_wait,
+    .unwait      = pipe_file_unwait,
+    .io          = pipe_file_io,
+    .info        = pipe_file_info,
 };
 
 /** Creates a new pipe.
@@ -291,6 +311,7 @@ pipe_t *pipe_create(unsigned mmflag) {
     notifier_init(&pipe->space_notifier, pipe);
     notifier_init(&pipe->data_notifier, pipe);
 
+    pipe->id         = atomic_fetch_add(&next_pipe_id, 1);
     pipe->file.ops   = &pipe_file_ops;
     pipe->file.type  = FILE_TYPE_PIPE;
     pipe->read_open  = true;

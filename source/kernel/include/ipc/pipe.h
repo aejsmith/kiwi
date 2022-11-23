@@ -53,6 +53,8 @@ typedef struct pipe {
     uint8_t *buf;                   /**< Circular data buffer. */
     size_t start;                   /**< Start position of buffer. */
     size_t count;                   /**< Number of bytes in buffer. */
+
+    uint32_t id;                    /**< Pipe ID (for debugging purposes). */
 } pipe_t;
 
 extern status_t pipe_io(pipe_t *pipe, struct io_request *request, bool nonblock);
