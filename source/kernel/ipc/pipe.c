@@ -199,17 +199,17 @@ static char *pipe_file_name(file_handle_t *handle) {
 
     const size_t prefix_len  = strlen("pipe");
     const size_t u32_max_len = 10;
-    const size_t len         = prefix_len + u32_max_len + 2;
+    const size_t len         = prefix_len + u32_max_len + 4;
 
     char *name = kmalloc(len, MM_KERNEL);
-    snprintf(name, len, "pipe:%" PRIu32, pipe->id);
+    snprintf(name, len, "pipe:%s%" PRIu32, (handle->access & FILE_ACCESS_READ) ? "<-" : "->", pipe->id);
     return name;
 }
 
 static char *pipe_file_name_unsafe(file_handle_t *handle, char *buf, size_t size) {
     pipe_t *pipe = handle->pipe;
 
-    snprintf(buf, size, "pipe:%" PRIu32, pipe->id);
+    snprintf(buf, size, "pipe:%s%" PRIu32, (handle->access & FILE_ACCESS_READ) ? "<-" : "->", pipe->id);
     return buf;
 }
 
