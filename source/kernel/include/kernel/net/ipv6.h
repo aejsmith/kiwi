@@ -25,7 +25,8 @@
 
 __KERNEL_EXTERN_C_BEGIN
 
-#define IPV6_ADDR_LEN   16
+#define IPV6_ADDR_LEN       16
+#define IPV6_ADDR_STR_LEN   46
 
 /** Type used to store an IPv6 address. */
 typedef struct in6_addr {

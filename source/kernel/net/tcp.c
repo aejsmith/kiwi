@@ -585,6 +585,37 @@ static void tcp_socket_close(socket_t *_socket) {
     tcp_socket_release(socket);
 }
 
+static char *tcp_socket_name_unsafe(socket_t *_socket, char *buf, size_t size) {
+    tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
+
+    if (socket->net.socket.family == AF_INET6) {
+        snprintf(
+            buf, size, "tcp6:%" PRIu16 "<->%pI6:%" PRIu16,
+            socket->port.num, &socket->dest_addr.ipv6.sin6_addr, socket->dest_addr.ipv6.sin6_port);
+    } else {
+        snprintf(
+            buf, size, "tcp4:%" PRIu16 "<->%pI4:%" PRIu16,
+            socket->port.num, &socket->dest_addr.ipv4.sin_addr, socket->dest_addr.ipv4.sin_port);
+    }
+
+    return buf;
+}
+
+static char *tcp_socket_name(socket_t *_socket) {
+    tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
+
+    /* tcp[4|6]:[source port]<->[dest addr]:[dest port] */
+    const size_t prefix_len  = strlen("tcp");
+    const size_t u16_max_len = 5;
+    const size_t len         = prefix_len + 2 + u16_max_len + 3 + IPV4_ADDR_STR_LEN + 1 + u16_max_len + 1;
+
+    char *name = kmalloc(len, MM_KERNEL);
+
+    MUTEX_SCOPED_LOCK(lock, &socket->lock);
+    tcp_socket_name_unsafe(_socket, name, len);
+    return name;
+}
+
 static status_t tcp_socket_wait(socket_t *_socket, object_event_t *event) {
     tcp_socket_t *socket = cast_tcp_socket(cast_net_socket(_socket));
 
@@ -899,6 +930,8 @@ static status_t tcp_socket_receive(
 
 static const socket_ops_t tcp_socket_ops = {
     .close       = tcp_socket_close,
+    .name        = tcp_socket_name,
+    .name_unsafe = tcp_socket_name_unsafe,
     .wait        = tcp_socket_wait,
     .unwait      = tcp_socket_unwait,
     .connect     = tcp_socket_connect,
@@ -1387,15 +1420,20 @@ static kdb_status_t kdb_cmd_tcp4(int argc, char **argv, kdb_filter_t *filter) {
         return KDB_SUCCESS;
     }
 
-    kdb_printf("Port   Destination      State\n");
-    kdb_printf("====   ===========      =====\n");
+    kdb_printf("Port   Destination            State\n");
+    kdb_printf("====   ===========            =====\n");
+
+    char dest_buf[IPV4_ADDR_STR_LEN + 7];
 
     list_foreach(&tcp_ipv4_space.ports, iter) {
         net_port_t *port = list_entry(iter, net_port_t, link);
         tcp_socket_t *socket = container_of(port, tcp_socket_t, port);
 
-        kdb_printf("%-6" PRIu16 " %-16pI4 %s\n",
-            socket->port.num, &socket->dest_addr.ipv4.sin_addr, state_string(socket->state));
+        sprintf(
+            dest_buf, "%pI4:%" PRIu16,
+            &socket->dest_addr.ipv4.sin_addr, socket->dest_addr.ipv4.sin_port);
+        kdb_printf("%-6" PRIu16 " %-22s %s\n",
+            socket->port.num, dest_buf, state_string(socket->state));
     }
 
     return KDB_SUCCESS;
@@ -1409,15 +1447,20 @@ static kdb_status_t kdb_cmd_tcp6(int argc, char **argv, kdb_filter_t *filter) {
         return KDB_SUCCESS;
     }
 
-    kdb_printf("Port   Destination                              State\n");
-    kdb_printf("====   ===========                              =====\n");
+    kdb_printf("Port   Destination                                          State\n");
+    kdb_printf("====   ===========                                          =====\n");
+
+    char dest_buf[IPV6_ADDR_STR_LEN + 7];
 
     list_foreach(&tcp_ipv6_space.ports, iter) {
         net_port_t *port = list_entry(iter, net_port_t, link);
         tcp_socket_t *socket = container_of(port, tcp_socket_t, port);
 
-        kdb_printf("%-6" PRIu16 " %-40pI6 %s\n",
-            socket->port.num, &socket->dest_addr.ipv6.sin6_addr, state_string(socket->state));
+        sprintf(
+            dest_buf, "%pI6:%" PRIu16,
+            &socket->dest_addr.ipv6.sin6_addr, socket->dest_addr.ipv6.sin6_port);
+        kdb_printf("%-6" PRIu16 " %-52s %s\n",
+            socket->port.num, dest_buf, state_string(socket->state));
     }
 
     return KDB_SUCCESS;

@@ -25,7 +25,8 @@
 
 __KERNEL_EXTERN_C_BEGIN
 
-#define IPV4_ADDR_LEN   4
+#define IPV4_ADDR_LEN       4
+#define IPV4_ADDR_STR_LEN   16
 
 typedef uint32_t in_addr_t;
 typedef uint16_t in_port_t;

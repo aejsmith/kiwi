@@ -35,8 +35,8 @@ __SYS_EXTERN_C_BEGIN
 #define ntohl(val) core_be32_to_cpu(val)
 #define ntohs(val) core_be16_to_cpu(val)
 
-#define INET_ADDRSTRLEN     16
-#define INET6_ADDRSTRLEN    46
+#define INET_ADDRSTRLEN     IPV4_ADDR_STR_LEN
+#define INET6_ADDRSTRLEN    IPV6_ADDR_STR_LEN
 
 #define IN6ADDR_ANY_INIT \
     {{{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }}}

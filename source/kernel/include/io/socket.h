@@ -37,6 +37,20 @@ typedef struct socket_ops {
      * @param socket        Socket to close. */
     void (*close)(struct socket *socket);
 
+    /** Gets the name of the socket.
+     * @param socket        Socket to get name of.
+     * @return              Pointer to allocated name string. */
+    char *(*name)(struct socket *socket);
+
+    /** Get the name of a file in KDB context.
+     * @see                 object_type_t::name().
+     * @param socket        Socket to get name of.
+     * @param buf           Buffer to write into.
+     * @param size          Size of the buffer.
+     * @return              Pointer to start of name string, or NULL if not
+     *                      available. */
+    char *(*name_unsafe)(struct socket *socket, char *buf, size_t size);
+
     /** Signals that a socket event is being waited for.
      * @see                 file_ops_t::wait
      * @param socket        Socket to wait on.

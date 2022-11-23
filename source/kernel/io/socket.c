@@ -140,6 +140,18 @@ static void socket_file_close(file_handle_t *handle) {
     socket_family_release(family);
 }
 
+static char *socket_file_name(file_handle_t *handle) {
+    socket_t *socket = handle->socket;
+
+    return (socket->ops->name) ? socket->ops->name(socket) : NULL;
+}
+
+static char *socket_file_name_unsafe(file_handle_t *handle, char *buf, size_t size) {
+    socket_t *socket = handle->socket;
+
+    return (socket->ops->name_unsafe) ? socket->ops->name_unsafe(socket, buf, size) : NULL;
+}
+
 static status_t socket_file_io(file_handle_t *handle, io_request_t *request) {
     if (request->op == IO_OP_WRITE) {
         return socket_do_send(handle, request, 0, NULL, 0);
@@ -177,11 +189,13 @@ static void socket_file_info(file_handle_t *handle, file_info_t *info) {
 }
 
 static const file_ops_t socket_file_ops = {
-    .close  = socket_file_close,
-    .io     = socket_file_io,
-    .wait   = socket_file_wait,
-    .unwait = socket_file_unwait,
-    .info   = socket_file_info,
+    .close       = socket_file_close,
+    .name        = socket_file_name,
+    .name_unsafe = socket_file_name_unsafe,
+    .io          = socket_file_io,
+    .wait        = socket_file_wait,
+    .unwait      = socket_file_unwait,
+    .info        = socket_file_info,
 };
 
 /** Validate that a handle is a socket and return its file_handle_t if so. */
