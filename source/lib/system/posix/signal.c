@@ -395,6 +395,25 @@ static void handle_signal(core_connection_t *conn, siginfo_t *info, thread_conte
     /* Restore previous IPL (in case caller loops again). */
     ret = kern_thread_set_ipl(THREAD_SET_IPL_ALWAYS, prev_ipl, NULL);
     libsystem_assert(ret == STATUS_SUCCESS);
+
+    if (mask != prev_mask) {
+        core_mutex_lock(&posix_signal_lock, -1);
+
+        conn = posix_service_get();
+        if (!conn) {
+            core_mutex_unlock(&posix_signal_lock);
+            return;
+        }
+
+        if (set_signal_mask_request(conn, prev_mask)) {
+            posix_signal_mask = prev_mask;
+        } else {
+            libsystem_log(CORE_LOG_ERROR, "failed to restore signal mask while handling signal %d", info->si_signo);
+        }
+
+        posix_service_put();
+        core_mutex_unlock(&posix_signal_lock);
+    }
 }
 
 /** Kernel object event callback for a signal being raised. */
