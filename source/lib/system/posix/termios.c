@@ -333,7 +333,7 @@ char *getpass(const char *prompt) {
     tcgetattr(in_fd, &orig_tio);
 
     struct termios new_tio = orig_tio;
-    new_tio.c_lflag = (new_tio.c_lflag & ~(ECHO | ISIG)) | ICANON;
+    new_tio.c_lflag = (new_tio.c_lflag & ~(ECHO | ISIG | ECHONL)) | ICANON;
     new_tio.c_iflag = (new_tio.c_iflag & ~(INLCR | IGNCR)) | ICRNL;
 
     tcsetattr(in_fd, TCSAFLUSH, &new_tio);
