@@ -1399,7 +1399,7 @@ static vm_region_t *alloc_region(
  * @return              Status code describing result of the operation.
  */
 status_t vm_map(
-    vm_aspace_t *as, ptr_t *_addr, size_t size, size_t align, unsigned spec,
+    vm_aspace_t *as, ptr_t *_addr, size_t size, size_t align, uint32_t spec,
     uint32_t access, uint32_t flags, object_handle_t *handle, offset_t offset,
     const char *name)
 {
@@ -2094,7 +2094,7 @@ __init_text void vm_init(void) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_vm_map(
-    void **_addr, size_t size, size_t align, unsigned spec, uint32_t access,
+    void **_addr, size_t size, size_t align, uint32_t spec, uint32_t access,
     uint32_t flags, handle_t handle, offset_t offset, const char *name)
 {
     status_t ret;

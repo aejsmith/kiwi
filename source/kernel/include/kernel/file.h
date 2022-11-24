@@ -111,14 +111,14 @@ extern status_t kern_file_state(
     handle_t handle, uint32_t *_access, uint32_t *_flags, offset_t *_offset);
 extern status_t kern_file_set_flags(handle_t handle, uint32_t flags);
 extern status_t kern_file_seek(
-    handle_t handle, unsigned action, offset_t offset, offset_t *_result);
+    handle_t handle, uint32_t action, offset_t offset, offset_t *_result);
 
 extern status_t kern_file_resize(handle_t handle, offset_t size);
 extern status_t kern_file_info(handle_t handle, file_info_t *info);
 extern status_t kern_file_sync(handle_t handle);
 
 extern status_t kern_file_request(
-    handle_t handle, unsigned request, const void *in, size_t in_size,
+    handle_t handle, uint32_t request, const void *in, size_t in_size,
     void *out, size_t out_size, size_t *_bytes);
 
 __KERNEL_EXTERN_C_END

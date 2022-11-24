@@ -30,7 +30,7 @@ __KERNEL_EXTERN_C_BEGIN
 /** Actions for kern_thread_control(). */
 #define THREAD_SET_TLS_ADDR     1   /**< Set TLS base address. */
 
-extern status_t kern_thread_control(unsigned action, const void *in, void *out);
+extern status_t kern_thread_control(uint32_t action, const void *in, void *out);
 extern void kern_thread_restore(void);
 
 typedef void (*thread_dtor_t)(void);

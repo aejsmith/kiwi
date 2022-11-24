@@ -31,7 +31,7 @@ __KERNEL_EXTERN_C_BEGIN
 #define PROCESS_LOADED          1   /**< Signal that process is loaded. */
 #define PROCESS_SET_RESTORE     2   /**< Set the thread restore function. */
 
-extern status_t kern_process_control(unsigned action, const void *in, void *out);
+extern status_t kern_process_control(uint32_t action, const void *in, void *out);
 
 typedef void (*process_clone_handler_t)(void);
 extern status_t kern_process_add_clone_handler(process_clone_handler_t handler);

@@ -58,9 +58,9 @@ enum {
 /** Details of an object event to wait for. */
 typedef struct object_event {
     handle_t handle;                        /**< Handle to wait on. */
-    unsigned event;                         /**< Event to wait for. */
+    uint32_t event;                         /**< Event to wait for. */
     uint32_t flags;                         /**< Flags for the event. */
-    unsigned long data;                     /**< Integer data associated with the event. */
+    uint64_t data;                          /**< Integer data associated with the event. */
     void *udata;                            /**< User data, passed through unmodified. */
 } object_event_t;
 
@@ -105,7 +105,7 @@ enum {
  */
 typedef void (*object_callback_t)(object_event_t *event, struct thread_context *ctx);
 
-extern status_t kern_object_type(handle_t handle, unsigned *_type);
+extern status_t kern_object_type(handle_t handle, uint32_t *_type);
 extern status_t kern_object_wait(object_event_t *events, size_t count, uint32_t flags, nstime_t timeout);
 extern status_t kern_object_callback(object_event_t *event, object_callback_t callback, uint32_t priority);
 

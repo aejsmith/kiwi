@@ -134,7 +134,7 @@ typedef struct file_ops {
      * @param _out_size     Where to store output buffer size.
      * @return              Status code describing result of operation. */
     status_t (*request)(
-        struct file_handle *handle, unsigned request, const void *in,
+        struct file_handle *handle, uint32_t request, const void *in,
         size_t in_size, void **_out, size_t *_out_size);
 } file_ops_t;
 
@@ -215,7 +215,7 @@ extern status_t file_state(
     offset_t *_offset);
 extern status_t file_set_flags(object_handle_t *handle, uint32_t flags);
 extern status_t file_seek(
-    object_handle_t *handle, unsigned action, offset_t offset,
+    object_handle_t *handle, uint32_t action, offset_t offset,
     offset_t *_result);
 
 extern status_t file_resize(object_handle_t *handle, offset_t size);
@@ -223,5 +223,5 @@ extern status_t file_info(object_handle_t *handle, file_info_t *info);
 extern status_t file_sync(object_handle_t *handle);
 
 extern status_t file_request(
-    object_handle_t *handle, unsigned request, const void *in, size_t in_size,
+    object_handle_t *handle, uint32_t request, const void *in, size_t in_size,
     void **_out, size_t *_out_size);

@@ -40,7 +40,7 @@
  * @return              STATUS_SUCCESS on success.
  *                      STATUS_INVALID_ARG if what is unknown or buf is NULL.
  */
-status_t kern_system_info(unsigned what, void *buf) {
+status_t kern_system_info(uint32_t what, void *buf) {
     if (!buf)
         return STATUS_INVALID_ARG;
 

@@ -130,7 +130,7 @@ typedef struct fs_mount_ops {
 typedef struct fs_mount {
     mutex_t lock;                   /**< Lock to protect structure. */
 
-    unsigned flags;                 /**< Flags for the mount. */
+    uint32_t flags;                 /**< Flags for the mount. */
     const fs_mount_ops_t *ops;      /**< Mount operations. */
     void *private;                  /**< Filesystem type private data. */
     struct device *device;          /**< Device that the filesystem resides on. */
@@ -346,7 +346,7 @@ typedef struct fs_dentry {
      */
     refcount_t count;
 
-    unsigned flags;                 /**< Flags for the entry. */
+    uint32_t flags;                 /**< Flags for the entry. */
     char *name;                     /**< Name of the entry. */
     node_id_t id;                   /**< Node ID that the entry refers to. */
     fs_mount_t *mount;              /**< Mount that the entry resides on. */
@@ -377,7 +377,7 @@ extern void fs_dentry_release(fs_dentry_t *entry);
  */
 
 extern status_t fs_open(
-    const char *path, uint32_t rights, uint32_t flags, unsigned create,
+    const char *path, uint32_t rights, uint32_t flags, uint32_t create,
     object_handle_t **_handle);
 
 extern status_t fs_create_dir(const char *path);
@@ -389,7 +389,7 @@ extern status_t fs_read_symlink(const char *path, char **_target);
 extern status_t fs_mount(
     const char *device, const char *path, const char *type, uint32_t flags,
     const char *opts);
-extern status_t fs_unmount(const char *path, unsigned flags);
+extern status_t fs_unmount(const char *path, uint32_t flags);
 
 extern status_t fs_path(object_handle_t *handle, char **_path);
 extern status_t fs_info(const char *path, bool follow, file_info_t *info);

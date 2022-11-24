@@ -41,7 +41,7 @@ __KERNEL_EXTERN_C_BEGIN
 #define VM_MAP_OVERCOMMIT   (1<<2)  /**< Allow overcommitting of memory. */
 
 extern status_t kern_vm_map(
-    void **_addr, size_t size, size_t align, unsigned spec, uint32_t access,
+    void **_addr, size_t size, size_t align, uint32_t spec, uint32_t access,
     uint32_t flags, handle_t handle, offset_t offset, const char *name);
 extern status_t kern_vm_unmap(void *start, size_t size);
 

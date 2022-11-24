@@ -674,7 +674,7 @@ status_t kern_timer_create(uint32_t flags, handle_t *_handle) {
  *
  * @return              Status code describing result of the operation.
  */
-status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode) {
+status_t kern_timer_start(handle_t handle, nstime_t interval, uint32_t mode) {
     if (interval <= 0 || (mode != TIMER_ONESHOT && mode != TIMER_PERIODIC))
         return STATUS_INVALID_ARG;
 
@@ -747,7 +747,7 @@ status_t kern_timer_stop(handle_t handle, nstime_t *_rem) {
  *                      STATUS_INVALID_ARG if time source is invalid or _time is
  *                      NULL.
  */
-status_t kern_time_get(unsigned source, nstime_t *_time) {
+status_t kern_time_get(uint32_t source, nstime_t *_time) {
     if (!_time)
         return STATUS_INVALID_ARG;
 
@@ -776,6 +776,6 @@ status_t kern_time_get(unsigned source, nstime_t *_time) {
  * @return              STATUS_SUCCESS on success.
  *                      STATUS_INVALID_ARG if time source is invalid.
  */
-status_t kern_time_set(unsigned source, nstime_t time) {
+status_t kern_time_set(uint32_t source, nstime_t time) {
     return STATUS_NOT_IMPLEMENTED;
 }

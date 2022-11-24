@@ -46,7 +46,7 @@ typedef struct mount_info {
 #define FS_UNMOUNT_FORCE    (1<<0)      /**< Force unmounting even if unable to flush data. */
 
 extern status_t kern_fs_open(
-    const char *path, uint32_t access, uint32_t flags, unsigned create,
+    const char *path, uint32_t access, uint32_t flags, uint32_t create,
     handle_t *_handle);
 
 extern status_t kern_fs_create_dir(const char *path);
@@ -59,7 +59,7 @@ extern status_t kern_fs_mount(
     const char *device, const char *path, const char *type, uint32_t flags,
     const char *opts);
 extern status_t kern_fs_mount_info(mount_info_t *infos, size_t *_count);
-extern status_t kern_fs_unmount(const char *path, unsigned flags);
+extern status_t kern_fs_unmount(const char *path, uint32_t flags);
 
 extern status_t kern_fs_path(handle_t handle, char *buf, size_t size);
 extern status_t kern_fs_curr_dir(char *buf, size_t size);

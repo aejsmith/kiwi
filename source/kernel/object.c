@@ -730,7 +730,7 @@ static void post_object_event_interrupt(thread_interrupt_t *interrupt) {
  *                      STATUS_SUCCESS then the event is marked as ERROR rather
  *                      than SIGNALLED.
  */
-void object_event_signal_etc(object_event_t *event, unsigned long data, status_t status) {
+void object_event_signal_etc(object_event_t *event, uint64_t data, status_t status) {
     object_wait_t *wait = container_of(event, object_wait_t, event);
     
     wait->status = status;
@@ -765,7 +765,7 @@ void object_event_signal_etc(object_event_t *event, unsigned long data, status_t
              *    which would prevent usage of this function from interrupt
              *    context.
              */
-            unsigned expected = 0;
+            uint32_t expected = 0;
             if (atomic_compare_exchange_strong(&wait->interrupt_state, &expected, 1)) {
                 wait->interrupt->priority   = wait->priority;
                 wait->interrupt->post_cb    = post_object_event_interrupt;
@@ -798,16 +798,16 @@ void object_event_signal_etc(object_event_t *event, unsigned long data, status_t
  * @param event         Object event structure.
  * @param data          Event data to return to waiter.
  */
-void object_event_signal(object_event_t *event, unsigned long data) {
+void object_event_signal(object_event_t *event, uint64_t data) {
     object_event_signal_etc(event, data, STATUS_SUCCESS);
 }
 
 /** Notifier function to use for object waiting.
  * @param arg1          Unused.
  * @param arg2          Event structure pointer.
- * @param arg3          Data for the event (unsigned long cast to void *). */
+ * @param arg3          Data for the event (uint64_t cast to void *). */
 void object_event_notifier(void *arg1, void *arg2, void *arg3) {
-    object_event_signal(arg2, (unsigned long)arg3);
+    object_event_signal(arg2, (uint64_t)arg3);
 }
 
 static char kdb_handle_name_buf[512];
@@ -877,7 +877,7 @@ __init_text void object_init(void) {
  * @param _type         Where to store object type.
  * @return              STATUS_SUCCESS if successful.
  *                      STATUS_INVALID_HANDLE if handle is invalid. */
-status_t kern_object_type(handle_t handle, unsigned *_type) {
+status_t kern_object_type(handle_t handle, uint32_t *_type) {
     object_handle_t *khandle;
     status_t ret = object_handle_lookup(handle, -1, &khandle);
     if (ret != STATUS_SUCCESS)

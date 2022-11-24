@@ -149,7 +149,7 @@ extern status_t vm_region_map(
     unsigned mmflag);
 
 extern status_t vm_map(
-    vm_aspace_t *as, ptr_t *_addr, size_t size, size_t align, unsigned spec,
+    vm_aspace_t *as, ptr_t *_addr, size_t size, size_t align, uint32_t spec,
     uint32_t access, uint32_t flags, object_handle_t *handle, offset_t offset,
     const char *name);
 extern status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);

@@ -664,7 +664,7 @@ status_t file_set_flags(object_handle_t *handle, uint32_t flags) {
  *
  * @return              Status code describing result of the operation.
  */
-status_t file_seek(object_handle_t *handle, unsigned action, offset_t offset, offset_t *_result) {
+status_t file_seek(object_handle_t *handle, uint32_t action, offset_t offset, offset_t *_result) {
     assert(handle);
 
     if (handle->type->id != OBJECT_TYPE_FILE)
@@ -794,7 +794,7 @@ status_t file_sync(object_handle_t *handle) {
  * @param _out_size     Where to store size of data returned.
  * @return              Status code describing result of the operation. */
 status_t file_request(
-    object_handle_t *handle, unsigned request, const void *in, size_t in_size,
+    object_handle_t *handle, uint32_t request, const void *in, size_t in_size,
     void **_out, size_t *_out_size)
 {
     assert(handle);
@@ -1269,7 +1269,7 @@ status_t kern_file_set_flags(handle_t handle, uint32_t flags) {
  *
  * @return              Status code describing result of the operation.
  */
-status_t kern_file_seek(handle_t handle, unsigned action, offset_t offset, offset_t *_result) {
+status_t kern_file_seek(handle_t handle, uint32_t action, offset_t offset, offset_t *_result) {
     status_t ret;
 
     object_handle_t *khandle;
@@ -1361,7 +1361,7 @@ status_t kern_file_sync(handle_t handle) {
  * @param _bytes        Where to store number of bytes copied into output buffer.
  * @return              Status code describing result of the operation. */
 status_t kern_file_request(
-    handle_t handle, unsigned request, const void *in, size_t in_size,
+    handle_t handle, uint32_t request, const void *in, size_t in_size,
     void *out, size_t out_size, size_t *_bytes)
 {
     status_t ret, err;

@@ -133,35 +133,35 @@ static inline void security_context_remove_group(security_context_t *ctx, group_
  * @param ctx           Context to check in.
  * @param priv          Privilege to check for.
  * @return              Whether context has the privilege. */
-static inline bool security_context_has_priv(const security_context_t *ctx, unsigned priv) {
+static inline bool security_context_has_priv(const security_context_t *ctx, uint32_t priv) {
     return (ctx->privs[priv / 32] & (1 << (priv % 32)));
 }
 
 /** Set a privilege in a security context.
  * @param ctx           Context to set in.
  * @param priv          Privilege to set. */
-static inline void security_context_set_priv(security_context_t *ctx, unsigned priv) {
+static inline void security_context_set_priv(security_context_t *ctx, uint32_t priv) {
     ctx->privs[priv / 32] |= (1 << (priv % 32));
 }
 
 /** Remove a privilege from a security context.
  * @param ctx           Context to remove from.
  * @param priv          Privilege to remove. */
-static inline void security_context_unset_priv(security_context_t *ctx, unsigned priv) {
+static inline void security_context_unset_priv(security_context_t *ctx, uint32_t priv) {
     ctx->privs[priv / 32] &= ~(1 << (priv % 32));
 }
 
 /** Set a privilege in a security context.
  * @param ctx           Context to set in.
  * @param priv          Privilege to set. */
-static inline void security_context_set_inherit(security_context_t *ctx, unsigned priv) {
+static inline void security_context_set_inherit(security_context_t *ctx, uint32_t priv) {
     ctx->inherit[priv / 32] |= (1 << (priv % 32));
 }
 
 /** Remove a privilege from a security context.
  * @param context       Context to remove from.
  * @param priv          Privilege to remove. */
-static inline void security_context_unset_inherit(security_context_t *ctx, unsigned priv) {
+static inline void security_context_unset_inherit(security_context_t *ctx, uint32_t priv) {
     ctx->inherit[priv / 32] &= ~(1 << (priv % 32));
 }
 

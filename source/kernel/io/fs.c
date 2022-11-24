@@ -520,7 +520,7 @@ static status_t fs_dentry_lookup(fs_dentry_t *parent, const char *name, fs_dentr
 }
 
 static status_t fs_lookup_internal(
-    char *path, fs_dentry_t *entry, unsigned flags, unsigned nest,
+    char *path, fs_dentry_t *entry, uint32_t flags, uint32_t nest,
     fs_dentry_t **_entry, char **_dev_path)
 {
     status_t ret;
@@ -751,7 +751,7 @@ err_release:
  *
  * @return              Status code describing result of the operation.
  */
-static status_t fs_lookup(const char *path, unsigned flags, fs_dentry_t **_entry, char **_dev_path) {
+static status_t fs_lookup(const char *path, uint32_t flags, fs_dentry_t **_entry, char **_dev_path) {
     assert(path);
     assert(_entry);
 
@@ -1224,7 +1224,7 @@ static const file_ops_t fs_file_ops = {
  * @return              Status code describing result of the operation.
  */
 status_t fs_open(
-    const char *path, uint32_t access, uint32_t flags, unsigned create,
+    const char *path, uint32_t access, uint32_t flags, uint32_t create,
     object_handle_t **_handle)
 {
     status_t ret;
@@ -1657,7 +1657,7 @@ err_unlock:
  *
  * @return              Status code describing result of the operation.
  */
-status_t fs_unmount(const char *path, unsigned flags) {
+status_t fs_unmount(const char *path, uint32_t flags) {
     status_t ret;
 
     if (!security_check_priv(PRIV_FS_MOUNT))
@@ -2129,7 +2129,7 @@ static void dump_children(fs_dentry_t *entry, bool descend) {
      * tree. Don't use recursion, we really don't want to overrun the stack. */
     fs_dentry_t *child = NULL;
     fs_dentry_t *prev = NULL;
-    unsigned depth = 0;
+    uint32_t depth = 0;
     while (true) {
         radix_tree_foreach(&entry->entries, iter) {
             child = radix_tree_entry(iter, fs_dentry_t);
@@ -2505,7 +2505,7 @@ void fs_shutdown(void) {
  * @return              Status code describing result of the operation.
  */
 status_t kern_fs_open(
-    const char *path, uint32_t access, uint32_t flags, unsigned create,
+    const char *path, uint32_t access, uint32_t flags, uint32_t create,
     handle_t *_handle)
 {
     status_t ret;
@@ -2745,7 +2745,7 @@ status_t kern_fs_mount_info(mount_info_t *infos, size_t *_count) {
  * @return              Status code describing result of the operation.
  */
 
-status_t kern_fs_unmount(const char *path, unsigned flags) {
+status_t kern_fs_unmount(const char *path, uint32_t flags) {
     status_t ret;
 
     if (!path)

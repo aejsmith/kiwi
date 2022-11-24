@@ -1670,7 +1670,7 @@ status_t kern_thread_set_token(handle_t handle) {
  *                      STATUS_INVALID_ARG if code is invalid.
  *                      STATUS_INVALID_ADDR if handler is an invalid address.
  */
-status_t kern_thread_set_exception_handler(unsigned code, exception_handler_t handler) {
+status_t kern_thread_set_exception_handler(uint32_t code, exception_handler_t handler) {
     if (code >= EXCEPTION_MAX) {
         return STATUS_INVALID_ARG;
     } else if (handler && !is_user_address(handler)) {
@@ -1793,7 +1793,7 @@ void kern_thread_exit(int status) {
  * @param in            Pointer to input buffer.
  * @param out           Pointer to output buffer.
  * @return              Status code describing result of the operation. */
-status_t kern_thread_control(unsigned action, const void *in, void *out) {
+status_t kern_thread_control(uint32_t action, const void *in, void *out) {
     switch (action) {
         case THREAD_SET_TLS_ADDR:
             if (!is_user_address(in))

@@ -29,7 +29,7 @@ struct thread_context;
 
 /** Exception information structure. */
 typedef struct exception_info {
-    unsigned code;                          /**< Exception code. */
+    uint32_t code;                          /**< Exception code. */
 
     /** For memory access exceptions, the faulting address. */
     void *addr;

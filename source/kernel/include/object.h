@@ -35,8 +35,8 @@ struct vm_region;
 
 /** Kernel object type structure. */
 typedef struct object_type {
-    unsigned id;                        /**< ID number for the type. */
-    unsigned flags;                     /**< Flags for objects of this type. */
+    uint32_t id;                        /**< ID number for the type. */
+    uint32_t flags;                     /**< Flags for objects of this type. */
 
     /** Close a handle to an object.
      * @param handle        Handle to the object. */
@@ -164,8 +164,8 @@ extern void object_process_clone(struct process *process, struct process *parent
 
 extern void object_thread_cleanup(struct thread *thread);
 
-extern void object_event_signal_etc(object_event_t *event, unsigned long data, status_t status);
-extern void object_event_signal(object_event_t *event, unsigned long data);
+extern void object_event_signal_etc(object_event_t *event, uint64_t data, status_t status);
+extern void object_event_signal(object_event_t *event, uint64_t data);
 
 extern void object_event_notifier(void *arg1, void *arg2, void *arg3);
 

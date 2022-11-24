@@ -107,7 +107,7 @@ extern status_t kern_thread_ipl(uint32_t *_ipl);
 extern status_t kern_thread_set_ipl(uint32_t mode, uint32_t ipl, uint32_t *_prev_ipl);
 extern status_t kern_thread_token(handle_t *_handle);
 extern status_t kern_thread_set_token(handle_t handle);
-extern status_t kern_thread_set_exception_handler(unsigned code, exception_handler_t handler);
+extern status_t kern_thread_set_exception_handler(uint32_t code, exception_handler_t handler);
 extern status_t kern_thread_set_exception_stack(const thread_stack_t *stack);
 
 extern status_t kern_thread_exception(exception_info_t *info);

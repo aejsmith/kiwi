@@ -38,7 +38,7 @@ enum {
 };
 
 extern status_t kern_timer_create(uint32_t flags, handle_t *_handle);
-extern status_t kern_timer_start(handle_t handle, nstime_t interval, unsigned mode);
+extern status_t kern_timer_start(handle_t handle, nstime_t interval, uint32_t mode);
 extern status_t kern_timer_stop(handle_t handle, nstime_t *_rem);
 
 /** Time sources. */
@@ -47,7 +47,7 @@ enum {
     TIME_REAL       = 2,            /**< Real time (time since UNIX epoch). */
 };
 
-extern status_t kern_time_get(unsigned source, nstime_t *_time);
-extern status_t kern_time_set(unsigned source, nstime_t time);
+extern status_t kern_time_get(uint32_t source, nstime_t *_time);
+extern status_t kern_time_set(uint32_t source, nstime_t time);
 
 __KERNEL_EXTERN_C_END

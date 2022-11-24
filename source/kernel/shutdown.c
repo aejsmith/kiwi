@@ -104,7 +104,7 @@ void system_shutdown(unsigned action) {
  *
  * @return              Status code describing result of the operation.
  */
-status_t kern_system_shutdown(unsigned action) {
+status_t kern_system_shutdown(uint32_t action) {
     system_shutdown(action);
     fatal("Shouldn't get here");
 }

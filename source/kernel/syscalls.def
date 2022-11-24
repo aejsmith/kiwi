@@ -38,15 +38,15 @@ type image_id_t int16_t;
 type socklen_t uint32_t;
 type sa_family_t uint16_t;
 
-syscall kern_system_info(uint, ptr_t);
-syscall kern_system_shutdown(int);
+syscall kern_system_info(uint32_t, ptr_t);
+syscall kern_system_shutdown(uint32_t);
 syscall kern_system_fatal(ptr_t);
 
 syscall kern_module_load(ptr_t, ptr_t);
 #syscall kern_module_info(ptr_t, ptr_t);
 
-syscall kern_time_get(uint, ptr_t);
-syscall kern_time_set(uint, ptr_t);
+syscall kern_time_get(uint32_t, ptr_t);
+syscall kern_time_set(uint32_t, ptr_t);
 
 syscall kern_object_type(handle_t, ptr_t);
 syscall kern_object_wait(ptr_t, size_t, uint32_t, nstime_t);
@@ -66,20 +66,20 @@ syscall kern_file_read_dir(handle_t, ptr_t, size_t);
 syscall kern_file_rewind_dir(handle_t);
 syscall kern_file_state(handle_t, ptr_t, ptr_t, ptr_t);
 syscall kern_file_set_flags(handle_t, uint32_t);
-syscall kern_file_seek(handle_t, uint, offset_t, ptr_t);
+syscall kern_file_seek(handle_t, uint32_t, offset_t, ptr_t);
 syscall kern_file_resize(handle_t, offset_t);
 syscall kern_file_info(handle_t, ptr_t);
 syscall kern_file_sync(handle_t);
-syscall kern_file_request(handle_t, uint, ptr_t, size_t, ptr_t, size_t, ptr_t);
+syscall kern_file_request(handle_t, uint32_t, ptr_t, size_t, ptr_t, size_t, ptr_t);
 
-syscall kern_fs_open(ptr_t, uint32_t, uint32_t, uint, ptr_t);
+syscall kern_fs_open(ptr_t, uint32_t, uint32_t, uint32_t, ptr_t);
 syscall kern_fs_create_dir(ptr_t);
 syscall kern_fs_create_pipe(ptr_t);
 syscall kern_fs_create_symlink(ptr_t, ptr_t);
 syscall kern_fs_read_symlink(ptr_t, ptr_t, size_t);
 syscall kern_fs_mount(ptr_t, ptr_t, ptr_t, uint32_t, ptr_t);
 syscall kern_fs_mount_info(ptr_t, ptr_t);
-syscall kern_fs_unmount(ptr_t, uint);
+syscall kern_fs_unmount(ptr_t, uint32_t);
 syscall kern_fs_path(handle_t, ptr_t, size_t);
 syscall kern_fs_set_curr_dir(ptr_t);
 syscall kern_fs_set_root_dir(ptr_t);
@@ -110,9 +110,9 @@ syscall kern_process_status(handle_t, ptr_t, ptr_t);
 syscall kern_process_kill(handle_t, int);
 syscall kern_process_token(ptr_t);
 syscall kern_process_set_token(handle_t);
-syscall kern_process_set_exception_handler(uint, ptr_t);
+syscall kern_process_set_exception_handler(uint32_t, ptr_t);
 syscall kern_process_exit(int);
-syscall kern_process_control(uint, ptr_t, ptr_t) hidden;
+syscall kern_process_control(uint32_t, ptr_t, ptr_t) hidden;
 
 syscall kern_process_group_create(uint32_t, ptr_t);
 syscall kern_process_group_add(handle_t, handle_t);
@@ -130,12 +130,12 @@ syscall kern_thread_ipl(ptr_t);
 syscall kern_thread_set_ipl(uint32_t, uint32_t, ptr_t);
 syscall kern_thread_token(ptr_t);
 syscall kern_thread_set_token(handle_t);
-syscall kern_thread_set_exception_handler(uint, ptr_t);
+syscall kern_thread_set_exception_handler(uint32_t, ptr_t);
 syscall kern_thread_set_exception_stack(ptr_t);
 syscall kern_thread_exception(ptr_t);
 syscall kern_thread_sleep(nstime_t, ptr_t);
 syscall kern_thread_exit(int) wrapped;
-syscall kern_thread_control(uint, ptr_t, ptr_t) hidden;
+syscall kern_thread_control(uint32_t, ptr_t, ptr_t) hidden;
 syscall kern_thread_restore() hidden;
 
 syscall kern_port_create(ptr_t);
@@ -163,8 +163,8 @@ syscall kern_futex_wait(ptr_t, int32_t, nstime_t);
 syscall kern_futex_wake(ptr_t, size_t, ptr_t);
 syscall kern_futex_requeue(ptr_t, int32_t, size_t, ptr_t, ptr_t);
 
-syscall kern_timer_create(int, ptr_t);
-syscall kern_timer_start(handle_t, nstime_t, int);
+syscall kern_timer_create(uint32_t, ptr_t);
+syscall kern_timer_start(handle_t, nstime_t, uint32_t);
 syscall kern_timer_stop(handle_t, ptr_t);
 
 syscall kern_image_register(image_id_t, ptr_t) hidden;
