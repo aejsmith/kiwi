@@ -32,8 +32,6 @@
 #include <io/file.h>
 #include <io/request.h>
 
-#include <ipc/ipc.h>
-
 #include <kernel/status.h>
 #include <kernel/user_file.h>
 
@@ -43,6 +41,8 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
+
+#include <proc/ipc.h>
 
 #include <assert.h>
 

@@ -19,14 +19,14 @@
  * @brief               IPC interface.
  */
 
-#include <ipc/ipc.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
+
+#include <proc/ipc.h>
 
 #include <security/security.h>
 

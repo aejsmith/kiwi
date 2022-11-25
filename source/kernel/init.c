@@ -24,8 +24,6 @@
 
 #include <io/fs.h>
 
-#include <ipc/ipc.h>
-
 #include <lib/random.h>
 #include <lib/string.h>
 
@@ -36,6 +34,7 @@
 #include <mm/slab.h>
 #include <mm/vm.h>
 
+#include <proc/ipc.h>
 #include <proc/process.h>
 #include <proc/sched.h>
 #include <proc/thread.h>

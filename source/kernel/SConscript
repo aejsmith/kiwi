@@ -42,7 +42,6 @@ dirs = feature_dirs(config, [
     'console',
     'device',
     'io',
-    'ipc',
     'lib',
     'mm',
     'net',

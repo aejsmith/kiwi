@@ -31,8 +31,6 @@
 
 #include <io/fs.h>
 
-#include <ipc/ipc.h>
-
 #include <kernel/private/process.h>
 #include <kernel/process_group.h>
 
@@ -42,6 +40,7 @@
 #include <mm/slab.h>
 #include <mm/vm.h>
 
+#include <proc/ipc.h>
 #include <proc/process.h>
 #include <proc/thread.h>
 
