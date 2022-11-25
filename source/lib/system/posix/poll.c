@@ -97,8 +97,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 
         switch (type) {
             case OBJECT_TYPE_FILE:
-                if (fds[i].events & ~(POLLIN | POLLOUT | POLLPRI | POLLRDBAND)) {
-                    core_log(CORE_LOG_ERROR, "0x%x", fds[i].events);
+                if (fds[i].events & ~(POLLIN | POLLOUT | POLLPRI | POLLHUP | POLLRDBAND)) {
                     errno = ENOTSUP;
                     return -1;
                 }
@@ -116,6 +115,15 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
                     if (!add_event(
                             &events, &convert, &count, fds[i].fd,
                             FILE_EVENT_WRITABLE, i, POLLOUT))
+                    {
+                        return -1;
+                    }
+                }
+
+                if (fds[i].events & POLLHUP) {
+                    if (!add_event(
+                            &events, &convert, &count, fds[i].fd,
+                            FILE_EVENT_HANGUP, i, POLLHUP))
                     {
                         return -1;
                     }

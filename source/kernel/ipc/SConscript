@@ -19,5 +19,4 @@ from util import feature_sources
 
 kern_sources += feature_sources(config, [
     'ipc.c',
-    'pipe.c',
 ])

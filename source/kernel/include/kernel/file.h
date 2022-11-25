@@ -70,23 +70,32 @@ typedef struct io_vec {
 } io_vec_t;
 
 /** Access rights for files. */
-#define FILE_ACCESS_READ    (1<<0)      /**< File can be read. */
-#define FILE_ACCESS_WRITE   (1<<1)      /**< File can be written. */
-#define FILE_ACCESS_EXECUTE (1<<2)      /**< File can be executed. */
+enum {
+    FILE_ACCESS_READ    = (1<<0),       /**< File can be read. */
+    FILE_ACCESS_WRITE   = (1<<1),       /**< File can be written. */
+    FILE_ACCESS_EXECUTE = (1<<2),       /**< File can be executed. */
+};
 
 /** Behaviour flags for file handles. */
-#define FILE_NONBLOCK       (1<<0)      /**< I/O operations on the handle should not block. */
-#define FILE_APPEND         (1<<1)      /**< Before each write, offset is set to the end of the file. */
-#define FILE_DIRECT         (1<<2)      /**< I/O operations bypass cache and directly access device. */
+enum {
+    FILE_NONBLOCK       = (1<<0),       /**< I/O operations on the handle should not block. */
+    FILE_APPEND         = (1<<1),       /**< Before each write, offset is set to the end of the file. */
+    FILE_DIRECT         = (1<<2),       /**< I/O operations bypass cache and directly access device. */
+};
 
 /** Operations for kern_file_seek(). */
-#define FILE_SEEK_SET       1           /**< Set to the exact position specified. */
-#define FILE_SEEK_ADD       2           /**< Add the supplied value to the current offset. */
-#define FILE_SEEK_END       3           /**< Set to the end of the file plus the supplied value. */
+enum {
+    FILE_SEEK_SET       = 1,            /**< Set to the exact position specified. */
+    FILE_SEEK_ADD       = 2,            /**< Add the supplied value to the current offset. */
+    FILE_SEEK_END       = 3,            /**< Set to the end of the file plus the supplied value. */
+};
 
 /** Events that can occur on file objects. */
-#define FILE_EVENT_READABLE 1           /**< Wait for the device to be readable. */
-#define FILE_EVENT_WRITABLE 2           /**< Wait for the device to be writable. */
+enum {
+    FILE_EVENT_READABLE = 1,            /**< Wait for the device to be readable. */
+    FILE_EVENT_WRITABLE = 2,            /**< Wait for the device to be writable. */
+    FILE_EVENT_HANGUP   = 3,            /**< Wait for the remote end to be closed (sockets, pipes). */
+};
 
 extern status_t kern_file_reopen(handle_t handle, uint32_t access, uint32_t flags, handle_t *_new);
 

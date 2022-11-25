@@ -23,6 +23,7 @@ kern_sources += feature_sources(config, [
     'file_map.c',
     'fs.c',
     'memory_file.c',
+    'pipe.c',
     'request.c',
     'socket.c',
     'user_file.c',

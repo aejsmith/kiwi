@@ -19,10 +19,12 @@
  * @brief               Unidirectional data pipe implementation.
  */
 
+#include <io/file.h>
 #include <io/request.h>
 
-#include <ipc/pipe.h>
+#include <kernel/pipe.h>
 
+#include <lib/notifier.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -31,17 +33,187 @@
 
 #include <proc/thread.h>
 
+#include <sync/mutex.h>
+#include <sync/condvar.h>
+
 #include <assert.h>
 #include <kernel.h>
 #include <object.h>
 #include <status.h>
 
+/** Size of a pipe's data buffer. */
+#define PIPE_SIZE       PAGE_SIZE
+
+/** Indices into elements of pipe_t per-end. */
+enum {
+    PIPE_READ = 0,
+    PIPE_WRITE = 1,
+};
+
+/** Structure containing a pipe. */
+typedef struct pipe {
+    file_t file;                    /**< File header. */
+
+    mutex_t lock;                   /**< Lock to protect pipe. */
+
+    bool open[2];                   /**< Whether each end is open. */
+
+    condvar_t space_cvar;           /**< Condition to wait for space on. */
+    condvar_t data_cvar;            /**< Condition to wait for data on. */
+
+    notifier_t space_notifier;      /**< Notifier for space availability. */
+    notifier_t data_notifier;       /**< Notifier for data availability. */
+    notifier_t hangup_notifier[2];  /**< Notifier for an end being closed. */
+
+    uint8_t *buf;                   /**< Circular data buffer. */
+    size_t start;                   /**< Start position of buffer. */
+    size_t count;                   /**< Number of bytes in buffer. */
+
+    uint32_t id;                    /**< Pipe ID (for debugging purposes). */
+} pipe_t;
+
 /** Next pipe ID (for debug naming). */
 static atomic_uint32_t next_pipe_id = 0;
 
+static void pipe_destroy(pipe_t *pipe) {
+    assert(!mutex_held(&pipe->lock));
+    assert(notifier_empty(&pipe->space_notifier));
+    assert(notifier_empty(&pipe->data_notifier));
+    assert(notifier_empty(&pipe->hangup_notifier[PIPE_READ]));
+    assert(notifier_empty(&pipe->hangup_notifier[PIPE_WRITE]));
+
+    kmem_free(pipe->buf, PIPE_SIZE);
+    kfree(pipe);
+}
+
+static void pipe_file_close(file_handle_t *handle) {
+    pipe_t *pipe = handle->pipe;
+
+    assert(handle->access == FILE_ACCESS_READ || handle->access == FILE_ACCESS_WRITE);
+
+    mutex_lock(&pipe->lock);
+
+    /* This will need changing to refcounts if we add support for reopen. */
+    if (handle->access & FILE_ACCESS_READ) {
+        assert(pipe->open[PIPE_READ]);
+        pipe->open[PIPE_READ] = false;
+
+        /* Wake anyone waiting for space so that they can fail. */
+        condvar_broadcast(&pipe->space_cvar);
+    } else {
+        assert(pipe->open[PIPE_WRITE]);
+        pipe->open[PIPE_WRITE] = false;
+
+        /* Wake anyone waiting for data so that they can fail. */
+        condvar_broadcast(&pipe->data_cvar);
+        notifier_run(&pipe->data_notifier, NULL, false);
+    }
+
+    bool destroy = !pipe->open[PIPE_READ] && !pipe->open[PIPE_WRITE];
+
+    mutex_unlock(&pipe->lock);
+
+    if (destroy)
+        pipe_destroy(pipe);
+}
+
+static char *pipe_file_name(file_handle_t *handle) {
+    pipe_t *pipe = handle->pipe;
+
+    const size_t prefix_len  = strlen("pipe");
+    const size_t u32_max_len = 10;
+    const size_t len         = prefix_len + u32_max_len + 4;
+
+    char *name = kmalloc(len, MM_KERNEL);
+    snprintf(name, len, "pipe:%s%" PRIu32, (handle->access & FILE_ACCESS_READ) ? "<-" : "->", pipe->id);
+    return name;
+}
+
+static char *pipe_file_name_unsafe(file_handle_t *handle, char *buf, size_t size) {
+    pipe_t *pipe = handle->pipe;
+
+    snprintf(buf, size, "pipe:%s%" PRIu32, (handle->access & FILE_ACCESS_READ) ? "<-" : "->", pipe->id);
+    return buf;
+}
+
+static status_t pipe_file_wait(file_handle_t *handle, object_event_t *event) {
+    pipe_t *pipe = handle->pipe;
+
+    MUTEX_SCOPED_LOCK(lock, &pipe->lock);
+
+    uint32_t end       = (handle->access & FILE_ACCESS_WRITE) ? PIPE_WRITE : PIPE_READ;
+    uint32_t other_end = (handle->access & FILE_ACCESS_WRITE) ? PIPE_READ : PIPE_WRITE;
+
+    status_t ret = STATUS_SUCCESS;
+
+    switch (event->event) {
+        case FILE_EVENT_READABLE:
+            /* It'll never become readable if this isn't the read end. */
+            if (end == PIPE_READ) {
+                /* Consider the pipe readable if the other end is closed. */
+                if (pipe->count > 0 || !pipe->open[PIPE_WRITE]) {
+                    object_event_signal(event, 0);
+                } else {
+                    notifier_register(&pipe->data_notifier, object_event_notifier, event);
+                }
+            }
+
+            break;
+        case FILE_EVENT_WRITABLE:
+            if (end == PIPE_WRITE) {
+                /* Pipe is not writable if the other end is closed. */
+                if (pipe->count < PIPE_SIZE && pipe->open[PIPE_READ]) {
+                    object_event_signal(event, 0);
+                } else {
+                    notifier_register(&pipe->space_notifier, object_event_notifier, event);
+                }
+            }
+
+            break;
+        case FILE_EVENT_HANGUP:
+            if (!pipe->open[other_end]) {
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&pipe->hangup_notifier[other_end], object_event_notifier, event);
+            }
+
+            break;
+        default:
+            ret = STATUS_INVALID_EVENT;
+            break;
+    }
+
+    return ret;
+}
+
+static void pipe_file_unwait(file_handle_t *handle, object_event_t *event) {
+    pipe_t *pipe = handle->pipe;
+
+    MUTEX_SCOPED_LOCK(lock, &pipe->lock);
+
+    uint32_t end       = (handle->access & FILE_ACCESS_WRITE) ? PIPE_WRITE : PIPE_READ;
+    uint32_t other_end = (handle->access & FILE_ACCESS_WRITE) ? PIPE_READ : PIPE_WRITE;
+
+    switch (event->event) {
+        case FILE_EVENT_READABLE:
+            if (end == PIPE_READ)
+                notifier_unregister(&pipe->data_notifier, object_event_notifier, event);
+
+            break;
+        case FILE_EVENT_WRITABLE:
+            if (end == PIPE_WRITE)
+                notifier_unregister(&pipe->space_notifier, object_event_notifier, event);
+
+            break;
+        case FILE_EVENT_HANGUP:
+            notifier_unregister(&pipe->hangup_notifier[other_end], object_event_notifier, event);
+            break;
+    }
+}
+
 /** Waits for any amount of data. */
 static status_t wait_data(pipe_t *pipe, bool nonblock) {
-    while (pipe->write_open && pipe->count == 0) {
+    while (pipe->open[PIPE_WRITE] && pipe->count == 0) {
         if (nonblock)
             return STATUS_WOULD_BLOCK;
 
@@ -53,9 +225,9 @@ static status_t wait_data(pipe_t *pipe, bool nonblock) {
     return STATUS_SUCCESS;
 }
 
-/** Waits for at least the specified amount of space. */
+/** Waits for at least the specified amount of space is available. */
 static status_t wait_space(pipe_t *pipe, size_t size, bool nonblock) {
-    while (pipe->read_open && (PIPE_SIZE - pipe->count) < size) {
+    while (pipe->open[PIPE_READ] && (PIPE_SIZE - pipe->count) < size) {
         if (nonblock)
             return STATUS_WOULD_BLOCK;
 
@@ -65,16 +237,16 @@ static status_t wait_space(pipe_t *pipe, size_t size, bool nonblock) {
     }
 
     /* If the read end closes we fail. */
-    return (pipe->read_open) ? STATUS_SUCCESS : STATUS_PIPE_CLOSED;
+    return (pipe->open[PIPE_READ]) ? STATUS_SUCCESS : STATUS_PIPE_CLOSED;
 }
 
-/** Performs I/O on a pipe.
- * @param pipe          Pipe to perform I/O on.
- * @param request       I/O request.
- * @param nonblock      Whether to allow blocking.
- * @return              Status code describing result of the operation. */
-status_t pipe_io(pipe_t *pipe, io_request_t *request, bool nonblock) {
-    mutex_lock(&pipe->lock);
+static status_t pipe_file_io(file_handle_t *handle, io_request_t *request) {
+    pipe_t *pipe = handle->pipe;
+
+    MUTEX_SCOPED_LOCK(lock, &pipe->lock);
+
+    uint32_t flags = file_handle_flags(handle);
+    bool nonblock  = flags & FILE_NONBLOCK;
 
     status_t ret = STATUS_SUCCESS;
 
@@ -149,138 +321,7 @@ status_t pipe_io(pipe_t *pipe, io_request_t *request, bool nonblock) {
         }
     }
 
-    mutex_unlock(&pipe->lock);
     return ret;
-}
-
-/**
- * Waits for a pipe to become readable or writable, and notifies the specified
- * object wait pointer when it is. This is a convenience function, for example
- * for devices that use pipes internally.
- *
- * @param pipe          Pipe to wait for.
- * @param write         Whether to wait to be writable (pipe is classed as
- *                      writable when there is space in the buffer).
- * @param event         Object event structure.
- */
-void pipe_wait(pipe_t *pipe, bool write, object_event_t *event) {
-    mutex_lock(&pipe->lock);
-
-    if (write) {
-        /* Pipe is not writable if the other end is closed. */
-        if (pipe->count < PIPE_SIZE && pipe->read_open) {
-            object_event_signal(event, 0);
-        } else {
-            notifier_register(&pipe->space_notifier, object_event_notifier, event);
-        }
-    } else {
-        /* Consider the pipe readable if the other end is closed. */
-        if (pipe->count > 0 || !pipe->write_open) {
-            object_event_signal(event, 0);
-        } else {
-            notifier_register(&pipe->data_notifier, object_event_notifier, event);
-        }
-    }
-
-    mutex_unlock(&pipe->lock);
-}
-
-/** Stops waiting for a pipe event.
- * @param pipe          Pipe to stop waiting for.
- * @param write         Whether waiting to be writable.
- * @param event         Object event structure. */
-void pipe_unwait(pipe_t *pipe, bool write, object_event_t *event) {
-    notifier_t *notifier = (write) ? &pipe->space_notifier : &pipe->data_notifier;
-    notifier_unregister(notifier, object_event_notifier, event);
-}
-
-static char *pipe_file_name(file_handle_t *handle) {
-    pipe_t *pipe = handle->pipe;
-
-    const size_t prefix_len  = strlen("pipe");
-    const size_t u32_max_len = 10;
-    const size_t len         = prefix_len + u32_max_len + 4;
-
-    char *name = kmalloc(len, MM_KERNEL);
-    snprintf(name, len, "pipe:%s%" PRIu32, (handle->access & FILE_ACCESS_READ) ? "<-" : "->", pipe->id);
-    return name;
-}
-
-static char *pipe_file_name_unsafe(file_handle_t *handle, char *buf, size_t size) {
-    pipe_t *pipe = handle->pipe;
-
-    snprintf(buf, size, "pipe:%s%" PRIu32, (handle->access & FILE_ACCESS_READ) ? "<-" : "->", pipe->id);
-    return buf;
-}
-
-static void pipe_file_close(file_handle_t *handle) {
-    pipe_t *pipe = handle->pipe;
-
-    assert(handle->access == FILE_ACCESS_READ || handle->access == FILE_ACCESS_WRITE);
-
-    mutex_lock(&pipe->lock);
-
-    /* This will need changing to refcounts if we add support for reopen. */
-    if (handle->access & FILE_ACCESS_READ) {
-        assert(pipe->read_open);
-        pipe->read_open = false;
-
-        /* Wake anyone waiting for space so that they can fail. */
-        condvar_broadcast(&pipe->space_cvar);
-    } else {
-        assert(pipe->write_open);
-        pipe->write_open = false;
-
-        /* Wake anyone waiting for data so that they can fail. */
-        condvar_broadcast(&pipe->data_cvar);
-        notifier_run(&pipe->data_notifier, NULL, false);
-    }
-
-    bool destroy = !pipe->read_open && !pipe->write_open;
-
-    mutex_unlock(&pipe->lock);
-
-    if (destroy)
-        pipe_destroy(pipe);
-}
-
-static status_t pipe_file_wait(file_handle_t *handle, object_event_t *event) {
-    pipe_t *pipe = handle->pipe;
-
-    switch (event->event) {
-        case FILE_EVENT_READABLE:
-            /* It'll never become readable if this isn't the read end. */
-            if (handle->access & FILE_ACCESS_READ)
-                pipe_wait(pipe, false, event);
-
-            return STATUS_SUCCESS;
-        case FILE_EVENT_WRITABLE:
-            if (handle->access & FILE_ACCESS_WRITE)
-                pipe_wait(pipe, true, event);
-
-            return STATUS_SUCCESS;
-        default:
-            return STATUS_INVALID_EVENT;
-    }
-}
-
-static void pipe_file_unwait(file_handle_t *handle, object_event_t *event) {
-    pipe_t *pipe = handle->pipe;
-
-    switch (event->event) {
-        case FILE_EVENT_READABLE:
-            pipe_unwait(pipe, false, event);
-            break;
-        case FILE_EVENT_WRITABLE:
-            pipe_unwait(pipe, true, event);
-            break;
-    }
-}
-
-static status_t pipe_file_io(file_handle_t *handle, io_request_t *request) {
-    pipe_t *pipe   = handle->pipe;
-    uint32_t flags = file_handle_flags(handle);
-    return pipe_io(pipe, request, flags & FILE_NONBLOCK);
 }
 
 static void pipe_file_info(file_handle_t *handle, file_info_t *info) {
@@ -298,53 +339,6 @@ static const file_ops_t pipe_file_ops = {
     .io          = pipe_file_io,
     .info        = pipe_file_info,
 };
-
-/** Creates a new pipe.
- * @param mmflag        Allocation flags to use for allocating the pipe buffer.
- * @return              Pointer to pipe, or null on allocation failure. */
-pipe_t *pipe_create(unsigned mmflag) {
-    pipe_t *pipe = kmalloc(sizeof(*pipe), MM_KERNEL);
-
-    mutex_init(&pipe->lock, "pipe_lock", 0);
-    condvar_init(&pipe->space_cvar, "pipe_space_cvar");
-    condvar_init(&pipe->data_cvar, "pipe_data_cvar");
-    notifier_init(&pipe->space_notifier, pipe);
-    notifier_init(&pipe->data_notifier, pipe);
-
-    pipe->id         = atomic_fetch_add(&next_pipe_id, 1);
-    pipe->file.ops   = &pipe_file_ops;
-    pipe->file.type  = FILE_TYPE_PIPE;
-    pipe->read_open  = true;
-    pipe->write_open = true;
-    pipe->start      = 0;
-    pipe->count      = 0;
-
-    pipe->buf = kmem_alloc(PIPE_SIZE, mmflag);
-    if (!pipe->buf) {
-        kfree(pipe);
-        return NULL;
-    }
-
-    return pipe;
-}
-
-/**
- * Destroys a pipe. The caller must ensure that nothing is using the pipe.
- *
- * @param pipe          Pipe to destroy.
- */
-void pipe_destroy(pipe_t *pipe) {
-    assert(!mutex_held(&pipe->lock));
-    assert(notifier_empty(&pipe->space_notifier));
-    assert(notifier_empty(&pipe->data_notifier));
-
-    kmem_free(pipe->buf, PIPE_SIZE);
-    kfree(pipe);
-}
-
-/**
- * System calls.
- */
 
 /**
  * Creates a pipe, which is a undirectional data channel. Two handles are
@@ -381,16 +375,36 @@ status_t kern_pipe_create(
 {
     status_t ret;
 
-    pipe_t *pipe = pipe_create(MM_USER);
-    if (!pipe)
+    pipe_t *pipe = kmalloc(sizeof(*pipe), MM_KERNEL);
+
+    mutex_init(&pipe->lock, "pipe_lock", 0);
+    condvar_init(&pipe->space_cvar, "pipe_space_cvar");
+    condvar_init(&pipe->data_cvar, "pipe_data_cvar");
+    notifier_init(&pipe->space_notifier, pipe);
+    notifier_init(&pipe->data_notifier, pipe);
+    notifier_init(&pipe->hangup_notifier[PIPE_READ], pipe);
+    notifier_init(&pipe->hangup_notifier[PIPE_WRITE], pipe);
+
+    pipe->id               = atomic_fetch_add(&next_pipe_id, 1);
+    pipe->file.ops         = &pipe_file_ops;
+    pipe->file.type        = FILE_TYPE_PIPE;
+    pipe->open[PIPE_READ]  = true;
+    pipe->open[PIPE_WRITE] = true;
+    pipe->start            = 0;
+    pipe->count            = 0;
+
+    pipe->buf = kmem_alloc(PIPE_SIZE, MM_USER);
+    if (!pipe->buf) {
+        kfree(pipe);
         return STATUS_NO_MEMORY;
+    }
 
     /* Prevent another thread coming in and immediately closing the read handle
      * before we've had a chance to try creating the write handle. */
     mutex_lock(&pipe->lock);
 
-    pipe->read_open  = false;
-    pipe->write_open = false;
+    pipe->open[PIPE_READ]  = false;
+    pipe->open[PIPE_WRITE] = false;
 
     handle_t read;
     ret = file_handle_open(&pipe->file, FILE_ACCESS_READ, read_flags, &read, _read);
@@ -400,18 +414,18 @@ status_t kern_pipe_create(
         return ret;
     }
 
-    pipe->read_open = true;
+    pipe->open[PIPE_READ] = true;
 
     ret = file_handle_open(&pipe->file, FILE_ACCESS_WRITE, write_flags, NULL, _write);
     if (ret != STATUS_SUCCESS) {
         mutex_unlock(&pipe->lock);
 
-        /* This should take care of cleaning up since write_open is false. */
+        /* This should take care of cleaning up since open[PIPE_WRITE] is false. */
         object_handle_detach(read, _read);
         return ret;
     }
 
-    pipe->write_open = true;
+    pipe->open[PIPE_WRITE] = true;
 
     mutex_unlock(&pipe->lock);
     return STATUS_SUCCESS;

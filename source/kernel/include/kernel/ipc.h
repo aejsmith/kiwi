@@ -27,13 +27,13 @@
 __KERNEL_EXTERN_C_BEGIN
 
 /** Maximum length of data that can be attached to a message. */
-#define IPC_DATA_MAX                16384
+#define IPC_DATA_MAX            16384
 
 /** Maximum number of messages that can be queued at a time. */
-#define IPC_QUEUE_MAX               256
+#define IPC_QUEUE_MAX           256
 
 /** Number of inline message arguments. */
-#define IPC_MESSAGE_ARGS_COUNT      6
+#define IPC_MESSAGE_ARGS_COUNT  6
 
 /** Structure describing an IPC message. */
 typedef struct ipc_message {
@@ -45,15 +45,21 @@ typedef struct ipc_message {
 } ipc_message_t;
 
 /** IPC message flags. */
-#define IPC_MESSAGE_HANDLE          (1<<0)  /**< Message has an attached handle. */
-#define IPC_MESSAGE_SECURITY        (1<<1)  /**< Message has an attached security context. */
+enum {
+    IPC_MESSAGE_HANDLE          = (1<<0),   /**< Message has an attached handle. */
+    IPC_MESSAGE_SECURITY        = (1<<1),   /**< Message has an attached security context. */
+};
 
 /** IPC port event IDs. */
-#define PORT_EVENT_CONNECTION       0       /**< A connection is being made to the port. */
+enum {
+    PORT_EVENT_CONNECTION       = 1,        /**< A connection is being made to the port. */
+};
 
 /** IPC connection event IDs. */
-#define CONNECTION_EVENT_HANGUP     0       /**< Remote end hung up or port was deleted. */
-#define CONNECTION_EVENT_MESSAGE    1       /**< A message is received. */
+enum {
+    CONNECTION_EVENT_HANGUP     = 1,        /**< Remote end hung up or port was deleted. */
+    CONNECTION_EVENT_MESSAGE    = 2,        /**< A message is received. */
+};
 
 /** Special process port IDs (negative values to distinguish from handles). */
 #define PROCESS_ROOT_PORT           (-2)
