@@ -308,7 +308,8 @@ void TerminalBuffer::output(Character ch, uint32_t flags) {
 
     /* Redraw our previous position to display any newly written character and
      * clear the cursor. */
-    if (m_cursorX != prevX || m_cursorY != prevY)
+    bool isDirty = m_cursorX != prevX || m_cursorY != prevY;
+    if (isDirty)
         m_window.bufferUpdated(prevX, prevY, 1, 1);
 
     /* If we have reached the bottom of the scroll region, scroll. */
@@ -317,6 +318,6 @@ void TerminalBuffer::output(Character ch, uint32_t flags) {
         scrollDown();
     }
 
-    if (m_cursorX != prevX || m_cursorY != prevY)
+    if (isDirty)
         m_window.bufferUpdated(m_cursorX, m_cursorY, 1, 1);
 }
