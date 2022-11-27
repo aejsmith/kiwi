@@ -330,3 +330,17 @@ def add_file_method(env, target, path):
 
 def add_link_method(env, target, path):
     env['MANIFEST'].add_link(path, target)
+
+def get_target_action(target, source, env):
+    manifest = env['MANIFEST']
+    path     = ARGUMENTS.get('MANIFEST_PATH')
+
+    if path:
+        path = os.path.normpath(path).lstrip('/')
+        if path in manifest.entries:
+            entry = manifest.entries[path]
+            if entry.entry_type == ManifestEntryType.File:
+                print(entry.target)
+                return 0
+
+    return 1

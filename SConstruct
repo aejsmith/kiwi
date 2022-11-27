@@ -45,6 +45,7 @@ from kconfig import ConfigParser
 from manager import BuildManager
 from package import PackageRepository
 from toolchain import ToolchainManager
+import manifest
 import util
 import vcs
 
@@ -88,7 +89,7 @@ if not config.configured() or 'config' in COMMAND_LINE_TARGETS:
 
 # Initialise the toolchain manager and add the toolchain build target.
 toolchain = ToolchainManager(config)
-Alias('toolchain', Command('__toolchain', [], Action(toolchain.update, None)))
+util.Phony(host_env, 'toolchain', [], Action(toolchain.update, None))
 
 # If the toolchain is out of date, only allow it to be built.
 if toolchain.check() or 'toolchain' in COMMAND_LINE_TARGETS:
@@ -152,6 +153,9 @@ packages.add_manifests(dist_env['MANIFEST'])
 system_manifest = dist_env.Manifest(os.path.join(build_dir, 'system.manifest'))
 Default(system_manifest)
 
+# Helpers to look up files in the manifest.
+util.Phony(dist_env, 'manifest_get_target', [], Action(manifest.get_target_action, None))
+
 ###############
 # Image build #
 ###############
@@ -191,24 +195,24 @@ if config['ARCH'] == 'amd64':
     #     them. This means SCons doesn't end up checksumming the whole image
     #     files every time we run.
     user_image_parts = File(user_image_path + '.parts')
-    Alias('qemu', dist_env.Command('__qemu', [user_image_parts], Action(
+    util.Phony(dist_env, 'qemu', [user_image_parts], Action(
         '%s -drive format=raw,file="%s" %s' % (qemu_binary, user_image_path + '.system', qemu_opts),
-        None)))
+        None))
 else:
     boot_archive_path = os.path.join(images_dir, 'boot.tar')
     boot_archive = dist_env.BootArchive(boot_archive_path)
     Alias('boot_archive', boot_archive)
 
-    Alias('qemu', dist_env.Command('__qemu', [dist_env['KBOOT'][0], boot_archive_path], Action(
+    util.Phony(dist_env, 'qemu', [dist_env['KBOOT'][0], boot_archive_path], Action(
         qemu_binary + ' -kernel ${SOURCES[0]} -initrd ${SOURCES[1]} ' + qemu_opts,
-        None)))
+        None))
 
 # Helper to run GDB attached to QEMU with the appropriate options for the
 # current configuration.
-Alias('qgdb', dist_env.Command('__qgdb', [], Action(
+util.Phony(dist_env, 'qgdb', [], Action(
     'gdb --eval-command="symbol-file %s" --eval-command="set architecture %s" --eval-command="target remote localhost:1234"' %
         (os.path.join(build_dir, 'kernel', 'kernel-unstripped'), config['GDB_ARCH']),
-    None)))
+    None))
 
 ###############
 # Final steps #
@@ -218,9 +222,7 @@ sysroot_env      = manager['sysroot']
 sysroot_manifest = sysroot_env['MANIFEST']
 
 # Command to update the toolchain sysroot.
-Alias('sysroot',
-    sysroot_env.Command('__sysroot', sysroot_manifest.dependencies,
-        Action(lambda target, source, env: toolchain.sysroot_action(target, source, env), None)))
+util.Phony(sysroot_env, 'sysroot', sysroot_manifest.dependencies, Action(toolchain.sysroot_action, None))
 
 # Generation compilation database.
 compile_commands = host_env.CompilationDatabase(os.path.join('build', 'compile_commands.json'))

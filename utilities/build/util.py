@@ -54,3 +54,7 @@ def Copy(env, dest, src):
     return env.Command(
         dest, src,
         Action(lambda target, source, env: SCons.Defaults.copy_func(target[0], source[0]), None))
+
+# Phony command.
+def Phony(env, name, dependencies, action):
+    return Alias(name, env.Command('__%s' % (name), dependencies, action))
