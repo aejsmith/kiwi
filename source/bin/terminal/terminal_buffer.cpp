@@ -39,6 +39,7 @@ TerminalBuffer::TerminalBuffer(TerminalWindow &window, bool useHistory) :
     m_useHistory    (useHistory),
     m_cursorX       (0),
     m_cursorY       (0),
+    m_pendingEOL    (false),
     m_scrollTop     (0),
     m_scrollBottom  (m_window.rows() - 1)
 {
@@ -225,8 +226,9 @@ void TerminalBuffer::moveCursor(int16_t x, int16_t y) {
 
     uint16_t prevX = m_cursorX;
     uint16_t prevY = m_cursorY;
-    m_cursorX = x;
-    m_cursorY = y;
+    m_cursorX      = x;
+    m_cursorY      = y;
+    m_pendingEOL   = false;
 
     m_window.bufferUpdated(prevX, prevY, 1, 1);
     m_window.bufferUpdated(m_cursorX, m_cursorY, 1, 1);
@@ -264,6 +266,20 @@ void TerminalBuffer::output(Character ch, uint32_t flags) {
         default:
             /* If it is a non-printing character, ignore it. */
             if (ch.ch >= ' ') {
+                if (m_pendingEOL) {
+                    m_pendingEOL = false;
+
+                    /* Run through the whole output again to do this as we
+                     * might need to scroll before we can write the new char. */
+                    Character eol = ch;
+                    eol.ch = '\n';
+                    output(eol, flags);
+
+                    /* Cursor will have changed. */
+                    prevX = m_cursorX;
+                    prevY = m_cursorY;
+                }
+
                 if (flags & kOutput_Insert)
                     insertChars(1);
 
@@ -274,12 +290,24 @@ void TerminalBuffer::output(Character ch, uint32_t flags) {
             break;
     }
 
-    /* If we have reached the edge of the console insert a new line. */
+    /* If we have reached the edge of the buffer move to a new line. */
     if (m_cursorX >= cols) {
-        m_cursorX = 0;
-        m_cursorY++;
+        if (flags & kOutput_DelayEOL) {
+            /* Xterm delayed EOL behaviour - newline is deferred to the next
+             * printable character. An explicit newline in between clears this
+             * so that you only get one newline. */
+            m_cursorX    = cols - 1;
+            m_pendingEOL = true;
+        } else {
+            m_cursorX = 0;
+            m_cursorY++;
+        }
+    } else {
+        m_pendingEOL = false;
     }
 
+    /* Redraw our previous position to display any newly written character and
+     * clear the cursor. */
     if (m_cursorX != prevX || m_cursorY != prevY)
         m_window.bufferUpdated(prevX, prevY, 1, 1);
 

@@ -38,7 +38,7 @@ Xterm::Xterm(TerminalWindow &window) :
     m_mainBuffer     (window, true),
     m_altBuffer      (window, false),
     m_usingAltBuffer (false),
-    m_outputFlags    (0),
+    m_outputFlags    (TerminalBuffer::kOutput_DelayEOL),
     m_escState       (0),
     m_escParamSize   (0),
     m_savedX         (0),

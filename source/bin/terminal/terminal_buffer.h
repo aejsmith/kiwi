@@ -59,6 +59,9 @@ public:
     enum Output {
         /** Insert rather than overwriting characters. */
         kOutput_Insert = (1<<0),
+
+        /** Xterm delayed EOL behaviour. */
+        kOutput_DelayEOL = (1<<1),
     };
 
     struct Character {
@@ -105,6 +108,7 @@ private:
     LineDeque m_history;                /**< Lines in the history. */
     uint16_t m_cursorX;                 /**< X position of cursor. */
     uint16_t m_cursorY;                 /**< Y position of cursor. */
+    bool m_pendingEOL;                  /**< Delayed EOL is pending. */
     uint16_t m_scrollTop;               /**< Top of scroll region. */
     uint16_t m_scrollBottom;            /**< Bottom of scroll region. */
 };
