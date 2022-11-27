@@ -133,6 +133,7 @@ typedef struct tcp_socket {
 
     condvar_t state_cvar;               /**< Condition to wait for state changes on. */
     timer_t close_timer;                /**< Close timeout. */
+    notifier_t hangup_notifier;         /**< Hangup event notifier. */
 } tcp_socket_t;
 
 DEFINE_CLASS_CAST(tcp_socket, net_socket, net);
@@ -631,7 +632,6 @@ static status_t tcp_socket_wait(socket_t *_socket, object_event_t *event) {
             }
 
             break;
-
         case FILE_EVENT_WRITABLE:
             if (socket->tx_buffer.curr_size < socket->tx_buffer.max_size) {
                 object_event_signal(event, 0);
@@ -640,7 +640,14 @@ static status_t tcp_socket_wait(socket_t *_socket, object_event_t *event) {
             }
 
             break;
+        case FILE_EVENT_HANGUP:
+            if (socket->state > TCP_STATE_ESTABLISHED) {
+                object_event_signal(event, 0);
+            } else {
+                notifier_register(&socket->hangup_notifier, object_event_notifier, event);
+            }
 
+            break;
         default:
             ret = STATUS_INVALID_EVENT;
             break;
@@ -658,9 +665,11 @@ static void tcp_socket_unwait(socket_t *_socket, object_event_t *event) {
         case FILE_EVENT_READABLE:
             notifier_unregister(&socket->rx_buffer.notifier, object_event_notifier, event);
             break;
-
         case FILE_EVENT_WRITABLE:
             notifier_unregister(&socket->tx_buffer.notifier, object_event_notifier, event);
+            break;
+        case FILE_EVENT_HANGUP:
+            notifier_unregister(&socket->hangup_notifier, object_event_notifier, event);
             break;
     }
 }
@@ -972,6 +981,7 @@ status_t tcp_socket_create(sa_family_t family, socket_t **_socket) {
     list_init(&socket->rx_ooo);
     condvar_init(&socket->state_cvar, "tcp_socket_state");
     timer_init(&socket->close_timer, "tcp_close_timer", close_timer_func, socket, TIMER_THREAD);
+    notifier_init(&socket->hangup_notifier, socket);
 
     socket->net.socket.ops = &tcp_socket_ops;
     socket->net.protocol   = IPPROTO_TCP;
@@ -1223,9 +1233,9 @@ static void receive_established(tcp_socket_t *socket, const tcp_header_t *header
         flush_tx_buffer(socket);
 
         /* Wake up receivers, we won't accept any more data. */
-        tcp_buffer_t *buffer = &socket->rx_buffer;
         condvar_broadcast(&buffer->cvar);
         notifier_run(&buffer->notifier, NULL, false);
+        notifier_run(&socket->hangup_notifier, NULL, false);
     }
 }
 
