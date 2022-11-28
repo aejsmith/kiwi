@@ -38,6 +38,11 @@ class ManifestEntry:
         result['type'] = self.entry_type.name
         if self.entry_type == ManifestEntryType.File:
             result['checksum'] = self.checksum
+
+            # Write this to give a record of where the file came from in the
+            # build tree. This is used by host utilities outside the build
+            # system to find files.
+            result['source'] = str(self.target)
         elif self.entry_type == ManifestEntryType.Link:
             result['target'] = str(self.target)
         return result

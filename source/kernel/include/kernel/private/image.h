@@ -30,6 +30,7 @@ __KERNEL_EXTERN_C_BEGIN
 /** Structure containing image information for the kernel. */
 typedef struct image_info {
     const char *name;               /**< Name of the image. */
+    const char *path;               /**< Path that the image was loaded from. */
     void *load_base;                /**< Base address of image for relocatable images. */
     size_t load_size;               /**< Size of image for relocatable images. */
     void *symtab;                   /**< Symbol table. */

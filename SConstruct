@@ -173,7 +173,7 @@ dist_env['FS_ARCHIVE'] = File(fs_archive_path)
 
 # Add arch-specific targets to generate images.
 qemu_binary = config['QEMU_BINARY_' + config['ARCH'].upper()]
-qemu_opts  = config['QEMU_OPTS_' + config['ARCH'].upper()]
+qemu_opts   = config['QEMU_OPTS_' + config['ARCH'].upper()]
 if config['ARCH'] == 'amd64':
     iso_image_path = os.path.join(images_dir, 'cdrom.iso')
     iso_image = dist_env.ISOImage(iso_image_path)
@@ -198,6 +198,8 @@ if config['ARCH'] == 'amd64':
     util.Phony(dist_env, 'qemu', [user_image_parts], Action(
         '%s -drive format=raw,file="%s" %s' % (qemu_binary, user_image_path + '.system', qemu_opts),
         None))
+
+    qemu_manifest_path = user_image_path + '.manifest'
 else:
     boot_archive_path = os.path.join(images_dir, 'boot.tar')
     boot_archive = dist_env.BootArchive(boot_archive_path)
@@ -207,12 +209,14 @@ else:
         qemu_binary + ' -kernel ${SOURCES[0]} -initrd ${SOURCES[1]} ' + qemu_opts,
         None))
 
+    qemu_manifest_path = fs_archive_path + '.manifest'
+
 # Helper to run GDB attached to QEMU with the appropriate options for the
 # current configuration.
-util.Phony(dist_env, 'qgdb', [], Action(
-    'gdb --eval-command="symbol-file %s" --eval-command="set architecture %s" --eval-command="target remote localhost:1234"' %
-        (os.path.join(build_dir, 'kernel', 'kernel-unstripped'), config['GDB_ARCH']),
-    None))
+util.Phony(dist_env, 'qgdb', [],
+    Action('gdb ' + \
+        '--eval-command="source utilities/gdb_extensions.py" ' + \
+        '--eval-command="kiwi-connect localhost:1234 %s"' % (qemu_manifest_path)))
 
 ###############
 # Final steps #

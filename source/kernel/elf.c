@@ -858,15 +858,16 @@ static kdb_status_t kdb_cmd_images(int argc, char **argv, kdb_filter_t *filter) 
         return KDB_FAILURE;
     }
 
-    kdb_printf("ID     Base               Size       Name\n");
-    kdb_printf("==     ====               ====       ====\n");
+    kdb_printf("ID     Base               Size       Name                             Path\n");
+    kdb_printf("==     ====               ====       ====                             ====\n");
 
     list_foreach(&process->images, iter) {
         image = list_entry(iter, elf_image_t, header);
 
         kdb_printf(
-            "%-6" PRIu16 " 0x%-16zx 0x%-8zx %s\n",
-            image->id, image->load_base, image->load_size, image->name);
+            "%-6" PRIu16 " 0x%-16zx 0x%-8zx %-32s %s\n",
+            image->id, image->load_base, image->load_size, image->name,
+            (image->path) ? image->path : "<unknown>");
     }
 
     return KDB_SUCCESS;
@@ -998,7 +999,7 @@ status_t kern_image_register(image_id_t id, image_info_t *info) {
         return STATUS_INVALID_ADDR;
     }
 
-    elf_image_t *image = kmalloc(sizeof(*image), MM_KERNEL);
+    elf_image_t *image = kmalloc(sizeof(*image), MM_KERNEL | MM_ZERO);
 
     list_init(&image->header);
 
@@ -1012,13 +1013,15 @@ status_t kern_image_register(image_id_t id, image_info_t *info) {
 
     char *name;
     ret = strndup_from_user(kinfo.name, FS_PATH_MAX, &name);
-    if (ret != STATUS_SUCCESS) {
-        kfree(image);
-        return ret;
-    }
+    if (ret != STATUS_SUCCESS)
+        goto err_free;
 
     image->name = kbasename(name, MM_KERNEL);
     kfree(name);
+
+    ret = strndup_from_user(kinfo.path, FS_PATH_MAX, &image->path);
+    if (ret != STATUS_SUCCESS)
+        goto err_free;
 
     mutex_lock(&curr_proc->lock);
 
@@ -1027,11 +1030,8 @@ status_t kern_image_register(image_id_t id, image_info_t *info) {
 
         if (exist->id == id) {
             mutex_unlock(&curr_proc->lock);
-
-            kfree(image->name);
-            kfree(image);
-
-            return STATUS_ALREADY_EXISTS;
+            ret = STATUS_ALREADY_EXISTS;
+            goto err_free;
         }
     }
 
@@ -1044,6 +1044,12 @@ status_t kern_image_register(image_id_t id, image_info_t *info) {
         image->id, image->name, curr_proc->id, image->load_base, image->load_size);
 
     return STATUS_SUCCESS;
+
+err_free:
+    kfree(image->path);
+    kfree(image->name);
+    kfree(image);
+    return ret;
 }
 
 /** Unregister an ELF image.

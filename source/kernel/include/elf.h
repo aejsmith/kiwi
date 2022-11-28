@@ -34,14 +34,16 @@ struct vm_aspace;
 /** ELF image information structure. */
 typedef struct elf_image {
     list_t header;                  /**< List to loaded image list. */
+    /* Note that if this is ever reordered, gdb_extensions must be updated. */
 
     image_id_t id;                  /**< ID of the image. */
     char *name;                     /**< Name of the image. */
+    char *path;                     /**< Path the image was loaded from (user only). */
     ptr_t load_base;                /**< Base address of image.. */
     size_t load_size;               /**< Total size of image. */
-    elf_ehdr_t *ehdr;               /**< ELF executable header. */
+    elf_ehdr_t *ehdr;               /**< ELF executable header (modules only). */
     elf_phdr_t *phdrs;              /**< Program headers (only valid during loading). */
-    elf_shdr_t *shdrs;              /**< ELF section headers. */
+    elf_shdr_t *shdrs;              /**< ELF section headers (modules only). */
 
     /** Symbol/string tables.
      * @warning             For user images, these are user pointers. */

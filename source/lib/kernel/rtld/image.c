@@ -484,6 +484,7 @@ static status_t load_image(const char *path, int type, void **_entry, rtld_image
      * contains exported symbols (perhaps only for debug builds). */
     image_info_t info;
     info.name        = (type == ELF_ET_DYN) ? image->name : image->path;
+    info.path        = image->path;
     info.load_base   = image->load_base;
     info.load_size   = image->load_size;
     info.symtab      = (void *)image->dynamic[ELF_DT_SYMTAB];
@@ -631,6 +632,7 @@ status_t rtld_init(void **_entry) {
     /* Register the image with the kernel. */
     image_info_t info;
     info.name        = image->name;
+    info.path        = image->path;
     info.load_base   = image->load_base;
     info.load_size   = image->load_size;
     info.symtab      = (void *)image->dynamic[ELF_DT_SYMTAB];

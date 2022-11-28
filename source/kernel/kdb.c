@@ -1673,21 +1673,3 @@ __init_text void kdb_init(void) {
         kdb_register_command("watch", "Create, list and remove watchpoints.", kdb_cmd_watch);
     #endif
 }
-
-/**
- * Debugging helper functions.
- *
- * These are here for use with GDB attached to the kernel to access things
- * which are not easy to access within GDB.
- */
-
-#undef curr_thread
-#undef curr_cpu
-
-thread_t *curr_thread(void) {
-    return arch_curr_thread();
-
-}
-cpu_t *curr_cpu(void) {
-    return arch_curr_cpu();
-}
