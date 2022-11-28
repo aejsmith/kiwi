@@ -408,9 +408,14 @@ static status_t load_module_sections(elf_image_t *image, object_handle_t *handle
     image->load_size = 0;
     for (size_t i = 0; i < image->ehdr->e_shnum; i++) {
         elf_shdr_t *shdr = get_image_section(image, i);
+
         switch (shdr->sh_type) {
             case ELF_SHT_PROGBITS:
             case ELF_SHT_NOBITS:
+                if (!(shdr->sh_flags & ELF_SHF_ALLOC))
+                    continue;
+
+                /* Fallthrough */
             case ELF_SHT_STRTAB:
             case ELF_SHT_SYMTAB:
                 if (shdr->sh_addralign)
@@ -438,6 +443,9 @@ static status_t load_module_sections(elf_image_t *image, object_handle_t *handle
 
         switch (shdr->sh_type) {
             case ELF_SHT_NOBITS:
+                if (!(shdr->sh_flags & ELF_SHF_ALLOC))
+                    continue;
+
                 if (shdr->sh_addralign)
                     dest = round_up(dest, shdr->sh_addralign);
 
@@ -451,6 +459,10 @@ static status_t load_module_sections(elf_image_t *image, object_handle_t *handle
                 dest += shdr->sh_size;
                 break;
             case ELF_SHT_PROGBITS:
+                if (!(shdr->sh_flags & ELF_SHF_ALLOC))
+                    continue;
+
+                /* Fallthrough */
             case ELF_SHT_STRTAB:
             case ELF_SHT_SYMTAB:
                 if (shdr->sh_addralign)
