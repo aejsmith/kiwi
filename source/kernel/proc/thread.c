@@ -738,10 +738,11 @@ void thread_at_kernel_exit(syscall_t *syscall, unsigned long ret) {
 
         spinlock_lock(&curr_thread->lock);
 
+        thread_clear_flag(curr_thread, THREAD_INTERRUPTED);
+
         if (!list_empty(&curr_thread->interrupts)) {
             thread_interrupt_t *interrupt = list_first(&curr_thread->interrupts, thread_interrupt_t, header);
             list_remove(&interrupt->header);
-            thread_clear_flag(curr_thread, THREAD_INTERRUPTED);
 
             assert(interrupt->priority >= curr_thread->ipl);
 
