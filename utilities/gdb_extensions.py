@@ -14,7 +14,6 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-from importlib.resources import path
 import os
 import sys
 sys.path = [os.path.abspath(os.path.join('utilities', 'build'))] + sys.path
@@ -46,15 +45,20 @@ class KiwiManifest:
             entry = self.manifest[path]
             if entry['type'] == 'File':
                 return entry['source']
+            elif entry['type'] == 'Link':
+                target = os.path.join(os.path.dirname(path), entry['target'])
+                return self.get_source_path(target)
 
         return None
 
 kiwi_manifest = KiwiManifest()
 
-ELF_SHT_PROGBITS = 1
-ELF_SHT_NOBITS = 8
+elf_sh_types = {
+    'SHT_PROGBITS': 1,
+    'SHT_NOBITS': 8,
+}
 
-ELF_SHF_ALLOC = 0x2
+SHF_ALLOC = 0x2
 
 class KiwiImage:
     name        = ''
@@ -77,26 +81,48 @@ class KiwiImage:
             path = os.path.join(search_path, self.name)
         return kiwi_manifest.get_source_path(path)
 
-    # Get a map of sections to their load address.
-    def get_sections(self, types):
+    # Get a map of sections to their load address according to kernel in-memory
+    # ELF headers (only for kernel modules).
+    def get_kern_sections(self, types):
         e_shnum    = int(self.ehdr['e_shnum'])
         e_shstrndx = int(self.ehdr['e_shstrndx'])
         shstrtab   = self.shdrs[e_shstrndx]['sh_addr'].cast(gdb.lookup_type('char').pointer())
 
         sections = {}
 
+        type_vals = [elf_sh_types[t] for t in types]
         for i in range(0, e_shnum):
             shdr     = self.shdrs[i]
             sh_name  = shdr['sh_name']
             sh_type  = shdr['sh_type']
             sh_flags = shdr['sh_flags']
 
-            if sh_flags & ELF_SHF_ALLOC and sh_type in types and int(sh_name) != 0:
+            if sh_flags & SHF_ALLOC and sh_type in type_vals and int(sh_name) != 0:
                 name = shstrtab[sh_name].address.string()
                 if name:
                     sections[name] = int(shdr['sh_addr'])
 
         return sections
+
+    # Get a map of sections to their load address by parsing the source ELF file.
+    def get_file_sections(self, source_path, types):
+        from elftools.elf.elffile import ELFFile
+
+        try:
+            sections = {}
+
+            with open(source_path, 'rb') as file:
+                elf = ELFFile(file)
+                for t in types:
+                    for shdr in elf.iter_sections(t):
+                        sh_flags = shdr['sh_flags']
+                        if sh_flags & SHF_ALLOC:
+                            sections[shdr.name] = int(shdr['sh_addr']) + self.load_base
+
+            return sections
+        except Exception as e:
+            print("Failed to read image '%s': %s" % (source_path, e))
+            return {}
 
 class KiwiTarget:
     def get_curr_proc(self):
@@ -122,39 +148,6 @@ class KiwiTarget:
             iter = iter.dereference()['next']
 
         return images
-
-    # Load symbol files for all kernel modules.
-    def load_kernel_modules(self):
-        images = self.get_images(self.get_kernel_proc())
-        for image in images:
-            # Ignore the kernel.
-            if image.name == 'kernel':
-                continue
-
-            # Try to find the file. Kernel doesn't track paths for modules so
-            # look up in the modules directory.
-            source_path = image.find_source_path('system/kernel/modules')
-            if not source_path:
-                print("Could not find file for module '%s'!" % (image.name))
-                continue
-
-            # Use the unstripped version from the build.
-            source_path += '-unstripped'
-
-            # Get loadable sections.
-            sections = image.get_sections([ELF_SHT_NOBITS, ELF_SHT_PROGBITS])
-            if not '.text' in sections:
-                print("Could not find text address for module '%s'!" % (image.name))
-                continue
-
-            text_addr = sections['.text']
-
-            cmd = 'add-symbol-file %s 0x%x' % (source_path, text_addr)
-            for (name, addr) in sections.items():
-                if name != '.text':
-                    cmd += ' -s %s 0x%x' % (name, addr)
-
-            gdb.execute(cmd)
 
 class KiwiAMD64Target(KiwiTarget):
     gdb_arch = 'i386:x86-64:intel'
@@ -210,11 +203,123 @@ class KiwiConnectCommand(gdb.Command):
         gdb.execute('set architecture %s' % (kiwi_target.gdb_arch))
         gdb.execute('target remote %s' % (argv[0]))
 
-        kiwi_target.load_kernel_modules()
+        self.load_kernel_modules()
 
         gdb.execute('frame')
 
+    # Load symbol files for all kernel modules.
+    def load_kernel_modules(self):
+        images = kiwi_target.get_images(kiwi_target.get_kernel_proc())
+        for image in images:
+            # Ignore the kernel.
+            if image.name == 'kernel':
+                continue
+
+            # Try to find the file. Kernel doesn't track paths for modules so
+            # look up in the modules directory.
+            source_path = image.find_source_path('system/kernel/modules')
+            if not source_path:
+                print("Could not find file for module '%s'!" % (image.name))
+                continue
+
+            # Use the unstripped version from the build.
+            source_path += '-unstripped'
+
+            # Get loadable sections. For modules, we load this off the target
+            # rather than parsing the file because it means we can get the load
+            # addresses without having to duplicate exactly how the kernel
+            # assigns section addresses.
+            sections = image.get_kern_sections(['SHT_NOBITS', 'SHT_PROGBITS'])
+            if not '.text' in sections:
+                print("Could not find text address for module '%s'!" % (image.name))
+                continue
+
+            text_addr = sections['.text']
+
+            cmd = 'add-symbol-file %s 0x%x' % (source_path, text_addr)
+            for (name, addr) in sections.items():
+                if name != '.text':
+                    cmd += ' -s %s 0x%x' % (name, addr)
+
+            gdb.execute(cmd)
+
 KiwiConnectCommand("kiwi-connect", gdb.COMMAND_USER)
+
+class KiwiListModulesCommand(gdb.Command):
+    """Lists loaded kernel modules."""
+
+    def invoke(self, args, from_tty):
+        images = kiwi_target.get_images(kiwi_target.get_kernel_proc())
+        for image in images:
+            if image.name == 'kernel':
+                continue
+
+            source_path = image.find_source_path('system/kernel/modules')
+            if not source_path:
+                print("Could not find file for module '%s'!" % (image.name))
+                continue
+
+            print('%s @ 0x%x -> %s' % (image.name, image.load_base, source_path))
+
+KiwiListModulesCommand("kiwi-list-modules", gdb.COMMAND_USER)
+
+class KiwiListImagesCommand(gdb.Command):
+    """Lists loaded images for the current process."""
+
+    def invoke(self, args, from_tty):
+        proc = kiwi_target.get_curr_proc()
+        if proc == kiwi_target.get_kernel_proc():
+            return
+
+        images = kiwi_target.get_images(proc)
+        for image in images:
+            source_path = image.find_source_path()
+            if not source_path:
+                print("Could not find file for image '%s'!" % (image.name))
+                continue
+
+            print('%s @ 0x%x -> %s' % (image.name, image.load_base, source_path))
+
+KiwiListImagesCommand("kiwi-list-images", gdb.COMMAND_USER)
+
+class KiwiLoadImages(gdb.Command):
+    """Loads images for the current user process."""
+
+    def invoke(self, args, from_tty):
+        try:
+            import elftools
+        except:
+            raise gdb.GdbError('This command requires pyelftools to be installed.')
+
+        proc = kiwi_target.get_curr_proc()
+        if proc == kiwi_target.get_kernel_proc():
+            print('Process is the kernel process, nothing to do')
+            return
+
+        images = kiwi_target.get_images(proc)
+        for image in images:
+            source_path = image.find_source_path()
+            if not source_path:
+                print("Could not find file for image '%s'!" % (image.name))
+                continue
+
+            # For user images, we have to parse the file, because the kernel
+            # doesn't keep around section headers for them.
+            sections = image.get_file_sections(source_path, ['SHT_NOBITS', 'SHT_PROGBITS'])
+            if not '.text' in sections:
+                print("Could not find text address for image '%s'!" % (image.name))
+                continue
+
+            text_addr = sections['.text']
+
+            cmd = 'add-symbol-file %s 0x%x' % (source_path, text_addr)
+            for (name, addr) in sections.items():
+                if name != '.text':
+                    cmd += ' -s %s 0x%x' % (name, addr)
+
+            gdb.execute(cmd)
+
+KiwiLoadImages("kiwi-load-images", gdb.COMMAND_USER)
 
 class KiwiCurrArchThreadFunction(gdb.Function):
     """Return the current arch_thread_t."""
