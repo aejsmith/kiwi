@@ -64,6 +64,8 @@ typedef struct page_cache {
 
 extern const vm_region_ops_t page_cache_region_ops;
 
+extern status_t page_cache_flush_page(page_t *page);
+
 extern status_t page_cache_io(page_cache_t *cache, struct io_request *request);
 extern status_t page_cache_read(page_cache_t *cache, void *buf, size_t size, offset_t offset, size_t *_bytes);
 extern status_t page_cache_write(page_cache_t *cache, const void *buf, size_t size, offset_t offset, size_t *_bytes);

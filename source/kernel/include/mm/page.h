@@ -33,14 +33,6 @@
 
 struct page;
 
-/** Interface from the memory manager to a page's owner. */
-typedef struct page_ops {
-    /** Write back a dirty page.
-     * @param page          Page to write back.
-     * @return              Status code describing result of the operation. */
-    status_t (*flush_page)(struct page *page);
-} page_ops_t;
-
 /** Structure describing a page in memory. */
 typedef struct page {
     list_t header;                  /**< Link to page queue. */
@@ -52,7 +44,6 @@ typedef struct page {
     atomic_uint16_t flags;          /**< Flags for the page. */
 
     /** Information about how the page is being used. */
-    const page_ops_t *ops;          /**< Operations for the page. */
     void *private;                  /**< Private data pointer for the owner. */
     offset_t offset;                /**< Offset into the owner of the page. */
     refcount_t count;               /**< Reference count for use by owner. */
@@ -75,10 +66,10 @@ enum {
 
     /**
      * Pages which have been modified and need to be written to their source.
-     * There is a special thread (the page writer) that periodically takes
-     * pages off this queue and writes them. This is used by the cache system
-     * to ensure that modifications to data get written to the source soon,
-     * rather than staying in memory for a long time without being written.
+     * There is a thread (the page writer) that periodically takes pages off
+     * this queue and writes them. This is used by the cache system to ensure
+     * that modifications to data get written to the source soon, rather than
+     * staying in memory for a long time without being written.
      */
     PAGE_STATE_CACHED_DIRTY,
 

@@ -71,6 +71,7 @@
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
+#include <mm/page_cache.h>
 #include <mm/phys.h>
 
 #include <proc/thread.h>
@@ -173,11 +174,9 @@ static void page_writer(void *arg1, void *arg2) {
             spinlock_unlock(&queue->lock);
 
             /* Write out the page. */
-            if (page->ops && page->ops->flush_page) {
-                if (page->ops->flush_page(page) == STATUS_SUCCESS) {
-                    dprintf("page: page writer wrote page 0x%" PRIxPHYS "\n", page->addr);
-                    written++;
-                }
+            if (page_cache_flush_page(page) == STATUS_SUCCESS) {
+                dprintf("page: page writer wrote page 0x%" PRIxPHYS "\n", page->addr);
+                written++;
             }
 
             spinlock_lock(&queue->lock);
@@ -316,7 +315,6 @@ static void page_free_internal(page_t *page) {
     /* Reset the page structure to a clear state. */
     atomic_store(&page->flags, 0);
     page->state   = PAGE_STATE_FREE;
-    page->ops     = NULL;
     page->private = NULL;
 
     /* Push it onto the appropriate list. */
@@ -685,7 +683,6 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
         kdb_printf("=================================================\n");
         kdb_printf("state:   %d\n", page->state);
         kdb_printf("flags:   0x%x\n", page_flags(page));
-        kdb_printf("ops:     %p\n", page->ops);
         kdb_printf("private: %p\n", page->private);
         kdb_printf("offset:  %" PRIu64 "\n", page->offset);
         kdb_printf("count:   %d\n", page->count);

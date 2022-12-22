@@ -47,8 +47,6 @@
 #   define dprintf(fmt...)
 #endif
 
-static const page_ops_t page_cache_page_ops;
-
 /** Slab cache for allocating page cache structures. */
 static slab_cache_t *page_cache_cache;
 
@@ -156,7 +154,6 @@ static status_t page_cache_get_page_internal(
     }
 
     /* Cache the page and unlock. */
-    page->ops     = &page_cache_page_ops;
     page->private = cache;
     page->offset  = offset;
 
@@ -299,8 +296,8 @@ static void page_cache_unmap_page(
     mutex_unlock(&cache->lock);
 }
 
-/** Flush changes to a page from a cache. */
-static status_t page_cache_flush_page(page_t *page) {
+/** Flush changes to a cached page. */
+status_t page_cache_flush_page(page_t *page) {
     /* Must be careful - another thread could be destroying the cache.
      * FIXME: wut? */
     page_cache_t *cache = page->private;
@@ -318,11 +315,6 @@ static status_t page_cache_flush_page(page_t *page) {
     mutex_unlock(&cache->lock);
     return (ret == STATUS_SUCCESS);
 }
-
-/** Page cache page operations. */
-static const page_ops_t page_cache_page_ops = {
-    .flush_page = page_cache_flush_page,
-};
 
 /** Get a page from a cache. */
 static status_t page_cache_get_page(vm_region_t *region, offset_t offset, page_t **_page) {
