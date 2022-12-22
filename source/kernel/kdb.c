@@ -534,7 +534,7 @@ static bool kdb_line_complete(kdb_read_line_t *state) {
     list_foreach(&kdb_commands, iter) {
         kdb_command_desc_t *cmd = list_entry(iter, kdb_command_desc_t, header);
 
-        if (state->length >= strlen(cmd->name)) {
+        if (state->length > strlen(cmd->name)) {
             continue;
         } else if (strncmp(state->buffer, cmd->name, state->length) == 0) {
             if (++matches == 1)
@@ -560,7 +560,7 @@ static bool kdb_line_complete(kdb_read_line_t *state) {
         list_foreach(&kdb_commands, iter) {
             kdb_command_desc_t *cmd = list_entry(iter, kdb_command_desc_t, header);
 
-            if (state->length >= strlen(cmd->name)) {
+            if (state->length > strlen(cmd->name)) {
                 continue;
             } else if (strncmp(state->buffer, cmd->name, state->length) != 0) {
                 continue;
