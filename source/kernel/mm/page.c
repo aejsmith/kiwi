@@ -683,9 +683,8 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
         kdb_printf("=================================================\n");
         kdb_printf("state:   %d\n", page->state);
         kdb_printf("flags:   0x%x\n", page_flags(page));
-        kdb_printf("private: %p\n", page->private);
-        kdb_printf("offset:  %" PRIu64 "\n", page->offset);
         kdb_printf("count:   %d\n", page->count);
+        kdb_printf("private: %p\n", page->private);
     } else {
         kdb_printf("Start              End                Freelist Pages\n");
         kdb_printf("=====              ===                ======== =====\n");

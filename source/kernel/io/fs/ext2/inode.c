@@ -260,7 +260,8 @@ void ext2_inode_put(ext2_inode_t *inode) {
     }
 
     /* Discard outstanding writes if the file is free. */
-    // TODO: How to handle write errors?
+    // TODO: How to handle write errors? The cache is currently not freed if
+    // this fails!
     page_cache_destroy(inode->cache, is_free);
 
     file_map_destroy(inode->map);

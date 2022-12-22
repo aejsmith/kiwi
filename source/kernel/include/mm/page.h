@@ -44,10 +44,8 @@ typedef struct page {
     atomic_uint16_t flags;          /**< Flags for the page. */
 
     /** Information about how the page is being used. */
-    void *private;                  /**< Private data pointer for the owner. */
-    offset_t offset;                /**< Offset into the owner of the page. */
     refcount_t count;               /**< Reference count for use by owner. */
-    avl_tree_node_t avl_link;       /**< Link to AVL tree for use by owner. */
+    void *private;                  /**< Private data pointer for the owner. */
 } page_t;
 
 /** Possible states of a page. */

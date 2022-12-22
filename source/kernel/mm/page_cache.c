@@ -19,8 +19,9 @@
  * @brief               Page-based data cache.
  *
  * TODO:
- *  - Put pages in the pageable queue.
  *  - Implement nonblocking I/O?
+ *  - Maybe a hash table or a multi-level array would be more appropriate than
+ *    an AVL tree for the page tree.
  */
 
 #include <lib/string.h>
@@ -47,17 +48,52 @@
 #   define dprintf(fmt...)
 #endif
 
-/** Slab cache for allocating page cache structures. */
+/**
+ * Per-page data structure. This contains tracking information for each cached
+ * page. These used to be a part of page_t, but they were split out so that we
+ * don't need to take up space in every page_t for things that are only needed
+ * when a page is used by the page cache.
+ */
+typedef struct page_cache_entry {
+    /** Link to cache pages tree. Key is used to get page offset. */
+    avl_tree_node_t link;
+
+    page_cache_t *cache;            /**< Owning cache. */
+    page_t *page;                   /**< Allocated page. */
+} page_cache_entry_t;
+
+/** Slab cache for allocating page_cache_t. */
 static slab_cache_t *page_cache_cache;
 
-/** Constructor for page cache structures.
- * @param obj           Object to construct.
- * @param data          Unused. */
+/** Slab cache for allocating page_cache_entry_t. */
+static slab_cache_t *page_cache_entry_cache;
+
 static void page_cache_ctor(void *obj, void *data) {
     page_cache_t *cache = obj;
 
     mutex_init(&cache->lock, "page_cache_lock", 0);
     avl_tree_init(&cache->pages);
+}
+
+static page_cache_entry_t *alloc_cache_page(page_cache_t *cache, unsigned mmflag) {
+    /* These are always allocated with MM_KERNEL. */
+    page_cache_entry_t *entry = slab_cache_alloc(page_cache_entry_cache, MM_KERNEL);
+
+    entry->page = page_alloc(mmflag);
+    if (!entry->page) {
+        slab_cache_free(page_cache_entry_cache, entry);
+        return NULL;
+    }
+
+    entry->page->private = entry;
+    entry->cache         = cache;
+
+    return entry;
+}
+
+static void free_cache_page(page_cache_entry_t *entry) {
+    page_free(entry->page);
+    slab_cache_free(page_cache_entry_cache, entry);
 }
 
 /** Get a page from a cache.
@@ -74,7 +110,7 @@ static void page_cache_ctor(void *obj, void *data) {
  * @param _shared       Where to store value stating whether a mapping had to
  *                      be shared. Only used if _mapping is set.
  * @return              Status code describing result of the operation. */
-static status_t page_cache_get_page_internal(
+static status_t get_cache_page(
     page_cache_t *cache, offset_t offset, bool overwrite, page_t **_page,
     void **_mapping, bool *_shared)
 {
@@ -94,10 +130,10 @@ static status_t page_cache_get_page_internal(
     }
 
     /* Check if we have it cached. */
-    page_t *page = avl_tree_lookup(&cache->pages, offset, page_t, avl_link);
-    if (page) {
-        if (refcount_inc(&page->count) == 1)
-            page_set_state(page, PAGE_STATE_ALLOCATED);
+    page_cache_entry_t *entry = avl_tree_lookup(&cache->pages, offset, page_cache_entry_t, link);
+    if (entry) {
+        if (refcount_inc(&entry->page->count) == 1)
+            page_set_state(entry->page, PAGE_STATE_ALLOCATED);
 
         mutex_unlock(&cache->lock);
 
@@ -110,61 +146,58 @@ static status_t page_cache_get_page_internal(
 
             thread_wire(curr_thread);
 
-            *_mapping = phys_map(page->addr, PAGE_SIZE, MM_KERNEL);
+            *_mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
             *_shared  = false;
         } else {
-            *_page = page;
+            *_page = entry->page;
         }
 
         dprintf(
             "cache: retreived cached page 0x%" PRIxPHYS " from offset 0x%" PRIx64 " in %p\n",
-            page->addr, offset, cache);
+            entry->page->addr, offset, cache);
 
         return STATUS_SUCCESS;
     }
 
     /* Allocate a new page. */
-    page = page_alloc(MM_KERNEL);
+    entry = alloc_cache_page(cache, MM_KERNEL);
 
     /* Only bother filling the page with data if it's not going to be
      * immediately overwritten. */
     void *mapping = NULL;
-    bool shared = false;
+    bool shared   = false;
     if (!overwrite) {
         /* If a read operation is provided, read in data, else zero the page. */
         if (cache->ops && cache->ops->read_page) {
             /* When reading in page data we cannot guarantee that the mapping
              * won't be shared, because it's possible that a device driver will
              * do work in another thread, which may be on another CPU. */
-            mapping = phys_map(page->addr, PAGE_SIZE, MM_KERNEL);
+            mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
             shared  = true;
 
             ret = cache->ops->read_page(cache, mapping, offset);
             if (ret != STATUS_SUCCESS) {
                 phys_unmap(mapping, PAGE_SIZE, true);
-                page_free(page);
+                free_cache_page(entry);
                 mutex_unlock(&cache->lock);
                 return ret;
             }
         } else {
             thread_wire(curr_thread);
-            mapping = phys_map(page->addr, PAGE_SIZE, MM_KERNEL);
+            mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
             memset(mapping, 0, PAGE_SIZE);
         }
     }
 
-    /* Cache the page and unlock. */
-    page->private = cache;
-    page->offset  = offset;
-
-    refcount_inc(&page->count);
-    avl_tree_insert(&cache->pages, offset, &page->avl_link);
-
-    mutex_unlock(&cache->lock);
+    refcount_inc(&entry->page->count);
+    avl_tree_insert(&cache->pages, offset, &entry->link);
 
     dprintf(
         "cache: cached new page 0x%" PRIxPHYS " at offset 0x%" PRIx64 " in %p\n",
-        page->addr, offset, cache);
+        entry->page->addr, offset, cache);
+
+    /* It's safe to access the entry beyond here because of the reference added. */
+    mutex_unlock(&cache->lock);
 
     if (_mapping) {
         assert(_shared);
@@ -172,7 +205,7 @@ static status_t page_cache_get_page_internal(
         /* Reuse any mapping that may have already been created. */
         if (!mapping) {
             thread_wire(curr_thread);
-            mapping = phys_map(page->addr, PAGE_SIZE, MM_KERNEL);
+            mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
         }
 
         *_mapping = mapping;
@@ -185,7 +218,7 @@ static status_t page_cache_get_page_internal(
                 thread_unwire(curr_thread);
         }
 
-        *_page = page;
+        *_page = entry->page;
     }
 
     return STATUS_SUCCESS;
@@ -193,58 +226,64 @@ static status_t page_cache_get_page_internal(
 
 /** Releases a page from a cache.
  * @param cache         Cache that the page belongs to. Must be locked.
- * @param page          Page to release.
+ * @param entry         Page to release.
  * @param dirty         Whether the page has been dirtied. */
-static void page_cache_release_page_internal(page_cache_t *cache, page_t *page, bool dirty) {
+static void release_cache_page(page_cache_t *cache, page_cache_entry_t *entry, bool dirty) {
+    offset_t offset = entry->link.key;
+
     dprintf(
         "cache: released page 0x%" PRIxPHYS " at offset 0x%" PRIx64 " in %p\n",
-        page->addr, offset, cache);
+        entry->page->addr, offset, cache);
 
     /* Mark as modified if requested. */
     if (dirty) {
-        page_set_flag(page, PAGE_FLAG_DIRTY);
+        page_set_flag(entry->page, PAGE_FLAG_DIRTY);
     } else {
-        dirty = page_flags(page) & PAGE_FLAG_DIRTY;
+        dirty = page_flags(entry->page) & PAGE_FLAG_DIRTY;
     }
 
     /* Decrease the reference count. */
-    if (refcount_dec(&page->count) == 0) {
+    if (refcount_dec(&entry->page->count) == 0) {
         /* If the page is outside of the cache's size (i.e. cache has been
          * resized with pages in use, discard it). Otherwise, move the page to
          * the appropriate queue. */
-        if (page->offset >= cache->size) {
-            avl_tree_remove(&cache->pages, &page->avl_link);
-            page_free(page);
+        if (offset >= cache->size) {
+            avl_tree_remove(&cache->pages, &entry->link);
+            free_cache_page(entry);
         } else if (dirty && cache->ops && cache->ops->write_page) {
-            page_set_state(page, PAGE_STATE_CACHED_DIRTY);
+            page_set_state(entry->page, PAGE_STATE_CACHED_DIRTY);
         } else {
-            page_clear_flag(page, PAGE_FLAG_DIRTY);
-            page_set_state(page, PAGE_STATE_CACHED_CLEAN);
+            page_clear_flag(entry->page, PAGE_FLAG_DIRTY);
+            page_set_state(entry->page, PAGE_STATE_CACHED_CLEAN);
         }
     }
 }
 
-/** Flushes changes to a cache page. */
-static status_t page_cache_flush_page_internal(page_cache_t *cache, page_t *page) {
+/** Flushes changes to a cache page.
+ * @param cache         Cache that the page belongs to. Must be locked.
+ * @param entry         Page to flush. */
+static status_t flush_cache_page(page_cache_t *cache, page_cache_entry_t *entry) {
+    offset_t offset = entry->link.key;
+
     /* If the page is outside of the cache, it may be there because the cache
      * was shrunk but with the page in use. Ignore this. Also ignore pages that
      * aren't dirty. */
-    if (page->offset >= cache->size || !(page_flags(page) & PAGE_FLAG_DIRTY))
+    if (offset >= cache->size || !(page_flags(entry->page) & PAGE_FLAG_DIRTY))
         return STATUS_SUCCESS;
 
     /* Should only end up here if the page is writable - when releasing pages
      * the dirty flag is cleared if there is no write operation. */
     assert(cache->ops && cache->ops->write_page);
 
-    void *mapping = phys_map(page->addr, PAGE_SIZE, MM_KERNEL);
+    void *mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
 
-    status_t ret = cache->ops->write_page(cache, mapping, page->offset);
+    status_t ret = cache->ops->write_page(cache, mapping, offset);
     if (ret == STATUS_SUCCESS) {
         /* Clear dirty flag only if the page reference count is zero. This is
          * because the page may be mapped into an address space as read-write. */
-        if (refcount_get(&page->count) == 0) {
-            page_clear_flag(page, PAGE_FLAG_DIRTY);
-            page_set_state(page, PAGE_STATE_CACHED_CLEAN); 
+        if (refcount_get(&entry->page->count) == 0) {
+            page_clear_flag(entry->page, PAGE_FLAG_DIRTY);
+            page_set_state(entry->page, PAGE_STATE_CACHED_CLEAN); 
         }
     }
 
@@ -262,13 +301,13 @@ static status_t page_cache_flush_page_internal(page_cache_t *cache, page_t *page
  * @param _shared       Where to store value stating whether a mapping had to
  *                      be shared.
  * @return              Status code describing result of the operation. */
-static status_t page_cache_map_page(
+static status_t map_cache_page(
     page_cache_t *cache, offset_t offset, bool overwrite, void **_addr,
     bool *_shared)
 {
     assert(_addr && _shared);
 
-    return page_cache_get_page_internal(cache, offset, overwrite, NULL, _addr, _shared);
+    return get_cache_page(cache, offset, overwrite, NULL, _addr, _shared);
 }
 
 /** Unmap and release a page from a cache.
@@ -276,8 +315,8 @@ static status_t page_cache_map_page(
  * @param addr          Address of mapping.
  * @param offset        Offset of page to release.
  * @param dirty         Whether the page has been dirtied.
- * @param shared        Shared value returned from page_cache_map_page(). */
-static void page_cache_unmap_page(
+ * @param shared        Shared value returned from map_cache_page(). */
+static void unmap_cache_page(
     page_cache_t *cache, void *mapping, offset_t offset, bool dirty,
     bool shared)
 {
@@ -287,22 +326,23 @@ static void page_cache_unmap_page(
 
     mutex_lock(&cache->lock);
 
-    page_t *page = avl_tree_lookup(&cache->pages, offset, page_t, avl_link);
-    if (unlikely(!page))
+    page_cache_entry_t *entry = avl_tree_lookup(&cache->pages, offset, page_cache_entry_t, link);
+    if (unlikely(!entry))
         fatal("Tried to release page that isn't cached");
 
-    page_cache_release_page_internal(cache, page, dirty);
+    release_cache_page(cache, entry, dirty);
 
     mutex_unlock(&cache->lock);
 }
 
-/** Flush changes to a cached page. */
+/** Flush changes to a page the CACHED_DIRTY state.
+ * @param page          Page to flush.
+ * @return              Status code describing result of the operation. */
 status_t page_cache_flush_page(page_t *page) {
     /* Must be careful - another thread could be destroying the cache.
      * FIXME: wut? */
-    page_cache_t *cache = page->private;
-    if (!cache)
-        return STATUS_SUCCESS;
+    page_cache_entry_t *entry = page->private;
+    page_cache_t *cache       = entry->cache;
 
     mutex_lock(&cache->lock);
 
@@ -311,32 +351,31 @@ status_t page_cache_flush_page(page_t *page) {
         return true;
     }
 
-    status_t ret = page_cache_flush_page_internal(cache, page);
+    status_t ret = flush_cache_page(cache, entry);
     mutex_unlock(&cache->lock);
     return (ret == STATUS_SUCCESS);
 }
 
-/** Get a page from a cache. */
-static status_t page_cache_get_page(vm_region_t *region, offset_t offset, page_t **_page) {
-    return page_cache_get_page_internal(region->private, offset, false, _page, NULL, NULL);
+static status_t page_cache_region_get_page(vm_region_t *region, offset_t offset, page_t **_page) {
+    return get_cache_page(region->private, offset, false, _page, NULL, NULL);
 }
 
-/** Release a page in a cache. */
-static void page_cache_release_page(vm_region_t *region, page_t *page) {
-    page_cache_t *cache = region->private;
+static void page_cache_region_release_page(vm_region_t *region, page_t *page) {
+    page_cache_t *cache       = region->private;
+    page_cache_entry_t *entry = page->private;
 
     mutex_lock(&cache->lock);
 
-    /* The VM system will have flagged the page as modified if necessary. */
-    page_cache_release_page_internal(cache, page, false);
+    /* The VM system will have flagged the page as dirty if necessary. */
+    release_cache_page(cache, entry, false);
 
     mutex_unlock(&cache->lock);
 }
 
 /** VM region operations for mapping a page cache. */
 const vm_region_ops_t page_cache_region_ops = {
-    .get_page     = page_cache_get_page,
-    .release_page = page_cache_release_page,
+    .get_page     = page_cache_region_get_page,
+    .release_page = page_cache_region_release_page,
 };
 
 /** Performs I/O on a cache.
@@ -373,7 +412,7 @@ status_t page_cache_io(page_cache_t *cache, io_request_t *request) {
      * transfer on the initial page to get us up to a page boundary. If the
      * transfer only goes across one page, this will handle it. */
     if (request->offset % PAGE_SIZE) {
-        ret = page_cache_map_page(cache, start, false, &mapping, &shared);
+        ret = map_cache_page(cache, start, false, &mapping, &shared);
         if (ret != STATUS_SUCCESS)
             return ret;
 
@@ -382,7 +421,9 @@ status_t page_cache_io(page_cache_t *cache, io_request_t *request) {
             : total;
 
         ret = io_request_copy(request, mapping + (request->offset % PAGE_SIZE), count, true);
-        page_cache_unmap_page(cache, mapping, start, false, shared);
+
+        // TODO: This is looking up again unnecessarily
+        unmap_cache_page(cache, mapping, start, false, shared);
 
         if (ret != STATUS_SUCCESS)
             return ret;
@@ -394,15 +435,15 @@ status_t page_cache_io(page_cache_t *cache, io_request_t *request) {
     /* Handle any full pages. */
     while (total >= PAGE_SIZE) {
         /* For writes, we pass the overwrite parameter as true to
-         * page_cache_map_page() here, so that if the page is not in the cache,
-         * its data will not be read in - we're about to overwrite it, so it
-         * would not be necessary. */
-        ret = page_cache_map_page(cache, start, request->op == IO_OP_WRITE, &mapping, &shared);
+         * map_cache_page() here, so that if the page is not in the cache, its
+         * data will not be read in - we're about to overwrite it, so it would
+         * not be necessary. */
+        ret = map_cache_page(cache, start, request->op == IO_OP_WRITE, &mapping, &shared);
         if (ret != STATUS_SUCCESS)
             return ret;
 
         ret = io_request_copy(request, mapping, PAGE_SIZE, true);
-        page_cache_unmap_page(cache, mapping, start, false, shared);
+        unmap_cache_page(cache, mapping, start, false, shared);
 
         if (ret != STATUS_SUCCESS)
             return ret;
@@ -413,12 +454,12 @@ status_t page_cache_io(page_cache_t *cache, io_request_t *request) {
 
     /* Handle anything that's left. */
     if (total) {
-        ret = page_cache_map_page(cache, start, false, &mapping, &shared);
+        ret = map_cache_page(cache, start, false, &mapping, &shared);
         if (ret != STATUS_SUCCESS)
             return ret;
 
         ret = io_request_copy(request, mapping, total, true);
-        page_cache_unmap_page(cache, mapping, start, false, shared);
+        unmap_cache_page(cache, mapping, start, false, shared);
 
         if (ret != STATUS_SUCCESS)
             return ret;
@@ -497,11 +538,13 @@ void page_cache_resize(page_cache_t *cache, offset_t size) {
      * will get freed once they are released. */
     if (size < cache->size) {
         avl_tree_foreach_safe(&cache->pages, iter) {
-            page_t *page = avl_tree_entry(iter, page_t, avl_link);
+            page_cache_entry_t *entry = avl_tree_entry(iter, page_cache_entry_t, link);
 
-            if (page->offset >= size && refcount_get(&page->count) == 0) {
-                avl_tree_remove(&cache->pages, &page->avl_link);
-                page_free(page);
+            offset_t offset = entry->link.key;
+
+            if (offset >= size && refcount_get(&entry->page->count) == 0) {
+                avl_tree_remove(&cache->pages, &entry->link);
+                free_cache_page(entry);
             }
         }
     }
@@ -511,12 +554,15 @@ void page_cache_resize(page_cache_t *cache, offset_t size) {
     mutex_unlock(&cache->lock);
 }
 
-/** Flushes modifications to a cache.
+/**
+ * Flushes modifications to a cache. If a failure occurs, the function carries
+ * on attempting to flush, but still returns an error. If multiple errors occur,
+ * it is the most recent that is returned.
+ *
  * @param cache         Cache to flush.
- * @return              Status code describing result of the operation. If a
- *                      failure occurs, the function carries on attempting to
- *                      flush, but still returns an error. If multiple errors
- *                      occur, it is the most recent that is returned. */
+ *
+ * @return              Status code describing result of the operation.
+ */
 status_t page_cache_flush(page_cache_t *cache) {
     status_t ret = STATUS_SUCCESS;
 
@@ -524,9 +570,9 @@ status_t page_cache_flush(page_cache_t *cache) {
 
     /* Flush all pages. */
     avl_tree_foreach(&cache->pages, iter) {
-        page_t *page = avl_tree_entry(iter, page_t, avl_link);
+        page_cache_entry_t *entry = avl_tree_entry(iter, page_cache_entry_t, link);
 
-        status_t err = page_cache_flush_page_internal(cache, page);
+        status_t err = flush_cache_page(cache, entry);
         if (err != STATUS_SUCCESS)
             ret = err;
     }
@@ -563,12 +609,12 @@ status_t page_cache_destroy(page_cache_t *cache, bool discard) {
 
     /* Free all pages. */
     avl_tree_foreach_safe(&cache->pages, iter) {
-        page_t *page = avl_tree_entry(iter, page_t, avl_link);
+        page_cache_entry_t *entry = avl_tree_entry(iter, page_cache_entry_t, link);
 
-        if (refcount_get(&page->count) != 0) {
+        if (refcount_get(&entry->page->count) != 0) {
             fatal("Cache page still in use while destroying");
         } else if (!discard) {
-            status_t ret = page_cache_flush_page_internal(cache, page);
+            status_t ret = flush_cache_page(cache, entry);
             if (ret != STATUS_SUCCESS) {
                 cache->deleted = false;
                 mutex_unlock(&cache->lock);
@@ -576,8 +622,8 @@ status_t page_cache_destroy(page_cache_t *cache, bool discard) {
             }
         }
 
-        avl_tree_remove(&cache->pages, &page->avl_link);
-        page_free(page);
+        avl_tree_remove(&cache->pages, &entry->link);
+        free_cache_page(entry);
     }
 
     /* Unlock and relock the cache to allow any attempts to flush or evict a
@@ -623,11 +669,12 @@ static kdb_status_t kdb_cmd_page_cache(int argc, char **argv, kdb_filter_t *filt
     /* Show all cached pages. */
     kdb_printf("Cached pages:\n");
     avl_tree_foreach(&cache->pages, iter) {
-        page_t *page = avl_tree_entry(iter, page_t, avl_link);
+        page_cache_entry_t *entry = avl_tree_entry(iter, page_cache_entry_t, link);
 
         kdb_printf(
             "  Page 0x%016" PRIxPHYS " - Offset: %-10" PRIu64 " Flags: 0x%-4x Count: %d\n",
-            page->addr, page->offset, page_flags(page), refcount_get(&page->count));
+            entry->page->addr, entry->link.key, page_flags(entry->page),
+            refcount_get(&entry->page->count));
     }
 
     return KDB_SUCCESS;
@@ -637,6 +684,9 @@ __init_text void page_cache_init(void) {
     page_cache_cache = object_cache_create(
         "page_cache_cache",
         page_cache_t, page_cache_ctor, NULL, NULL, 0, MM_BOOT);
+    page_cache_entry_cache = object_cache_create(
+        "page_cache_entry_cache",
+        page_cache_entry_t, NULL, NULL, NULL, 0, MM_BOOT);
 
     kdb_register_command("page_cache", "Print information about a page cache.", kdb_cmd_page_cache);
 }
