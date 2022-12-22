@@ -42,7 +42,7 @@ static __init_text void acpi_table_copy(phys_ptr_t addr) {
 
     /* Check the checksum of the table. */
     if (!checksum_range(source, source->length)) {
-        phys_unmap(source, PAGE_SIZE * 2, true);
+        phys_unmap(source, PAGE_SIZE * 2);
         return;
     }
 
@@ -58,7 +58,7 @@ static __init_text void acpi_table_copy(phys_ptr_t addr) {
     acpi_tables[acpi_table_count - 1] = kmalloc(source->length, MM_BOOT);
     memcpy(acpi_tables[acpi_table_count - 1], source, source->length);
 
-    phys_unmap(source, PAGE_SIZE * 2, true);
+    phys_unmap(source, PAGE_SIZE * 2);
 }
 
 static inline acpi_rsdp_t *acpi_find_rsdp(phys_ptr_t start, size_t size) {
@@ -71,10 +71,10 @@ static inline acpi_rsdp_t *acpi_find_rsdp(phys_ptr_t start, size_t size) {
 
         /* Check if the signature and checksum are correct. */
         if (strncmp((char *)rsdp->signature, ACPI_RSDP_SIGNATURE, 8) != 0) {
-            phys_unmap(rsdp, sizeof(*rsdp), true);
+            phys_unmap(rsdp, sizeof(*rsdp));
             continue;
         } else if (!checksum_range(rsdp, 20)) {
-            phys_unmap(rsdp, sizeof(*rsdp), true);
+            phys_unmap(rsdp, sizeof(*rsdp));
             continue;
         }
 
@@ -82,7 +82,7 @@ static inline acpi_rsdp_t *acpi_find_rsdp(phys_ptr_t start, size_t size) {
          * well. */
         if (rsdp->revision >= 2) {
             if (!checksum_range(rsdp, rsdp->length)) {
-                phys_unmap(rsdp, sizeof(*rsdp), true);
+                phys_unmap(rsdp, sizeof(*rsdp));
                 continue;
             }
         }
@@ -103,11 +103,11 @@ static inline bool acpi_parse_xsdt(uint32_t addr) {
     /* Check signature and checksum. */
     if (strncmp((char *)source->header.signature, ACPI_XSDT_SIGNATURE, 4) != 0) {
         kprintf(LOG_WARN, "acpi: XSDT signature does not match expected signature\n");
-        phys_unmap(source, PAGE_SIZE, true);
+        phys_unmap(source, PAGE_SIZE);
         return false;
     } else if (!checksum_range(source, source->header.length)) {
         kprintf(LOG_WARN, "acpi: XSDT checksum is incorrect\n");
-        phys_unmap(source, PAGE_SIZE, true);
+        phys_unmap(source, PAGE_SIZE);
         return false;
     }
 
@@ -116,7 +116,7 @@ static inline bool acpi_parse_xsdt(uint32_t addr) {
     for (size_t i = 0; i < count; i++)
         acpi_table_copy((phys_ptr_t)source->entry[i]);
 
-    phys_unmap(source, PAGE_SIZE, true);
+    phys_unmap(source, PAGE_SIZE);
 
     acpi_supported = true;
     return true;
@@ -128,11 +128,11 @@ static inline bool acpi_parse_rsdt(uint32_t addr) {
     /* Check signature and checksum. */
     if (strncmp((char *)source->header.signature, ACPI_RSDT_SIGNATURE, 4) != 0) {
         kprintf(LOG_WARN, "acpi: RSDT signature does not match expected signature\n");
-        phys_unmap(source, PAGE_SIZE, true);
+        phys_unmap(source, PAGE_SIZE);
         return false;
     } else if (!checksum_range(source, source->header.length)) {
         kprintf(LOG_WARN, "acpi: RSDT checksum is incorrect\n");
-        phys_unmap(source, PAGE_SIZE, true);
+        phys_unmap(source, PAGE_SIZE);
         return false;
     }
 
@@ -141,7 +141,7 @@ static inline bool acpi_parse_rsdt(uint32_t addr) {
     for (size_t i = 0; i < count; i++)
         acpi_table_copy((phys_ptr_t)source->entry[i]);
 
-    phys_unmap(source, PAGE_SIZE, true);
+    phys_unmap(source, PAGE_SIZE);
 
     acpi_supported = true;
     return true;
@@ -166,7 +166,7 @@ __init_text void acpi_init(void) {
     /* Get the base address of the Extended BIOS Data Area (EBDA). */
     uint16_t *mapping = phys_map(0x40e, sizeof(uint16_t), MM_BOOT);
     phys_ptr_t ebda   = (*mapping) << 4;
-    phys_unmap(mapping, sizeof(uint16_t), true);
+    phys_unmap(mapping, sizeof(uint16_t));
 
     /* Search for the RSDP. */
     acpi_rsdp_t *rsdp = acpi_find_rsdp(ebda, 0x400);
@@ -188,5 +188,5 @@ __init_text void acpi_init(void) {
         kprintf(LOG_WARN, "acpi: RSDP contains neither an XSDT or RSDT address, not using ACPI\n");
     }
 
-    phys_unmap(rsdp, sizeof(*rsdp), true);
+    phys_unmap(rsdp, sizeof(*rsdp));
 }

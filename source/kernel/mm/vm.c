@@ -474,7 +474,7 @@ static status_t map_anon_page(vm_region_t *region, ptr_t addr, uint32_t requeste
     /* The page address should now be stored in phys, and access flags should be
      * set correctly. If there is an existing mapping, remove it. */
     if (exist) {
-        if (!mmu_context_unmap(region->as->mmu, addr, true, NULL))
+        if (!mmu_context_unmap(region->as->mmu, addr, NULL))
             fatal("Could not remove previous mapping for 0x%zx", addr);
     }
 
@@ -558,7 +558,7 @@ static bool unmap_page(vm_region_t *region, ptr_t addr) {
     offset_t offset = addr - region->start;
 
     page_t *page;
-    if (!mmu_context_unmap(region->as->mmu, addr, true, &page))
+    if (!mmu_context_unmap(region->as->mmu, addr, &page))
         return false;
 
     /* Release the page from the source. */

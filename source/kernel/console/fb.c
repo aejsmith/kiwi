@@ -428,7 +428,7 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
 
     uint8_t *backbuffer = kmem_alloc(size, mmflag);
     if (!backbuffer) {
-        phys_unmap(fb_mapping, size, true);
+        phys_unmap(fb_mapping, size);
         return STATUS_NO_MEMORY;
     }
 
@@ -438,7 +438,7 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
     unsigned char *glyphs = kmalloc(cols * rows, mmflag);
     if (!glyphs) {
         kmem_free(backbuffer, size);
-        phys_unmap(fb_mapping, size, true);
+        phys_unmap(fb_mapping, size);
         return STATUS_NO_MEMORY;
     }
 
@@ -480,7 +480,7 @@ status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
         /* Free old mappings. */
         kfree(glyphs);
         kmem_free(backbuffer, size);
-        phys_unmap(mapping, size, true);
+        phys_unmap(mapping, size);
     } else {
         /* First time the framebuffer console has been enabled. Register
          * callbacks to reset the framebuffer console upon fatal() and KDB

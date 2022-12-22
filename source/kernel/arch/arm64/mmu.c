@@ -239,7 +239,7 @@ void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
 }
 
 /** Unmap a page in a context. */
-bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
+bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page) {
     // TODO: TLB invalidation:
     //  - Need DSB before and after.
     //  - Seems we don't need manual remote TLB invalidation? Use IS operations

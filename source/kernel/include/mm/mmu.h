@@ -102,7 +102,7 @@ extern status_t arch_mmu_context_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t flags,
     unsigned mmflag);
 extern void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access);
-extern bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page);
+extern bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page);
 extern bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags);
 extern void arch_mmu_context_flush(mmu_context_t *ctx);
 extern void arch_mmu_context_load(mmu_context_t *ctx);
@@ -115,7 +115,7 @@ extern status_t mmu_context_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t flags,
     unsigned mmflag);
 extern void mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access);
-extern bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page);
+extern bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page);
 extern bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags);
 
 extern void mmu_context_load(mmu_context_t *ctx);

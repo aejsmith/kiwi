@@ -224,7 +224,7 @@ static kmem_range_t *kmem_hash_find(ptr_t addr, size_t size) {
     return NULL;
 }
 
-static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, bool shared) {
+static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free) {
     mutex_lock(&kmem_lock);
 
     /* Search for the allocation and check if it is as expected. */
@@ -248,7 +248,7 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
 
         for (size_t i = 0; i < size; i += PAGE_SIZE) {
             page_t *page;
-            if (!mmu_context_unmap(&kernel_mmu_context, addr + i, shared, &page))
+            if (!mmu_context_unmap(&kernel_mmu_context, addr + i, &page))
                 fatal("Address 0x%zx was not mapped while freeing", addr + i);
 
             if (free)
@@ -357,7 +357,7 @@ ptr_t kmem_raw_alloc(size_t size, unsigned mmflag) {
  * @param size          Size of range.
  */
 void kmem_raw_free(ptr_t addr, size_t size) {
-    kmem_free_internal((ptr_t)addr, size, false, false, false);
+    kmem_free_internal((ptr_t)addr, size, false, false);
 }
 
 /**
@@ -435,7 +435,7 @@ fail:
     /* Go back and reverse what we have done. */
     for (; i; i -= PAGE_SIZE) {
         page_t *page;
-        mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), true, &page);
+        mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), &page);
         page_free(page);
     }
 
@@ -453,7 +453,7 @@ fail:
  * @param size          Size of range.
  */
 void kmem_free(void *addr, size_t size) {
-    kmem_free_internal((ptr_t)addr, size, true, true, true);
+    kmem_free_internal((ptr_t)addr, size, true, true);
 }
 
 /**
@@ -499,7 +499,7 @@ void *kmem_map(phys_ptr_t base, size_t size, uint32_t flags, unsigned mmflag) {
 fail:
     /* Go back and reverse what we have done. */
     for (; i; i -= PAGE_SIZE)
-        mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), true, NULL);
+        mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), NULL);
 
     mmu_context_unlock(&kernel_mmu_context);
     kmem_raw_free(addr, size);
@@ -514,13 +514,9 @@ fail:
  *
  * @param addr          Address to free.
  * @param size          Size of range to unmap (must be multiple of PAGE_SIZE).
- * @param shared        Whether the mapping was used by any other CPUs. This
- *                      is used as an optimization to reduce the number of
- *                      remote TLB invalidations we have to do when doing
- *                      physical mappings.
  */
-void kmem_unmap(void *addr, size_t size, bool shared) {
-    kmem_free_internal((ptr_t)addr, size, true, false, shared);
+void kmem_unmap(void *addr, size_t size) {
+    kmem_free_internal((ptr_t)addr, size, true, false);
 }
 
 /** Initialize the kernel memory allocator. */
@@ -593,6 +589,6 @@ __init_text void kmem_late_init(void) {
     if (boot_end != KERNEL_KMEM_BASE) {
         /* The pages have already been freed, so we don't want to free them
          * again, but do need to unmap them. */
-        kmem_unmap((void *)KERNEL_KMEM_BASE, boot_end - KERNEL_KMEM_BASE, true);
+        kmem_unmap((void *)KERNEL_KMEM_BASE, boot_end - KERNEL_KMEM_BASE);
     }
 }

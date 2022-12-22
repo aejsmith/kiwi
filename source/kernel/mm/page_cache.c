@@ -33,8 +33,6 @@
 #include <mm/phys.h>
 #include <mm/slab.h>
 
-#include <proc/thread.h>
-
 #include <assert.h>
 #include <kdb.h>
 #include <status.h>
@@ -78,12 +76,6 @@ typedef struct page_cache_page_handle {
 
     /** Set by the user to whether the page is dirty. */
     bool dirty;
-
-    /**
-     * Whether access to the mapping was possibly shared with other CPUs. Used
-     * as an optimisation to skip TLB invalidation where unnecessary.
-     */
-    bool shared;
 } page_cache_page_handle_t;
 
 /** Slab cache for allocating page_cache_t. */
@@ -137,7 +129,6 @@ static status_t get_cache_page(
     handle->entry   = NULL;
     handle->mapping = NULL;
     handle->dirty   = false;
-    handle->shared  = false;
 
     mutex_lock(&cache->lock);
 
@@ -159,15 +150,8 @@ static status_t get_cache_page(
 
         handle->entry = entry;
 
-        /* Map it in if required. Wire the thread to the current CPU and specify
-         * that the mapping is not being shared - the mapping will only be
-         * accessed by this thread, so we can save having to do a remote TLB
-         * invalidation. */
-        if (flags & PAGE_CACHE_GET_PAGE_MAP) {
-            thread_wire(curr_thread);
-
+        if (flags & PAGE_CACHE_GET_PAGE_MAP)
             handle->mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
-        }
 
         dprintf(
             "cache: retreived cached page 0x%" PRIxPHYS " from offset 0x%" PRIx64 " in %p\n",
@@ -184,22 +168,16 @@ static status_t get_cache_page(
     if (!(flags & PAGE_CACHE_GET_PAGE_OVERWRITE)) {
         /* If a read operation is provided, read in data, else zero the page. */
         if (cache->ops && cache->ops->read_page) {
-            /* When reading in page data we cannot guarantee that the mapping
-             * won't be shared, because it's possible that a device driver will
-             * do work in another thread, which may be on another CPU. */
             handle->mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
-            handle->shared  = true;
 
             ret = cache->ops->read_page(cache, handle->mapping, offset);
             if (ret != STATUS_SUCCESS) {
-                phys_unmap(handle->mapping, PAGE_SIZE, true);
+                phys_unmap(handle->mapping, PAGE_SIZE);
                 free_cache_page(entry);
                 mutex_unlock(&cache->lock);
                 return ret;
             }
         } else {
-            thread_wire(curr_thread);
-
             handle->mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
             memset(handle->mapping, 0, PAGE_SIZE);
         }
@@ -219,19 +197,12 @@ static status_t get_cache_page(
 
     if (flags & PAGE_CACHE_GET_PAGE_MAP) {
         /* Reuse mapping that may have already been created for reading. */
-        if (!handle->mapping) {
-            thread_wire(curr_thread);
-
+        if (!handle->mapping)
             handle->mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
-        }
     } else {
         /* Page mapping is not required, get rid of it. */
         if (handle->mapping) {
-            phys_unmap(handle->mapping, PAGE_SIZE, handle->shared);
-
-            if (!handle->shared)
-                thread_unwire(curr_thread);
-
+            phys_unmap(handle->mapping, PAGE_SIZE);
             handle->mapping = NULL;
         }
     }
@@ -250,11 +221,8 @@ static void release_cache_page(page_cache_t *cache, page_cache_page_handle_t *ha
         "cache: released page 0x%" PRIxPHYS " at offset 0x%" PRIx64 " in %p\n",
         entry->page->addr, offset, cache);
 
-    if (handle->mapping) {
-        phys_unmap(handle->mapping, PAGE_SIZE, handle->shared);
-        if (!handle->shared)
-            thread_unwire(curr_thread);
-    }
+    if (handle->mapping)
+        phys_unmap(handle->mapping, PAGE_SIZE);
 
     mutex_lock(&cache->lock);
 
@@ -313,7 +281,7 @@ static status_t flush_cache_page(page_cache_t *cache, page_cache_entry_t *entry)
         }
     }
 
-    phys_unmap(mapping, PAGE_SIZE, true);
+    phys_unmap(mapping, PAGE_SIZE);
     return ret;
 }
 

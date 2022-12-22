@@ -108,7 +108,7 @@ typedef struct device_phys_map_resource {
 static void device_phys_map_resource_release(device_t *device, void *data) {
     device_phys_map_resource_t *resource = data;
 
-    phys_unmap(resource->mapping, resource->size, true);
+    phys_unmap(resource->mapping, resource->size);
 }
 
 /**
@@ -154,9 +154,8 @@ void *device_phys_map_etc(
 
 /** Unmaps memory mapped with phys_map().
  * @param addr          Address of virtual mapping.
- * @param size          Size of range.
- * @param shared        Whether the mapping was used by other CPUs. */
-void phys_unmap(void *addr, size_t size, bool shared) {
+ * @param size          Size of range. */
+void phys_unmap(void *addr, size_t size) {
     /* If the range lies within the physical map area, don't need to do
      * anything. Otherwise, unmap and free from kernel memory. */
     ptr_t ptr = (ptr_t)addr;
@@ -164,7 +163,7 @@ void phys_unmap(void *addr, size_t size, bool shared) {
         ptr_t base = round_down(ptr, PAGE_SIZE);
         ptr_t end  = round_up(ptr + size, PAGE_SIZE);
         
-        kmem_unmap((void *)base, end - base, shared);
+        kmem_unmap((void *)base, end - base);
     }
 }
 
@@ -188,15 +187,15 @@ bool phys_copy(phys_ptr_t dest, phys_ptr_t source, unsigned mmflag) {
 
     void *source_map = phys_map(source, PAGE_SIZE, mmflag);
     if (unlikely(!source_map)) {
-        phys_unmap(dest_map, PAGE_SIZE, false);
+        phys_unmap(dest_map, PAGE_SIZE);
         preempt_enable();
         return false;
     }
 
     memcpy(dest_map, source_map, PAGE_SIZE);
 
-    phys_unmap(source_map, PAGE_SIZE, false);
-    phys_unmap(dest_map, PAGE_SIZE, false);
+    phys_unmap(source_map, PAGE_SIZE);
+    phys_unmap(dest_map, PAGE_SIZE);
 
     preempt_enable();
     return true;

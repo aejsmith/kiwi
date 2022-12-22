@@ -287,7 +287,7 @@ page_t *page_alloc(unsigned mmflag) {
             }
 
             memset(mapping, 0, PAGE_SIZE);
-            phys_unmap(mapping, PAGE_SIZE, false);
+            phys_unmap(mapping, PAGE_SIZE);
         }
 
         preempt_enable();
@@ -544,7 +544,7 @@ status_t phys_alloc(
         }
 
         memset(mapping, 0, size);
-        phys_unmap(mapping, size, false);
+        phys_unmap(mapping, size);
     }
 
     preempt_enable();

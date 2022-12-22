@@ -177,7 +177,7 @@ ptr_t io_addr(io_region_t region) {
  * @param size          Size of region. */
 void io_unmap(io_region_t region, size_t size) {
     do_io(
-        phys_unmap((void *)region, size, true),
+        phys_unmap((void *)region, size),
         /* Nothing. */
     );
 }

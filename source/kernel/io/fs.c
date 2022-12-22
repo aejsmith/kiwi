@@ -2441,7 +2441,7 @@ static void mount_root_fs_archive(void) {
         ret = tar_extract(handle, "/");
 
         object_handle_release(handle);
-        phys_unmap(mapping, tag->size, true);
+        phys_unmap(mapping, tag->size);
 
         if (ret == STATUS_UNKNOWN_IMAGE) {
             continue;

@@ -242,21 +242,19 @@ static uint64_t *get_ptbl(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
 }
 
 /** Invalidate a TLB entry for an MMU context. */
-static void invalidate_page(mmu_context_t *ctx, ptr_t virt, bool shared) {
+static void invalidate_page(mmu_context_t *ctx, ptr_t virt) {
     /* Invalidate on the current CPU if we're using this context. */
     if (is_current_context(ctx))
         x86_invlpg(virt);
 
-    if (shared) {
-        /* Record the address to invalidate on other CPUs when the context is
-         * unlocked. */
-        if (ctx->arch.invalidate_count < INVALIDATE_ARRAY_SIZE)
-            ctx->arch.pages_to_invalidate[ctx->arch.invalidate_count] = virt;
+    /* Record the address to invalidate on other CPUs when the context is
+     * unlocked. */
+    if (ctx->arch.invalidate_count < INVALIDATE_ARRAY_SIZE)
+        ctx->arch.pages_to_invalidate[ctx->arch.invalidate_count] = virt;
 
-        /* Increment the count regardless. If it is found to be greater than the
-         * array size when unlocking, the entire TLB will be flushed. */
-        ctx->arch.invalidate_count++;
-    }
+    /* Increment the count regardless. If it is found to be greater than the
+     * array size when unlocking, the entire TLB will be flushed. */
+    ctx->arch.invalidate_count++;
 }
 
 /** Initialize a new context. */
@@ -370,7 +368,7 @@ void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
 
             /* Clear TLB entries if necessary (see note in unmap()). */
             if (prev & X86_PTE_ACCESSED)
-                invalidate_page(ctx, virt, true);
+                invalidate_page(ctx, virt);
         }
 
         virt += PAGE_SIZE;
@@ -378,7 +376,7 @@ void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
 }
 
 /** Unmap a page in a context. */
-bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
+bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page) {
     /* Find the page table for the entry. */
     uint64_t *ptbl = get_ptbl(ctx, virt, false, 0);
     if (!ptbl)
@@ -402,7 +400,7 @@ bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t 
      * will not cache a translation without setting the accessed flag first
      * (Intel Vol. 3A Section 4.10.2.3 "Details of TLB Use"). */
     if (entry & X86_PTE_ACCESSED)
-        invalidate_page(ctx, virt, shared);
+        invalidate_page(ctx, virt);
 
     if (_page)
         *_page = page;

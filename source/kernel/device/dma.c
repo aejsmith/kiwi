@@ -188,7 +188,7 @@ void *dma_map_etc(
  * @param addr          Memory to unmap.
  * @param size          Size of memory range. */
 void dma_unmap(void *addr, size_t size) {
-    return phys_unmap(addr, size, true);
+    return phys_unmap(addr, size);
 }
 
 /**

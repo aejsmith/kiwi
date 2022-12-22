@@ -125,14 +125,11 @@ void mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t acc
 /** Unmaps a page in an MMU context.
  * @param ctx           Context to unmap from.
  * @param virt          Virtual address to unmap.
- * @param shared        Whether the mapping was shared across multiple CPUs.
- *                      Used as an optimisation to not perform remote TLB
- *                      invalidations if not necessary.
  * @param _page         Where to pointer to page that was unmapped. May be set
  *                      to NULL if the address was mapped to memory that doesn't
  *                      have a page_t (e.g. device memory).
  * @return              Whether a page was mapped at the virtual address. */
-bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_page) {
+bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page) {
     assert(mutex_held(&ctx->lock));
     assert(!(virt % PAGE_SIZE));
 
@@ -142,9 +139,9 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, page_t **_pa
         assert(virt < USER_SIZE);
     }
 
-    dprintf("mmu: mmu_context_unmap(%p, %p, %d)\n", ctx, virt, shared);
+    dprintf("mmu: mmu_context_unmap(%p, %p)\n", ctx, virt);
 
-    return arch_mmu_context_unmap(ctx, virt, shared, _page);
+    return arch_mmu_context_unmap(ctx, virt, _page);
 }
 
 /** Queries details about a mapping.

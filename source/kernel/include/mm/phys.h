@@ -35,7 +35,7 @@ struct device;
 
 extern void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag);
 extern void *phys_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, unsigned mmflag);
-extern void phys_unmap(void *addr, size_t size, bool shared);
+extern void phys_unmap(void *addr, size_t size);
 
 extern void *device_phys_map(struct device *device, phys_ptr_t addr, size_t size, unsigned mmflag);
 extern void *device_phys_map_etc(

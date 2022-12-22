@@ -33,7 +33,7 @@ extern void *kmem_alloc_etc(size_t size, uint32_t mmu_flags, unsigned mmflag);
 extern void kmem_free(void *addr, size_t size);
 
 extern void *kmem_map(phys_ptr_t base, size_t size, uint32_t flags, unsigned mmflag);
-extern void kmem_unmap(void *addr, size_t size, bool shared);
+extern void kmem_unmap(void *addr, size_t size);
 
 extern void kmem_init(void);
 extern void kmem_late_init(void);

@@ -106,7 +106,7 @@ fail:
     /* Go back and reverse what we have done. */
     for (; i; i -= PAGE_SIZE) {
         page_t *page;
-        mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), true, &page);
+        mmu_context_unmap(&kernel_mmu_context, addr + (i - PAGE_SIZE), &page);
         page_free(page);
     }
 
@@ -576,7 +576,7 @@ __init_text void module_init(void) {
 
         ret = elf_module_load(handle, name, &module->image);
         object_handle_release(handle);
-        phys_unmap(mapping, tag->size, true);
+        phys_unmap(mapping, tag->size);
         if (ret != STATUS_SUCCESS) {
             if (ret == STATUS_UNKNOWN_IMAGE) {
                 /* Assume that it is a filesystem image rather than a module. */

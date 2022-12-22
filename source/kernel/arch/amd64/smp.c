@@ -95,7 +95,7 @@ __init_text void arch_smp_boot_prepare(void) {
      * initialization code. */
     void *mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_BOOT);
     memcpy(mapping, __ap_trampoline_start, __ap_trampoline_end - __ap_trampoline_start);
-    phys_unmap(mapping, PAGE_SIZE, false);
+    phys_unmap(mapping, PAGE_SIZE);
 
     /* Create a temporary MMU context for APs to use while booting which
      * identity maps the bootstrap code at its physical location. */
@@ -161,7 +161,7 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
     *(uint64_t *)(mapping + 32) = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;
     *(uint32_t *)(mapping + 40) = (ptr_t)ap_mmu_context->arch.pml4;
     memory_barrier();
-    phys_unmap(mapping, PAGE_SIZE, false);
+    phys_unmap(mapping, PAGE_SIZE);
 
     /* Kick the CPU into life. */
     if (!boot_cpu_and_wait(cpu->id))
