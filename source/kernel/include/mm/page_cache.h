@@ -29,10 +29,10 @@
 #include <sync/mutex.h>
 
 struct io_request;
-struct vm_cache;
+struct page_cache;
 
 /** Structure containing operations for a page cache. */
-typedef struct vm_cache_ops {
+typedef struct page_cache_ops {
     /** Read a page of data from the source.
      * @note                If not provided, pages that need to be allocated
      *                      will be zero-filled.
@@ -40,7 +40,7 @@ typedef struct vm_cache_ops {
      * @param buf           Buffer to read into.
      * @param offset        Offset to read from.
      * @return              Status code describing result of operation. */
-    status_t (*read_page)(struct vm_cache *cache, void *buf, offset_t offset);
+    status_t (*read_page)(struct page_cache *cache, void *buf, offset_t offset);
 
     /** Write a page of data to the source.
      * @note                If not provided, pages in the cache will never be
@@ -49,7 +49,7 @@ typedef struct vm_cache_ops {
      * @param buf           Buffer containing data to write.
      * @param offset        Offset to write from.
      * @return              Status code describing result of operation. */
-    status_t (*write_page)(struct vm_cache *cache, const void *buf, offset_t offset);
+    status_t (*write_page)(struct page_cache *cache, const void *buf, offset_t offset);
 
     /** Determine whether a page can be evicted.
      * @note                If not provided, then behaviour will be as though
@@ -57,29 +57,29 @@ typedef struct vm_cache_ops {
      * @param cache         Cache the page belongs to.
      * @param page          Page to check.
      * @return              Whether the page can be evicted. */
-    bool (*evict_page)(struct vm_cache *cache, page_t *page);
-} vm_cache_ops_t;
+    bool (*evict_page)(struct page_cache *cache, page_t *page);
+} page_cache_ops_t;
 
 /** Structure containing a page-based data cache. */
-typedef struct vm_cache {
+typedef struct page_cache {
     mutex_t lock;                   /**< Lock protecting cache. */
     avl_tree_t pages;               /**< Tree of pages. */
     offset_t size;                  /**< Size of the cache. */
-    const vm_cache_ops_t *ops;      /**< Pointer to operations structure. */
-    void *data;                     /**< Cache data pointer. */
+    const page_cache_ops_t *ops;    /**< Pointer to operations structure. */
+    void *private;                  /**< Cache data pointer. */
     bool deleted;                   /**< Whether the cache is destroyed. */
-} vm_cache_t;
+} page_cache_t;
 
-extern const vm_region_ops_t vm_cache_region_ops;
+extern const vm_region_ops_t page_cache_region_ops;
 
-extern status_t vm_cache_io(vm_cache_t *cache, struct io_request *request);
-extern status_t vm_cache_read(vm_cache_t *cache, void *buf, size_t size, offset_t offset, size_t *_bytes);
-extern status_t vm_cache_write(vm_cache_t *cache, const void *buf, size_t size, offset_t offset, size_t *_bytes);
+extern status_t page_cache_io(page_cache_t *cache, struct io_request *request);
+extern status_t page_cache_read(page_cache_t *cache, void *buf, size_t size, offset_t offset, size_t *_bytes);
+extern status_t page_cache_write(page_cache_t *cache, const void *buf, size_t size, offset_t offset, size_t *_bytes);
 
-extern void vm_cache_resize(vm_cache_t *cache, offset_t size);
-extern status_t vm_cache_flush(vm_cache_t *cache);
+extern void page_cache_resize(page_cache_t *cache, offset_t size);
+extern status_t page_cache_flush(page_cache_t *cache);
 
-extern vm_cache_t *vm_cache_create(offset_t size, const vm_cache_ops_t *ops, void *data);
-extern status_t vm_cache_destroy(vm_cache_t *cache, bool discard);
+extern page_cache_t *page_cache_create(offset_t size, const page_cache_ops_t *ops, void *private);
+extern status_t page_cache_destroy(page_cache_t *cache, bool discard);
 
-extern void vm_cache_init(void);
+extern void page_cache_init(void);

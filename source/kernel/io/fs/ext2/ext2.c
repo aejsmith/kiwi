@@ -150,10 +150,10 @@ static status_t ext2_node_io(file_handle_t *handle, io_request_t *request) {
         return STATUS_NOT_IMPLEMENTED;
     }
 
-    return vm_cache_io(inode->cache, request);
+    return page_cache_io(inode->cache, request);
 }
 
-static vm_cache_t *ext2_node_get_cache(file_handle_t *handle) {
+static page_cache_t *ext2_node_get_cache(file_handle_t *handle) {
     ext2_inode_t *inode = handle->node->private;
 
     return inode->cache;

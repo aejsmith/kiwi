@@ -19,8 +19,8 @@
  * @brief               File map.
  *
  * A file map implements a cache for file block number to raw (i.e. on-disk)
- * block number translations. Also provided are VM cache helper functions that
- * can use a file map to handle reading and writing of data pages.
+ * block number translations. Also provided are page cache helper functions
+ * that can use a file map to handle reading and writing of data pages.
  */
 
 #pragma once
@@ -30,8 +30,8 @@
 #include <sync/mutex.h>
 
 struct file_map;
-struct vm_cache_ops;
-struct vm_cache;
+struct page_cache_ops;
+struct page_cache;
 
 /** Structure containing operations for a file map. */
 typedef struct file_map_ops {
@@ -43,7 +43,7 @@ typedef struct file_map_ops {
     status_t (*lookup)(struct file_map *map, uint64_t num, uint64_t *_raw);
 
     /**
-     * Block I/O functions. These are only required if the file map VM cache
+     * Block I/O functions. These are only required if the file map page cache
      * functions are used.
      */
 
@@ -74,13 +74,13 @@ typedef struct file_map {
     void *private;                  /**< Implementation-specific private data. */
 } file_map_t;
 
-extern const struct vm_cache_ops file_map_vm_cache_ops;
+extern const struct page_cache_ops file_map_page_cache_ops;
 
 extern status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *_raw);
 extern void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count);
 
-extern status_t file_map_read_page(struct vm_cache *cache, void *buf, offset_t offset);
-extern status_t file_map_write_page(struct vm_cache *cache, const void *buf, offset_t offset);
+extern status_t file_map_read_page(struct page_cache *cache, void *buf, offset_t offset);
+extern status_t file_map_write_page(struct page_cache *cache, const void *buf, offset_t offset);
 
 extern file_map_t *file_map_create(size_t block_size, const file_map_ops_t *ops, void *private);
 extern void file_map_destroy(file_map_t *map);

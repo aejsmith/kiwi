@@ -22,9 +22,9 @@ kern_sources += feature_sources(config, [
     'malloc.c',
     'mmu.c',
     'page.c',
+    'page_cache.c',
     'phys.c',
     'safe.c',
     'slab.c',
     'vm.c',
-    'vm_cache.c',
 ])

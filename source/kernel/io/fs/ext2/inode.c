@@ -232,7 +232,7 @@ status_t ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **_inode
         inode->size |= (offset_t)le32_to_cpu(inode->disk.i_size_high) << 32;
 
     inode->map   = file_map_create(mount->block_size, &ext2_file_map_ops, inode);
-    inode->cache = vm_cache_create(inode->size, &file_map_vm_cache_ops, inode->map);
+    inode->cache = page_cache_create(inode->size, &file_map_page_cache_ops, inode->map);
 
     dprintf(
         "ext2: %pD: read inode %" PRIu32 " from %" PRIu64 " (group: %" PRIu32 ", block: %" PRId64 ")\n",
@@ -261,7 +261,7 @@ void ext2_inode_put(ext2_inode_t *inode) {
 
     /* Discard outstanding writes if the file is free. */
     // TODO: How to handle write errors?
-    vm_cache_destroy(inode->cache, is_free);
+    page_cache_destroy(inode->cache, is_free);
 
     file_map_destroy(inode->map);
 

@@ -59,11 +59,11 @@
 #include <lib/tar.h>
 
 #include <mm/malloc.h>
+#include <mm/page_cache.h>
 #include <mm/phys.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
-#include <mm/vm_cache.h>
 
 #include <proc/process.h>
 
@@ -1117,7 +1117,7 @@ static status_t fs_file_map(file_handle_t *handle, vm_region_t *region) {
         return STATUS_NOT_SUPPORTED;
 
     region->private = node->ops->get_cache(handle);
-    region->ops     = &vm_cache_region_ops;
+    region->ops     = &page_cache_region_ops;
 
     return STATUS_SUCCESS;
 }

@@ -37,7 +37,7 @@ struct device;
 struct fs_mount;
 struct fs_node;
 struct fs_dentry;
-struct vm_cache;
+struct page_cache;
 
 /** Length of a standard UUID string. */
 #define UUID_STR_LEN 36
@@ -270,11 +270,11 @@ typedef struct fs_node_ops {
 
     /** Get the data cache for a file.
      * @param handle        Handle that the cache is needed for.
-     * @return              Pointer to node's VM cache. If this function is
+     * @return              Pointer to node's page cache. If this function is
      *                      provided, it is assumed that this function will
      *                      always succeed, otherwise it is assumed that the
      *                      file cannot be memory-mapped. */
-    struct vm_cache *(*get_cache)(file_handle_t *handle);
+    struct page_cache *(*get_cache)(file_handle_t *handle);
 
     /** Read the next directory entry.
      * @note                It is up to the filesystem implementation to store

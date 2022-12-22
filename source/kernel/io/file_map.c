@@ -31,8 +31,8 @@
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
+#include <mm/page_cache.h>
 #include <mm/slab.h>
-#include <mm/vm_cache.h>
 
 #include <assert.h>
 #include <status.h>
@@ -144,7 +144,7 @@ void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
 }
 
 /**
- * Helper function for a VM cache to read a page from a file using its file
+ * Helper function for a page cache to read a page from a file using its file
  * map to help read from the source device. If this function is used, the
  * operations structure for the map must have read_block set. The cache's
  * private pointer must be a pointer to the file map.
@@ -155,8 +155,8 @@ void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
  *
  * @return              Status code describing result of the operation.
  */
-status_t file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset) {
-    file_map_t *map = cache->data;
+status_t file_map_read_page(page_cache_t *cache, void *buf, offset_t offset) {
+    file_map_t *map = cache->private;
     status_t ret;
 
     assert(map);
@@ -181,7 +181,7 @@ status_t file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset) {
 }
 
 /**
- * Helper function for a VM cache to write a page to a file using its file
+ * Helper function for a page cache to write a page to a file using its file
  * map to help write to the source device. If this function is used, the
  * operations structure for the map must have write_block set. The cache's
  * private pointer must be a pointer to the file map.
@@ -192,8 +192,8 @@ status_t file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset) {
  *
  * @return              Status code describing result of the operation.
  */
-status_t file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset) {
-    file_map_t *map = cache->data;
+status_t file_map_write_page(page_cache_t *cache, const void *buf, offset_t offset) {
+    file_map_t *map = cache->private;
     status_t ret;
 
     assert(map);
@@ -209,9 +209,9 @@ status_t file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset
         if (ret != STATUS_SUCCESS)
             return ret;
 
-        // TODO: What happens if this fails part way through? From the VM cache
-        // perspective the whole write will have failed, but some blocks have
-        // actually been written...
+        // TODO: What happens if this fails part way through? From the page
+        // cache perspective the whole write will have failed, but some blocks
+        // have actually been written...
         ret = map->ops->write_block(map, buf, raw);
         if (ret != STATUS_SUCCESS)
             return ret;
@@ -221,10 +221,10 @@ status_t file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset
 }
 
 /**
- * VM cache operations using a file map to read/write blocks. The cache's data
+ * Page cache operations using a file map to read/write blocks. The cache's data
  * pointer should be set to a pointer to the file map.
  */
-const vm_cache_ops_t file_map_vm_cache_ops = {
+const page_cache_ops_t file_map_page_cache_ops = {
     .read_page  = file_map_read_page,
     .write_page = file_map_write_page,
 };

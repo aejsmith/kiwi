@@ -25,7 +25,7 @@
 #include <lib/string.h>
 
 #include <mm/malloc.h>
-#include <mm/vm_cache.h>
+#include <mm/page_cache.h>
 
 #include <assert.h>
 #include <kernel.h>
@@ -35,7 +35,7 @@
 /** Node information structure. */
 typedef struct ramfs_node {
     union {
-        vm_cache_t *cache;          /**< Data cache. */
+        page_cache_t *cache;        /**< Data cache. */
         char *target;               /**< Symbolic link destination. */
     };
 
@@ -59,7 +59,7 @@ static void ramfs_node_free(fs_node_t *node) {
     /* Destroy the data caches. */
     switch (node->file.type) {
         case FILE_TYPE_REGULAR:
-            vm_cache_destroy(data->cache, true);
+            page_cache_destroy(data->cache, true);
             break;
         case FILE_TYPE_SYMLINK:
             kfree(data->target);
@@ -92,7 +92,7 @@ static status_t ramfs_node_create(
 
     switch (_node->file.type) {
         case FILE_TYPE_REGULAR:
-            node->cache = vm_cache_create(0, NULL, NULL);
+            node->cache = page_cache_create(0, NULL, NULL);
             break;
         case FILE_TYPE_SYMLINK:
             node->target = kstrdup(target, MM_KERNEL);
@@ -178,7 +178,7 @@ static status_t ramfs_node_resize(fs_node_t *_node, offset_t size) {
 
     assert(_node->file.type == FILE_TYPE_REGULAR);
 
-    vm_cache_resize(node->cache, size);
+    page_cache_resize(node->cache, size);
     node->modified = unix_time();
     return STATUS_SUCCESS;
 }
@@ -202,10 +202,10 @@ static status_t ramfs_node_io(file_handle_t *handle, io_request_t *request) {
     if (request->op == IO_OP_WRITE) {
         offset_t end = request->offset + request->total;
         if (end > node->cache->size)
-            vm_cache_resize(node->cache, end);
+            page_cache_resize(node->cache, end);
     }
 
-    status_t ret = vm_cache_io(node->cache, request);
+    status_t ret = page_cache_io(node->cache, request);
     if (ret != STATUS_SUCCESS)
         return ret;
 
@@ -216,7 +216,7 @@ static status_t ramfs_node_io(file_handle_t *handle, io_request_t *request) {
 }
 
 /** Get the data cache for a ramfs file. */
-static vm_cache_t *ramfs_node_get_cache(file_handle_t *handle) {
+static page_cache_t *ramfs_node_get_cache(file_handle_t *handle) {
     ramfs_node_t *node = handle->node->private;
 
     assert(handle->file->type == FILE_TYPE_REGULAR);

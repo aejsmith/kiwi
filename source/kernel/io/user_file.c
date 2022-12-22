@@ -22,7 +22,7 @@
  *  - Currently this only supports basic direct I/O, with no memory mapping or
  *    any kind of kernel level caching. In future, this could be extended to
  *    allow both of these by adding a page-based I/O model (read/write whole
- *    pages at a time) with a vm_cache in the kernel. However, the current
+ *    pages at a time) with a page cache in the kernel. However, the current
  *    model would need to be retained as an option, as page-based I/O is not
  *    suitable for implementation of character devices.
  *  - This could later be expanded to allow full filesystem implementations in

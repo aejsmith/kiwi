@@ -79,7 +79,6 @@
 #include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
-#include <mm/vm_cache.h>
 
 #include <proc/process.h>
 #include <proc/thread.h>
@@ -2034,9 +2033,6 @@ __init_text void vm_init(void) {
 
     /* Bring up the page daemons. */
     page_daemon_init();
-
-    /* Initialize the caching system. */
-    vm_cache_init();
 
     /* Register the KDB commands. */
     kdb_register_command("region", "Print details about a VM region.", kdb_cmd_region);

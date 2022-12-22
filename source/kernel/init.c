@@ -31,6 +31,7 @@
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
+#include <mm/page_cache.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
 
@@ -120,6 +121,7 @@ __init_text void kmain(uint32_t magic, kboot_tag_t *tags) {
     thread_init();
     time_late_init();
     vm_init();
+    page_cache_init();
 
     /* Create the second stage initialization thread. */
     status_t ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL);
