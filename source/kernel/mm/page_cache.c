@@ -62,6 +62,30 @@ typedef struct page_cache_entry {
     page_t *page;                   /**< Allocated page. */
 } page_cache_entry_t;
 
+/** Behaviour flags for getting a cache page. */
+enum {
+    /** Page is being fully overwritten, no need to fetch existing content. */
+    PAGE_CACHE_GET_PAGE_OVERWRITE   = (1<<0),
+
+    /** Map the page into memory. */
+    PAGE_CACHE_GET_PAGE_MAP         = (1<<1),
+};
+
+/** Details of a cached page returned from get_cache_page(). */
+typedef struct page_cache_page_handle {
+    page_cache_entry_t *entry;
+    void *mapping;
+
+    /** Set by the user to whether the page is dirty. */
+    bool dirty;
+
+    /**
+     * Whether access to the mapping was possibly shared with other CPUs. Used
+     * as an optimisation to skip TLB invalidation where unnecessary.
+     */
+    bool shared;
+} page_cache_page_handle_t;
+
 /** Slab cache for allocating page_cache_t. */
 static slab_cache_t *page_cache_cache;
 
@@ -97,27 +121,23 @@ static void free_cache_page(page_cache_entry_t *entry) {
 }
 
 /** Get a page from a cache.
- * @note                Should not be passed both _mapping and _page.
  * @param cache         Cache to get page from.
  * @param offset        Offset of page to get.
- * @param overwrite     If true, then the page's data will not be read in if
- *                      it is not in the cache, a page will only be allocated.
- *                      This is used if the page is about to be overwritten.
- * @param _page         Where to store pointer to page structure.
- * @param _mapping      Where to store address of virtual mapping. If this is
- *                      set the calling thread will be wired to its CPU when
- *                      the function returns.
- * @param _shared       Where to store value stating whether a mapping had to
- *                      be shared. Only used if _mapping is set.
+ * @param flags         Behaviour flags (PAGE_CACHE_GET_PAGE_*).
+ * @param _handle       Where to store page details.
  * @return              Status code describing result of the operation. */
 static status_t get_cache_page(
-    page_cache_t *cache, offset_t offset, bool overwrite, page_t **_page,
-    void **_mapping, bool *_shared)
+    page_cache_t *cache, offset_t offset, uint32_t flags,
+    page_cache_page_handle_t *handle)
 {
     status_t ret;
 
-    assert((_page && !_mapping) || (_mapping && !_page));
     assert(!(offset % PAGE_SIZE));
+
+    handle->entry   = NULL;
+    handle->mapping = NULL;
+    handle->dirty   = false;
+    handle->shared  = false;
 
     mutex_lock(&cache->lock);
 
@@ -137,19 +157,16 @@ static status_t get_cache_page(
 
         mutex_unlock(&cache->lock);
 
+        handle->entry = entry;
+
         /* Map it in if required. Wire the thread to the current CPU and specify
          * that the mapping is not being shared - the mapping will only be
          * accessed by this thread, so we can save having to do a remote TLB
          * invalidation. */
-        if (_mapping) {
-            assert(_shared);
-
+        if (flags & PAGE_CACHE_GET_PAGE_MAP) {
             thread_wire(curr_thread);
 
-            *_mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
-            *_shared  = false;
-        } else {
-            *_page = entry->page;
+            handle->mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
         }
 
         dprintf(
@@ -164,28 +181,27 @@ static status_t get_cache_page(
 
     /* Only bother filling the page with data if it's not going to be
      * immediately overwritten. */
-    void *mapping = NULL;
-    bool shared   = false;
-    if (!overwrite) {
+    if (!(flags & PAGE_CACHE_GET_PAGE_OVERWRITE)) {
         /* If a read operation is provided, read in data, else zero the page. */
         if (cache->ops && cache->ops->read_page) {
             /* When reading in page data we cannot guarantee that the mapping
              * won't be shared, because it's possible that a device driver will
              * do work in another thread, which may be on another CPU. */
-            mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
-            shared  = true;
+            handle->mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
+            handle->shared  = true;
 
-            ret = cache->ops->read_page(cache, mapping, offset);
+            ret = cache->ops->read_page(cache, handle->mapping, offset);
             if (ret != STATUS_SUCCESS) {
-                phys_unmap(mapping, PAGE_SIZE, true);
+                phys_unmap(handle->mapping, PAGE_SIZE, true);
                 free_cache_page(entry);
                 mutex_unlock(&cache->lock);
                 return ret;
             }
         } else {
             thread_wire(curr_thread);
-            mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
-            memset(mapping, 0, PAGE_SIZE);
+
+            handle->mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
+            memset(handle->mapping, 0, PAGE_SIZE);
         }
     }
 
@@ -199,43 +215,51 @@ static status_t get_cache_page(
     /* It's safe to access the entry beyond here because of the reference added. */
     mutex_unlock(&cache->lock);
 
-    if (_mapping) {
-        assert(_shared);
+    handle->entry = entry;
 
-        /* Reuse any mapping that may have already been created. */
-        if (!mapping) {
+    if (flags & PAGE_CACHE_GET_PAGE_MAP) {
+        /* Reuse mapping that may have already been created for reading. */
+        if (!handle->mapping) {
             thread_wire(curr_thread);
-            mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
-        }
 
-        *_mapping = mapping;
-        *_shared  = shared;
+            handle->mapping = phys_map(entry->page->addr, PAGE_SIZE, MM_KERNEL);
+        }
     } else {
         /* Page mapping is not required, get rid of it. */
-        if (mapping) {
-            phys_unmap(mapping, PAGE_SIZE, shared);
-            if (!shared)
-                thread_unwire(curr_thread);
-        }
+        if (handle->mapping) {
+            phys_unmap(handle->mapping, PAGE_SIZE, handle->shared);
 
-        *_page = entry->page;
+            if (!handle->shared)
+                thread_unwire(curr_thread);
+
+            handle->mapping = NULL;
+        }
     }
 
     return STATUS_SUCCESS;
 }
 
 /** Releases a page from a cache.
- * @param cache         Cache that the page belongs to. Must be locked.
- * @param entry         Page to release.
- * @param dirty         Whether the page has been dirtied. */
-static void release_cache_page(page_cache_t *cache, page_cache_entry_t *entry, bool dirty) {
-    offset_t offset = entry->link.key;
+ * @param cache         Cache that the page belongs to.
+ * @param handle        Handle to page to release. */
+static void release_cache_page(page_cache_t *cache, page_cache_page_handle_t *handle) {
+    page_cache_entry_t *entry = handle->entry;
+    offset_t offset           = entry->link.key;
 
     dprintf(
         "cache: released page 0x%" PRIxPHYS " at offset 0x%" PRIx64 " in %p\n",
         entry->page->addr, offset, cache);
 
-    /* Mark as modified if requested. */
+    if (handle->mapping) {
+        phys_unmap(handle->mapping, PAGE_SIZE, handle->shared);
+        if (!handle->shared)
+            thread_unwire(curr_thread);
+    }
+
+    mutex_lock(&cache->lock);
+
+    /* Mark as dirty if requested. */
+    bool dirty = handle->dirty;
     if (dirty) {
         page_set_flag(entry->page, PAGE_FLAG_DIRTY);
     } else {
@@ -257,6 +281,8 @@ static void release_cache_page(page_cache_t *cache, page_cache_entry_t *entry, b
             page_set_state(entry->page, PAGE_STATE_CACHED_CLEAN);
         }
     }
+
+    mutex_unlock(&cache->lock);
 }
 
 /** Flushes changes to a cache page.
@@ -291,50 +317,6 @@ static status_t flush_cache_page(page_cache_t *cache, page_cache_entry_t *entry)
     return ret;
 }
 
-/** Get and map a page from a cache.
- * @param cache         Cache to get page from.
- * @param offset        Offset of page to get.
- * @param overwrite     If true, then the page's data will not be read in if
- *                      it is not in the cache, a page will only be allocated.
- *                      This is used if the page is about to be overwritten.
- * @param _addr         Where to store address of mapping.
- * @param _shared       Where to store value stating whether a mapping had to
- *                      be shared.
- * @return              Status code describing result of the operation. */
-static status_t map_cache_page(
-    page_cache_t *cache, offset_t offset, bool overwrite, void **_addr,
-    bool *_shared)
-{
-    assert(_addr && _shared);
-
-    return get_cache_page(cache, offset, overwrite, NULL, _addr, _shared);
-}
-
-/** Unmap and release a page from a cache.
- * @param cache         Cache to release page in.
- * @param addr          Address of mapping.
- * @param offset        Offset of page to release.
- * @param dirty         Whether the page has been dirtied.
- * @param shared        Shared value returned from map_cache_page(). */
-static void unmap_cache_page(
-    page_cache_t *cache, void *mapping, offset_t offset, bool dirty,
-    bool shared)
-{
-    phys_unmap(mapping, PAGE_SIZE, shared);
-    if (!shared)
-        thread_unwire(curr_thread);
-
-    mutex_lock(&cache->lock);
-
-    page_cache_entry_t *entry = avl_tree_lookup(&cache->pages, offset, page_cache_entry_t, link);
-    if (unlikely(!entry))
-        fatal("Tried to release page that isn't cached");
-
-    release_cache_page(cache, entry, dirty);
-
-    mutex_unlock(&cache->lock);
-}
-
 /** Flush changes to a page the CACHED_DIRTY state.
  * @param page          Page to flush.
  * @return              Status code describing result of the operation. */
@@ -357,19 +339,25 @@ status_t page_cache_flush_page(page_t *page) {
 }
 
 static status_t page_cache_region_get_page(vm_region_t *region, offset_t offset, page_t **_page) {
-    return get_cache_page(region->private, offset, false, _page, NULL, NULL);
+    page_cache_t *cache = region->private;
+
+    page_cache_page_handle_t handle;
+    status_t ret = get_cache_page(cache, offset, 0, &handle);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
+    *_page = handle.entry->page;
+    return STATUS_SUCCESS;
 }
 
 static void page_cache_region_release_page(vm_region_t *region, page_t *page) {
-    page_cache_t *cache       = region->private;
-    page_cache_entry_t *entry = page->private;
+    page_cache_t *cache = region->private;
 
-    mutex_lock(&cache->lock);
+    /* The VM system will have already flagged the page as dirty if necessary. */
+    page_cache_page_handle_t handle = {};
+    handle.entry = page->private;
 
-    /* The VM system will have flagged the page as dirty if necessary. */
-    release_cache_page(cache, entry, false);
-
-    mutex_unlock(&cache->lock);
+    release_cache_page(cache, &handle);
 }
 
 /** VM region operations for mapping a page cache. */
@@ -405,14 +393,13 @@ status_t page_cache_io(page_cache_t *cache, io_request_t *request) {
     offset_t start = round_down(request->offset, PAGE_SIZE);
     offset_t end   = round_down((request->offset + (total - 1)), PAGE_SIZE);
 
-    void *mapping;
-    bool shared;
+    page_cache_page_handle_t handle;
 
     /* If we're not starting on a page boundary, we need to do a partial
      * transfer on the initial page to get us up to a page boundary. If the
      * transfer only goes across one page, this will handle it. */
     if (request->offset % PAGE_SIZE) {
-        ret = map_cache_page(cache, start, false, &mapping, &shared);
+        ret = get_cache_page(cache, start, PAGE_CACHE_GET_PAGE_MAP, &handle);
         if (ret != STATUS_SUCCESS)
             return ret;
 
@@ -420,10 +407,10 @@ status_t page_cache_io(page_cache_t *cache, io_request_t *request) {
             ? (size_t)(PAGE_SIZE - (request->offset % PAGE_SIZE))
             : total;
 
-        ret = io_request_copy(request, mapping + (request->offset % PAGE_SIZE), count, true);
+        ret = io_request_copy(request, handle.mapping + (request->offset % PAGE_SIZE), count, true);
 
-        // TODO: This is looking up again unnecessarily
-        unmap_cache_page(cache, mapping, start, false, shared);
+        handle.dirty = request->op == IO_OP_WRITE;
+        release_cache_page(cache, &handle);
 
         if (ret != STATUS_SUCCESS)
             return ret;
@@ -434,16 +421,19 @@ status_t page_cache_io(page_cache_t *cache, io_request_t *request) {
 
     /* Handle any full pages. */
     while (total >= PAGE_SIZE) {
-        /* For writes, we pass the overwrite parameter as true to
-         * map_cache_page() here, so that if the page is not in the cache, its
-         * data will not be read in - we're about to overwrite it, so it would
-         * not be necessary. */
-        ret = map_cache_page(cache, start, request->op == IO_OP_WRITE, &mapping, &shared);
+        /* For writes, we don't need to read in pages we're about to overwrite. */
+        uint32_t flags = PAGE_CACHE_GET_PAGE_MAP;
+        if (request->op == IO_OP_WRITE)
+            flags |= PAGE_CACHE_GET_PAGE_OVERWRITE;
+
+        ret = get_cache_page(cache, start, flags, &handle);
         if (ret != STATUS_SUCCESS)
             return ret;
 
-        ret = io_request_copy(request, mapping, PAGE_SIZE, true);
-        unmap_cache_page(cache, mapping, start, false, shared);
+        ret = io_request_copy(request, handle.mapping, PAGE_SIZE, true);
+
+        handle.dirty = request->op == IO_OP_WRITE;
+        release_cache_page(cache, &handle);
 
         if (ret != STATUS_SUCCESS)
             return ret;
@@ -454,12 +444,14 @@ status_t page_cache_io(page_cache_t *cache, io_request_t *request) {
 
     /* Handle anything that's left. */
     if (total) {
-        ret = map_cache_page(cache, start, false, &mapping, &shared);
+        ret = get_cache_page(cache, start, PAGE_CACHE_GET_PAGE_MAP, &handle);
         if (ret != STATUS_SUCCESS)
             return ret;
 
-        ret = io_request_copy(request, mapping, total, true);
-        unmap_cache_page(cache, mapping, start, false, shared);
+        ret = io_request_copy(request, handle.mapping, total, true);
+
+        handle.dirty = request->op == IO_OP_WRITE;
+        release_cache_page(cache, &handle);
 
         if (ret != STATUS_SUCCESS)
             return ret;
