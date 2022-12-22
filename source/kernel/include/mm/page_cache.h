@@ -50,14 +50,6 @@ typedef struct page_cache_ops {
      * @param offset        Offset to write from.
      * @return              Status code describing result of operation. */
     status_t (*write_page)(struct page_cache *cache, const void *buf, offset_t offset);
-
-    /** Determine whether a page can be evicted.
-     * @note                If not provided, then behaviour will be as though
-     *                      the function returns true.
-     * @param cache         Cache the page belongs to.
-     * @param page          Page to check.
-     * @return              Whether the page can be evicted. */
-    bool (*evict_page)(struct page_cache *cache, page_t *page);
 } page_cache_ops_t;
 
 /** Structure containing a page-based data cache. */
