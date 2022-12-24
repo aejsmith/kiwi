@@ -257,7 +257,10 @@ static status_t file_io(object_handle_t *handle, io_request_t *request) {
         goto out;
     }
 
-    if (fhandle->file->type == FILE_TYPE_DIR || !fhandle->file->ops->io) {
+    if (fhandle->file->type == FILE_TYPE_DIR) {
+        ret = STATUS_IS_DIR;
+        goto out;
+    } else if (!fhandle->file->ops->io) {
         ret = STATUS_NOT_SUPPORTED;
         goto out;
     }
