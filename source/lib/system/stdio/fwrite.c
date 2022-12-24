@@ -43,8 +43,15 @@ size_t fwrite(const void *restrict ptr, size_t size, size_t nmemb, FILE *restric
         return 0;
 
     ret = write(stream->fd, ptr, size * nmemb);
-    if (ret <= 0)
+    if (ret <= 0) {
+        if (ret == 0) {
+            stream->eof = true;
+        } else {
+            stream->err = true;
+        }
+
         return 0;
+    }
 
     return ret / size;
 }

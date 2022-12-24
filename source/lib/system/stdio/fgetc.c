@@ -36,10 +36,10 @@ int fgetc(FILE *stream) {
 
     ret = read(stream->fd, &ch, 1);
     if (ret < 0) {
-        stream->err = 1;
+        stream->err = true;
         return EOF;
     } else if (ret < 1) {
-        stream->eof = 1;
+        stream->eof = true;
         return EOF;
     }
 

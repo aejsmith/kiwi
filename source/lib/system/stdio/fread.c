@@ -54,8 +54,13 @@ size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict strea
     /* Read remaining data. */
     if (count < total) {
         ret = read(stream->fd, &buf[count], total - count);
-        if (ret > 0)
+        if (ret > 0) {
             count += ret;
+        } else if (ret == 0) {
+            stream->eof = true;
+        } else {
+            stream->err = true;
+        }
     }
 
     return count / size;
