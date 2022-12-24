@@ -133,7 +133,7 @@ static status_t ata_device_begin_transfer(
     }
 
     /* Start the transfer. */
-    ata_channel_command(channel, transfer_commands[is_write][false][is_dma]);
+    ata_channel_command(channel, transfer_commands[is_write][is_lba48][is_dma]);
 
     *_transfer_count = count;
     *_is_dma         = is_dma;
