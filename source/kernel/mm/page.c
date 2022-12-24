@@ -171,9 +171,21 @@ static void page_writer(void *arg1, void *arg2) {
             /* Take the page and move the marker after it. */
             page_t *page = list_entry(marker.next, page_t, header);
             list_add_after(&page->header, &marker);
+
+            /*
+             * Try to mark the page as busy. If it was not previously busy, we
+             * are able to try to write it. Otherwise, something else is working
+             * on this page, so we ignore it for now.
+             *
+             * Successfully setting this flag guarantees that the page's cache
+             * will not be destroyed until we unset it.
+             */
+            if (page_set_flag(page, PAGE_BUSY) & PAGE_BUSY)
+                continue;
+
             spinlock_unlock(&queue->lock);
 
-            /* Write out the page. */
+            /* Write out the page. This will clear the busy flag. */
             if (page_cache_flush_page(page) == STATUS_SUCCESS) {
                 dprintf("page: page writer wrote page 0x%" PRIxPHYS "\n", page->addr);
                 written++;
@@ -227,8 +239,7 @@ void page_set_state(page_t *page, uint8_t state) {
     /* Remove from current queue. */
     remove_page_from_current_queue(page);
 
-    if (unlikely(state >= PAGE_QUEUE_COUNT))
-        fatal("Setting invalid state on 0x%" PRIxPHYS " (%u)\n", page->addr, state);
+    assert(state < PAGE_QUEUE_COUNT);
 
     /* Set new state and push on the new queue. */
     page->state = state;
@@ -314,8 +325,8 @@ static void page_free_internal(page_t *page) {
 
     /* Reset the page structure to a clear state. */
     atomic_store(&page->flags, 0);
-    page->state   = PAGE_STATE_FREE;
-    page->private = NULL;
+    page->state       = PAGE_STATE_FREE;
+    page->cache_entry = NULL;
 
     /* Push it onto the appropriate list. */
     list_prepend(&free_page_lists[memory_ranges[page->range].freelist].pages, &page->header);
@@ -681,10 +692,10 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
 
         kdb_printf("Page 0x%" PRIxPHYS " (%p) (Range: %u)\n", page->addr, page, page->range);
         kdb_printf("=================================================\n");
-        kdb_printf("state:   %d\n", page->state);
-        kdb_printf("flags:   0x%x\n", page_flags(page));
-        kdb_printf("count:   %d\n", page->count);
-        kdb_printf("private: %p\n", page->private);
+        kdb_printf("state:       %d\n", page->state);
+        kdb_printf("flags:       0x%x\n", page_flags(page));
+        kdb_printf("count:       %d\n", page->count);
+        kdb_printf("cache_entry: %p\n", page->cache_entry);
     } else {
         kdb_printf("Start              End                Freelist Pages\n");
         kdb_printf("=====              ===                ======== =====\n");

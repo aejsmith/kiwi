@@ -87,6 +87,7 @@ static inline bool avl_tree_empty(avl_tree_t *tree) {
 extern void avl_tree_insert(avl_tree_t *tree, avl_tree_key_t key, avl_tree_node_t *node);
 extern void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node);
 extern avl_tree_node_t *avl_tree_lookup_node(avl_tree_t *tree, avl_tree_key_t key);
+extern avl_tree_node_t *avl_tree_lookup_ge_node(avl_tree_t *tree, avl_tree_key_t key);
 
 /** Look up an entry in an AVL tree.
  * @param tree          Tree to look up in.

@@ -32,20 +32,32 @@
 #include <sync/spinlock.h>
 
 struct page;
+struct page_cache_entry;
 
 /** Structure describing a page in memory. */
 typedef struct page {
     list_t header;                  /**< Link to page queue. */
 
-    /** Basic page information. */
     phys_ptr_t addr;                /**< Physical address of page. */
     uint8_t range;                  /**< Memory range that the page belongs to. */
     uint8_t state;                  /**< State of the page. */
     atomic_uint16_t flags;          /**< Flags for the page. */
 
-    /** Information about how the page is being used. */
-    refcount_t count;               /**< Reference count for use by owner. */
-    void *private;                  /**< Private data pointer for the owner. */
+    /**
+     * Reference count for the page, depending on user:
+     *  - Page cache: Number of current users of the page, used to determine
+     *    when to transition between allocated and cached states. Modified only
+     *    under owning cache's lock.
+     *  - VM anon map: Number of mappings sharing this page. Atomicity is
+     *    required since shared between any number of mappings.
+    */
+    refcount_t count;
+
+    /**
+     * Owning page cache entry. Only valid when the page is known to belong to
+     * a cache (e.g. when the page is in a cached state).
+     */
+    struct page_cache_entry *cache_entry;
 } page_t;
 
 /** Possible states of a page. */
@@ -88,7 +100,23 @@ enum {
      * specific MMU code if any writes actually occurred to a page while mapped
      * writable.
      */
-    PAGE_FLAG_DIRTY = (1<<0),
+    PAGE_DIRTY      = (1<<0),
+
+    /**
+     * Page is busy. This is used by the page cache, when it is set any of the
+     * following is happening:
+     *
+     *  - It is transitioning from CACHED_* (unused) to ALLOCATED.
+     *  - It is being initially read in (in ALLOCATED).
+     *  - It is being written back (in CACHED_DIRTY).
+     *  - It is being evicted, including when the cache is being destroyed (in
+     *    CACHED_CLEAN or CACHED_DIRTY).
+     *
+     * When the page is in an unused state, the flag must be atomically set and
+     * tested, since it is set outside the cache lock by page maintenance
+     * operations (page writer, memory reclaim).
+     */
+    PAGE_BUSY       = (1<<1),
 };
 
 /** Structure containing physical memory usage statistics. */
@@ -104,16 +132,18 @@ extern bool page_init_done;
 
 /** Atomically adds the given flag(s) to the page's flags.
  * @param page          Page to set for.
- * @param flags         Flag(s) to set. */
-static inline void page_set_flag(page_t *page, uint16_t flags) {
-    atomic_fetch_or(&page->flags, flags);
+ * @param flags         Flag(s) to set.
+ * @return              Previous flags. */
+static inline uint16_t page_set_flag(page_t *page, uint16_t flags) {
+    return atomic_fetch_or(&page->flags, flags);
 }
 
 /** Atomically clears the given flag(s) from the page's flags.
  * @param page          Page to set for.
- * @param flags         Flag(s) to clear. */
-static inline void page_clear_flag(page_t *page, uint16_t flags) {
-    atomic_fetch_and(&page->flags, ~flags);
+ * @param flags         Flag(s) to clear.
+ * @return              Previous flags. */
+static inline uint16_t page_clear_flag(page_t *page, uint16_t flags) {
+    return atomic_fetch_and(&page->flags, ~flags);
 }
 
 /** Gets a page's flags.

@@ -260,9 +260,15 @@ void ext2_inode_put(ext2_inode_t *inode) {
     }
 
     /* Discard outstanding writes if the file is free. */
-    // TODO: How to handle write errors? The cache is currently not freed if
-    // this fails!
-    page_cache_destroy(inode->cache, is_free);
+    // TODO: How to handle write errors? When we have a parent disk cache, it
+    // should be flushed to there and we won't lose data.
+    // TODO: When do we free the blocks if removed? Must be here.
+    status_t ret = page_cache_destroy(inode->cache);
+    if (ret != STATUS_SUCCESS) {
+        kprintf(
+            LOG_ERROR, "ext2: %pD: failed to write cache for inode %" PRIu32 "\n",
+            inode->mount->fs->device, inode->num);
+    }
 
     file_map_destroy(inode->map);
 

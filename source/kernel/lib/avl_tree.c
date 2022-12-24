@@ -294,6 +294,32 @@ avl_tree_node_t *avl_tree_lookup_node(avl_tree_t *tree, avl_tree_key_t key) {
 }
 
 /**
+ * Looks up the first node in an AVL tree with a key greater or equal the given
+ * key.
+ *
+ * @param tree          Tree to look up in.
+ * @param key           Key to look for.
+ *
+ * @return              Pointer to node if found, NULL if none found.
+ */
+avl_tree_node_t *avl_tree_lookup_ge_node(avl_tree_t *tree, avl_tree_key_t key) {
+    avl_tree_node_t *node   = tree->root;
+    avl_tree_node_t *result = NULL;
+    while (node) {
+        if (node->key > key) {
+            result = node;
+            node   = node->left;
+        } else if (node->key < key) {
+            node = node->right;
+        } else {
+            return node;
+        }
+    }
+
+    return result;
+}
+
+/**
  * Gets a pointer to the first node (the one with the lowest key) in an AVL
  * tree by descending down the tree's left-hand side.
  *

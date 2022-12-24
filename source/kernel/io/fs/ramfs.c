@@ -59,7 +59,7 @@ static void ramfs_node_free(fs_node_t *node) {
     /* Destroy the data caches. */
     switch (node->file.type) {
         case FILE_TYPE_REGULAR:
-            page_cache_destroy(data->cache, true);
+            page_cache_destroy(data->cache);
             break;
         case FILE_TYPE_SYMLINK:
             kfree(data->target);
