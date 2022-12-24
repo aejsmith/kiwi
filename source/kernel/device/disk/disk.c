@@ -51,24 +51,27 @@ static void disk_device_size(device_t *node, offset_t *_size, size_t *_block_siz
     *_block_size = device->block_size;
 }
 
-/** Allocate a block buffer suitable for transfers to/from the device. */
+/**
+ * Allocates a block buffer suitable for transfers to/from the device. This uses
+ * the device's optimal_block_size.
+ */
 static void *alloc_block_buffer(disk_device_t *device, dma_ptr_t *_dma) {
     if (device->flags & DISK_DEVICE_DMA) {
         /* TODO: Once we have a DMA pool allocator API we should use that for
          * buffer allocations: DMA constraints might not hit the allocation fast
          * path, and could also be smaller than a page. */
-        size_t size = round_up(device->block_size, PAGE_SIZE);
+        size_t size = round_up(device->optimal_block_size, PAGE_SIZE);
         dma_alloc(device->node, size, &device->dma_constraints, MM_KERNEL, _dma);
         return dma_map(device->node, *_dma, size, MM_KERNEL);
     } else {
         *_dma = 0;
-        return kmalloc(device->block_size, MM_KERNEL);
+        return kmalloc(device->optimal_block_size, MM_KERNEL);
     }
 }
 
 static void free_block_buffer(disk_device_t *device, void *buf, dma_ptr_t dma) {
     if (device->flags & DISK_DEVICE_DMA) {
-        size_t size = round_up(device->block_size, PAGE_SIZE);
+        size_t size = round_up(device->optimal_block_size, PAGE_SIZE);
         dma_unmap(buf, size);
         dma_free(device->node, dma, size);
     } else {
@@ -100,20 +103,19 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
     uint64_t start = request->offset / device->block_size;
     uint64_t end   = (request->offset + (total - 1)) / device->block_size;
 
-    /* Temporary buffer allocated for partial block transfers if needed. */
-    void *temp_buf     = NULL;
-    dma_ptr_t temp_dma = 0;
+    void *block_buf     = NULL;
+    dma_ptr_t block_dma = 0;
 
     /* If we're not starting on a block boundary, we need to do a partial
      * transfer on the initial block to get us up to a block boundary. If the
      * transfer only goes across one block, this will handle it. */
     uint32_t block_offset = request->offset % device->block_size;
     if (block_offset > 0) {
-        temp_buf = alloc_block_buffer(device, &temp_dma);
+        block_buf = alloc_block_buffer(device, &block_dma);
 
         /* For a write, we need to partially update the current block contents,
          * so we need to read in the block regardless of the operation. */
-        ret = device->ops->read_blocks(device, temp_buf, temp_dma, start, 1);
+        ret = device->ops->read_blocks(device, block_buf, block_dma, start, 1);
         if (ret != STATUS_SUCCESS)
             goto out;
 
@@ -121,13 +123,13 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
             ? (size_t)(device->block_size - block_offset)
             : total;
 
-        ret = io_request_copy(request, temp_buf + block_offset, size, false);
+        ret = io_request_copy(request, block_buf + block_offset, size, false);
         if (ret != STATUS_SUCCESS)
             goto out;
 
         /* If we're writing, write back the partially updated block. */
         if (request->op == IO_OP_WRITE) {
-            ret = device->ops->write_blocks(device, temp_buf, temp_dma, start, 1);
+            ret = device->ops->write_blocks(device, block_buf, block_dma, start, 1);
             if (ret != STATUS_SUCCESS)
                 goto out;
         }
@@ -140,70 +142,71 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
     /* Handle any full blocks. */
     while (total >= device->block_size) {
         /*
-         * Use the request memory directly if it is a contiguous accessible
-         * block, otherwise use an intermediate buffer.
+         * TODO: Use the request memory directly where possible. This needs an
+         * io_request_map() equivalent for DMA. Should be able to check whether
+         * memory satisfies constraints and allow direct mapping if so.
          *
-         * TODO: io_request_map() equivalent for DMA. Should be able to check
-         * whether memory satisfies constraints and allow direct mapping if so.
-         *
-         * TODO: Should be able to do multiple block transfers here in one go.
-         * We should change the read/write_blocks APIs to accept a list of
+         * This would also need some work to support multiple block transfers
+         * in one go. The read/write_blocks APIs would need to accept a list of
          * transfers rather than just one contiguous range: DMA hardware can
          * typically handle a list of non-contiguous transfer regions for one
          * hardware request, so we should compile as many block transfers as
          * we can into one request to the driver.
          */
-        dma_ptr_t dest_dma = 0;
-        void *dest_buf = NULL;//io_request_map(request, device->block_size, false);
-        if (!dest_buf) {
-            if (!temp_buf)
-                temp_buf = alloc_block_buffer(device, &temp_dma);
 
-            dest_buf = temp_buf;
-            dest_dma = temp_dma;
-
-            if (request->op == IO_OP_WRITE) {
-                /* Get the data to write into the temporary buffer. */
-                ret = io_request_copy(request, dest_buf, device->block_size, false);
-                if (ret != STATUS_SUCCESS)
-                    goto out;
-            }
+        /* Use optimal block size if we can - large enough transfer and aligned
+         * to the optimal size. */
+        uint32_t curr_block_size = device->block_size;
+        uint32_t curr_blocks     = 1;
+        if (total >= device->optimal_block_size && (start & (device->blocks_per_optimal_block - 1)) == 0) {
+            curr_block_size = device->optimal_block_size;
+            curr_blocks     = device->blocks_per_optimal_block;
         }
 
-        ret = (request->op == IO_OP_WRITE)
-            ? device->ops->write_blocks(device, dest_buf, dest_dma, start, 1)
-            : device->ops->read_blocks(device, dest_buf, dest_dma, start, 1);
-        if (ret != STATUS_SUCCESS)
-            goto out;
+        if (!block_buf)
+            block_buf = alloc_block_buffer(device, &block_dma);
 
-        if (dest_buf == temp_buf && request->op == IO_OP_READ) {
-            /* Copy back from the temporary buffer. */
-            ret = io_request_copy(request, dest_buf, device->block_size, false);
+        if (request->op == IO_OP_WRITE) {
+            /* Get the data to write into the temporary buffer. */
+            ret = io_request_copy(request, block_buf, curr_block_size, false);
             if (ret != STATUS_SUCCESS)
                 goto out;
         }
 
-        request->transferred += device->block_size;
-        total -= device->block_size;
-        start++;
+        ret = (request->op == IO_OP_WRITE)
+            ? device->ops->write_blocks(device, block_buf, block_dma, start, curr_blocks)
+            : device->ops->read_blocks(device, block_buf, block_dma, start, curr_blocks);
+        if (ret != STATUS_SUCCESS)
+            goto out;
+
+        if (request->op == IO_OP_READ) {
+            /* Copy back from the temporary buffer. */
+            ret = io_request_copy(request, block_buf, curr_block_size, false);
+            if (ret != STATUS_SUCCESS)
+                goto out;
+        }
+
+        request->transferred += curr_block_size;
+        total -= curr_block_size;
+        start += curr_blocks;
     }
 
     /* Handle anything that's left. This is similar to the first case. */
     if (total) {
-        if (!temp_buf)
-            temp_buf = alloc_block_buffer(device, &temp_dma);
+        if (!block_buf)
+            block_buf = alloc_block_buffer(device, &block_dma);
 
         /* As before, for a write, need to partial update. */
-        ret = device->ops->read_blocks(device, temp_buf, temp_dma, start, 1);
+        ret = device->ops->read_blocks(device, block_buf, block_dma, start, 1);
         if (ret != STATUS_SUCCESS)
             goto out;
 
-        ret = io_request_copy(request, temp_buf, total, false);
+        ret = io_request_copy(request, block_buf, total, false);
         if (ret != STATUS_SUCCESS)
             goto out;
 
         if (request->op == IO_OP_WRITE) {
-            ret = device->ops->write_blocks(device, temp_buf, temp_dma, start, 1);
+            ret = device->ops->write_blocks(device, block_buf, block_dma, start, 1);
             if (ret != STATUS_SUCCESS)
                 goto out;
         }
@@ -214,8 +217,8 @@ static status_t disk_device_io(device_t *node, file_handle_t *handle, io_request
     ret = STATUS_SUCCESS;
 
 out:
-    if (temp_buf)
-        free_block_buffer(device, temp_buf, temp_dma);
+    if (block_buf)
+        free_block_buffer(device, block_buf, block_dma);
 
     return ret;
 }
@@ -283,6 +286,12 @@ __export status_t disk_device_create(disk_device_t *device, device_t *parent) {
  */
 __export void disk_device_publish(disk_device_t *device) {
     device->size = device->block_count * device->block_size;
+
+    /* If physical block size is larger than the logical block size, that is
+     * more optimal for I/O. Additionally, we set the optimal size to at least
+     * PAGE_SIZE, because most disk access will be through the page cache. */
+    device->optimal_block_size       = max(PAGE_SIZE, device->physical_block_size);
+    device->blocks_per_optimal_block = device->optimal_block_size / device->block_size;
 
     device_publish(device->node);
 

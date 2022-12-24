@@ -75,6 +75,8 @@ typedef struct disk_device {
 
     /** Internal fields. */
     uint64_t size;                      /**< Total size of the device. */
+    uint32_t optimal_block_size;        /**< Optimal I/O block size. */
+    uint32_t blocks_per_optimal_block;  /**< Number of logical blocks per optimal block. */
 } disk_device_t;
 
 /** Disk device flags. */
