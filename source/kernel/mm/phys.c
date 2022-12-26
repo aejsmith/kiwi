@@ -50,7 +50,7 @@
  *
  * @return              Pointer to mapped data, or NULL on failure.
  */
-void *phys_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
+void *phys_map(phys_ptr_t addr, size_t size, uint32_t mmflag) {
     return phys_map_etc(addr, size, PMAP_MMU_FLAGS, mmflag);
 }
 
@@ -80,7 +80,7 @@ static inline bool pmap_accessible(phys_ptr_t addr, size_t size, uint32_t flags)
  *
  * @return              Pointer to mapped data, or NULL on failure.
  */
-void *phys_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, unsigned mmflag) {
+void *phys_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, uint32_t mmflag) {
     if (unlikely(!size))
         return NULL;
 
@@ -119,7 +119,7 @@ static void device_phys_map_resource_release(device_t *device, void *data) {
  *
  * @param device        Device to register to.
  */
-void *device_phys_map(device_t *device, phys_ptr_t addr, size_t size, unsigned mmflag) {
+void *device_phys_map(device_t *device, phys_ptr_t addr, size_t size, uint32_t mmflag) {
     return device_phys_map_etc(device, addr, size, PMAP_MMU_FLAGS, mmflag);
 }
 
@@ -133,7 +133,7 @@ void *device_phys_map(device_t *device, phys_ptr_t addr, size_t size, unsigned m
  */
 void *device_phys_map_etc(
     device_t *device, phys_ptr_t addr, size_t size, uint32_t flags,
-    unsigned mmflag)
+    uint32_t mmflag)
 {
     void *mapping = phys_map(addr, size, mmflag);
 
@@ -173,7 +173,7 @@ void phys_unmap(void *addr, size_t size) {
  * @param mmflag        Allocation flags for mapping page in memory.
  * @return              True if successful, false if unable to map pages into
  *                      memory (cannot happen if MM_WAIT is specified). */
-bool phys_copy(phys_ptr_t dest, phys_ptr_t source, unsigned mmflag) {
+bool phys_copy(phys_ptr_t dest, phys_ptr_t source, uint32_t mmflag) {
     assert(!(dest % PAGE_SIZE));
     assert(!(source % PAGE_SIZE));
 

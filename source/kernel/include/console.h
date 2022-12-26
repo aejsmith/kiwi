@@ -102,5 +102,5 @@ typedef struct fb_info {
 } fb_info_t;
 
 extern void fb_console_info(fb_info_t *info);
-extern status_t fb_console_configure(const fb_info_t *info, unsigned mmflag);
+extern status_t fb_console_configure(const fb_info_t *info, uint32_t mmflag);
 extern void fb_console_early_init(struct kboot_tag_video *video);

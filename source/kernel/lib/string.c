@@ -498,7 +498,7 @@ char *strcat(char *__restrict dest, const char *__restrict src) {
  *
  * @return              Pointer to duplicated memory.
  */
-void *kmemdup(const void *src, size_t count, unsigned mmflag) {
+void *kmemdup(const void *src, size_t count, uint32_t mmflag) {
     char *dest;
 
     if (!count)
@@ -520,7 +520,7 @@ void *kmemdup(const void *src, size_t count, unsigned mmflag) {
  *
  * @return              Pointer to the allocated buffer containing the string.
  */
-char *kstrdup(const char *src, unsigned mmflag) {
+char *kstrdup(const char *src, uint32_t mmflag) {
     size_t len = strlen(src) + 1;
     char *dup;
 
@@ -544,7 +544,7 @@ char *kstrdup(const char *src, unsigned mmflag) {
  *
  * @return              Pointer to the allocated buffer containing the string.
  */
-char *kstrndup(const char *src, size_t n, unsigned mmflag) {
+char *kstrndup(const char *src, size_t n, uint32_t mmflag) {
     size_t len;
     char *dup;
 
@@ -569,7 +569,7 @@ char *kstrndup(const char *src, size_t n, unsigned mmflag) {
  *                      The string returned is allocated via kmalloc(), so
  *                      should be freed using kfree().
  */
-char *kbasename(const char *path, unsigned mmflag) {
+char *kbasename(const char *path, uint32_t mmflag) {
     char *ptr, *dup, *ret;
     size_t len;
 
@@ -620,7 +620,7 @@ char *kbasename(const char *path, unsigned mmflag) {
  * @return              Pointer to string. The string returned is allocated via
  *                      kmalloc(), so should be freed using kfree().
  */
-char *kdirname(const char *path, unsigned mmflag) {
+char *kdirname(const char *path, uint32_t mmflag) {
     char *ptr, *dup, *ret;
     size_t len;
 

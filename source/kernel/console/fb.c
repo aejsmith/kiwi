@@ -418,7 +418,7 @@ void fb_console_info(fb_info_t *info) {
  * @param info          Information for the new framebuffer.
  * @param mmflag        Allocation behaviour flags.
  * @return              Status code describing the result of the operation. */
-status_t fb_console_configure(const fb_info_t *info, unsigned mmflag) {
+status_t fb_console_configure(const fb_info_t *info, uint32_t mmflag) {
     /* Map in the framebuffer and allocate a backbuffer. */
     size_t size      = info->height * info->pitch;
     size             = round_up(size, PAGE_SIZE);

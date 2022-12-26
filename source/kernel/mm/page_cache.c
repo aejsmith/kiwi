@@ -134,7 +134,7 @@ static void page_cache_ctor(void *obj, void *data) {
     spinlock_init(&cache->waiters_lock, "page_cache_waiters_lock");
 }
 
-static page_cache_entry_t *alloc_cache_page(page_cache_t *cache, unsigned mmflag) {
+static page_cache_entry_t *alloc_cache_page(page_cache_t *cache, uint32_t mmflag) {
     /* These are always allocated with MM_KERNEL. */
     page_cache_entry_t *entry = slab_cache_alloc(page_cache_entry_cache, MM_KERNEL);
 

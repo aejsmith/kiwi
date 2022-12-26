@@ -95,12 +95,12 @@ typedef struct slab_cache {
 #define SLAB_CACHE_LARGE    (1<<1)      /**< Cache is a large object cache. */
 #define SLAB_CACHE_LATEMAG  (1<<3)      /**< Internal, do not set. */
 
-extern void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag);
+extern void *slab_cache_alloc(slab_cache_t *cache, uint32_t mmflag);
 extern void slab_cache_free(slab_cache_t *cache, void *obj);
 
 extern slab_cache_t *slab_cache_create(
     const char *name, size_t size, size_t align, slab_ctor_t ctor,
-    slab_dtor_t dtor, void *data, unsigned flags, unsigned mmflag);
+    slab_dtor_t dtor, void *data, unsigned flags, uint32_t mmflag);
 extern void slab_cache_destroy(slab_cache_t *cache);
 
 /** Create a slab cache for allocation of objects of a certain type.

@@ -146,7 +146,7 @@ extern bool vm_fault(struct frame *frame, ptr_t addr, int reason, uint32_t acces
 
 extern status_t vm_region_map(
     vm_region_t *region, phys_ptr_t base, phys_size_t size, uint32_t flags,
-    unsigned mmflag);
+    uint32_t mmflag);
 
 extern status_t vm_map(
     vm_aspace_t *as, ptr_t *_addr, size_t size, size_t align, uint32_t spec,

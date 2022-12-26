@@ -95,7 +95,7 @@ static void get_page_constraints(dma_constraints_t *dest, const dma_constraints_
  */
 status_t dma_alloc(
     device_t *device, phys_size_t size, const dma_constraints_t *constraints,
-    unsigned mmflag, dma_ptr_t *_addr)
+    uint32_t mmflag, dma_ptr_t *_addr)
 {
     // TODO: Translate constraints to physical.
     dma_constraints_t constr;
@@ -129,7 +129,7 @@ void dma_free(device_t *device, dma_ptr_t addr, phys_size_t size) {
  */
 status_t device_dma_alloc(
     device_t *device, phys_size_t size, const dma_constraints_t *constraints,
-    unsigned mmflag, dma_ptr_t *_addr)
+    uint32_t mmflag, dma_ptr_t *_addr)
 {
     // TODO: Translate constraints to physical.
     dma_constraints_t constr;
@@ -159,7 +159,7 @@ status_t device_dma_alloc(
  *
  * @return              Pointer to mapped memory, or NULL on failure.
  */
-void *dma_map(device_t *device, dma_ptr_t addr, size_t size, unsigned mmflag) {
+void *dma_map(device_t *device, dma_ptr_t addr, size_t size, uint32_t mmflag) {
     return phys_map(dma_to_phys(device, addr), size, mmflag);
 }
 
@@ -179,7 +179,7 @@ void *dma_map(device_t *device, dma_ptr_t addr, size_t size, unsigned mmflag) {
  */
 void *dma_map_etc(
     device_t *device, dma_ptr_t addr, size_t size, uint32_t flags,
-    unsigned mmflag)
+    uint32_t mmflag)
 {
     return phys_map_etc(dma_to_phys(device, addr), size, flags, mmflag);
 }
@@ -197,7 +197,7 @@ void dma_unmap(void *addr, size_t size) {
  *
  * @see                 dma_map().
  */
-void *device_dma_map(device_t *device, dma_ptr_t addr, size_t size, unsigned mmflag) {
+void *device_dma_map(device_t *device, dma_ptr_t addr, size_t size, uint32_t mmflag) {
     return device_phys_map(device, dma_to_phys(device, addr), size, mmflag);
 }
 
@@ -209,7 +209,7 @@ void *device_dma_map(device_t *device, dma_ptr_t addr, size_t size, unsigned mmf
  */
 void *device_dma_map_etc(
     device_t *device, dma_ptr_t addr, size_t size, uint32_t flags,
-    unsigned mmflag)
+    uint32_t mmflag)
 {
     return device_phys_map_etc(device, dma_to_phys(device, addr), size, flags, mmflag);
 }

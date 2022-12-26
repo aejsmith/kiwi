@@ -230,7 +230,7 @@ extern status_t device_attr(
     size_t size, size_t *_written);
 
 extern void *device_resource_alloc(
-    size_t size, device_resource_release_t release, unsigned mmflag) __malloc;
+    size_t size, device_resource_release_t release, uint32_t mmflag) __malloc;
 extern void device_resource_free(void *data);
 extern void device_resource_register(device_t *device, void *data);
 

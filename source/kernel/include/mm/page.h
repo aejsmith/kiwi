@@ -155,9 +155,9 @@ static inline uint16_t page_flags(page_t *page) {
 
 extern void page_set_state(page_t *page, uint8_t state);
 extern page_t *page_lookup(phys_ptr_t addr);
-extern page_t *page_alloc(unsigned mmflag);
+extern page_t *page_alloc(uint32_t mmflag);
 extern void page_free(page_t *page);
-extern page_t *page_copy(page_t *page, unsigned mmflag);
+extern page_t *page_copy(page_t *page, uint32_t mmflag);
 
 extern void page_stats(page_stats_t *stats);
 

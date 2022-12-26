@@ -732,7 +732,7 @@ static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
  */
 status_t vm_region_map(
     vm_region_t *region, phys_ptr_t base, phys_size_t size, uint32_t flags,
-    unsigned mmflag)
+    uint32_t mmflag)
 {
     assert(!(base % PAGE_SIZE));
     assert(!(size % PAGE_SIZE));

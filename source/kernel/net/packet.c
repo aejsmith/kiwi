@@ -53,7 +53,7 @@ static slab_cache_t *net_packet_cache;
  * @return              Allocated network buffer, or NULL on failure (only
  *                      if mmflag allows failure).
  */
-__export net_buffer_t *net_buffer_kmalloc(uint32_t size, unsigned mmflag, void **_data) {
+__export net_buffer_t *net_buffer_kmalloc(uint32_t size, uint32_t mmflag, void **_data) {
     assert(size > 0);
 
     void *data = kmalloc(size, mmflag);
@@ -92,7 +92,7 @@ __export net_buffer_t *net_buffer_kmalloc(uint32_t size, unsigned mmflag, void *
  * @return              Allocated network buffer, or NULL on failure (only
  *                      if mmflag allows failure).
  */
-__export net_buffer_t *net_buffer_slab_alloc(slab_cache_t *cache, uint32_t size, unsigned mmflag, void **_data) {
+__export net_buffer_t *net_buffer_slab_alloc(slab_cache_t *cache, uint32_t size, uint32_t mmflag, void **_data) {
     assert(size > 0);
     assert(cache->obj_size >= sizeof(net_buffer_slab_t) + size);
 

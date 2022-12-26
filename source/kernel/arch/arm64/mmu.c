@@ -62,7 +62,7 @@ static uint64_t *map_table(phys_ptr_t addr) {
     return phys_map(addr, PAGE_SIZE, MM_BOOT);
 }
 
-static phys_ptr_t alloc_table(unsigned mmflag) {
+static phys_ptr_t alloc_table(uint32_t mmflag) {
     phys_ptr_t ret;
 
     if (likely(page_init_done)) {
@@ -88,7 +88,7 @@ static phys_ptr_t alloc_table(unsigned mmflag) {
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to mapped table, NULL if not found or on
  *                      allocation failure. */
-static uint64_t *get_ttl1(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
+static uint64_t *get_ttl1(mmu_context_t *ctx, ptr_t virt, bool alloc, uint32_t mmflag) {
     uint64_t *ttl0 = map_table(ctx->arch.ttl0);
 
     unsigned ttl0e = (virt / ARM64_TTL1_RANGE) % 512;
@@ -111,7 +111,7 @@ static uint64_t *get_ttl1(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to mapped table, NULL if not found or on
  *                      allocation failure. */
-static uint64_t *get_ttl2(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
+static uint64_t *get_ttl2(mmu_context_t *ctx, ptr_t virt, bool alloc, uint32_t mmflag) {
     uint64_t *ttl1 = get_ttl1(ctx, virt, alloc, mmflag);
     if (!ttl1)
         return NULL;
@@ -137,7 +137,7 @@ static uint64_t *get_ttl2(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to mapped page table, NULL if not found or on
  *                      allocation failure. */
-static uint64_t *get_ttl3(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
+static uint64_t *get_ttl3(mmu_context_t *ctx, ptr_t virt, bool alloc, uint32_t mmflag) {
     uint64_t *ttl2 = get_ttl2(ctx, virt, alloc, mmflag);
     if (!ttl2)
         return NULL;
@@ -205,7 +205,7 @@ static inline uint64_t calc_tte_flags(mmu_context_t *ctx, uint32_t flags) {
 }
 
 /** Initialize a new context. */
-status_t arch_mmu_context_init(mmu_context_t *ctx, unsigned mmflag) {
+status_t arch_mmu_context_init(mmu_context_t *ctx, uint32_t mmflag) {
     /* TODO: Will need to allocate ASIDs for user contexts. */ 
     fatal_todo();
 }
@@ -218,7 +218,7 @@ void arch_mmu_context_destroy(mmu_context_t *ctx) {
 /** Map a page in a context. */
 status_t arch_mmu_context_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t flags,
-    unsigned mmflag)
+    uint32_t mmflag)
 {
     uint64_t *ttl3 = get_ttl3(ctx, virt, true, mmflag);
     if (!ttl3)

@@ -45,7 +45,7 @@ static unsigned long bit_offset(unsigned long bit) {
  *
  * @return              Pointer to allocated bitmap, or null on failure.
  */
-unsigned long *bitmap_alloc(size_t nbits, unsigned mmflag) {
+unsigned long *bitmap_alloc(size_t nbits, uint32_t mmflag) {
     unsigned long *bitmap = kmalloc(bitmap_bytes(nbits), mmflag);
 
     if (likely(bitmap))

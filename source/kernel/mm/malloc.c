@@ -64,7 +64,7 @@ static slab_cache_t *kmalloc_caches[KMALLOC_CACHE_MAX - KMALLOC_CACHE_MIN + 1];
  * @param size          Size of block.
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to block on success, NULL on failure. */
-void *kmalloc(size_t size, unsigned mmflag) {
+void *kmalloc(size_t size, uint32_t mmflag) {
     size_t total = size + sizeof(alloc_tag_t);
     alloc_tag_t *addr;
 
@@ -106,7 +106,7 @@ void *kmalloc(size_t size, unsigned mmflag) {
  * @param size          Size of each element.
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to block on success, NULL on failure. */
-void *kcalloc(size_t nmemb, size_t size, unsigned mmflag) {
+void *kcalloc(size_t nmemb, size_t size, uint32_t mmflag) {
     return kmalloc(nmemb * size, mmflag | MM_ZERO);
 }
 
@@ -122,7 +122,7 @@ void *kcalloc(size_t nmemb, size_t size, unsigned mmflag) {
  *
  * @return              Pointer to block on success, NULL on failure.
  */
-void *krealloc(void *addr, size_t size, unsigned mmflag) {
+void *krealloc(void *addr, size_t size, uint32_t mmflag) {
     if (!addr)
         return kmalloc(size, mmflag);
 
@@ -181,7 +181,7 @@ void kfree(void *addr) {
  *
  * @return              Pointer to block on success, NULL on failure.
  */
-void *device_kmalloc(device_t *device, size_t size, unsigned mmflag) {
+void *device_kmalloc(device_t *device, size_t size, uint32_t mmflag) {
     /* We just allocate this directly with the tracking data. */
     void *mem = device_resource_alloc(size, NULL, mmflag);
 

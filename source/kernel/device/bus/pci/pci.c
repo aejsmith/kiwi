@@ -170,7 +170,7 @@ static status_t get_map_params(
  * @return              STATUS_NOT_FOUND if BAR does not exist.
  *                      STATUS_NO_MEMORY if mapping the BAR failed.
  */
-__export status_t pci_bar_map(pci_device_t *device, uint8_t index, unsigned mmflag, io_region_t *_region) {
+__export status_t pci_bar_map(pci_device_t *device, uint8_t index, uint32_t mmflag, io_region_t *_region) {
     return pci_bar_map_etc(device, index, 0, 0, MMU_ACCESS_RW, mmflag, _region);
 }
 
@@ -206,7 +206,7 @@ __export status_t pci_bar_map(pci_device_t *device, uint8_t index, unsigned mmfl
  */
 __export status_t pci_bar_map_etc(
     pci_device_t *device, uint8_t index, phys_ptr_t offset, phys_size_t size,
-    uint32_t flags, unsigned mmflag, io_region_t *_region)
+    uint32_t flags, uint32_t mmflag, io_region_t *_region)
 {
     phys_ptr_t base = offset;
     status_t ret = get_map_params(device, index, &base, &size, &flags);
@@ -273,7 +273,7 @@ __export void pci_bar_unmap_etc(
  * @param owner         Device to register to.
  */
 __export status_t device_pci_bar_map(
-    device_t *owner, pci_device_t *device, uint8_t index, unsigned mmflag,
+    device_t *owner, pci_device_t *device, uint8_t index, uint32_t mmflag,
     io_region_t *_region)
 {
     return device_pci_bar_map_etc(owner, device, index, 0, 0, MMU_ACCESS_RW, mmflag, _region);
@@ -289,7 +289,7 @@ __export status_t device_pci_bar_map(
  */
 __export status_t device_pci_bar_map_etc(
     device_t *owner, pci_device_t *device, uint8_t index, phys_ptr_t offset,
-    phys_size_t size, uint32_t flags, unsigned mmflag, io_region_t *_region)
+    phys_size_t size, uint32_t flags, uint32_t mmflag, io_region_t *_region)
 {
     phys_ptr_t base = offset;
     status_t ret = get_map_params(device, index, &base, &size, &flags);

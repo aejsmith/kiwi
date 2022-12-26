@@ -71,7 +71,7 @@ typedef struct device_io_resource {
  *
  * @return              I/O region handle, or IO_REGION_INVALID on failure.
  */
-io_region_t mmio_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
+io_region_t mmio_map(phys_ptr_t addr, size_t size, uint32_t mmflag) {
     return mmio_map_etc(addr, size, MMIO_MAP_MMU_FLAGS, mmflag);
 }
 
@@ -87,7 +87,7 @@ io_region_t mmio_map(phys_ptr_t addr, size_t size, unsigned mmflag) {
  *
  * @return              I/O region handle, or IO_REGION_INVALID on failure.
  */
-io_region_t mmio_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, unsigned mmflag) {
+io_region_t mmio_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, uint32_t mmflag) {
     assert(size > 0);
 
     return (io_region_t)phys_map_etc(addr, size, flags, mmflag);
@@ -101,7 +101,7 @@ io_region_t mmio_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, unsigned 
  *
  * @param device        Device to register to.
  */
-io_region_t device_mmio_map(device_t *device, phys_ptr_t addr, size_t size, unsigned mmflag) {
+io_region_t device_mmio_map(device_t *device, phys_ptr_t addr, size_t size, uint32_t mmflag) {
     return device_mmio_map_etc(device, addr, size, MMIO_MAP_MMU_FLAGS, mmflag);
 }
 
@@ -115,7 +115,7 @@ io_region_t device_mmio_map(device_t *device, phys_ptr_t addr, size_t size, unsi
  */
 io_region_t device_mmio_map_etc(
     device_t *device, phys_ptr_t addr, size_t size, uint32_t flags,
-    unsigned mmflag)
+    uint32_t mmflag)
 {
     return (io_region_t)device_phys_map_etc(device, addr, size, flags, mmflag);
 }

@@ -58,20 +58,20 @@ typedef struct dma_constraints {
 
 extern status_t dma_alloc(
     struct device *device, phys_size_t size, const dma_constraints_t *constraints,
-    unsigned mmflag, dma_ptr_t *_addr);
+    uint32_t mmflag, dma_ptr_t *_addr);
 extern void dma_free(struct device *device, dma_ptr_t addr, phys_size_t size);
 
 extern status_t device_dma_alloc(
     struct device *device, phys_size_t size, const dma_constraints_t *constraints,
-    unsigned mmflag, dma_ptr_t *_addr);
+    uint32_t mmflag, dma_ptr_t *_addr);
 
-extern void *dma_map(struct device *device, dma_ptr_t addr, size_t size, unsigned mmflag);
+extern void *dma_map(struct device *device, dma_ptr_t addr, size_t size, uint32_t mmflag);
 extern void *dma_map_etc(
     struct device *device, dma_ptr_t addr, size_t size, uint32_t flags,
-    unsigned mmflag);
+    uint32_t mmflag);
 extern void dma_unmap(void *addr, size_t size);
 
-extern void *device_dma_map(struct device *device, dma_ptr_t addr, size_t size, unsigned mmflag);
+extern void *device_dma_map(struct device *device, dma_ptr_t addr, size_t size, uint32_t mmflag);
 extern void *device_dma_map_etc(
     struct device *device, dma_ptr_t addr, size_t size, uint32_t flags,
-    unsigned mmflag);
+    uint32_t mmflag);

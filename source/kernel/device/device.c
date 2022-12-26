@@ -623,7 +623,7 @@ status_t device_attr(
  * @return              Allocated structure, or null on failure (if mmflag
  *                      allows it).
  */
-void *device_resource_alloc(size_t size, device_resource_release_t release, unsigned mmflag) {
+void *device_resource_alloc(size_t size, device_resource_release_t release, uint32_t mmflag) {
     assert(release);
 
     device_resource_t *resource = kmalloc(sizeof(device_resource_t) + size, mmflag);

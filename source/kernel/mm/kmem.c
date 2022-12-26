@@ -92,7 +92,7 @@ static LIST_DEFINE(kmem_range_pool);
 /** Global kernel memory lock. */
 static MUTEX_DEFINE(kmem_lock, 0);
 
-static kmem_range_t *kmem_range_get(unsigned mmflag) {
+static kmem_range_t *kmem_range_get(uint32_t mmflag) {
     kmem_range_t *range;
 
     if (unlikely(list_empty(&kmem_range_pool))) {
@@ -298,7 +298,7 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free) {
  * @param size          Size of allocation to make (multiple of PAGE_SIZE).
  * @param mmflag        Allocation behaviour flags.
  * @return              Address of allocation on success, 0 on failure. */
-ptr_t kmem_raw_alloc(size_t size, unsigned mmflag) {
+ptr_t kmem_raw_alloc(size_t size, uint32_t mmflag) {
     assert(size);
     assert(!(size % PAGE_SIZE));
     assert((mmflag & (MM_WAIT | MM_ATOMIC)) != (MM_WAIT | MM_ATOMIC));
@@ -376,7 +376,7 @@ void kmem_raw_free(ptr_t addr, size_t size) {
  *
  * @return              Address of allocation on success, 0 on failure.
  */
-void *kmem_alloc(size_t size, unsigned mmflag) {
+void *kmem_alloc(size_t size, uint32_t mmflag) {
     return kmem_alloc_etc(size, MMU_ACCESS_RW | MMU_CACHE_NORMAL, mmflag);
 }
 
@@ -394,7 +394,7 @@ void *kmem_alloc(size_t size, unsigned mmflag) {
  *
  * @return              Address of allocation on success, 0 on failure.
  */
-void *kmem_alloc_etc(size_t size, uint32_t mmu_flags, unsigned mmflag) {
+void *kmem_alloc_etc(size_t size, uint32_t mmu_flags, uint32_t mmflag) {
     /* Allocate a range to map into. */
     ptr_t addr = kmem_raw_alloc(size, mmflag);
     if (unlikely(!addr))
@@ -470,7 +470,7 @@ void kmem_free(void *addr, size_t size) {
  *
  * @return              Pointer to mapped range.
  */
-void *kmem_map(phys_ptr_t base, size_t size, uint32_t flags, unsigned mmflag) {
+void *kmem_map(phys_ptr_t base, size_t size, uint32_t flags, uint32_t mmflag) {
     assert(!(base % PAGE_SIZE));
 
     ptr_t addr = kmem_raw_alloc(size, mmflag);

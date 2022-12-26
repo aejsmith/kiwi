@@ -143,7 +143,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
     kmem_free(addr, cache->slab_size);
 }
 
-static inline slab_t *slab_create(slab_cache_t *cache, unsigned mmflag) {
+static inline slab_t *slab_create(slab_cache_t *cache, uint32_t mmflag) {
     /* Drop slab lock while creating as a reclaim may occur that wants to free
      * to this cache. */
     mutex_unlock(&cache->slab_lock);
@@ -278,7 +278,7 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 }
 
 /** Allocate an object from the slab layer and construct it. */
-static inline void *slab_obj_alloc(slab_cache_t *cache, unsigned mmflag) {
+static inline void *slab_obj_alloc(slab_cache_t *cache, uint32_t mmflag) {
     mutex_lock(&cache->slab_lock);
 
     /* If there is a slab in the partial list, take it. */
@@ -604,7 +604,7 @@ static __always_inline void *trace_return_address(slab_cache_t *cache) {
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to allocated object or NULL if unable to
  *                      allocate.  */
-void *slab_cache_alloc(slab_cache_t *cache, unsigned mmflag) {
+void *slab_cache_alloc(slab_cache_t *cache, uint32_t mmflag) {
     assert(!in_interrupt());
     assert(cache);
 
@@ -684,7 +684,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 }
 
 /** Create the per-CPU data for a slab cache. */
-static status_t slab_percpu_init(slab_cache_t *cache, unsigned mmflag) {
+static status_t slab_percpu_init(slab_cache_t *cache, uint32_t mmflag) {
     assert(cpu_count != 0);
     assert(slab_percpu_cache);
 
@@ -714,7 +714,7 @@ static status_t slab_percpu_init(slab_cache_t *cache, unsigned mmflag) {
 static status_t slab_cache_init(
     slab_cache_t *cache, const char *name, size_t size, size_t align,
     slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
-    unsigned flags, unsigned mmflag)
+    unsigned flags, uint32_t mmflag)
 {
     assert(size);
     assert(!align || is_pow2(align));
@@ -825,7 +825,7 @@ static status_t slab_cache_init(
  * @return              Pointer to cache on success, NULL on failure. */
 slab_cache_t *slab_cache_create(
     const char *name, size_t size, size_t align, slab_ctor_t ctor,
-    slab_dtor_t dtor, void *data, unsigned flags, unsigned mmflag)
+    slab_dtor_t dtor, void *data, unsigned flags, uint32_t mmflag)
 {
     slab_cache_t *cache = slab_cache_alloc(&slab_cache_cache, mmflag);
     if (!cache)

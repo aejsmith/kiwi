@@ -132,8 +132,8 @@ static inline void net_buffer_init(net_buffer_t *buffer) {
     buffer->offset = 0;
 }
 
-extern net_buffer_t *net_buffer_kmalloc(uint32_t size, unsigned mmflag, void **_data);
-extern net_buffer_t *net_buffer_slab_alloc(struct slab_cache *cache, uint32_t size, unsigned mmflag, void **_data);
+extern net_buffer_t *net_buffer_kmalloc(uint32_t size, uint32_t mmflag, void **_data);
+extern net_buffer_t *net_buffer_slab_alloc(struct slab_cache *cache, uint32_t size, uint32_t mmflag, void **_data);
 
 extern net_buffer_t *net_buffer_from_kmalloc(void *data, uint32_t size);
 extern net_buffer_t *net_buffer_from_subset(struct net_packet *packet, uint32_t offset, uint32_t size);
@@ -195,7 +195,7 @@ extern net_packet_t *net_packet_create(net_buffer_t *buffer);
  *
  * @return              Pointer to created packet, NULL on failure.
  */
-static inline net_packet_t *net_packet_kmalloc(uint32_t size, unsigned mmflag, void **_data) {
+static inline net_packet_t *net_packet_kmalloc(uint32_t size, uint32_t mmflag, void **_data) {
     net_buffer_t *buffer = net_buffer_kmalloc(size, mmflag, _data);
     if (!buffer)
         return NULL;

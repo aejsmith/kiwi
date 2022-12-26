@@ -263,7 +263,7 @@ page_t *page_lookup(phys_ptr_t addr) {
 /** Allocates a page.
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to structure for allocated page. */
-page_t *page_alloc(unsigned mmflag) {
+page_t *page_alloc(uint32_t mmflag) {
     assert((mmflag & (MM_WAIT | MM_ATOMIC)) != (MM_WAIT | MM_ATOMIC));
 
     preempt_disable();
@@ -355,7 +355,7 @@ void page_free(page_t *page) {
  * @param mmflag        Allocation flags.
  * @return              Pointer to new page structure on success, NULL on
  *                      failure. */
-page_t *page_copy(page_t *page, unsigned mmflag) {
+page_t *page_copy(page_t *page, uint32_t mmflag) {
     assert(page);
 
     page_t *dest = page_alloc(mmflag);
@@ -491,7 +491,7 @@ static page_t *phys_alloc_slowpath(
  */
 status_t phys_alloc(
     phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
-    phys_ptr_t min_addr, phys_ptr_t max_addr, unsigned mmflag,
+    phys_ptr_t min_addr, phys_ptr_t max_addr, uint32_t mmflag,
     phys_ptr_t *_base)
 {
     if (align == 0)
@@ -631,7 +631,7 @@ static void device_phys_alloc_resource_release(device_t *device, void *data) {
  */
 status_t device_phys_alloc(
     device_t *device, phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
-    phys_ptr_t min_addr, phys_ptr_t max_addr, unsigned mmflag, phys_ptr_t *_base)
+    phys_ptr_t min_addr, phys_ptr_t max_addr, uint32_t mmflag, phys_ptr_t *_base)
 {
     phys_ptr_t base;
     status_t ret = phys_alloc(size, align, boundary, min_addr, max_addr, mmflag, &base);

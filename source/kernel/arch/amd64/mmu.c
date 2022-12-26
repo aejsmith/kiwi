@@ -143,7 +143,7 @@ static uint64_t *map_structure(phys_ptr_t addr) {
     return phys_map(addr, PAGE_SIZE, MM_BOOT);
 }
 
-static phys_ptr_t alloc_structure(unsigned mmflag) {
+static phys_ptr_t alloc_structure(uint32_t mmflag) {
     phys_ptr_t ret;
 
     if (likely(page_init_done)) {
@@ -164,7 +164,7 @@ static phys_ptr_t alloc_structure(unsigned mmflag) {
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to mapped page directory, NULL if not found or
  *                      on allocation failure. */
-static uint64_t *get_pdir(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
+static uint64_t *get_pdir(mmu_context_t *ctx, ptr_t virt, bool alloc, uint32_t mmflag) {
     /* Get the virtual address of the PML4. */
     uint64_t *pml4 = map_structure(ctx->arch.pml4);
 
@@ -214,7 +214,7 @@ static uint64_t *get_pdir(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned m
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to mapped page table, NULL if not found or on
  *                      allocation failure. */
-static uint64_t *get_ptbl(mmu_context_t *ctx, ptr_t virt, bool alloc, unsigned mmflag) {
+static uint64_t *get_ptbl(mmu_context_t *ctx, ptr_t virt, bool alloc, uint32_t mmflag) {
     /* Get hold of the page directory. */
     uint64_t *pdir = get_pdir(ctx, virt, alloc, mmflag);
     if (!pdir)
@@ -258,7 +258,7 @@ static void invalidate_page(mmu_context_t *ctx, ptr_t virt) {
 }
 
 /** Initialize a new context. */
-status_t arch_mmu_context_init(mmu_context_t *ctx, unsigned mmflag) {
+status_t arch_mmu_context_init(mmu_context_t *ctx, uint32_t mmflag) {
     ctx->arch.invalidate_count = 0;
 
     ctx->arch.pml4 = alloc_structure(mmflag);
@@ -314,7 +314,7 @@ void arch_mmu_context_destroy(mmu_context_t *ctx) {
 /** Map a page in a context. */
 status_t arch_mmu_context_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t flags,
-    unsigned mmflag)
+    uint32_t mmflag)
 {
     /* Find the page table for the entry. */
     uint64_t *ptbl = get_ptbl(ctx, virt, true, mmflag);

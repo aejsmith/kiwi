@@ -50,12 +50,12 @@ static inline io_region_t mmio_early_map(ptr_t addr) {
     return (io_region_t)addr;
 }
 
-extern io_region_t mmio_map(phys_ptr_t addr, size_t size, unsigned mmflag);
-extern io_region_t mmio_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, unsigned mmflag);
-extern io_region_t device_mmio_map(struct device *device, phys_ptr_t addr, size_t size, unsigned mmflag);
+extern io_region_t mmio_map(phys_ptr_t addr, size_t size, uint32_t mmflag);
+extern io_region_t mmio_map_etc(phys_ptr_t addr, size_t size, uint32_t flags, uint32_t mmflag);
+extern io_region_t device_mmio_map(struct device *device, phys_ptr_t addr, size_t size, uint32_t mmflag);
 extern io_region_t device_mmio_map_etc(
     struct device *device, phys_ptr_t addr, size_t size, uint32_t flags,
-    unsigned mmflag);
+    uint32_t mmflag);
 
 #if ARCH_HAS_PIO
 extern io_region_t pio_map(pio_addr_t addr, size_t size);

@@ -203,21 +203,21 @@ extern void pci_config_write16(pci_device_t *device, uint8_t reg, uint16_t val);
 extern uint32_t config_read32(pci_device_t *device, uint8_t reg);
 extern void pci_config_write32(pci_device_t *device, uint8_t reg, uint32_t val);
 
-extern status_t pci_bar_map(pci_device_t *device, uint8_t index, unsigned mmflag, io_region_t *_region);
+extern status_t pci_bar_map(pci_device_t *device, uint8_t index, uint32_t mmflag, io_region_t *_region);
 extern status_t pci_bar_map_etc(
     pci_device_t *device, uint8_t index, phys_ptr_t offset, phys_size_t size,
-    uint32_t flags, unsigned mmflag, io_region_t *_region);
+    uint32_t flags, uint32_t mmflag, io_region_t *_region);
 extern void pci_bar_unmap(pci_device_t *device, uint8_t index, io_region_t region);
 extern void pci_bar_unmap_etc(
     pci_device_t *device, uint8_t index, io_region_t region, phys_ptr_t offset,
     phys_size_t size);
 
 extern status_t device_pci_bar_map(
-    device_t *owner, pci_device_t *device, uint8_t index, unsigned mmflag,
+    device_t *owner, pci_device_t *device, uint8_t index, uint32_t mmflag,
     io_region_t *_region);
 extern status_t device_pci_bar_map_etc(
     device_t *owner, pci_device_t *device, uint8_t index, phys_ptr_t offset,
-    phys_size_t size, uint32_t flags, unsigned mmflag, io_region_t *_region);
+    phys_size_t size, uint32_t flags, uint32_t mmflag, io_region_t *_region);
 
 extern status_t pci_irq_register(
     pci_device_t *device, irq_early_func_t early_func, irq_func_t func,
