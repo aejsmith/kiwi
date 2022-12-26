@@ -529,7 +529,8 @@ static bool kdb_line_complete(kdb_read_line_t *state) {
 
     /* First find all the matches. */
     kdb_command_desc_t *first = NULL;
-    size_t matches = 0;
+    size_t matches    = 0;
+    size_t common_len = 0;
 
     list_foreach(&kdb_commands, iter) {
         kdb_command_desc_t *cmd = list_entry(iter, kdb_command_desc_t, header);
@@ -537,22 +538,34 @@ static bool kdb_line_complete(kdb_read_line_t *state) {
         if (state->length > strlen(cmd->name)) {
             continue;
         } else if (strncmp(state->buffer, cmd->name, state->length) == 0) {
-            if (++matches == 1)
-                first = cmd;
+            if (++matches == 1) {
+                first      = cmd;
+                common_len = strlen(&cmd->name[state->length]);
+            } else {
+                /* Find common prefix to all matches. */
+                size_t this_len = 0;
+                for (size_t pos = state->length;
+                     this_len < common_len && cmd->name[pos] && cmd->name[pos] == first->name[pos];
+                     pos++, this_len++);
+                common_len = this_len;
+            }
         }
     }
 
-    /* If we only have one match, go and find it and complete. If we have
-     * multiple matches, print a list. */
+    /* Match up to common length, if any. */
+    if (matches > 0) {
+        size_t end = state->length + common_len;
+
+        for (size_t pos = state->length; pos < end; pos++)
+            kdb_line_insert(state, first->name[pos]);
+    }
+
     if (matches == 1) {
-        size_t end = state->length + strlen(&first->name[state->length]);
-
-        for (size_t i = state->length; i < end; i++)
-            kdb_line_insert(state, first->name[i]);
-
+        /* Only one match, finish it and complete. */
         kdb_line_insert(state, ' ');
         return false;
     } else if (matches > 1) {
+        /* Multiple matches, print a list. */
         kdb_putc('\n');
 
         size_t printed = 0;
