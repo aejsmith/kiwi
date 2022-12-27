@@ -308,7 +308,8 @@ void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
         bp = curr_kdb_frame->bp;
     }
 
-    while (bp) {
+    const size_t max_depth = 64;
+    for(size_t i = 0; bp && i < max_depth; i++) {
         /* Don't want to go off into user memory if this isn't the current
          * process. */
         if (thread && thread->owner != curr_thread->owner) {
@@ -320,6 +321,9 @@ void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
 
         if (frame->addr)
             cb(frame->addr);
+
+        if (frame->next == bp)
+            break;
 
         bp = frame->next;
     }
