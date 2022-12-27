@@ -176,12 +176,12 @@ int arch_kdb_install_watchpoint(ptr_t addr, size_t size, bool rw) {
             case 1:
                 break;
             case 4:
-                dr7 |= (1 << (19 + (i * 4)));
+                dr7 |= (1ul << (19 + (i * 4)));
             case 2:
-                dr7 |= (1 << (18 + (i * 4)));
+                dr7 |= (1ul << (18 + (i * 4)));
                 break;
             case 8:
-                dr7 |= (1 << (19 + (i * 4)));
+                dr7 |= (1ul << (19 + (i * 4)));
                 break;
             default:
                 kdb_printf("Invalid size.\n");
