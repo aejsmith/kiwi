@@ -559,10 +559,15 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 
 #if CONFIG_SLAB_TRACING
 
+/* Our usage of __builtin_return_address is OK, disable errors. */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wframe-address"
+
 /** Function names to skip over in trace_return_address(). */
 static const char *trace_skip_names[] = {
     "kmalloc", "krealloc", "kcalloc", "kfree", "kstrdup", "kstrndup",
-    "kmemdup", "kbasename", "kdirname",
+    "kmemdup", "kbasename", "kdirname", "strdup_from_user", "strndup_from_user",
+    "arrcpy_from_user",
 };
 
 /** Get the address for allocation tracing output.
@@ -596,6 +601,8 @@ static __always_inline void *trace_return_address(slab_cache_t *cache) {
 
     return addr;
 }
+
+#pragma clang diagnostic pop
 
 #endif /* CONFIG_SLAB_TRACING */
 
