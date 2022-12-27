@@ -329,6 +329,9 @@ static fs_dentry_t *fs_dentry_alloc(const char *name, fs_mount_t *mount, fs_dent
 
 /** Free a directory entry structure. */
 static void fs_dentry_free(fs_dentry_t *entry) {
+    assert(list_empty(&entry->mount_link));
+    assert(list_empty(&entry->unused_link));
+
     radix_tree_clear(&entry->entries, NULL);
     kfree(entry->name);
     slab_cache_free(fs_dentry_cache, entry);
@@ -359,24 +362,22 @@ static void fs_dentry_release_locked(fs_dentry_t *entry) {
 
     /* If the parent is NULL, that means the entry has been unlinked, therefore
      * we should free it immediately. */
-    if (!entry->parent) {
-        dprintf(
-            "fs: freed entry '%s' (%p) on mount %" PRIu16 "\n",
-            entry->name, entry, entry->mount->id);
+    bool free = !entry->parent;
 
-        mutex_unlock(&entry->lock);
-        fs_dentry_free(entry);
-        return;
+    mutex_lock(&entry->mount->lock);
+
+    if (free) {
+        list_remove(&entry->mount_link);
+    } else {
+        /* Add to the mount unused list. This is done regardless of the keep
+         * flag as the purpose this list serves is to aid in cleanup when
+         * unmounting, and when doing so we want to free all entries. */
+        list_append(&entry->mount->unused_entries, &entry->mount_link);
     }
 
-    /* Add to the mount unused list. This is done regardless of the keep flag
-     * as the purpose this list serves is to aid in cleanup when unmounting,
-     * and when doing so we want to free all entries. */
-    mutex_lock(&entry->mount->lock);
-    list_append(&entry->mount->unused_entries, &entry->mount_link);
     mutex_unlock(&entry->mount->lock);
 
-    if (!(entry->flags & FS_DENTRY_KEEP)) {
+    if (!free && !(entry->flags & FS_DENTRY_KEEP)) {
         /* Move to the global unused list so it can be reclaimed. */
         spinlock_lock(&unused_entries_lock);
         assert(list_empty(&entry->unused_link));
@@ -386,6 +387,14 @@ static void fs_dentry_release_locked(fs_dentry_t *entry) {
     }
 
     mutex_unlock(&entry->lock);
+
+    if (free) {
+        dprintf(
+            "fs: freed entry '%s' (%p) on mount %" PRIu16 "\n",
+            entry->name, entry, entry->mount->id);
+
+        fs_dentry_free(entry);
+    }
 }
 
 /** Decrease the reference count of a directory entry.
