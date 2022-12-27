@@ -44,6 +44,13 @@ config SLAB_TRACING
 	  useful to run through the allocation statistics script in the
 	  utilities directory.
 
+config SLAB_GUARD
+	bool "Slab allocation overrun guard"
+	default n
+	help
+	  Guard the end of each slab allocation with a magic value that will
+	  detect buffer overruns when freed.
+
 #######
 endmenu
 #######

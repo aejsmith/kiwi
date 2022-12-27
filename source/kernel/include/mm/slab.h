@@ -88,19 +88,26 @@ typedef struct slab_cache {
     /** Debugging information. */
     list_t header;                      /**< List to slab cache list. */
     char name[SLAB_NAME_MAX];           /**< Name of cache. */
+#if CONFIG_SLAB_GUARD
+    size_t orig_obj_size;               /**< Original requested object size. */
+#endif
 } __cacheline_aligned slab_cache_t;
 
 /** Slab cache flags. */
-#define SLAB_CACHE_NOMAG    (1<<0)      /**< Disable the magazine layer. */
-#define SLAB_CACHE_LARGE    (1<<1)      /**< Cache is a large object cache. */
-#define SLAB_CACHE_LATEMAG  (1<<3)      /**< Internal, do not set. */
+enum {
+    SLAB_CACHE_NO_MAG       = (1<<0),   /**< Disable the magazine layer. */
+    SLAB_CACHE_LARGE        = (1<<1),   /**< Cache is a large object cache. */
+
+    __SLAB_CACHE_LATE_MAG   = (1<<3),
+    __SLAB_CACHE_NO_GUARD   = (1<<4),
+};
 
 extern void *slab_cache_alloc(slab_cache_t *cache, uint32_t mmflag);
 extern void slab_cache_free(slab_cache_t *cache, void *obj);
 
 extern slab_cache_t *slab_cache_create(
     const char *name, size_t size, size_t align, slab_ctor_t ctor,
-    slab_dtor_t dtor, void *data, unsigned flags, uint32_t mmflag);
+    slab_dtor_t dtor, void *data, uint32_t flags, uint32_t mmflag);
 extern void slab_cache_destroy(slab_cache_t *cache);
 
 /** Create a slab cache for allocation of objects of a certain type.

@@ -119,6 +119,11 @@ static slab_cache_t *slab_percpu_cache; /**< Cache for per-CPU structures. */
 static LIST_DEFINE(slab_caches);
 static MUTEX_DEFINE(slab_caches_lock, 0);
 
+#if CONFIG_SLAB_GUARD
+static const uint8_t slab_guard[8]  = { 0xa0, 0xb1, 0xc2, 0xd3, 0xe4, 0xf5, 0x06, 0x17 };
+static const size_t slab_guard_size = 8;
+#endif
+
 static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
     assert(!slab->refcount);
 
@@ -615,29 +620,22 @@ void *slab_cache_alloc(slab_cache_t *cache, uint32_t mmflag) {
     assert(!in_interrupt());
     assert(cache);
 
-    void *ret;
+    void *ret = NULL;
 
-    if (!(cache->flags & SLAB_CACHE_NOMAG)) {
+    /* Try the magazine layer first. */
+    if (!(cache->flags & SLAB_CACHE_NO_MAG))
         ret = slab_cpu_obj_alloc(cache);
-        if (likely(ret)) {
-            #if CONFIG_SLAB_STATS
-                atomic_fetch_add(&cache->alloc_total, 1);
-                atomic_fetch_add(&cache->alloc_current, 1);
-            #endif
 
-            #if CONFIG_SLAB_TRACING
-                kprintf(
-                    LOG_DEBUG, "slab: allocated %p from %s at %pB\n",
-                    ret, cache->name, trace_return_address(cache));
-            #endif
+    /* Fall back on the slab layer. */
+    if (!ret)
+        ret = slab_obj_alloc(cache, mmflag);
 
-            return ret;
-        }
-    }
-
-    /* Cannot allocate from magazine layer, allocate from slab layer. */
-    ret = slab_obj_alloc(cache, mmflag);
     if (likely(ret)) {
+        #if CONFIG_SLAB_GUARD
+            if (!(cache->flags & __SLAB_CACHE_NO_GUARD))
+                memcpy((uint8_t *)ret + cache->orig_obj_size, slab_guard, slab_guard_size);
+        #endif
+
         #if CONFIG_SLAB_STATS
             atomic_fetch_add(&cache->alloc_total, 1);
             atomic_fetch_add(&cache->alloc_current, 1);
@@ -660,24 +658,18 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
     assert(!in_interrupt());
     assert(cache);
 
-    if (!(cache->flags & SLAB_CACHE_NOMAG)) {
-        if (likely(slab_cpu_obj_free(cache, obj))) {
-            #if CONFIG_SLAB_STATS
-                atomic_fetch_sub(&cache->alloc_current, 1);
-            #endif
+    #if CONFIG_SLAB_GUARD
+        if (memcmp((uint8_t *)obj + cache->orig_obj_size, slab_guard, slab_guard_size) != 0)
+            fatal("Guard failure freeing object %p from %p (%s)", obj, cache, cache->name);
+    #endif
 
-            #if CONFIG_SLAB_TRACING
-                kprintf(
-                    LOG_DEBUG, "slab: freed %p to %s at %pB\n",
-                    obj, cache->name, trace_return_address(cache));
-            #endif
+    bool freed = false;
 
-            return;
-        }
-    }
+    if (!(cache->flags & SLAB_CACHE_NO_MAG))
+        freed = slab_cpu_obj_free(cache, obj);
 
-    /* Cannot free to magazine layer, free to slab layer. */
-    slab_obj_free(cache, obj);
+    if (!freed)
+        slab_obj_free(cache, obj);
 
     #if CONFIG_SLAB_STATS
         atomic_fetch_sub(&cache->alloc_current, 1);
@@ -685,8 +677,8 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 
     #if CONFIG_SLAB_TRACING
         kprintf(
-            LOG_DEBUG, "slab: freed %p to %s at %pB\n", obj, cache->name,
-            trace_return_address(cache));
+            LOG_DEBUG, "slab: freed %p to %s at %pB\n",
+            obj, cache->name, trace_return_address(cache));
     #endif
 }
 
@@ -721,11 +713,11 @@ static status_t slab_percpu_init(slab_cache_t *cache, uint32_t mmflag) {
 static status_t slab_cache_init(
     slab_cache_t *cache, const char *name, size_t size, size_t align,
     slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
-    unsigned flags, uint32_t mmflag)
+    uint32_t flags, uint32_t mmflag)
 {
     assert(size);
     assert(!align || is_pow2(align));
-    assert(!(flags & SLAB_CACHE_LATEMAG));
+    assert(!(flags & __SLAB_CACHE_LATE_MAG));
 
     mutex_init(&cache->depot_lock, "slab_depot_lock", 0);
     mutex_init(&cache->slab_lock, "slab_slab_lock", 0);
@@ -757,6 +749,12 @@ static status_t slab_cache_init(
     /* Alignment must be at lest SLAB_ALIGN_MIN. */
     cache->align = max(SLAB_ALIGN_MIN, align);
 
+    #if CONFIG_SLAB_GUARD
+        cache->orig_obj_size = size;
+        if (!(flags & __SLAB_CACHE_NO_GUARD))
+            size += slab_guard_size;
+    #endif
+
     /* Make sure the object size is aligned. */
     size = round_up(size, cache->align);
     cache->obj_size = size;
@@ -781,11 +779,11 @@ static status_t slab_cache_init(
 
     /* If we want the magazine layer to be enabled but the CPU count is not
      * known, disable it until it is known. */
-    if (!(cache->flags & SLAB_CACHE_NOMAG) && !slab_percpu_cache)
-        cache->flags |= (SLAB_CACHE_NOMAG | SLAB_CACHE_LATEMAG);
+    if (!(cache->flags & SLAB_CACHE_NO_MAG) && !slab_percpu_cache)
+        cache->flags |= (SLAB_CACHE_NO_MAG | __SLAB_CACHE_LATE_MAG);
 
     /* Initialize the CPU caches if required. */
-    if (!(cache->flags & SLAB_CACHE_NOMAG)) {
+    if (!(cache->flags & SLAB_CACHE_NO_MAG)) {
         status_t ret = slab_percpu_init(cache, mmflag);
         if (ret != STATUS_SUCCESS)
             return ret;
@@ -890,11 +888,11 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
     }
 
     #if CONFIG_SLAB_STATS
-        kdb_printf("Name                      Align  Obj Size Slab Size Flags Slab Count Current Total\n");
-        kdb_printf("====                      =====  ======== ========= ===== ========== ======= =====\n");
+        kdb_printf("Name                             Align  Obj Size Slab Size Flags Slab Count Current Total\n");
+        kdb_printf("====                             =====  ======== ========= ===== ========== ======= =====\n");
     #else
-        kdb_printf("Name                      Align  Obj Size Slab Size Flags Slab Count\n");
-        kdb_printf("====                      =====  ======== ========= ===== ==========\n");
+        kdb_printf("Name                             Align  Obj Size Slab Size Flags Slab Count\n");
+        kdb_printf("====                             =====  ======== ========= ===== ==========\n");
     #endif
 
     list_foreach(&slab_caches, iter) {
@@ -921,24 +919,24 @@ __init_text void slab_init(void) {
     slab_cache_init(
         &slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t),
         alignof(slab_cache_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
-        0, MM_BOOT);
+        __SLAB_CACHE_NO_GUARD, MM_BOOT);
 
     /* Initialize the magazine cache. This cannot have the magazine layer
      * enabled, for pretty obvious reasons. */
     slab_cache_init(
         &slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t),
         alignof(slab_magazine_t), NULL, NULL, NULL, SLAB_MAG_PRIORITY,
-        SLAB_CACHE_NOMAG, MM_BOOT);
+        SLAB_CACHE_NO_MAG | __SLAB_CACHE_NO_GUARD, MM_BOOT);
 
     /* Create other internal caches. */
     slab_cache_init(
         &slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t),
         alignof(slab_bufctl_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
-        0, MM_BOOT);
+        __SLAB_CACHE_NO_GUARD, MM_BOOT);
     slab_cache_init(
         &slab_slab_cache, "slab_slab_cache", sizeof(slab_t),
-        alignof(slab_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0,
-        MM_BOOT);
+        alignof(slab_t), NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
+        __SLAB_CACHE_NO_GUARD, MM_BOOT);
 
     /* Register the KDB command. */
     kdb_register_command("slab", "Display slab cache statistics.", kdb_cmd_slab);
@@ -951,7 +949,8 @@ __init_text void slab_late_init(void) {
     slab_percpu_cache = slab_cache_alloc(&slab_cache_cache, MM_BOOT);
     slab_cache_init(
         slab_percpu_cache, "slab_percpu_cache", size, alignof(slab_percpu_t),
-        NULL, NULL, NULL, SLAB_METADATA_PRIORITY, SLAB_CACHE_NOMAG, MM_BOOT);
+        NULL, NULL, NULL, SLAB_METADATA_PRIORITY,
+        SLAB_CACHE_NO_MAG | __SLAB_CACHE_NO_GUARD, MM_BOOT);
 
     mutex_lock(&slab_caches_lock);
 
@@ -959,10 +958,10 @@ __init_text void slab_late_init(void) {
     list_foreach(&slab_caches, iter) {
         slab_cache_t *cache = list_entry(iter, slab_cache_t, header);
 
-        if (cache->flags & SLAB_CACHE_LATEMAG) {
-            assert(cache->flags & SLAB_CACHE_NOMAG);
+        if (cache->flags & __SLAB_CACHE_LATE_MAG) {
+            assert(cache->flags & SLAB_CACHE_NO_MAG);
             slab_percpu_init(cache, MM_BOOT);
-            cache->flags &= ~(SLAB_CACHE_LATEMAG | SLAB_CACHE_NOMAG);
+            cache->flags &= ~(__SLAB_CACHE_LATE_MAG | SLAB_CACHE_NO_MAG);
         }
     }
 
