@@ -19,20 +19,27 @@
  * @brief               Page-based data cache.
  *
  * Pages used by the page cache can be in one of the following states:
+ *
  *  - ALLOCATED: Currently in use (memory mapped, or being used by an I/O
- *    operation). The page reference count is used to track the number of users.
+ *    operation), or unused but there is no backing source for the cache (e.g.
+ *    ramfs).
+ *
+ *    The page reference count is used to track the number of users.
  *    get_cache_page() increments the count when it returns a page,
- *    release_cache_page() decrements it. When the count first goes above 0,
- *    the page is moved to the ALLOCATED state. When it goes back to 0, it is
- *    moved to a CACHED_* state.
+ *    release_cache_page() decrements it. For caches with a backing source,
+ *    the page is moved to a CACHED_* state while the count is 0.
+ *
  *  - CACHED_CLEAN: Currently unused, with no modifications.
+ *
  *  - CACHED_DIRTY: Currently unused, with modifications that need to be written
  *    back to the source.
  *
  * Pages in either of the unused states are available to page maintenance
  * operations:
+ *
  *  - Writeback: The page writer thread periodically flushes CACHED_DIRTY
  *    pages back to the source.
+ *
  *  - Reclaim: When the system is low on memory, the page allocator can evict
  *    CACHED_CLEAN pages to make them available for other users.
  *
@@ -122,7 +129,7 @@ static slab_cache_t *page_cache_cache;
 static slab_cache_t *page_cache_entry_cache;
 
 static inline bool page_is_unused(page_t *page) {
-    return page->state == PAGE_STATE_CACHED_CLEAN || page->state == PAGE_STATE_CACHED_DIRTY;
+    return refcount_get(&page->count) == 0;
 }
 
 static void page_cache_ctor(void *obj, void *data) {
@@ -274,7 +281,7 @@ static status_t get_existing_cache_page(page_cache_t *cache, page_cache_entry_t 
     while (true) {
         bool was_busy;
         if (page->state != PAGE_STATE_ALLOCATED) {
-            assert(refcount_get(&page->count) == 0);
+            assert(page->state == PAGE_STATE_CACHED_CLEAN || page->state == PAGE_STATE_CACHED_DIRTY);
             assert(page_is_unused(page));
 
             /* Page is currently in an unused state, we need to transition it
@@ -336,8 +343,8 @@ static status_t get_new_cache_page(
 
     void *mapping = phys_map(page->addr, PAGE_SIZE, MM_KERNEL);
 
-    /* If a read operation is provided, read in data, else zero the page. */
-    if (cache->ops && cache->ops->read_page) {
+    /* If the cache has a backing source, read in data, else zero the page. */
+    if (cache->ops) {
         /* We don't want to hold the cache lock while we read data, so mark the
          * page as busy. This will allow other cache users to pick up this page
          * since we have put it in the cache, but they will wait until the read
@@ -365,6 +372,8 @@ static status_t get_new_cache_page(
         /* Wake anyone who was waiting for our read. */
         unbusy_cache_page(cache, entry, false);
     } else {
+        // TODO: We could optimise this to use a system-wide zero page if this
+        // is going to be a read-only mapping.
         memset(mapping, 0, PAGE_SIZE);
     }
 
@@ -459,6 +468,7 @@ static void release_cache_page(page_cache_t *cache, page_cache_page_handle_t *ha
         phys_unmap(handle->mapping, PAGE_SIZE);
 
     assert(page->state == PAGE_STATE_ALLOCATED);
+    assert(!page_is_unused(page));
     assert(!(page_flags(page) & PAGE_BUSY));
 
     /* Mark as dirty if requested. */
@@ -473,8 +483,11 @@ static void release_cache_page(page_cache_t *cache, page_cache_page_handle_t *ha
     if (refcount_dec(&page->count) == 0) {
         /*
          * If the page is outside of the cache's size (i.e. cache has been
-         * resized with pages in use, discard it). Otherwise, move the page to
-         * the appropriate queue.
+         * resized with pages in use), discard it.
+         *
+         * Otherwise, if the cache has a backing source, move the page to the
+         * appropriate cached state to make it visible to maintenance
+         * operations.
          *
          * This does not need the page to be marked as busy. We only need to use
          * that flag in unused states. The page cannot be busy at this point
@@ -484,11 +497,12 @@ static void release_cache_page(page_cache_t *cache, page_cache_page_handle_t *ha
         if (offset >= cache->size) {
             avl_tree_remove(&cache->pages, &entry->link);
             free_cache_page(entry);
-        } else if (dirty && cache->ops && cache->ops->write_page) {
-            page_set_state(page, PAGE_STATE_CACHED_DIRTY);
-        } else {
-            page_clear_flag(page, PAGE_DIRTY);
-            page_set_state(page, PAGE_STATE_CACHED_CLEAN);
+        } else if (cache->ops) {
+            if (dirty) {
+                page_set_state(page, PAGE_STATE_CACHED_DIRTY);
+            } else {
+                page_set_state(page, PAGE_STATE_CACHED_CLEAN);
+            }
         }
     }
 }
@@ -834,6 +848,8 @@ status_t page_cache_flush(page_cache_t *cache) {
 page_cache_t *page_cache_create(offset_t size, const page_cache_ops_t *ops, void *private) {
     page_cache_t *cache = slab_cache_alloc(page_cache_cache, MM_KERNEL);
 
+    assert(!ops || (ops->read_page && ops->write_page));
+
     cache->size    = size;
     cache->ops     = ops;
     cache->private = private;
@@ -868,7 +884,7 @@ status_t page_cache_destroy(page_cache_t *cache) {
         page_cache_entry_t *entry = avl_tree_entry(cache->pages.root, page_cache_entry_t, link);
         page_t *page = entry->page;
 
-        assert(page->state == PAGE_STATE_CACHED_CLEAN || page->state == PAGE_STATE_CACHED_DIRTY);
+        assert(page_is_unused(page));
 
         /* Make the page busy to take it away from maintenance operations. */
         status_t err = busy_cache_page(cache, entry, 0);

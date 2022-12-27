@@ -35,8 +35,6 @@ struct page_cache;
 /** Structure containing operations for a page cache. */
 typedef struct page_cache_ops {
     /** Read a page of data from the source.
-     * @note                If not provided, pages that need to be allocated
-     *                      will be zero-filled.
      * @param cache         Cache being read from.
      * @param buf           Buffer to read into.
      * @param offset        Offset to read from.
@@ -44,8 +42,6 @@ typedef struct page_cache_ops {
     status_t (*read_page)(struct page_cache *cache, void *buf, offset_t offset);
 
     /** Write a page of data to the source.
-     * @note                If not provided, pages in the cache will never be
-     *                      marked as modified.
      * @param cache         Cache to write to.
      * @param buf           Buffer containing data to write.
      * @param offset        Offset to write from.
