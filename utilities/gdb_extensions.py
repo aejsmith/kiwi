@@ -352,3 +352,7 @@ class KiwiCurrCPUFunction(gdb.Function):
         return kiwi_target.get_curr_cpu()
 
 KiwiCurrCPUFunction('curr_cpu')
+
+# Macros.
+gdb.execute("macro define offsetof(type, member) &((type *)0)->member")
+gdb.execute("macro define container_of(ptr, type, member) (type *)((uint8_t *)(ptr) - (uint8_t *)offsetof(type, member))")
