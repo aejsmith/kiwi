@@ -120,8 +120,8 @@ static LIST_DEFINE(slab_caches);
 static MUTEX_DEFINE(slab_caches_lock, 0);
 
 #if CONFIG_SLAB_GUARD
-static const uint8_t slab_guard[8]  = { 0xa0, 0xb1, 0xc2, 0xd3, 0xe4, 0xf5, 0x06, 0x17 };
-static const size_t slab_guard_size = 8;
+static const uint8_t SLAB_GUARD[8]  = { 0xa0, 0xb1, 0xc2, 0xd3, 0xe4, 0xf5, 0x06, 0x17 };
+static const size_t SLAB_GUARD_SIZE = 8;
 #endif
 
 static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
@@ -632,8 +632,10 @@ void *slab_cache_alloc(slab_cache_t *cache, uint32_t mmflag) {
 
     if (likely(ret)) {
         #if CONFIG_SLAB_GUARD
-            if (!(cache->flags & __SLAB_CACHE_NO_GUARD))
-                memcpy((uint8_t *)ret + cache->orig_obj_size, slab_guard, slab_guard_size);
+            if (!(cache->flags & __SLAB_CACHE_NO_GUARD)) {
+                uint8_t *guard = (uint8_t *)ret + cache->orig_obj_size;
+                memcpy(guard, SLAB_GUARD, SLAB_GUARD_SIZE);
+            }
         #endif
 
         #if CONFIG_SLAB_STATS
@@ -659,8 +661,15 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
     assert(cache);
 
     #if CONFIG_SLAB_GUARD
-        if (memcmp((uint8_t *)obj + cache->orig_obj_size, slab_guard, slab_guard_size) != 0)
-            fatal("Guard failure freeing object %p from %p (%s)", obj, cache, cache->name);
+        if (!(cache->flags & __SLAB_CACHE_NO_GUARD)) {
+            uint8_t *guard = (uint8_t *)obj + cache->orig_obj_size;
+
+            if (memcmp(guard, SLAB_GUARD, SLAB_GUARD_SIZE) != 0)
+                fatal("Guard failure freeing object %p from %p (%s)", obj, cache, cache->name);
+
+            /* Clear it to detect double frees. */
+            memset(guard, 0, SLAB_GUARD_SIZE);
+        }
     #endif
 
     bool freed = false;
@@ -752,7 +761,7 @@ static status_t slab_cache_init(
     #if CONFIG_SLAB_GUARD
         cache->orig_obj_size = size;
         if (!(flags & __SLAB_CACHE_NO_GUARD))
-            size += slab_guard_size;
+            size += SLAB_GUARD_SIZE;
     #endif
 
     /* Make sure the object size is aligned. */
