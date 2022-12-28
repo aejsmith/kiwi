@@ -60,7 +60,7 @@ dist_env = manager['dist']
 dist_env['MODULES'] = []
 
 # Create the kernel environment.
-kern_env = manager.create_bare(name = 'kernel', flags = {
+kern_env = manager.create_bare(name = 'kernel', with_config_h = True, flags = {
     'LIBS': [],
     'CPPPATH': [
         Dir('include'),
@@ -69,14 +69,12 @@ kern_env = manager.create_bare(name = 'kernel', flags = {
     'CCFLAGS': [
         '-nostdlib', '-nostdinc', '-ffreestanding',
         '-fno-optimize-sibling-calls', '-fno-stack-protector',
-        '-include', 'build/%s-%s/config.h' % (config['ARCH'], config['BUILD']),
     ],
     'CXXFLAGS': [
         '-fno-exceptions', '-fno-rtti',
     ],
     'ASFLAGS': [
         '-nostdinc',
-        '-include', 'build/%s-%s/config.h' % (config['ARCH'], config['BUILD']),
     ],
     'LINKFLAGS': [
         '-nostdlib',

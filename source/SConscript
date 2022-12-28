@@ -18,16 +18,18 @@ Import('config', 'manager', 'version')
 
 # Generate the configuration header. We don't generate with Kconfig because its
 # too much of a pain to get SCons to do it properly.
-f = open('config.h', 'w')
-f.write('/* This file is automatically-generated, do not edit. */\n\n')
-for (k, v) in config.items():
-    if isinstance(v, str):
-        f.write("#define CONFIG_%s \"%s\"\n" % (k, v))
-    elif isinstance(v, bool) or isinstance(v, int):
-        f.write("#define CONFIG_%s %d\n" % (k, int(v)))
-    else:
-        raise Exception("Unsupported type %s in config" % (type(v)))
-f.close()
+def gen_config_h(target, source, env):
+    f = open(str(target[0]), 'w')
+    f.write('/* This file is automatically-generated, do not edit. */\n\n')
+    for (k, v) in config.items():
+        if isinstance(v, str):
+            f.write("#define CONFIG_%s \"%s\"\n" % (k, v))
+        elif isinstance(v, bool) or isinstance(v, int):
+            f.write("#define CONFIG_%s %d\n" % (k, int(v)))
+        else:
+            raise Exception("Unsupported type %s in config" % (type(v)))
+    f.close()
+AlwaysBuild(manager['dist'].Command('config.h', [], Action(gen_config_h, None)))
 
 #################
 # Kernel build. #

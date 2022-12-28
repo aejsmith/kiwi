@@ -197,10 +197,26 @@ class BuildManager:
         # through the compiler.
         self.target_template['ASCOM'] = '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES'
 
-        # Add an action for ASM files in a shared library.
+        # Add an action for ASM files in a shared library, and emitters that
+        # handle -include arguments.
         from SCons.Tool import createObjBuilders
         static_obj, shared_obj = createObjBuilders(self.target_template)
         shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
+        def add_cmdline_deps(target, source, env):
+            for idx, flag in enumerate(env['CCFLAGS']):
+                if flag == '-include':
+                    next = env.subst(env['CCFLAGS'][idx + 1], conv = lambda x: x)
+                    Depends(target[0], File(next))
+        def static_obj_emitter(target, source, env):
+            add_cmdline_deps(target, source, env)
+            return SCons.Defaults.StaticObjectEmitter(target, source, env)
+        def shared_obj_emitter(target, source, env):
+            add_cmdline_deps(target, source, env)
+            return SCons.Defaults.SharedObjectEmitter(target, source, env)
+        suffixes = ['.c', '.cpp', '.cxx', '.cc', '.S']
+        for suffix in suffixes:
+            static_obj.add_emitter(suffix, static_obj_emitter)
+            shared_obj.add_emitter(suffix, shared_obj_emitter)
 
         # Add in extra compilation flags from the configuration.
         if 'ARCH_ASFLAGS' in self.config:
@@ -279,10 +295,17 @@ class BuildManager:
             'lib_paths': lib_paths,
         }
 
+    def _add_config_h(self, env):
+        env['CONFIG_H'] = File('#%s/config.h' % (self.target_build_dir))
+        self.merge_flags(env, {
+            'ASFLAGS': ['-include', '${CONFIG_H}'],
+            'CCFLAGS': ['-include', '${CONFIG_H}'],
+        })
+
     # Create an environment for building for the host system.
     def create_host(self, **kwargs):
-        name = kwargs['name'] if 'name' in kwargs else None
-        flags = kwargs['flags'] if 'flags' in kwargs else {}
+        name  = kwargs.get('name', None)
+        flags = kwargs.get('flags', {})
 
         env = self.host_template.Clone()
         self.merge_flags(env, flags)
@@ -291,21 +314,31 @@ class BuildManager:
 
     # Create an environment for building for the target system.
     def create_bare(self, **kwargs):
-        name = kwargs['name'] if 'name' in kwargs else None
-        flags = kwargs['flags'] if 'flags' in kwargs else {}
+        name          = kwargs.get('name', None)
+        flags         = kwargs.get('flags', {})
+        with_config_h = kwargs.get('with_config_h', False)
 
         env = self.target_template.Clone()
+
+        if with_config_h:
+            self._add_config_h(env)
+
         self.merge_flags(env, flags)
+
         self.envs.append((name, env))
         return env
 
     # Create an environment for building for the target system.
     def create(self, **kwargs):
-        name = kwargs['name'] if 'name' in kwargs else None
-        flags = kwargs['flags'] if 'flags' in kwargs else {}
-        libraries = kwargs['libraries'] if 'libraries' in kwargs else []
+        name          = kwargs.get('name', None)
+        flags         = kwargs.get('flags', {})
+        libraries     = kwargs.get('libraries', [])
+        with_config_h = kwargs.get('with_config_h', True)
 
         env = self.target_template.Clone()
+
+        if with_config_h:
+            self._add_config_h(env)
 
         self.merge_flags(env, {
             # Specify -nostdinc to prevent the compiler from using the
@@ -313,14 +346,8 @@ class BuildManager:
             # compiling outside the build system, we manage all the header
             # paths internally. We do need to add the compiler's own include
             # directory to the path, though.
-            'ASFLAGS': [
-                '-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'],
-                '-include', '%s/config.h' % (self.target_build_dir)
-            ],
-            'CCFLAGS': [
-                '-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE'],
-                '-include', '%s/config.h' % (self.target_build_dir)
-            ],
+            'ASFLAGS': ['-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE']],
+            'CCFLAGS': ['-nostdinc', '-isystem', env['TOOLCHAIN_INCLUDE']],
 
             # Link to the specified libraries and set up the library path.
             'LIBS': libraries,
@@ -388,8 +415,8 @@ class BuildManager:
 
     # Create a new environment based on an existing environment.
     def clone(self, base, **kwargs):
-        name = kwargs['name'] if 'name' in kwargs else None
-        flags = kwargs['flags'] if 'flags' in kwargs else {}
+        name  = kwargs.get('name', None)
+        flags = kwargs.get('flags', {})
 
         env = base.Clone()
         self.merge_flags(env, flags)
