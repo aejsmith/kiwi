@@ -230,7 +230,7 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
     slab_bufctl_t *bufctl;
     slab_t *slab;
     if (cache->flags & SLAB_CACHE_LARGE) {
-        uint32_t hash = fnv_hash_integer((ptr_t)obj) % SLAB_HASH_SIZE;
+        uint32_t hash = fnv32_hash_integer((ptr_t)obj) % SLAB_HASH_SIZE;
         slab_bufctl_t *prev = NULL;
         for (bufctl = cache->bufctl_hash[hash]; bufctl; bufctl = bufctl->next) {
             if (bufctl->object == obj)
@@ -315,7 +315,7 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, uint32_t mmflag) {
 
     /* Place the allocation on the allocation hash table if required. */
     if (cache->flags & SLAB_CACHE_LARGE) {
-        uint32_t hash = fnv_hash_integer((ptr_t)obj) % SLAB_HASH_SIZE;
+        uint32_t hash = fnv32_hash_integer((ptr_t)obj) % SLAB_HASH_SIZE;
         bufctl->next = cache->bufctl_hash[hash];
         cache->bufctl_hash[hash] = bufctl;
     }

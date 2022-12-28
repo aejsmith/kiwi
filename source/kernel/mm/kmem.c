@@ -186,7 +186,7 @@ static inline kmem_range_t *kmem_freelist_find(size_t size) {
 }
 
 static inline void kmem_hash_insert(kmem_range_t *range) {
-    uint32_t hash = fnv_hash_integer(range->addr) % kmem_hash_size;
+    uint32_t hash = fnv32_hash_integer(range->addr) % kmem_hash_size;
     list_append(&kmem_hash[hash], &range->af_link);
 }
 
@@ -196,7 +196,7 @@ static kmem_range_t *kmem_hash_find(ptr_t addr, size_t size) {
     assert(!(size % PAGE_SIZE));
 
     /* Search the bucket for the allocation. */
-    uint32_t hash = fnv_hash_integer(addr) % kmem_hash_size;
+    uint32_t hash = fnv32_hash_integer(addr) % kmem_hash_size;
     size_t i = 0;
     list_foreach(&kmem_hash[hash], iter) {
         kmem_range_t *range = list_entry(iter, kmem_range_t, af_link);

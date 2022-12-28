@@ -40,55 +40,110 @@
 
 #include <lib/string.h>
 #include <lib/utility.h>
+#include <lib/fnv.h>
 
 #include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/slab.h>
 
+#include <assert.h>
 #include <kernel.h>
 
 /** Information structure prepended to allocations. */
 typedef struct alloc_tag {
-    size_t size;                    /**< Size of the allocation. */
+    uint32_t size;                  /**< Size of the allocation. */
+    uint32_t magic;                 /**< Magic value. */
     slab_cache_t *cache;            /**< Pointer to cache for allocation. */
 } alloc_tag_t;
 
 /** Cache settings. */
-#define KMALLOC_CACHE_MIN   5       /**< Minimum cache size (2^5  == 32). */
-#define KMALLOC_CACHE_MAX   16      /**< Maximum cache size (2^16 == 64K). */
+enum {
+    KMALLOC_CACHE_MIN = 5,          /**< Minimum cache size (2^5  == 32). */
+    KMALLOC_CACHE_MAX = 16,         /**< Maximum cache size (2^16 == 64K). */
+
+    KMALLOC_NUM_CACHES = KMALLOC_CACHE_MAX - KMALLOC_CACHE_MIN + 1
+};
 
 /** Slab caches for kmalloc(). */
-static slab_cache_t *kmalloc_caches[KMALLOC_CACHE_MAX - KMALLOC_CACHE_MIN + 1];
+static slab_cache_t *kmalloc_caches[KMALLOC_NUM_CACHES];
+
+/**
+ * Allocation magic values, set based on their cache. This gives a bit more
+ * sanity checking of allocation compared to using a fixed value for everything.
+ */
+static uint32_t kmalloc_magic[KMALLOC_NUM_CACHES];
+static const uint32_t KMALLOC_LARGE_MAGIC = 0xbeefbeef;
+
+static size_t get_alloc_total(size_t size) {
+    return size + sizeof(alloc_tag_t);
+}
+
+static size_t get_cache_idx(size_t total) {
+    assert(total <= (1 << KMALLOC_CACHE_MAX));
+
+    /* If exactly a power-of-two, then highbit(total) will work, else we want
+     * the next size up. */
+    size_t idx = (is_pow2(total)) ? highbit(total) - 1 : highbit(total);
+    if (idx < KMALLOC_CACHE_MIN)
+        idx = KMALLOC_CACHE_MIN;
+
+    return idx - KMALLOC_CACHE_MIN;
+}
+
+static alloc_tag_t *get_alloc_tag(void *addr) {
+    return (alloc_tag_t *)((uint8_t *)addr - sizeof(alloc_tag_t));
+}
+
+static void validate_alloc(alloc_tag_t *tag) {
+    bool valid = tag->size > 0;
+
+    size_t total = get_alloc_total(tag->size);
+
+    if (tag->cache) {
+        size_t idx = get_cache_idx(total);
+
+        valid = valid && idx < KMALLOC_NUM_CACHES;
+        valid = valid && tag->cache == kmalloc_caches[idx];
+        valid = valid && tag->magic == kmalloc_magic[idx];
+    } else {
+        valid = valid && total > (1 << KMALLOC_CACHE_MAX);
+        valid = valid && tag->magic == KMALLOC_LARGE_MAGIC;
+    }
+
+    if (!valid)
+        fatal("Invalid kmalloc allocation %p detected", &tag[1]);
+}
 
 /** Allocates a block of memory.
  * @param size          Size of block.
  * @param mmflag        Allocation behaviour flags.
  * @return              Pointer to block on success, NULL on failure. */
 void *kmalloc(size_t size, uint32_t mmflag) {
-    size_t total = size + sizeof(alloc_tag_t);
-    alloc_tag_t *addr;
+    if (size == 0)
+        return NULL;
 
-    /* Use the slab caches where possible. */
+    alloc_tag_t *addr;
+    size_t total = get_alloc_total(size);
+
+    assert(total <= UINT32_MAX);
+
     if (total <= (1 << KMALLOC_CACHE_MAX)) {
-        /* If exactly a power-of-two, then highbit(total) will work, else we
-         * want the next size up. Remember that the highbit function returns
-         * (log2(n) + 1). */
-        size_t idx = (is_pow2(total)) ? highbit(total) - 1 : highbit(total);
-        if (idx < KMALLOC_CACHE_MIN)
-            idx = KMALLOC_CACHE_MIN;
-        idx -= KMALLOC_CACHE_MIN;
+        size_t idx = get_cache_idx(total);
 
         addr = slab_cache_alloc(kmalloc_caches[idx], mmflag);
         if (unlikely(!addr))
             return NULL;
 
+        addr->magic = kmalloc_magic[idx];
         addr->cache = kmalloc_caches[idx];
     } else {
         /* Fall back on kmem. */
-        addr = kmem_alloc(round_up(total, PAGE_SIZE), mmflag & MM_FLAG_MASK);
+        size_t aligned = round_up(total, PAGE_SIZE);
+        addr = kmem_alloc(aligned, mmflag & MM_FLAG_MASK);
         if (unlikely(!addr))
             return NULL;
 
+        addr->magic = KMALLOC_LARGE_MAGIC;
         addr->cache = NULL;
     }
 
@@ -123,10 +178,16 @@ void *kcalloc(size_t nmemb, size_t size, uint32_t mmflag) {
  * @return              Pointer to block on success, NULL on failure.
  */
 void *krealloc(void *addr, size_t size, uint32_t mmflag) {
-    if (!addr)
+    if (!addr) {
         return kmalloc(size, mmflag);
+    } else if (size == 0) {
+        kfree(addr);
+        return NULL;
+    }
 
-    alloc_tag_t *tag = (alloc_tag_t *)((char *)addr - sizeof(alloc_tag_t));
+    alloc_tag_t *tag = get_alloc_tag(addr);
+    validate_alloc(tag);
+
     if (tag->size == size)
         return addr;
 
@@ -154,18 +215,23 @@ void *krealloc(void *addr, size_t size, uint32_t mmflag) {
  * @param addr          Address to free. If NULL, nothing is done.
  */
 void kfree(void *addr) {
-    if (addr) {
-        alloc_tag_t *tag = (alloc_tag_t *)((char *)addr - sizeof(alloc_tag_t));
+    if (!addr)
+        return;
 
-        /* If the cache pointer is not set, assume the allocation came directly
-         * from kmem. */
-        if (!tag->cache) {
-            kmem_free(tag, round_up(tag->size + sizeof(alloc_tag_t), PAGE_SIZE));
-            return;
-        }
+    alloc_tag_t *tag = get_alloc_tag(addr);
+    validate_alloc(tag);
 
-        /* Free to the cache it came from. */
+    /* Get and invalidate size so we can detect double frees later. */
+    size_t size = tag->size;
+    tag->size  = 0;
+    tag->magic = 0;
+
+    if (tag->cache) {
         slab_cache_free(tag->cache, tag);
+    } else {
+        size_t total   = get_alloc_total(size);
+        size_t aligned = round_up(total, PAGE_SIZE);
+        kmem_free(tag, aligned);
     }
 }
 
@@ -232,5 +298,6 @@ __init_text void malloc_init(void) {
         name[SLAB_NAME_MAX - 1] = 0;
 
         kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL, NULL, 0, MM_BOOT);
+        kmalloc_magic[i]  = fnv32_hash_string(name);
     }
 }
