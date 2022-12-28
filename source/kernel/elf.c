@@ -215,8 +215,9 @@ status_t elf_binary_load(
     status_t ret;
     size_t bytes;
 
-    elf_image_t *image = kmalloc(sizeof(*image), MM_KERNEL);
+    elf_image_t *image = kmalloc(sizeof(*image), MM_KERNEL | MM_ZERO);
 
+    image->path  = kstrdup(path, MM_KERNEL);
     image->name  = kbasename(path, MM_KERNEL);
     image->ehdr  = kmalloc(sizeof(*image->ehdr), MM_KERNEL);
     image->phdrs = NULL;
@@ -332,10 +333,7 @@ status_t elf_binary_load(
     return STATUS_SUCCESS;
 
 err:
-    kfree(image->phdrs);
-    kfree(image->ehdr);
-    kfree(image->name);
-    kfree(image);
+    elf_binary_destroy(image);
     return ret;
 }
 
@@ -365,6 +363,7 @@ void elf_binary_destroy(elf_image_t *image) {
     kfree(image->phdrs);
     kfree(image->ehdr);
     kfree(image->name);
+    kfree(image->path);
     kfree(image);
 }
 
@@ -954,9 +953,18 @@ __init_text void elf_init(elf_image_t *image) {
 void elf_process_clone(process_t *process, process_t *parent) {
     list_foreach(&parent->images, iter) {
         elf_image_t *image = list_entry(iter, elf_image_t, header);
-        elf_image_t *clone = kmemdup(image, sizeof(*image), MM_KERNEL);
 
-        clone->name = kstrdup(image->name, MM_KERNEL);
+        elf_image_t *clone = kmalloc(sizeof(*clone), MM_KERNEL | MM_ZERO);
+
+        clone->id          = image->id;
+        clone->name        = kstrdup(image->name, MM_KERNEL);
+        clone->path        = kstrdup(image->path, MM_KERNEL);
+        clone->load_base   = image->load_base;
+        clone->load_size   = image->load_size;
+        clone->symtab      = image->symtab;
+        clone->sym_size    = image->sym_size;
+        clone->sym_entsize = image->sym_entsize;
+        clone->strtab      = image->strtab;
 
         list_init(&clone->header);
         list_append(&process->images, &clone->header);
@@ -971,8 +979,7 @@ void elf_process_cleanup(process_t *process) {
 
         list_remove(&image->header);
 
-        kfree(image->name);
-        kfree(image);
+        elf_binary_destroy(image);
     }
 }
 
@@ -1046,9 +1053,7 @@ status_t kern_image_register(image_id_t id, image_info_t *info) {
     return STATUS_SUCCESS;
 
 err_free:
-    kfree(image->path);
-    kfree(image->name);
-    kfree(image);
+    elf_binary_destroy(image);
     return ret;
 }
 
