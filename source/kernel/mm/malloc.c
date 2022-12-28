@@ -53,7 +53,6 @@
 typedef struct alloc_tag {
     uint32_t size;                  /**< Size of the allocation. */
     uint32_t magic;                 /**< Magic value. */
-    slab_cache_t *cache;            /**< Pointer to cache for allocation. */
 } alloc_tag_t;
 
 /** Cache settings. */
@@ -79,15 +78,15 @@ static size_t get_alloc_total(size_t size) {
 }
 
 static size_t get_cache_idx(size_t total) {
-    assert(total <= (1 << KMALLOC_CACHE_MAX));
-
-    /* If exactly a power-of-two, then highbit(total) will work, else we want
-     * the next size up. */
-    size_t idx = (is_pow2(total)) ? highbit(total) - 1 : highbit(total);
-    if (idx < KMALLOC_CACHE_MIN)
-        idx = KMALLOC_CACHE_MIN;
-
-    return idx - KMALLOC_CACHE_MIN;
+    if (total > (1 << KMALLOC_CACHE_MAX)) {
+        return KMALLOC_NUM_CACHES;
+    } else {
+        /* If exactly a power-of-two, then highbit(total) will work, else we
+         * want the next size up. */
+        size_t bit = highbit(total);
+        size_t idx = (is_pow2(total)) ? bit - 1 : bit;
+        return max(idx, KMALLOC_CACHE_MIN) - KMALLOC_CACHE_MIN;
+    }
 }
 
 static alloc_tag_t *get_alloc_tag(void *addr) {
@@ -97,17 +96,12 @@ static alloc_tag_t *get_alloc_tag(void *addr) {
 static void validate_alloc(alloc_tag_t *tag) {
     bool valid = tag->size > 0;
 
-    size_t total = get_alloc_total(tag->size);
+    if (valid) {
+        size_t total   = get_alloc_total(tag->size);
+        size_t idx     = get_cache_idx(total);
+        uint32_t magic = (idx < KMALLOC_NUM_CACHES) ? kmalloc_magic[idx] : KMALLOC_LARGE_MAGIC;
 
-    if (tag->cache) {
-        size_t idx = get_cache_idx(total);
-
-        valid = valid && idx < KMALLOC_NUM_CACHES;
-        valid = valid && tag->cache == kmalloc_caches[idx];
-        valid = valid && tag->magic == kmalloc_magic[idx];
-    } else {
-        valid = valid && total > (1 << KMALLOC_CACHE_MAX);
-        valid = valid && tag->magic == KMALLOC_LARGE_MAGIC;
+        valid = tag->magic == magic;
     }
 
     if (!valid)
@@ -122,20 +116,18 @@ void *kmalloc(size_t size, uint32_t mmflag) {
     if (size == 0)
         return NULL;
 
-    alloc_tag_t *addr;
     size_t total = get_alloc_total(size);
+    size_t idx   = get_cache_idx(total);
 
     assert(total <= UINT32_MAX);
 
-    if (total <= (1 << KMALLOC_CACHE_MAX)) {
-        size_t idx = get_cache_idx(total);
-
+    alloc_tag_t *addr;
+    if (idx < KMALLOC_NUM_CACHES) {
         addr = slab_cache_alloc(kmalloc_caches[idx], mmflag);
         if (unlikely(!addr))
             return NULL;
 
         addr->magic = kmalloc_magic[idx];
-        addr->cache = kmalloc_caches[idx];
     } else {
         /* Fall back on kmem. */
         size_t aligned = round_up(total, PAGE_SIZE);
@@ -144,7 +136,6 @@ void *kmalloc(size_t size, uint32_t mmflag) {
             return NULL;
 
         addr->magic = KMALLOC_LARGE_MAGIC;
-        addr->cache = NULL;
     }
 
     addr->size = size;
@@ -221,15 +212,16 @@ void kfree(void *addr) {
     alloc_tag_t *tag = get_alloc_tag(addr);
     validate_alloc(tag);
 
-    /* Get and invalidate size so we can detect double frees later. */
-    size_t size = tag->size;
+    size_t total = get_alloc_total(tag->size);
+    size_t idx   = get_cache_idx(total);
+
+    /* Invalidate so we can detect double frees later. */
     tag->size  = 0;
     tag->magic = 0;
 
-    if (tag->cache) {
-        slab_cache_free(tag->cache, tag);
+    if (idx < KMALLOC_NUM_CACHES) {
+        slab_cache_free(kmalloc_caches[idx], tag);
     } else {
-        size_t total   = get_alloc_total(size);
         size_t aligned = round_up(total, PAGE_SIZE);
         kmem_free(tag, aligned);
     }
