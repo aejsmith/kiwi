@@ -124,8 +124,13 @@ class BuildManager:
     def _init_tools(self):
         self.add_builder('LDScript', builders.ld_script_builder)
 
-        self.host_template.Tool('compilation_db', toolpath = ['utilities/build'])
-        self.target_template.Tool('compilation_db', toolpath = ['utilities/build'])
+        self.host_template.Tool('compilation_db')
+        self.target_template.Tool('compilation_db')
+
+        # Setting COMPILATION_DBCOMSTR to None or empty results in the function
+        # name being printed, this silences it completely.
+        self.host_template.CompilationDatabase.builder.action.cmdstr = None
+        self.target_template.CompilationDatabase.builder.action.cmdstr = None
 
     # Initialise the host environment template.
     def _init_host(self):
@@ -202,21 +207,17 @@ class BuildManager:
         from SCons.Tool import createObjBuilders
         static_obj, shared_obj = createObjBuilders(self.target_template)
         shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
-        def add_cmdline_deps(target, source, env):
+        def cmdline_deps_emitter(target, source, env):
             for idx, flag in enumerate(env['CCFLAGS']):
                 if flag == '-include':
                     next = env.subst(env['CCFLAGS'][idx + 1], conv = lambda x: x)
                     Depends(target[0], File(next))
-        def static_obj_emitter(target, source, env):
-            add_cmdline_deps(target, source, env)
-            return SCons.Defaults.StaticObjectEmitter(target, source, env)
-        def shared_obj_emitter(target, source, env):
-            add_cmdline_deps(target, source, env)
-            return SCons.Defaults.SharedObjectEmitter(target, source, env)
+            return (target, source)
         suffixes = ['.c', '.cpp', '.cxx', '.cc', '.S']
         for suffix in suffixes:
-            static_obj.add_emitter(suffix, static_obj_emitter)
-            shared_obj.add_emitter(suffix, shared_obj_emitter)
+            for builder in [static_obj, shared_obj]:
+                emitter = builder.emitter.get(suffix, False)
+                builder.emitter[suffix] = SCons.Builder.ListEmitter([emitter, cmdline_deps_emitter])
 
         # Add in extra compilation flags from the configuration.
         if 'ARCH_ASFLAGS' in self.config:
