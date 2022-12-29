@@ -134,6 +134,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
     /* Destroy all buffer control structures and the slab structure if stored
      * externally. */
     if (cache->flags & SLAB_CACHE_LARGE) {
+        kprintf(LOG_DEBUG, "foo");
         while (slab->free) {
             slab_bufctl_t *bufctl = slab->free;
             slab->free = bufctl->next;
@@ -575,9 +576,8 @@ static const char *trace_skip_names[] = {
     "arrcpy_from_user",
 };
 
-/** Get the address for allocation tracing output.
- * @param cache     Cache being allocated from. */
-static __always_inline void *trace_return_address(slab_cache_t *cache) {
+/** Get the address for allocation tracing output. */
+static __always_inline void *trace_return_address(void) {
     void *addr = __builtin_return_address(0);
     symbol_t sym;
     if (!symbol_from_addr((ptr_t)addr - 1, &sym, NULL))
@@ -644,9 +644,7 @@ void *slab_cache_alloc(slab_cache_t *cache, uint32_t mmflag) {
         #endif
 
         #if CONFIG_SLAB_TRACING
-            kprintf(
-                LOG_DEBUG, "slab: allocated %p from %s at %pB\n",
-                ret, cache->name, trace_return_address(cache));
+            kprintf(LOG_DEBUG, "alloc: %p %s %pB\n", ret, cache->name, trace_return_address());
         #endif
     }
 
@@ -685,9 +683,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
     #endif
 
     #if CONFIG_SLAB_TRACING
-        kprintf(
-            LOG_DEBUG, "slab: freed %p to %s at %pB\n",
-            obj, cache->name, trace_return_address(cache));
+        kprintf(LOG_DEBUG, "free: %p %s %pB\n", obj, cache->name, trace_return_address());
     #endif
 }
 

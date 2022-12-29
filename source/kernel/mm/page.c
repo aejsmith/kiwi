@@ -152,6 +152,34 @@ static size_t boot_range_count __init_data = 0;
 /** Whether the physical memory manager has been initialized. */
 bool page_init_done;
 
+#if CONFIG_PAGE_TRACING
+
+/* Our usage of __builtin_return_address is OK, disable errors. */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wframe-address"
+
+static const char *trace_skip_names[] = {
+    "page_copy", "dma_alloc", "dma_free",
+};
+
+static __always_inline void *trace_return_address(void) {
+    void *addr = __builtin_return_address(0);
+    symbol_t sym;
+    if (!symbol_from_addr((ptr_t)addr - 1, &sym, NULL))
+        return addr;
+
+    for (size_t i = 0; i < array_size(trace_skip_names); i++) {
+        if (strcmp(trace_skip_names[i], sym.name) == 0)
+            return __builtin_return_address(1);
+    }
+
+    return addr;
+}
+
+#pragma clang diagnostic pop
+
+#endif /* CONFIG_PAGE_TRACING */
+
 static void page_writer(void *arg1, void *arg2) {
     page_queue_t *queue = &page_queues[PAGE_STATE_CACHED_DIRTY];
     LIST_DEFINE(marker);
@@ -303,6 +331,10 @@ page_t *page_alloc(uint32_t mmflag) {
 
         preempt_enable();
 
+        #if CONFIG_PAGE_TRACING
+            kprintf(LOG_DEBUG, "alloc: 0x%" PRIxPHYS " page %pB\n", page->addr, trace_return_address());
+        #endif
+
         dprintf("page: allocated page 0x%" PRIxPHYS " (list: %u)\n", page->addr, i);
         return page;
     }
@@ -344,6 +376,10 @@ void page_free(page_t *page) {
     mutex_lock(&free_page_lock);
     page_free_internal(page);
     mutex_unlock(&free_page_lock);
+
+    #if CONFIG_PAGE_TRACING
+        kprintf(LOG_DEBUG, "free: 0x%" PRIxPHYS " page %pB\n", page->addr, trace_return_address());
+    #endif
 
     dprintf(
         "page: freed page 0x%" PRIxPHYS " (list: %u)\n",
@@ -560,6 +596,10 @@ status_t phys_alloc(
 
     preempt_enable();
 
+    #if CONFIG_PAGE_TRACING
+        kprintf(LOG_DEBUG, "alloc: 0x%" PRIxPHYS " phys %pB\n", pages->addr, trace_return_address());
+    #endif
+
     dprintf(
         "page: allocated page range [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
         pages->addr, pages->addr + size);
@@ -604,6 +644,10 @@ void phys_free(phys_ptr_t base, phys_size_t size) {
         page_free_internal(&pages[i]);
 
     mutex_unlock(&free_page_lock);
+
+    #if CONFIG_PAGE_TRACING
+        kprintf(LOG_DEBUG, "free: 0x%" PRIxPHYS " phys %pB\n", base, trace_return_address());
+    #endif
 
     dprintf(
         "page: freed page range [0x%" PRIxPHYS ",0x%" PRIxPHYS ") (list: %u)\n",

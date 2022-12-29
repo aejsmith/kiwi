@@ -39,15 +39,15 @@ else:
 allocations = {}
 f = open(sys.argv[i], 'r')
 for line in f.readlines():
-    line = line.strip().split(' ', 6)
-    if len(line) != 7 or line[0] != 'slab:':
+    line = line.strip().split(' ', 3)
+    if len(line) != 4 or (line[0] != 'alloc:' and line[0] != 'free:'):
         continue
 
-    if line[1] == 'allocated':
-        allocations[line[2]] = (line[4], line[6])
-    elif line[1] == 'freed':
+    if line[0] == 'alloc:':
+        allocations[line[1]] = (line[2], line[3])
+    elif line[0] == 'free:':
         try:
-            del allocations[line[2]]
+            del allocations[line[1]]
         except KeyError:
             pass
 
@@ -60,8 +60,8 @@ for (k, v) in allocations.items():
 print("Outstanding")
 print("===========")
 print()
-print("%s %s Caller" % ("Address".ljust(addr_width), "Cache".ljust(name_width)))
-print("%s %s ------" % ("-------".ljust(addr_width), "-----".ljust(name_width)))
+print("%s %s Caller" % ("Address".ljust(addr_width), "Source".ljust(name_width)))
+print("%s %s ------" % ("-------".ljust(addr_width), "------".ljust(name_width)))
 
 for (k, v) in allocations.items():
     slab_caches = ['slab_bufctl_cache', 'slab_mag_cache', 'slab_slab_cache']
@@ -72,8 +72,8 @@ print()
 print("Totals")
 print("------")
 print()
-print("Count    %s Caller" % ("Cache".ljust(name_width)))
-print("-----    %s ------" % ("-----".ljust(name_width)))
+print("Count    %s Caller" % ("Source".ljust(name_width)))
+print("-----    %s ------" % ("------".ljust(name_width)))
 
 counter = Counter(allocations.values())
 for (v, count) in counter.most_common():

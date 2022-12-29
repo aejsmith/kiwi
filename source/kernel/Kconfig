@@ -29,6 +29,13 @@ menu "Debugging options"
 	depends on DEBUG
 ########################
 
+config PAGE_TRACING
+	bool "Page allocation tracing"
+	default n
+	help
+	  Enable output on the debug console on every page allocation/free,
+	  to run through utilities/alloc_stats.py.
+
 config SLAB_STATS
 	bool "Slab allocator statistics"
 	default n
@@ -37,12 +44,11 @@ config SLAB_STATS
 	  default as it causes a slight performance hit.
 
 config SLAB_TRACING
-	bool "Slab allocation tracing output"
+	bool "Slab allocation tracing"
 	default n
 	help
 	  Enable output on the debug console on every slab allocation/free,
-	  useful to run through the allocation statistics script in the
-	  utilities directory.
+	  to run through utilities/alloc_stats.py.
 
 config SLAB_GUARD
 	bool "Slab allocation overrun guard"
