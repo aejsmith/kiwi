@@ -764,7 +764,7 @@ void page_cache_resize(page_cache_t *cache, offset_t size) {
                      * that entry might also be invalid after waiting. The only
                      * entry we have any guarantee about is the current one.
                      */
-                    iter = avl_tree_first(&cache->pages);
+                    iter = avl_tree_lookup_ge_node(&cache->pages, size);
                     continue;
                 }
 
