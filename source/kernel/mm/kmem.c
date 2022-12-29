@@ -41,7 +41,10 @@
 #include <assert.h>
 #include <kboot.h>
 #include <kernel.h>
+#include <module.h>
 #include <status.h>
+
+#include "trace.h"
 
 /** Define to enable debug output. */
 //#define DEBUG_KMEM
@@ -91,6 +94,20 @@ static LIST_DEFINE(kmem_range_pool);
 
 /** Global kernel memory lock. */
 static MUTEX_DEFINE(kmem_lock, 0);
+
+#if CONFIG_KMEM_TRACING
+
+/** Function names to skip over in trace_return_address(). */
+static const char *trace_skip_names[] = {
+    "kmem_alloc", "kmem_alloc_etc", "kmem_free", "kmem_raw_free"
+};
+
+/** Get the address for allocation tracing output. */
+static __always_inline void *trace_return_address(void) {
+    return mm_trace_return_address(trace_skip_names, array_size(trace_skip_names));
+}
+
+#endif /* CONFIG_KMEM_TRACING */
 
 static kmem_range_t *kmem_range_get(uint32_t mmflag) {
     kmem_range_t *range;
@@ -291,6 +308,10 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free) {
 
     mutex_unlock(&kmem_lock);
 
+    #if CONFIG_KMEM_TRACING
+        kprintf(LOG_DEBUG, "free: 0x%" PRIxPHYS " kmem %pB\n", addr, trace_return_address());
+    #endif
+
     dprintf("kmem: freed range [0x%zx,0x%zx)\n", addr, addr + size);
 }
 
@@ -341,6 +362,10 @@ ptr_t kmem_raw_alloc(size_t size, uint32_t mmflag) {
     /* Mark the range as allocated, add to the allocation hash table. */
     range->allocated = true;
     kmem_hash_insert(range);
+
+    #if CONFIG_KMEM_TRACING
+        kprintf(LOG_DEBUG, "alloc: 0x%" PRIxPHYS " kmem %pB\n", range->addr, trace_return_address());
+    #endif
 
     dprintf("kmem: allocated range [0x%zx,0x%zx)\n", range->addr, range->addr + size);
     mutex_unlock(&kmem_lock);

@@ -29,6 +29,13 @@ menu "Debugging options"
 	depends on DEBUG
 ########################
 
+config KMEM_TRACING
+	bool "Kmem allocation tracing"
+	default n
+	help
+	  Enable output on the debug console on every kmem allocation/free,
+	  to run through utilities/alloc_stats.py.
+
 config PAGE_TRACING
 	bool "Page allocation tracing"
 	default n

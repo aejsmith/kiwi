@@ -85,6 +85,8 @@
 #include <status.h>
 #include <time.h>
 
+#include "trace.h"
+
 /** Define to enable debug output. */
 //#define DEBUG_PAGE
 
@@ -154,29 +156,13 @@ bool page_init_done;
 
 #if CONFIG_PAGE_TRACING
 
-/* Our usage of __builtin_return_address is OK, disable errors. */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wframe-address"
-
 static const char *trace_skip_names[] = {
     "page_copy", "dma_alloc", "dma_free",
 };
 
 static __always_inline void *trace_return_address(void) {
-    void *addr = __builtin_return_address(0);
-    symbol_t sym;
-    if (!symbol_from_addr((ptr_t)addr - 1, &sym, NULL))
-        return addr;
-
-    for (size_t i = 0; i < array_size(trace_skip_names); i++) {
-        if (strcmp(trace_skip_names[i], sym.name) == 0)
-            return __builtin_return_address(1);
-    }
-
-    return addr;
+    return mm_trace_return_address(trace_skip_names, array_size(trace_skip_names));
 }
-
-#pragma clang diagnostic pop
 
 #endif /* CONFIG_PAGE_TRACING */
 

@@ -51,8 +51,9 @@ for line in f.readlines():
         except KeyError:
             pass
 
-addr_width = 0
-name_width = 0
+# At least the column header width.
+addr_width = 7
+name_width = 6
 for (k, v) in allocations.items():
     addr_width = max(addr_width, len(k))
     name_width = max(name_width, len(v[0]))

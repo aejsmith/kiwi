@@ -54,6 +54,8 @@
 #include <module.h>
 #include <status.h>
 
+#include "trace.h"
+
 struct slab;
 
 /** Slab magazine structure. */
@@ -565,10 +567,6 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 
 #if CONFIG_SLAB_TRACING
 
-/* Our usage of __builtin_return_address is OK, disable errors. */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wframe-address"
-
 /** Function names to skip over in trace_return_address(). */
 static const char *trace_skip_names[] = {
     "kmalloc", "krealloc", "kcalloc", "kfree", "kstrdup", "kstrndup",
@@ -578,36 +576,8 @@ static const char *trace_skip_names[] = {
 
 /** Get the address for allocation tracing output. */
 static __always_inline void *trace_return_address(void) {
-    void *addr = __builtin_return_address(0);
-    symbol_t sym;
-    if (!symbol_from_addr((ptr_t)addr - 1, &sym, NULL))
-        return addr;
-
-    /* If we're called through another allocation function, we want the address
-     * printed to be the caller of that. This can be multiple levels deep, e.g.
-     * kstrdup -> kmalloc -> slab_cache_alloc. We have to pass a constant
-     * integer to __builtin_return_address, so hardcode this for 2 levels deep.
-     * Yeah, this is terribly inefficient, but this is only enabled for
-     * debugging. */
-    for (size_t i = 0; i < array_size(trace_skip_names); i++) {
-        if (strcmp(trace_skip_names[i], sym.name) == 0) {
-            addr = __builtin_return_address(1);
-            if (!symbol_from_addr((ptr_t)addr - 1, &sym, NULL))
-                return addr;
-
-            for (size_t j = 0; j < array_size(trace_skip_names); j++) {
-                if (strcmp(trace_skip_names[j], sym.name) == 0)
-                    return __builtin_return_address(2);
-            }
-
-            return addr;
-        }
-    }
-
-    return addr;
+    return mm_trace_return_address(trace_skip_names, array_size(trace_skip_names));
 }
-
-#pragma clang diagnostic pop
 
 #endif /* CONFIG_SLAB_TRACING */
 
