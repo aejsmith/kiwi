@@ -86,7 +86,7 @@ typedef struct slab_cache {
     int priority;                       /**< Reclaim priority. */
 
     /** Debugging information. */
-    list_t header;                      /**< List to slab cache list. */
+    list_t link;                        /**< List to slab cache list. */
     char name[SLAB_NAME_MAX];           /**< Name of cache. */
 #if CONFIG_SLAB_GUARD
     size_t orig_obj_size;               /**< Original requested object size. */

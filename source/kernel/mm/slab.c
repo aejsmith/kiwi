@@ -53,6 +53,7 @@
 #include <kernel.h>
 #include <module.h>
 #include <status.h>
+#include <time.h>
 
 #include "trace.h"
 
@@ -62,9 +63,19 @@ struct slab;
 typedef struct slab_magazine {
     /** Array of objects in the magazine. */
     void *objects[SLAB_MAGAZINE_SIZE];
-    size_t rounds;                      /**< Number of rounds currently in the magazine. */
 
-    list_t header;                      /**< Link to depot lists. */
+    union {
+        /** Number of rounds currently in the magazine (while empty). */
+        size_t rounds;
+
+        /**
+         * Last used time, for magzines in the depot, to determine when to
+         * reclaim.
+         */
+        nstime_t last_used;
+    };
+
+    list_t link;                        /**< Link to depot lists. */
 } slab_magazine_t;
 
 /** Slab per-CPU cache structure. */
@@ -96,7 +107,7 @@ typedef struct slab_bufctl {
 
 /** Slab structure. */
 typedef struct slab {
-    list_t header;                      /**< Link to appropriate slab list in cache. */
+    list_t link;                        /**< Link to appropriate slab list in cache. */
 
     void *base;                         /**< Base address of allocation. */
     size_t refcount;                    /**< Reference count. */
@@ -106,9 +117,18 @@ typedef struct slab {
 } slab_t;
 
 /** Reclaim priorities to use for caches. */
-#define SLAB_DEFAULT_PRIORITY       0
-#define SLAB_METADATA_PRIORITY      1
-#define SLAB_MAG_PRIORITY           2
+enum {
+    SLAB_DEFAULT_PRIORITY       = 0,
+    SLAB_METADATA_PRIORITY      = 1,
+    SLAB_MAG_PRIORITY           = 2,
+};
+
+/** Interval for the slab reclaim thread. */
+#define SLAB_RECLAIM_INTERVAL       msecs_to_nsecs(500)
+
+/** How long a full/empty magazine has to be unused before it is reclaimed. */
+#define SLAB_RECLAIM_FULL_AGE       secs_to_nsecs(5)
+#define SLAB_RECLAIM_EMPTY_AGE      secs_to_nsecs(20)
 
 /** Internally-used caches. */
 static slab_cache_t slab_cache_cache;   /**< Cache for allocation of new slab caches. */
@@ -131,12 +151,11 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
 
     void *addr = slab->base;
 
-    list_remove(&slab->header);
+    list_remove(&slab->link);
 
     /* Destroy all buffer control structures and the slab structure if stored
      * externally. */
     if (cache->flags & SLAB_CACHE_LARGE) {
-        kprintf(LOG_DEBUG, "foo");
         while (slab->free) {
             slab_bufctl_t *bufctl = slab->free;
             slab->free = bufctl->next;
@@ -179,7 +198,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, uint32_t mmflag) {
 
     cache->slab_count++;
 
-    list_init(&slab->header);
+    list_init(&slab->link);
 
     slab->base     = addr;
     slab->refcount = 0;
@@ -279,7 +298,7 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
         slab_destroy(cache, slab);
     } else if ((slab->refcount + 1) == cache->obj_count) {
         /* Take from the full list and move to the partial list. */
-        list_append(&cache->slab_partial, &slab->header);
+        list_append(&cache->slab_partial, &slab->link);
     }
 
     mutex_unlock(&cache->slab_lock);
@@ -292,7 +311,7 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, uint32_t mmflag) {
     /* If there is a slab in the partial list, take it. */
     slab_t *slab;
     if (!list_empty(&cache->slab_partial)) {
-        slab = list_first(&cache->slab_partial, slab_t, header);
+        slab = list_first(&cache->slab_partial, slab_t, link);
     } else {
         /* No slabs with free objects available - allocate a new slab. */
         slab = slab_create(cache, mmflag);
@@ -325,9 +344,9 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, uint32_t mmflag) {
 
     /* Check if a list move is required. */
     if (slab->refcount == cache->obj_count) {
-        list_append(&cache->slab_full, &slab->header);
+        list_append(&cache->slab_full, &slab->link);
     } else {
-        list_append(&cache->slab_partial, &slab->header);
+        list_append(&cache->slab_partial, &slab->link);
     }
 
     /* Construct the object and return it. Unlock the cache before calling the
@@ -345,9 +364,10 @@ static inline slab_magazine_t *slab_magazine_get_full(slab_cache_t *cache) {
 
     slab_magazine_t *mag = NULL;
     if (!list_empty(&cache->magazine_full)) {
-        mag = list_first(&cache->magazine_full, slab_magazine_t, header);
-        list_remove(&mag->header);
-        assert(mag->rounds == SLAB_MAGAZINE_SIZE);
+        mag = list_first(&cache->magazine_full, slab_magazine_t, link);
+        list_remove(&mag->link);
+
+        mag->rounds = SLAB_MAGAZINE_SIZE;
     }
 
     mutex_unlock(&cache->depot_lock);
@@ -358,8 +378,10 @@ static inline slab_magazine_t *slab_magazine_get_full(slab_cache_t *cache) {
 static inline void slab_magazine_put_full(slab_cache_t *cache, slab_magazine_t *mag) {
     assert(mag->rounds == SLAB_MAGAZINE_SIZE);
 
+    mag->last_used = system_time();
+
     mutex_lock(&cache->depot_lock);
-    list_prepend(&cache->magazine_full, &mag->header);
+    list_prepend(&cache->magazine_full, &mag->link);
     mutex_unlock(&cache->depot_lock);
 }
 
@@ -369,9 +391,10 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 
     slab_magazine_t *mag;
     if (!list_empty(&cache->magazine_empty)) {
-        mag = list_first(&cache->magazine_empty, slab_magazine_t, header);
-        list_remove(&mag->header);
-        assert(!mag->rounds);
+        mag = list_first(&cache->magazine_empty, slab_magazine_t, link);
+        list_remove(&mag->link);
+
+        mag->rounds = 0;
     } else {
         /* None available, try to allocate a new structure. We do not wait for
          * memory to be available here as if a new magazine cannot be allocated
@@ -380,7 +403,7 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
          * memory, should not attempt to allocate at all. */
         mag = slab_cache_alloc(&slab_mag_cache, MM_ATOMIC);
         if (mag) {
-            list_init(&mag->header);
+            list_init(&mag->link);
             mag->rounds = 0;
         }
     }
@@ -393,20 +416,22 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 static inline void slab_magazine_put_empty(slab_cache_t *cache, slab_magazine_t *mag) {
     assert(!mag->rounds);
 
+    mag->last_used = system_time();
+
     mutex_lock(&cache->depot_lock);
-    list_prepend(&cache->magazine_empty, &mag->header);
+    list_prepend(&cache->magazine_empty, &mag->link);
     mutex_unlock(&cache->depot_lock);
 }
 
 /** Destroy a magazine. */
-static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *mag) {
+static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *mag, size_t rounds) {
     size_t i;
 
     /* Free all rounds within the magazine, if any. */
-    for (i = 0; i < mag->rounds; i++)
+    for (i = 0; i < rounds; i++)
         slab_obj_free(cache, mag->objects[i]);
 
-    list_remove(&mag->header);
+    list_remove(&mag->link);
     slab_cache_free(&slab_mag_cache, mag);
 }
 
@@ -700,7 +725,7 @@ static status_t slab_cache_init(
     list_init(&cache->magazine_empty);
     list_init(&cache->slab_partial);
     list_init(&cache->slab_full);
-    list_init(&cache->header);
+    list_init(&cache->link);
 
     cache->slab_count = 0;
 
@@ -768,16 +793,16 @@ static status_t slab_cache_init(
 
     /* Add the cache to the global cache list, keeping it ordered by priority. */
     if (list_empty(&slab_caches)) {
-        list_append(&slab_caches, &cache->header);
+        list_append(&slab_caches, &cache->link);
     } else {
         list_foreach(&slab_caches, iter) {
-            slab_cache_t *exist = list_entry(iter, slab_cache_t, header);
+            slab_cache_t *exist = list_entry(iter, slab_cache_t, link);
 
             if (exist->priority > priority) {
-                list_add_before(&exist->header, &cache->header);
+                list_add_before(&exist->link, &cache->link);
                 break;
-            } else if (exist->header.next == &slab_caches) {
-                list_append(&slab_caches, &cache->header);
+            } else if (exist->link.next == &slab_caches) {
+                list_append(&slab_caches, &cache->link);
                 break;
             }
         }
@@ -827,17 +852,36 @@ slab_cache_t *slab_cache_create(
 void slab_cache_destroy(slab_cache_t *cache) {
     assert(cache);
 
-    mutex_lock(&cache->depot_lock);
+    /* Destroy the CPU caches. */
+    if (!(cache->flags & SLAB_CACHE_NO_MAG)) {
+        mutex_lock(&cache->depot_lock);
 
-    /* Destroy empty magazines. */
-    list_foreach_safe(&cache->magazine_empty, iter)
-        slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
+        for (size_t i = 0; i <= highest_cpu_id; i++) {
+            slab_percpu_t *cc = &cache->cpu_caches[i];
 
-    /* Destroy full magazines. */
-    list_foreach_safe(&cache->magazine_full, iter)
-        slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
+            if (cc->loaded)
+                slab_magazine_destroy(cache, cc->loaded, cc->loaded->rounds);
 
-    mutex_unlock(&cache->depot_lock);
+            if (cc->previous)
+                slab_magazine_destroy(cache, cc->previous, cc->previous->rounds);
+        }
+
+        /* Destroy empty magazines. */
+        list_foreach_safe(&cache->magazine_empty, iter) {
+            slab_magazine_t *mag = list_entry(iter, slab_magazine_t, link);
+            slab_magazine_destroy(cache, mag, 0);
+        }
+
+        /* Destroy full magazines. */
+        list_foreach_safe(&cache->magazine_full, iter) {
+            slab_magazine_t *mag = list_entry(iter, slab_magazine_t, link);
+            slab_magazine_destroy(cache, mag, SLAB_MAGAZINE_SIZE);
+        }
+
+        mutex_unlock(&cache->depot_lock);
+
+        slab_cache_free(slab_percpu_cache, cache->cpu_caches);
+    }
 
     mutex_lock(&cache->slab_lock);
 
@@ -847,10 +891,47 @@ void slab_cache_destroy(slab_cache_t *cache) {
     mutex_unlock(&cache->slab_lock);
 
     mutex_lock(&slab_caches_lock);
-    list_remove(&cache->header);
+    list_remove(&cache->link);
     mutex_unlock(&slab_caches_lock);
 
     slab_cache_free(&slab_cache_cache, cache);
+}
+
+static void reclaim_mag_list(
+    slab_cache_t *cache, list_t *list, nstime_t curr_time, nstime_t max_age,
+    size_t rounds)
+{
+    list_foreach_safe(list, iter) {
+        slab_magazine_t *mag = list_entry(iter, slab_magazine_t, link);
+
+        nstime_t age = curr_time - mag->last_used;
+        if (age >= max_age)
+            slab_magazine_destroy(cache, mag, rounds);
+    }
+}
+
+/** Thread to periodically reclaim unused magazines. */
+static void slab_reclaim_thread_func(void *arg1, void *arg2) {
+    while (true) {
+        delay(SLAB_RECLAIM_INTERVAL);
+
+        mutex_lock(&slab_caches_lock);
+
+        nstime_t curr_time = system_time();
+
+        list_foreach(&slab_caches, iter) {
+            slab_cache_t *cache = list_entry(iter, slab_cache_t, link);
+
+            mutex_lock(&cache->depot_lock);
+
+            reclaim_mag_list(cache, &cache->magazine_full, curr_time, SLAB_RECLAIM_FULL_AGE, SLAB_MAGAZINE_SIZE);
+            reclaim_mag_list(cache, &cache->magazine_empty, curr_time, SLAB_RECLAIM_EMPTY_AGE, 0);
+
+            mutex_unlock(&cache->depot_lock);
+        }
+
+        mutex_unlock(&slab_caches_lock);
+    }
 }
 
 /** Prints a list of all slab caches. */
@@ -871,7 +952,7 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
     #endif
 
     list_foreach(&slab_caches, iter) {
-        slab_cache_t *cache = list_entry(iter, slab_cache_t, header);
+        slab_cache_t *cache = list_entry(iter, slab_cache_t, link);
 
         kdb_printf(
             "%-*s %-6zu %-8zu %-9zu %-5d %-10zu",
@@ -931,7 +1012,7 @@ __init_text void slab_late_init(void) {
 
     /* Create per-CPU structures for all caches that want the magazine layer. */
     list_foreach(&slab_caches, iter) {
-        slab_cache_t *cache = list_entry(iter, slab_cache_t, header);
+        slab_cache_t *cache = list_entry(iter, slab_cache_t, link);
 
         if (cache->flags & __SLAB_CACHE_LATE_MAG) {
             assert(cache->flags & SLAB_CACHE_NO_MAG);
@@ -942,3 +1023,12 @@ __init_text void slab_late_init(void) {
 
     mutex_unlock(&slab_caches_lock);
 }
+
+/** Create slab worker threads. */
+__init_text void slab_thread_init(void) {
+    status_t ret = thread_create("slab_reclaim", NULL, 0, slab_reclaim_thread_func, NULL, NULL, NULL);
+    if (ret != STATUS_SUCCESS)
+        fatal("Failed to create slab reclaim thread: %" PRId32, ret);
+}
+
+INITCALL(slab_thread_init);
