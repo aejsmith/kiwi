@@ -68,7 +68,7 @@ for kboot_target in config['KBOOT_TARGETS'].split(','):
                 '-Wno-format',
             ],
             'ASFLAGS': ['-nostdinc'],
-            'LINKFLAGS': ['-nostdlib'],
+            'LINKFLAGS': ['-nostdlib', '-Wl,-z,noexecstack', '-Wl,--no-warn-rwx-segments'],
 
             # Variables required by the KBoot build system.
             'CONFIG': kboot_target,

@@ -63,4 +63,6 @@ void ARM64Target::generate(std::ostream &stream, const SyscallList &calls) {
         stream << "     b ." << endl;
         stream << ".size " << name << ", .-" << name << endl;
     }
+
+    stream << ".section \".note.GNU-stack\",\"\",@progbits" << endl;
 }

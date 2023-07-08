@@ -71,4 +71,6 @@ void AMD64Target::generate(std::ostream &stream, const SyscallList &calls) {
         stream << "    .cfi_endproc" << endl;
         stream << ".size " << name << ", .-" << name << endl;
     }
+
+    stream << ".section \".note.GNU-stack\",\"\",@progbits" << endl;
 }

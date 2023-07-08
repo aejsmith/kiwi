@@ -92,3 +92,5 @@ FUNCTION_START(siglongjmp)
 
     jmp     longjmp
 FUNCTION_END(siglongjmp)
+
+.section ".note.GNU-stack", "", @progbits

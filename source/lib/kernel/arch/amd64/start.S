@@ -35,3 +35,5 @@ FUNCTION_START(libkernel_start)
     popq    %rdi
     jmp     libkernel_init
 FUNCTION_END(libkernel_start)
+
+.section ".note.GNU-stack", "", @progbits

@@ -150,3 +150,5 @@ __do_global_ctors_aux:
 	call	__do_global_ctors_aux
 	.section	.fini, "ax", @progbits
 	call	__do_global_dtors_aux
+
+    .section ".note.GNU-stack", "", @progbits

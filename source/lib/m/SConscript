@@ -35,6 +35,10 @@ env = manager.create(flags = {
     ],
     'ASFLAGS': [
         '-Wno-unused-command-line-argument',
+    ],
+    'LINKFLAGS': [
+        # Saves us adding GNU-stack sections to musl sources.
+        '-Wl,-z,noexecstack',
     ]
 })
 

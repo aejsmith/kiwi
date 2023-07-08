@@ -46,3 +46,5 @@ __CTOR_LIST_END__:
 	.section	.jcr, "aw", @progbits
 	.align 8
 	.quad 0
+
+    .section ".note.GNU-stack", "", @progbits

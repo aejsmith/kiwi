@@ -77,7 +77,7 @@ kern_env = manager.create_bare(name = 'kernel', with_config_h = True, flags = {
         '-nostdinc',
     ],
     'LINKFLAGS': [
-        '-nostdlib',
+        '-nostdlib', '-Wl,-z,noexecstack', '-Wl,--no-warn-rwx-segments',
     ],
     'CPPDEFINES': {
         '__KERNEL': None,

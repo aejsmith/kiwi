@@ -35,6 +35,9 @@ flags = {
     'CPPDEFINES': {
         '_LIBUNWIND_IS_NATIVE_ONLY': None,
     },
+    'CPPFLAGS': [
+        '-Wno-unused-but-set-variable',
+    ]
 }
 
 targets = [env.SharedObject(f, **flags) for f in sources]

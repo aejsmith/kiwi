@@ -1,18 +1,18 @@
-diff -urN llvm-14.0.0.src.orig/include/llvm/ADT/Triple.h llvm-14.0.0.src/include/llvm/ADT/Triple.h
---- llvm-14.0.0.src.orig/include/llvm/ADT/Triple.h	2022-11-08 15:43:19.274583131 +0000
-+++ llvm-14.0.0.src/include/llvm/ADT/Triple.h	2022-11-08 16:15:07.461344298 +0000
-@@ -205,7 +205,8 @@
-     Hurd,       // GNU/Hurd
+diff -urN llvm-16.0.6.src.orig/include/llvm/TargetParser/Triple.h llvm-16.0.6.src/include/llvm/TargetParser/Triple.h
+--- llvm-16.0.6.src.orig/include/llvm/TargetParser/Triple.h	2023-06-10 23:58:16.000000000 +0100
++++ llvm-16.0.6.src/include/llvm/TargetParser/Triple.h	2023-07-08 10:47:42.202449858 +0100
+@@ -223,7 +223,8 @@
      WASI,       // Experimental WebAssembly OS
      Emscripten,
--    LastOSType = Emscripten
+     ShaderModel, // DirectX ShaderModel
+-    LastOSType = ShaderModel
 +    Kiwi,
 +    LastOSType = Kiwi
    };
    enum EnvironmentType {
      UnknownEnvironment,
-@@ -527,6 +528,11 @@
-     return getOS() == Triple::Haiku;
+@@ -584,6 +585,11 @@
+     return getOS() == Triple::Win32;
    }
  
 +  /// Tests whether the OS is Kiwi.
@@ -20,32 +20,32 @@ diff -urN llvm-14.0.0.src.orig/include/llvm/ADT/Triple.h llvm-14.0.0.src/include
 +    return getOS() == Triple::Kiwi;
 +  }
 +
-   /// Tests whether the OS is Windows.
-   bool isOSWindows() const {
-     return getOS() == Triple::Win32;
-diff -urN llvm-14.0.0.src.orig/lib/Support/Triple.cpp llvm-14.0.0.src/lib/Support/Triple.cpp
---- llvm-14.0.0.src.orig/lib/Support/Triple.cpp	2022-11-08 15:43:19.374582961 +0000
-+++ llvm-14.0.0.src/lib/Support/Triple.cpp	2022-11-08 16:15:07.462344296 +0000
-@@ -212,6 +212,7 @@
-   case Hurd: return "hurd";
-   case IOS: return "ios";
-   case KFreeBSD: return "kfreebsd";
+   /// Checks if the environment is MSVC.
+   bool isKnownWindowsMSVCEnvironment() const {
+     return isOSWindows() && getEnvironment() == Triple::MSVC;
+diff -urN llvm-16.0.6.src.orig/lib/TargetParser/Triple.cpp llvm-16.0.6.src/lib/TargetParser/Triple.cpp
+--- llvm-16.0.6.src.orig/lib/TargetParser/Triple.cpp	2023-06-10 23:58:16.000000000 +0100
++++ llvm-16.0.6.src/lib/TargetParser/Triple.cpp	2023-07-08 10:48:16.047447362 +0100
+@@ -243,6 +243,7 @@
+   case Win32: return "windows";
+   case ZOS: return "zos";
+   case ShaderModel: return "shadermodel";
 +  case Kiwi: return "kiwi";
-   case Linux: return "linux";
-   case Lv2: return "lv2";
-   case MacOSX: return "macosx";
-@@ -548,6 +549,7 @@
-     .StartsWith("hurd", Triple::Hurd)
+   }
+ 
+   llvm_unreachable("Invalid OSType");
+@@ -596,6 +597,7 @@
      .StartsWith("wasi", Triple::WASI)
      .StartsWith("emscripten", Triple::Emscripten)
+     .StartsWith("shadermodel", Triple::ShaderModel)
 +    .StartsWith("kiwi", Triple::Kiwi)
      .Default(Triple::UnknownOS);
  }
  
-diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets/OSTargets.h llvm-14.0.0.src/tools/clang/lib/Basic/Targets/OSTargets.h
---- llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets/OSTargets.h	2022-11-08 15:43:21.025580146 +0000
-+++ llvm-14.0.0.src/tools/clang/lib/Basic/Targets/OSTargets.h	2022-11-08 16:15:07.463344294 +0000
-@@ -315,6 +315,22 @@
+diff -urN llvm-16.0.6.src.orig/tools/clang/lib/Basic/Targets/OSTargets.h llvm-16.0.6.src/tools/clang/lib/Basic/Targets/OSTargets.h
+--- llvm-16.0.6.src.orig/tools/clang/lib/Basic/Targets/OSTargets.h	2023-06-10 23:58:16.000000000 +0100
++++ llvm-16.0.6.src/tools/clang/lib/Basic/Targets/OSTargets.h	2023-07-08 10:45:55.102457758 +0100
+@@ -318,6 +318,22 @@
    }
  };
  
@@ -68,10 +68,10 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets/OSTargets.h llvm-14
  // Hurd target
  template <typename Target>
  class LLVM_LIBRARY_VISIBILITY HurdTargetInfo : public OSTargetInfo<Target> {
-diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-14.0.0.src/tools/clang/lib/Basic/Targets.cpp
---- llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets.cpp	2022-11-08 15:43:21.024580148 +0000
-+++ llvm-14.0.0.src/tools/clang/lib/Basic/Targets.cpp	2022-11-08 16:15:07.463344294 +0000
-@@ -143,6 +143,8 @@
+diff -urN llvm-16.0.6.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-16.0.6.src/tools/clang/lib/Basic/Targets.cpp
+--- llvm-16.0.6.src.orig/tools/clang/lib/Basic/Targets.cpp	2023-06-10 23:58:16.000000000 +0100
++++ llvm-16.0.6.src/tools/clang/lib/Basic/Targets.cpp	2023-07-08 10:45:55.102457758 +0100
+@@ -147,6 +147,8 @@
        return new FreeBSDTargetInfo<AArch64leTargetInfo>(Triple, Opts);
      case llvm::Triple::Fuchsia:
        return new FuchsiaTargetInfo<AArch64leTargetInfo>(Triple, Opts);
@@ -80,7 +80,7 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-14.0.0.src
      case llvm::Triple::Linux:
        return new LinuxTargetInfo<AArch64leTargetInfo>(Triple, Opts);
      case llvm::Triple::NetBSD:
-@@ -167,6 +169,8 @@
+@@ -171,6 +173,8 @@
        return new FreeBSDTargetInfo<AArch64beTargetInfo>(Triple, Opts);
      case llvm::Triple::Fuchsia:
        return new FuchsiaTargetInfo<AArch64beTargetInfo>(Triple, Opts);
@@ -89,7 +89,7 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-14.0.0.src
      case llvm::Triple::Linux:
        return new LinuxTargetInfo<AArch64beTargetInfo>(Triple, Opts);
      case llvm::Triple::NetBSD:
-@@ -183,6 +187,8 @@
+@@ -187,6 +191,8 @@
      switch (os) {
      case llvm::Triple::CloudABI:
        return new CloudABITargetInfo<ARMleTargetInfo>(Triple, Opts);
@@ -98,7 +98,7 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-14.0.0.src
      case llvm::Triple::Linux:
        return new LinuxTargetInfo<ARMleTargetInfo>(Triple, Opts);
      case llvm::Triple::FreeBSD:
-@@ -217,6 +223,8 @@
+@@ -221,6 +227,8 @@
        return new DarwinARMTargetInfo(Triple, Opts);
  
      switch (os) {
@@ -107,7 +107,7 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-14.0.0.src
      case llvm::Triple::Linux:
        return new LinuxTargetInfo<ARMbeTargetInfo>(Triple, Opts);
      case llvm::Triple::FreeBSD:
-@@ -530,6 +538,8 @@
+@@ -534,6 +542,8 @@
      }
      case llvm::Triple::Haiku:
        return new HaikuX86_32TargetInfo(Triple, Opts);
@@ -116,7 +116,7 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-14.0.0.src
      case llvm::Triple::RTEMS:
        return new RTEMSX86_32TargetInfo(Triple, Opts);
      case llvm::Triple::NaCl:
-@@ -586,6 +596,8 @@
+@@ -590,6 +600,8 @@
      }
      case llvm::Triple::Haiku:
        return new HaikuTargetInfo<X86_64TargetInfo>(Triple, Opts);
@@ -125,21 +125,21 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Basic/Targets.cpp llvm-14.0.0.src
      case llvm::Triple::NaCl:
        return new NaClTargetInfo<X86_64TargetInfo>(Triple, Opts);
      case llvm::Triple::PS4:
-diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/CMakeLists.txt llvm-14.0.0.src/tools/clang/lib/Driver/CMakeLists.txt
---- llvm-14.0.0.src.orig/tools/clang/lib/Driver/CMakeLists.txt	2022-11-08 15:43:21.033580133 +0000
-+++ llvm-14.0.0.src/tools/clang/lib/Driver/CMakeLists.txt	2022-11-08 16:15:07.463344294 +0000
-@@ -58,6 +58,7 @@
-   ToolChains/HIPSPV.cpp
+diff -urN llvm-16.0.6.src.orig/tools/clang/lib/Driver/CMakeLists.txt llvm-16.0.6.src/tools/clang/lib/Driver/CMakeLists.txt
+--- llvm-16.0.6.src.orig/tools/clang/lib/Driver/CMakeLists.txt	2023-06-10 23:58:16.000000000 +0100
++++ llvm-16.0.6.src/tools/clang/lib/Driver/CMakeLists.txt	2023-07-08 10:45:55.102457758 +0100
+@@ -66,6 +66,7 @@
    ToolChains/Hexagon.cpp
+   ToolChains/HLSL.cpp
    ToolChains/Hurd.cpp
 +  ToolChains/Kiwi.cpp
    ToolChains/Linux.cpp
    ToolChains/MipsLinux.cpp
    ToolChains/MinGW.cpp
-diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-14.0.0.src/tools/clang/lib/Driver/Driver.cpp
---- llvm-14.0.0.src.orig/tools/clang/lib/Driver/Driver.cpp	2022-11-08 15:43:21.033580133 +0000
-+++ llvm-14.0.0.src/tools/clang/lib/Driver/Driver.cpp	2022-11-08 16:15:07.464344292 +0000
-@@ -28,6 +28,7 @@
+diff -urN llvm-16.0.6.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-16.0.6.src/tools/clang/lib/Driver/Driver.cpp
+--- llvm-16.0.6.src.orig/tools/clang/lib/Driver/Driver.cpp	2023-06-10 23:58:16.000000000 +0100
++++ llvm-16.0.6.src/tools/clang/lib/Driver/Driver.cpp	2023-07-08 10:45:55.103457758 +0100
+@@ -30,6 +30,7 @@
  #include "ToolChains/Haiku.h"
  #include "ToolChains/Hexagon.h"
  #include "ToolChains/Hurd.h"
@@ -147,7 +147,7 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-14.0.0.src
  #include "ToolChains/Lanai.h"
  #include "ToolChains/Linux.h"
  #include "ToolChains/MSP430.h"
-@@ -5508,6 +5509,9 @@
+@@ -5984,6 +5985,9 @@
      case llvm::Triple::Haiku:
        TC = std::make_unique<toolchains::Haiku>(*this, Target, Args);
        break;
@@ -157,10 +157,10 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/Driver.cpp llvm-14.0.0.src
      case llvm::Triple::Ananas:
        TC = std::make_unique<toolchains::Ananas>(*this, Target, Args);
        break;
-diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Gnu.cpp llvm-14.0.0.src/tools/clang/lib/Driver/ToolChains/Gnu.cpp
---- llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Gnu.cpp	2022-11-08 15:43:21.036580128 +0000
-+++ llvm-14.0.0.src/tools/clang/lib/Driver/ToolChains/Gnu.cpp	2022-11-08 16:20:15.040837606 +0000
-@@ -246,8 +246,12 @@
+diff -urN llvm-16.0.6.src.orig/tools/clang/lib/Driver/ToolChains/Gnu.cpp llvm-16.0.6.src/tools/clang/lib/Driver/ToolChains/Gnu.cpp
+--- llvm-16.0.6.src.orig/tools/clang/lib/Driver/ToolChains/Gnu.cpp	2023-06-10 23:58:16.000000000 +0100
++++ llvm-16.0.6.src/tools/clang/lib/Driver/ToolChains/Gnu.cpp	2023-07-08 10:45:55.103457758 +0100
+@@ -249,8 +249,12 @@
        return "elf_iamcu";
      return "elf_i386";
    case llvm::Triple::aarch64:
@@ -173,9 +173,9 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Gnu.cpp llvm-14
      return "aarch64linuxb";
    case llvm::Triple::arm:
    case llvm::Triple::thumb:
-@@ -609,18 +613,23 @@
- 
-       AddRunTimeLibs(ToolChain, D, CmdArgs, Args);
+@@ -640,18 +644,23 @@
+         CmdArgs.push_back("--pop-state");
+       }
  
 -      if (WantPthread && !isAndroid)
 -        CmdArgs.push_back("-lpthread");
@@ -209,9 +209,9 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Gnu.cpp llvm-14
  
        if (IsStatic || IsStaticPIE)
          CmdArgs.push_back("--end-group");
-diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.cpp llvm-14.0.0.src/tools/clang/lib/Driver/ToolChains/Kiwi.cpp
---- llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.cpp	1970-01-01 01:00:00.000000000 +0100
-+++ llvm-14.0.0.src/tools/clang/lib/Driver/ToolChains/Kiwi.cpp	2022-11-08 16:15:07.464344292 +0000
+diff -urN llvm-16.0.6.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.cpp llvm-16.0.6.src/tools/clang/lib/Driver/ToolChains/Kiwi.cpp
+--- llvm-16.0.6.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.cpp	1970-01-01 01:00:00.000000000 +0100
++++ llvm-16.0.6.src/tools/clang/lib/Driver/ToolChains/Kiwi.cpp	2023-07-08 10:45:55.103457758 +0100
 @@ -0,0 +1,110 @@
 +//===--- Kiwi.h - Kiwi ToolChain Implementations ----------------*- C++ -*-===//
 +//
@@ -323,9 +323,9 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.cpp llvm-1
 +    addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/include/c++/v1");
 +  addSystemInclude(DriverArgs, CC1Args, D.SysRoot + "/system/include/c++/v1");
 +}
-diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.h llvm-14.0.0.src/tools/clang/lib/Driver/ToolChains/Kiwi.h
---- llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.h	1970-01-01 01:00:00.000000000 +0100
-+++ llvm-14.0.0.src/tools/clang/lib/Driver/ToolChains/Kiwi.h	2022-11-08 16:15:07.464344292 +0000
+diff -urN llvm-16.0.6.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.h llvm-16.0.6.src/tools/clang/lib/Driver/ToolChains/Kiwi.h
+--- llvm-16.0.6.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.h	1970-01-01 01:00:00.000000000 +0100
++++ llvm-16.0.6.src/tools/clang/lib/Driver/ToolChains/Kiwi.h	2023-07-08 10:45:55.104457758 +0100
 @@ -0,0 +1,49 @@
 +//===--- Kiwi.h - Kiwi ToolChain Implementations ----------------*- C++ -*-===//
 +//
@@ -376,30 +376,14 @@ diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Driver/ToolChains/Kiwi.h llvm-14.
 +} // end namespace clang
 +
 +#endif // LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_KIWI_H
-diff -urN llvm-14.0.0.src.orig/tools/clang/lib/Lex/InitHeaderSearch.cpp llvm-14.0.0.src/tools/clang/lib/Lex/InitHeaderSearch.cpp
---- llvm-14.0.0.src.orig/tools/clang/lib/Lex/InitHeaderSearch.cpp	2022-11-08 15:43:21.052580100 +0000
-+++ llvm-14.0.0.src/tools/clang/lib/Lex/InitHeaderSearch.cpp	2022-11-08 16:15:07.465344291 +0000
-@@ -281,6 +281,7 @@
-   switch (os) {
+diff -urN llvm-16.0.6.src.orig/tools/clang/lib/Lex/InitHeaderSearch.cpp llvm-16.0.6.src/tools/clang/lib/Lex/InitHeaderSearch.cpp
+--- llvm-16.0.6.src.orig/tools/clang/lib/Lex/InitHeaderSearch.cpp	2023-06-10 23:58:16.000000000 +0100
++++ llvm-16.0.6.src/tools/clang/lib/Lex/InitHeaderSearch.cpp	2023-07-08 10:59:46.582612349 +0100
+@@ -417,6 +417,7 @@
    case llvm::Triple::Linux:
-   case llvm::Triple::Hurd:
-+  case llvm::Triple::Kiwi:
-   case llvm::Triple::Solaris:
-   case llvm::Triple::OpenBSD:
-     llvm_unreachable("Include management is handled in the driver.");
-@@ -393,6 +394,7 @@
-   switch (os) {
-   case llvm::Triple::Linux:
-   case llvm::Triple::Hurd:
-+  case llvm::Triple::Kiwi:
-   case llvm::Triple::Solaris:
-   case llvm::Triple::AIX:
-     llvm_unreachable("Include management is handled in the driver.");
-@@ -436,6 +438,7 @@
-   case llvm::Triple::Emscripten:
-   case llvm::Triple::Linux:
-   case llvm::Triple::Hurd:
-+  case llvm::Triple::Kiwi:
-   case llvm::Triple::OpenBSD:
    case llvm::Triple::Solaris:
    case llvm::Triple::WASI:
++  case llvm::Triple::Kiwi:
+     return false;
+ 
+   case llvm::Triple::Win32:

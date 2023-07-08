@@ -30,3 +30,5 @@
 .type _fini, @function
     addq    $8, %rsp
     ret
+
+.section ".note.GNU-stack", "", @progbits

@@ -27,3 +27,5 @@
 _start:
     jmp     libsystem_main
 .size _start, .-_start
+
+.section ".note.GNU-stack", "", @progbits

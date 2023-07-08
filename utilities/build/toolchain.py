@@ -19,7 +19,8 @@ import shutil
 import time
 from urllib.parse import urlparse
 
-llvm_version = '14.0.0'
+llvm_major_version = '16'
+llvm_version = '16.0.6'
 
 def which(program):
     def is_exe(fpath):
@@ -135,10 +136,10 @@ class ToolchainComponent:
 # Component definition for binutils.
 class BinutilsComponent(ToolchainComponent):
     name = 'binutils'
-    version = '2.38'
+    version = '2.40'
     generic = False
     source = [
-        'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
+        'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.xz',
     ]
     patches = [
         ('binutils-' + version + '-kiwi.patch', 'binutils-' + version, 1),
@@ -171,14 +172,17 @@ class LLVMComponent(ToolchainComponent):
     source = [
         'https://github.com/llvm/llvm-project/releases/download/llvmorg-' + version + '/llvm-' + version + '.src.tar.xz',
         'https://github.com/llvm/llvm-project/releases/download/llvmorg-' + version + '/clang-' + version + '.src.tar.xz',
+        'https://github.com/llvm/llvm-project/releases/download/llvmorg-' + version + '/cmake-' + version + '.src.tar.xz',
+        'https://github.com/llvm/llvm-project/releases/download/llvmorg-' + version + '/third-party-' + version + '.src.tar.xz',
     ]
     patches = [
         ('llvm-' + version + '-kiwi.patch', 'llvm-' + version + '.src', 1),
     ]
 
     def build(self):
-        # Move clang sources to the right place.
         os.rename('clang-%s.src' % (self.version), 'llvm-%s.src/tools/clang' % (self.version))
+        os.rename('cmake-%s.src' % (self.version), 'cmake')
+        os.rename('third-party-%s.src' % (self.version), 'third-party')
 
         self.patch()
 
@@ -261,7 +265,7 @@ class ToolchainManager:
         build_dir = os.path.join(os.getcwd(), 'build', '%s-%s' % (self.arch, self.build))
 
         # Create a symlink to the compiler-rt builtins library in the build tree.
-        runtime_dir = os.path.join(self.generic_dir, 'lib', 'clang', llvm_version, 'lib', 'kiwi')
+        runtime_dir = os.path.join(self.generic_dir, 'lib', 'clang', llvm_major_version, 'lib', 'kiwi')
         makedirs(runtime_dir)
         runtime_name = 'libclang_rt.builtins-%s.a' % (self.toolchain_arch)
         runtime_lib = os.path.join(runtime_dir, runtime_name)

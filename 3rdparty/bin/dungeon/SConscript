@@ -29,7 +29,7 @@ env = manager.create(
         'CCFLAGS': [
             '-Wno-format', '-Wno-missing-braces', '-Wno-parentheses',
             '-Wno-redundant-decls', '-Wno-unused-variable',
-            '-Wno-unused-but-set-variable',
+            '-Wno-unused-but-set-variable', '-Wno-deprecated-non-prototype',
         ],
     }
 )
