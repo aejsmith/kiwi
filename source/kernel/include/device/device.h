@@ -36,6 +36,7 @@
 
 struct device;
 struct device_resource;
+struct irq_domain;
 
 /** Structure containing device operations. */
 typedef struct device_ops {
@@ -161,6 +162,9 @@ typedef struct device {
     const device_ops_t *ops;        /**< Operations structure for the device. */
     void *private;                  /**< Implementation private data. */
 
+    /** IRQ domain for this device, inherited by any underneath it. */
+    struct irq_domain *irq_domain;
+
     /** Attributes. */
     rwlock_t attr_lock;             /**< Lock for attribute access. */
     device_attr_t *attrs;           /**< Array of attribute structures. */
@@ -220,6 +224,8 @@ extern status_t device_alias_etc(
 /** @see device_alias_etc(). */
 #define device_alias(name, parent, dest, _device) \
     device_alias_etc(module_self(), name, parent, dest, _device)
+
+extern void device_set_irq_domain(device_t *device, struct irq_domain *domain);
 
 extern void device_publish(device_t *device);
 

@@ -314,7 +314,7 @@ __export status_t device_pci_bar_map_etc(
     return STATUS_SUCCESS;
 }
 
-static unsigned get_pci_irq(pci_device_t *device) {
+static uint32_t get_pci_irq(pci_device_t *device) {
     // TODO: MSI
     return device->interrupt_line;
 }
@@ -332,8 +332,8 @@ __export status_t pci_irq_register(
     pci_device_t *device, irq_early_func_t early_func, irq_func_t func,
     void *data, irq_handler_t **_handler)
 {
-    unsigned num = get_pci_irq(device);
-    return irq_register(num, early_func, func, data, _handler);
+    uint32_t num = get_pci_irq(device);
+    return irq_register(device->bus.node->irq_domain, num, early_func, func, data, _handler);
 }
 
 /**
@@ -348,7 +348,7 @@ __export status_t device_pci_irq_register(
     device_t *owner, pci_device_t *device, irq_early_func_t early_func,
     irq_func_t func, void *data)
 {
-    unsigned num = get_pci_irq(device);
+    uint32_t num = get_pci_irq(device);
     return device_irq_register(owner, num, early_func, func, data);
 }
 

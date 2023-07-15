@@ -50,8 +50,8 @@ typedef enum initcall_type {
     /** Early platform device detection. */
     INITCALL_TYPE_EARLY_DEVICE,
 
-    /** Register IRQ controllers. */
-    INITCALL_TYPE_IRQC,
+    /** Register IRQ domains/controllers. */
+    INITCALL_TYPE_IRQ,
 
     /** Register timer devices. */
     INITCALL_TYPE_TIME,

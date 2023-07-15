@@ -20,6 +20,7 @@
  */
 
 #include <device/device.h>
+#include <device/irq.h>
 
 #include <io/request.h>
 
@@ -296,6 +297,9 @@ status_t device_create_etc(
     device->ops       = ops;
     device->private   = private;
 
+    /* IRQ domain defaults to that of the parent, can be changed post-init. */
+    device->irq_domain = parent->irq_domain;
+
     if (attrs) {
         /* Ensure the attribute structures are valid. Do validity checking
          * before allocating anything to make it easier to clean up if an
@@ -416,6 +420,18 @@ status_t device_alias_etc(
         *_device = device;
 
     return STATUS_SUCCESS;
+}
+
+/**
+ * Sets the IRQ domain for a device. This should generally only be used by bus
+ * managers, immediately after creating the device. It must not be used on
+ * devices that already have children - creating a child copies the domain from
+ * the parent so changes would not propagate down to children.
+*/
+void device_set_irq_domain(device_t *device, irq_domain_t *domain) {
+    assert(radix_tree_empty(&device->children));
+
+    device->irq_domain = domain;
 }
 
 /**
@@ -1171,11 +1187,12 @@ __init_text void device_init(void) {
 
     device_ctor(device_root_dir);
 
-    device_root_dir->file.ops  = &device_file_ops;
-    device_root_dir->file.type = FILE_TYPE_CHAR;
-    device_root_dir->name      = (char *)"<root>";
-    device_root_dir->time      = boot_time();
-    device_root_dir->module    = &kernel_module;
+    device_root_dir->file.ops   = &device_file_ops;
+    device_root_dir->file.type  = FILE_TYPE_CHAR;
+    device_root_dir->name       = (char *)"<root>";
+    device_root_dir->time       = boot_time();
+    device_root_dir->module     = &kernel_module;
+    device_root_dir->irq_domain = root_irq_domain;
 
     /* Create standard device directories. */
     ret = device_create_dir("bus", device_root_dir, &device_bus_dir);

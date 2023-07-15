@@ -118,7 +118,7 @@ static virtio_transport_t virtio_pci_transport = {
     .get_config       = virtio_pci_get_config,
 };
 
-static irq_status_t virtio_pci_early_irq(unsigned num, void *_device) {
+static irq_status_t virtio_pci_early_irq(uint32_t num, void *_device) {
     virtio_pci_device_t *device = _device;
 
     // TODO: MSI
@@ -130,7 +130,7 @@ static irq_status_t virtio_pci_early_irq(unsigned num, void *_device) {
     return (isr & (1 << 0)) ? IRQ_RUN_THREAD : IRQ_UNHANDLED;
 }
 
-static void virtio_pci_irq(unsigned num, void *_device) {
+static void virtio_pci_irq(uint32_t num, void *_device) {
     virtio_pci_device_t *device = _device;
     virtio_device_irq(&device->virtio);
 }

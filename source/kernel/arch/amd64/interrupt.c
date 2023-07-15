@@ -114,7 +114,7 @@ static void hardware_interrupt(frame_t *frame) {
     enter_interrupt();
 
     /* Hardware IRQs start at 32. */
-    irq_handler(frame->num - 32);
+    irq_handler(root_irq_domain, frame->num - 32);
 
     leave_interrupt();
 }

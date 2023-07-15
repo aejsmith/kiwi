@@ -205,7 +205,7 @@ static const ata_sff_channel_ops_t pci_ata_channel_ops = {
     .finish_dma  = pci_ata_channel_finish_dma,
 };
 
-static irq_status_t pci_ata_early_irq(unsigned num, void *_channel) {
+static irq_status_t pci_ata_early_irq(uint32_t num, void *_channel) {
     pci_ata_channel_t *channel = _channel;
 
     if (channel->bus_master == IO_REGION_INVALID)
@@ -319,7 +319,7 @@ err_destroy:
 
 static void add_compat_channel(
     pci_ata_controller_t *controller, const char *name, pio_addr_t cmd_base,
-    pio_addr_t ctrl_base, io_region_t bus_master, unsigned irq)
+    pio_addr_t ctrl_base, io_region_t bus_master, uint32_t irq)
 {
     status_t ret;
 

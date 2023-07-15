@@ -29,7 +29,7 @@
 #include <kernel.h>
 #include <time.h>
 
-static irq_status_t pit_irq(unsigned num, void *data) {
+static irq_status_t pit_irq(uint32_t num, void *data) {
     return (timer_tick()) ? IRQ_PREEMPT : IRQ_HANDLED;
 }
 
@@ -63,7 +63,7 @@ static __init_text void pit_init(void) {
 
     time_set_device(&pit_timer_device);
     pit_disable();
-    irq_register(0, pit_irq, NULL, NULL, NULL);
+    irq_register(root_irq_domain, 0, pit_irq, NULL, NULL, NULL);
 }
 
 INITCALL_TYPE(pit_init, INITCALL_TYPE_TIME);

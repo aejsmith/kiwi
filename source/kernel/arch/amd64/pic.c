@@ -38,7 +38,7 @@ static uint8_t pic_mask_slave = 0xff;
 /** Level-triggered interrupts. */
 static uint16_t pic_level_triggered;
 
-static void pic_eoi(unsigned num) {
+static void pic_eoi(uint32_t num) {
     if (num >= 8)
         out8(PIC_SLAVE_COMMAND, PIC_COMMAND_EOI);
 
@@ -46,7 +46,7 @@ static void pic_eoi(unsigned num) {
     out8(PIC_MASTER_COMMAND, PIC_COMMAND_EOI);
 }
 
-static void pic_disable_locked(unsigned num) {
+static void pic_disable_locked(uint32_t num) {
     if (num >= 8) {
         pic_mask_slave |= (1<<(num - 8));
         out8(PIC_SLAVE_DATA, pic_mask_slave);
@@ -56,7 +56,7 @@ static void pic_disable_locked(unsigned num) {
     }
 }
 
-static bool pic_pre_handle(unsigned num) {
+static bool pic_pre_handle(uint32_t num) {
     assert(num < 16);
 
     spinlock_lock(&pic_lock);
@@ -88,7 +88,7 @@ static bool pic_pre_handle(unsigned num) {
     return handle;
 }
 
-static void pic_post_handle(unsigned num, bool disable) {
+static void pic_post_handle(uint32_t num, bool disable) {
     spinlock_lock(&pic_lock);
 
     if (disable)
@@ -101,11 +101,11 @@ static void pic_post_handle(unsigned num, bool disable) {
     spinlock_unlock(&pic_lock);
 }
 
-static irq_mode_t pic_mode(unsigned num) {
+static irq_mode_t pic_mode(uint32_t num) {
     return (pic_level_triggered & (1 << num));
 }
 
-static void pic_enable(unsigned num) {
+static void pic_enable(uint32_t num) {
     assert(num < 16);
 
     spinlock_lock(&pic_lock);
@@ -121,7 +121,7 @@ static void pic_enable(unsigned num) {
     spinlock_unlock(&pic_lock);
 }
 
-static void pic_disable(unsigned num) {
+static void pic_disable(uint32_t num) {
     assert(num < 16);
 
     spinlock_lock(&pic_lock);
@@ -161,7 +161,8 @@ static __init_text void pic_init(void) {
     /* Get the trigger modes. */
     pic_level_triggered = (in8(PIC_SLAVE_ELCR) << 8) | in8(PIC_MASTER_ELCR);
 
-    irq_set_controller(&pic_irq_controller);
+    /* TODO: This will change once we support IOAPIC. */
+    root_irq_domain = irq_domain_create(PIC_IRQ_COUNT, &pic_irq_controller);
 }
 
-INITCALL_TYPE(pic_init, INITCALL_TYPE_IRQC);
+INITCALL_TYPE(pic_init, INITCALL_TYPE_IRQ);

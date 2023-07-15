@@ -19,8 +19,6 @@
  * @brief               Hardware interrupt handling code.
  */
 
-#include <arch/irq.h>
-
 #include <device/device.h>
 #include <device/irq.h>
 
@@ -41,11 +39,13 @@
 struct irq_handler {
     list_t header;                  /**< List header. */
 
-    unsigned num;                   /**< IRQ number. */
+    uint32_t num;                   /**< IRQ number. */
     irq_early_func_t early_func;    /**< Early handler function. */
     irq_func_t func;                /**< Threaded handler function. */
     void *data;                     /**< Argument to pass to handler. */
     bool thread_pending;            /**< Whether execution of threaded handler is pending. */
+
+    irq_domain_t *domain;           /**< Domain the handler belongs to. */
 };
 
 /** An entry in the IRQ table. */
@@ -57,30 +57,35 @@ typedef struct irq {
     mutex_t thread_lock;            /**< Lock for IRQ thread. */
     thread_t *thread;               /**< Thread for deferred handling. */
     semaphore_t sem;                /**< Semaphore for thread to wait for IRQs on. */
-    unsigned threaded_handlers;     /**< Number of threaded handlers. */
+    unsigned int threaded_handlers; /**< Number of threaded handlers. */
 } irq_t;
 
-/** IRQ controller being used. */
-static irq_controller_t *irq_controller;
+/**
+ * Root IRQ domain. This is set by the architecture/platform to be used as the
+ * domain of the root device tree node.
+ *
+ * This does not necessarily exist if the platform does not need it, for example
+ * on DT platforms we always use interrupt domains specified in the DT.
+ */
+irq_domain_t *root_irq_domain;
 
-/** Array of IRQ structures. */
-static irq_t irq_table[IRQ_COUNT];
-
-static void enable_irq(irq_t *irq, unsigned num) {
+static void enable_irq(irq_domain_t *domain, irq_t *irq, uint32_t num) {
     assert(irq->disable_count > 0);
 
-    if (--irq->disable_count == 0 && irq_controller->enable)
-        irq_controller->enable(num);
+    if (--irq->disable_count == 0 && domain->controller->enable)
+        domain->controller->enable(num);
 }
 
-static void disable_irq(irq_t *irq, unsigned num) {
-    if (irq->disable_count++ == 0 && irq_controller->disable)
-        irq_controller->disable(num);
+static void disable_irq(irq_domain_t *domain, irq_t *irq, uint32_t num) {
+    if (irq->disable_count++ == 0 && domain->controller->disable)
+        domain->controller->disable(num);
 }
 
-static void irq_thread(void *_num, void *arg2) {
-    unsigned num = (ptr_t)_num;
-    irq_t *irq = &irq_table[num];
+static void irq_thread(void *_domain, void *_num) {
+    irq_domain_t *domain = _domain;
+
+    uint32_t num = (ptr_t)_num;
+    irq_t *irq = &domain->irqs[num];
 
     while (true) {
         semaphore_down(&irq->sem);
@@ -129,7 +134,7 @@ static void irq_thread(void *_num, void *arg2) {
         if (found) {
             spinlock_lock(&irq->handlers_lock);
 
-            enable_irq(irq, num);
+            enable_irq(domain, irq, num);
         }
 
         spinlock_unlock(&irq->handlers_lock);
@@ -147,6 +152,7 @@ static void irq_thread(void *_num, void *arg2) {
  * When an IRQ fires, the IRQ will be disabled until all handlers have finished
  * executing.
  *
+ * @param domain        IRQ domain to register in.
  * @param num           IRQ number.
  * @param early_func    Early handler function, see irq_early_func_t. Can be
  *                      null, but must be non-null if func is null.
@@ -159,23 +165,31 @@ static void irq_thread(void *_num, void *arg2) {
  * @return              Status code describing result of the operation.
  */
 status_t irq_register(
-    unsigned num, irq_early_func_t early_func, irq_func_t func, void *data,
+    irq_domain_t *domain, uint32_t num,
+    irq_early_func_t early_func, irq_func_t func, void *data,
     irq_handler_t **_handler)
 {
-    if (num >= IRQ_COUNT || (!func && !early_func))
+    if (!domain) {
+        /* This indicates that a device does not have an associated IRQ domain. */
+        kprintf(LOG_ERROR, "irq: attempting to register IRQ %u without a domain", num);
+        return STATUS_NOT_SUPPORTED;
+    }
+
+    if (num >= domain->count || (!func && !early_func))
         return STATUS_INVALID_ARG;
 
-    irq_handler_t *handler = kmalloc(sizeof(irq_handler_t), MM_KERNEL);
+    irq_handler_t *handler = kmalloc(sizeof(*handler), MM_KERNEL);
 
     list_init(&handler->header);
 
+    handler->domain         = domain;
     handler->num            = num;
     handler->early_func     = early_func;
     handler->func           = func;
     handler->data           = data;
     handler->thread_pending = false;
 
-    irq_t *irq = &irq_table[num];
+    irq_t *irq = &domain->irqs[num];
 
     /* Create a handler thread if we need it and there isn't already one. */
     if (handler->func) {
@@ -187,7 +201,7 @@ status_t irq_register(
             char name[THREAD_NAME_MAX];
             sprintf(name, "irq-%u", num);
 
-            status_t ret = thread_create(name, NULL, 0, irq_thread, (void *)((ptr_t)num), NULL, &irq->thread);
+            status_t ret = thread_create(name, NULL, 0, irq_thread, domain, (void *)((ptr_t)num), &irq->thread);
             if (ret != STATUS_SUCCESS) {
                 irq->threaded_handlers--;
 
@@ -211,7 +225,7 @@ status_t irq_register(
     if (enable) {
         assert(irq->disable_count == 1);
 
-        enable_irq(irq, num);
+        enable_irq(domain, irq, num);
     }
 
     spinlock_unlock(&irq->handlers_lock);
@@ -225,7 +239,11 @@ status_t irq_register(
 /** Removes a previously registered handler for an IRQ.
  * @param handler       Handler returned from irq_register(). */
 void irq_unregister(irq_handler_t *handler) {
-    irq_t *irq = &irq_table[handler->num];
+    assert(handler->domain);
+
+    irq_domain_t *domain = handler->domain;
+
+    irq_t *irq = &domain->irqs[handler->num];
 
     /* Stop the thread if this is the last threaded handler for this IRQ. The
      * thread function will check the threaded handler count when it is woken
@@ -256,9 +274,9 @@ void irq_unregister(irq_handler_t *handler) {
     bool enable  = !list_empty(&irq->handlers) && handler->thread_pending;
 
     if (disable) {
-        disable_irq(irq, handler->num);
+        disable_irq(domain, irq, handler->num);
     } else if (enable) {
-        enable_irq(irq, handler->num);
+        enable_irq(domain, irq, handler->num);
     }
 
     assert(!list_empty(&irq->handlers) || irq->disable_count == 1);
@@ -287,11 +305,11 @@ static void device_irq_resource_release(device_t *device, void *data) {
  * @param device        Device to register to.
  */
 status_t device_irq_register(
-    device_t *device, unsigned num, irq_early_func_t early_func,
+    device_t *device, uint32_t num, irq_early_func_t early_func,
     irq_func_t func, void *data)
 {
     irq_handler_t *handler;
-    status_t ret = irq_register(num, early_func, func, data, &handler);
+    status_t ret = irq_register(device->irq_domain, num, early_func, func, data, &handler);
     if (ret != STATUS_SUCCESS)
         return ret;
 
@@ -324,10 +342,11 @@ static bool wake_irq_thread(irq_t *irq, irq_handler_t *handler) {
 }
 
 /** Hardware interrupt handler.
+ * @param domain        Domain that the IRQ occurred in.
  * @param num           IRQ number. */
-void irq_handler(unsigned num) {
-    assert(irq_controller);
-    assert(num < IRQ_COUNT);
+void irq_handler(irq_domain_t *domain, uint32_t num) {
+    assert(domain);
+    assert(num < domain->count);
 
     /* IRQs can happen during a user memory operation. Force the flag to off
      * while handling an IRQ so that we don't incorrectly treat faults during
@@ -335,13 +354,13 @@ void irq_handler(unsigned num) {
     uint32_t prev_usermem = thread_clear_flag(curr_thread, THREAD_IN_USERMEM) & THREAD_IN_USERMEM;
 
     /* Execute any pre-handling function. */
-    if (irq_controller->pre_handle && !irq_controller->pre_handle(num))
+    if (domain->controller->pre_handle && !domain->controller->pre_handle(num))
         goto out;
 
     /* Get the trigger mode. */
-    irq_mode_t mode = irq_controller->mode(num);
+    irq_mode_t mode = domain->controller->mode(num);
 
-    irq_t *irq = &irq_table[num];
+    irq_t *irq = &domain->irqs[num];
     spinlock_lock(&irq->handlers_lock);
 
     bool disable = false;
@@ -386,26 +405,26 @@ out_handled:
 
     /* Perform post-handling actions. IRQ is disabled until the thread completes
      * execution of all handlers. */
-    if (irq_controller->post_handle)
-        irq_controller->post_handle(num, disable);
+    if (domain->controller->post_handle)
+        domain->controller->post_handle(num, disable);
 
 out:
     thread_set_flag(curr_thread, prev_usermem);
 }
 
-/** Set the IRQ controller.
- * @param controller    IRQ controller to use. */
-void irq_set_controller(irq_controller_t *controller) {
-    assert(!irq_controller);
-    assert(controller->mode);
+/** Create a new IRQ domain. */
+irq_domain_t *irq_domain_create(uint32_t count, irq_controller_t *controller) {
+    assert(count > 0);
+    assert(controller);
 
-    irq_controller = controller;
-}
+    irq_domain_t *domain = kmalloc(sizeof(*domain), MM_BOOT);
 
-/** Initialize the IRQ handling system. */
-__init_text void irq_init(void) {
-    for (unsigned i = 0; i < IRQ_COUNT; i++) {
-        irq_t *irq = &irq_table[i];
+    domain->count      = count;
+    domain->controller = controller;
+    domain->irqs       = kcalloc(count, sizeof(domain->irqs[0]), MM_BOOT);
+
+    for (uint32_t i = 0; i < count; i++) {
+        irq_t *irq = &domain->irqs[i];
 
         spinlock_init(&irq->handlers_lock, "irq_handlers_lock");
         list_init(&irq->handlers);
@@ -416,8 +435,11 @@ __init_text void irq_init(void) {
         irq->disable_count = 1;
     }
 
-    /* Look for a controller. */
-    initcall_run(INITCALL_TYPE_IRQC);
+    return domain;
+}
 
-    assert(irq_controller);
+/** Initialize the IRQ handling system. */
+__init_text void irq_init(void) {
+    /* Set up IRQ domains/controllers. */
+    initcall_run(INITCALL_TYPE_IRQ);
 }

@@ -24,6 +24,7 @@
 #include <types.h>
 
 struct device;
+struct irq;
 
 /** IRQ early handler return status. */
 typedef enum irq_status {
@@ -69,7 +70,7 @@ typedef struct irq_controller {
      *
      * @return              True if IRQ should be handled.
      */
-    bool (*pre_handle)(unsigned num);
+    bool (*pre_handle)(uint32_t num);
 
     /**
      * Post-early handling function. Called at the end of the hardware IRQ
@@ -78,21 +79,35 @@ typedef struct irq_controller {
      * @param num           IRQ number.
      * @param disable       Whether the IRQ should be disabled.
      */
-    void (*post_handle)(unsigned num, bool disable);
+    void (*post_handle)(uint32_t num, bool disable);
 
     /** Get IRQ trigger mode.
      * @param num           IRQ number.
      * @return              Trigger mode of the IRQ. */
-    irq_mode_t (*mode)(unsigned num);
+    irq_mode_t (*mode)(uint32_t num);
 
     /** Enable an IRQ.
      * @param num           IRQ number. */
-    void (*enable)(unsigned num);
+    void (*enable)(uint32_t num);
 
     /** Disable an IRQ.
      * @param num           IRQ number. */
-    void (*disable)(unsigned num);
+    void (*disable)(uint32_t num);
 } irq_controller_t;
+
+/**
+ * IRQ domain structure. An IRQ domain is a set of IRQ numbers and handlers for
+ * those IRQs.
+ *
+ * Currently this just directly corresponds to an IRQ controller, but this may
+ * need to change in future (e.g. DT/OF support interrupt "nexuses" which
+ * translate between domains).
+ */
+typedef struct irq_domain {
+    uint32_t count;                 /**< Number of IRQs in the domain. */
+    irq_controller_t *controller;   /**< Controller for the domain. */
+    struct irq *irqs;               /**< Table of IRQs. */
+} irq_domain_t;
 
 /**
  * IRQ early handler function type. This is run in interrupt context directly
@@ -110,7 +125,7 @@ typedef struct irq_controller {
  *
  * @return              IRQ status code.
  */
-typedef irq_status_t (*irq_early_func_t)(unsigned num, void *data);
+typedef irq_status_t (*irq_early_func_t)(uint32_t num, void *data);
 
 /**
  * IRQ handler function type. This is run in a handler thread and is therefore
@@ -120,21 +135,25 @@ typedef irq_status_t (*irq_early_func_t)(unsigned num, void *data);
  * @param num           IRQ number.
  * @param data          Data pointer associated with the handler.
  */
-typedef void (*irq_func_t)(unsigned num, void *data);
+typedef void (*irq_func_t)(uint32_t num, void *data);
 
 /** IRQ handler type (opaque). */
 typedef struct irq_handler irq_handler_t;
 
+extern irq_domain_t *root_irq_domain;
+
 extern status_t irq_register(
-    unsigned num, irq_early_func_t early_func, irq_func_t func, void *data,
+    irq_domain_t *domain, uint32_t num,
+    irq_early_func_t early_func, irq_func_t func, void *data,
     irq_handler_t **_handler);
 extern void irq_unregister(irq_handler_t *handler);
 
 extern status_t device_irq_register(
-    struct device *device, unsigned num, irq_early_func_t early_func,
+    struct device *device, uint32_t num, irq_early_func_t early_func,
     irq_func_t func, void *data);
 
-extern void irq_handler(unsigned num);
+extern void irq_handler(irq_domain_t *domain, uint32_t num);
 
-extern void irq_set_controller(irq_controller_t *controller);
+extern irq_domain_t *irq_domain_create(uint32_t count, irq_controller_t *controller);
+
 extern void irq_init(void);

@@ -21,6 +21,8 @@
 
 #pragma once
 
+#define PIC_IRQ_COUNT       16
+
 /** PIC port definitions. */
 #define PIC_MASTER_COMMAND  0x20    /**< Command port (Master). */
 #define PIC_MASTER_DATA     0x21    /**< Data port (Master). */
