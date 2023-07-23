@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2022 Alex Smith
+# Copyright (C) 2009-2023 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,13 +14,11 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-menu "Device support"
+comment "IRQ controllers"
 
-source "bus/Kconfig"
-source "console/Kconfig"
-source "disk/Kconfig"
-source "input/Kconfig"
-source "irq/Kconfig"
-source "net/Kconfig"
-
-endmenu
+config DEVICE_IRQ_BCM2836_L1
+	bool "BCM2836 L1 IRQ controller"
+	default y
+	depends on DEVICE_BUS_DT && ARCH_ARM64
+	help
+	  Enable the driver for the root IRQ controller on the Raspberry Pi 2+.

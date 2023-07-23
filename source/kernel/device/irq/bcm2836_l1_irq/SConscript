@@ -14,13 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-menu "Device support"
+Import('config', 'kern_sources')
+from util import feature_sources
 
-source "bus/Kconfig"
-source "console/Kconfig"
-source "disk/Kconfig"
-source "input/Kconfig"
-source "irq/Kconfig"
-source "net/Kconfig"
-
-endmenu
+# Built-in driver.
+kern_sources += feature_sources(config, [
+    'bcm2836_l1_irq.c',
+])

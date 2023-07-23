@@ -16,16 +16,30 @@
 
 /**
  * @file
- * @brief               FDT (low-level) device tree interface.
- *
- * This is a low-level libfdt-based interface to the platform device tree. This
- * is built in to the kernel on DT-based platforms. It is necessary since there
- * are various bits of core kernel functionality that rely on the DT to detect
- * hardware (IRQ controllers, timers, SMP, etc.).
+ * @brief               BCM2836 L1 IRQ controller driver.
  */
 
-#pragma once
+#include <device/bus/dt.h>
+#include <device/irq.h>
 
-#include <libfdt.h>
+#include <mm/malloc.h>
 
-extern const void *fdt_get(void);
+#include <assert.h>
+#include <kernel.h>
+#include <status.h>
+
+static status_t bcm2836_l1_irq_init(dt_device_t *device) {
+    kprintf(LOG_DEBUG, "hello world\n");
+    return STATUS_SUCCESS;
+}
+
+static dt_match_t bcm2836_l1_irq_matches[] = {
+    { .compatible = "brcm,bcm2836-l1-intc" },
+};
+
+static dt_driver_t bcm2836_l1_irq_driver = {
+    .matches      = DT_MATCH_TABLE(bcm2836_l1_irq_matches),
+    .init_builtin = bcm2836_l1_irq_init,
+};
+
+BUILTIN_DT_DRIVER(bcm2836_l1_irq_driver, INITCALL_TYPE_IRQ);

@@ -14,13 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-menu "Device support"
+Import('config', 'mod_env')
+from util import feature_dirs
 
-source "bus/Kconfig"
-source "console/Kconfig"
-source "disk/Kconfig"
-source "input/Kconfig"
-source "irq/Kconfig"
-source "net/Kconfig"
-
-endmenu
+SConscript(dirs = feature_dirs(config, [
+    ('DEVICE_IRQ_BCM2836_L1', 'bcm2836_l1_irq'),
+]))

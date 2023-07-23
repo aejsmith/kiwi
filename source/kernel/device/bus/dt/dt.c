@@ -21,18 +21,44 @@
 
 #include <device/bus/dt.h>
 
-#include <module.h>
-#include <status.h>
+#include <lib/string.h>
 
-static status_t dt_init(void) {
-    // TODO
-    return STATUS_SUCCESS;
+#include <mm/malloc.h>
+
+#include <kboot.h>
+#include <kernel.h>
+
+static void *fdt_address;
+static uint32_t fdt_size;
+
+/** Get the FDT address. */
+const void *dt_fdt_get(void) {
+    return fdt_address;
 }
 
-static status_t dt_unload(void) {
-    return STATUS_NOT_IMPLEMENTED;
+/** Register a built-in driver (see BUILTIN_DT_DRIVER). */
+void dt_register_builtin_driver(dt_driver_t *driver) {
+    // TODO: Register built-in drivers as bus drivers once the bus type is
+    // initialised.
 }
 
-MODULE_NAME(DT_MODULE_NAME);
-MODULE_DESC("Device Tree bus manager");
-MODULE_FUNCS(dt_init, dt_unload);
+/**
+ * Early initialisation of DT. Sets up enough for low-level devices (IRQ
+ * controllers, timers, etc.) to function.
+ */
+static __init_text void dt_early_init(void) {
+    kboot_tag_fdt_t *tag = kboot_tag_iterate(KBOOT_TAG_FDT, NULL);
+    if (!tag)
+        fatal("Boot loader did not supply FDT");
+
+    /* Make our own copy of the FDT since KBoot puts it in reclaimable memory. */
+    fdt_size    = tag->size;
+    fdt_address = kmalloc(fdt_size, MM_BOOT);
+    memcpy(fdt_address, (void *)((ptr_t)tag->addr_virt), fdt_size);
+
+    int ret = fdt_check_header(fdt_address);
+    if (ret != 0)
+        fatal("FDT header validation failed (%d)", ret);
+}
+
+INITCALL_TYPE(dt_early_init, INITCALL_TYPE_EARLY_DEVICE);

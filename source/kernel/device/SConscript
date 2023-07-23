@@ -30,6 +30,7 @@ SConscript(dirs = feature_dirs(config, [
     'bus',
     'console',
     'disk',
+    'irq',
     'input',
     'net',
 ]))

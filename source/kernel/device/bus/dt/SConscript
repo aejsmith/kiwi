@@ -17,10 +17,6 @@
 Import('config', 'kern_env', 'kern_sources', 'mod_env')
 from util import feature_sources
 
-# See device/bus/{dt,fdt}.h, there are two parts to DT support: the low-level
-# libfdt-based interface used by core kernel functionality that needs to use
-# DT for device detection, and the high-level DT bus manager driver.
-
 for env in [kern_env, mod_env]:
     env['CPPPATH'] += [Dir('fdt/include')]
 
@@ -36,9 +32,5 @@ kern_sources += feature_sources(config, [
     'fdt/fdt_sw.c',
     'fdt/fdt_wip.c',
 
-    'fdt.c',
-])
-
-mod_env.Module('dt', [
     'dt.c',
 ])
