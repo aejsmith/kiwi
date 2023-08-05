@@ -18,5 +18,6 @@ Import('config', 'mod_env')
 from util import feature_dirs
 
 SConscript(dirs = feature_dirs(config, [
+    ('DEVICE_IRQ_ARM_GIC_V2', 'arm_gic_v2'),
     ('DEVICE_IRQ_BCM2836_L1', 'bcm2836_l1_irq'),
 ]))

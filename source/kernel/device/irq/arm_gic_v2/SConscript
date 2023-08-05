@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2023 Alex Smith
+# Copyright (C) 2009-2022 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,18 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-comment "IRQ controllers"
+Import('config', 'kern_sources')
+from util import feature_sources
 
-config DEVICE_IRQ_ARM_GIC_V2
-	bool "ARM GIC v2 IRQ controller"
-	default y
-	depends on DEVICE_BUS_DT && ARCH_ARM64
-	help
-	  Enable the driver for the ARM GIC v2 IRQ controller.
-
-config DEVICE_IRQ_BCM2836_L1
-	bool "BCM2836 L1 IRQ controller"
-	default y
-	depends on DEVICE_BUS_DT && ARCH_ARM64
-	help
-	  Enable the driver for the root IRQ controller on the Raspberry Pi 2+.
+# Built-in driver.
+kern_sources += feature_sources(config, [
+    'arm_gic_v2.c',
+])
