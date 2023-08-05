@@ -23,6 +23,7 @@
 
 #include <mm/malloc.h>
 
+#include <assert.h>
 #include <kboot.h>
 #include <kernel.h>
 
@@ -39,7 +40,7 @@ static AVL_TREE_DEFINE(dt_phandle_tree);
 
 static LIST_DEFINE(builtin_dt_drivers);
 
-/** Register a built-in driver (see BUILTIN_DT_DRIVER). */
+/** Registers a built-in driver (see BUILTIN_DT_DRIVER). */
 void __init_text dt_register_builtin_driver(dt_driver_t *driver) {
     // TODO: Register built-in drivers as bus drivers once the bus type is
     // initialised.
@@ -48,8 +49,41 @@ void __init_text dt_register_builtin_driver(dt_driver_t *driver) {
     list_append(&builtin_dt_drivers, &driver->builtin_link);
 }
 
+/**
+ * Matches a device to a built-in driver. Marks the device as matched and sets
+ * its match pointer.
+ */
+dt_driver_t *dt_match_builtin_driver(dt_device_t *device, builtin_dt_driver_type_t type) {
+    assert(device->flags & DT_DEVICE_AVAILABLE);
+
+    list_foreach(&builtin_dt_drivers, iter) {
+        dt_driver_t *driver = list_entry(iter, dt_driver_t, builtin_link);
+
+        if (driver->builtin_type == type) {
+            for (size_t i = 0; i < driver->matches.count; i++) {
+                dt_match_t *match = &driver->matches.array[i];
+
+                if (strcmp(device->compatible, match->compatible) == 0) {
+                    if (!(device->flags & DT_DEVICE_MATCHED)) {
+                        device->flags |= DT_DEVICE_MATCHED;
+                        device->driver = driver;
+                        device->match  = match;
+                        return driver;
+                    } else {
+                        kprintf(LOG_WARN, "dt: multiple built-in drivers match device %s\n", device->name);
+                        return NULL;
+                    }
+                }
+            }
+        }
+    }
+
+    return NULL;
+}
+
 static void do_dt_iterate(dt_device_t *device, dt_iterate_cb_t cb, void *data) {
-    cb(device, data);
+    if (device->flags & DT_DEVICE_AVAILABLE)
+        cb(device, data);
 
     list_foreach(&device->children, iter) {
         dt_device_t *child = list_entry(iter, dt_device_t, parent_link);
@@ -145,7 +179,7 @@ static __init_text dt_device_t *add_device(int node_offset, dt_device_t *parent)
     device->name       = (parent) ? name : "/";
     device->compatible = fdt_getprop(fdt_address, node_offset, "compatible", NULL);
     device->parent     = parent;
-    device->available  = is_available(node_offset);
+    device->flags      = (is_available(node_offset)) ? DT_DEVICE_AVAILABLE : 0;
 
     if (device->phandle != 0)
         avl_tree_insert(&dt_phandle_tree, device->phandle, &device->phandle_link);
@@ -167,7 +201,7 @@ static __init_text void print_device(dt_device_t *device, int depth) {
         LOG_DEBUG, "%*s%s (compatible: '%s', available: %s)\n",
         (depth + 1) * 2, "", device->name,
         (device->compatible) ? device->compatible : "<none>",
-        (device->available) ? "yes" : "no");
+        (device->flags & DT_DEVICE_AVAILABLE) ? "yes" : "no");
 
     list_foreach(&device->children, iter) {
         dt_device_t *child = list_entry(iter, dt_device_t, parent_link);

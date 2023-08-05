@@ -115,6 +115,15 @@ typedef struct dt_driver {
 
 extern void dt_register_builtin_driver(dt_driver_t *driver);
 
+/** DT device flags. */
+enum {
+    /** Device is marked as available via its status property. */
+    DT_DEVICE_AVAILABLE     = (1<<0),
+
+    /** Device is matched to a driver. */
+    DT_DEVICE_MATCHED       = (1<<1),
+};
+
 /** DT device structure. */
 typedef struct dt_device {
     // TODO: bus_device_t.
@@ -123,7 +132,7 @@ typedef struct dt_device {
     uint32_t phandle;               /**< Device node's phandle. */
     const char *name;               /**< Name of the device. */
     const char *compatible;         /**< Compatible string. */
-    bool available;                 /**< Whether device's status is available. */
+    uint32_t flags;                 /**< Device flags. */
 
     avl_tree_node_t phandle_link;   /** Link to phandle lookup tree. */
 
@@ -134,6 +143,10 @@ typedef struct dt_device {
 
     /** IRQ state. */
     struct dt_device *irq_parent;
+
+    /** Driver state. */
+    dt_driver_t *driver;
+    dt_match_t *match;
 } dt_device_t;
 
 extern dt_device_t *dt_device_get_by_phandle(uint32_t phandle);

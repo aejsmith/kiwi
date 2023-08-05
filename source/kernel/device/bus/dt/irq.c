@@ -21,6 +21,9 @@
 
 #include <mm/malloc.h>
 
+#include <module.h>
+#include <status.h>
+
 #include "dt.h"
 
 typedef struct dt_irq_controller {
@@ -54,7 +57,32 @@ static __init_text void init_device_irq(dt_device_t *device, void *_init) {
         controller->device = device;
 
         list_append(&init->controllers, &controller->link);
+
+        dt_match_builtin_driver(device, BUILTIN_DT_DRIVER_IRQ);
     }
+}
+
+static void init_irq_controllers(dt_irq_init_t *init, dt_device_t *parent) {
+    list_foreach_safe(&init->controllers, iter) {
+        dt_irq_controller_t *controller = list_entry(iter, dt_irq_controller_t, link);
+        dt_device_t *device = controller->device;
+
+        if (device->irq_parent == parent && device->flags & DT_DEVICE_MATCHED) {
+            list_remove(&controller->link);
+
+            status_t ret = device->driver->init_builtin(device);
+            if (ret == STATUS_SUCCESS) {
+                /* Initialise child controllers. */
+                init_irq_controllers(init, device);
+            } else {
+                kprintf(LOG_ERROR, "dt: failed to initialise IRQ controller %s: %d\n", device->name, ret);
+                dt_device_unmatch(device);
+            }
+
+            kfree(controller);
+        }
+    }
+    // TODO: free
 }
 
 /** Initialise DT IRQ devices. */
@@ -73,14 +101,40 @@ static __init_text void dt_irq_init(void) {
     dt_iterate(init_device_irq, &init);
 
     kprintf(LOG_DEBUG, "dt: found IRQ controllers:\n");
+
     list_foreach(&init.controllers, iter) {
         dt_irq_controller_t *controller = list_entry(iter, dt_irq_controller_t, link);
         dt_device_t *device = controller->device;
 
-        kprintf(LOG_DEBUG, "  %s (parent: %s)\n", device->name, (device->irq_parent) ? device->irq_parent->name : "none");
+        symbol_t sym;
+        symbol_from_addr((ptr_t)device->driver, &sym, NULL);
+
+        kprintf(
+            LOG_DEBUG, "  %s (parent: %s, driver: %s)\n",
+            device->name, (device->irq_parent) ? device->irq_parent->name : "none",
+            sym.name);
     }
 
-    // TODO: free the controller list
+    /*
+     * Initialise all controllers without a parent first, recursing down into
+     * those that are parented to each of those.
+     */
+    init_irq_controllers(&init, NULL);
+
+    if (!list_empty(&init.controllers)) {
+        kprintf(LOG_WARN, "dt: could not initialise all IRQ controllers:\n");
+
+        while (!list_empty(&init.controllers)) {
+            dt_irq_controller_t *controller = list_first(&init.controllers, dt_irq_controller_t, link);
+
+            kprintf(LOG_WARN, "  %s\n", controller->device->name);
+
+            dt_device_unmatch(controller->device);
+
+            list_remove(&controller->link);
+            kfree(controller);
+        }
+    }
 }
 
 INITCALL_TYPE(dt_irq_init, INITCALL_TYPE_IRQ);

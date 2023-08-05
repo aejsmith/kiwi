@@ -26,3 +26,11 @@
 typedef void (*dt_iterate_cb_t)(dt_device_t *device, void *data);
 
 extern void dt_iterate(dt_iterate_cb_t cb, void *data);
+
+extern dt_driver_t *dt_match_builtin_driver(dt_device_t *device, builtin_dt_driver_type_t type);
+
+static inline void dt_device_unmatch(dt_device_t *device) {
+    device->driver = NULL;
+    device->match  = NULL;
+    device->flags &= DT_DEVICE_MATCHED;
+}
