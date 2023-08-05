@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2022 Alex Smith
+ * Copyright (C) 2009-2023 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,31 +16,13 @@
 
 /**
  * @file
- * @brief               BCM2836 L1 IRQ controller driver.
+ * @brief               DT bus manager internal definitions.
  */
 
+#pragma once
+
 #include <device/bus/dt.h>
-#include <device/irq.h>
 
-#include <mm/malloc.h>
+typedef void (*dt_iterate_cb_t)(dt_device_t *device, void *data);
 
-#include <assert.h>
-#include <kernel.h>
-#include <status.h>
-
-static status_t bcm2836_l1_irq_init(dt_device_t *device) {
-    kprintf(LOG_DEBUG, "hello world\n");
-    return STATUS_SUCCESS;
-}
-
-static dt_match_t bcm2836_l1_irq_matches[] = {
-    { .compatible = "brcm,bcm2836-l1-intc" },
-};
-
-static dt_driver_t bcm2836_l1_irq_driver = {
-    .matches      = DT_MATCH_TABLE(bcm2836_l1_irq_matches),
-    .builtin_type = BUILTIN_DT_DRIVER_IRQ,
-    .init_builtin = bcm2836_l1_irq_init,
-};
-
-BUILTIN_DT_DRIVER(bcm2836_l1_irq_driver);
+extern void dt_iterate(dt_iterate_cb_t cb, void *data);

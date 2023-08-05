@@ -23,6 +23,7 @@
 
 #include <kernel/device/bus/dt.h>
 
+#include <lib/avl_tree.h>
 #include <lib/utility.h>
 
 #include <kernel.h>
@@ -63,11 +64,20 @@ typedef struct dt_match_table {
  */
 #define DT_MATCH_TABLE(table) { table, array_size(table) }
 
+/** Stage at which built-in drivers are initialised. */
+typedef enum builtin_dt_driver_type {
+    BUILTIN_DT_DRIVER_IRQ,
+    BUILTIN_DT_DRIVER_TIME,
+} builtin_dt_driver_type_t;
+
 /** DT driver structure. */
 typedef struct dt_driver {
     // TODO: bus_driver_t
 
     dt_match_table_t matches;
+
+    list_t builtin_link;
+    builtin_dt_driver_type_t builtin_type;
 
     /**
      * Initialisation for builtin drivers for low-level devices. This will be
@@ -89,24 +99,19 @@ typedef struct dt_driver {
  * (IRQ controllers, timers, etc.) that are needed earlier in boot before the
  * full device manager is initialised.
  *
- * They are registered with an initcall stage to run in. During that stage,
- * any devices that match the driver will have their init_builtin() method
- * called.
+ * They are registered with a stage to run in. During that stage, any devices
+ * that match the driver will have their init_builtin() method called.
  *
  * Devices using built-in drivers are still later instantiated as proper
  * devices in the kernel device tree.
  *
  * @param driver            Driver structure.
- * @param init_type         Initcall type. Must be later than
- *                          INITCALL_TYPE_EARLY_DEVICE, as the DT initialisation
- *                          does not take place until then.
  */
-#define BUILTIN_DT_DRIVER(driver, init_type) \
+#define BUILTIN_DT_DRIVER(driver) \
     static __init_text void driver##_builtin_init(void) { \
         dt_register_builtin_driver(&driver); \
     } \
-    INITCALL_TYPE(driver##_builtin_init, init_type)
-// TODO: register bus driver
+    INITCALL_TYPE(driver##_builtin_init, INITCALL_TYPE_EARLY_DEVICE)
 
 extern void dt_register_builtin_driver(dt_driver_t *driver);
 
@@ -115,11 +120,31 @@ typedef struct dt_device {
     // TODO: bus_device_t.
 
     int fdt_offset;                 /**< Offset of the corresponding FDT node. */
+    uint32_t phandle;               /**< Device node's phandle. */
+    const char *name;               /**< Name of the device. */
+    const char *compatible;         /**< Compatible string. */
+    bool available;                 /**< Whether device's status is available. */
+
+    avl_tree_node_t phandle_link;   /** Link to phandle lookup tree. */
+
+    /** Parent/child tree. */
+    struct dt_device *parent;
+    list_t parent_link;
+    list_t children;
+
+    /** IRQ state. */
+    struct dt_device *irq_parent;
 } dt_device_t;
+
+extern dt_device_t *dt_device_get_by_phandle(uint32_t phandle);
 
 /**
  * FDT access.
  */
+
+extern bool dt_get_prop(dt_device_t *device, const char *name, const uint32_t **_value, uint32_t *_len);
+extern bool dt_get_prop_u32(dt_device_t *device, const char *name, uint32_t *_value);
+#define dt_get_prop_phandle dt_get_prop_u32
 
 extern const void *dt_fdt_get(void);
 

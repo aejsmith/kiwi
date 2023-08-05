@@ -33,4 +33,5 @@ kern_sources += feature_sources(config, [
     'fdt/fdt_wip.c',
 
     'dt.c',
+    'irq.c',
 ])
