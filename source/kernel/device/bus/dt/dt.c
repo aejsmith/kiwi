@@ -59,22 +59,30 @@ void __init_text dt_register_builtin_driver(dt_driver_t *driver) {
 dt_driver_t *dt_match_builtin_driver(dt_device_t *device, builtin_dt_driver_type_t type) {
     assert(device->flags & DT_DEVICE_AVAILABLE);
 
-    list_foreach(&builtin_dt_drivers, iter) {
-        dt_driver_t *driver = list_entry(iter, dt_driver_t, builtin_link);
+    /*
+     * For multiple compatible strings, they are ordered most to least specific
+     * so we want to try matching in that order to get the best match.
+     */
+    for (size_t i = 0; i < device->compatible.count; i++) {
+        const char **compatible = array_entry(&device->compatible, const char *, i);
 
-        if (driver->builtin_type == type) {
-            for (size_t i = 0; i < driver->matches.count; i++) {
-                dt_match_t *match = &driver->matches.array[i];
+        list_foreach(&builtin_dt_drivers, iter) {
+            dt_driver_t *driver = list_entry(iter, dt_driver_t, builtin_link);
 
-                if (strcmp(device->compatible, match->compatible) == 0) {
-                    if (!(device->flags & DT_DEVICE_MATCHED)) {
-                        device->flags |= DT_DEVICE_MATCHED;
-                        device->driver = driver;
-                        device->match  = match;
-                        return driver;
-                    } else {
-                        kprintf(LOG_WARN, "dt: multiple built-in drivers match device %s\n", device->name);
-                        return NULL;
+            if (driver->builtin_type == type) {
+                for (size_t i = 0; i < driver->matches.count; i++) {
+                    dt_match_t *match = &driver->matches.array[i];
+
+                    if (strcmp(*compatible, match->compatible) == 0) {
+                        if (!(device->flags & DT_DEVICE_MATCHED)) {
+                            device->flags |= DT_DEVICE_MATCHED;
+                            device->driver = driver;
+                            device->match  = match;
+                            return driver;
+                        } else {
+                            kprintf(LOG_WARN, "dt: multiple built-in drivers match device %s\n", device->name);
+                            return NULL;
+                        }
                     }
                 }
             }
@@ -450,18 +458,35 @@ static __init_text dt_device_t *add_device(int node_offset, dt_device_t *parent)
 
     dt_device_t *device = kmalloc(sizeof(*device), MM_BOOT | MM_ZERO);
 
+    array_init(&device->compatible);
     list_init(&device->parent_link);
     list_init(&device->children);
-
-    if (parent)
-        list_append(&parent->children, &device->parent_link);
 
     device->fdt_offset = node_offset;
     device->phandle    = fdt_get_phandle(fdt_address, node_offset);
     device->name       = (parent) ? name : "/";
-    device->compatible = fdt_getprop(fdt_address, node_offset, "compatible", NULL);
     device->parent     = parent;
     device->flags      = (is_available(node_offset)) ? DT_DEVICE_AVAILABLE : 0;
+
+    int compat_len;
+    const char *compat_str = fdt_getprop(fdt_address, node_offset, "compatible", &compat_len);
+    if (compat_str) {
+        const char *curr = compat_str;
+        int pos = 0;
+        while (pos < compat_len) {
+            if (compat_str[pos] == 0) {
+                const char **str = array_append(&device->compatible, const char *);
+                *str = curr;
+
+                curr = &compat_str[pos + 1];
+            }
+
+            pos++;
+        }
+    }
+
+    if (parent)
+        list_append(&parent->children, &device->parent_link);
 
     if (device->phandle != 0)
         avl_tree_insert(&dt_phandle_tree, device->phandle, &device->phandle_link);
@@ -480,10 +505,16 @@ static __init_text dt_device_t *add_device(int node_offset, dt_device_t *parent)
 
 static __init_text void print_device(dt_device_t *device, int depth) {
     kprintf(
-        LOG_DEBUG, "%*s%s (compatible: '%s', available: %s)\n",
+        LOG_DEBUG, "%*s%s (available: %s, compatible: ",
         (depth + 1) * 2, "", device->name,
-        (device->compatible) ? device->compatible : "<none>",
         (device->flags & DT_DEVICE_AVAILABLE) ? "yes" : "no");
+
+    for (size_t i = 0; i < device->compatible.count; i++) {
+        const char **str = array_entry(&device->compatible, const char *, i);
+        kprintf(LOG_DEBUG, "%s'%s'", (i != 0) ? ", " : "", *str);
+    }
+
+    kprintf(LOG_DEBUG, ")\n");
 
     list_foreach(&device->children, iter) {
         dt_device_t *child = list_entry(iter, dt_device_t, parent_link);

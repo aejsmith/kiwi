@@ -25,6 +25,7 @@
 
 #include <kernel/device/bus/dt.h>
 
+#include <lib/array.h>
 #include <lib/avl_tree.h>
 #include <lib/utility.h>
 
@@ -138,7 +139,7 @@ typedef struct dt_device {
     int fdt_offset;                 /**< Offset of the corresponding FDT node. */
     uint32_t phandle;               /**< Device node's phandle. */
     const char *name;               /**< Name of the device. */
-    const char *compatible;         /**< Compatible string. */
+    array_t compatible;             /**< Compatible strings. */
     uint32_t flags;                 /**< Device flags. */
 
     /**
