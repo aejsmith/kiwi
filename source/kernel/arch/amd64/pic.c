@@ -56,7 +56,7 @@ static void pic_disable_locked(uint32_t num) {
     }
 }
 
-static bool pic_pre_handle(uint32_t num) {
+static bool pic_pre_handle(irq_domain_t *domain, uint32_t num) {
     assert(num < 16);
 
     spinlock_lock(&pic_lock);
@@ -88,7 +88,7 @@ static bool pic_pre_handle(uint32_t num) {
     return handle;
 }
 
-static void pic_post_handle(uint32_t num, bool disable) {
+static void pic_post_handle(irq_domain_t *domain, uint32_t num, bool disable) {
     spinlock_lock(&pic_lock);
 
     if (disable)
@@ -101,11 +101,11 @@ static void pic_post_handle(uint32_t num, bool disable) {
     spinlock_unlock(&pic_lock);
 }
 
-static irq_mode_t pic_mode(uint32_t num) {
+static irq_mode_t pic_mode(irq_domain_t *domain, uint32_t num) {
     return (pic_level_triggered & (1 << num));
 }
 
-static void pic_enable(uint32_t num) {
+static void pic_enable(irq_domain_t *domain, uint32_t num) {
     assert(num < 16);
 
     spinlock_lock(&pic_lock);
@@ -121,7 +121,7 @@ static void pic_enable(uint32_t num) {
     spinlock_unlock(&pic_lock);
 }
 
-static void pic_disable(uint32_t num) {
+static void pic_disable(irq_domain_t *domain, uint32_t num) {
     assert(num < 16);
 
     spinlock_lock(&pic_lock);
@@ -129,7 +129,7 @@ static void pic_disable(uint32_t num) {
     spinlock_unlock(&pic_lock);
 }
 
-static irq_controller_t pic_irq_controller = {
+static irq_domain_ops_t pic_irq_ops = {
     .pre_handle  = pic_pre_handle,
     .post_handle = pic_post_handle,
     .mode        = pic_mode,
@@ -162,7 +162,7 @@ static __init_text void pic_init(void) {
     pic_level_triggered = (in8(PIC_SLAVE_ELCR) << 8) | in8(PIC_MASTER_ELCR);
 
     /* TODO: This will change once we support IOAPIC. */
-    root_irq_domain = irq_domain_create(PIC_IRQ_COUNT, &pic_irq_controller);
+    root_irq_domain = irq_domain_create(PIC_IRQ_COUNT, &pic_irq_ops, NULL);
 }
 
 INITCALL_TYPE(pic_init, INITCALL_TYPE_IRQ);

@@ -72,13 +72,13 @@ irq_domain_t *root_irq_domain;
 static void enable_irq(irq_domain_t *domain, irq_t *irq, uint32_t num) {
     assert(irq->disable_count > 0);
 
-    if (--irq->disable_count == 0 && domain->controller->enable)
-        domain->controller->enable(num);
+    if (--irq->disable_count == 0 && domain->ops->enable)
+        domain->ops->enable(domain, num);
 }
 
 static void disable_irq(irq_domain_t *domain, irq_t *irq, uint32_t num) {
-    if (irq->disable_count++ == 0 && domain->controller->disable)
-        domain->controller->disable(num);
+    if (irq->disable_count++ == 0 && domain->ops->disable)
+        domain->ops->disable(domain, num);
 }
 
 static void irq_thread(void *_domain, void *_num) {
@@ -354,11 +354,11 @@ void irq_handler(irq_domain_t *domain, uint32_t num) {
     uint32_t prev_usermem = thread_clear_flag(curr_thread, THREAD_IN_USERMEM) & THREAD_IN_USERMEM;
 
     /* Execute any pre-handling function. */
-    if (domain->controller->pre_handle && !domain->controller->pre_handle(num))
+    if (domain->ops->pre_handle && !domain->ops->pre_handle(domain, num))
         goto out;
 
     /* Get the trigger mode. */
-    irq_mode_t mode = domain->controller->mode(num);
+    irq_mode_t mode = domain->ops->mode(domain, num);
 
     irq_t *irq = &domain->irqs[num];
     spinlock_lock(&irq->handlers_lock);
@@ -405,23 +405,28 @@ out_handled:
 
     /* Perform post-handling actions. IRQ is disabled until the thread completes
      * execution of all handlers. */
-    if (domain->controller->post_handle)
-        domain->controller->post_handle(num, disable);
+    if (domain->ops->post_handle)
+        domain->ops->post_handle(domain, num, disable);
 
 out:
     thread_set_flag(curr_thread, prev_usermem);
 }
 
-/** Create a new IRQ domain. */
-irq_domain_t *irq_domain_create(uint32_t count, irq_controller_t *controller) {
+/** Creates a new IRQ domain.
+ * @param count         Number of IRQs in the domain.
+ * @param ops           Operations for the domain.
+ * @param private       Private data for the domain.
+ * @return              Pointer to created domain. */
+irq_domain_t *irq_domain_create(uint32_t count, irq_domain_ops_t *ops, void *private) {
     assert(count > 0);
-    assert(controller);
+    assert(ops);
 
     irq_domain_t *domain = kmalloc(sizeof(*domain), MM_BOOT);
 
-    domain->count      = count;
-    domain->controller = controller;
-    domain->irqs       = kcalloc(count, sizeof(domain->irqs[0]), MM_BOOT);
+    domain->count   = count;
+    domain->ops     = ops;
+    domain->private = private;
+    domain->irqs    = kcalloc(count, sizeof(domain->irqs[0]), MM_BOOT);
 
     for (uint32_t i = 0; i < count; i++) {
         irq_t *irq = &domain->irqs[i];

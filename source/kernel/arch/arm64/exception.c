@@ -27,6 +27,26 @@
 
 extern uint8_t arm64_exception_vectors[];
 
+static arm64_irq_handler_t arm64_irq_handler_func;
+static void *arm64_irq_handler_private;
+
+/** Sets the hardware IRQ handler. */
+void arm64_set_irq_handler(arm64_irq_handler_t handler, void *private) {
+    if (arm64_irq_handler_func)
+        fatal("Multiple IRQ handlers installed");
+
+    arm64_irq_handler_func    = handler;
+    arm64_irq_handler_private = private;
+}
+
+/** Handle an IRQ. */
+void arm64_irq_handler(frame_t *frame) {
+    if (!arm64_irq_handler_func)
+        fatal("Received IRQ without registered IRQ handler");
+
+    arm64_irq_handler_func(arm64_irq_handler_private, frame);
+}
+
 /** Handle a synchronous exception. */
 void arm64_sync_exception_handler(frame_t *frame) {
     unsigned long esr   = arm64_read_sysreg(esr_el1);
@@ -43,6 +63,11 @@ void arm64_sync_exception_handler(frame_t *frame) {
             fatal_etc(frame, "Unhandled synchronous exception (class %lu)", class);
             break;
     }
+}
+
+/** Unhandled exception. */
+void arm64_unhandled_exception_handler(frame_t *frame) {
+    fatal_etc(frame, "Unhandled CPU exception");
 }
 
 /** Set up exception handling. */

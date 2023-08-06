@@ -75,8 +75,7 @@ static __init_text void init_irq_controllers(dt_irq_init_t *init, dt_device_t *p
                 /* Initialise child controllers. */
                 init_irq_controllers(init, device);
             } else {
-                kprintf(LOG_ERROR, "dt: failed to initialise IRQ controller %s: %d\n", device->name, ret);
-                dt_device_unmatch(device);
+                fatal("Failed to initialise IRQ controller %s: %d\n", device->name, ret);
             }
 
             kfree(controller);

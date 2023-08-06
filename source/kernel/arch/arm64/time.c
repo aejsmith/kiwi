@@ -33,7 +33,7 @@ static uint64_t arm64_boot_time;
 /** Get the system time (number of nanoseconds since boot).
  * @return              Number of nanoseconds since system was booted. */
 nstime_t system_time(void) {
-    uint64_t ticks = arm64_read_sysreg(cntpct_el0);
+    uint64_t ticks = arm64_read_sysreg(cntvct_el0);
     ticks -= arm64_boot_time;
     return time_from_ticks(ticks, arm64_timer_freq);
 }
@@ -41,12 +41,12 @@ nstime_t system_time(void) {
 /** Spin for a certain amount of time.
  * @param nsecs         Nanoseconds to spin for. */
 void spin(nstime_t nsecs) {
-    uint64_t current = arm64_read_sysreg(cntpct_el0);
+    uint64_t current = arm64_read_sysreg(cntvct_el0);
     uint64_t target  = current + time_to_ticks(nsecs, arm64_timer_freq);
 
     while (current < target) {
         arch_cpu_spin_hint();
-        current = arm64_read_sysreg(cntpct_el0);
+        current = arm64_read_sysreg(cntvct_el0);
     }
 }
 
@@ -66,7 +66,7 @@ __init_text void arm64_time_init(void) {
         arm64_timer_freq / 1000000);
 
     /* Boot time, this is the base for system_time(). */
-    arm64_boot_time = arm64_read_sysreg(cntpct_el0);
+    arm64_boot_time = arm64_read_sysreg(cntvct_el0);
 }
 
 /** Get the number of nanoseconds since the Epoch from the RTC.
