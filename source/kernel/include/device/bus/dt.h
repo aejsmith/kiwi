@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <device/io.h>
+
 #include <kernel/device/bus/dt.h>
 
 #include <lib/avl_tree.h>
@@ -28,9 +30,12 @@
 
 #include <kernel.h>
 
+#include <assert.h>
 #include <libfdt.h>
 
+struct device;
 struct dt_device;
+struct irq_domain;
 
 /**
  * Driver implementation.
@@ -66,6 +71,8 @@ typedef struct dt_match_table {
 
 /** Stage at which built-in drivers are initialised. */
 typedef enum builtin_dt_driver_type {
+    BUILTIN_DT_DRIVER_NONE = 0,
+
     BUILTIN_DT_DRIVER_IRQ,
     BUILTIN_DT_DRIVER_TIME,
 } builtin_dt_driver_type_t;
@@ -134,15 +141,37 @@ typedef struct dt_device {
     const char *compatible;         /**< Compatible string. */
     uint32_t flags;                 /**< Device flags. */
 
+    /**
+     * Device private pointer. To be used by built-in drivers which need to
+     * initialise before the bus manager is set up. Normal drivers should prefer
+     * the usual device_t private pointer.
+     */
+    void *private;
+
     avl_tree_node_t phandle_link;   /** Link to phandle lookup tree. */
 
     /** Parent/child tree. */
     struct dt_device *parent;
-    list_t parent_link;
-    list_t children;
+    list_t parent_link;             /**< Link to parent's children list. */
+    list_t children;                /**< List of child nodes. */
 
-    /** IRQ state. */
+    /**
+     * Resolved interrupt parent device, from searching the hierarchy to find
+     * the interrupt controller/nexus node.
+     */
     struct dt_device *irq_parent;
+
+    /**
+     * IRQ domain local to this device. Maps indices into the interrupts
+     * property on the DT node to the correct IRQ within the interrupt parent.
+     */
+    struct irq_domain *irq_domain;
+
+    /**
+     * For an interrupt controller, the IRQ domain created by the driver that
+     * devices whose interrupt parent is set to this controller will use.
+     */
+    struct irq_domain *child_irq_domain;
 
     /** Driver state. */
     dt_driver_t *driver;
@@ -155,9 +184,51 @@ extern dt_device_t *dt_device_get_by_phandle(uint32_t phandle);
  * FDT access.
  */
 
+/** Gets the number of entries in a property.
+ * @param len           Byte length of the property.
+ * @param num_cells     Number of cells per entry. */
+static inline uint32_t dt_get_num_entries(uint32_t len, uint32_t num_cells) {
+    return len / 4 / num_cells;
+}
+
+extern uint64_t dt_get_value(const uint32_t *ptr, uint32_t num_cells);
+
 extern bool dt_get_prop(dt_device_t *device, const char *name, const uint32_t **_value, uint32_t *_len);
 extern bool dt_get_prop_u32(dt_device_t *device, const char *name, uint32_t *_value);
 #define dt_get_prop_phandle dt_get_prop_u32
 
 extern const void *dt_fdt_get(void);
 
+/**
+ * Memory access.
+ */
+
+extern uint32_t dt_get_address_cells(dt_device_t *device);
+extern uint32_t dt_get_size_cells(dt_device_t *device);
+
+extern bool dt_reg_get(dt_device_t *device, uint8_t index, phys_ptr_t *_address, phys_size_t *_size);
+
+extern status_t dt_reg_map(dt_device_t *device, uint8_t index, uint32_t mmflag, io_region_t *_region);
+extern status_t dt_reg_map_etc(
+    dt_device_t *device, uint8_t index, phys_ptr_t offset, phys_size_t size,
+    uint32_t flags, uint32_t mmflag, io_region_t *_region);
+extern void dt_reg_unmap(dt_device_t *device, uint8_t index, io_region_t region);
+extern void dt_reg_unmap_etc(
+    dt_device_t *device, uint8_t index, io_region_t region, phys_ptr_t offset,
+    phys_size_t size);
+
+extern status_t device_dt_reg_map(
+    struct device *owner, dt_device_t *device, uint8_t index, uint32_t mmflag,
+    io_region_t *_region);
+extern status_t device_dt_reg_map_etc(
+    struct device *owner, dt_device_t *device, uint8_t index, phys_ptr_t offset,
+    phys_size_t size, uint32_t flags, uint32_t mmflag, io_region_t *_region);
+
+/**
+ * IRQ handling.
+ */
+
+static inline void dt_device_set_child_irq_domain(dt_device_t *device, struct irq_domain *domain) {
+    assert(!device->child_irq_domain);
+    device->child_irq_domain = domain;
+}

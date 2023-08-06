@@ -28,8 +28,51 @@
 #include <kernel.h>
 #include <status.h>
 
-static status_t bcm2836_l1_irq_init(dt_device_t *device) {
+typedef struct bcm2836_l1_irq_device {
+    io_region_t io;
+} bcm2836_l1_irq_device_t;
+
+static bool bcm2836_l1_irq_pre_handle(uint32_t num) {
+    assert(false);
+    return true;
+}
+
+static void bcm2836_l1_irq_post_handle(uint32_t num, bool disable) {
+    assert(false);
+}
+
+static irq_mode_t bcm2836_l1_irq_mode(uint32_t num) {
+    assert(false);
+}
+
+static void bcm2836_l1_irq_enable(uint32_t num) {
+    assert(false);
+}
+
+static void bcm2836_l1_irq_disable(uint32_t num) {
+    assert(false);
+}
+
+static irq_controller_t bcm2836_l1_irq_controller = {
+    .pre_handle  = bcm2836_l1_irq_pre_handle,
+    .post_handle = bcm2836_l1_irq_post_handle,
+    .mode        = bcm2836_l1_irq_mode,
+    .enable      = bcm2836_l1_irq_enable,
+    .disable     = bcm2836_l1_irq_disable,
+};
+
+static status_t bcm2836_l1_irq_init_builtin(dt_device_t *dt) {
     kprintf(LOG_DEBUG, "hello world\n");
+
+    bcm2836_l1_irq_device_t *device = kmalloc(sizeof(*device), MM_BOOT | MM_ZERO);
+    dt->private = device;
+
+    status_t ret = dt_reg_map(dt, 0, MM_BOOT, &device->io);
+    if (ret != STATUS_SUCCESS) {
+        kprintf(LOG_ERROR, "bcm2836_l1_irq: failed to map registers: %d\n", ret);
+        return ret;
+    }
+
     return STATUS_SUCCESS;
 }
 
@@ -40,7 +83,7 @@ static dt_match_t bcm2836_l1_irq_matches[] = {
 static dt_driver_t bcm2836_l1_irq_driver = {
     .matches      = DT_MATCH_TABLE(bcm2836_l1_irq_matches),
     .builtin_type = BUILTIN_DT_DRIVER_IRQ,
-    .init_builtin = bcm2836_l1_irq_init,
+    .init_builtin = bcm2836_l1_irq_init_builtin,
 };
 
 BUILTIN_DT_DRIVER(bcm2836_l1_irq_driver);

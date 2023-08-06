@@ -19,6 +19,8 @@
  * @brief               Device Tree bus manager.
  */
 
+#include <device/device.h>
+
 #include <lib/string.h>
 
 #include <mm/malloc.h>
@@ -26,6 +28,7 @@
 #include <assert.h>
 #include <kboot.h>
 #include <kernel.h>
+#include <status.h>
 
 #include "dt.h"
 
@@ -91,7 +94,7 @@ static void do_dt_iterate(dt_device_t *device, dt_iterate_cb_t cb, void *data) {
     }
 }
 
-/** Iterate the DT device tree.
+/** Iterates the DT device tree.
  * @param cb            Callback function call on each node.
  * @param data          Data to pass to the callback. */
 void dt_iterate(dt_iterate_cb_t cb, void *data) {
@@ -99,17 +102,30 @@ void dt_iterate(dt_iterate_cb_t cb, void *data) {
         do_dt_iterate(root_dt_device, cb, data);
 }
 
-/** Find a device by phandle. */
+/** Finds a device by phandle. */
 dt_device_t *dt_device_get_by_phandle(uint32_t phandle) {
     return avl_tree_lookup(&dt_phandle_tree, phandle, dt_device_t, phandle_link);
 }
 
-/** Get the FDT address. */
-const void *dt_fdt_get(void) {
-    return fdt_address;
+/** Gets a value from a property.
+ * @param ptr           Pointer to value.
+ * @param num_cells     Number of cells per value.
+ * @return              Value read. */
+uint64_t dt_get_value(const uint32_t *ptr, uint32_t num_cells) {
+    assert(num_cells == 1 || num_cells == 2);
+
+    uint64_t value = 0;
+
+    for (uint32_t i = 0; i < num_cells; i++) {
+        value = value << 32;
+        value |= fdt32_to_cpu(*(ptr));
+        ptr++;
+    }
+
+    return value;
 }
 
-/** Get a raw DT property.
+/** Gets a raw DT property.
  * @param device        Device to get for.
  * @param name          Name of property.
  * @param _value        Where to store property value pointer.
@@ -127,7 +143,7 @@ bool dt_get_prop(dt_device_t *device, const char *name, const uint32_t **_value,
     return value != NULL;
 }
 
-/** Get a uint32 DT property.
+/** Gets a uint32 DT property.
  * @param device        Device to get for.
  * @param name          Name of property.
  * @param _value        Where to store property value.
@@ -142,6 +158,272 @@ bool dt_get_prop_u32(dt_device_t *device, const char *name, uint32_t *_value) {
         *_value = fdt32_to_cpu(*prop);
 
     return true;
+}
+
+/** Gets the FDT address. */
+const void *dt_fdt_get(void) {
+    return fdt_address;
+}
+
+static uint32_t get_num_cells(dt_device_t *device, const char *name, uint32_t def) {
+    while (device) {
+        const uint32_t *prop;
+        uint32_t len;
+        if (dt_get_prop(device, name, &prop, &len))
+            return fdt32_to_cpu(*prop);
+
+        device = device->parent;
+    }
+
+    return def;
+}
+
+/** Gets the number of address cells for a device. */
+uint32_t dt_get_address_cells(dt_device_t *device) {
+    return get_num_cells(device, "#address-cells", 2);
+}
+
+/** Gets the number of size cells for a device. */
+uint32_t dt_get_size_cells(dt_device_t *device) {
+    return get_num_cells(device, "#size-cells", 1);
+}
+
+static phys_ptr_t translate_address(dt_device_t *device, phys_ptr_t address) {
+    uint32_t parent_address_cells = 0;
+    uint32_t parent_size_cells = 0;
+    bool first = true;
+
+    while (device) {
+        uint32_t node_address_cells = parent_address_cells;
+        uint32_t node_size_cells    = parent_size_cells;
+
+        if (device->parent) {
+            parent_address_cells = dt_get_address_cells(device->parent);
+            parent_size_cells    = dt_get_size_cells(device->parent);
+        } else {
+            parent_address_cells = 2;
+            parent_size_cells    = 1;
+        }
+
+        if (first) {
+            /* Just need cells details from the parent to start, but we start
+             * searching for ranges from the parent. */
+            first = false;
+        } else {
+            const uint32_t *prop;
+            uint32_t len;
+            if (dt_get_prop(device, "ranges", &prop, &len)) {
+                /* Each entry is a (child-address, parent-address, child-length) triplet. */
+                uint32_t entry_cells = node_address_cells + parent_address_cells + node_size_cells;
+                uint32_t entries     = dt_get_num_entries(len, entry_cells);
+
+                for (uint32_t i = 0; i < entries; i++) {
+                    uint64_t node_base   = dt_get_value(prop, node_address_cells);
+                    prop += node_address_cells;
+                    uint64_t parent_base = dt_get_value(prop, parent_address_cells);
+                    prop += parent_address_cells;
+                    uint64_t length      = dt_get_value(prop, node_size_cells);
+                    prop += node_size_cells;
+
+                    /* Translate if within the range. */
+                    if (address >= node_base && address < (node_base + length)) {
+                        address = (address - node_base) + parent_base;
+                        break;
+                    }
+                }
+            }
+        }
+
+        device = device->parent;
+    }
+
+    return address;
+}
+
+/** Gets a register address for a device.
+ * @param device        Device to get for.
+ * @param index         Register index.
+ * @param _address      Where to store register adddress.
+ * @param _size         Where to store register size.
+ * @return              Whether found. */
+bool dt_reg_get(dt_device_t *device, uint8_t index, phys_ptr_t *_address, phys_size_t *_size) {
+    uint32_t address_cells = dt_get_address_cells(device);
+    uint32_t size_cells    = dt_get_size_cells(device);
+    uint32_t total_cells   = address_cells + size_cells;
+
+    const uint32_t *prop;
+    uint32_t len;
+    if (!dt_get_prop(device, "reg", &prop, &len))
+        return false;
+
+    uint32_t entries = dt_get_num_entries(len, total_cells);
+    if (index >= entries)
+        return false;
+
+    phys_ptr_t address = dt_get_value(&prop[index * total_cells], address_cells);
+    phys_size_t size   = dt_get_value(&prop[(index * total_cells) + address_cells], size_cells);
+
+    *_address = translate_address(device, address);
+    *_size    = size;
+    return true;
+}
+
+/**
+ * Maps a DT device register. This will return an I/O region handle to the
+ * register.
+ *
+ * The mapping will be created with MMU_ACCESS_RW and MMU_CACHE_DEVICE. Use
+ * dt_reg_map_etc() to change this.
+ *
+ * The full detected range of the register is mapped. To map only a sub-range,
+ * use dt_reg_map_etc().
+ *
+ * The region should be unmapped with dt_reg_unmap(), which will handle passing
+ * the correct size to io_unmap().
+ *
+ * @param device        Device to map for.
+ * @param index         Index of the register to map.
+ * @param mmflag        Allocation behaviour flags.
+ * @param _region       Where to store I/O region handle.
+ *
+ * @return              STATUS_NOT_FOUND if register does not exist.
+ *                      STATUS_NO_MEMORY if mapping the register failed.
+ */
+status_t dt_reg_map(dt_device_t *device, uint8_t index, uint32_t mmflag, io_region_t *_region) {
+    return dt_reg_map_etc(device, index, 0, 0, MMU_ACCESS_RW | MMU_CACHE_DEVICE, mmflag, _region);
+}
+
+/**
+ * Maps a DT device register. This will return an I/O region handle to the
+ * register.
+ *
+ * The mapping will be created with the specified access and cache mode.
+ *
+ * This allows only a sub-range of the register to be mapped. An error will be
+ * returned if the specified range goes outside of the maximum register range.
+ *
+ * The region should be unmapped with dt_reg_unmap_etc(), which will handle
+ * passing the correct size to io_unmap(). dt_reg_unmap() can be used if the
+ * offset and size are both 0.
+ *
+ * @param device        Device to map for.
+ * @param index         Index of the register to map.
+ * @param offset        Offset into the register to map from.
+ * @param size          Size of the range to map (if 0, will map the whole
+ *                      register from the offset).
+ * @param flags         MMU mapping flags.
+ * @param mmflag        Allocation behaviour flags.
+ * @param _region       Where to store I/O region handle.
+ *
+ * @return              STATUS_NOT_FOUND if register does not exist.
+ *                      STATUS_INVALID_ADDR if range is outside of the register.
+ *                      STATUS_NO_MEMORY if mapping the register failed.
+ */
+status_t dt_reg_map_etc(
+    dt_device_t *device, uint8_t index, phys_ptr_t offset, phys_size_t size,
+    uint32_t flags, uint32_t mmflag, io_region_t *_region)
+{
+    phys_ptr_t reg_base;
+    phys_size_t reg_size;
+    if (!dt_reg_get(device, index, &reg_base, &reg_size))
+        return STATUS_NOT_FOUND;
+
+    /* Validate offset and size. */
+    if (offset >= reg_size)
+        return STATUS_INVALID_ADDR;
+
+    phys_ptr_t map_base = reg_base + offset;
+    phys_ptr_t map_size = (size == 0) ? reg_size - offset : size;
+
+    if (offset + map_size > reg_size)
+        return STATUS_INVALID_ADDR;
+
+    io_region_t region = mmio_map_etc(map_base, map_size, flags, mmflag);
+    if (region == IO_REGION_INVALID)
+        return STATUS_NO_MEMORY;
+
+    *_region = region;
+    return STATUS_SUCCESS;
+}
+
+/** Unmaps a previously mapped register from dt_reg_map().
+ * @param device        Device to unmap for.
+ * @param index         Index of the register to unmap.
+ * @param region        I/O region handle to unmap. */
+void dt_reg_unmap(dt_device_t *device, uint8_t index, io_region_t region) {
+    dt_reg_unmap_etc(device, index, region, 0, 0);
+}
+
+/** Unmaps a previously mapped register sub-range from dt_reg_map_etc().
+ * @param device        Device to unmap for.
+ * @param index         Index of the register to unmap.
+ * @param region        I/O region handle to unmap.
+ * @param offset        Offset into the register that was mapped.
+ * @param size          Size of the range that was mapped. */
+void dt_reg_unmap_etc(
+    dt_device_t *device, uint8_t index, io_region_t region, phys_ptr_t offset,
+    phys_size_t size)
+{
+    phys_ptr_t reg_base;
+    phys_size_t reg_size;
+    bool found __unused = dt_reg_get(device, index, &reg_base, &reg_size);
+    assert(found);
+
+    phys_ptr_t map_size = (size == 0) ? reg_size - offset : size;
+
+    assert(offset + map_size <= reg_size);
+
+    io_unmap(region, map_size);
+}
+
+/**
+ * Maps a DT device register, as a device-managed resource (will be unmapped
+ * when the device is destroyed).
+ *
+ * @see                 dt_reg_map().
+ *
+ * @param owner         Device to register to.
+ */
+status_t device_dt_reg_map(
+    device_t *owner, dt_device_t *device, uint8_t index, uint32_t mmflag,
+    io_region_t *_region)
+{
+    return device_dt_reg_map_etc(owner, device, index, 0, 0, MMU_ACCESS_RW | MMU_CACHE_DEVICE, mmflag, _region);
+}
+
+/**
+ * Maps a DT device register, as a device-managed resource (will be unmapped
+ * when the device is destroyed).
+ *
+ * @see                 dt_reg_map_etc().
+ *
+ * @param owner         Device to register to.
+ */
+status_t device_dt_reg_map_etc(
+    device_t *owner, dt_device_t *device, uint8_t index, phys_ptr_t offset,
+    phys_size_t size, uint32_t flags, uint32_t mmflag, io_region_t *_region)
+{
+    phys_ptr_t reg_base;
+    phys_size_t reg_size;
+    if (!dt_reg_get(device, index, &reg_base, &reg_size))
+        return STATUS_NOT_FOUND;
+
+    /* Validate offset and size. */
+    if (offset >= reg_size)
+        return STATUS_INVALID_ADDR;
+
+    phys_ptr_t map_base = reg_base + offset;
+    phys_ptr_t map_size = (size == 0) ? reg_size - offset : size;
+
+    if (offset + map_size > reg_size)
+        return STATUS_INVALID_ADDR;
+
+    io_region_t region = device_mmio_map_etc(owner, map_base, map_size, flags, mmflag);
+    if (region == IO_REGION_INVALID)
+        return STATUS_NO_MEMORY;
+
+    *_region = region;
+    return STATUS_SUCCESS;
 }
 
 static __init_text bool is_available(int node_offset) {
@@ -166,7 +448,7 @@ static __init_text dt_device_t *add_device(int node_offset, dt_device_t *parent)
         return NULL;
     }
 
-    dt_device_t *device = kmalloc(sizeof(*device), MM_BOOT);
+    dt_device_t *device = kmalloc(sizeof(*device), MM_BOOT | MM_ZERO);
 
     list_init(&device->parent_link);
     list_init(&device->children);

@@ -62,7 +62,7 @@ static __init_text void init_device_irq(dt_device_t *device, void *_init) {
     }
 }
 
-static void init_irq_controllers(dt_irq_init_t *init, dt_device_t *parent) {
+static __init_text void init_irq_controllers(dt_irq_init_t *init, dt_device_t *parent) {
     list_foreach_safe(&init->controllers, iter) {
         dt_irq_controller_t *controller = list_entry(iter, dt_irq_controller_t, link);
         dt_device_t *device = controller->device;
@@ -82,7 +82,6 @@ static void init_irq_controllers(dt_irq_init_t *init, dt_device_t *parent) {
             kfree(controller);
         }
     }
-    // TODO: free
 }
 
 /** Initialise DT IRQ devices. */
