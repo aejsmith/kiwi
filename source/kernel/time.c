@@ -188,7 +188,7 @@ static void timer_device_prepare(timer_t *timer) {
     nstime_t current = system_time();
     nstime_t length  = (timer->target > current) ? timer->target - current : 1;
 
-    timer_device->prepare(length);
+    timer_device->ops->prepare(timer_device, length);
 }
 
 /** Ensure that the timer device is enabled. */
@@ -197,7 +197,7 @@ static inline void timer_device_enable(void) {
      * is run from a different CPU to the one the timer is running on, it won't
      * be able to disable the timer if the list becomes empty). */
     if (!curr_cpu->timer_enabled) {
-        timer_device->enable();
+        timer_device->ops->enable(timer_device);
         curr_cpu->timer_enabled = true;
     }
 }
@@ -207,24 +207,29 @@ static inline void timer_device_disable(void) {
     /* The timer device should always be enabled when we expect it to be. */
     assert(curr_cpu->timer_enabled);
 
-    timer_device->disable();
+    timer_device->ops->disable(timer_device);
     curr_cpu->timer_enabled = false;
 }
 
 /**
- * Sets the device that will provide timer ticks. This function must only be
- * called once.
+ * Sets the device that will provide timer ticks. If one is already set, the
+ * new device will only be used if it is higher priority than the existing one.
  *
  * @param device        Device to set.
+ *
+ * @return              Whether the device was set.
  */
-void time_set_device(timer_device_t *device) {
-    assert(!timer_device);
+bool time_set_timer_device(timer_device_t *device) {
+    if (!timer_device || device->priority > timer_device->priority) {
+        timer_device = device;
+        if (timer_device->ops->type == TIMER_DEVICE_ONESHOT)
+            curr_cpu->timer_enabled = true;
 
-    timer_device = device;
-    if (timer_device->type == TIMER_DEVICE_ONESHOT)
-        curr_cpu->timer_enabled = true;
-
-    kprintf(LOG_NOTICE, "time: activated timer device %s\n", device->name);
+        kprintf(LOG_NOTICE, "time: activated timer device %s\n", device->name);
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /** Start a timer, with CPU timer lock held. */
@@ -322,7 +327,7 @@ bool timer_tick(void) {
             timer_start_unsafe(timer);
     }
 
-    switch (timer_device->type) {
+    switch (timer_device->ops->type) {
         case TIMER_DEVICE_ONESHOT:
             /* Prepare the next tick if there is still a timer in the list. */
             if (!list_empty(&curr_cpu->timers))
@@ -381,7 +386,7 @@ void timer_start(timer_t *timer, nstime_t length, unsigned mode) {
     /* Add the timer to the list. */
     timer_start_unsafe(timer);
 
-    switch (timer_device->type) {
+    switch (timer_device->ops->type) {
         case TIMER_DEVICE_ONESHOT:
             /* If the new timer is at the beginning of the list, then it has
              * the shortest remaining time, so we need to adjust the device to
@@ -417,7 +422,7 @@ uint32_t timer_stop(timer_t *timer) {
          * disable the device if required. If the timer is on another CPU, it's
          * no big deal: the tick handler is able to handle unexpected ticks. */
         if (timer->cpu == curr_cpu) {
-            switch (timer_device->type) {
+            switch (timer_device->ops->type) {
                 case TIMER_DEVICE_ONESHOT:
                     if (first == timer && !list_empty(&curr_cpu->timers)) {
                         first = list_first(&curr_cpu->timers, timer_t, cpu_link);
@@ -552,7 +557,7 @@ __init_text void time_late_init(void) {
 __init_text void time_init_percpu(void) {
     assert(timer_device);
 
-    if (timer_device->type == TIMER_DEVICE_ONESHOT)
+    if (timer_device->ops->type == TIMER_DEVICE_ONESHOT)
         curr_cpu->timer_enabled = true;
 
     curr_cpu->timer_thread = kmalloc(sizeof(*curr_cpu->timer_thread), MM_BOOT);

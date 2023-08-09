@@ -29,8 +29,30 @@
 #include <status.h>
 #include <time.h>
 
-static status_t arm_timer_init_builtin(dt_device_t *device) {
-    kprintf(LOG_DEBUG, "hello from ARM timer\n");
+typedef struct arm_timer_device {
+    timer_device_t timer;
+} arm_timer_device_t;
+
+static void arm_timer_prepare(timer_device_t *_device, nstime_t nsecs) {
+    //arm_timer_device_t *device = _device->private;
+
+    fatal("TODO");
+}
+
+static timer_device_ops_t arm_timer_device_ops = {
+    .type     = TIMER_DEVICE_ONESHOT,
+    .prepare  = arm_timer_prepare,
+};
+
+static status_t arm_timer_init_builtin(dt_device_t *dt) {
+    arm_timer_device_t *device = kmalloc(sizeof(*device), MM_BOOT);
+
+    device->timer.name     = "ARM";
+    device->timer.priority = 100;
+    device->timer.ops      = &arm_timer_device_ops;
+    device->timer.private  = device;
+
+    time_set_timer_device(&device->timer);
     return STATUS_SUCCESS;
 }
 

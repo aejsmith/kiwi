@@ -26,6 +26,7 @@
 #include <types.h>
 
 struct cpu;
+struct timer_device;
 
 /** Convert seconds to nanoseconds.
  * @param secs          Seconds value to convert.
@@ -69,10 +70,8 @@ static inline nstime_t nsecs_to_usecs(nstime_t nsecs) {
     return nsecs / 1000;
 }
 
-/** Structure containing details of a hardware timer. */
-typedef struct timer_device {
-    const char *name;               /**< Name of the timer. */
-
+/** Operations for a hardware timer. */
+typedef struct timer_device_ops {
     /** Type of the device. */
     enum {
         TIMER_DEVICE_PERIODIC,      /**< Timer fires periodically. */
@@ -80,10 +79,10 @@ typedef struct timer_device {
     } type;
 
     /** Enable the device (for periodic devices). */
-    void (*enable)(void);
+    void (*enable)(struct timer_device *device);
 
     /** Disable the device (for periodic devices). */
-    void (*disable)(void);
+    void (*disable)(struct timer_device *device);
 
     /** Set up the next tick (for one-shot devices).
      * @note                It is OK if the timer fires before the interval is
@@ -92,7 +91,15 @@ typedef struct timer_device {
      *                      only call handlers if system_time() shows that the
      *                      timer's target has been reached.
      * @param nsecs         Nanoseconds to fire in. */
-    void (*prepare)(nstime_t nsecs);
+    void (*prepare)(struct timer_device *device, nstime_t nsecs);
+} timer_device_ops_t;
+
+/** Structure containing details of a hardware timer. */
+typedef struct timer_device {
+    const char *name;               /**< Name of the device. */
+    int priority;                   /**< Priority of the device. */
+    timer_device_ops_t *ops;        /**< Operations for the device. */
+    void *private;                  /**< Private data for the driver. */
 } timer_device_t;
 
 /**
@@ -156,7 +163,7 @@ extern void spin(nstime_t nsecs);
 
 extern nstime_t arch_time_from_hardware(void);
 
-extern void time_set_device(timer_device_t *device);
+extern bool time_set_timer_device(timer_device_t *device);
 extern void time_init(void);
 extern void time_late_init(void);
 extern void time_init_percpu(void);

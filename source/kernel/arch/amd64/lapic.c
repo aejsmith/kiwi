@@ -76,9 +76,7 @@ static void lapic_ipi_interrupt(frame_t *frame) {
     smp_ipi_handler();
 }
 
-/** Prepare local APIC timer tick.
- * @param nsecs         Number of nanoseconds to tick in. */
-static void lapic_timer_prepare(nstime_t nsecs) {
+static void lapic_timer_prepare(timer_device_t *device, nstime_t nsecs) {
     uint32_t count = (curr_cpu->arch.lapic_timer_cv * nsecs) >> 32;
     lapic_write(LAPIC_REG_TIMER_INITIAL, max(count, 1));
 
@@ -95,11 +93,15 @@ static void lapic_timer_prepare(nstime_t nsecs) {
     lapic_read(LAPIC_REG_TIMER_CURRENT);
 }
 
-/** Local APIC timer device. */
+static timer_device_ops_t lapic_timer_device_ops = {
+    .type     = TIMER_DEVICE_ONESHOT,
+    .prepare  = lapic_timer_prepare,
+};
+
 static timer_device_t lapic_timer_device = {
-    .name = "LAPIC",
-    .type = TIMER_DEVICE_ONESHOT,
-    .prepare = lapic_timer_prepare,
+    .name     = "LAPIC",
+    .priority = 100,
+    .ops      = &lapic_timer_device_ops,
 };
 
 /** Timer interrupt handler.
@@ -219,7 +221,7 @@ __init_text void lapic_init(void) {
         base, lapic_mapping);
 
     /* Install the LAPIC timer device. */
-    time_set_device(&lapic_timer_device);
+    time_set_timer_device(&lapic_timer_device);
 
     /* Install interrupt vectors. */
     interrupt_table[LAPIC_VECT_SPURIOUS] = lapic_spurious_interrupt;
