@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2022 Alex Smithh
+ * Copyright (C) 2009-2023 Alex Smithh
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
