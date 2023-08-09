@@ -68,7 +68,7 @@ typedef struct initcall {
 
 /** Macro to declare an initialization function with a specified type. */
 #define INITCALL_TYPE(_func, _type) \
-    static initcall_t __initcall_##func __section(".init.initcalls") __used = { \
+    static initcall_t __initcall_##_func __section(".init.initcalls") __used = { \
         .type = _type, \
         .func = _func, \
      }

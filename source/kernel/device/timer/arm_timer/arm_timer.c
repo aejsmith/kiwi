@@ -16,22 +16,33 @@
 
 /**
  * @file
- * @brief               DT bus manager internal definitions.
+ * @brief               ARM generic timer driver.
  */
 
-#pragma once
-
 #include <device/bus/dt.h>
+#include <device/irq.h>
 
-typedef void (*dt_iterate_cb_t)(dt_device_t *device, void *data);
+#include <mm/malloc.h>
 
-extern void dt_iterate(dt_iterate_cb_t cb, void *data);
+#include <assert.h>
+#include <kernel.h>
+#include <status.h>
+#include <time.h>
 
-extern const char *dt_get_builtin_driver_name(dt_driver_t *driver);
-extern dt_driver_t *dt_match_builtin_driver(dt_device_t *device, builtin_dt_driver_type_t type);
-
-static inline void dt_device_unmatch(dt_device_t *device) {
-    device->driver = NULL;
-    device->match  = NULL;
-    device->flags &= DT_DEVICE_MATCHED;
+static status_t arm_timer_init_builtin(dt_device_t *device) {
+    kprintf(LOG_DEBUG, "hello from ARM timer\n");
+    return STATUS_SUCCESS;
 }
+
+static dt_match_t arm_timer_matches[] = {
+    { .compatible = "arm,armv8-timer" },
+    { .compatible = "arm,armv7-timer" },
+};
+
+static dt_driver_t arm_timer_driver = {
+    .matches      = DT_MATCH_TABLE(arm_timer_matches),
+    .builtin_type = BUILTIN_DT_DRIVER_TIME,
+    .init_builtin = arm_timer_init_builtin,
+};
+
+BUILTIN_DT_DRIVER(arm_timer_driver);

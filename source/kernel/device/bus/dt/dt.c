@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <kboot.h>
 #include <kernel.h>
+#include <module.h>
 #include <status.h>
 
 #include "dt.h"
@@ -52,6 +53,12 @@ void __init_text dt_register_builtin_driver(dt_driver_t *driver) {
     list_append(&builtin_dt_drivers, &driver->builtin_link);
 }
 
+const char *dt_get_builtin_driver_name(dt_driver_t *driver) {
+    symbol_t sym;
+    symbol_from_addr((ptr_t)driver, &sym, NULL);
+    return sym.name;
+}
+
 /**
  * Matches a device to a built-in driver. Marks the device as matched and sets
  * its match pointer.
@@ -74,6 +81,10 @@ dt_driver_t *dt_match_builtin_driver(dt_device_t *device, builtin_dt_driver_type
                     dt_match_t *match = &driver->matches.array[i];
 
                     if (strcmp(*compatible, match->compatible) == 0) {
+                        kprintf(
+                            LOG_DEBUG, "dt: matched device %s to built-in driver %s\n",
+                            device->name, dt_get_builtin_driver_name(driver));
+
                         if (!(device->flags & DT_DEVICE_MATCHED)) {
                             device->flags |= DT_DEVICE_MATCHED;
                             device->driver = driver;
@@ -556,3 +567,27 @@ static __init_text void dt_early_init(void) {
 }
 
 INITCALL_TYPE(dt_early_init, INITCALL_TYPE_EARLY_DEVICE);
+
+static __init_text void init_builtin_device(dt_device_t *device, void *_type) {
+    builtin_dt_driver_type_t type = *(builtin_dt_driver_type_t *)_type;
+
+    if (dt_match_builtin_driver(device, type)) {
+        status_t ret = device->driver->init_builtin(device);
+        if (ret != STATUS_SUCCESS) {
+            kprintf(
+                LOG_ERROR, "dt: failed to initialise device %s with built-in driver %s: %d\n",
+                device->name, dt_get_builtin_driver_name(device->driver), ret);
+        }
+    }
+}
+
+static __init_text void init_builtin_devices(builtin_dt_driver_type_t type) {
+    dt_iterate(init_builtin_device, &type);
+}
+
+/** Init time devices from DT. */
+static __init_text void dt_time_init(void) {
+    init_builtin_devices(BUILTIN_DT_DRIVER_TIME);
+}
+
+INITCALL_TYPE(dt_time_init, INITCALL_TYPE_TIME);

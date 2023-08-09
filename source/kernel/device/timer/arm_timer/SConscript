@@ -15,23 +15,9 @@
 #
 
 Import('config', 'kern_sources')
-from util import feature_sources, feature_dirs
+from util import feature_sources
 
+# Built-in driver.
 kern_sources += feature_sources(config, [
-    'bus.c',
-    'class.c',
-    'device.c',
-    'dma.c',
-    'io.c',
-    'irq.c',
+    'arm_timer.c',
 ])
-
-SConscript(dirs = feature_dirs(config, [
-    'bus',
-    'console',
-    'disk',
-    'irq',
-    'input',
-    'net',
-    'timer',
-]))

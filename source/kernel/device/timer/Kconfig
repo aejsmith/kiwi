@@ -14,24 +14,12 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('config', 'kern_sources')
-from util import feature_sources, feature_dirs
+comment "Timer devices"
 
-kern_sources += feature_sources(config, [
-    'bus.c',
-    'class.c',
-    'device.c',
-    'dma.c',
-    'io.c',
-    'irq.c',
-])
-
-SConscript(dirs = feature_dirs(config, [
-    'bus',
-    'console',
-    'disk',
-    'irq',
-    'input',
-    'net',
-    'timer',
-]))
+config DEVICE_TIMER_ARM
+	bool "ARM Generic Timer"
+	default y
+	depends on DEVICE_BUS_DT && ARCH_ARM64
+	help
+	  Enable the driver for the ARM Generic Timer defined in the ARMv7/8
+	  architectures.

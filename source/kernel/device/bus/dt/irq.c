@@ -21,7 +21,6 @@
 
 #include <mm/malloc.h>
 
-#include <module.h>
 #include <status.h>
 
 #include "dt.h"
@@ -104,13 +103,10 @@ static __init_text void dt_irq_init(void) {
         dt_irq_controller_t *controller = list_entry(iter, dt_irq_controller_t, link);
         dt_device_t *device = controller->device;
 
-        symbol_t sym;
-        symbol_from_addr((ptr_t)device->driver, &sym, NULL);
-
         kprintf(
             LOG_DEBUG, "  %s (parent: %s, driver: %s)\n",
             device->name, (device->irq_parent) ? device->irq_parent->name : "none",
-            sym.name);
+            dt_get_builtin_driver_name(device->driver));
     }
 
     /*

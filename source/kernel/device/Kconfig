@@ -22,5 +22,6 @@ source "disk/Kconfig"
 source "input/Kconfig"
 source "irq/Kconfig"
 source "net/Kconfig"
+source "timer/Kconfig"
 
 endmenu

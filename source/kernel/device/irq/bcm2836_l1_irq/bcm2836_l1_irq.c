@@ -107,6 +107,9 @@ static irq_mode_t bcm2836_l1_irq_mode(irq_domain_t *domain, uint32_t num) {
 
 static void bcm2836_l1_irq_enable(irq_domain_t *domain, uint32_t num) {
     assert(false);
+
+    // TODO: These need to apply locally when handling per cpu but globally for
+    // registration.
 }
 
 static void bcm2836_l1_irq_disable(irq_domain_t *domain, uint32_t num) {
