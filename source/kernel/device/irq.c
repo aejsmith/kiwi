@@ -50,6 +50,8 @@ struct irq_handler {
 
 /** An entry in the IRQ table. */
 typedef struct irq {
+    irq_mode_t mode;                /**< Trigger mode. */
+
     spinlock_t handlers_lock;       /**< Lock to protect handler list. */
     list_t handlers;                /**< List of handler structures. */
     unsigned int disable_count;     /**< Reference count for disabling the IRQ. */
@@ -139,6 +141,23 @@ static void irq_thread(void *_domain, void *_num) {
 
         spinlock_unlock(&irq->handlers_lock);
     }
+}
+
+/** Sets the trigger mode of an IRQ.
+ * @param domain        Domain that the interrupt is in.
+ * @param num           IRQ number.
+ * @param mode          Trigger mode for the IRQ. */
+status_t irq_set_mode(irq_domain_t *domain, uint32_t num, irq_mode_t mode) {
+    irq_t *irq = &domain->irqs[num];
+
+    if (domain->ops->set_mode) {
+        status_t ret = domain->ops->set_mode(domain, num, mode);
+        if (ret != STATUS_SUCCESS)
+            return ret;
+    }
+
+    irq->mode = mode;
+    return STATUS_SUCCESS;
 }
 
 /**
@@ -357,9 +376,6 @@ void irq_handler(irq_domain_t *domain, uint32_t num) {
     if (domain->ops->pre_handle && !domain->ops->pre_handle(domain, num))
         goto out;
 
-    /* Get the trigger mode. */
-    irq_mode_t mode = domain->ops->mode(domain, num);
-
     irq_t *irq = &domain->irqs[num];
     spinlock_lock(&irq->handlers_lock);
 
@@ -386,7 +402,7 @@ void irq_handler(irq_domain_t *domain, uint32_t num) {
             /* For edge-triggered interrupts we must invoke all handlers,
              * because multiple interrupt pulses can be merged if they occur
              * close together. */
-            if (mode == IRQ_MODE_LEVEL && ret != IRQ_UNHANDLED)
+            if (irq->mode == IRQ_MODE_LEVEL && ret != IRQ_UNHANDLED)
                 goto out_handled;
         }
     }
@@ -438,6 +454,8 @@ irq_domain_t *irq_domain_create(uint32_t count, irq_domain_ops_t *ops, void *pri
 
         /* Start disabled until a handler is registered. */
         irq->disable_count = 1;
+
+        irq->mode = (domain->ops->mode) ? domain->ops->mode(domain, i) : IRQ_MODE_LEVEL;
     }
 
     return domain;

@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <types.h>
+#include <status.h>
 
 struct device;
 struct irq;
@@ -67,7 +67,7 @@ typedef struct irq_domain_ops {
      * Pre-handling function. Called at the start of the hardware IRQ handler
      * before any handlers are called.
      *
-     * @param domain        Domain that the interrupt occurred in.
+     * @param domain        Domain that the interrupt is in.
      * @param num           IRQ number.
      *
      * @return              True if IRQ should be handled.
@@ -78,25 +78,31 @@ typedef struct irq_domain_ops {
      * Post-early handling function. Called at the end of the hardware IRQ
      * handler, after any early handlers have been called.
      *
-     * @param domain        Domain that the interrupt occurred in.
+     * @param domain        Domain that the interrupt is in.
      * @param num           IRQ number.
      * @param disable       Whether the IRQ should be disabled.
      */
     void (*post_handle)(struct irq_domain *domain, uint32_t num, bool disable);
 
     /** Get IRQ trigger mode.
-     * @param domain        Domain that the interrupt occurred in.
+     * @param domain        Domain that the interrupt is in.
      * @param num           IRQ number.
      * @return              Trigger mode of the IRQ. */
     irq_mode_t (*mode)(struct irq_domain *domain, uint32_t num);
 
+    /** Set IRQ trigger mode.
+     * @param domain        Domain that the interrupt is in.
+     * @param num           IRQ number.
+     * @param mode          Trigger mode for the IRQ. */
+    status_t (*set_mode)(struct irq_domain *domain, uint32_t num, irq_mode_t mode);
+
     /** Enable an IRQ.
-     * @param domain        Domain that the interrupt occurred in.
+     * @param domain        Domain that the interrupt is in.
      * @param num           IRQ number. */
     void (*enable)(struct irq_domain *domain, uint32_t num);
 
     /** Disable an IRQ.
-     * @param domain        Domain that the interrupt occurred in.
+     * @param domain        Domain that the interrupt is in.
      * @param num           IRQ number. */
     void (*disable)(struct irq_domain *domain, uint32_t num);
 } irq_domain_ops_t;
@@ -149,6 +155,7 @@ typedef struct irq_handler irq_handler_t;
 
 extern irq_domain_t *root_irq_domain;
 
+extern status_t irq_set_mode(irq_domain_t *domain, uint32_t num, irq_mode_t mode);
 extern status_t irq_register(
     irq_domain_t *domain, uint32_t num,
     irq_early_func_t early_func, irq_func_t func, void *data,
