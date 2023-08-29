@@ -91,12 +91,12 @@ static inline void write_global_reg(bcm2836_l1_device_t *device, uint32_t reg, u
     io_write32(device->io, reg, val);
 }
 
-static bool bcm2836_l1_irq_pre_handle(irq_domain_t *domain, uint32_t num) {
+static bool bcm2836_l1_irq_pre_handle(irq_domain_t *domain, uint32_t num, irq_mode_t mode) {
     assert(false);
     return true;
 }
 
-static void bcm2836_l1_irq_post_handle(irq_domain_t *domain, uint32_t num, bool disable) {
+static void bcm2836_l1_irq_post_handle(irq_domain_t *domain, uint32_t num, irq_mode_t mode, bool disable) {
     assert(false);
 }
 

@@ -415,13 +415,16 @@ void irq_handler(irq_domain_t *domain, uint32_t num) {
     /* IRQs can happen during a user memory operation. Force the flag to off
      * while handling an IRQ so that we don't incorrectly treat faults during
      * the handler as a user memory violation. */
-    uint32_t prev_usermem = thread_clear_flag(curr_thread, THREAD_IN_USERMEM) & THREAD_IN_USERMEM;
-
-    /* Execute any pre-handling function. */
-    if (domain->ops->pre_handle && !domain->ops->pre_handle(domain, num))
-        goto out;
+    uint32_t prev_usermem = (curr_thread)
+        ? thread_clear_flag(curr_thread, THREAD_IN_USERMEM) & THREAD_IN_USERMEM
+        : 0;
 
     irq_t *irq = &domain->irqs[num];
+
+    /* Execute any pre-handling function. */
+    if (domain->ops->pre_handle && !domain->ops->pre_handle(domain, num, irq->mode))
+        goto out;
+
     spinlock_lock(&irq->handlers_lock);
 
     bool disable = false;
@@ -467,10 +470,11 @@ out_handled:
     /* Perform post-handling actions. IRQ is disabled until the thread completes
      * execution of all handlers. */
     if (domain->ops->post_handle)
-        domain->ops->post_handle(domain, num, disable);
+        domain->ops->post_handle(domain, num, irq->mode, disable);
 
 out:
-    thread_set_flag(curr_thread, prev_usermem);
+    if (curr_thread)
+        thread_set_flag(curr_thread, prev_usermem);
 }
 
 /** Creates a new IRQ domain.

@@ -62,12 +62,19 @@ enum {
     GIC_REG_GICC_CTLR                   = 0x0,
     GIC_REG_GICC_PMR                    = 0x4,
     GIC_REG_GICC_BPR                    = 0x8,
+    GIC_REG_GICC_IAR                    = 0xc,
+    GIC_REG_GICC_EOIR                   = 0x10,
 };
 
 /** CPU interface register bits. */
 enum {
     GIC_GICC_CTLR_EnableGrp0            = (1<<0),
     GIC_GICC_CTLR_EnableGrp1            = (1<<1),
+
+    GIC_GICC_IAR_InterruptID_SHIFT      = 0,
+    GIC_GICC_IAR_InterruptID_MASK       = 0x3ff,
+
+    GIC_GICC_EOIR_EOIINTID_SHIFT        = 0,
 };
 
 typedef struct arm_gic_v2_device {
@@ -94,15 +101,25 @@ static inline void write_cpu_reg(arm_gic_v2_device_t *device, uint32_t reg, uint
     io_write32(device->cpu_io, reg, val);
 }
 
-static bool arm_gic_v2_irq_pre_handle(irq_domain_t *domain, uint32_t num) {
-// TODO: ack?
-    assert(false);
+static void write_eoi(arm_gic_v2_device_t *device, uint32_t num) {
+    // TODO: For SGI, need to write the CPU ID as well.
+    write_cpu_reg(device, GIC_REG_GICC_EOIR, num << GIC_GICC_EOIR_EOIINTID_SHIFT);
+}
+
+static bool arm_gic_v2_irq_pre_handle(irq_domain_t *domain, uint32_t num, irq_mode_t mode) {
+    arm_gic_v2_device_t *device = domain->private;
+
+    if (mode == IRQ_MODE_EDGE)
+        write_eoi(device, num);
+
     return true;
 }
 
-static void arm_gic_v2_irq_post_handle(irq_domain_t *domain, uint32_t num, bool disable) {
-// TODO: ack?
-    assert(false);
+static void arm_gic_v2_irq_post_handle(irq_domain_t *domain, uint32_t num, irq_mode_t mode, bool disable) {
+    arm_gic_v2_device_t *device = domain->private;
+
+    if (mode == IRQ_MODE_LEVEL)
+        write_eoi(device, num);
 }
 
 static irq_mode_t arm_gic_v2_irq_mode(irq_domain_t *domain, uint32_t num) {
@@ -241,8 +258,15 @@ static dt_irq_ops_t arm_gic_v2_dt_irq_ops = {
 static void arm_gic_v2_irq_handler(void *_device, frame_t *frame) {
     arm_gic_v2_device_t *device = _device;
 
-    (void)device;
-    assert(false);
+    do {
+        uint32_t iar = read_cpu_reg(device, GIC_REG_GICC_IAR);
+        uint32_t num = (iar >> GIC_GICC_IAR_InterruptID_SHIFT) & GIC_GICC_IAR_InterruptID_MASK;
+
+        if (num >= 1020)
+            break;
+
+        irq_handler(device->domain, num);
+    } while (true);
 }
 
 static status_t arm_gic_v2_init_builtin(dt_device_t *dt) {

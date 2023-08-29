@@ -95,10 +95,11 @@ typedef struct irq_domain_ops {
      *
      * @param domain        Domain that the IRQ is in.
      * @param num           IRQ number.
+     * @param mode          Mode of the IRQ.
      *
      * @return              True if IRQ should be handled.
      */
-    bool (*pre_handle)(struct irq_domain *domain, uint32_t num);
+    bool (*pre_handle)(struct irq_domain *domain, uint32_t num, irq_mode_t mode);
 
     /**
      * Post-early handling function. Called at the end of the hardware IRQ
@@ -106,9 +107,10 @@ typedef struct irq_domain_ops {
      *
      * @param domain        Domain that the IRQ is in.
      * @param num           IRQ number.
+     * @param mode          Mode of the IRQ.
      * @param disable       Whether the IRQ should be disabled.
      */
-    void (*post_handle)(struct irq_domain *domain, uint32_t num, bool disable);
+    void (*post_handle)(struct irq_domain *domain, uint32_t num, irq_mode_t mode, bool disable);
 
     /** Get IRQ trigger mode.
      * @param domain        Domain that the IRQ is in.

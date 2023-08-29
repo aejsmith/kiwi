@@ -40,25 +40,41 @@ enum {
     ARM_TIMER_IRQ_HYP_VIRT,
 };
 
+enum {
+    ARM_TIMER_CNTV_CTL_ENABLE = (1<<0),
+};
+
 typedef struct arm_timer_device {
     timer_device_t timer;
     irq_handler_t *irq;
+    uint64_t freq;
 } arm_timer_device_t;
 
 static irq_status_t arm_timer_irq(void *_device) {
-    assert(false);
+    arm64_write_sysreg(cntv_ctl_el0, 0);
+    return (timer_tick()) ? IRQ_PREEMPT : IRQ_HANDLED;
 }
 
 static void arm_timer_prepare(timer_device_t *_device, nstime_t nsecs) {
-    //arm_timer_device_t *device = _device->private;
+    arm_timer_device_t *device = _device->private;
 
-    fatal("TODO");
+    uint64_t ticks = time_to_ticks(nsecs, device->freq);
+
+    arm64_write_sysreg(cntv_tval_el0, ticks);
+    arm64_write_sysreg(cntv_ctl_el0, ARM_TIMER_CNTV_CTL_ENABLE);
 }
 
 static timer_device_ops_t arm_timer_device_ops = {
     .type     = TIMER_DEVICE_ONESHOT,
     .prepare  = arm_timer_prepare,
 };
+
+#if 1
+static bool test_timer_func(void *data) {
+    kprintf(LOG_DEBUG, "test timer\n");
+    return false;
+}
+#endif
 
 static status_t arm_timer_init_builtin(dt_device_t *dt) {
     status_t ret;
@@ -70,6 +86,8 @@ static status_t arm_timer_init_builtin(dt_device_t *dt) {
     device->timer.ops      = &arm_timer_device_ops;
     device->timer.private  = device;
 
+    device->freq = arm64_read_sysreg(cntfrq_el0);
+
     /* Just assume we're using the virtual IRQ for now... */
     ret = dt_irq_register(dt, ARM_TIMER_IRQ_VIRT, arm_timer_irq, NULL, device, &device->irq);
     if (ret != STATUS_SUCCESS) {
@@ -80,18 +98,12 @@ static status_t arm_timer_init_builtin(dt_device_t *dt) {
     time_set_timer_device(&device->timer);
 
 #if 1
-    uint64_t freq = arm64_read_sysreg(cntfrq_el0);
-    uint64_t time = time_to_ticks(secs_to_nsecs(1), freq);
+    timer_t timer;
+    timer_init(&timer, "test_timer", test_timer_func, NULL, 0);
+    timer_start(&timer, secs_to_nsecs(1), TIMER_PERIODIC);
 
     local_irq_enable();
-    while (true) {
-        kprintf(LOG_DEBUG, "time 0x%lx\n", arm64_read_sysreg(cntv_ctl_el0));
-
-        arm64_write_sysreg(cntv_tval_el0, time);
-        arm64_write_sysreg(cntv_ctl_el0, (1<<0));
-
-        spin(secs_to_nsecs(2));
-    }
+    while (true);
 #endif
 
     return STATUS_SUCCESS;

@@ -56,7 +56,7 @@ static void pic_disable_locked(uint32_t num) {
     }
 }
 
-static bool pic_pre_handle(irq_domain_t *domain, uint32_t num) {
+static bool pic_pre_handle(irq_domain_t *domain, uint32_t num, irq_mode_t mode) {
     assert(num < 16);
 
     spinlock_lock(&pic_lock);
@@ -81,28 +81,28 @@ static bool pic_pre_handle(irq_domain_t *domain, uint32_t num) {
     }
 
     /* Edge-triggered interrupts must be acked before we handle. */
-    if (handle && !(pic_level_triggered & (1 << num)))
+    if (handle && mode == IRQ_MODE_EDGE)
         pic_eoi(num);
 
     spinlock_unlock(&pic_lock);
     return handle;
 }
 
-static void pic_post_handle(irq_domain_t *domain, uint32_t num, bool disable) {
+static void pic_post_handle(irq_domain_t *domain, uint32_t num, irq_mode_t mode, bool disable) {
     spinlock_lock(&pic_lock);
 
     if (disable)
         pic_disable_locked(num);
 
     /* Level-triggered interrupts must be acked once all handlers have been run. */
-    if (pic_level_triggered & (1 << num))
+    if (mode == IRQ_MODE_LEVEL)
         pic_eoi(num);
 
     spinlock_unlock(&pic_lock);
 }
 
 static irq_mode_t pic_mode(irq_domain_t *domain, uint32_t num) {
-    return (pic_level_triggered & (1 << num));
+    return (pic_level_triggered & (1 << num)) ? IRQ_MODE_LEVEL : IRQ_MODE_EDGE;
 }
 
 static void pic_enable(irq_domain_t *domain, uint32_t num) {
