@@ -135,14 +135,14 @@ static void i8042_write_command(i8042_controller_t *controller, uint8_t cmd) {
     io_write8(controller->io, I8042_PORT_COMMAND, cmd);
 }
 
-static irq_status_t i8042_keyboard_irq_early(uint32_t num, void *data) {
+static irq_status_t i8042_keyboard_irq_early(void *data) {
     i8042_controller_t *controller = data;
 
     uint8_t status = i8042_read_status(controller);
     return (status & I8042_STATUS_OUTPUT) ? IRQ_RUN_THREAD : IRQ_UNHANDLED;
 }
 
-static void i8042_keyboard_irq(uint32_t num, void *data) {
+static void i8042_keyboard_irq(void *data) {
     i8042_controller_t *controller = data;
 
     uint8_t code = i8042_read_data(controller, false);

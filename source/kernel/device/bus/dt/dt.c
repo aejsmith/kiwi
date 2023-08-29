@@ -44,6 +44,34 @@ static AVL_TREE_DEFINE(dt_phandle_tree);
 
 static LIST_DEFINE(builtin_dt_drivers);
 
+/**
+ * Sets the driver that a device is matched to, and sets up things such as
+ * IRQs before initialising the driver.
+ */
+bool dt_device_match(dt_device_t *device, dt_driver_t *driver, dt_match_t *match) {
+    assert(!(device->flags & DT_DEVICE_MATCHED));
+
+    device->flags |= DT_DEVICE_MATCHED;
+    device->driver = driver;
+    device->match  = match;
+
+    if (!dt_irq_init_device(device)) {
+        dt_device_unmatch(device);
+        return false;
+    }
+
+    return true;
+}
+
+/** Unmatches a device from its current driver. */
+void dt_device_unmatch(dt_device_t *device) {
+    dt_irq_deinit_device(device);
+
+    device->driver = NULL;
+    device->match  = NULL;
+    device->flags &= ~DT_DEVICE_MATCHED;
+}
+
 /** Registers a built-in driver (see BUILTIN_DT_DRIVER). */
 void __init_text dt_register_builtin_driver(dt_driver_t *driver) {
     // TODO: Register built-in drivers as bus drivers once the bus type is
@@ -53,6 +81,7 @@ void __init_text dt_register_builtin_driver(dt_driver_t *driver) {
     list_append(&builtin_dt_drivers, &driver->builtin_link);
 }
 
+/** Gets the symbol name for a builtin driver. */
 const char *dt_get_builtin_driver_name(dt_driver_t *driver) {
     symbol_t sym;
     symbol_from_addr((ptr_t)driver, &sym, NULL);
@@ -86,10 +115,11 @@ dt_driver_t *dt_match_builtin_driver(dt_device_t *device, builtin_dt_driver_type
                             device->name, dt_get_builtin_driver_name(driver));
 
                         if (!(device->flags & DT_DEVICE_MATCHED)) {
-                            device->flags |= DT_DEVICE_MATCHED;
-                            device->driver = driver;
-                            device->match  = match;
-                            return driver;
+                            if (dt_device_match(device, driver, match)) {
+                                return driver;
+                            } else {
+                                return NULL;
+                            }
                         } else {
                             kprintf(LOG_WARN, "dt: multiple built-in drivers match device %s\n", device->name);
                             return NULL;

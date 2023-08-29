@@ -22,6 +22,7 @@
 #pragma once
 
 #include <device/io.h>
+#include <device/irq.h>
 
 #include <kernel/device/bus/dt.h>
 
@@ -36,7 +37,7 @@
 
 struct device;
 struct dt_device;
-struct irq_domain;
+struct dt_irq_ops;
 
 /**
  * Driver implementation.
@@ -166,13 +167,18 @@ typedef struct dt_device {
      * IRQ domain local to this device. Maps indices into the interrupts
      * property on the DT node to the correct IRQ within the interrupt parent.
      */
-    struct irq_domain *irq_domain;
+    irq_domain_t *irq_domain;
 
     /**
      * For an interrupt controller, the IRQ domain created by the driver that
-     * devices whose interrupt parent is set to this controller will use.
+     * devices whose interrupt parent is set to this controller will use, and
+     * operations for setting up IRQs for children of this controller.
      */
-    struct irq_domain *child_irq_domain;
+    struct {
+        irq_domain_t *domain;
+        struct dt_irq_ops *ops;
+        uint32_t num_cells;
+    } irq_controller;
 
     /** Driver state. */
     dt_driver_t *driver;
@@ -229,7 +235,42 @@ extern status_t device_dt_reg_map_etc(
  * IRQ handling.
  */
 
-static inline void dt_device_set_child_irq_domain(dt_device_t *device, struct irq_domain *domain) {
-    assert(!device->child_irq_domain);
-    device->child_irq_domain = domain;
-}
+/**
+ * DT IRQ controller operations. This is needed since the format of the
+ * interrupts property of a node is specific to the type of the controller that
+ * is its IRQ parent.
+ */
+typedef struct dt_irq_ops {
+    /**
+     * Configures an IRQ for a device whose IRQ parent is this controller from
+     * its DT node. Should apply things like IRQ mode configuration that are
+     * specified in the interrupts property for the node. Called when the
+     * device is initially matched to a driver.
+     *
+     * @param controller    IRQ controller node.
+     * @param child         Child node whose IRQ is being registered.
+     * @param num           IRQ index within the child.
+     */
+    void (*configure)(dt_device_t *controller, dt_device_t *child, uint32_t num);
+
+    /**
+     * Translates an IRQ number within a child device to the IRQ number within
+     * the controller's IRQ domain.
+     *
+     * @param controller    IRQ controller node.
+     * @param child         Child node whose IRQ is being registered.
+     * @param num           IRQ index within the child.
+     *
+     * @return              Translated IRQ number, or UINT32_MAX on failure.
+     */
+    uint32_t (*translate)(dt_device_t *controller, dt_device_t *child, uint32_t num);
+} dt_irq_ops_t;
+
+extern void dt_irq_init_controller(dt_device_t *device, irq_domain_t *domain, dt_irq_ops_t *ops);
+
+extern status_t dt_irq_register(
+    dt_device_t *device, uint32_t num, irq_early_func_t early_func,
+    irq_func_t func, void *data, irq_handler_t **_handler);
+
+extern bool dt_irq_get_prop(dt_device_t *device, uint32_t num, uint32_t *_value);
+extern irq_mode_t dt_irq_mode(uint32_t mode);

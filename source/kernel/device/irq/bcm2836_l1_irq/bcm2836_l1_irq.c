@@ -19,7 +19,6 @@
  * @brief               BCM2836 L1 IRQ controller driver.
  */
 
-#include <arm64/cpu.h>
 #include <arm64/exception.h>
 
 #include <device/bus/dt.h>
@@ -124,6 +123,19 @@ static irq_domain_ops_t bcm2836_l1_irq_ops = {
     .disable     = bcm2836_l1_irq_disable,
 };
 
+static void bcm2836_l1_dt_irq_configure(dt_device_t *controller, dt_device_t *child, uint32_t num) {
+    assert(false);
+}
+
+static uint32_t bcm2836_l1_dt_irq_translate(dt_device_t *controller, dt_device_t *child, uint32_t num) {
+    assert(false);
+}
+
+static dt_irq_ops_t bcm2836_l1_dt_irq_ops = {
+    .configure = bcm2836_l1_dt_irq_configure,
+    .translate = bcm2836_l1_dt_irq_translate,
+};
+
 static void bcm2836_l1_irq_handler(void *_device, frame_t *frame) {
     bcm2836_l1_device_t *device = _device;
 
@@ -132,12 +144,15 @@ static void bcm2836_l1_irq_handler(void *_device, frame_t *frame) {
     uint32_t pending = read_percpu_reg(device, BCM2836_L1_REG_PENDING0, cpu);
 
     kprintf(LOG_DEBUG, "received IRQ! 0x%x\n", pending);
-    arm64_write_sysreg(cntv_ctl_el0, 0);
+    assert(false);
 }
 
 static status_t bcm2836_l1_irq_init_builtin(dt_device_t *dt) {
     if (dt->irq_parent != NULL) {
         kprintf(LOG_ERROR, "bcm2836_l1_irq: controller is expected to be the interrupt root\n");
+        return STATUS_DEVICE_ERROR;
+    } else if (dt->irq_controller.num_cells != 2) {
+        kprintf(LOG_ERROR, "arm_gic_v2: %s: unexpected number of interrupt cells\n", dt->name);
         return STATUS_DEVICE_ERROR;
     }
 
@@ -156,24 +171,9 @@ static status_t bcm2836_l1_irq_init_builtin(dt_device_t *dt) {
      */
 
     device->domain = irq_domain_create(BCM2836_L1_IRQ_COUNT, &bcm2836_l1_irq_ops, device);
-    dt_device_set_child_irq_domain(dt, device->domain);
+    dt_irq_init_controller(dt, device->domain, &bcm2836_l1_dt_irq_ops);
 
     arm64_set_irq_handler(bcm2836_l1_irq_handler, device);
-
-    uint64_t freq = arm64_read_sysreg(cntfrq_el0);
-    uint64_t time = time_to_ticks(secs_to_nsecs(1), freq);
-
-    write_percpu_reg(device, BCM2836_L1_REG_TIMER_INT_CONTROL0, 0, (1 << BCM2836_L1_IRQ_CNTVIRQ));
-
-    local_irq_enable();
-    while (true) {
-        kprintf(LOG_DEBUG, "time 0x%lx\n", arm64_read_sysreg(cntv_ctl_el0));
-
-        arm64_write_sysreg(cntv_tval_el0, time);
-        arm64_write_sysreg(cntv_ctl_el0, (1<<0));
-
-        spin(secs_to_nsecs(2));
-    }
 
     return STATUS_SUCCESS;
 }

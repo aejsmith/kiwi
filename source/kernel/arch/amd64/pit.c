@@ -29,7 +29,7 @@
 #include <kernel.h>
 #include <time.h>
 
-static irq_status_t pit_irq(uint32_t num, void *data) {
+static irq_status_t pit_irq(void *data) {
     return (timer_tick()) ? IRQ_PREEMPT : IRQ_HANDLED;
 }
 

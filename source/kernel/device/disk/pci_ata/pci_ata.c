@@ -205,7 +205,7 @@ static const ata_sff_channel_ops_t pci_ata_channel_ops = {
     .finish_dma  = pci_ata_channel_finish_dma,
 };
 
-static irq_status_t pci_ata_early_irq(uint32_t num, void *_channel) {
+static irq_status_t pci_ata_early_irq(void *_channel) {
     pci_ata_channel_t *channel = _channel;
 
     if (channel->bus_master == IO_REGION_INVALID)

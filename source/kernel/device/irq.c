@@ -122,7 +122,7 @@ static void irq_thread(void *_domain, void *_num) {
                 /* Can't execute handler with spinlock held. */
                 spinlock_unlock(&irq->handlers_lock);
 
-                handler->func(num, handler->data);
+                handler->func(handler->data);
 
                 /* We only execute one handler per iteration. Since we unlocked,
                  * the list might have changed underneath us. If more handlers
@@ -143,15 +143,55 @@ static void irq_thread(void *_domain, void *_num) {
     }
 }
 
+static status_t resolve_domain(irq_domain_t **_domain, uint32_t *_num) {
+    irq_domain_t *domain = *_domain;
+    uint32_t num         = *_num;
+
+    while (true) {
+        if (num >= domain->count) {
+            kprintf(LOG_WARN, "irq: IRQ %u does not exist in domain %p\n", num, domain);
+            return STATUS_NOT_FOUND;
+        }
+
+        if (domain->ops->translate) {
+            irq_domain_t *dest_domain = NULL;
+            uint32_t dest_num = 0;
+            status_t ret = domain->ops->translate(domain, num, &dest_domain, &dest_num);
+            if (ret != STATUS_SUCCESS) {
+                kprintf(LOG_WARN, "irq: failed to translate IRQ %u in domain %p: %d\n", num, domain, ret);
+                return ret;
+            }
+
+            assert(dest_domain);
+
+            domain = dest_domain;
+            num    = dest_num;
+        } else {
+            break;
+        }
+    }
+
+    *_domain = domain;
+    *_num    = num;
+
+    return STATUS_SUCCESS;
+}
+
 /** Sets the trigger mode of an IRQ.
  * @param domain        Domain that the interrupt is in.
  * @param num           IRQ number.
  * @param mode          Trigger mode for the IRQ. */
 status_t irq_set_mode(irq_domain_t *domain, uint32_t num, irq_mode_t mode) {
+    status_t ret;
+
+    ret = resolve_domain(&domain, &num);
+    if (ret != STATUS_SUCCESS)
+        return ret;
+
     irq_t *irq = &domain->irqs[num];
 
     if (domain->ops->set_mode) {
-        status_t ret = domain->ops->set_mode(domain, num, mode);
+        ret = domain->ops->set_mode(domain, num, mode);
         if (ret != STATUS_SUCCESS)
             return ret;
     }
@@ -188,14 +228,19 @@ status_t irq_register(
     irq_early_func_t early_func, irq_func_t func, void *data,
     irq_handler_t **_handler)
 {
+    status_t ret;
+
+    assert(func || early_func);
+
     if (!domain) {
         /* This indicates that a device does not have an associated IRQ domain. */
         kprintf(LOG_ERROR, "irq: attempting to register IRQ %u without a domain", num);
         return STATUS_NOT_SUPPORTED;
     }
 
-    if (num >= domain->count || (!func && !early_func))
-        return STATUS_INVALID_ARG;
+    ret = resolve_domain(&domain, &num);
+    if (ret != STATUS_SUCCESS)
+        return ret;
 
     irq_handler_t *handler = kmalloc(sizeof(*handler), MM_KERNEL);
 
@@ -220,7 +265,7 @@ status_t irq_register(
             char name[THREAD_NAME_MAX];
             sprintf(name, "irq-%u", num);
 
-            status_t ret = thread_create(name, NULL, 0, irq_thread, domain, (void *)((ptr_t)num), &irq->thread);
+            ret = thread_create(name, NULL, 0, irq_thread, domain, (void *)((ptr_t)num), &irq->thread);
             if (ret != STATUS_SUCCESS) {
                 irq->threaded_handlers--;
 
@@ -386,7 +431,7 @@ void irq_handler(irq_domain_t *domain, uint32_t num) {
         irq_handler_t *handler = list_entry(iter, irq_handler_t, header);
 
         if (handler->early_func) {
-            irq_status_t ret = handler->early_func(num, handler->data);
+            irq_status_t ret = handler->early_func(handler->data);
 
             switch (ret) {
                 case IRQ_PREEMPT:

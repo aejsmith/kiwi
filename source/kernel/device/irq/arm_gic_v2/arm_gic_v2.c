@@ -23,7 +23,6 @@
  *    https://developer.arm.com/documentation/ihi0048/b
  */
 
-#include <arm64/cpu.h>
 #include <arm64/exception.h>
 
 #include <device/bus/dt.h>
@@ -96,11 +95,13 @@ static inline void write_cpu_reg(arm_gic_v2_device_t *device, uint32_t reg, uint
 }
 
 static bool arm_gic_v2_irq_pre_handle(irq_domain_t *domain, uint32_t num) {
+// TODO: ack?
     assert(false);
     return true;
 }
 
 static void arm_gic_v2_irq_post_handle(irq_domain_t *domain, uint32_t num, bool disable) {
+// TODO: ack?
     assert(false);
 }
 
@@ -195,6 +196,48 @@ static irq_domain_ops_t arm_gic_v2_irq_ops = {
     .disable     = arm_gic_v2_irq_disable,
 };
 
+static uint32_t translate_irq(const uint32_t *prop) {
+    switch (prop[0]) {
+        case 0:
+            /* SPI */
+            return prop[1] + 32;
+        case 1:
+            /* PPI */
+            return prop[1] + 16;
+        default:
+            kprintf(LOG_ERROR, "arm_gic_v2: invalid interrupt type %u\n", prop[0]);
+            return UINT32_MAX;
+    }
+}
+
+static void arm_gic_v2_dt_irq_configure(dt_device_t *controller, dt_device_t *child, uint32_t num) {
+    uint32_t prop[3];
+    bool success __unused = dt_irq_get_prop(child, num, prop);
+    assert(success);
+
+    uint32_t dest_num = translate_irq(prop);
+    if (dest_num != UINT32_MAX) {
+        irq_mode_t mode = dt_irq_mode(prop[2] & 0xff);
+        status_t ret = irq_set_mode(controller->irq_controller.domain, dest_num, mode);
+        if (ret != STATUS_SUCCESS) {
+            kprintf(
+                LOG_ERROR, "arm_gic_v2: failed to set mode %d for interrupt %u in device %s (dest_num: %u)\n",
+                prop[2], num, child->name, dest_num);
+        }
+    }
+}
+
+static uint32_t arm_gic_v2_dt_irq_translate(dt_device_t *controller, dt_device_t *child, uint32_t num) {
+    uint32_t prop[3];
+    bool success = dt_irq_get_prop(child, num, prop);
+    return (success) ? translate_irq(prop) : UINT32_MAX;
+}
+
+static dt_irq_ops_t arm_gic_v2_dt_irq_ops = {
+    .configure = arm_gic_v2_dt_irq_configure,
+    .translate = arm_gic_v2_dt_irq_translate,
+};
+
 static void arm_gic_v2_irq_handler(void *_device, frame_t *frame) {
     arm_gic_v2_device_t *device = _device;
 
@@ -208,7 +251,10 @@ static status_t arm_gic_v2_init_builtin(dt_device_t *dt) {
     if (dt->irq_parent != NULL) {
         // TODO: This isn't guaranteed, if it's not the root we'll need to
         // register our interrupts with the parent.
-        kprintf(LOG_ERROR, "arm_gic_v2: non-root interrupt controllers not currently supported\n");
+        kprintf(LOG_ERROR, "arm_gic_v2: %s: non-root interrupt controllers not currently supported\n", dt->name);
+        return STATUS_DEVICE_ERROR;
+    } else if (dt->irq_controller.num_cells != 3) {
+        kprintf(LOG_ERROR, "arm_gic_v2: %s: unexpected number of interrupt cells\n", dt->name);
         return STATUS_DEVICE_ERROR;
     }
 
@@ -237,7 +283,7 @@ static status_t arm_gic_v2_init_builtin(dt_device_t *dt) {
     kprintf(LOG_NOTICE, "arm_gic_v2: %s: %u IRQ lines\n", dt->name, irq_count);
 
     device->domain = irq_domain_create(irq_count, &arm_gic_v2_irq_ops, device);
-    dt_device_set_child_irq_domain(dt, device->domain);
+    dt_irq_init_controller(dt, device->domain, &arm_gic_v2_dt_irq_ops);
 
     if (dt->irq_parent) {
         // TODO
@@ -258,29 +304,6 @@ static status_t arm_gic_v2_init_builtin(dt_device_t *dt) {
     /* Re-enable GICD/GICC. */
     write_cpu_reg(device, GIC_REG_GICC_CTLR, GIC_GICC_CTLR_EnableGrp0 | GIC_GICC_CTLR_EnableGrp1);
     write_distrib_reg(device, GIC_REG_GICD_CTLR, GIC_GICD_CTLR_EnableGrp0 | GIC_GICD_CTLR_EnableGrp1);
-
-    uint64_t freq = arm64_read_sysreg(cntfrq_el0);
-    uint64_t time = time_to_ticks(secs_to_nsecs(1), freq);
-
-    arm_gic_v2_irq_set_mode(device->domain, 16 + 0xd, IRQ_MODE_LEVEL);
-    arm_gic_v2_irq_enable(device->domain, 16 + 0xd);
-    arm_gic_v2_irq_set_mode(device->domain, 16 + 0xe, IRQ_MODE_LEVEL);
-    arm_gic_v2_irq_enable(device->domain, 16 + 0xe);
-    arm_gic_v2_irq_set_mode(device->domain, 16 + 0xb, IRQ_MODE_LEVEL);
-    arm_gic_v2_irq_enable(device->domain, 16 + 0xb);
-    arm_gic_v2_irq_set_mode(device->domain, 16 + 0xa, IRQ_MODE_LEVEL);
-    arm_gic_v2_irq_enable(device->domain, 16 + 0xa);
-//    write_percpu_reg(device, arm_gic_v2_REG_TIMER_INT_CONTROL0, 0, (1 << arm_gic_v2_IRQ_CNTVIRQ));
-
-    local_irq_enable();
-    while (true) {
-        kprintf(LOG_DEBUG, "time 0x%lx\n", arm64_read_sysreg(cntv_ctl_el0));
-
-        arm64_write_sysreg(cntv_tval_el0, time);
-        arm64_write_sysreg(cntv_ctl_el0, (1<<0));
-
-        spin(secs_to_nsecs(2));
-    }
 
     return STATUS_SUCCESS;
 }
