@@ -69,13 +69,6 @@ static timer_device_ops_t arm_timer_device_ops = {
     .prepare  = arm_timer_prepare,
 };
 
-#if 1
-static bool test_timer_func(void *data) {
-    kprintf(LOG_DEBUG, "test timer\n");
-    return false;
-}
-#endif
-
 static status_t arm_timer_init_builtin(dt_device_t *dt) {
     status_t ret;
 
@@ -96,15 +89,6 @@ static status_t arm_timer_init_builtin(dt_device_t *dt) {
     }
 
     time_set_timer_device(&device->timer);
-
-#if 1
-    timer_t timer;
-    timer_init(&timer, "test_timer", test_timer_func, NULL, 0);
-    timer_start(&timer, secs_to_nsecs(1), TIMER_PERIODIC);
-
-    local_irq_enable();
-    while (true);
-#endif
 
     return STATUS_SUCCESS;
 

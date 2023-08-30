@@ -274,3 +274,5 @@ extern status_t dt_irq_register(
 
 extern bool dt_irq_get_prop(dt_device_t *device, uint32_t num, uint32_t *_value);
 extern irq_mode_t dt_irq_mode(uint32_t mode);
+
+extern dt_irq_ops_t dt_irq_two_cell_ops;

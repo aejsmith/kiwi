@@ -90,6 +90,31 @@ irq_mode_t dt_irq_mode(uint32_t mode) {
     }
 }
 
+static void dt_irq_two_cell_configure(dt_device_t *controller, dt_device_t *child, uint32_t num) {
+    uint32_t prop[2];
+    bool success __unused = dt_irq_get_prop(child, num, prop);
+    assert(success);
+
+    irq_mode_t mode = dt_irq_mode(prop[1] & 0xf);
+    status_t ret = irq_set_mode(controller->irq_controller.domain, prop[0], mode);
+    if (ret != STATUS_SUCCESS) {
+        kprintf(
+            LOG_ERROR, "dt: failed to set mode %d for interrupt %u in device %s (dest_num: %u)\n",
+            prop[1], num, child->name, prop[0]);
+    }
+}
+
+static uint32_t dt_irq_two_cell_translate(dt_device_t *controller, dt_device_t *child, uint32_t num) {
+    uint32_t prop[2];
+    bool success = dt_irq_get_prop(child, num, prop);
+    return (success) ? prop[0] : UINT32_MAX;
+}
+
+dt_irq_ops_t dt_irq_two_cell_ops = {
+    .configure = dt_irq_two_cell_configure,
+    .translate = dt_irq_two_cell_translate,
+};
+
 /** Configures IRQs for a device after matching to a driver. */
 bool dt_irq_init_device(dt_device_t *device) {
     dt_device_t *parent = device->irq_parent;

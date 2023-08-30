@@ -34,13 +34,11 @@
 
 /** Register definitions. */
 enum {
-    /** Timer interrupt control (per-core). */
+    BCM2836_L1_REG_CONTROL              = 0x0,
+    BCM2836_L1_REG_TIMER_PRESCALER      = 0x8,
+    BCM2836_L1_REG_GPU_INT_CONTROL      = 0xc,
     BCM2836_L1_REG_TIMER_INT_CONTROL0   = 0x40,
-
-    /** Mailbox interrupt control (per-core). */
     BCM2836_L1_REG_MAILBOX_INT_CONTROL0 = 0x50,
-
-    /** Interrupt pending (per-core). */
     BCM2836_L1_REG_PENDING0             = 0x60,
 };
 
@@ -83,7 +81,7 @@ static inline void write_percpu_reg(bcm2836_l1_device_t *device, uint32_t reg, c
     io_write32(device->io, reg + (4 * cpu), val);
 }
 
-static inline uint32_t read_global_reg(bcm2836_l1_device_t *device, uint32_t reg) {
+static inline __unused uint32_t read_global_reg(bcm2836_l1_device_t *device, uint32_t reg) {
     return io_read32(device->io, reg);
 }
 
@@ -91,60 +89,65 @@ static inline void write_global_reg(bcm2836_l1_device_t *device, uint32_t reg, u
     io_write32(device->io, reg, val);
 }
 
-static bool bcm2836_l1_irq_pre_handle(irq_domain_t *domain, uint32_t num, irq_mode_t mode) {
-    assert(false);
-    return true;
-}
-
-static void bcm2836_l1_irq_post_handle(irq_domain_t *domain, uint32_t num, irq_mode_t mode, bool disable) {
-    assert(false);
-}
-
-static irq_mode_t bcm2836_l1_irq_mode(irq_domain_t *domain, uint32_t num) {
-    assert(false);
-}
-
 static void bcm2836_l1_irq_enable(irq_domain_t *domain, uint32_t num) {
-    assert(false);
+    bcm2836_l1_device_t *device = domain->private;
 
     // TODO: These need to apply locally when handling per cpu but globally for
     // registration.
+
+    cpu_id_t cpu = curr_cpu->id;
+
+    if (num >= BCM2836_L1_IRQ_CNTPSIRQ && num <= BCM2836_L1_IRQ_CNTVIRQ) {
+        uint32_t reg = read_percpu_reg(device, BCM2836_L1_REG_TIMER_INT_CONTROL0, cpu);
+        reg |= (1 << (num - BCM2836_L1_IRQ_CNTPSIRQ));
+        write_percpu_reg(device, BCM2836_L1_REG_TIMER_INT_CONTROL0, cpu, reg);
+    } else if (num >= BCM2836_L1_IRQ_MAILBOX0 && num <= BCM2836_L1_IRQ_MAILBOX3) {
+        uint32_t reg = read_percpu_reg(device, BCM2836_L1_REG_MAILBOX_INT_CONTROL0, cpu);
+        reg |= (1 << (num - BCM2836_L1_IRQ_MAILBOX0));
+        write_percpu_reg(device, BCM2836_L1_REG_MAILBOX_INT_CONTROL0, cpu, reg);
+    } else if (num == BCM2836_L1_IRQ_GPU) {
+        /* GPU can't be disabled. */
+    } else {
+        fatal("TODO");
+    }
 }
 
 static void bcm2836_l1_irq_disable(irq_domain_t *domain, uint32_t num) {
-    assert(false);
+    bcm2836_l1_device_t *device = domain->private;
+
+    // TODO: As above.
+
+    cpu_id_t cpu = curr_cpu->id;
+
+    if (num >= BCM2836_L1_IRQ_CNTPSIRQ && num <= BCM2836_L1_IRQ_CNTVIRQ) {
+        uint32_t reg = read_percpu_reg(device, BCM2836_L1_REG_TIMER_INT_CONTROL0, cpu);
+        reg &= ~(1 << (num - BCM2836_L1_IRQ_CNTPSIRQ));
+        write_percpu_reg(device, BCM2836_L1_REG_TIMER_INT_CONTROL0, cpu, reg);
+    } else if (num >= BCM2836_L1_IRQ_MAILBOX0 && num <= BCM2836_L1_IRQ_MAILBOX3) {
+        uint32_t reg = read_percpu_reg(device, BCM2836_L1_REG_MAILBOX_INT_CONTROL0, cpu);
+        reg &= ~(1 << (num - BCM2836_L1_IRQ_MAILBOX0));
+        write_percpu_reg(device, BCM2836_L1_REG_MAILBOX_INT_CONTROL0, cpu, reg);
+    } else if (num == BCM2836_L1_IRQ_GPU) {
+        /* GPU can't be disabled. */
+    } else {
+        fatal("TODO");
+    }
 }
 
 static irq_domain_ops_t bcm2836_l1_irq_ops = {
-    .pre_handle  = bcm2836_l1_irq_pre_handle,
-    .post_handle = bcm2836_l1_irq_post_handle,
-    .mode        = bcm2836_l1_irq_mode,
     .enable      = bcm2836_l1_irq_enable,
     .disable     = bcm2836_l1_irq_disable,
-};
-
-static void bcm2836_l1_dt_irq_configure(dt_device_t *controller, dt_device_t *child, uint32_t num) {
-    assert(false);
-}
-
-static uint32_t bcm2836_l1_dt_irq_translate(dt_device_t *controller, dt_device_t *child, uint32_t num) {
-    assert(false);
-}
-
-static dt_irq_ops_t bcm2836_l1_dt_irq_ops = {
-    .configure = bcm2836_l1_dt_irq_configure,
-    .translate = bcm2836_l1_dt_irq_translate,
 };
 
 static void bcm2836_l1_irq_handler(void *_device, frame_t *frame) {
     bcm2836_l1_device_t *device = _device;
 
-    cpu_id_t cpu = curr_cpu->id;
-
-    uint32_t pending = read_percpu_reg(device, BCM2836_L1_REG_PENDING0, cpu);
-
-    kprintf(LOG_DEBUG, "received IRQ! 0x%x\n", pending);
-    assert(false);
+    uint32_t pending = read_percpu_reg(device, BCM2836_L1_REG_PENDING0, curr_cpu->id);
+    while (pending) {
+        uint32_t num = ffs(pending) - 1;
+        pending &= ~(1 << num);
+        irq_handler(device->domain, num);
+    }
 }
 
 static status_t bcm2836_l1_irq_init_builtin(dt_device_t *dt) {
@@ -170,8 +173,14 @@ static status_t bcm2836_l1_irq_init_builtin(dt_device_t *dt) {
      * core 0. We don't need to change this.
      */
 
+    /* Set the timer to use the 19.2Mhz clock, prescaler 1:1. This should match
+     * what is reported in CNTFRQ_EL0 and may not have been what the firmware
+     * left according to Linux. */
+    write_global_reg(device, BCM2836_L1_REG_CONTROL, 0);
+    write_global_reg(device, BCM2836_L1_REG_TIMER_PRESCALER, 0x80000000);
+
     device->domain = irq_domain_create(BCM2836_L1_IRQ_COUNT, &bcm2836_l1_irq_ops, device);
-    dt_irq_init_controller(dt, device->domain, &bcm2836_l1_dt_irq_ops);
+    dt_irq_init_controller(dt, device->domain, &dt_irq_two_cell_ops);
 
     arm64_set_irq_handler(bcm2836_l1_irq_handler, device);
 
