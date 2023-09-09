@@ -28,6 +28,7 @@ kern_sources += feature_sources(config, [
     'page.c',
     'setjmp.S',
     'smp.c',
+    'switch.S',
     'thread.c',
     'time.c',
 ])

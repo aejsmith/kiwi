@@ -19,10 +19,16 @@
  * @brief               ARM64 thread functions.
  */
 
+#include <arch/cpu.h>
 #include <arch/frame.h>
 #include <arch/stack.h>
 
+#include <arm64/cpu.h>
+
 #include <proc/thread.h>
+
+extern void arm64_context_switch(ptr_t new_sp, ptr_t *_old_sp);
+extern void arm64_context_restore(ptr_t new_sp);
 
 /** Initialize ARM64-specific thread data.
  * @param thread        Thread to initialize. */
@@ -32,8 +38,8 @@ void arch_thread_init(thread_t *thread) {
     /* Initialize the kernel stack. */
     ptr_t entry = (ptr_t)thread_trampoline;
     unsigned long *sp = (unsigned long *)((ptr_t)thread->kstack + KSTACK_SIZE);
-    *--sp = entry;  /* LR. */
-    *--sp = 0;      /* FP. */
+    *--sp = entry;  /* LR/X30. */
+    *--sp = 0;      /* FP/X29. */
     *--sp = 0;      /* X28. */
     *--sp = 0;      /* X27. */
     *--sp = 0;      /* X26. */
@@ -67,8 +73,21 @@ void arch_thread_clone(thread_t *thread, frame_t *frame) {
  * @param thread        Thread to switch to.
  * @param prev          Thread that was previously running. */
 void arch_thread_switch(thread_t *thread, thread_t *prev) {
-    // TODO: Point TPIDR to arch_thread.
-    fatal_todo();
+    // TODO: FPU state.
+
+    /* Store the current CPU pointer, then set TPIDR_EL1 to point to the current
+     * thread. The curr_cpu load will come from the previous thread's data. */
+    thread->arch.cpu = arch_curr_cpu_volatile();
+    arm64_write_sysreg(tpidr_el1, &thread->arch);
+    arm64_isb();
+
+    /* Switch to the new context. */
+    if (likely(prev)) {
+        arm64_context_switch(thread->arch.saved_sp, &prev->arch.saved_sp);
+    } else {
+        /* Initial thread switch, don't have a previous thread. */
+        arm64_context_restore(thread->arch.saved_sp);
+    }
 }
 
 /** Set the TLS address for the current thread.

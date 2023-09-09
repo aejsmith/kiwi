@@ -34,7 +34,7 @@ void arch_smp_detect(void) {
 
 /** Prepare the SMP boot process. */
 __init_text void arch_smp_boot_prepare(void) {
-    fatal_todo();
+    /* TODO. */
 }
 
 /** Boot a secondary CPU.
@@ -45,5 +45,5 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
 
 /** Clean up after secondary CPUs have been booted. */
 __init_text void arch_smp_boot_cleanup(void) {
-    fatal_todo();
+    /* TODO. */
 }
