@@ -45,7 +45,8 @@ cpu_id_t cpu_id(void) {
 /** Dump information about a CPU.
  * @param cpu           CPU to dump. */
 void cpu_dump(cpu_t *cpu) {
-    /* TODO. */
+    kprintf(LOG_NOTICE, " cpu%" PRIu32 "\n", cpu->id);
+    // TODO: Identification
 }
 
 /** Perform early initialization common to all CPUs. */

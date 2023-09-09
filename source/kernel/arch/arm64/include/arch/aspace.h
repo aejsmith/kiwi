@@ -30,6 +30,10 @@
  *  0xffffff0000000000-0xffffff7fffffffff - 512GB - Page database.
  *  0xffffff8000000000-0xffffffff7fffffff - 510GB - Kernel allocation area.
  *  0xffffffff80000000-0xffffffffffffffff - 2GB   - Kernel image/modules.
+ *
+ * Note that kernel and modules are currently constrained to 128MB to fit within
+ * the maximum +/-128MB relative branch offset. If we need to increase this we
+ * will have to implement PLT support for modules.
  */
 
 #pragma once
@@ -48,8 +52,8 @@
 #define KERNEL_KMEM_BASE    0xffffff8000000000  /**< Kernel allocation area base. */
 #define KERNEL_KMEM_SIZE    0x0000007f80000000  /**< Kernel allocation area size (510GB). */
 #define KERNEL_VIRT_BASE    0xffffffff80000000  /**< Kernel virtual base address. */
-#define KERNEL_MODULE_BASE  0xffffffffc0000000  /**< Module area base. */
-#define KERNEL_MODULE_SIZE  0x0000000040000000  /**< Module area size (1GB). */
+#define KERNEL_MODULE_BASE  0xffffffff84000000  /**< Module area base. */
+#define KERNEL_MODULE_SIZE  0x0000000004000000  /**< Module area size (64MB). */
 
 #ifndef __ASM__
 extern char __text_seg_start[], __text_seg_end[];
