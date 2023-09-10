@@ -22,8 +22,8 @@
 #include <arm64/asm.h>
 
 /** Perform a thread context switch.
- * @param %rdi          New stack pointer.
- * @param %rsi          Location to store old stack pointer at. */
+ * @param %x0           New stack pointer.
+ * @param %x1          Location to store old stack pointer at. */
 FUNCTION_START(arm64_context_switch)
     /* Just need to save callee-save registers. */
     stp     x29, x30, [sp,#-16]! /* LR/FP. */

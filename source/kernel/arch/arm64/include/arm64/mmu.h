@@ -69,19 +69,34 @@
     ARM64_MAIR_ENTRY(2, 0b00000000) | \
     ARM64_MAIR_ENTRY(3, 0b00000100))
 
-/** TLBI instruction with no address.
- * @param op            Operation to perform. */
-#define arm64_tlbi(op) \
-    do { \
-        __asm__ volatile("tlbi " STRINGIFY(op)); \
-        arm64_isb(); \
-    } while (0)
+/*
+ * TCR value for the kernel.
+ *  - 48-bit virtual address.
+ *  - 48-bit intermediate physical address.
+ *  - Write-back/write-allocate, inner shareable translation tables.
+ *  - 4KB granule.
+ *  - TTBR0 disabled.
+ *  - TTBR1 defines ASID.
+ */
+#define ARM64_TCR_KERNEL \
+    ((16 << ARM64_TCR_T0SZ_SHIFT) | \
+     ARM64_TCR_EPD0 | \
+     ARM64_TCR_IRGN0_WB_WA | \
+     ARM64_TCR_ORGN0_WB_WA | \
+     ARM64_TCR_SH0_INNER | \
+     ARM64_TCR_TG0_4 | \
+     (16 << ARM64_TCR_T1SZ_SHIFT) | \
+     ARM64_TCR_A1 | \
+     ARM64_TCR_IRGN1_WB_WA | \
+     ARM64_TCR_ORGN1_WB_WA | \
+     ARM64_TCR_SH1_INNER | \
+     ARM64_TCR_TG1_4 | \
+     ARM64_TCR_IPS_48 | \
+     ARM64_TCR_TBI0 | \
+     ARM64_TCR_TBI1)
 
-/** TLBI instruction with address.
- * @param op            Operation to perform.
- * @param addr          Address to operate on. */
-#define arm64_tlbi_addr(op, addr) \
-    do { \
-        __asm__ volatile("tlbi " STRINGIFY(op) ", %0" :: "r"((unsigned long)(addr))); \
-        arm64_isb(); \
-    } while (0)
+/** ASID definitions. */
+#define ARM64_ASID_UNUSED               0
+#define ARM64_ASID_KERNEL               1
+#define ARM64_ASID_USER_START           2
+#define ARM64_ASID_USER_COUNT           254

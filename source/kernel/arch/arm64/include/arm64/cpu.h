@@ -57,11 +57,14 @@
 
 /** Translation Control Register (TCR_ELx). */
 #define ARM64_TCR_T0SZ_SHIFT    0
+#define ARM64_TCR_EPD0          (UL(1)<<7)
 #define ARM64_TCR_IRGN0_WB_WA   (UL(1)<<8)
 #define ARM64_TCR_ORGN0_WB_WA   (UL(1)<<10)
 #define ARM64_TCR_SH0_INNER     (UL(3)<<12)
 #define ARM64_TCR_TG0_4         (UL(0)<<14)
 #define ARM64_TCR_T1SZ_SHIFT    16
+#define ARM64_TCR_A1            (UL(1)<<22)
+#define ARM64_TCR_EPD1          (UL(1)<<23)
 #define ARM64_TCR_IRGN1_WB_WA   (UL(1)<<24)
 #define ARM64_TCR_ORGN1_WB_WA   (UL(1)<<26)
 #define ARM64_TCR_SH1_INNER     (UL(3)<<28)
@@ -69,6 +72,13 @@
 #define ARM64_TCR_IPS_48        (UL(5)<<32)
 #define ARM64_TCR_TBI0          (UL(1)<<37)
 #define ARM64_TCR_TBI1          (UL(1)<<38)
+
+/** Translation Table Base Register (TTBR_ELx). */
+#define ARM64_TTBR_ASID_SHIFT   48
+
+/** TLBI input value bits. */
+#define ARM64_TLBI_VADDR_MASK   ((UL(1)<<44) - 1)
+#define ARM64_TLBI_ASID_SHIFT   48
 
 #ifndef __ASM__
 
@@ -95,5 +105,22 @@
 /** ISB instruction. */
 #define arm64_isb() \
     __asm__ __volatile__("isb");
+
+/** TLBI instruction with no address.
+ * @param op            Operation to perform. */
+#define arm64_tlbi(op) \
+    do { \
+        __asm__ volatile("tlbi " STRINGIFY(op)); \
+        arm64_isb(); \
+    } while (0)
+
+/** TLBI instruction with value.
+ * @param op            Operation to perform.
+ * @param addr          Address to operate on. */
+#define arm64_tlbi_val(op, val) \
+    do { \
+        __asm__ volatile("tlbi " STRINGIFY(op) ", %0" :: "r"((unsigned long)(val))); \
+        arm64_isb(); \
+    } while (0)
 
 #endif /* __ASM__ */

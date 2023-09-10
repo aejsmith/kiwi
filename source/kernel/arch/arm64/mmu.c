@@ -19,8 +19,13 @@
  * @brief               ARM64 MMU context implementation.
  *
  * TODO:
- *  - Accessed and dirty bit management. Hardware-based implementation needs
- *    atomic TTE updates like AMD64, but hardware support may not be there.
+ *  - Free page tables as soon as they become empty (we will retain allocated
+ *    page tables until address space destruction at the moment). This needs to
+ *    be synchronised properly - the page table cannot be freed until after the
+ *    TLB invalidate and DSB for unsetting the TTE pointing to it. This will
+ *    need to use a non-last-level TLB invalidate operation for the last page
+ *    removed from the table.
+ *  - 16-bit ASID support where supported by hardware.
  */
 
 #include <arch/barrier.h>
@@ -58,7 +63,7 @@ static inline bool is_kernel_context(mmu_context_t *ctx) {
 }
 
 static uint64_t *map_table(phys_ptr_t addr) {
-    /* phys_map() should never fail for normal memory on AMD64. */
+    /* phys_map() should never fail for normal memory on ARM64. */
     return phys_map(addr, PAGE_SIZE, MM_BOOT);
 }
 
@@ -204,18 +209,84 @@ static inline uint64_t calc_tte_flags(mmu_context_t *ctx, uint32_t flags) {
     return tte_flags;
 }
 
-/** Initialize a new context. */
+/** Flushes queued TLB invalidations. */
+static void flush_invalidate_queue(mmu_context_t *ctx) {
+    /* IS operations apply to other CPUs as well (same Inner Shareable domain). */
+
+    /* DSB pre-invalidate. */
+    memory_barrier();
+
+    if (ctx->arch.invalidate_count > ARCH_MMU_INVALIDATE_QUEUE_SIZE) {
+        assert(!is_kernel_context(ctx));
+
+        /* See queue_invalidate(). Invalidate the whole ASID in this case. */
+        arm64_tlbi_val(aside1is, (uint64_t)ctx->arch.asid << ARM64_TLBI_ASID_SHIFT);
+    } else {
+        /* Since we currently don't unmap PTEs except on un*/
+        if (is_kernel_context(ctx)) {
+            for (size_t i = 0; i < ctx->arch.invalidate_count; i++) {
+                ptr_t addr = ctx->arch.invalidate_queue[i];
+                ptr_t val  = (addr >> 12) & ARM64_TLBI_VADDR_MASK;
+                arm64_tlbi_val(vaale1is, val);
+            }
+        } else {
+            for (size_t i = 0; i < ctx->arch.invalidate_count; i++) {
+                ptr_t addr = ctx->arch.invalidate_queue[i];
+                ptr_t val  = ((addr >> 12) & ARM64_TLBI_VADDR_MASK) | ((uint64_t)ctx->arch.asid << ARM64_TLBI_ASID_SHIFT);
+                arm64_tlbi_val(vale1is, val);
+            }
+        }
+    }
+
+    /* DSB post-invalidate. */
+    memory_barrier();
+
+    ctx->arch.invalidate_count = 0;
+}
+
+/** Queues a TLB entry for invalidation. */
+static void queue_invalidate(mmu_context_t *ctx, ptr_t virt) {
+    /* See if we have enough space in the queue. */
+    bool has_space = ctx->arch.invalidate_count < ARCH_MMU_INVALIDATE_QUEUE_SIZE;
+    if (!has_space) {
+        /*
+         * For user address spaces, we just flush the whole ASID later, as a
+         * result of the count overflowing below.
+         *
+         * For the kernel, all mappings are flagged as global, and there's no
+         * operation to flush all global TLB entries. Flushing the whole TLB
+         * is probably quite expensive, so instead just flush out what we've
+         * got queued.
+         */
+        if (is_kernel_context(ctx)) {
+            flush_invalidate_queue(ctx);
+            has_space = true;
+        }
+    }
+
+    if (has_space)
+        ctx->arch.invalidate_queue[ctx->arch.invalidate_count] = virt;
+
+    /* Increment the count regardless, as per above. */
+    ctx->arch.invalidate_count++;
+}
+
+/** Initializes a new context. */
 status_t arch_mmu_context_init(mmu_context_t *ctx, uint32_t mmflag) {
+    ctx->arch.invalidate_count = 0;
+
     /* TODO: Will need to allocate ASIDs for user contexts. */ 
     fatal_todo();
 }
 
-/** Destroy a context. */
+/** Destroys a context. */
 void arch_mmu_context_destroy(mmu_context_t *ctx) {
+    // TODO: Flush whole ASID to ensure cached intermediate table level entries
+    // are flushed from the TLB.
     fatal_todo();
 }
 
-/** Map a page in a context. */
+/** Maps a page in a context. */
 status_t arch_mmu_context_map(
     mmu_context_t *ctx, ptr_t virt, phys_ptr_t phys, uint32_t flags,
     uint32_t mmflag)
@@ -232,34 +303,47 @@ status_t arch_mmu_context_map(
     return STATUS_SUCCESS;
 }
 
-/** Remap a range with different access flags. */
+/** Remaps a range with different access flags. */
 void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_t access) {
-    // TODO: See unmap for TLB invalidation.
+    // TODO: Might require TLB break-before-make sequence, see manual? Possibly
+    // not if just changing access?
     fatal_todo();
 }
 
-/** Unmap a page in a context. */
+/** Unmaps a page in a context. */
 bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page) {
-    // TODO: TLB invalidation:
-    //  - Need DSB before and after.
-    //  - Seems we don't need manual remote TLB invalidation? Use IS operations
-    //    to apply to all TLBs in the same inner shareability domain.
-    //  - Batch TLB operations together.
-    fatal_todo();
+    uint64_t *ttl3 = get_ttl3(ctx, virt, false, 0);
+    if (!ttl3)
+        return false;
+
+    unsigned ttl3e = (virt % ARM64_TTL3_RANGE) / PAGE_SIZE;
+    if (!(ttl3[ttl3e] & ARM64_TTE_PRESENT))
+        return false;
+
+    uint64_t entry = ttl3[ttl3e];
+    ttl3[ttl3e] = 0;
+
+    if (_page)
+        *_page = page_lookup(entry & ARM64_TTE_ADDR_MASK);
+
+    queue_invalidate(ctx, virt);
+    return true;
 }
 
-/** Query details about a mapping. */
+/** Queries details about a mapping. */
 bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags) {
     fatal_todo();
 }
 
-/** Perform remote TLB invalidation. */
+/** Performs remote TLB invalidation. */
 void arch_mmu_context_flush(mmu_context_t *ctx) {
-    // TODO: TLB
+    flush_invalidate_queue(ctx);
 }
 
-/** Switch to another MMU context. */
+/** Switches to another MMU context. */
 void arch_mmu_context_load(mmu_context_t *ctx) {
+    // TODO: Configure TCR to enable/disable user page table walking, and
+    // set/clear A1 bit. Anything else need changing in there for user?
     fatal_todo();
 }
 
@@ -336,6 +420,7 @@ static void map_pmap(void) {
 
 /** Create the kernel MMU context. */
 __init_text void arch_mmu_init(void) {
+    kernel_mmu_context.arch.asid = ARM64_ASID_KERNEL;
     kernel_mmu_context.arch.ttl0 = alloc_table(MM_BOOT);
 
     /* Map each section of the kernel. The linker script aligns the text and
@@ -364,20 +449,25 @@ __init_text void arch_mmu_init(void) {
 
 /** Initialize the MMU for this CPU. */
 __init_text void arch_mmu_init_percpu(void) {
+    /* Initially set kernel-only TCR configuration. */
+    arm64_write_sysreg(tcr_el1, ARM64_TCR_KERNEL);
+    arm64_isb();
+
     /* Set our MAIR value. */
     arm64_write_sysreg(mair_el1, ARM64_MAIR);
     arm64_isb();
 
     /* Load the kernel translation tables (TTBR1 for high half of address space). */
-    arm64_write_sysreg(ttbr1_el1, kernel_mmu_context.arch.ttl0);
+    uint64_t ttbr0 = (uint64_t)ARM64_ASID_UNUSED << ARM64_TTBR_ASID_SHIFT;
+    uint64_t ttbr1 = kernel_mmu_context.arch.ttl0 | ((uint64_t)ARM64_ASID_KERNEL << ARM64_TTBR_ASID_SHIFT);
+    arm64_write_sysreg(ttbr0_el1, ttbr0);
+    arm64_write_sysreg(ttbr1_el1, ttbr1);
     arm64_isb();
 
-    /* Invalidate the TLB - things might have changed a bit from what KBoot set
-     * up. */
+    /* Invalidate the TLB - things might have changed from what KBoot set up. */
     memory_barrier();
     arm64_tlbi(vmalle1);
     memory_barrier();
 
     // TODO: Invalidate the caches since we've changed MAIR.
-    // TODO: Disable TTBR0.
 }

@@ -21,6 +21,8 @@
  * TODO:
  *  - Proper large page support, and 1GB pages for the physical map.
  *  - PCID (ASID) support.
+ *  - Free page tables as soon as they become empty (we will retain allocated
+ *    page tables until address space destruction at the moment).
  */
 
 #include <arch/barrier.h>
@@ -241,16 +243,16 @@ static uint64_t *get_ptbl(mmu_context_t *ctx, ptr_t virt, bool alloc, uint32_t m
     return map_structure(pdir[pde] & PHYS_PAGE_MASK);
 }
 
-/** Invalidate a TLB entry for an MMU context. */
-static void invalidate_page(mmu_context_t *ctx, ptr_t virt) {
+/** Queues a TLB entry for invalidation. */
+static void queue_invalidate(mmu_context_t *ctx, ptr_t virt) {
     /* Invalidate on the current CPU if we're using this context. */
     if (is_current_context(ctx))
         x86_invlpg(virt);
 
     /* Record the address to invalidate on other CPUs when the context is
      * unlocked. */
-    if (ctx->arch.invalidate_count < INVALIDATE_ARRAY_SIZE)
-        ctx->arch.pages_to_invalidate[ctx->arch.invalidate_count] = virt;
+    if (ctx->arch.invalidate_count < ARCH_MMU_INVALIDATE_QUEUE_SIZE)
+        ctx->arch.invalidate_queue[ctx->arch.invalidate_count] = virt;
 
     /* Increment the count regardless. If it is found to be greater than the
      * array size when unlocking, the entire TLB will be flushed. */
@@ -368,7 +370,7 @@ void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint32_
 
             /* Clear TLB entries if necessary (see note in unmap()). */
             if (prev & X86_PTE_ACCESSED)
-                invalidate_page(ctx, virt);
+                queue_invalidate(ctx, virt);
         }
 
         virt += PAGE_SIZE;
@@ -400,7 +402,7 @@ bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page) {
      * will not cache a translation without setting the accessed flag first
      * (Intel Vol. 3A Section 4.10.2.3 "Details of TLB Use"). */
     if (entry & X86_PTE_ACCESSED)
-        invalidate_page(ctx, virt);
+        queue_invalidate(ctx, virt);
 
     if (_page)
         *_page = page;
@@ -482,7 +484,7 @@ static status_t tlb_invalidate_func(void *_ctx) {
     if (is_current_context(ctx)) {
         /* If the number of pages to invalidate is larger than the size of the
          * address array, perform a complete TLB flush. */
-        if (ctx->arch.invalidate_count > INVALIDATE_ARRAY_SIZE) {
+        if (ctx->arch.invalidate_count > ARCH_MMU_INVALIDATE_QUEUE_SIZE) {
             /* For the kernel context, we must disable PGE and reenable it to
              * perform a complete TLB flush. */
             if (is_kernel_context(ctx)) {
@@ -493,7 +495,7 @@ static status_t tlb_invalidate_func(void *_ctx) {
             }
         } else {
             for (size_t i = 0; i < ctx->arch.invalidate_count; i++)
-                x86_invlpg(ctx->arch.pages_to_invalidate[i]);
+                x86_invlpg(ctx->arch.invalidate_queue[i]);
         }
     }
 
