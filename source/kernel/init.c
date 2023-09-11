@@ -188,6 +188,7 @@ static void init_thread(void *arg1, void *arg2) {
     fs_mount_root();
 
     /* Reclaim memory taken up by initialization code/data. */
+    mmu_late_init();
     page_late_init();
     kmem_late_init();
 

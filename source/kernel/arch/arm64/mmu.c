@@ -33,6 +33,7 @@
 #include <arm64/cpu.h>
 #include <arm64/mmu.h>
 
+#include <lib/bitmap.h>
 #include <lib/string.h>
 
 #include <mm/aspace.h>
@@ -41,6 +42,8 @@
 #include <mm/phys.h>
 
 #include <proc/thread.h>
+
+#include <sync/spinlock.h>
 
 #include <assert.h>
 #include <cpu.h>
@@ -58,8 +61,39 @@ KBOOT_LOAD(0, LARGE_PAGE_SIZE, LARGE_PAGE_SIZE, KERNEL_KMEM_BASE, KERNEL_KMEM_SI
  */
 KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000, KBOOT_CACHE_DEFAULT);
 
+/** Allocator for free ASIDs. */
+static unsigned long *asid_bitmap;
+static uint16_t asid_count;
+static SPINLOCK_DEFINE(asid_lock);
+
 static inline bool is_kernel_context(mmu_context_t *ctx) {
     return ctx == &kernel_mmu_context;
+}
+
+static uint16_t alloc_asid(void) {
+    spinlock_lock(&asid_lock);
+
+    long result = bitmap_ffz(asid_bitmap, asid_count);
+    if (result < 0) {
+        // TODO: Steal ASIDs from other processes.
+        fatal("Out of ASIDs");
+    }
+
+    bitmap_set(asid_bitmap, result);
+
+    spinlock_unlock(&asid_lock);
+
+    result += ARM64_ASID_USER_START;
+    return (uint16_t)result;
+}
+
+static void free_asid(uint16_t asid) {
+    assert(asid >= ARM64_ASID_USER_START);
+    asid -= ARM64_ASID_USER_START;
+
+    spinlock_lock(&asid_lock);
+    bitmap_clear(asid_bitmap, asid);
+    spinlock_unlock(&asid_lock);
 }
 
 static uint64_t *map_table(phys_ptr_t addr) {
@@ -275,15 +309,61 @@ static void queue_invalidate(mmu_context_t *ctx, ptr_t virt) {
 status_t arch_mmu_context_init(mmu_context_t *ctx, uint32_t mmflag) {
     ctx->arch.invalidate_count = 0;
 
-    /* TODO: Will need to allocate ASIDs for user contexts. */ 
-    fatal_todo();
+    ctx->arch.ttl0 = alloc_table(mmflag);
+    if (!ctx->arch.ttl0)
+        return STATUS_NO_MEMORY;
+
+    /*
+     * Don't need to initialise anything in the table, since the kernel address
+     * space is separate in TTBR1.
+     */
+
+    ctx->arch.asid = alloc_asid();
+
+    return STATUS_SUCCESS;
 }
 
 /** Destroys a context. */
 void arch_mmu_context_destroy(mmu_context_t *ctx) {
-    // TODO: Flush whole ASID to ensure cached intermediate table level entries
-    // are flushed from the TLB.
-    fatal_todo();
+    assert(!is_kernel_context(ctx));
+
+    /* Invalidate the whole ASID. Intermediate table entries could still be
+     * cached. It should no longer be in use. */
+    arm64_tlbi_val(aside1is, (uint64_t)ctx->arch.asid << ARM64_TLBI_ASID_SHIFT);
+
+    /* Free all structures in the bottom half of the table (user memory). */
+    uint64_t *ttl0 = map_table(ctx->arch.ttl0);
+    for (uint32_t i = 0; i < 256; i++) {
+        if (!(ttl0[i] & ARM64_TTE_PRESENT))
+            continue;
+
+        uint64_t *ttl1 = map_table(ttl0[i] & ARM64_TTE_ADDR_MASK);
+        for (uint32_t j = 0; j < 512; j++) {
+            if (!(ttl1[j] & ARM64_TTE_PRESENT))
+                continue;
+
+            assert(ttl1[j] & ARM64_TTE_TABLE);
+
+            uint64_t *ttl2 = map_table(ttl1[j] & ARM64_TTE_ADDR_MASK);
+            for (uint32_t k = 0; k < 512; k++) {
+                if (!(ttl2[k] & ARM64_TTE_PRESENT))
+                    continue;
+
+                assert(ttl2[k] & ARM64_TTE_TABLE);
+
+                phys_free(ttl2[k] & ARM64_TTE_ADDR_MASK, PAGE_SIZE);
+            }
+
+            phys_free(ttl1[j] & ARM64_TTE_ADDR_MASK, PAGE_SIZE);
+        }
+
+        phys_free(ttl0[i] & ARM64_TTE_ADDR_MASK, PAGE_SIZE);
+    }
+
+    phys_free(ctx->arch.ttl0, PAGE_SIZE);
+
+    /* Free this ASID. */
+    free_asid(ctx->arch.asid);
 }
 
 /** Maps a page in a context. */
@@ -445,6 +525,13 @@ __init_text void arch_mmu_init(void) {
 
     /* Map the physical map area. */
     map_pmap();
+}
+
+/** Perform late MMU initialisation needed to support userspace. */
+__init_text void arch_mmu_late_init(void) {
+    // TODO: 16-bit ASID support.
+    asid_count  = ARM64_ASID_USER_COUNT;
+    asid_bitmap = bitmap_alloc(asid_count, MM_BOOT);
 }
 
 /** Initialize the MMU for this CPU. */

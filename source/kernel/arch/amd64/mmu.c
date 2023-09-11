@@ -624,6 +624,11 @@ __init_text void arch_mmu_init(void) {
     mmu_context_unlock(&kernel_mmu_context);
 }
 
+/** Perform late MMU initialisation needed to support userspace. */
+__init_text void arch_mmu_late_init(void) {
+    /* Nothing happens. */
+}
+
 /** Initialize the MMU for this CPU. */
 __init_text void arch_mmu_init_percpu(void) {
     /* Enable NX/XD if supported. */

@@ -125,7 +125,9 @@ extern mmu_context_t *mmu_context_create(uint32_t mmflag);
 extern void mmu_context_destroy(mmu_context_t *ctx);
 
 extern void arch_mmu_init(void);
+extern void arch_mmu_late_init(void);
 extern void arch_mmu_init_percpu(void);
 
 extern void mmu_init(void);
+extern void mmu_late_init(void);
 extern void mmu_init_percpu(void);

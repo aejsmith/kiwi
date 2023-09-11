@@ -25,8 +25,8 @@
 
 /** Definitions of paging structure bits. */
 #define ARM64_TTE_PRESENT               (1ul<<0)    /**< Entry is present. */
-#define ARM64_TTE_TABLE                 (1ul<<1)    /**< Entry is a table. */
-#define ARM64_TTE_PAGE                  (1ul<<1)    /**< Entry is a page. */
+#define ARM64_TTE_TABLE                 (1ul<<1)    /**< Entry is a table (TTL0-2). */
+#define ARM64_TTE_PAGE                  (1ul<<1)    /**< Entry is a page (TTL3). */
 #define ARM64_TTE_AP_P_RW_U_NA          (0ul<<6)    /**< Protected RW, user not accessible. */
 #define ARM64_TTE_AP_P_RW_U_RW          (1ul<<6)    /**< Protected RW, user RW. */
 #define ARM64_TTE_AP_P_RO_U_NA          (2ul<<6)    /**< Protected RO, user not accessible. */

@@ -595,7 +595,7 @@ __init_text void kmem_init(void) {
 }
 
 /** Free up space taken by boot mappings. */
-__init_text void kmem_late_init(void) {
+void kmem_late_init(void) {
     /* Find out the boot mapping end again. We're actually accessing free pages
      * here (we're called after page_late_init()), but nothing should have
      * touched them since freeing them. */

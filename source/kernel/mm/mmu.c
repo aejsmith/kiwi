@@ -269,6 +269,11 @@ __init_text void mmu_init(void) {
     mmu_init_percpu();
 }
 
+/** Perform late MMU initialisation needed to support userspace. */
+__init_text void mmu_late_init(void) {
+    arch_mmu_late_init();
+}
+
 /** Perform per-CPU MMU initialization. */
 __init_text void mmu_init_percpu(void) {
     /* This should switch to the kernel context. */

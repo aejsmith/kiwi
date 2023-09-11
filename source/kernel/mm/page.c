@@ -976,7 +976,7 @@ __init_text void page_daemon_init(void) {
 }
 
 /** Reclaim memory no longer in use after kernel initialization. */
-__init_text void page_late_init(void) {
+void page_late_init(void) {
     /* Calculate the location and size of the initialization section. */
     kboot_tag_core_t *core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
     phys_ptr_t init_start  = ((ptr_t)__init_seg_start - KERNEL_VIRT_BASE) + core->kernel_phys;
