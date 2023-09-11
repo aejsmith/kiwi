@@ -1032,7 +1032,7 @@ static void dump_children(radix_tree_t *tree, int indent) {
 
         kdb_printf(
             "%*s%-*s %-18p %-16s %c    %-6d %s\n", indent, "",
-            24 - indent, device->name, device, device->module->name,
+            32 - indent, device->name, device, device->module->name,
             (device->flags & DEVICE_PUBLISHED) ? 'Y' : 'N',
             refcount_get(&device->count), dest);
 
@@ -1054,8 +1054,8 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
     }
 
     if (argc == 1) {
-        kdb_printf("Name                     Address            Module           Pub  Count  Destination\n");
-        kdb_printf("====                     =======            ======           ===  =====  ===========\n");
+        kdb_printf("Name                             Address            Module           Pub  Count  Destination\n");
+        kdb_printf("====                             =======            ======           ===  =====  ===========\n");
 
         dump_children(&device_root_dir->children, 0);
         return KDB_SUCCESS;

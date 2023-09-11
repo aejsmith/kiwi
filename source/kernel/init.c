@@ -174,6 +174,7 @@ static void init_thread(void *arg1, void *arg2) {
     fs_init();
 
     /* Call other initialization functions. */
+    initcall_run(INITCALL_TYPE_DEVICE);
     initcall_run(INITCALL_TYPE_OTHER);
 
     update_boot_progress(10);

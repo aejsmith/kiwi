@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <device/bus.h>
 #include <device/io.h>
 #include <device/irq.h>
 
@@ -42,6 +43,8 @@ struct dt_irq_ops;
 /**
  * Driver implementation.
  */
+
+extern bus_t dt_bus;
 
 /** Structure defining a compatible string that a driver matches. */
 typedef struct dt_match {
@@ -81,7 +84,7 @@ typedef enum builtin_dt_driver_type {
 
 /** DT driver structure. */
 typedef struct dt_driver {
-    // TODO: bus_driver_t
+    bus_driver_t bus;
 
     dt_match_table_t matches;
 
@@ -101,7 +104,19 @@ typedef struct dt_driver {
      * @return              Status code describing result of the operation.
      */
     status_t (*init_builtin)(struct dt_device *device);
+
+    /** Initialises a device that matched against this driver.
+     * @param device        Device to initialise.
+     * @return              Status code describing the result of the operation. */
+    status_t (*init_device)(struct dt_device *device);
 } dt_driver_t;
+
+DEFINE_CLASS_CAST(dt_driver, bus_driver, bus);
+
+/** Define module init/unload functions for a DT driver.
+ * @param driver        Driver to register. */
+#define MODULE_DT_DRIVER(driver) \
+    MODULE_BUS_DRIVER(dt_bus, driver)
 
 /**
  * Define a built-in DT driver. Built-in drivers are used for low-level devices
@@ -135,7 +150,7 @@ enum {
 
 /** DT device structure. */
 typedef struct dt_device {
-    // TODO: bus_device_t.
+    bus_device_t bus;
 
     int fdt_offset;                 /**< Offset of the corresponding FDT node. */
     uint32_t phandle;               /**< Device node's phandle. */
@@ -184,6 +199,8 @@ typedef struct dt_device {
     dt_driver_t *driver;
     dt_match_t *match;
 } dt_device_t;
+
+DEFINE_CLASS_CAST(dt_device, bus_device, bus);
 
 extern dt_device_t *dt_device_get_by_phandle(uint32_t phandle);
 

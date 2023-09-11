@@ -44,6 +44,8 @@ static AVL_TREE_DEFINE(dt_phandle_tree);
 
 static LIST_DEFINE(builtin_dt_drivers);
 
+bus_t dt_bus;
+
 /**
  * Sets the driver that a device is matched to, and sets up things such as
  * IRQs before initialising the driver.
@@ -99,15 +101,15 @@ dt_driver_t *dt_match_builtin_driver(dt_device_t *device, builtin_dt_driver_type
      * For multiple compatible strings, they are ordered most to least specific
      * so we want to try matching in that order to get the best match.
      */
-    for (size_t i = 0; i < device->compatible.count; i++) {
-        const char **compatible = array_entry(&device->compatible, const char *, i);
+    for (size_t compatible_idx = 0; compatible_idx < device->compatible.count; compatible_idx++) {
+        const char **compatible = array_entry(&device->compatible, const char *, compatible_idx);
 
         list_foreach(&builtin_dt_drivers, iter) {
             dt_driver_t *driver = list_entry(iter, dt_driver_t, builtin_link);
 
             if (driver->builtin_type == type) {
-                for (size_t i = 0; i < driver->matches.count; i++) {
-                    dt_match_t *match = &driver->matches.array[i];
+                for (size_t match_idx = 0; match_idx < driver->matches.count; match_idx++) {
+                    dt_match_t *match = &driver->matches.array[match_idx];
 
                     if (strcmp(*compatible, match->compatible) == 0) {
                         kprintf(
@@ -474,6 +476,85 @@ status_t device_dt_reg_map_etc(
     *_region = region;
     return STATUS_SUCCESS;
 }
+
+static bool dt_bus_match_device(bus_device_t *_device, bus_driver_t *_driver) {
+    dt_device_t *device = cast_dt_device(_device);
+    dt_driver_t *driver = cast_dt_driver(_driver);
+
+    /*
+     * For multiple compatible strings, they are ordered most to least specific
+     * so we want to try matching in that order to get the best match.
+     */
+    for (size_t compatible_idx = 0; compatible_idx < device->compatible.count; compatible_idx++) {
+        const char **compatible = array_entry(&device->compatible, const char *, compatible_idx);
+
+        for (size_t match_idx = 0; match_idx < driver->matches.count; match_idx++) {
+            dt_match_t *match = &driver->matches.array[match_idx];
+
+            if (strcmp(*compatible, match->compatible) == 0) {
+                if (!(device->flags & DT_DEVICE_MATCHED)) {
+                    return dt_device_match(device, driver, match);
+                } else {
+                    kprintf(LOG_WARN, "dt: multiple drivers match device %s\n", device->name);
+                    return false;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+static status_t dt_bus_init_device(bus_device_t *_device, bus_driver_t *_driver) {
+    dt_device_t *device = cast_dt_device(_device);
+    dt_driver_t *driver = cast_dt_driver(_driver);
+
+    return (driver->init_device)
+        ? driver->init_device(device)
+        : STATUS_SUCCESS;
+}
+
+static bus_type_t dt_bus_type = {
+    .name         = "dt",
+    .device_class = DT_DEVICE_CLASS_NAME,
+    .match_device = dt_bus_match_device,
+    .init_device  = dt_bus_init_device,
+};
+
+static __init_text void add_bus_device(dt_device_t *device) {
+    device_attr_t attrs[] = {
+        { DEVICE_ATTR_CLASS, DEVICE_ATTR_STRING, { .string = DT_DEVICE_CLASS_NAME } },
+    };
+
+    const char *name = (device == root_dt_device) ? "root" : device->name;
+    device_t *parent = (device == root_dt_device) ? dt_bus.dir : device->parent->bus.node;
+
+    bus_device_init(&device->bus);
+
+    status_t ret = device_create(name, parent, NULL, NULL, attrs, array_size(attrs), &device->bus.node);
+    if (ret != STATUS_SUCCESS)
+        fatal("Failed to create DT device %s (%d)", name, ret);
+
+    device_publish(device->bus.node);
+    bus_match_device(&dt_bus, &device->bus);
+
+    list_foreach(&device->children, iter) {
+        dt_device_t *child = list_entry(iter, dt_device_t, parent_link);
+
+        add_bus_device(child);
+    }
+}
+
+/** Full initialisation of DT, registers the bus device. */
+static __init_text void dt_bus_init(void) {
+    status_t ret = bus_init(&dt_bus, &dt_bus_type);
+    if (ret != STATUS_SUCCESS)
+        fatal("Failed to register DT bus (%d)", ret);
+
+    add_bus_device(root_dt_device);
+}
+
+INITCALL_TYPE(dt_bus_init, INITCALL_TYPE_DEVICE);
 
 static __init_text bool is_available(int node_offset) {
     int len;

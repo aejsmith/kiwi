@@ -56,6 +56,9 @@ typedef enum initcall_type {
     /** Register timer devices. */
     INITCALL_TYPE_TIME,
 
+    /** Builtin platform device initialisation. */
+    INITCALL_TYPE_DEVICE,
+
     /** Late initialization functions called on the init thread. */
     INITCALL_TYPE_OTHER,
 } initcall_type_t;
