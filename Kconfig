@@ -154,7 +154,12 @@ config SYS_SUPPORTS_BIG_ENDIAN
 
 # Flag which can be used to disable userspace build while bringing up a new
 # platform.
-config SYS_SUPPORTS_USERSPACE
+config SYS_DISABLE_USERSPACE
+	bool
+
+# Flag which can be used to enable a minimal userspace build while bringing up
+# a new platform.
+config SYS_MINIMAL_USERSPACE
 	bool
 
 # For KBoot compatibility.
@@ -170,7 +175,6 @@ config ARCH_AMD64
 	select 64BIT
 	select ARCH_X86
 	select SYS_SUPPORTS_LITTLE_ENDIAN
-	select SYS_SUPPORTS_USERSPACE
 	help
 	  Target the built system to 64-bit x86 PCs.
 
@@ -178,6 +182,7 @@ config ARCH_ARM64
 	bool "ARM64"
 	select 64BIT
 	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select SYS_DISABLE_USERSPACE
 	help
 	  Target the built system to 64-bit ARM processors.
 

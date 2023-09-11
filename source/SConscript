@@ -106,5 +106,5 @@ Alias('kboot', dist_env['KBOOT'])
 # Userspace build. #
 ####################
 
-if config['SYS_SUPPORTS_USERSPACE']:
+if not config['SYS_DISABLE_USERSPACE']:
     SConscript(dirs = ['lib', 'services', 'bin'])

@@ -14,12 +14,22 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-dirs = [
+Import('config')
+
+minimal_bins = [
+    'test',
+]
+
+SConscript(dirs = minimal_bins)
+
+if config['SYS_MINIMAL_USERSPACE']:
+    Return()
+
+bins = [
     'dungeon',
     'posix',
     'terminal',
-    'test',
     'utilities',
 ]
 
-SConscript(dirs = dirs)
+SConscript(dirs = bins)

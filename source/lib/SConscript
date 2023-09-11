@@ -14,24 +14,42 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('manager')
+Import('config', 'manager')
 
 # Set the library output directory.
 manager.add_variable('_LIBOUTDIR', Dir('.'))
 
-dirs = [
-    # Core runtime libraries (must be first).
+# All core libraries must be visited first, and libraries that depend on other
+# libraries must come after their dependencies.
+
+core_minimal_c_libs = [
     'crt',
     'kernel',
     'system',
     'compiler-rt',
-    'm',
+]
+
+SConscript(dirs = core_minimal_c_libs)
+
+if config['SYS_MINIMAL_USERSPACE']:
+    Return()
+
+core_c_libs = [
+    'm'
+]
+
+SConscript(dirs = core_c_libs)
+
+core_cxx_libs = [
     'cxxrt',
     'cxx',
     'kiwi',
+]
 
-    # Other libraries.
+SConscript(dirs = core_cxx_libs)
+
+other_libs = [
     'device',
 ]
 
-SConscript(dirs = dirs)
+SConscript(dirs = other_libs)
