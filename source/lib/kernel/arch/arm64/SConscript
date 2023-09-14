@@ -14,28 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('manager', 'config')
+sources = [File(f) for f in [
+    'rtld.c',
+    'start.S',
+]]
 
-env = manager.create()
-
-sysroot_env = manager['sysroot']
-
-crt_files        = ['crtbegin', 'crtend']
-shared_crt_files = ['crtbegin', 'crtend']
-
-defines = {
-    'CRT_HAS_INITFINI_ARRAY': None,
-    'EH_USE_FRAME_REGISTRY': None,
-}
-
-for file in crt_files:
-    path = '%s/%s.o' % (str(env['_LIBOUTDIR']), file)
-    env.Object(path, ['lib/crt/%s.c' % (file)], CPPDEFINES = defines)
-    sysroot_env.AddFile(File(path), 'lib/%s.o' % (file))
-
-for file in shared_crt_files:
-    path = '%s/%sS.o' % (str(env['_LIBOUTDIR']), file)
-    env.SharedObject(path, ['lib/crt/%s.c' % (file)], CPPDEFINES = defines)
-    sysroot_env.AddFile(File(path), 'lib/%sS.o' % (file))
-
-SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])
+Return('sources')

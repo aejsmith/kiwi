@@ -194,6 +194,10 @@ arch_sources = {
         'x86_64/floatdixf.c',
         'x86_64/floatundixf.S',
     ],
+    'arm64': generic_tf_sources + [
+        'cpu_model.c',
+        'aarch64/fp_mode.c',
+    ]
 }
 
 target_arch_sources = arch_sources[config['ARCH']]
