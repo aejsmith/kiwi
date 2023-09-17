@@ -34,6 +34,8 @@
 #include <assert.h>
 #include <status.h>
 
+static_assert(offsetof(arch_thread_t, user_frame) == ARCH_THREAD_OFF_user_frame, "Incorrect thread offset definitions");
+
 extern void arm64_context_switch(ptr_t new_sp, ptr_t *_old_sp);
 extern void arm64_context_restore(ptr_t new_sp);
 

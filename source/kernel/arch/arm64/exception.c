@@ -32,6 +32,7 @@
 #include <kernel.h>
 
 enum {
+    EC_SVC_AARCH64              = 0b010101,
     EC_INSTRUCTION_ABORT_EL0    = 0b100000,
     EC_INSTRUCTION_ABORT_EL1    = 0b100001,
     EC_DATA_ABORT_EL0           = 0b100100,
@@ -45,10 +46,8 @@ static arm64_irq_handler_t arm64_irq_handler_func;
 static void *arm64_irq_handler_private;
 
 static void common_entry(frame_t *frame) {
-    if (frame_from_user(frame)) {
-        curr_thread->arch.user_frame = frame;
+    if (frame_from_user(frame))
         thread_at_kernel_entry(NULL);
-    }
 }
 
 static void common_exit(frame_t *frame) {
@@ -79,6 +78,7 @@ void arm64_irq_handler(frame_t *frame) {
 
 static const char *exception_class_to_string(uint64_t class) {
     switch (class) {
+        case EC_SVC_AARCH64:            return "SVC (AArch64)";
         case EC_INSTRUCTION_ABORT_EL0:  return "Instruction Abort (EL0)";
         case EC_INSTRUCTION_ABORT_EL1:  return "Instruction Abort (EL1)";
         case EC_DATA_ABORT_EL0:         return "Data Abort (EL0)";

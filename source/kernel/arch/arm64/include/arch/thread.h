@@ -50,3 +50,5 @@ static inline struct thread *arch_curr_thread(void) {
 }
 
 #endif /* __ASM__ */
+
+#define ARCH_THREAD_OFF_user_frame  24

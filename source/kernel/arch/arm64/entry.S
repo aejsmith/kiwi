@@ -19,11 +19,33 @@
  * @brief               ARM64 kernel entry points.
  */
 
+#include <arch/frame.h>
+#include <arch/thread.h>
+
 #include <arm64/asm.h>
+#include <arm64/cpu.h>
+
+#include <status.h>
 
 .section .text, "ax", @progbits
 
+/** Call an interrupt handler function. */
+.macro CALL_HANDLER, name
+    /* Pass frame to handler. */
+    mov     x0, sp
+
+    /* Set up frame pointer (X29) with ELR as return address. */
+    stp     x29, x1, [sp, #-16]!
+    mov     x29, sp
+
+    bl      \name
+
+    add     sp, sp, #16
+.endm
+
+/** Push a frame_t on the stack, and leave a pointer to it in x19. */
 .macro PUSH_REGS, user
+    /* X0-29. */
     stp     x0, x1, [sp,#-16]!
     stp     x2, x3, [sp,#-16]!
     stp     x4, x5, [sp,#-16]!
@@ -40,46 +62,48 @@
     stp     x26, x27, [sp,#-16]!
     stp     x28, x29, [sp,#-16]!
 
+    /* X30/SP. */
 .if \user
     /* Save the EL0 SP. */
-    mrs     x0, sp_el0
+    mrs     x9, sp_el0
 .else
     /* Restore original SP value to save. */
-    add     x0, sp, #(30 * 8)
+    add     x9, sp, #(30 * 8)
 .endif
-
-    stp     x30, x0, [sp,#-16]!
-
-    mrs     x0, spsr_el1
-    mrs     x1, elr_el1
-    stp     x0, x1, [sp,#-16]!
-
-    /* Pass frame to handler. */
-    mov     x0, sp
-
-    /* Set up frame pointer (X29) with ELR as return address. */
-    stp     x29, x1, [sp, #-16]!
-    mov     x29, sp
-.endm
-
-.macro POP_REGS, user, with_frame
-.if \with_frame
-    /* Frame pointer. */
-    add     sp, sp, #16
-.endif
+    stp     x30, x9, [sp,#-16]!
 
     /* SPSR/ELR. */
-    ldp     x0, x1, [sp], #16
-    msr     spsr_el1, x0
-    msr     elr_el1, x1
+    mrs     x9, spsr_el1
+    mrs     x10, elr_el1
+    stp     x9, x10, [sp,#-16]!
 
-    /* X30/SP. For the kernel, SP doesn't need to be restored here, we'll get it
-     * back by the end. */
-    ldp     x30, x0, [sp], #16
+    mov     x19, sp
+
 .if \user
-    msr     sp_el0, x0
+    /* Save the frame pointer in curr_thread. */
+    mrs     x9, tpidr_el1
+    str     x19, [x9,#ARCH_THREAD_OFF_user_frame]
+.endif
+.endm
+
+/** Restore frame at current stack pointer. */
+.macro POP_REGS, user
+    /* SPSR/ELR. */
+    ldp     x9, x10, [sp], #16
+    msr     spsr_el1, x9
+    msr     elr_el1, x10
+
+    /* X30/SP. */
+    ldp     x30, x9, [sp], #16
+.if \user
+    /* Restore EL0 SP for user. */
+    msr     sp_el0, x9
+.else
+    /* For the kernel, SP doesn't need to be restored here, we'll get it back
+     * by the end. */
 .endif
 
+    /* X0-29. */
     ldp     x28, x29, [sp], #16
     ldp     x26, x27, [sp], #16
     ldp     x24, x25, [sp], #16
@@ -99,44 +123,115 @@
 
 PRIVATE_FUNCTION_START(unhandled_exception_handler)
     PUSH_REGS 0
+    CALL_HANDLER arm64_unhandled_exception_handler
 
-    bl      arm64_unhandled_exception_handler
     b       .
 FUNCTION_END(unhandled_exception_handler)
 
 PRIVATE_FUNCTION_START(sync_EL1h_handler)
     PUSH_REGS 0
+    CALL_HANDLER arm64_sync_exception_handler
+    POP_REGS 0
 
-    bl      arm64_sync_exception_handler
-
-    POP_REGS 0, 1
     eret
 FUNCTION_END(sync_EL1h_handler)
 
 PRIVATE_FUNCTION_START(irq_EL1h_handler)
     PUSH_REGS 0
+    CALL_HANDLER arm64_irq_handler
+    POP_REGS 0
 
-    bl      arm64_irq_handler
-
-    POP_REGS 0, 1
     eret
 FUNCTION_END(irq_EL1h_handler)
 
 PRIVATE_FUNCTION_START(sync_EL0_64_handler)
     PUSH_REGS 1
 
-    bl      arm64_sync_exception_handler
+    /* Check for SVC in ESR.EC. */
+    mrs     x9, esr_el1
+    lsr     x10, x9, #ARM64_ESR_EC_SHIFT
+    cmp     x10, #21
+    beq     .Lsyscall_handler
 
-    POP_REGS 1, 1
+    CALL_HANDLER arm64_sync_exception_handler
+
+.Lreturn:
+    POP_REGS 1
     eret
+
+.Lsyscall_handler:
+    /* Get system call number from ESR and get the system call table entry.
+     * Use callee-save registers to preserve across thread_at_kernel_entry().
+     * x19 = frame (left by PUSH_REGS)
+     * x20 = call number
+     * x21 = syscall_table_size
+     * x22 = &syscall_table[x20] */
+    and     x20, x9, #ARM64_ESR_ISS_MASK
+    mov     x22, xzr
+    adr_l   x21, syscall_table_size
+    ldr     x21, [x21]
+    cmp     x20, x21
+    bhi     1f          /* Leave syscall table entry pointer null if invalid number. */
+    adr_l   x22, syscall_table
+    add     x22, x22, x20, lsl #4
+1:
+    /* Perform kernel entry work. */
+    mov     x0, x22
+    bl      thread_at_kernel_entry
+
+    /* Enable interrupts. */
+    msr     daifclr, #2
+
+    /* Check for invalid system call. */
+    cmp     xzr, x22
+    beq     .Linvalid_syscall
+
+    /* Check for stack arguments. */
+    ldr     x9, [x22,#8]
+    cmp     x9, #8
+    bgt     .Lstack_args
+
+    /* Restore the arguments and call the function. */
+    ldr     x0, [x19,#FRAME_OFF_x0]
+    ldr     x1, [x19,#FRAME_OFF_x1]
+    ldr     x2, [x19,#FRAME_OFF_x2]
+    ldr     x3, [x19,#FRAME_OFF_x3]
+    ldr     x4, [x19,#FRAME_OFF_x4]
+    ldr     x5, [x19,#FRAME_OFF_x5]
+    ldr     x6, [x19,#FRAME_OFF_x6]
+    ldr     x7, [x19,#FRAME_OFF_x7]
+    ldr     x9, [x22]
+    blr     x9
+
+.Lsyscall_return:
+    /* Save the return value of the system call. */
+    // TODO: kern_thread_restore().
+    str     x0, [x19,#FRAME_OFF_x0]
+
+    /* Disable interrupts. */
+    msr     daifset, #2
+
+    /* Perform kernel exit work. */
+    mov     x1, x0
+    mov     x0, x22
+    bl      thread_at_kernel_exit
+
+    b       .Lreturn
+
+.Lstack_args:
+    // TODO
+    brk     #0
+
+.Linvalid_syscall:
+    mov     x0, #STATUS_INVALID_SYSCALL
+    b       .Lsyscall_return
 FUNCTION_END(sync_EL0_64_handler)
 
 PRIVATE_FUNCTION_START(irq_EL0_64_handler)
     PUSH_REGS 1
+    CALL_HANDLER arm64_irq_handler
+    POP_REGS 1
 
-    bl      arm64_irq_handler
-
-    POP_REGS 1, 1
     eret
 FUNCTION_END(irq_EL0_64_handler)
 
@@ -147,7 +242,7 @@ FUNCTION_START(arch_thread_user_enter)
     mov     sp, x0
 
     /* Restore and return to EL0. */
-    POP_REGS 1, 0
+    POP_REGS 1
     eret
 FUNCTION_END(arch_thread_user_enter)
 

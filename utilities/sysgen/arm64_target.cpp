@@ -53,14 +53,14 @@ void ARM64Target::generate(std::ostream &stream, const SyscallList &calls) {
         if (call->attributes() & Syscall::kWrappedAttribute)
             name = '_' + name;
 
-        /* TODO... */
         stream << endl;
         if (call->attributes() & Syscall::kHiddenAttribute)
             stream << ".hidden " << name << endl;
         stream << ".global " << name << endl;
         stream << ".type " << name << ", @function" << endl;
         stream << name << ':' << endl;
-        stream << "     b ." << endl;
+        stream << "     svc #" << call->id() << endl;
+        stream << "     ret" << endl;
         stream << ".size " << name << ", .-" << name << endl;
     }
 

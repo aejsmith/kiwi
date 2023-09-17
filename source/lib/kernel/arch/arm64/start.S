@@ -26,6 +26,10 @@
 /** Kernel library entry point.
  * @param %rdi          Process argument block. */
 FUNCTION_START(libkernel_start)
+    mov     x0, #0
+    mov     x1, #0
+    bl      kern_thread_sleep
+
     b       .
 FUNCTION_END(libkernel_start)
 

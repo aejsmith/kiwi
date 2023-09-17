@@ -50,3 +50,9 @@
     .balign _align; \
     .global _name; \
     _name:
+
+/** Shortcut for ADRP + ADD to load a global symbol address into a register. */
+.macro adr_l reg, symbol
+    adrp    \reg, \symbol
+    add     \reg, \reg, #:lo12:\symbol
+.endm
