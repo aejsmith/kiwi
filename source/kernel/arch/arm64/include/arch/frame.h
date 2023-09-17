@@ -67,8 +67,8 @@ typedef struct frame {
  * @param frame         Frame to check.
  * @return              Whether the frame is from user mode. */
 static inline bool frame_from_user(frame_t *frame) {
-    // TODO
-    return false;
+    /* SPSR.M[3:2] == PSTATE.EL */
+    return (frame->spsr & 0xc) == 0;
 }
 
 #endif /* __ASM__ */

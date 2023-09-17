@@ -69,24 +69,29 @@
     ARM64_MAIR_ENTRY(2, 0b00000000) | \
     ARM64_MAIR_ENTRY(3, 0b00000100))
 
+#define ARM64_TTE_CACHE_NORMAL \
+    (ARM64_TTE_ATTR_INDEX(ARM64_MAIR_INDEX_NORMAL) |  ARM64_TTE_SH_INNER_SHAREABLE)
+#define ARM64_TTE_CACHE_DEVICE \
+    (ARM64_TTE_ATTR_INDEX(ARM64_MAIR_INDEX_DEVICE) | ARM64_TTE_SH_OUTER_SHAREABLE)
+#define ARM64_TTE_CACHE_UNCACHED \
+    (ARM64_TTE_ATTR_INDEX(ARM64_MAIR_INDEX_UNCACHED) | ARM64_TTE_SH_OUTER_SHAREABLE)
+#define ARM64_TTE_CACHE_WRITE_COMBINE \
+    (ARM64_TTE_ATTR_INDEX(ARM64_MAIR_INDEX_WRITE_COMBINE) | ARM64_TTE_SH_OUTER_SHAREABLE)
+
 /*
- * TCR value for the kernel.
+ * Common TCR configuration:
  *  - 48-bit virtual address.
  *  - 48-bit intermediate physical address.
  *  - Write-back/write-allocate, inner shareable translation tables.
  *  - 4KB granule.
- *  - TTBR0 disabled.
- *  - TTBR1 defines ASID.
  */
-#define ARM64_TCR_KERNEL \
+#define ARM64_TCR_COMMON \
     ((16 << ARM64_TCR_T0SZ_SHIFT) | \
-     ARM64_TCR_EPD0 | \
      ARM64_TCR_IRGN0_WB_WA | \
      ARM64_TCR_ORGN0_WB_WA | \
      ARM64_TCR_SH0_INNER | \
      ARM64_TCR_TG0_4 | \
      (16 << ARM64_TCR_T1SZ_SHIFT) | \
-     ARM64_TCR_A1 | \
      ARM64_TCR_IRGN1_WB_WA | \
      ARM64_TCR_ORGN1_WB_WA | \
      ARM64_TCR_SH1_INNER | \
@@ -94,6 +99,24 @@
      ARM64_TCR_IPS_48 | \
      ARM64_TCR_TBI0 | \
      ARM64_TCR_TBI1)
+
+/*
+ * TCR value for the kernel.
+ *  - TTBR0 disabled (EPD0 set).
+ *  - TTBR1 defines ASID (A1 set).
+ */
+#define ARM64_TCR_KERNEL \
+    (ARM64_TCR_COMMON | \
+     ARM64_TCR_EPD0 | \
+     ARM64_TCR_A1)
+
+/*
+ * TCR value for userspace.
+ *  - TTBR0 enabled (EPD0 clear).
+ *  - TTBR0 defines ASID (A1 clear).
+ */
+#define ARM64_TCR_USER \
+    ARM64_TCR_COMMON
 
 /** ASID definitions. */
 #define ARM64_ASID_UNUSED               0

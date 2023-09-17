@@ -105,8 +105,7 @@ extern void arch_mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, 
 extern bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page);
 extern bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags);
 extern void arch_mmu_context_flush(mmu_context_t *ctx);
-extern void arch_mmu_context_load(mmu_context_t *ctx);
-extern void arch_mmu_context_unload(mmu_context_t *ctx);
+extern void arch_mmu_context_switch(mmu_context_t *ctx, mmu_context_t *prev);
 
 extern void mmu_context_lock(mmu_context_t *ctx);
 extern void mmu_context_unlock(mmu_context_t *ctx);
@@ -118,8 +117,7 @@ extern void mmu_context_remap(mmu_context_t *ctx, ptr_t virt, size_t size, uint3
 extern bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page);
 extern bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags);
 
-extern void mmu_context_load(mmu_context_t *ctx);
-extern void mmu_context_unload(mmu_context_t *ctx);
+extern void mmu_context_switch(mmu_context_t *ctx, mmu_context_t *prev);
 
 extern mmu_context_t *mmu_context_create(uint32_t mmflag);
 extern void mmu_context_destroy(mmu_context_t *ctx);

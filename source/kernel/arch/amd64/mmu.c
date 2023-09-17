@@ -531,13 +531,8 @@ void arch_mmu_context_flush(mmu_context_t *ctx) {
 }
 
 /** Switch to another MMU context. */
-void arch_mmu_context_load(mmu_context_t *ctx) {
+void arch_mmu_context_switch(mmu_context_t *ctx, mmu_context_t *prev) {
     x86_write_cr3(ctx->arch.pml4);
-}
-
-/** Unloads an MMU context. */
-void arch_mmu_context_unload(mmu_context_t *ctx) {
-    /* Nothing happens. */
 }
 
 static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t flags) {
@@ -649,5 +644,5 @@ __init_text void arch_mmu_init_percpu(void) {
     x86_write_msr(X86_MSR_CR_PAT, X86_PAT);
 
     /* Switch to the kernel context. */
-    arch_mmu_context_load(&kernel_mmu_context);
+    arch_mmu_context_switch(&kernel_mmu_context, NULL);
 }

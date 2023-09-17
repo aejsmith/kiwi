@@ -217,24 +217,16 @@ static inline uint64_t calc_tte_flags(mmu_context_t *ctx, uint32_t flags) {
     uint32_t cache_flag = flags & MMU_CACHE_MASK;
     switch (cache_flag) {
         case MMU_CACHE_NORMAL:
-            tte_flags |=
-                ARM64_TTE_ATTR_INDEX(ARM64_MAIR_INDEX_NORMAL) |
-                ARM64_TTE_SH_INNER_SHAREABLE;
+            tte_flags |= ARM64_TTE_CACHE_NORMAL;
             break;
         case MMU_CACHE_DEVICE:
-            tte_flags |=
-                ARM64_TTE_ATTR_INDEX(ARM64_MAIR_INDEX_DEVICE) |
-                ARM64_TTE_SH_OUTER_SHAREABLE;
+            tte_flags |= ARM64_TTE_CACHE_DEVICE;
             break;
         case MMU_CACHE_UNCACHED:
-            tte_flags |=
-                ARM64_TTE_ATTR_INDEX(ARM64_MAIR_INDEX_UNCACHED) |
-                ARM64_TTE_SH_OUTER_SHAREABLE;
+            tte_flags |= ARM64_TTE_CACHE_UNCACHED;
             break;
         case MMU_CACHE_WRITE_COMBINE:
-            tte_flags |=
-                ARM64_TTE_ATTR_INDEX(ARM64_MAIR_INDEX_WRITE_COMBINE) |
-                ARM64_TTE_SH_OUTER_SHAREABLE;
+            tte_flags |= ARM64_TTE_CACHE_WRITE_COMBINE;
             break;
         default:
             unreachable();
@@ -256,7 +248,11 @@ static void flush_invalidate_queue(mmu_context_t *ctx) {
         /* See queue_invalidate(). Invalidate the whole ASID in this case. */
         arm64_tlbi_val(aside1is, (uint64_t)ctx->arch.asid << ARM64_TLBI_ASID_SHIFT);
     } else {
-        /* Since we currently don't unmap PTEs except on un*/
+        /* Since we currently don't unmap PTEs except on context destruction,
+         * we always use the last-level operations here, which avoids unnecessary
+         * invalidation of anything cached for intermediate tables. This will
+         * need to change when freeing tables as they become empty is
+         * implemented. */
         if (is_kernel_context(ctx)) {
             for (size_t i = 0; i < ctx->arch.invalidate_count; i++) {
                 ptr_t addr = ctx->arch.invalidate_queue[i];
@@ -412,7 +408,80 @@ bool arch_mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, page_t **_page) {
 
 /** Queries details about a mapping. */
 bool arch_mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32_t *_flags) {
-    fatal_todo();
+    uint64_t entry;
+    phys_ptr_t phys;
+    bool ret = false;
+
+    uint64_t *ttl2 = get_ttl2(ctx, virt, false, 0);
+    if (ttl2) {
+        unsigned ttl2e = (virt % ARM64_TTL2_RANGE) / ARM64_TTL3_RANGE;
+        if (ttl2[ttl2e] & ARM64_TTE_PRESENT) {
+            /* Handle large pages: parts of the kernel address space may be
+             * mapped with large pages, so we must be able to handle queries on
+             * these parts. */
+            if (!(ttl2[ttl2e] & ARM64_TTE_PAGE)) {
+                entry = ttl2[ttl2e];
+                phys = (ttl2[ttl2e] & ARM64_TTE_ADDR_MASK) + (virt % 0x200000);
+                ret = true;
+            } else {
+                uint64_t *ttl3 = map_table(ttl2[ttl2e] & ARM64_TTE_ADDR_MASK);
+                unsigned ttl3e = (virt % ARM64_TTL3_RANGE) / PAGE_SIZE;
+                if (ttl3[ttl3e] & ARM64_TTE_PRESENT) {
+                    entry = ttl3[ttl3e];
+                    phys = ttl3[ttl3e] & ARM64_TTE_ADDR_MASK;
+                    ret = true;
+                }
+            }
+        }
+    }
+
+    if (ret) {
+        if (_phys)
+            *_phys = phys;
+
+        if (_flags) {
+            uint32_t flags = 0;
+
+            uint64_t ap = entry & ARM64_TTE_AP_MASK;
+            switch (ap) {
+                case ARM64_TTE_AP_P_RW_U_NA:
+                case ARM64_TTE_AP_P_RW_U_RW:
+                    flags |= MMU_ACCESS_READ | MMU_ACCESS_WRITE;
+                    break;
+                case ARM64_TTE_AP_P_RO_U_NA:
+                case ARM64_TTE_AP_P_RO_U_RO:
+                    flags |= MMU_ACCESS_READ;
+                    break;
+                default:
+                    fatal("Unhandled AP bits 0x%" PRIx64 " in translation table entry", ap);
+            }
+
+            if (!(entry & ARM64_TTE_XN))
+                flags |= MMU_ACCESS_EXECUTE;
+
+            uint64_t attr_sh = entry & (ARM64_TTE_ATTR_INDEX_MASK | ARM64_TTE_SH_MASK);
+            switch (attr_sh) {
+                case ARM64_TTE_CACHE_NORMAL:
+                    flags |= MMU_CACHE_NORMAL;
+                    break;
+                case ARM64_TTE_CACHE_DEVICE:
+                    flags |= MMU_CACHE_DEVICE;
+                    break;
+                case ARM64_TTE_CACHE_UNCACHED:
+                    flags |= MMU_CACHE_UNCACHED;
+                    break;
+                case ARM64_TTE_CACHE_WRITE_COMBINE:
+                    flags |= MMU_CACHE_WRITE_COMBINE;
+                    break;
+                default:
+                    fatal("Unhandled cache bits 0x%" PRIx64 " in translation table entry", attr_sh);
+            }
+
+            *_flags = flags;
+        }
+    }
+
+    return ret;
 }
 
 /** Performs remote TLB invalidation. */
@@ -421,15 +490,20 @@ void arch_mmu_context_flush(mmu_context_t *ctx) {
 }
 
 /** Switches to another MMU context. */
-void arch_mmu_context_load(mmu_context_t *ctx) {
-    // TODO: Configure TCR to enable/disable user page table walking, and
-    // set/clear A1 bit. Anything else need changing in there for user?
-    fatal_todo();
-}
+void arch_mmu_context_switch(mmu_context_t *ctx, mmu_context_t *prev) {
+    /* Change TCR if we're switching to/from kernel. */
+    bool to_kernel   = is_kernel_context(ctx);
+    bool from_kernel = is_kernel_context(prev);
+    if (to_kernel != from_kernel) {
+        uint64_t tcr = (to_kernel) ? ARM64_TCR_KERNEL : ARM64_TCR_USER;
+        arm64_write_sysreg(tcr_el1, tcr);
+        arm64_isb();
+    }
 
-/** Unloads an MMU context. */
-void arch_mmu_context_unload(mmu_context_t *ctx) {
-    /* Nothing happens. */
+    /* Load the user translation table. */
+    uint64_t ttbr0 = ctx->arch.ttl0 | ((uint64_t)ctx->arch.asid << ARM64_TTBR_ASID_SHIFT);
+    arm64_write_sysreg(ttbr0_el1, ttbr0);
+    arm64_isb();
 }
 
 static void map_kernel(const char *name, ptr_t start, ptr_t end, uint32_t flags) {

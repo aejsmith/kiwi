@@ -175,24 +175,16 @@ bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *_phys, uint32
 }
 
 /**
- * Switches to a new MMU context. The previously active context must first be
- * unloaded with mmu_context_unload(). This function must be called with
- * interrupts disabled.
+ * Switches to a new MMU context. This function must be called with interrupts
+ * disabled.
  *
  * @param ctx           Context to load.
+ * @param prev          Previous context.
  */
-void mmu_context_load(mmu_context_t *ctx) {
+void mmu_context_switch(mmu_context_t *ctx, mmu_context_t *prev) {
     assert(!local_irq_state());
 
-    arch_mmu_context_load(ctx);
-}
-
-/** Unloads an MMU context.
- * @param ctx           Context to unload. */
-void mmu_context_unload(mmu_context_t *ctx) {
-    assert(!local_irq_state());
-
-    arch_mmu_context_unload(ctx);
+    arch_mmu_context_switch(ctx, prev);
 }
 
 /** Creates an MMU context.

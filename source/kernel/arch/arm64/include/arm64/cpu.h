@@ -30,6 +30,9 @@
 #define ARM64_CURRENTEL_EL3     (3<<2)
 
 /** Exception Syndrome Register (ESR_ELx). */
+#define ARM64_ESR_ISS_SHIFT     0
+#define ARM64_ESR_ISS_MASK      (0x1fffffful << ARM64_ESR_ISS_SHIFT)
+#define ARM64_ESR_ISS(esr)      (((esr) & ARM64_ESR_ISS_MASK) >> ARM64_ESR_ISS_SHIFT)
 #define ARM64_ESR_EC_SHIFT      26
 #define ARM64_ESR_EC_MASK       (0x3ful << ARM64_ESR_EC_SHIFT)
 #define ARM64_ESR_EC(esr)       (((esr) & ARM64_ESR_EC_MASK) >> ARM64_ESR_EC_SHIFT)

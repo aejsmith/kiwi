@@ -1607,15 +1607,14 @@ void vm_aspace_switch(vm_aspace_t *as) {
      * Kernel threads should never touch the userspace portion of the address
      * space. */
     if (as && as != curr_cpu->aspace) {
-        /* Decrease old address space's reference count, if there is one. */
-        if (curr_cpu->aspace) {
-            mmu_context_unload(curr_cpu->aspace->mmu);
-            refcount_dec(&curr_cpu->aspace->count);
-        }
+        mmu_context_t *prev = (curr_cpu->aspace) ? curr_cpu->aspace->mmu : &kernel_mmu_context;
 
-        /* Switch to the new address space. */
         refcount_inc(&as->count);
-        mmu_context_load(as->mmu);
+        mmu_context_switch(as->mmu, prev);
+
+        if (curr_cpu->aspace)
+            refcount_dec(&curr_cpu->aspace->count);
+
         curr_cpu->aspace = as;
     }
 
@@ -1704,10 +1703,8 @@ static status_t switch_to_kernel(void *_as) {
     /* We may have switched address space between the check below and receiving
      * the interrupt. Avoid an unnecessary switch in this case. */
     if (as == curr_cpu->aspace) {
-        mmu_context_unload(as->mmu);
+        mmu_context_switch(&kernel_mmu_context, as->mmu);
         refcount_dec(&as->count);
-
-        mmu_context_load(&kernel_mmu_context);
         curr_cpu->aspace = NULL;
     }
 

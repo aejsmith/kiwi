@@ -23,7 +23,18 @@
 #include <arm64/exception.h>
 #include <arm64/kdb.h>
 
+#include <mm/vm.h>
+
+#include <kdb.h>
 #include <kernel.h>
+
+enum {
+    EC_INSTRUCTION_ABORT_EL0    = 0b100000,
+    EC_INSTRUCTION_ABORT_EL1    = 0b100001,
+    EC_DATA_ABORT_EL0           = 0b100100,
+    EC_DATA_ABORT_EL1           = 0b100101,
+    EC_BRK_AARCH64              = 0b111100,
+};
 
 extern uint8_t arm64_exception_vectors[];
 
@@ -47,22 +58,97 @@ void arm64_irq_handler(frame_t *frame) {
     arm64_irq_handler_func(arm64_irq_handler_private, frame);
 }
 
-/** Handle a synchronous exception. */
-void arm64_sync_exception_handler(frame_t *frame) {
-    unsigned long esr   = arm64_read_sysreg(esr_el1);
-    unsigned long class = ARM64_ESR_EC(esr);
-
+static const char *exception_class_to_string(uint64_t class) {
     switch (class) {
-        case 0b111100:
-            /* BRK instruction (AArch64). */
-            // TODO: Should not enter KDB if this came from EL0.
-            arm64_kdb_brk_handler(frame);
+        case EC_INSTRUCTION_ABORT_EL0:  return "Instruction Abort (EL0)";
+        case EC_INSTRUCTION_ABORT_EL1:  return "Instruction Abort (EL1)";
+        case EC_DATA_ABORT_EL0:         return "Data Abort (EL0)";
+        case EC_DATA_ABORT_EL1:         return "Data Abort (EL1)";
+        case EC_BRK_AARCH64:            return "BRK (AArch64)";
+        default:                        return "Unknown";
+    }
+}
+
+static void unhandled_exception(frame_t *frame, uint64_t esr) {
+    uint64_t class     = ARM64_ESR_EC(esr);
+    const char *string = exception_class_to_string(class);
+
+    if (atomic_load(&kdb_running) == 2) {
+        kdb_exception(string, frame);
+    } else {
+        // TODO: User exceptions.
+        fatal_etc(
+            frame, "Unhandled %s mode exception %lu (%s)",
+            (frame_from_user(frame)) ? "user" : "kernel", class, string);
+    }
+}
+
+static bool mmu_exception(frame_t *frame, uint64_t esr, bool instruction) {
+    /* We can't handle an MMU fault while running KDB. */
+    if (unlikely(atomic_load(&kdb_running) == 2))
+        return false;
+
+    uint64_t iss  = ARM64_ESR_ISS(esr);
+    uint64_t far  = arm64_read_sysreg(far_el1);
+
+    int reason      = -1;
+    uint32_t access = 0;
+
+    /* DFSC/IFSC are mostly the same. Mask out the low 2 bits that specify the
+     * table level, we don't care about this. */
+    uint64_t fsc = iss & 0x3c;
+    switch (fsc) {
+        case 0b000100:
+            /* Translation fault. */
+            reason = VM_FAULT_UNMAPPED;
             break;
-        default:
-            /* TODO: Proper exception handling. */
-            fatal_etc(frame, "Unhandled synchronous exception (class %lu)", class);
+        case 0b001100:
+            /* Permission fault. */
+            reason = VM_FAULT_ACCESS;
             break;
     }
+
+    if (instruction) {
+        access = VM_ACCESS_EXECUTE;
+    } else {
+        /* Check WnR bit for access type. */
+        access = (iss & (1 << 6)) ? VM_ACCESS_WRITE : VM_ACCESS_READ;
+    }
+
+    if (reason != -1) {
+        return vm_fault(frame, far, reason, access);
+    } else {
+        // TODO: Some unhandled exceptions should probably be fatal even from
+        // user mode?
+        return false;
+    }
+}
+
+/** Handle a synchronous exception. */
+void arm64_sync_exception_handler(frame_t *frame) {
+    uint64_t esr   = arm64_read_sysreg(esr_el1);
+    uint64_t class = ARM64_ESR_EC(esr);
+
+    bool handled = false;
+
+    switch (class) {
+        case EC_INSTRUCTION_ABORT_EL0:
+        case EC_INSTRUCTION_ABORT_EL1:
+            handled = mmu_exception(frame, esr, true);
+            break;
+        case EC_DATA_ABORT_EL0:
+        case EC_DATA_ABORT_EL1:
+            handled = mmu_exception(frame, esr, false);
+            break;
+        case EC_BRK_AARCH64:
+            // TODO: Should not enter KDB if this came from EL0.
+            arm64_kdb_brk_handler(frame);
+            handled = true;
+            break;
+    }
+
+    if (!handled)
+        unhandled_exception(frame, esr);
 }
 
 /** Unhandled exception. */
