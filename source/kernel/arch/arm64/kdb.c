@@ -30,12 +30,6 @@
 #include <cpu.h>
 #include <kdb.h>
 
-/** Structure containing a stack frame. */
-typedef struct stack_frame {
-    ptr_t next;                 /**< Address of next stack frame. */
-    ptr_t addr;                 /**< Function return address. */
-} stack_frame_t;
-
 /** Install a kernel breakpoint.
  * @param addr          Address of the breakpoint.
  * @return              Index of added breakpoint, or -1 if none available. */

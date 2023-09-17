@@ -63,6 +63,12 @@ typedef struct frame {
     unsigned long x1;
 } __packed frame_t;
 
+/** Structure containing a stack frame. */
+typedef struct stack_frame {
+    ptr_t next;                 /**< Address of next stack frame. */
+    ptr_t addr;                 /**< Function return address. */
+} stack_frame_t;
+
 /** Return whether an interrupt frame is from user mode.
  * @param frame         Frame to check.
  * @return              Whether the frame is from user mode. */

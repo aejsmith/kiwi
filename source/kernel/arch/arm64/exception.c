@@ -25,6 +25,9 @@
 
 #include <mm/vm.h>
 
+#include <proc/sched.h>
+#include <proc/thread.h>
+
 #include <kdb.h>
 #include <kernel.h>
 
@@ -41,6 +44,18 @@ extern uint8_t arm64_exception_vectors[];
 static arm64_irq_handler_t arm64_irq_handler_func;
 static void *arm64_irq_handler_private;
 
+static void common_entry(frame_t *frame) {
+    if (frame_from_user(frame)) {
+        curr_thread->arch.user_frame = frame;
+        thread_at_kernel_entry(NULL);
+    }
+}
+
+static void common_exit(frame_t *frame) {
+    if (frame_from_user(frame))
+        thread_at_kernel_exit(NULL, 0);
+}
+
 /** Sets the hardware IRQ handler. */
 void arm64_set_irq_handler(arm64_irq_handler_t handler, void *private) {
     if (arm64_irq_handler_func)
@@ -52,10 +67,14 @@ void arm64_set_irq_handler(arm64_irq_handler_t handler, void *private) {
 
 /** Handle an IRQ. */
 void arm64_irq_handler(frame_t *frame) {
+    common_entry(frame);
+
     if (!arm64_irq_handler_func)
         fatal("Received IRQ without registered IRQ handler");
 
     arm64_irq_handler_func(arm64_irq_handler_private, frame);
+
+    common_exit(frame);
 }
 
 static const char *exception_class_to_string(uint64_t class) {
@@ -126,6 +145,8 @@ static bool mmu_exception(frame_t *frame, uint64_t esr, bool instruction) {
 
 /** Handle a synchronous exception. */
 void arm64_sync_exception_handler(frame_t *frame) {
+    common_entry(frame);
+
     uint64_t esr   = arm64_read_sysreg(esr_el1);
     uint64_t class = ARM64_ESR_EC(esr);
 
@@ -149,11 +170,16 @@ void arm64_sync_exception_handler(frame_t *frame) {
 
     if (!handled)
         unhandled_exception(frame, esr);
+
+    common_exit(frame);
 }
 
 /** Unhandled exception. */
 void arm64_unhandled_exception_handler(frame_t *frame) {
-    fatal_etc(frame, "Unhandled CPU exception");
+    uint64_t esr   = arm64_read_sysreg(esr_el1);
+    uint64_t class = ARM64_ESR_EC(esr);
+
+    fatal_etc(frame, "Unhandled CPU exception (ESR = 0x%" PRIx64 " class = 0x%" PRIx64 ")", esr, class);
 }
 
 /** Set up exception handling. */

@@ -23,7 +23,7 @@
 
 .section .text, "ax", @progbits
 
-.macro PUSH_REGS
+.macro PUSH_REGS, user
     stp     x0, x1, [sp,#-16]!
     stp     x2, x3, [sp,#-16]!
     stp     x4, x5, [sp,#-16]!
@@ -40,8 +40,14 @@
     stp     x26, x27, [sp,#-16]!
     stp     x28, x29, [sp,#-16]!
 
-    /* Restore original SP value and save it. */
+.if \user
+    /* Save the EL0 SP. */
+    mrs     x0, sp_el0
+.else
+    /* Restore original SP value to save. */
     add     x0, sp, #(30 * 8)
+.endif
+
     stp     x30, x0, [sp,#-16]!
 
     mrs     x0, spsr_el1
@@ -56,17 +62,23 @@
     mov     x29, sp
 .endm
 
-.macro POP_REGS
+.macro POP_REGS, user, with_frame
+.if \with_frame
     /* Frame pointer. */
     add     sp, sp, #16
+.endif
 
     /* SPSR/ELR. */
     ldp     x0, x1, [sp], #16
     msr     spsr_el1, x0
     msr     elr_el1, x1
 
-    /* X30/SP. SP doesn't need to be restored here, we'll get it back by the end. */
+    /* X30/SP. For the kernel, SP doesn't need to be restored here, we'll get it
+     * back by the end. */
     ldp     x30, x0, [sp], #16
+.if \user
+    msr     sp_el0, x0
+.endif
 
     ldp     x28, x29, [sp], #16
     ldp     x26, x27, [sp], #16
@@ -86,37 +98,57 @@
 .endm
 
 PRIVATE_FUNCTION_START(unhandled_exception_handler)
-    PUSH_REGS
+    PUSH_REGS 0
 
     bl      arm64_unhandled_exception_handler
     b       .
 FUNCTION_END(unhandled_exception_handler)
 
 PRIVATE_FUNCTION_START(sync_EL1h_handler)
-    PUSH_REGS
+    PUSH_REGS 0
 
     bl      arm64_sync_exception_handler
 
-    POP_REGS
+    POP_REGS 0, 1
     eret
 FUNCTION_END(sync_EL1h_handler)
 
 PRIVATE_FUNCTION_START(irq_EL1h_handler)
-    PUSH_REGS
+    PUSH_REGS 0
 
     bl      arm64_irq_handler
 
-    POP_REGS
+    POP_REGS 0, 1
     eret
-FUNCTION_END(sync_EL1h_handler)
+FUNCTION_END(irq_EL1h_handler)
+
+PRIVATE_FUNCTION_START(sync_EL0_64_handler)
+    PUSH_REGS 1
+
+    bl      arm64_sync_exception_handler
+
+    POP_REGS 1, 1
+    eret
+FUNCTION_END(sync_EL0_64_handler)
+
+PRIVATE_FUNCTION_START(irq_EL0_64_handler)
+    PUSH_REGS 1
+
+    bl      arm64_irq_handler
+
+    POP_REGS 1, 1
+    eret
+FUNCTION_END(irq_EL0_64_handler)
 
 /** Enter user mode in the current thread.
  * @param frame         Previously prepared frame. */
 FUNCTION_START(arch_thread_user_enter)
-    /* TODO. */
-    mov     x0, #0
-    str     x0, [x0]
-    ret
+    /* Point SP at the frame to restore. */
+    mov     sp, x0
+
+    /* Restore and return to EL0. */
+    POP_REGS 1, 0
+    eret
 FUNCTION_END(arch_thread_user_enter)
 
 .p2align 12
@@ -154,11 +186,11 @@ FUNCTION_START(arm64_exception_vectors)
 
 .p2align 7
 .Lsync_EL0_64_handler:      /* Synchronous exception from EL0 64-bit. */
-    b       unhandled_exception_handler
+    b       sync_EL0_64_handler
 
 .p2align 7
 .Lirq_EL0_64_handler:       /* IRQ from EL0 64-bit. */
-    b       unhandled_exception_handler
+    b       irq_EL0_64_handler
 
 .p2align 7
 .Lfiq_EL0_64_handler:       /* FIQ from EL0 64-bit. */

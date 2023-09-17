@@ -37,6 +37,8 @@ typedef struct arch_thread {
 
     /** Saved context switch stack pointer. */
     ptr_t saved_sp;
+
+    struct frame *user_frame;       /**< Frame from last user-mode entry. */
 } arch_thread_t;
 
 /** Get the current thread structure pointer.

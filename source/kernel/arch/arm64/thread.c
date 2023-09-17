@@ -25,7 +25,14 @@
 
 #include <arm64/cpu.h>
 
+#include <lib/string.h>
+
+#include <mm/safe.h>
+
 #include <proc/thread.h>
+
+#include <assert.h>
+#include <status.h>
 
 extern void arm64_context_switch(ptr_t new_sp, ptr_t *_old_sp);
 extern void arm64_context_restore(ptr_t new_sp);
@@ -102,7 +109,15 @@ void arch_thread_set_tls_addr(ptr_t addr) {
  * @param sp            Stack pointer.
  * @param arg           First argument to function. */
 void arch_thread_user_setup(frame_t *frame, ptr_t entry, ptr_t sp, ptr_t arg) {
-    fatal_todo();
+    assert((sp % 16) == 0);
+
+    /* Clear out the frame to zero all GPRs. */
+    memset(frame, 0, sizeof(*frame));
+
+    frame->ip   = entry;
+    frame->sp   = sp;
+    frame->x0   = arg;
+    frame->spsr = ARM64_SPSR_MODE_EL0T;
 }
 
 /** Prepare to execute a user mode interrupt.
@@ -122,5 +137,22 @@ status_t arch_thread_interrupt_restore(uint32_t *_ipl) {
 
 /** Log a user backtrrace for the current thread. */
 void arch_thread_backtrace(void (*cb)(ptr_t)) {
-    fatal_todo();
+    frame_t *frame = curr_thread->arch.user_frame;
+    assert(frame_from_user(frame));
+
+    cb(frame->ip);
+
+    const size_t max_depth = 8;
+    ptr_t fp = frame->x29;
+    for(size_t i = 0; fp && i < max_depth; i++) {
+        stack_frame_t frame;
+        status_t ret = memcpy_from_user(&frame, (void *)fp, sizeof(frame));
+        if (ret != STATUS_SUCCESS)
+            break;
+
+        if (frame.addr)
+            cb(frame.addr);
+
+        fp = frame.next;
+    }
 }
