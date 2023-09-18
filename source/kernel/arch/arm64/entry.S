@@ -165,7 +165,8 @@ PRIVATE_FUNCTION_START(sync_EL0_64_handler)
      * x19 = frame (left by PUSH_REGS)
      * x20 = call number
      * x21 = syscall_table_size
-     * x22 = &syscall_table[x20] */
+     * x22 = &syscall_table[x20]
+     * x23 = original SP */
     and     x20, x9, #ARM64_ESR_ISS_MASK
     mov     x22, xzr
     adr_l   x21, syscall_table_size
@@ -182,6 +183,9 @@ PRIVATE_FUNCTION_START(sync_EL0_64_handler)
     /* Enable interrupts. */
     msr     daifclr, #2
 
+    /* Preserve SP in case we need to modify it. */
+    mov     x23, sp
+
     /* Check for invalid system call. */
     cmp     xzr, x22
     beq     .Linvalid_syscall
@@ -191,6 +195,7 @@ PRIVATE_FUNCTION_START(sync_EL0_64_handler)
     cmp     x9, #8
     bgt     .Lstack_args
 
+.Lsyscall_regs:
     /* Restore the arguments and call the function. */
     ldr     x0, [x19,#FRAME_OFF_x0]
     ldr     x1, [x19,#FRAME_OFF_x1]
@@ -204,6 +209,9 @@ PRIVATE_FUNCTION_START(sync_EL0_64_handler)
     blr     x9
 
 .Lsyscall_return:
+    /* Restore original SP. */
+    mov     sp, x23
+
     /* Save the return value of the system call. */
     // TODO: kern_thread_restore().
     str     x0, [x19,#FRAME_OFF_x0]
@@ -219,11 +227,26 @@ PRIVATE_FUNCTION_START(sync_EL0_64_handler)
     b       .Lreturn
 
 .Lstack_args:
-    // TODO
-    brk     #0
+    /* Work out how many bytes to copy and reserve stack space. */
+    sub     x2, x9, #8
+    lsl     x2, x2, #3
+    sub     sp, sp, x2
+
+    /* Copy arguments. Source is userspace stack address. */
+    mov     x0, sp
+    ldr     x1, [x19,#FRAME_OFF_sp]
+    bl      memcpy_from_user
+    cmp     x0, #STATUS_SUCCESS
+    bne     .Lcopy_failed
+
+    b       .Lsyscall_regs
 
 .Linvalid_syscall:
     mov     x0, #STATUS_INVALID_SYSCALL
+    b       .Lsyscall_return
+
+.Lcopy_failed:
+    mov     x0, #STATUS_INVALID_ADDR
     b       .Lsyscall_return
 FUNCTION_END(sync_EL0_64_handler)
 
