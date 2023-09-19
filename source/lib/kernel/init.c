@@ -80,6 +80,8 @@ void libkernel_init(process_args_t *args) {
         kern_process_exit(ret);
 
     /* Set up TLS for the current thread. */
+// TODO
+#ifndef CONFIG_ARCH_ARM64
     tls_tcb_t *tcb;
     ret = tls_alloc(&tcb);
     if (ret != STATUS_SUCCESS)
@@ -88,6 +90,7 @@ void libkernel_init(process_args_t *args) {
 
     /* Save the current thread ID in TLS for the kern_thread_id() wrapper. */
     _kern_thread_id(THREAD_SELF, &curr_thread_id);
+#endif
 
     /* Let the kernel know where kern_thread_restore() is. */
     kern_process_control(PROCESS_SET_RESTORE, kern_thread_restore, NULL);

@@ -26,11 +26,15 @@
 /** Kernel library entry point.
  * @param %rdi          Process argument block. */
 FUNCTION_START(libkernel_start)
-    mov     x0, #0
-    mov     x1, #0
-    bl      kern_thread_sleep
+    /* Relocate ourself. */
+    mov     x19, x0
+    adrp    x1, _DYNAMIC
+    add     x1, x1, #:lo12:_DYNAMIC
+    bl      libkernel_relocate
 
-    b       .
+    /* Call the main function. */
+    mov     x0, x19
+    b       libkernel_init
 FUNCTION_END(libkernel_start)
 
 .section ".note.GNU-stack", "", @progbits

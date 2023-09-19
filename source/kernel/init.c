@@ -197,10 +197,11 @@ static void init_thread(void *arg1, void *arg2) {
     /* Run the inital process. */
 #if CONFIG_SYS_MINIMAL_USERSPACE
     const char *args[] = { "/system/bin/test_hello", NULL };
+    const char *env[]  = { "LIBKERNEL_DEBUG=1", NULL };
 #else
     const char *args[] = { "/system/services/service_manager", NULL };
-#endif
     const char *env[]  = { NULL };
+#endif
     ret = process_create(args, env, PROCESS_CREATE_CRITICAL, PRIORITY_CLASS_SYSTEM, NULL);
     if (ret != STATUS_SUCCESS)
         fatal("Could not start initial process (%d)", ret);

@@ -15,6 +15,7 @@
 #
 
 sources = [File(f) for f in [
+    'relocate.c',
     'rtld.c',
     'start.S',
 ]]

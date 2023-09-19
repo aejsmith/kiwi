@@ -79,7 +79,7 @@ __init_text void console_init(void) {
 static status_t kconsole_device_io(device_t *device, file_handle_t *handle, io_request_t *request) {
     status_t ret;
 
-    if (request->op != IO_OP_WRITE || !main_console.out)
+    if (request->op != IO_OP_WRITE)
         return STATUS_NOT_SUPPORTED;
 
     char *buf = kmalloc(request->total, MM_USER);

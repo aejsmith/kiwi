@@ -387,8 +387,11 @@ void process_thread_exited(thread_t *thread) {
             process->status = 0;
         }
 
-        if (process->flags & PROCESS_CRITICAL && !shutdown_in_progress)
-            fatal("Critical process %" PRId32 " (%s) terminated", process->id, process->name);
+        if (process->flags & PROCESS_CRITICAL && !shutdown_in_progress) {
+            fatal(
+                "Critical process %" PRId32 " (%s) terminated (%d:%d)",
+                process->id, process->name, process->reason, process->status);
+        }
 
         /* Don't bother running callbacks during shutdown. */
         if (!shutdown_in_progress)

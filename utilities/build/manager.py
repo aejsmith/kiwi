@@ -174,6 +174,10 @@ class BuildManager:
         for (k, v) in target_type_flags[self.config['BUILD']].items():
             self.target_template[k] += v
 
+        # TODO: Enable FPU support for ARM64
+        if self.config['ARCH'] == 'arm64':
+            self.target_template['CCFLAGS'] += ['-mgeneral-regs-only']
+
         # We don't use the toolchain generated "<target>-clang" wrappers, as
         # this sets the sysroot to the external one, which isn't always set up.
         # We want to use our internal build tree only. Make wrappers to use
