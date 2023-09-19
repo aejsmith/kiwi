@@ -35,7 +35,7 @@ static inline bool local_irq_state(void) {
  * @return              Previous IRQ state. */
 static inline bool local_irq_enable(void) {
     bool curr_state = local_irq_state();
-    __asm__ volatile("msr daifclr, #2" ::: "memory");
+    __asm__ volatile("msr daifclr, #2");
     return curr_state;
 }
 
@@ -43,7 +43,7 @@ static inline bool local_irq_enable(void) {
  * @return              Previous IRQ state. */
 static inline bool local_irq_disable(void) {
     bool curr_state = local_irq_state();
-    __asm__ volatile("msr daifset, #2" ::: "memory");
+    __asm__ volatile("msr daifset, #2");
     return curr_state;
 }
 
@@ -51,8 +51,8 @@ static inline bool local_irq_disable(void) {
  * @param state         State to restore. */
 static inline void local_irq_restore(bool state) {
     if (state) {
-        __asm__ volatile("msr daifclr, #2" ::: "memory");
+        __asm__ volatile("msr daifclr, #2");
     } else {
-        __asm__ volatile("msr daifset, #2" ::: "memory");
+        __asm__ volatile("msr daifset, #2");
     }
 }

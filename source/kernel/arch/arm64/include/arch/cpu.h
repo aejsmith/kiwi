@@ -61,7 +61,7 @@ static inline __noreturn void arch_cpu_halt(void) {
 
 /** Place the CPU in an idle state until an interrupt occurs. */
 static inline void arch_cpu_idle(void) {
-    __asm__ volatile("wfi");
+    __asm__ volatile("msr daifclr, #2; wfi; msr daifset, #2");
 }
 
 /** CPU-specific spin loop hint. */

@@ -51,6 +51,9 @@ static void common_entry(frame_t *frame) {
 }
 
 static void common_exit(frame_t *frame) {
+    if (curr_cpu->should_preempt)
+        sched_preempt();
+
     if (frame_from_user(frame))
         thread_at_kernel_exit(NULL, 0);
 }
