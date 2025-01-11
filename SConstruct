@@ -205,6 +205,9 @@ else:
     boot_archive = dist_env.BootArchive(boot_archive_path)
     Alias('boot_archive', boot_archive)
 
+    kboot_copy = util.Copy(dist_env, os.path.join(images_dir, 'kboot.bin'), dist_env['KBOOT'][0])
+    Depends(boot_archive, kboot_copy)
+
     util.Phony(dist_env, 'qemu', [dist_env['KBOOT'][0], boot_archive_path], Action(
         qemu_binary + ' -kernel ${SOURCES[0]} -initrd ${SOURCES[1]} ' + qemu_opts,
         None))
