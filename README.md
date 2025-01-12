@@ -16,7 +16,7 @@ Supported platforms:
  * 64-bit x86 PCs
  * ARM64 (work-in-progress)
      * QEMU 'virt' machine
-     * Raspberry Pi 3/4
+     * Raspberry Pi 3/4/5
 
 Features:
 
